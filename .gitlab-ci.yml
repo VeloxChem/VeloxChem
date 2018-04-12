@@ -41,7 +41,7 @@ run_unit_test:
   stage: test
   script: 
     - cd src
-    - cp ../config/Setup.Monkey Makefile.setup
+    - cp ../config/Setup.Monkey.NoMPI Makefile.setup
     - cd ../unit_tests/
     - make release
     - cd ../bin/

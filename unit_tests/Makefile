@@ -28,9 +28,6 @@ CXXFLAGS := $(CXX_REL_FLG)
 CPPFLAGS := $(CPP_REL_FLG)
 endif
 
-# Disable MPI 
-CPPFLAGS += -DENABLE_MPI=0 
-
 # Add includes directories
 VLX_INCLUDES := ${shell find * -type d -print}
 
