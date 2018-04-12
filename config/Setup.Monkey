@@ -20,8 +20,8 @@ CXX_DEB_FLG += -qopt-report-phase=vec
 
 # Generic preprocessor flags
 
-CPP_REL_FLG := -DENABLE_MPI=1 -DVLX_ALIGN=64
-CPP_DEB_FLG := -DVAR_DEBUG=1 -DENABLE_MPI=1 -DVLX_ALIGN=64
+CPP_REL_FLG := -DVLX_ALIGN=64
+CPP_DEB_FLG := -DVAR_DEBUG=1 -DVLX_ALIGN=64
 
 # Google Test root directory
 
