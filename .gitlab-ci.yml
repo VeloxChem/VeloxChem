@@ -1,0 +1,48 @@
+#
+#                      V.E.L.O.X. C.H.E.M. MP
+#      ---------------------------------------------------
+#           An Electronic Structure Code for Nanoscale
+#
+#  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+#  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+
+before_script:
+  - source /opt/intel/bin/compilervars.sh intel64
+
+after_script:
+  - echo "Done..."
+
+stages: 
+  - build
+  - test 
+
+build_veloxchem:
+  tags: 
+   - vlx-test
+  stage: build
+  script:
+    - cd src 
+    - cp ../config/Setup.Monkey Makefile.setup 
+    - make release 
+   
+build_unit_test:
+  tags: 
+    - vlx-test
+  stage: build
+  script: 
+    - cd src
+    - cp ../config/Setup.Monkey Makefile.setup
+    - cd ../unit_tests/
+    - make release 
+
+run_unit_test: 
+  tags: 
+    - vlx-test
+  stage: test
+  script: 
+    - cd src
+    - cp ../config/Setup.Monkey Makefile.setup
+    - cd ../unit_tests/
+    - make release
+    - cd ../bin/
+    - ./UnitTestVeloxChemMP.x  

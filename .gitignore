@@ -1,0 +1,7 @@
+VeloxChemMP.xcodeproj
+bin
+*.d
+*.o
+*.a
+*.optrpt
+*~
