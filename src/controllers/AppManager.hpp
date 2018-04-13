@@ -12,6 +12,9 @@
 #include <cstdint>
 #include <string>
 
+#include "OutputStream.hpp"
+#include "SystemClock.hpp"
+
 /**
  Class CAppManager manages jobs list creation, ordering and execution workflow.
  
@@ -20,20 +23,18 @@
 class CAppManager
 {
     /**
-     The execution state of application manager (true - no
-     errors, false otherwise)
+     The execution state of application manager (true - no errors, false
+     otherwise)
      */
     bool _state;
     
     /**
-     The global rank of MPI process asssociate with application
-     manager.
+     The global rank of MPI process asssociate with application manager.
      */
     int32_t _globRank;
     
     /**
-     The total number of MPI processes available to application
-     manager.
+     The total number of MPI processes available to application manager.
      */
     int32_t _globNodes;
     
@@ -52,6 +53,25 @@ class CAppManager
      */
     std::string _pathToBasLib;
     
+    /**
+     The application manager object's timer.
+     */
+    CSystemClock _sysClock;
+    
+    /**
+     Prints Velox Chem MP start header to output stream.
+
+     @param oStream the output stream.
+     */
+    void _printStartHeader(COutputStream& oStream);
+    
+    /**
+     Prints Velox Chem MP finish header to output stream.
+
+     @param oStream the output stream.
+     */
+    void _printFinishHeader(COutputStream& oStream);
+    
 public:
     
     /**
@@ -63,24 +83,24 @@ public:
     CAppManager(int argc, char** argv);
     
     /**
-     Destroys an application manager objec.
+     Destroys an application manager object.
      */
     ~CAppManager();
     
     /**
-     Executes a list of jobs assigned to application manager.
+     Executes a list of jobs assigned to application manager object.
      */
     void execute();
     
     /**
-     Updates execution status of application manager.
+     Updates execution status of application manager object.
 
      @param state the new execution status.
      */
     void updateState(const bool state);
     
     /**
-     Gets execution status of application manager.
+     Gets execution status of application manager object.
 
      @return true - no errors, false - otherwise.
      */
