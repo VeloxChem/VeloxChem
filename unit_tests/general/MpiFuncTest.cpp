@@ -57,5 +57,24 @@ TEST_F(CMpiFuncTest, BcastBoolean)
     ASSERT_FALSE(mvalue);
 }
 
+TEST_F(CMpiFuncTest, BcastIntegerVector)
+{
+    std::vector<int32_t> mvector({2, 3, 4, -7, 9, 18});
+    
+    mpi::bcast(mvector, mpi::master(),  MPI_COMM_WORLD);
+    
+    ASSERT_EQ(mvector[0], 2);
+    
+    ASSERT_EQ(mvector[1], 3);
+    
+    ASSERT_EQ(mvector[2], 4);
+    
+    ASSERT_EQ(mvector[3], -7);
+    
+    ASSERT_EQ(mvector[4], 9);
+    
+    ASSERT_EQ(mvector[5], 18);
+}
+
 
 

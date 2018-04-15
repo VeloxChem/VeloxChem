@@ -9,6 +9,10 @@
 #include "AppManager.hpp"
 
 #include "MpiFunc.hpp"
+#include "CommandLineReader.hpp"
+#include "InputStream.hpp"
+#include "EnvironmentReader.hpp"
+#include "JobsManager.hpp"
 
 CAppManager::CAppManager(int argc, char** argv)
 
@@ -24,6 +28,21 @@ CAppManager::CAppManager(int argc, char** argv)
 
     _globNodes = mpi::nodes(MPI_COMM_WORLD);
 
+    // read command line input
+    
+    if (_globRank == mpi::master())
+    {
+        CCommandLineReader rdrcomline(argc, argv);
+        
+        updateState(rdrcomline.checkParameters());
+        
+        if (_state)
+        {
+            _iFilename.assign(rdrcomline.getInputFilename());
+            
+            _oFilename.assign(rdrcomline.getOutputFilename());
+        }
+    }
     
     // update state of application manager across MPI processes
 
@@ -37,7 +56,71 @@ CAppManager::~CAppManager()
 
 void CAppManager::execute()
 {
-   
+    COutputStream ostream(_oFilename);
+    
+    // print start header
+    
+    if (_globRank == mpi::master()) _printStartHeader(ostream);
+    
+    ostream.flush();
+    
+    CInputStream istream(_iFilename, ostream);
+    
+    updateState(istream.getState());
+    
+    // update state of application manager across MPI processes
+    
+    mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+    
+    if (_state)
+    {
+        // read input file
+        
+        CInputData inpdata;
+        
+        istream.read(inpdata, ostream);
+        
+        updateState(istream.getState());
+        
+        // update state of application manager across MPI processes
+        
+        mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+        
+        if (_state)
+        {
+            CJobsManager jobsManager(_globRank, _globNodes);
+            
+            // set up list of jobs
+            
+            jobsManager.setJobs(inpdata, ostream);
+            
+            updateState(jobsManager.getState());
+            
+            // update state of application manager across MPI processes
+            
+            mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+            
+            // read environment variables
+            
+            _setEnvironment(inpdata, ostream);
+            
+            // run jobs in list of jobs
+            
+            if (_state) jobsManager.runJobs(_pathToBasLib, inpdata, ostream);
+            
+            updateState(jobsManager.getState());
+            
+            // update state of application manager across MPI processes
+            
+            mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+        };
+    }
+    
+    // print finish header
+    
+    if (_globRank == mpi::master()) _printFinishHeader(ostream);
+    
+    ostream.flush();
 }
 
 void CAppManager::updateState(const bool state)
@@ -100,4 +183,28 @@ CAppManager::_printFinishHeader(COutputStream& oStream)
     oStream << "Total execution time is " << _sysClock.getElapsedTime();
     
     oStream << fmt::end << fmt::tsep;
+}
+
+void CAppManager::_setEnvironment(const CInputData& inputData,
+                                  COutputStream& oStream)
+{
+    if (_globRank == mpi::master())
+    {
+        CEnvironmentReader rdrenvironment;
+        
+        rdrenvironment.parse(inputData, oStream);
+        
+        updateState(rdrenvironment.getState());
+        
+        // assign environmental variables
+        
+        if (_state)
+        {
+            _pathToBasLib = rdrenvironment.getPathToBasisSets();
+            
+            // TODO: add other environmental variables
+        }
+    }
+    
+    mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
 }

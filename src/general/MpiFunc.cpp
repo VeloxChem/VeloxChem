@@ -110,16 +110,6 @@ void bcast(double& value, MPI_Comm comm)
     }
 }
 
-void abort(const int errorcode, const char* label)
-{
-    if (ENABLE_MPI)
-    {
-        std::cerr << "MPI ERROR: " << label << errorcode << std::endl;
-        
-        MPI_Abort(MPI_COMM_WORLD, errorcode);
-    }
-}
-    
 void bcast(bool& value, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
@@ -131,6 +121,41 @@ void bcast(bool& value, int32_t rank, MPI_Comm comm)
         mpi::bcast(mvalue, comm);
             
         value = (mvalue == 1) ? true : false;
+    }
+}
+
+void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        int32_t veclen = 0;
+
+        if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
+
+        mpi::bcast(veclen, comm);
+
+        for (int32_t i = 0; i < veclen; i++)
+        {
+            int32_t mvalue = 0;
+
+            if (rank == mpi::master()) mvalue = vector[i];
+
+            mpi::bcast(mvalue, comm);
+
+            if (rank != mpi::master()) vector.push_back(mvalue);
+        }
+    }
+}
+    
+// TODO: Add other broadcast methods...
+    
+void abort(const int errorcode, const char* label)
+{
+    if (ENABLE_MPI)
+    {
+        std::cerr << "MPI ERROR - " << label << " : " << errorcode << std::endl;
+        
+        MPI_Abort(MPI_COMM_WORLD, errorcode);
     }
 }
     

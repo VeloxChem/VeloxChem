@@ -10,6 +10,7 @@
 #define MpiFunc_hpp
 
 #include <cstdint>
+#include <vector>
 
 #include "mpi.h"
 
@@ -64,14 +65,6 @@ int32_t nodes(MPI_Comm comm);
 bool compare(MPI_Comm comm1, MPI_Comm comm2);
     
 /**
- Terminates all MPI processes and prints error message to standard error stream.
-
- @param errorcode the MPI error code.
- @param label the label of function in which MPI error occured.
- */
-void abort(const int errorcode, const char* label);
-    
-/**
  Broadcasts an integer number within MPI communicator.
 
  @param value the integer number.
@@ -95,6 +88,23 @@ void bcast(double& value, MPI_Comm comm);
  @param comm the MPI communicator.
  */
 void bcast(bool& value, int32_t rank, MPI_Comm comm);
+    
+/**
+ Broadcasts vector of integer numbers within domain of MPI communicator.
+
+ @param vector the vector of integer numbers.
+ @param rank the rank of MPI process.
+ @param comm the MPI communicator.
+ */
+void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm);
+    
+/**
+ Terminates all MPI processes and prints error message to standard error stream.
+
+ @param errorcode the MPI error code.
+ @param label the label of function in which MPI error occured.
+ */
+void abort(const int errorcode, const char* label);
     
 } // mpi namespace
 

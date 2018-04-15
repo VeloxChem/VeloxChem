@@ -14,9 +14,11 @@
 
 #include "OutputStream.hpp"
 #include "SystemClock.hpp"
+#include "InputData.hpp"
 
 /**
- Class CAppManager manages jobs list creation, ordering and execution workflow.
+ Class CAppManager handles jobs manager, ordering and execution workflow in
+ main() function of program.
  
  @author Z. Rinkevicius
   */
@@ -24,7 +26,7 @@ class CAppManager
 {
     /**
      The execution state of application manager (true - no errors, false
-     otherwise)
+     otherwise).
      */
     bool _state;
     
@@ -71,6 +73,15 @@ class CAppManager
      @param oStream the output stream.
      */
     void _printFinishHeader(COutputStream& oStream);
+    
+    /**
+     Sets environmental variables by reading @progenv control group from input
+     data object. Errors are printed to output stream.
+
+     @param inpData the input data object.
+     @param oStream the output stream.
+     */
+    void _setEnvironment(const CInputData& inpData, COutputStream& oStream);
     
 public:
     
