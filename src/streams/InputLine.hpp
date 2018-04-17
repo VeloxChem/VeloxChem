@@ -59,7 +59,7 @@ public:
     CInputLine(const CInputLine& source);
 
     /**
-     Creates an input line object by by moving other input line object.
+     Creates an input line object by moving other input line object.
      
      @param source the input line object.
      */

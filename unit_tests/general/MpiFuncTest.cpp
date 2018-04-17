@@ -57,7 +57,16 @@ TEST_F(CMpiFuncTest, BcastBoolean)
     ASSERT_FALSE(mvalue);
 }
 
-TEST_F(CMpiFuncTest, BcastIntegerVector)
+TEST_F(CMpiFuncTest, BcastSymbol)
+{
+    char mvalue = 'x';
+    
+    mpi::bcast(mvalue, MPI_COMM_WORLD);
+    
+    ASSERT_EQ(mvalue, 'x');
+}
+
+TEST_F(CMpiFuncTest, BcastIntegersVector)
 {
     std::vector<int32_t> mvector({2, 3, 4, -7, 9, 18});
     
@@ -75,6 +84,50 @@ TEST_F(CMpiFuncTest, BcastIntegerVector)
     
     ASSERT_EQ(mvector[5], 18);
 }
+
+TEST_F(CMpiFuncTest, BcastString)
+{
+    std::string str("Velox");
+    
+    mpi::bcast(str, mpi::master(),  MPI_COMM_WORLD);
+    
+    ASSERT_EQ(str, std::string("Velox")); 
+}
+
+TEST_F(CMpiFuncTest, Batch_size)
+{
+    ASSERT_EQ(6, mpi::batch_size(11, 0, 2));
+    
+    ASSERT_EQ(5, mpi::batch_size(11, 1, 2));
+}
+
+TEST_F(CMpiFuncTest, Batch_offset)
+{
+    ASSERT_EQ(0, mpi::batch_offset(11, 0, 2));
+    
+    ASSERT_EQ(6, mpi::batch_offset(11, 1, 2));
+}
+
+TEST_F(CMpiFuncTest, Batches_pattern)
+{
+    int32_t mpat[2];
+    
+    mpi::batches_pattern(mpat, 11, 2);
+    
+    ASSERT_EQ(mpat[0], 6);
+    
+    ASSERT_EQ(mpat[1], 5);
+}
+
+TEST_F(CMpiFuncTest, GatherInteger)
+{
+    int32_t mvalue = 0;
+    
+    mpi::gather(&mvalue, 9, mpi::master(), MPI_COMM_WORLD);
+    
+    ASSERT_EQ(mvalue, 9);
+}
+
 
 
 

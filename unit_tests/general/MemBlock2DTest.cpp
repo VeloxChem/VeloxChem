@@ -1,0 +1,148 @@
+//
+//                     V.E.L.O.X. C.H.E.M. MP
+//      ---------------------------------------------------
+//           An Electronic Structure Code for Nanoscale
+//
+//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+
+#include "MemBlock2DTest.hpp"
+
+#include "MemBlock2D.hpp"
+
+TEST_F(CMemBlock2DTest, DefaultConstructor)
+{
+    CMemBlock2D<double> ma;
+
+    CMemBlock2D<double> mb(0, 0);
+
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, ConstructorWithNumberOfElements)
+{
+    CMemBlock2D<double> ma(3, 2);
+
+    ma.zero();
+
+    CMemBlock2D<double> mb({0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 3, 2);
+
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, CopyConstructor)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+
+    CMemBlock2D<double> mb(ma);
+
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, MoveConstructor)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+
+    CMemBlock2D <double> mb(CMemBlock2D<double>({1.0, 2.0, 3.0, 6.0}, 2, 2));
+
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, CopyAssignment)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+
+    CMemBlock2D<double> mb = ma;
+
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, MoveAssignment)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+
+    CMemBlock2D<double> mb = CMemBlock2D<double>({1.0, 2.0, 3.0, 6.0}, 2, 2);
+
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, Zero)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    ma.zero();
+    
+    CMemBlock2D<double> mb = CMemBlock2D<double>({0.0, 0.0, 0.0, 0.0}, 2, 2);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, Data)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    auto ar = ma.data(0);
+    
+    ASSERT_EQ(0, ((size_t) ar) % VLX_ALIGN);
+    
+    ASSERT_NEAR(1.0, ar[0], 1.0e-13);
+    
+    ASSERT_NEAR(2.0, ar[1], 1.0e-13);
+    
+    ar[0] = 4.0;
+    
+    ar[1] = 5.0;
+    
+    auto br = ma.data(1);
+    
+    ASSERT_EQ(0, ((size_t) br) % VLX_ALIGN);
+    
+    ASSERT_NEAR(3.0, br[0], 1.0e-13);
+    
+    ASSERT_NEAR(6.0, br[1], 1.0e-13);
+    
+    br[0] = 8.0;
+    
+    br[1] = 9.0;
+    
+    CMemBlock2D<double> mb = CMemBlock2D<double>({4.0, 5.0, 8.0, 9.0}, 2, 2);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, DataConstant)
+{
+    const CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    auto ar = ma.data(0);
+    
+    ASSERT_EQ(0, ((size_t) ar) % VLX_ALIGN);
+    
+    ASSERT_NEAR(1.0, ar[0], 1.0e-13);
+    
+    ASSERT_NEAR(2.0, ar[1], 1.0e-13);
+    
+    auto br = ma.data(1);
+    
+    ASSERT_EQ(0, ((size_t) br) % VLX_ALIGN);
+    
+    ASSERT_NEAR(3.0, br[0], 1.0e-13);
+    
+    ASSERT_NEAR(6.0, br[1], 1.0e-13);
+}
+
+TEST_F(CMemBlock2DTest, Size)
+{
+    CMemBlock2D<double> ma(3, 2);
+    
+    ASSERT_EQ(ma.size(0), 3);
+    
+    ASSERT_EQ(ma.size(1), 3);
+}
+
+TEST_F(CMemBlock2DTest, Blocks)
+{
+    CMemBlock2D<double> ma(3, 2);
+    
+    ASSERT_EQ(ma.blocks(), 2);
+}

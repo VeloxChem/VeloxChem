@@ -1,0 +1,77 @@
+//
+//                     V.E.L.O.X. C.H.E.M. MP
+//      ---------------------------------------------------
+//           An Electronic Structure Code for Nanoscale
+//
+//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+
+#include "MathFuncTest.hpp"
+
+#include "MathFunc.hpp"
+#include "CheckFunctions.hpp"
+
+TEST_F(CMathFuncTest, Max)
+{
+    double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
+
+    double vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {0.0, 0.0,  0.0, 0.0, 0.0};
+
+    mathfunc::zero(veca, 5);
+
+    vlxtest::compare(veca, vecb, 5);
+}
+
+TEST_F(CMathFuncTest, Set_To)
+{
+    double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
+
+    double vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {2.0, 2.0,  2.0, 2.0, 2.0};
+
+    mathfunc::set_to(veca, 2.0, 5);
+
+    vlxtest::compare(veca, vecb, 5);
+}
+
+TEST_F(CMathFuncTest, SumReal)
+{
+    double vec[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
+
+    ASSERT_NEAR(mathfunc::sum(vec, 5), 19.0, 1.0e-13);
+}
+
+TEST_F(CMathFuncTest, SumInteger)
+{
+    int32_t vec[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, -1, 3, 4};
+
+    ASSERT_EQ(mathfunc::sum(vec, 5), 19);
+}
+
+TEST_F(CMathFuncTest, Normalize)
+{
+    double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 9.0, -1.0, 3.0, 4.0};
+
+    double vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {0.25, 0.45, -0.05, 0.15, 0.20};
+
+    mathfunc::normalize(veca, 5);
+
+    vlxtest::compare(veca, vecb, 5);
+}
+
+TEST_F(CMathFuncTest, Distance)
+{
+    ASSERT_NEAR(mathfunc::distance(4.0, 5.0, 2.0, 3.0, 3.0, 0.0), 3.0, 1.0e-13);
+}
+
+TEST_F(CMathFuncTest, Indexes)
+{
+    int32_t veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, 4, 3, 4};
+
+    int32_t vecb[5] __attribute__ ((aligned(VLX_ALIGN)));
+
+    int32_t vecc[5] __attribute__ ((aligned(VLX_ALIGN))) = {0, 5, 13, 17, 20};
+
+    mathfunc::indexes(vecb, veca, 5);
+
+    vlxtest::compare(vecb, vecc, 5); 
+}

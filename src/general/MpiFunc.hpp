@@ -90,6 +90,14 @@ void bcast(double& value, MPI_Comm comm);
 void bcast(bool& value, int32_t rank, MPI_Comm comm);
     
 /**
+ Broadcasts a symbol within domain of MPI communicator.
+
+ @param value the symbol.
+ @param comm the MPI communicator.
+ */
+void bcast(char& value, MPI_Comm comm);
+    
+/**
  Broadcasts vector of integer numbers within domain of MPI communicator.
 
  @param vector the vector of integer numbers.
@@ -97,7 +105,61 @@ void bcast(bool& value, int32_t rank, MPI_Comm comm);
  @param comm the MPI communicator.
  */
 void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm);
+  
+/**
+ Broadcasts a string within domain of MPI communicator.
+
+ @param str the string.
+ @param rank the rank of MPI process.
+ @param comm the MPI communicator.
+ */
+void bcast(std::string& str, int32_t rank, MPI_Comm comm);
+   
+/**
+ Determines batch size associated with MPI process for data vector within domain
+ of MPI communicator.
+
+ @param nElements the size of data vector.
+ @param rank the rank of MPI process.
+ @param nodes the number of nodes in MPI communicator domain.
+ @return the size of data batch.
+ */
+int32_t batch_size(const int32_t nElements, const int32_t rank,
+                   const int32_t nodes);
     
+/**
+ Determines offset of batch associated with MPI process within indexing
+ space of MPI communicator domain.
+
+ @param nElements the number of elements in data vector.
+ @param rank the rank of MPI process.
+ @param nodes the number of nodes in MPI domain.
+ @return the offset of batch.
+ */
+int32_t batch_offset(const int32_t nElements, const int32_t rank,
+                     const int32_t nodes);
+
+/**
+ Creates batches distribution pattern for data vector with given number of
+ elements.
+
+ @param pattern the batches distribution pattern.
+ @param nElements the number of elements in data vector.
+ @param nodes the number of nodes in MPI communicator domain.
+ */
+void batches_pattern(int32_t* pattern, const int32_t nElements,
+                     const int32_t nodes);
+/**
+ Gathers vector of integers on master MPI process by taking single integer from
+ all MPI processes within domain of MPI communicator.
+
+ @param vector the vector of integers.
+ @param value the integer value.
+ @param rank the rank of MPI process.
+ @param comm the MPI communicator.
+ */
+void gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm);
+
 /**
  Terminates all MPI processes and prints error message to standard error stream.
 

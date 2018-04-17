@@ -124,6 +124,16 @@ void bcast(bool& value, int32_t rank, MPI_Comm comm)
     }
 }
 
+void bcast(char& value, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        auto merror = MPI_Bcast(&value, 1, MPI_CHAR, mpi::master(), comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "bcast(char)");
+    }
+}
+    
 void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
@@ -143,11 +153,87 @@ void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
             mpi::bcast(mvalue, comm);
 
             if (rank != mpi::master()) vector.push_back(mvalue);
+        
+            MPI_Barrier(comm);
         }
     }
 }
+ 
+void bcast(std::string& str, int32_t rank, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        int32_t strwidth = 0;
+
+        if (rank == mpi::master()) strwidth = static_cast<int32_t>(str.size());
+
+        mpi::bcast(strwidth, comm);
+
+        for (int32_t i = 0; i < strwidth; i++)
+        {
+            char symbol;
+
+            if (rank == mpi::master()) symbol = str[i];
+
+            mpi::bcast(symbol, comm);
+
+            if (rank != mpi::master()) str.append(1, symbol);
+            
+            MPI_Barrier(comm);
+        }
+    }
+}
+
+int32_t batch_size(const int32_t nElements, const int32_t rank,
+                   const int32_t nodes)
+{
+    int32_t numelem = nElements / nodes;
+
+    int32_t nremind = nElements % nodes;
+
+    if ((nremind != 0) && (rank < nremind)) numelem++;
+
+    return numelem;
+}
+
+int32_t batch_offset(const int32_t nElements, const int32_t rank,
+                     const int32_t nodes)
+{
+    int32_t index = 0;
+
+    for (int32_t i = 0; i < rank; i++)
+    {
+        index += mpi::batch_size(nElements, i, nodes);
+    }
+
+    return index;
+}
+
+void batches_pattern(int32_t* pattern, const int32_t  nElements,
+                     const int32_t nodes)
+{
+    for (int32_t i = 0; i < nodes; i++)
+    {
+        pattern[i] = mpi::batch_size(nElements, i, nodes);
+    }
+}
+
+void gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        auto merror = MPI_Gather(&value, 1, MPI_INT32_T, vector, 1, MPI_INT32_T,
+                                 mpi::master(), comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "gather(integer)");
+    }
+    else
+    {
+        vector[0] = value; 
+    }
+}
     
-// TODO: Add other broadcast methods...
+// TODO: Add other MPI functions for generic types
     
 void abort(const int errorcode, const char* label)
 {
