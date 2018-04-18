@@ -30,6 +30,26 @@ TEST_F(CMemBlock2DTest, ConstructorWithNumberOfElements)
     ASSERT_EQ(ma, mb);
 }
 
+TEST_F(CMemBlock2DTest, ConstructorWithVector)
+{
+    CMemBlock2D<double> ma(std::vector<int32_t>({3, 3}));
+    
+    ma.zero();
+    
+    CMemBlock2D<double> mb({0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 3, 2);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, ConstructorWithDataVector)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, {2, 2});
+    
+    CMemBlock2D<double> mb({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    ASSERT_EQ(ma, mb);
+}
+
 TEST_F(CMemBlock2DTest, CopyConstructor)
 {
     CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
@@ -133,11 +153,13 @@ TEST_F(CMemBlock2DTest, DataConstant)
 
 TEST_F(CMemBlock2DTest, Size)
 {
-    CMemBlock2D<double> ma(3, 2);
+    CMemBlock2D<double> ma(std::vector<int32_t>({2, 4, 5}));
     
-    ASSERT_EQ(ma.size(0), 3);
+    ASSERT_EQ(ma.size(0), 2);
     
-    ASSERT_EQ(ma.size(1), 3);
+    ASSERT_EQ(ma.size(1), 4);
+    
+    ASSERT_EQ(ma.size(2), 5);
 }
 
 TEST_F(CMemBlock2DTest, Blocks)
@@ -145,4 +167,66 @@ TEST_F(CMemBlock2DTest, Blocks)
     CMemBlock2D<double> ma(3, 2);
     
     ASSERT_EQ(ma.blocks(), 2);
+}
+
+TEST_F(CMemBlock2DTest, BroadcastIntegers)
+{
+    CMemBlock2D<int32_t> ma({1, 2, 3, 6, 5}, {2, 3});
+    
+    ma.broadcast(0, MPI_COMM_WORLD);
+    
+    CMemBlock2D<int32_t> mb({1, 2, 3, 6, 5}, {2, 3});
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, BroadcastReals)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0, 5.0}, {2, 3});
+    
+    ma.broadcast(0, MPI_COMM_WORLD);
+    
+    CMemBlock2D<double> mb({1.0, 2.0, 3.0, 6.0, 5.0}, {2, 3});
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, GatherIntegers)
+{
+    CMemBlock2D<int32_t> ma({1, 2, 3, 6, 5}, {2, 3});
+    
+    auto mb = ma.gather(0, 1, MPI_COMM_WORLD);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, GatherReals)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0, 5.0}, {2, 3});
+    
+    auto mb = ma.gather(0, 1, MPI_COMM_WORLD);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, ScatterIntegers)
+{
+    CMemBlock2D<int32_t> ma({1, 2, 3, 6, 5}, {2, 3});
+    
+    ma.scatter(0, 1, MPI_COMM_WORLD);
+    
+    CMemBlock2D<int32_t> mb({1, 2, 3, 6, 5}, {2, 3});
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, ScatterReals)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0, 5.0}, {2, 3});
+    
+    ma.scatter(0, 1, MPI_COMM_WORLD);
+    
+    CMemBlock2D<double> mb({1.0, 2.0, 3.0, 6.0, 5.0}, {2, 3});
+    
+    ASSERT_EQ(ma, mb);
 }

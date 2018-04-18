@@ -17,6 +17,8 @@
 //#include "DensityGridDriver.hpp"
 //#include "XCFuncType.hpp"
 
+#include "MemBlock2D.hpp"
+
 #include <iostream>
 
 CSinglePointEnergy::CSinglePointEnergy(const int32_t globRank,
@@ -32,6 +34,31 @@ void CSinglePointEnergy::set(const std::string& pathToBasisSets,
                              COutputStream& oStream)
 {
     if (_globRank == mpi::master()) _startHeader(oStream);
+    
+    
+    
+    CMemBlock2D<int32_t> ma;
+    
+    if (_globRank == mpi::master())
+        ma = CMemBlock2D<int32_t>({1, 2, 3, 6, 5}, {2, 3});
+    
+    if (_globRank == (mpi::master() + 1))
+        ma = CMemBlock2D<int32_t>({13, 3, 7, 8, -1, -2}, {4, 2});
+
+    auto mb = ma.gather(_globRank, _globNodes, MPI_COMM_WORLD);
+    
+    if (_globRank == mpi::master())
+    {
+        std::cout << "Rank: " << _globRank << " Gathered data: " << mb << std::endl;
+    }
+    
+    mb.scatter(_globRank, _globNodes, MPI_COMM_WORLD); 
+    
+    std::cout << "Rank: " << _globRank << " Scattered data: " << mb << std::endl;
+    
+    
+    
+    
 
     // read molecular geometry
 //

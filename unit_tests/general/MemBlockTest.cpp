@@ -102,6 +102,32 @@ TEST_F(CMemBlockTest, ConstData)
     ASSERT_NEAR(6.0, dptr[3], 1.0e-13);
 }
 
+TEST_F(CMemBlockTest, DataAtPosition)
+{
+    CMemBlock<int32_t> ma({1, 2, 7});
+    
+    auto dptr = ma.data(2);
+    
+    ASSERT_EQ(7, dptr[0]);
+    
+    dptr[0] = 8;
+    
+    ASSERT_EQ(ma, CMemBlock<int32_t>({1, 2, 8}));
+}
+
+TEST_F(CMemBlockTest, ConstDataAtPosition)
+{
+    const CMemBlock<double> ma({1.0, 2.0, 3.0, 6.0});
+    
+    auto dptr = ma.data(1);
+    
+    ASSERT_NEAR(2.0, dptr[0], 1.0e-13);
+    
+    ASSERT_NEAR(3.0, dptr[1], 1.0e-13);
+    
+    ASSERT_NEAR(6.0, dptr[2], 1.0e-13);
+}
+
 TEST_F(CMemBlockTest, Size)
 {
     const CMemBlock<double> ma({1.0, 2.0, 3.0, 6.0});
@@ -148,6 +174,68 @@ TEST_F(CMemBlockTest, AtConstant)
     ASSERT_NEAR(ma.at(2), 3.0, 1.0e-13);
     
     ASSERT_NEAR(ma.at(3), 6.0, 1.0e-13);
+}
+
+TEST_F(CMemBlockTest, Pack)
+{
+    CMemBlock<double> ma({1.0, 2.0, 3.0, 6.0});
+    
+    auto mb = ma.pack(2);
+    
+    ASSERT_EQ(mb, CMemBlock<double>({4.0, 8.0}));
+    
+    auto mc = ma.pack(3);
+    
+    ASSERT_EQ(mc, CMemBlock<double>(std::vector<double>({12.0})));
+    
+    auto md = ma.pack(4);
+    
+    ASSERT_EQ(md, CMemBlock<double>(std::vector<double>({12.0})));
+    
+    auto mf = ma.pack(1);
+    
+    ASSERT_EQ(mf, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+    
+    auto me = ma.pack(5);
+    
+    ASSERT_EQ(me, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+}
+
+TEST_F(CMemBlockTest, Pick)
+{
+    CMemBlock<double> ma({1.0, 2.0, 3.0, 6.0});
+    
+    auto mb = ma.pick(2, 0);
+    
+    ASSERT_EQ(mb, CMemBlock<double>({1.0, 3.0}));
+    
+    auto mc = ma.pick(2, 1);
+    
+    ASSERT_EQ(mc, CMemBlock<double>({2.0, 6.0}));
+    
+    auto md = ma.pick(4, 0);
+    
+    ASSERT_EQ(md, CMemBlock<double>(std::vector<double>({1.0})));
+    
+    auto mf = ma.pick(4, 1);
+    
+    ASSERT_EQ(mf, CMemBlock<double>(std::vector<double>({2.0})));
+
+    auto me = ma.pick(4, 2);
+    
+    ASSERT_EQ(me, CMemBlock<double>(std::vector<double>({3.0})));
+    
+    auto mg = ma.pick(4, 3);
+    
+    ASSERT_EQ(mg, CMemBlock<double>(std::vector<double>({6.0})));
+    
+    auto mk = ma.pick(1, 0);
+    
+    ASSERT_EQ(mk, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+    
+    auto ml = ma.pick(5, 0);
+    
+    ASSERT_EQ(ml, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
 }
 
 TEST_F(CMemBlockTest, BroadcastIntegers)

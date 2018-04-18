@@ -29,7 +29,7 @@ namespace mathfunc { // mathfunc namespace
      @param value the value of element.
      @param nElements the number of elements in vector.
      */
-    void set_to(double* vector, const double factor, const int32_t nElements);
+    void set_to(double* vector, const double value, const int32_t nElements);
 
     /**
      Computes sum of all elements in real numbers vector.

@@ -95,6 +95,13 @@ public:
      @param dimVector the vector of data chunk sizes.
      */
     CMemBlock2D(const std::vector<int32_t>& dimVector);
+    
+    /**
+     Creates an 2D memory block object.
+     
+     @param originalSizes the memory block object with data chunk sizes.
+     */
+    CMemBlock2D(const CMemBlock<int32_t> originalSizes);
 
     /**
      Creates an 2D memory block object.
@@ -201,6 +208,36 @@ public:
     int32_t blocks() const;
     
     /**
+     Broadcasts 2D memory block within domain of MPI communicator.
+     
+     @param rank the rank of MPI process.
+     @param comm the MPI communicator.
+     */
+    void broadcast(int32_t rank, MPI_Comm comm);
+    
+    /**
+     Creates 2D memory block object on master MPI process by gathering 2D memory
+     block object from all MPI processes within domain of MPI communicator.
+     
+     @param rank the rank of MPI process.
+     @param nodes the number of MPI processes in MPI communicator.
+     @param comm the MPI communicator.
+     @return the 2D memory block object: (a) on master node with gathered data;
+             (b) on worker nodes empty.
+     */
+    CMemBlock2D<T> gather(int32_t rank, int32_t nodes, MPI_Comm comm);
+    
+    /**
+     Reasigns 2D memory block object on all MPI process within domain of MPI
+     communicator by scattering 2D memory object from master MPI process.
+     
+     @param rank the rank of MPI process.
+     @param nodes the number of MPI processes in MPI communicator.
+     @param comm the MPI communicator.
+     */
+    void scatter(int32_t rank, int32_t nodes, MPI_Comm comm);
+    
+    /**
      Converts 2D memory block object to text output and insert it into output
      text stream.
      
@@ -236,6 +273,16 @@ template<class T>
 CMemBlock2D<T>::CMemBlock2D(const std::vector<int32_t>& dimVector)
 {
     _originalSizes = CMemBlock<int32_t>(dimVector);
+    
+    _setDimensions();
+    
+    _data = CMemBlock<T>(_nElements);
+}
+
+template<class T>
+CMemBlock2D<T>::CMemBlock2D(const CMemBlock<int32_t> originalSizes)
+{
+    _originalSizes = originalSizes;
     
     _setDimensions();
     
@@ -378,17 +425,23 @@ void CMemBlock2D<T>::zero()
 template<class T>
 T* CMemBlock2D<T>::data(const int32_t iBlock)
 {
-    auto pdata = _data.data();
+    if (_originalSizes.size() > 0)
+    {
+        return _data.data(_positions.at(iBlock));
+    }
     
-    return &(pdata[_positions.at(iBlock)]);
+    return nullptr;
 }
 
 template<class T>
 const T* CMemBlock2D<T>::data(const int32_t iBlock) const 
 {
-    auto pdata = _data.data();
+    if (_originalSizes.size() > 0)
+    {
+        return _data.data(_positions.at(iBlock));
+    }
     
-    return &(pdata[_positions.at(iBlock)]);
+    return nullptr;
 }
 
 template <class T>
@@ -401,6 +454,342 @@ template <class T>
 int32_t CMemBlock2D<T>::blocks() const
 {
     return _originalSizes.size();
+}
+
+template <>
+inline void CMemBlock2D<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        mpi::bcast(_nElements, comm);
+        
+        _positions.broadcast(rank, comm);
+        
+        _paddedSizes.broadcast(rank, comm);
+        
+        _originalSizes.broadcast(rank, comm);
+        
+        _data.broadcast(rank, comm);
+    }
+}
+
+template <>
+inline void CMemBlock2D<double>::broadcast(int32_t rank, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        mpi::bcast(_nElements, comm);
+        
+        _positions.broadcast(rank, comm);
+        
+        _paddedSizes.broadcast(rank, comm);
+        
+        _originalSizes.broadcast(rank, comm);
+        
+        _data.broadcast(rank, comm);
+    }
+}
+
+template <>
+inline CMemBlock2D<int32_t>
+CMemBlock2D<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        if (nodes == 1) return CMemBlock2D<int32_t>(*this);
+        
+        // get dimensions from nodes
+        
+        auto orgsizes = _originalSizes.gather(rank, nodes, comm);
+        
+        // create 2D memory block
+        
+        auto nsizes = orgsizes.pack(nodes);
+        
+        CMemBlock2D<int32_t> mblock(nsizes);
+        
+        mblock.zero();
+        
+        // collect data elements from nodes
+        
+        auto nchunks = mblock.blocks();
+        
+        mpi::bcast(nchunks, comm);
+        
+        // set up gathering pattern
+        
+        CMemBlock<int32_t> bsizes;
+        
+        CMemBlock<int32_t> bindexes;
+        
+        if (rank == mpi::master()) bindexes = CMemBlock<int32_t>(nodes);
+        
+        // gather data chunks
+        
+        for (int32_t i = 0; i < nchunks; i++)
+        {
+            if (rank == mpi::master())
+            {
+                bsizes = orgsizes.pick(nodes, i);
+                
+                mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
+            }
+           
+            // gather data on master node
+            
+            auto merror = MPI_Gatherv(data(i), size(i), MPI_INT32_T,
+                                      mblock.data(i), bsizes.data(),
+                                      bindexes.data(), MPI_INT32_T,
+                                      mpi::master(), comm);
+            
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "gather(CMemBlock2D)");
+          
+            MPI_Barrier(comm);
+        }
+        
+        return mblock;
+    }
+
+    return CMemBlock2D<int32_t>(*this);
+}
+
+template <>
+inline CMemBlock2D<double>
+CMemBlock2D<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        if (nodes == 1) return CMemBlock2D<double>(*this);
+        
+        // get dimensions from nodes
+        
+        auto orgsizes = _originalSizes.gather(rank, nodes, comm);
+        
+        // create 2D memory block
+        
+        auto nsizes = orgsizes.pack(nodes);
+        
+        CMemBlock2D<double> mblock(nsizes);
+        
+        mblock.zero();
+        
+        // distribute number of data chunks
+        
+        auto nchunks = mblock.blocks();
+        
+        mpi::bcast(nchunks, comm);
+        
+        // set up gathering pattern
+        
+        CMemBlock<int32_t> bsizes;
+        
+        CMemBlock<int32_t> bindexes;
+        
+        if (rank == mpi::master()) bindexes = CMemBlock<int32_t>(nodes);
+        
+        // gather data chunks
+        
+        for (int32_t i = 0; i < nchunks; i++)
+        {
+            if (rank == mpi::master())
+            {
+                bsizes = orgsizes.pick(nodes, i);
+                
+                mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
+            }
+            
+            // gather data on master node
+            
+            auto merror = MPI_Gatherv(data(i), size(i), MPI_DOUBLE,
+                                      mblock.data(i), bsizes.data(),
+                                      bindexes.data(), MPI_DOUBLE,
+                                      mpi::master(), comm);
+            
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "gather(CMemBlock2D)");
+            
+            MPI_Barrier(comm);
+        }
+        
+        return mblock;
+    }
+    
+    return CMemBlock2D<double>(*this);
+}
+
+template <>
+inline void
+CMemBlock2D<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        if (nodes == 1) return;
+        
+        // save old dimensions
+        
+        CMemBlock<int32_t> oldSizes;
+        
+        CMemBlock<int32_t> oldPositions;
+        
+        if (rank == mpi::master())
+        {
+            oldSizes = _originalSizes;
+            
+            oldPositions = _positions;
+        }
+        
+        // update dimensions on all nodes
+        
+        _originalSizes.broadcast(rank, comm);
+        
+        for (int32_t i = 0; i < _originalSizes.size(); i++)
+        {
+            _originalSizes.at(i) = mpi::batch_size(_originalSizes.at(i),
+                                                   rank, nodes);
+        }
+        
+        _setDimensions();
+        
+        // set up scattered data storage
+        
+        CMemBlock<int32_t> mblock(_nElements);
+        
+        mblock.zero(); 
+        
+        // allocate scaterring pattern data
+        
+        CMemBlock<int32_t> bsizes;
+        
+        CMemBlock<int32_t> bindexes;
+        
+        if (rank == mpi::master())
+        {
+            bsizes = CMemBlock<int32_t>(nodes);
+            
+            bindexes = CMemBlock<int32_t>(nodes);
+        }
+        
+        // scatter data chunks
+        
+        for (int32_t i = 0; i < _originalSizes.size(); i++)
+        {
+            // set up scattering pattern for data chunk
+            
+            int32_t* pdata = nullptr;
+            
+            if (rank == mpi::master())
+            {
+                mpi::batches_pattern(bsizes.data(), oldSizes.at(i), nodes);
+                
+                mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
+                
+                pdata = _data.data(oldPositions.at(i));
+            }
+            
+            // scatter data chunk
+
+            int32_t* bdata = mblock.data(_positions.at(i));
+            
+            auto merror = MPI_Scatterv(pdata, bsizes.data(), bindexes.data(),
+                                       MPI_INT32_T, bdata, _originalSizes.at(i),
+                                       MPI_INT32_T, mpi::master(), comm);
+            
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "scatter(CMemBlock2D)");
+            
+            MPI_Barrier(comm);
+        }
+        
+        // update data
+        
+        _data = mblock;
+    }
+}
+
+template <>
+inline void
+CMemBlock2D<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        if (nodes == 1) return;
+        
+        // save old dimensions
+        
+        CMemBlock<int32_t> oldSizes;
+        
+        CMemBlock<int32_t> oldPositions;
+        
+        if (rank == mpi::master())
+        {
+            oldSizes = _originalSizes;
+            
+            oldPositions = _positions;
+        }
+        
+        // update dimensions on all nodes
+        
+        _originalSizes.broadcast(rank, comm);
+        
+        for (int32_t i = 0; i < _originalSizes.size(); i++)
+        {
+            _originalSizes.at(i) = mpi::batch_size(_originalSizes.at(i),
+                                                   rank, nodes);
+        }
+        
+        _setDimensions();
+        
+        // set up scattered data storage
+        
+        CMemBlock<double> mblock(_nElements);
+        
+        mblock.zero();
+        
+        // allocate scaterring pattern data
+        
+        CMemBlock<int32_t> bsizes;
+        
+        CMemBlock<int32_t> bindexes;
+        
+        if (rank == mpi::master())
+        {
+            bsizes = CMemBlock<int32_t>(nodes);
+            
+            bindexes = CMemBlock<int32_t>(nodes);
+        }
+        
+        // scatter data chunks
+        
+        for (int32_t i = 0; i < _originalSizes.size(); i++)
+        {
+            // set up scattering pattern for data chunk
+            
+            double* pdata = nullptr;
+            
+            if (rank == mpi::master())
+            {
+                mpi::batches_pattern(bsizes.data(), oldSizes.at(i), nodes);
+                
+                mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
+                
+                pdata = _data.data(oldPositions.at(i));
+            }
+            
+            // scatter data chunk
+
+            double* bdata = mblock.data(_positions.at(i));
+            
+            auto merror = MPI_Scatterv(pdata, bsizes.data(), bindexes.data(),
+                                       MPI_DOUBLE, bdata, _originalSizes.at(i),
+                                       MPI_DOUBLE, mpi::master(), comm);
+            
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "scatter(CMemBlock2D)");
+            
+            MPI_Barrier(comm);
+        }
+        
+        // update data
+        
+        _data = mblock;
+    }
 }
 
 template <class T>
