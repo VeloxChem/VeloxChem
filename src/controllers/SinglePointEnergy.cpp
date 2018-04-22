@@ -9,7 +9,7 @@
 #include "SinglePointEnergy.hpp"
 
 #include "MpiFunc.hpp"
-//#include "MolXYZReader.hpp"
+#include "MolXYZReader.hpp"
 //#include "BasisReader.hpp"
 //#include "AtomicDensityReader.hpp"
 
@@ -35,63 +35,38 @@ void CSinglePointEnergy::set(const std::string& pathToBasisSets,
 {
     if (_globRank == mpi::master()) _startHeader(oStream);
     
-    
-    
-    CMemBlock2D<int32_t> ma;
-    
-    if (_globRank == mpi::master())
-        ma = CMemBlock2D<int32_t>({1, 2, 3, 6, 5}, {2, 3});
-    
-    if (_globRank == (mpi::master() + 1))
-        ma = CMemBlock2D<int32_t>({13, 3, 7, 8, -1, -2}, {4, 2});
-
-    auto mb = ma.gather(_globRank, _globNodes, MPI_COMM_WORLD);
+    // read molecular geometry
     
     if (_globRank == mpi::master())
     {
-        std::cout << "Rank: " << _globRank << " Gathered data: " << mb << std::endl;
-    }
-    
-    mb.scatter(_globRank, _globNodes, MPI_COMM_WORLD); 
-    
-    std::cout << "Rank: " << _globRank << " Scattered data: " << mb << std::endl;
-    
-    
-    
-    
+        CMolXYZReader rdrmolxyz;
 
-    // read molecular geometry
-//
-//    if (_globRank == mpi::master())
-//    {
-//        CMolXYZReader rdrMolXYZ;
-//
-//        rdrMolXYZ.parse(_molecule, inputData, oStream);
-//
-//        _state = rdrMolXYZ.getState();
-//    }
-//
-//    mpi::bcast_bool(_state, _globRank, MPI_COMM_WORLD);
-//
-//    // broadcast molecular geometry
-//
-//    _molecule.broadcast(_globRank, MPI_COMM_WORLD);
-//
-//    if (!_state) return;
-//
-//    // print molecular geometry
-//
-//    if (_globRank == mpi::master())
-//    {
-//        _molecule.printGeometry(oStream);
-//
-//        _state = _molecule.checkProximity(0.1, oStream);
-//    }
-//
-//    mpi::bcast_bool(_state, _globRank, MPI_COMM_WORLD);
-//
-//    if (!_state) return;
-//
+        rdrmolxyz.parse(_molecule, inputData, oStream);
+
+        _state = rdrmolxyz.getState();
+    }
+
+    mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+    
+    if (!_state) return;
+
+    // broadcast molecular geometry
+
+    _molecule.broadcast(_globRank, MPI_COMM_WORLD);
+
+    // print molecular geometry
+
+    if (_globRank == mpi::master())
+    {
+        _molecule.printGeometry(oStream);
+
+        _state = _molecule.checkProximity(0.1, oStream);
+    }
+
+    mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+
+    if (!_state) return;
+
 //    // read AO basis from basis set library
 //
 //    if (_globRank == mpi::master())

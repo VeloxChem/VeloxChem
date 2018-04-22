@@ -111,14 +111,14 @@ bool CControlGroup::isNameOfControlGroup(const char* name) const
     return isNameOfControlGroup(std::string(name));
 }
 
-size_t CControlGroup::getNumberOfCommands() const
+int32_t CControlGroup::getNumberOfCommands() const
 {
-    return _commands.size();
+    return static_cast<int32_t>(_commands.size());
 }
 
-size_t CControlGroup::getNumberOfCommands(const std::string& keyword) const
+int32_t CControlGroup::getNumberOfCommands(const std::string& keyword) const
 {
-    size_t nkeys = 0;
+    int32_t nkeys = 0;
 
     for (size_t i = 0; i < _commands.size(); i++)
     {
@@ -128,12 +128,12 @@ size_t CControlGroup::getNumberOfCommands(const std::string& keyword) const
     return nkeys;
 }
 
-size_t CControlGroup::getNumberOfCommands(const char* keyword) const
+int32_t CControlGroup::getNumberOfCommands(const char* keyword) const
 {
     return getNumberOfCommands(std::string(keyword));
 }
 
-CInputLine CControlGroup::getCommand(const size_t index) const
+CInputLine CControlGroup::getCommand(const int32_t index) const
 {
     return _commands[index];
 }

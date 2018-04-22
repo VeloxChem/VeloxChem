@@ -159,7 +159,7 @@ public:
 
      @return the number of command lines in vector of command lines.
      */
-    size_t getNumberOfCommands() const;
+    int32_t getNumberOfCommands() const;
 
     /**
      Determines number of input lines starting with requested keyword
@@ -169,7 +169,7 @@ public:
      @return the number of command lines starting with requested keyword in
              vector of command lines.
      */
-    size_t getNumberOfCommands(const std::string& keyword) const;
+    int32_t getNumberOfCommands(const std::string& keyword) const;
 
     /**
      Determines number of input lines starting with requested keyword
@@ -179,7 +179,7 @@ public:
      @return the number of command lines starting with requested keyword in
      vector of command lines.
      */
-    size_t getNumberOfCommands(const char* keyword) const;
+    int32_t getNumberOfCommands(const char* keyword) const;
 
     /**
      Gets requested command line from vector of command lines.
@@ -188,7 +188,7 @@ public:
             lines.
      @return the command line.
      */
-    CInputLine getCommand(const size_t index) const;
+    CInputLine getCommand(const int32_t index) const;
 
     /**
      Gets command line starting with request keyword from vector of command

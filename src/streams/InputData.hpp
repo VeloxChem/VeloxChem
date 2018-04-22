@@ -68,7 +68,7 @@ public:
 
      @return the number of control group objects.
      */
-    size_t getNumberOfControlGroups() const;
+    int32_t getNumberOfControlGroups() const;
 
     /**
      Determines number of control group objects with requested name in vector
@@ -77,7 +77,7 @@ public:
      @param nameOfControlGroup the name of control group.
      @return the number of control group objects.
      */
-    size_t getNumberOfControlGroups(const std::string& nameOfControlGroup) const;
+    int32_t getNumberOfControlGroups(const std::string& nameOfControlGroup) const;
 
     /**
      Determines number of control group objects with requested name in vector
@@ -86,7 +86,7 @@ public:
      @param nameOfControlGroup the name of control group.
      @return the number of control group objects.
      */
-    size_t getNumberOfControlGroups(const char* nameOfControlGroup) const;
+    int32_t getNumberOfControlGroups(const char* nameOfControlGroup) const;
 
     // CControlGroup getControlGroup(const size_t indexOfControlGroup):
     //

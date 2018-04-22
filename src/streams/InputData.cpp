@@ -40,14 +40,14 @@ void CInputData::addControlGroup(const CControlGroup& controlGroup)
     _controlGroups.push_back(controlGroup);
 }
 
-size_t CInputData::getNumberOfControlGroups() const
+int32_t CInputData::getNumberOfControlGroups() const
 {
-    return _controlGroups.size();
+    return static_cast<int32_t>(_controlGroups.size());
 }
 
-size_t CInputData::getNumberOfControlGroups(const std::string& nameOfControlGroup) const
+int32_t CInputData::getNumberOfControlGroups(const std::string& nameOfControlGroup) const
 {
-    size_t ngroups = 0;
+    int32_t ngroups = 0;
 
     for (size_t i = 0; i < _controlGroups.size(); i++)
     {
@@ -60,7 +60,7 @@ size_t CInputData::getNumberOfControlGroups(const std::string& nameOfControlGrou
     return ngroups;
 }
 
-size_t CInputData::getNumberOfControlGroups(const char* nameOfControlGroup) const
+int32_t CInputData::getNumberOfControlGroups(const char* nameOfControlGroup) const
 {
     return getNumberOfControlGroups(std::string(nameOfControlGroup));
 }

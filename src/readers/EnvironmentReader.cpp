@@ -39,7 +39,7 @@ void CEnvironmentReader::parse(const CInputData&    inputData,
 
         auto ncommands = cgroup.getNumberOfCommands();
 
-        for (size_t i = 0; i < ncommands; i++)
+        for (int32_t i = 0; i < ncommands; i++)
         {
             auto iline = cgroup.getCommand(i);
 

@@ -14,6 +14,7 @@
 #include "BaseJob.hpp"
 #include "InputData.hpp"
 #include "OutputStream.hpp"
+#include "Molecule.hpp"
 
 /**
  Class CSinglePointEnergy manages single point energy computation job for case
@@ -23,7 +24,10 @@
  */
 class CSinglePointEnergy : public CBaseJob
 {
-    //CMolecule _molecule;       // molecular data
+    /**
+     The molecular data.
+     */
+    CMolecule _molecule;      
 
     //CMolecularBasis _aoBasis;  // ao basis set
 

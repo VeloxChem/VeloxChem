@@ -115,6 +115,16 @@ void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm);
  @param comm the MPI communicator.
  */
 void bcast(std::string& str, int32_t rank, MPI_Comm comm);
+    
+    
+/**
+ Broadcasts vector of stringd within domain of MPI communicator.
+
+ @param vector the vector of strings.
+ @param rank the rank of MPI process.
+ @param comm the MPI communicator.
+ */
+void bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm);
    
 /**
  Determines batch size associated with MPI process for data vector within domain

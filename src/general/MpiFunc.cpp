@@ -143,6 +143,8 @@ void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
         if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
 
         mpi::bcast(veclen, comm);
+        
+        if (rank != mpi::master()) vector.clear();
 
         for (int32_t i = 0; i < veclen; i++)
         {
@@ -169,6 +171,8 @@ void bcast(std::string& str, int32_t rank, MPI_Comm comm)
 
         mpi::bcast(strwidth, comm);
 
+        if (rank != mpi::master()) str.clear();
+        
         for (int32_t i = 0; i < strwidth; i++)
         {
             char symbol;
@@ -179,6 +183,33 @@ void bcast(std::string& str, int32_t rank, MPI_Comm comm)
 
             if (rank != mpi::master()) str.append(1, symbol);
             
+            MPI_Barrier(comm);
+        }
+    }
+}
+    
+void bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        int32_t veclen = 0;
+
+        if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
+
+        mpi::bcast(veclen, comm);
+        
+        if (rank != mpi::master()) vector.clear(); 
+
+        for (int32_t i = 0; i < veclen; i++)
+        {
+            std::string mstr;
+
+            if (rank == mpi::master()) mstr = vector[i];
+
+            mpi::bcast(mstr, rank, comm);
+
+            if (rank != mpi::master()) vector.push_back(mstr);
+        
             MPI_Barrier(comm);
         }
     }

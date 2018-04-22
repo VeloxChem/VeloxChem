@@ -198,7 +198,7 @@ public:
     CMemBlock<T> pick(const int32_t nSubBlocks, const int32_t iPosition) const;
     
     /**
-     Broadcasts memory block within domain of MPI communicator.
+     Broadcasts memory block object within domain of MPI communicator.
 
      @param rank the rank of MPI process.
      @param comm the MPI communicator.
