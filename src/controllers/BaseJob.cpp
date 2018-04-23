@@ -8,13 +8,16 @@
 
 #include "BaseJob.hpp"
 
-CBaseJob::CBaseJob(const int32_t globRank, const int32_t globNodes)
+CBaseJob::CBaseJob(const int32_t globRank, const int32_t globNodes,
+                   const execmode runMode)
 
     : _state(true)
 
     , _globRank(globRank)
 
     , _globNodes(globNodes)
+
+    , _runMode(runMode)
 {
 
 }

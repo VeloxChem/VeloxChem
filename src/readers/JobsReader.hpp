@@ -14,6 +14,7 @@
 #include "InputData.hpp"
 #include "BaseJob.hpp"
 #include "OutputStream.hpp"
+#include "ExecMode.hpp"
 
 /**
  Class CJobsReader handles parsing of @jobs control group, which
@@ -27,7 +28,12 @@ class CJobsReader
      The state of jobs reader object : true - no errors, false - otherwise.
      */
     bool _state;
-
+    
+    /**
+     The parsed execution mode of jobs.
+     */
+    execmode _runMode;
+    
     /**
      Prints multiple definitions error message for @jobs control group to
      output stream and sets jobs reader object state to abnormal.
@@ -46,6 +52,16 @@ class CJobsReader
      */
     void _errorUnknownJobType(const CInputLine& inputLine,
                               COutputStream& oStream);
+    
+    /**
+     Reads a execution mode by parsing input line object. Errors are printed to
+     output stream.
+     
+     @param inputLine the input line object.
+     @param oStream the output stream.
+     @return true if execution mode is read, false otherwise.
+     */
+    bool _addExecutionMode(const CInputLine& inputLine, COutputStream& oStream);
 
     /**
      Adds a single point job identifier to vector of job identifiers by
@@ -59,7 +75,7 @@ class CJobsReader
      */
     bool _addSinglePoint(std::vector<int32_t>& listOfJobIds,
                          const CInputLine& inputLine, COutputStream& oStream);
-
+    
     /**
      Adds a optimization job identifier to vector of job identifiers by parsing
      input line object. Errors are printed to output stream.
@@ -73,6 +89,15 @@ class CJobsReader
     bool _addOptimization(std::vector<int32_t>& listOfJobIds,
                           const CInputLine& inputLine, COutputStream& oStream);
 
+    /**
+     Prints syntax error message for run mode selection to output stream and
+     sets jobs reader object state to abnormal.
+     
+     @param inputLine the input line object with syntax error.
+     @param oStream the output stream.
+     */
+    void _syntaxRunMode(const CInputLine& inputLine, COutputStream& oStream);
+    
     /**
      Prints syntax error message for single point job to output stream and sets
      jobs reader object state to abnormal.
@@ -117,11 +142,18 @@ public:
     ~CJobsReader();
 
     /**
-     Get a state of jobs reader object.
+     Gets a state of jobs reader object.
 
      @return true if no errors, false otherwise.
      */
     bool getState() const;
+    
+    /**
+     Gets a parsed run mode of jobs.
+
+     @return key value for run mode.
+     */
+    execmode getRunMode() const;
 
     /**
      Creates vector of job identifiers by parsing input data object. Parsing

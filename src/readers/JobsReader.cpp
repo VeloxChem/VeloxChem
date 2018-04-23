@@ -13,6 +13,8 @@
 CJobsReader::CJobsReader()
 
     : _state(true)
+
+    , _runMode(execmode::cpu)
 {
 
 }
@@ -25,6 +27,11 @@ CJobsReader::~CJobsReader()
 bool CJobsReader::getState() const
 {
     return _state;
+}
+
+execmode CJobsReader::getRunMode() const
+{
+    return _runMode;
 }
 
 void CJobsReader::parse(std::vector<int32_t>& listOfJobIds,
@@ -44,6 +51,11 @@ void CJobsReader::parse(std::vector<int32_t>& listOfJobIds,
         {
             auto iline = cgroup.getCommand(i);
 
+            if (_addExecutionMode(iline, oStream))
+            {
+                continue;
+            }
+            
             if (_addSinglePoint(listOfJobIds, iline, oStream))
             {
                 continue;
@@ -111,6 +123,40 @@ void CJobsReader::_errorUnknownJobType(const CInputLine& inputLine,
 
     oStream << fmt::end << fmt::blank;
 }
+                
+bool CJobsReader::_addExecutionMode(const CInputLine& inputLine,
+                                    COutputStream& oStream)
+{
+    if (inputLine.isKeyword(0, "RunMode:"))
+    {
+        if (inputLine.getNumberOfKeywords() == 2)
+        {
+            if (inputLine.isKeyword(1, "CPU/GPU"))
+            {
+                _runMode = execmode::cpu_gpu;
+
+                return true;
+            }
+            
+            if (inputLine.isKeyword(1, "CPU"))
+            {
+                _runMode = execmode::cpu; 
+                
+                return true;
+            }
+
+            // TODO: Other types of single point calculations
+
+            _errorUnknownCalculationType("RunMode", inputLine, oStream);
+        }
+        else
+        {
+            _syntaxRunMode(inputLine, oStream);
+        }
+    }
+
+    return false;
+}
 
 bool CJobsReader::_addSinglePoint(std::vector<int32_t>& listOfJobIds,
                                   const CInputLine& inputLine,
@@ -168,6 +214,22 @@ bool CJobsReader::_addOptimization(std::vector<int32_t>& listOfJobIds,
     return false;
 }
 
+void CJobsReader::_syntaxRunMode(const CInputLine& inputLine,
+                                 COutputStream& oStream)
+{
+    _state = false;
+    
+    oStream << fmt::error << "A Run mode is selected as: ";
+    
+    oStream << fmt::end;
+    
+    oStream << fmt::error << "RunMode:: [execution mode] " << fmt::end;
+    
+    oStream << "Please correct input line: " << inputLine.getOriginalString();
+    
+    oStream << fmt::end << fmt::blank;
+}
+
 void CJobsReader::_syntaxSinglePoint(const CInputLine& inputLine,
                                      COutputStream& oStream)
 {
@@ -192,7 +254,7 @@ void CJobsReader::_errorUnknownCalculationType(const char* calcType,
 
     oStream << fmt::cerror << "Unsupported type of " << calcType;
 
-    oStream <<  " calculation is requested!" << fmt::end;
+    oStream <<  " is requested!" << fmt::end;
 
     oStream << "Please correct input line: " << inputLine.getOriginalString();
 

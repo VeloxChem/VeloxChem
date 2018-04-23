@@ -49,8 +49,10 @@ public:
      
      @param globRank the the rank of MPI process.
      @param globNodes the total number of MPI processes.
+     @param runMode the execution mode of job.
      */
-    CSinglePointEnergy(const int32_t globRank, const int32_t globNodes);
+    CSinglePointEnergy(const int32_t globRank, const int32_t globNodes,
+                       const execmode runMode);
 
     /**
      Sets parameters of single point energy computation job.
@@ -65,9 +67,10 @@ public:
     /**
      Executes a single point energy computation job.
 
+     @param comm the MPI communicator.
      @param oStream the output stream.
      */
-    void run(COutputStream& oStream) override;
+    void run(COutputStream& oStream, MPI_Comm comm) override;
 };
 
 #endif /* SinglePointEnergy_hpp */

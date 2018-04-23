@@ -11,8 +11,11 @@
 
 #include <cstdint>
 
+#include "mpi.h"
+
 #include "InputData.hpp"
 #include "OutputStream.hpp"
+#include "ExecMode.hpp"
 
 /**
  Class CBaseJob defines base class for description of single job.
@@ -37,7 +40,12 @@ protected:
      The total number of MPI processes associated with base job object.
      */
     int32_t _globNodes;
-
+    
+    /**
+     The execution mode of job.
+     */
+    execmode _runMode;
+    
 public:
 
     /**
@@ -45,9 +53,11 @@ public:
      
      @param globRank the the rank of MPI process.
      @param globNodes the total number of MPI processes.
+     @param runMode the execution mode of job.
      */
-    CBaseJob(const int32_t globRank, const int32_t globNodes);
-
+    CBaseJob(const int32_t globRank, const int32_t globNodes,
+             const execmode runMode);
+    
     /**
      Destroys a basic job object.
      */
@@ -73,9 +83,10 @@ public:
     /**
      Executes basic job.
 
+     @param comm the MPI communicator.
      @param oStream the output stream.
      */
-    virtual void run(COutputStream& oStream) = 0;
+    virtual void run(COutputStream& oStream, MPI_Comm comm) = 0;
 };
 
 #endif /* BaseJob_hpp */

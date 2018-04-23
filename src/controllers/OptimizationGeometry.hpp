@@ -33,8 +33,10 @@ public:
      
      @param globRank the the rank of MPI process.
      @param globNodes the total number of MPI processes.
+     @param runMode the execution mode of job.
      */
-    COptimizationGeometry(const int32_t globRank, const int32_t globNodes);
+    COptimizationGeometry(const int32_t globRank, const int32_t globNodes,
+                          const execmode runMode);
 
     /**
      Sets parameters of geometry optimization job.
@@ -49,9 +51,10 @@ public:
     /**
      Executes a geometry optimization job.
 
+     @param comm the MPI communicator.
      @param oStream the output stream.
      */
-    void run(COutputStream& oStream) override;
+    void run(COutputStream& oStream, MPI_Comm comm) override;
 };
 
 #endif /* OptimizationGeometry_hpp */

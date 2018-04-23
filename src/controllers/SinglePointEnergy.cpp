@@ -13,7 +13,7 @@
 //#include "BasisReader.hpp"
 //#include "AtomicDensityReader.hpp"
 
-//#include "GridDriver.hpp"
+#include "GridDriver.hpp"
 //#include "DensityGridDriver.hpp"
 //#include "XCFuncType.hpp"
 
@@ -22,9 +22,10 @@
 #include <iostream>
 
 CSinglePointEnergy::CSinglePointEnergy(const int32_t globRank,
-                                       const int32_t globNodes)
+                                       const int32_t globNodes,
+                                       const execmode runMode)
 
-    : CBaseJob(globRank, globNodes)
+    : CBaseJob(globRank, globNodes, runMode)
 {
 
 }
@@ -119,12 +120,12 @@ void CSinglePointEnergy::set(const std::string& pathToBasisSets,
     // TODO: add other keywords...
 }
 
-void CSinglePointEnergy::run(COutputStream& oStream)
+void CSinglePointEnergy::run(COutputStream& oStream, MPI_Comm comm)
 {
-//    // generate molecular grid
-//
-//    CGridDriver drvGrid(_globRank, _globNodes, MPI_COMM_WORLD);
-//
+    // generate molecular grid
+
+    CGridDriver drvgrid(_globRank, _globNodes, comm);
+
 //    auto molGrid = drvGrid.generate(_molecule, oStream, MPI_COMM_WORLD);
 //
 //    std::cout << "Before: Rank: " << _globRank << " Grid. Points: " << molGrid.getNumberOfGridPoints() << std::endl;

@@ -1,10 +1,10 @@
 //
-//                       V.E.L.O.X. C.H.E.M. X
+//                     V.E.L.O.X. C.H.E.M. MP
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2018 by Velox Chem X developers. All rights reserved.
+//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #ifndef JobsManager_hpp
 #define JobsManager_hpp
@@ -15,6 +15,7 @@
 #include "InputData.hpp"
 #include "OutputStream.hpp"
 #include "BaseJob.hpp"
+#include "ExecMode.hpp"
 
 /**
  Class CJobsManager manages jobs list creation, ordering and execution workflow.
@@ -37,6 +38,11 @@ class CJobsManager
      The total number of MPI processes associated with jobs manager object.
      */
     int32_t _globNodes;
+    
+    /**
+     The execution mode of jobs.
+     */
+    execmode _runMode;
 
     /**
      The vector of job objects.
@@ -50,6 +56,13 @@ class CJobsManager
      @param listOfJobIds the vector of identifiers.
      */
     void _assignJobs(const std::vector<int32_t>& listOfJobIds);
+    
+    /**
+     Assigns a run mode to jobs manager object.
+
+     @param runMode the run mode.
+     */
+    void _assignRunMode(const execmode runMode); 
 
     /**
      Updates state of jobs manager object.
