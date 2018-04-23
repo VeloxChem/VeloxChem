@@ -67,7 +67,9 @@ void CSinglePointEnergy::set(const std::string& pathToBasisSets,
     mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
 
     if (!_state) return;
-
+    
+    
+    
 //    // read AO basis from basis set library
 //
 //    if (_globRank == mpi::master())
@@ -124,7 +126,7 @@ void CSinglePointEnergy::run(COutputStream& oStream, MPI_Comm comm)
 {
     // generate molecular grid
 
-    CGridDriver drvgrid(_globRank, _globNodes, comm);
+    CGridDriver drvgrid(_globRank, _globNodes, _runMode, comm);
 
 //    auto molGrid = drvGrid.generate(_molecule, oStream, MPI_COMM_WORLD);
 //

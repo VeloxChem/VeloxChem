@@ -16,6 +16,7 @@
 #include "OutputStream.hpp"
 #include "Molecule.hpp"
 #include "OutputStream.hpp"
+#include "ExecMode.hpp"
 
 /**
  Class CGridDriver generates grid points data for usage in numerical
@@ -59,6 +60,11 @@ class CGridDriver
      The threshold of weights screening.
      */
     double _thresholdOfWeight;
+    
+    /**
+     The execution mode of grid driver object.
+     */
+    execmode _runMode;
 
     /**
      Determines number of radial grid points for specific chemical element.
@@ -83,9 +89,11 @@ public:
      
      @param globRank the the rank of MPI process.
      @param globNodes the total number of MPI processes.
+     @param runMode the execution mode. 
      @param comm the MPI communicator.
      */
-    CGridDriver(const int32_t globRank, const int32_t globNodes, MPI_Comm comm);
+    CGridDriver(const int32_t globRank, const int32_t globNodes,
+                execmode runMode, MPI_Comm comm);
 
     /**
      Destroys a grid driver object.

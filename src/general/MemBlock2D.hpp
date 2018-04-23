@@ -193,6 +193,25 @@ public:
     const T* data(const int32_t iBlock) const;
     
     /**
+     Gets pointer to specific element of selected data chunk in 2D memory block.
+     
+     @param iBlock the index of data chunk.
+     @param iElement the index of element in memory block.
+     @return the pointer to data chunk.
+     */
+    T* data(const int32_t iBlock, const int32_t iElement);
+    
+    /**
+     Gets constant pointer to specific elment of selected data chunk in 2D
+     memory block.
+     
+     @param iBlock the index of data chunk.
+     @param iElement the index of element in memory block.
+     @return the pointer to data chunk.
+     */
+    const T* data(const int32_t iBlock, const int32_t iElement) const;
+    
+    /**
      Gets number of elements in specific data chunk.
 
      @param iBlock the index of data chunk.
@@ -444,10 +463,48 @@ const T* CMemBlock2D<T>::data(const int32_t iBlock) const
     return nullptr;
 }
 
+template<class T>
+T* CMemBlock2D<T>::data(const int32_t iBlock, const int32_t iElement)
+{
+    if (_originalSizes.size() > 0)
+    {
+        auto pdata = _data.data(_positions.at(iBlock));
+        
+        if (iElement < _originalSizes.at(iBlock))
+        {
+            return &(pdata[iElement]);
+        }
+        
+        return nullptr;
+    }
+    
+    return nullptr;
+}
+
+template<class T>
+const T* CMemBlock2D<T>::data(const int32_t iBlock, const int32_t iElement) const
+{
+    if (_originalSizes.size() > 0)
+    {
+        auto pdata = _data.data(_positions.at(iBlock));
+        
+        if (iElement < _originalSizes.at(iBlock))
+        {
+            return &(pdata[iElement]);
+        }
+        
+        return nullptr;
+    }
+    
+    return nullptr;
+}
+
 template <class T>
 int32_t CMemBlock2D<T>::size(const int32_t iBlock) const
 {
-    return _originalSizes.at(iBlock);
+    if (iBlock < _originalSizes.size()) return _originalSizes.at(iBlock);
+    
+    return 0;
 }
 
 template <class T>

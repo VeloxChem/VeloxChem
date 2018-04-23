@@ -13,7 +13,7 @@
 #include "MpiFunc.hpp"
 
 CGridDriver::CGridDriver(const int32_t globRank, const int32_t globNodes,
-                         MPI_Comm comm)
+                         execmode runMode, MPI_Comm comm)
 
     : _gridLevel(5)
 
@@ -24,6 +24,8 @@ CGridDriver::CGridDriver(const int32_t globRank, const int32_t globNodes,
     , _isLocalMode(false)
 
     , _thresholdOfWeight(1.0e-15)
+
+    , _runMode(runMode)
 {
     _locRank  = mpi::rank(comm);
 

@@ -151,6 +151,46 @@ TEST_F(CMemBlock2DTest, DataConstant)
     ASSERT_NEAR(6.0, br[1], 1.0e-13);
 }
 
+TEST_F(CMemBlock2DTest, DataAtElement)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    auto ar = ma.data(0, 1);
+    
+    ASSERT_NEAR(2.0, ar[0], 1.0e-13);
+    
+    ar[0] = 4.0;
+    
+    auto br = ma.data(1, 0);
+    
+    ASSERT_NEAR(3.0, br[0], 1.0e-13);
+    
+    ASSERT_NEAR(6.0, br[1], 1.0e-13);
+    
+    br[0] = 8.0;
+    
+    br[1] = 9.0;
+    
+    CMemBlock2D<double> mb = CMemBlock2D<double>({1.0, 4.0, 8.0, 9.0}, 2, 2);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, DataConstantAtElement)
+{
+    const CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    auto ar = ma.data(0, 0);
+    
+    ASSERT_NEAR(1.0, ar[0], 1.0e-13);
+    
+    ASSERT_NEAR(2.0, ar[1], 1.0e-13);
+    
+    auto br = ma.data(1, 1);
+    
+    ASSERT_NEAR(6.0, br[0], 1.0e-13);
+}
+
 TEST_F(CMemBlock2DTest, Size)
 {
     CMemBlock2D<double> ma(std::vector<int32_t>({2, 4, 5}));
