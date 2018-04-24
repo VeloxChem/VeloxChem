@@ -8,6 +8,8 @@
 
 #include "MathFunc.hpp"
 
+#include "MathConst.hpp"
+
 namespace mathfunc { // mathfunc namespace
 
     void zero(double* vector, const int32_t nElements)
@@ -60,6 +62,28 @@ namespace mathfunc { // mathfunc namespace
             aVector[i] = index;
 
             index += bVector[i];
+        }
+    }
+    
+    void quadChebyshevOfKindTwo(double* coordinates, double* weights,
+                                const int32_t nPoints)
+    {
+        // prefactor
+        
+        auto fstep = mathconst::getPiValue()
+                   / (static_cast<double>(nPoints) + 1.0);
+        
+        // loop over grid points
+        
+        for (int32_t i = 1; i < nPoints + 1; i++)
+        {
+            auto farg = static_cast<double>(i) * fstep;
+            
+            coordinates[i - 1]  = std::cos(farg);
+            
+            auto warg= std::sin(farg);
+            
+            weights[i - 1] = fstep * warg * warg;
         }
     }
 

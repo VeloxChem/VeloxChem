@@ -75,3 +75,26 @@ TEST_F(CMathFuncTest, Indexes)
 
     vlxtest::compare(vecb, vecc, 5); 
 }
+
+TEST_F(CMathFuncTest, QuadChebyshevOfKindTwo)
+{
+    double coords[5] __attribute__ ((aligned(VLX_ALIGN)));
+    
+    double weights[5] __attribute__ ((aligned(VLX_ALIGN)));
+    
+    mathfunc::quadChebyshevOfKindTwo(coords, weights, 5);
+    
+    double refcrd[5] __attribute__ ((aligned(VLX_ALIGN))) = {
+                      8.66025403784439e-01,   5.00000000000000e-01,
+                      6.12323399573677e-17,  -5.00000000000000e-01,
+                     -8.66025403784439e-01};
+    
+    vlxtest::compare(coords, refcrd, 5);
+    
+    double refwgt[5] __attribute__ ((aligned(VLX_ALIGN))) = {
+                    1.30899693899575e-01, 3.92699081698724e-01,
+                    5.23598775598299e-01, 3.92699081698724e-01,
+                    1.30899693899575e-01};
+    
+    vlxtest::compare(weights, refwgt, 5);
+}

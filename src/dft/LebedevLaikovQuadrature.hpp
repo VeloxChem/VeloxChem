@@ -1,10 +1,10 @@
 //
-//                       V.E.L.O.X. C.H.E.M. X
+//                     V.E.L.O.X. C.H.E.M. MP
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2018 by Velox Chem X developers. All rights reserved.
+//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #ifndef LebedevLaikovQuadrature_hpp
 #define LebedevLaikovQuadrature_hpp
@@ -176,7 +176,7 @@ class CLebedevLaikovQuadrature
 public:
 
     /**
-     Creates a ebedev-Laikov quadrature object.
+     Creates a Lebedev-Laikov quadrature object.
      
      @param nAngularPoints the number of angular points.
      */
@@ -192,7 +192,7 @@ public:
 
      @return the quadrature points (coordinates, weights).
      */
-    CMemBlock2D<double> getGridPoints() const;
+    CMemBlock2D<double> generate() const;
 };
 
 #endif /* LebedevLaikovQuadrature_hpp */

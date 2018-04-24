@@ -6,18 +6,18 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#ifndef LebedevLaikovQuadratureTest_hpp
-#define LebedevLaikovQuadratureTest_hpp
+#ifndef Log3QuadratureTest_hpp
+#define Log3QuadratureTest_hpp
 
 #include "gtest/gtest.h"
 
-class CLebedevLaikovQuadratureTest : public ::testing::Test
+class CLog3QuadratureTest : public ::testing::Test
 {
 protected:
 
-    CLebedevLaikovQuadratureTest() {};
+    CLog3QuadratureTest() {};
 
-    virtual ~CLebedevLaikovQuadratureTest() {};
+    virtual ~CLog3QuadratureTest() {};
 };
 
-#endif /* LebedevLaikovQuadratureTest_hpp */
+#endif /* Log3QuadratureTest_hpp */

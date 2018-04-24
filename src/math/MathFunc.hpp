@@ -90,6 +90,16 @@ namespace mathfunc { // mathfunc namespace
 
         return std::sqrt(rx * rx  + ry * ry + rz * rz);
     }
+    
+    /**
+     Computes Chebtshev quadrature of second kind in [-1,1] interval.
+
+     @param coordinates the vector of quadature coordinates.
+     @param weights the vector of quadrature weights.
+     @param nPoints the number of points in quadrature.
+     */
+    void quadChebyshevOfKindTwo(double* coordinates, double* weights,
+                                const int32_t nPoints);
 
 } // mathfunc namespace
 
