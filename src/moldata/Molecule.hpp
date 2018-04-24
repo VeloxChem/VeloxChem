@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <vector>
+#include <set>
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
@@ -170,7 +171,6 @@ public:
      */
     void setCharge(const double charge);
     
-    
     /**
      Sets multiplicity of molecule object.
 
@@ -200,11 +200,54 @@ public:
     int32_t getNumberOfAtoms() const;
     
     /**
+     Gets number of atoms belonging to specific chemical element in molecule.
+
+     @param idElemental the chemical element number.
+     @return the number of atoms.
+     */
+    int32_t getNumberOfAtoms(const int32_t idElemental) const;
+    
+    /**
+     Gets set of unique chemical elements in molecule.
+
+     @return the set of unique chemical elements.
+     */
+    std::set<int32_t> getElementalComposition() const;
+    
+    /**
      Gets a number of electrons in molecule.
 
      @return the number of electrons.
      */
     int32_t getNumberOfElectrons() const;
+    
+    /**
+     Gets constant pointer to vector of chemical element identifiers.
+
+     @return the constant pointer to chemical element indentifiers.
+     */
+    const int32_t* getIdsElemental() const;
+    
+    /**
+     Gets vector Cartesian X coordinates of atoms in molecule.
+
+     @return the constant pointer to vector of coordinates.
+     */
+    const double* getCoordinatesX() const;
+    
+    /**
+     Gets vector Cartesian Y coordinates of atoms in molecule.
+     
+     @return the constant pointer to vector of coordinates.
+     */
+    const double* getCoordinatesY() const;
+    
+    /**
+     Gets vector Cartesian Z coordinates of atoms in molecule.
+     
+     @return the constant pointer to vector of coordinates.
+     */
+    const double* getCoordinatesZ() const;
     
     /**
      Prints geometry of molecule as table to output stream.

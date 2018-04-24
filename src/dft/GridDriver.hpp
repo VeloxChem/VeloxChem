@@ -17,6 +17,8 @@
 #include "Molecule.hpp"
 #include "OutputStream.hpp"
 #include "ExecMode.hpp"
+#include "MolecularGrid.hpp"
+#include "SystemClock.hpp"
 
 /**
  Class CGridDriver generates grid points data for usage in numerical
@@ -81,7 +83,76 @@ class CGridDriver
      @return the number of angular points.
      */
     int32_t _getNumberOfAngularPoints(const int32_t idElemental) const;
+    
+    /**
+     Prints start header with grid generation settings to output stream.
 
+     @param molecule the molecule.
+     @param oStream the output stream.
+     */
+    void _startHeader(const CMolecule& molecule, COutputStream& oStream) const;
+    
+    /**
+     Prints finish header with grid generation settings to output stream.
+
+     @param time the time clock object.
+     @param molecularGrid the molecular grid object.
+     @param oStream the output stream.
+     */
+    void _finishHeader(const CSystemClock& time,
+                       const CMolecularGrid& molecularGrid,
+                       COutputStream& oStream) const;
+    
+    /**
+     Creates molecular grid on master node by generating fraction of grid
+     points on each MPI process within domain of MPI communicator. Grid points
+     are generated using only CPUs.
+
+     @param molecule the molecule.
+     @param comm the MPI communicator.
+     @return the molecular grid object.
+     */
+    CMolecularGrid _genGridPointsOnCPU(const CMolecule& molecule,
+                                       MPI_Comm comm) const;
+    
+    /**
+     Gets size of grid points batch.
+
+     @param idsElemental the vector of chemical elements identifiers.
+     @param offset the  in vector of chemical elements identifiers.
+     @param nAtoms the number of atoms in batch.
+     @return the number of grid points.
+     */
+    int32_t _getBatchOfGridPoints(const int32_t* idsElemental,
+                                  const int32_t offset,
+                                  const int32_t nAtoms) const;
+    
+    /**
+     Generates partitioned atomic grid from radial and angular quadratures for
+     specific atom.
+
+     @param radPoints the radial quadrature points.
+     @param angPoints the angular quadrature points.
+     @param molecule the molecule.
+     @param idAtom the index of atom.
+     @return the partitioned atomic grid.
+     */
+    CMemBlock2D<double> _combAtomicGrid(const CMemBlock2D<double>& radPoints,
+                                        const CMemBlock2D<double>& angPoints,
+                                        const CMolecule& molecule,
+                                        const int32_t idAtom) const;
+    /**
+     Screens weights of grid points in atom grid and adds grid points with
+     weight larger than cuttoff threshold to molecular grid.
+
+     @param molGridPoints the molecular grid.
+     @param nGridPoints the number of grid points in molecular grid.
+     @param atomGridPoints the atomic grid.
+     */
+    void _screenAtomGridPoints(CMemBlock2D<double>& molGridPoints,
+                               int32_t& nGridPoints,
+                               const CMemBlock2D<double>& atomGridPoints) const;
+    
 public:
 
     /**
@@ -108,6 +179,18 @@ public:
      @param comm the MPI communicator.
      */
     void setLevel(const int32_t gridLevel, MPI_Comm comm);
+    
+    /**
+     Generates molecular grid for molecule. Errors are printed to output stream.
+     Grid generation is distributed within domain of MPI communicator.
+
+     @param molecule the molecule.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the molecular grid object.
+     */
+    CMolecularGrid generate(const CMolecule& molecule, COutputStream& oStream,
+                            MPI_Comm comm) const;
 };
 
 #endif /* GridDriver_hpp */

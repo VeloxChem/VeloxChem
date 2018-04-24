@@ -128,7 +128,9 @@ void CSinglePointEnergy::run(COutputStream& oStream, MPI_Comm comm)
 
     CGridDriver drvgrid(_globRank, _globNodes, _runMode, comm);
 
-//    auto molGrid = drvGrid.generate(_molecule, oStream, MPI_COMM_WORLD);
+    auto molGrid = drvgrid.generate(_molecule, oStream, comm);
+    
+    
 //
 //    std::cout << "Before: Rank: " << _globRank << " Grid. Points: " << molGrid.getNumberOfGridPoints() << std::endl;
 //

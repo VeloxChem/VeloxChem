@@ -65,13 +65,6 @@ public:
      */
     CControlGroup& operator=(const CControlGroup& source);
 
-    // CControlGroup& operator=(CControlGroup&& source):
-    //
-    // Assigns a control group by moving other control group.
-    //
-    // Input:
-    // source (CControlGroup&&) - the other control group being assigned.
-
     /**
      Assigns a control group object by moving other control group object.
      
@@ -86,16 +79,6 @@ public:
      @return true if control group objects are equal, false otherwise.
      */
     bool operator==(const CControlGroup& other) const;
-
-    // bool operator!=(const CControlGroup& other):
-    //
-    // Compares control group with other control group.
-    //
-    // Input:
-    // other (CControlGroup&) - the control group.
-    //
-    // Output:
-    // (bool) - true if control groups are not equal, false otherwise.
 
     /**
      Compares control group object with other control group object.
@@ -118,10 +101,6 @@ public:
      @param command the input line object.
      */
     void addCommand(const CInputLine& command);
-
-    // void clear():
-    //
-    // Sets header to empty input line, and empties vector of commands.
 
     /**
      Sets header to empty input line object, and empties vector of command

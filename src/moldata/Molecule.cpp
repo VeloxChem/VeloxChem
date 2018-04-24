@@ -208,6 +208,30 @@ int32_t CMolecule::getNumberOfAtoms() const
     return _idsElemental.size();
 }
 
+int32_t CMolecule::getNumberOfAtoms(const int32_t idElemental) const
+{
+    int32_t natoms = 0;
+    
+    for (int32_t i = 0; i < _idsElemental.size(); i++)
+    {
+        if (_idsElemental.at(i) == idElemental) natoms++;
+    }
+    
+    return natoms;
+}
+
+std::set<int32_t> CMolecule::getElementalComposition() const
+{
+    std::set<int32_t> elemset;
+    
+    for (int32_t i = 0; i < _idsElemental.size(); i++)
+    {
+        elemset.insert(_idsElemental.at(i));
+    }
+    
+    return elemset;
+}
+
 int32_t CMolecule::getNumberOfElectrons() const
 {
     double nElectrons = -_charge;
@@ -218,6 +242,26 @@ int32_t CMolecule::getNumberOfElectrons() const
     }
     
     return static_cast<int32_t>(nElectrons);
+}
+
+const int32_t* CMolecule::getIdsElemental() const
+{
+    return _idsElemental.data();
+}
+
+const double* CMolecule::getCoordinatesX() const
+{
+    return _atomCoordinates.data(0);
+}
+
+const double* CMolecule::getCoordinatesY() const
+{
+    return _atomCoordinates.data(1);
+}
+
+const double* CMolecule::getCoordinatesZ() const
+{
+    return _atomCoordinates.data(2);
 }
 
 void CMolecule::printGeometry(COutputStream& oStream) const

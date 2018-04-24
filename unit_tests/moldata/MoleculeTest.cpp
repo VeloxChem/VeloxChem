@@ -86,9 +86,61 @@ TEST_F(CMoleculeTest, GetNumberOfAtoms)
     ASSERT_EQ(3, mol.getNumberOfAtoms());
 }
 
+TEST_F(CMoleculeTest, GetNumberOfAtomsWithIdElemental)
+{
+    CMolecule mol = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(1, mol.getNumberOfAtoms(1));
+    
+    ASSERT_EQ(1, mol.getNumberOfAtoms(3));
+    
+    ASSERT_EQ(0, mol.getNumberOfAtoms(2));
+}
+
+TEST_F(CMoleculeTest, GetElementalComposition)
+{
+    CMolecule mol = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(std::set<int32_t>({1, 3}), mol.getElementalComposition());
+    
+    mol = vlxmol::getMoleculeEmpty();
+    
+    ASSERT_EQ(std::set<int32_t>(), mol.getElementalComposition());
+}
+
 TEST_F(CMoleculeTest, GetNumberOfElectrons)
 {
     CMolecule mol = vlxmol::getMoleculeLiHCation();
     
     ASSERT_EQ(3, mol.getNumberOfElectrons());
 }
+
+TEST_F(CMoleculeTest, GetIdsElemental)
+{
+    CMolecule mol = vlxmol::getMoleculeLiHCation();
+    
+    vlxtest::compare({3, 1}, mol.getIdsElemental());
+}
+
+TEST_F(CMoleculeTest, GetCoordinatesX)
+{
+    CMolecule mol = vlxmol::getMoleculeLiHCation();
+    
+    vlxtest::compare({0.0, 0.0}, mol.getCoordinatesX());
+}
+
+TEST_F(CMoleculeTest, GetCoordinatesY)
+{
+    CMolecule mol = vlxmol::getMoleculeLiHCation();
+    
+    vlxtest::compare({0.0, 0.0}, mol.getCoordinatesY());
+}
+
+TEST_F(CMoleculeTest, GetCoordinatesZ)
+{
+    CMolecule mol = vlxmol::getMoleculeLiHCation();
+    
+    vlxtest::compare({0.0, 1.2}, mol.getCoordinatesZ());
+}
+
+
