@@ -27,7 +27,17 @@
  */
 enum class fmt
 {
-    end, left, center, right, blank, title, tsep, cerror, info, error, header
+    end,
+    left,
+    center,
+    right,
+    blank,
+    title,
+    tsep,
+    cerror,
+    info,
+    error,
+    header
 };
 
 #endif /* FmtType_hpp */

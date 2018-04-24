@@ -12,12 +12,14 @@
 
 namespace mem { // mem namespace
 
-void* malloc(const size_t size)
+void*
+malloc(const size_t size)
 {
     return MKL_malloc(size, VLX_ALIGN);
 }
 
-void free(void* pointer)
+void
+free(void* pointer)
 {
     if (pointer != nullptr) MKL_free(pointer);
 }

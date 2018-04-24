@@ -8,7 +8,8 @@
 
 #include "BaseJob.hpp"
 
-CBaseJob::CBaseJob(const int32_t globRank, const int32_t globNodes,
+CBaseJob::CBaseJob(const int32_t  globRank,
+                   const int32_t  globNodes,
                    const execmode runMode)
 
     : _state(true)
@@ -22,7 +23,8 @@ CBaseJob::CBaseJob(const int32_t globRank, const int32_t globNodes,
 
 }
 
-bool CBaseJob::getState() const
+bool
+CBaseJob::getState() const
 {
     return _state;
 }

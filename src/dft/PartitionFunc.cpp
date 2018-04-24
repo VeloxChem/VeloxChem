@@ -12,11 +12,18 @@
 
 namespace partfunc { // partfunc namespace
 
-    void ssf(double* gridCoordsX, double* gridCoordsY, double* gridCoordsZ,
-             double* gridWeights, const int32_t nGridPoints,
-             const double* molCoordsX, const double* molCoordsY,
-             const double* molCoordsZ, const int32_t nAtoms,
-             double* partWeights, const int32_t idAtom)
+    void
+    ssf(      double* gridCoordsX,
+              double* gridCoordsY,
+              double* gridCoordsZ,
+              double* gridWeights,
+        const int32_t nGridPoints,
+        const double* molCoordsX,
+        const double* molCoordsY,
+        const double* molCoordsZ,
+        const int32_t nAtoms,
+              double* partWeights,
+        const int32_t idAtom)
     {
         // loop over grid points
         
@@ -88,7 +95,8 @@ namespace partfunc { // partfunc namespace
         }
     }
     
-    double zeta(const double eRadius)
+    double
+    zeta(const double eRadius)
     {
         // efefctive SSF radius
         

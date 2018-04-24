@@ -47,8 +47,8 @@ class CInputStream
      @param inputLine the input line object, which can not be parsed.
      @param oStream the output stream.
      */
-    void _errorControlGroup(const CInputLine& inputLine,
-                            COutputStream& oStream);
+    void _errorControlGroup(const CInputLine&    inputLine,
+                                  COutputStream& oStream);
 
     /**
      Prints input parsing start message to output stream.
@@ -65,8 +65,9 @@ class CInputStream
      @param nEmptyGroups the number of empty control group objects.
      @param oStream the output stream.
      */
-    void _finishMessage(const CInputData& inpuData, const size_t nEmptyGroups,
-                        COutputStream& oStream) const;
+    void _finishMessage(const CInputData&    inpuData,
+                        const size_t         nEmptyGroups,
+                              COutputStream& oStream) const;
 
 public:
 
@@ -77,7 +78,8 @@ public:
      @param iFilename the name of input file.
      @param oStream the output stream.
      */
-    CInputStream(const std::string& iFilename, COutputStream& oStream);
+    CInputStream(const std::string&   iFilename,
+                       COutputStream& oStream);
 
     /**
      Destroys an input stream object.
@@ -91,7 +93,8 @@ public:
      @param inputData the input data object.
      @param oStream the output stream.
      */
-    void read(CInputData& inputData, COutputStream& oStream);
+    void read(CInputData&    inputData,
+              COutputStream& oStream);
 
     /**
      Get a state of input stream object.

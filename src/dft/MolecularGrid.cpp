@@ -47,7 +47,8 @@ CMolecularGrid::~CMolecularGrid()
 
 }
 
-CMolecularGrid& CMolecularGrid::operator=(const CMolecularGrid& source)
+CMolecularGrid&
+CMolecularGrid::operator=(const CMolecularGrid& source)
 {
     if (this == &source) return *this;
 
@@ -58,7 +59,8 @@ CMolecularGrid& CMolecularGrid::operator=(const CMolecularGrid& source)
     return *this;
 }
 
-CMolecularGrid& CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
+CMolecularGrid&
+CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -69,7 +71,8 @@ CMolecularGrid& CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
     return *this;
 }
 
-bool CMolecularGrid::operator==(const CMolecularGrid& other) const
+bool
+CMolecularGrid::operator==(const CMolecularGrid& other) const
 {
     if (_isDistributed != other._isDistributed) return false;
     
@@ -78,37 +81,46 @@ bool CMolecularGrid::operator==(const CMolecularGrid& other) const
     return true;
 }
 
-bool CMolecularGrid::operator!=(const CMolecularGrid& other) const
+bool
+CMolecularGrid::operator!=(const CMolecularGrid& other) const
 {
     return !(*this == other);
 }
 
-int32_t CMolecularGrid::getNumberOfGridPoints() const
+int32_t
+CMolecularGrid::getNumberOfGridPoints() const
 {
     return _gridPoints.size(0);
 }
 
-const double* CMolecularGrid::getCoordinatesX() const
+const double*
+CMolecularGrid::getCoordinatesX() const
 {
     return _gridPoints.data(0);
 }
 
-const double* CMolecularGrid::getCoordinatesY() const
+const double*
+CMolecularGrid::getCoordinatesY() const
 {
     return _gridPoints.data(1);
 }
 
-const double* CMolecularGrid::getCoordinatesZ() const
+const double*
+CMolecularGrid::getCoordinatesZ() const
 {
     return _gridPoints.data(2);
 }
 
-const double* CMolecularGrid::getWeights() const
+const double*
+CMolecularGrid::getWeights() const
 {
     return _gridPoints.data(3);
 }
 
-void CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
+void
+CMolecularGrid::distribute(int32_t  rank,
+                           int32_t  nodes,
+                           MPI_Comm comm)
 {
     if (!_isDistributed)
     {
@@ -118,7 +130,9 @@ void CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
     }
 }
 
-std::ostream& operator<<(std::ostream& output, const CMolecularGrid& source)
+std::ostream&
+operator<<(      std::ostream&   output,
+           const CMolecularGrid& source)
 {
     output << std::endl;
 

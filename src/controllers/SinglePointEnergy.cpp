@@ -21,8 +21,8 @@
 
 #include <iostream>
 
-CSinglePointEnergy::CSinglePointEnergy(const int32_t globRank,
-                                       const int32_t globNodes,
+CSinglePointEnergy::CSinglePointEnergy(const int32_t  globRank,
+                                       const int32_t  globNodes,
                                        const execmode runMode)
 
     : CBaseJob(globRank, globNodes, runMode)
@@ -30,9 +30,10 @@ CSinglePointEnergy::CSinglePointEnergy(const int32_t globRank,
 
 }
 
-void CSinglePointEnergy::set(const std::string& pathToBasisSets,
-                             const CInputData& inputData,
-                             COutputStream& oStream)
+void
+CSinglePointEnergy::set(const std::string&   pathToBasisSets,
+                        const CInputData&    inputData,
+                              COutputStream& oStream)
 {
     if (_globRank == mpi::master()) _startHeader(oStream);
     
@@ -122,7 +123,9 @@ void CSinglePointEnergy::set(const std::string& pathToBasisSets,
     // TODO: add other keywords...
 }
 
-void CSinglePointEnergy::run(COutputStream& oStream, MPI_Comm comm)
+void
+CSinglePointEnergy::run(COutputStream& oStream,
+                        MPI_Comm       comm)
 {
     // generate molecular grid
 
@@ -145,7 +148,8 @@ void CSinglePointEnergy::run(COutputStream& oStream, MPI_Comm comm)
 //    drvDenGrid.generate(_molecule, _aoBasis, molGrid, xcfun::lda, oStream, MPI_COMM_WORLD);
 }
 
-void CSinglePointEnergy::_startHeader(COutputStream& oStream) const
+void
+CSinglePointEnergy::_startHeader(COutputStream& oStream) const
 {
     oStream << fmt::header;
 

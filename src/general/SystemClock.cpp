@@ -36,7 +36,8 @@ CSystemClock::~CSystemClock()
 
 }
 
-CSystemClock& CSystemClock::operator=(const CSystemClock& source)
+CSystemClock&
+CSystemClock::operator=(const CSystemClock& source)
 {
     if (this == &source) return *this;
 
@@ -45,7 +46,8 @@ CSystemClock& CSystemClock::operator=(const CSystemClock& source)
     return *this;
 }
 
-CSystemClock& CSystemClock::operator=(CSystemClock&& source) noexcept
+CSystemClock&
+CSystemClock::operator=(CSystemClock&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -54,19 +56,22 @@ CSystemClock& CSystemClock::operator=(CSystemClock&& source) noexcept
     return *this;
 }
 
-void CSystemClock::restart()
+void
+CSystemClock::restart()
 {
     _refTime = std::chrono::system_clock::now();
 }
 
-std::string CSystemClock::getStartDate() const
+std::string
+CSystemClock::getStartDate() const
 {
     auto mtime = _getLocalTime(std::chrono::system_clock::to_time_t(_refTime));
 
     return _date(&mtime);
 }
 
-std::string CSystemClock::getCurrentDate() const
+std::string
+CSystemClock::getCurrentDate() const
 {
     auto curtime = std::chrono::system_clock::now();
 
@@ -75,7 +80,8 @@ std::string CSystemClock::getCurrentDate() const
     return _date(&mtime);
 }
 
-std::string CSystemClock::getElapsedTime() const
+std::string
+CSystemClock::getElapsedTime() const
 {
     auto tdiff = std::chrono::system_clock::now() - _refTime;
 
@@ -98,7 +104,8 @@ std::string CSystemClock::getElapsedTime() const
     return stream.str();
 }
 
-double CSystemClock::getElapsedTimeInSeconds() const
+double
+CSystemClock::getElapsedTimeInSeconds() const
 {
     std::chrono::duration<double> tsec = std::chrono::system_clock::now()
                                        - _refTime;
@@ -106,7 +113,8 @@ double CSystemClock::getElapsedTimeInSeconds() const
     return tsec.count();
 }
 
-std::tm CSystemClock::_getLocalTime(const std::time_t& time) const
+std::tm
+CSystemClock::_getLocalTime(const std::time_t& time) const
 {
     std::tm ctime;
 
@@ -115,7 +123,8 @@ std::tm CSystemClock::_getLocalTime(const std::time_t& time) const
     return ctime;
 }
 
-std::string CSystemClock::_date(const std::tm* time) const
+std::string
+CSystemClock::_date(const std::tm* time) const
 {
     char cstring[81];
 

@@ -78,7 +78,8 @@ class CMolXYZReader
      @param inputLine the input line object.
      @param oStream the output stream.
      */
-    void _parseHeader(const CInputLine& inputLine, COutputStream& oStream);
+    void _parseHeader(const CInputLine&    inputLine,
+                            COutputStream& oStream);
     
     /**
      Reads and parses atomic data line from @molxyz control group, adds it to
@@ -89,8 +90,9 @@ class CMolXYZReader
      @param iAtom the index of parsed atom.
      @param oStream the output stream.
      */
-    void _parseAtom(const CInputLine& inputLine, const int32_t iAtom,
-                    COutputStream& oStream);
+    void _parseAtom(const CInputLine&    inputLine,
+                    const int32_t        iAtom,
+                          COutputStream& oStream);
    
     /**
      Reads and parses @molxyz line in @molxyz control group, sets up flag for
@@ -99,7 +101,8 @@ class CMolXYZReader
      @param inputLine the input line object.
      @param oStream the output stream.
      */
-    void _parseUnits(const CInputLine& inputLine, COutputStream& oStream);
+    void _parseUnits(const CInputLine&    inputLine,
+                           COutputStream& oStream);
 
     /**
      Prints error message for multiple definitions of @molxyz control group to
@@ -116,7 +119,8 @@ class CMolXYZReader
      @param inputLine the header line of @molxyz control group.
      @param oStream the output stream.
      */
-    void _errorMultiplicity(const CInputLine& inputLine, COutputStream& oStream);
+    void _errorMultiplicity(const CInputLine&    inputLine,
+                                  COutputStream& oStream);
 
     /**
      Prints error message for wrong definition of units in @molxyz line of
@@ -126,7 +130,8 @@ class CMolXYZReader
      @param inputLine the @molxyz line of @molxyz control group.
      @param oStream the output stream.
      */
-    void _errorUnits(const CInputLine& inputLine, COutputStream& oStream);
+    void _errorUnits(const CInputLine&    inputLine,
+                           COutputStream& oStream);
 
     /**
      Prints error message for encounter of unsupported chemical element to
@@ -135,8 +140,8 @@ class CMolXYZReader
      @param inputLine the input line object with unsuppoprted chemical element.
      @param oStream the output stream.
      */
-    void _errorChemicalElement(const CInputLine& inputLine,
-                               COutputStream& oStream);
+    void _errorChemicalElement(const CInputLine&    inputLine,
+                                     COutputStream& oStream);
 
     /**
      Prints error message for encounter of unsupported isotope of chemical
@@ -146,7 +151,8 @@ class CMolXYZReader
             chemical element.
      @param oStream the output stream.
      */
-    void _errorIsotope(const CInputLine& inputLine, COutputStream& oStream);
+    void _errorIsotope(const CInputLine&    inputLine,
+                             COutputStream& oStream);
 
     /**
      Prints error message for syntax error of imcomplete @molxyz control group
@@ -163,7 +169,8 @@ class CMolXYZReader
      @param inputLine the header line of @molxyz control group.
      @param oStream the output stream.
      */
-    void _syntaxHeader(const CInputLine& inputLine, COutputStream& oStream);
+    void _syntaxHeader(const CInputLine&    inputLine,
+                             COutputStream& oStream);
 
     /**
      Prints error message for syntax error in atom input to output stream and
@@ -172,7 +179,8 @@ class CMolXYZReader
      @param inputLine  the input line object with atom input.
      @param oStream the output stream.
      */
-    void _syntaxAtom(const CInputLine& inputLine, COutputStream& oStream);
+    void _syntaxAtom(const CInputLine&    inputLine,
+                           COutputStream& oStream);
 
     /**
      Determines if multiplicity of molecule is correctly defined in header of
@@ -183,9 +191,9 @@ class CMolXYZReader
      @param inputLine the header line of @molxyz control group.
      @param oStream the output stream.
      */
-    void _checkMultiplicity(const CMolecule& molecule,
-                            const CInputLine& inputLine,
-                            COutputStream& oStream);
+    void _checkMultiplicity(const CMolecule&     molecule,
+                            const CInputLine&    inputLine,
+                                  COutputStream& oStream);
     
     /**
      Sets up dimensions of atomic data vectors.
@@ -221,8 +229,9 @@ public:
      @param inputData the input data object.
      @param oStream the output stream.
      */
-    void parse(CMolecule& molecule, const CInputData& inputData,
-               COutputStream& oStream);
+    void parse(      CMolecule&     molecule,
+               const CInputData&    inputData,
+                     COutputStream& oStream);
     
     /**
      Creates molecule by reading and parsing specific @molxyz control group from
@@ -233,8 +242,10 @@ public:
      @param iGroup the index of @molxyz control group.
      @param oStream the output stream.
      */
-    void parse(CMolecule& molecule, const CInputData& inputData,
-               const int32_t iGroup, COutputStream& oStream);
+    void parse(      CMolecule&     molecule,
+               const CInputData&    inputData,
+               const int32_t        iGroup,
+                     COutputStream& oStream);
 };
 
 #endif /* MolXYZReader_hpp */

@@ -50,7 +50,8 @@ CInputLine::~CInputLine()
 
 }
 
-CInputLine& CInputLine::operator=(const CInputLine& source)
+CInputLine&
+CInputLine::operator=(const CInputLine& source)
 {
     if (this == &source) return *this;
 
@@ -61,7 +62,8 @@ CInputLine& CInputLine::operator=(const CInputLine& source)
     return *this;
 }
 
-CInputLine& CInputLine::operator=(CInputLine&& source) noexcept
+CInputLine&
+CInputLine::operator=(CInputLine&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -72,7 +74,8 @@ CInputLine& CInputLine::operator=(CInputLine&& source) noexcept
     return *this;
 }
 
-bool CInputLine::operator==(const CInputLine& other) const
+bool
+CInputLine::operator==(const CInputLine& other) const
 {
     if (_originalString != other._originalString) return false;
 
@@ -81,12 +84,14 @@ bool CInputLine::operator==(const CInputLine& other) const
     return true;
 }
 
-bool CInputLine::operator!=(const CInputLine& other) const
+bool
+CInputLine::operator!=(const CInputLine& other) const
 {
     return !(*this == other);
 }
 
-std::string CInputLine::getKeyword(const size_t iKeyword) const
+std::string
+CInputLine::getKeyword(const size_t iKeyword) const
 {
     auto str = _parsedString;
 
@@ -110,12 +115,14 @@ std::string CInputLine::getKeyword(const size_t iKeyword) const
     return str;
 }
 
-std::string CInputLine::getUpcasedKeyword(const size_t iKeyword) const
+std::string
+CInputLine::getUpcasedKeyword(const size_t iKeyword) const
 {
     return fstr::upcase(getKeyword(iKeyword));
 }
 
-size_t CInputLine::getNumberOfKeywords() const
+size_t
+CInputLine::getNumberOfKeywords() const
 {
     size_t cnt = 0;
 
@@ -131,7 +138,8 @@ size_t CInputLine::getNumberOfKeywords() const
     return cnt;
 }
 
-bool CInputLine::isRealNumber(const size_t iKeyword) const
+bool
+CInputLine::isRealNumber(const size_t iKeyword) const
 {
     auto str = getKeyword(iKeyword);
 
@@ -145,14 +153,16 @@ bool CInputLine::isRealNumber(const size_t iKeyword) const
     return false;
 }
 
-double CInputLine::getRealNumber(const size_t iKeyword) const
+double
+CInputLine::getRealNumber(const size_t iKeyword) const
 {
     if (isRealNumber(iKeyword)) return std::stod(getKeyword(iKeyword));
 
     return std::numeric_limits<double>::quiet_NaN();
 }
 
-bool CInputLine::isIntegerNumber(const size_t iKeyword) const
+bool
+CInputLine::isIntegerNumber(const size_t iKeyword) const
 {
     auto str = getKeyword(iKeyword);
 
@@ -166,7 +176,8 @@ bool CInputLine::isIntegerNumber(const size_t iKeyword) const
     return false;
 }
 
-int32_t CInputLine::getIntegerNumber(const size_t iKeyword) const
+int32_t
+CInputLine::getIntegerNumber(const size_t iKeyword) const
 {
     if (isIntegerNumber(iKeyword))
     {
@@ -176,8 +187,9 @@ int32_t CInputLine::getIntegerNumber(const size_t iKeyword) const
     return std::numeric_limits<int32_t>::quiet_NaN();
 }
 
-bool CInputLine::isKeyword(const size_t iKeyword,
-                           const std::string& keyLabel) const
+bool
+CInputLine::isKeyword(const size_t       iKeyword,
+                      const std::string& keyLabel) const
 {
     auto str = fstr::upcase(getKeyword(iKeyword));
 
@@ -189,7 +201,9 @@ bool CInputLine::isKeyword(const size_t iKeyword,
     return false;
 }
 
-bool CInputLine::isKeyword(const size_t iKeyword, const char* keyLabel) const
+bool
+CInputLine::isKeyword(const size_t iKeyword,
+                      const char*  keyLabel) const
 {
     return isKeyword(iKeyword, std::string(keyLabel));
 }
@@ -210,12 +224,14 @@ bool CInputLine::isControlKeyword(const std::string& keyLabel) const
     return false;
 }
 
-bool CInputLine::isControlKeyword(const char* keyLabel) const
+bool
+CInputLine::isControlKeyword(const char* keyLabel) const
 {
     return isControlKeyword(std::string(keyLabel));
 }
 
-bool CInputLine::isControlLine()const
+bool
+CInputLine::isControlLine()const
 {
     auto  str = getKeyword(0);
 
@@ -227,29 +243,34 @@ bool CInputLine::isControlLine()const
     return false;
 }
 
-std::string CInputLine::getParsedString() const
+std::string
+CInputLine::getParsedString() const
 {
     return _parsedString;
 }
 
-std::string CInputLine::getOriginalString() const
+std::string
+CInputLine::getOriginalString() const
 {
     return _originalString;
 }
 
-bool CInputLine::isEmpty() const
+bool
+CInputLine::isEmpty() const
 {
     return _parsedString.empty();
 }
 
-void CInputLine::clear()
+void
+CInputLine::clear()
 {
     _parsedString.clear();
 
     _originalString.clear();
 }
 
-void CInputLine::_trimParsedString()
+void
+CInputLine::_trimParsedString()
 {
     std::smatch match;
 
@@ -269,7 +290,9 @@ void CInputLine::_trimParsedString()
     }
 }
 
-std::ostream& operator<<(std::ostream& output, const CInputLine& source)
+std::ostream&
+operator<<(      std::ostream& output,
+           const CInputLine&   source)
 {
     output << std::endl;
 

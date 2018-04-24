@@ -25,9 +25,12 @@ COutputLine::COutputLine()
 
 }
 
-COutputLine::COutputLine(const std::string& line, const size_t offset,
-                         const char leftSymol, const char rightSymbol,
-                         const char fillSymbol, const size_t width)
+COutputLine::COutputLine(const std::string& line,
+                         const size_t       offset,
+                         const char         leftSymol,
+                         const char         rightSymbol,
+                         const char         fillSymbol,
+                         const size_t       width)
 
     : _line(line)
 
@@ -83,7 +86,8 @@ COutputLine::~COutputLine()
 
 }
 
-COutputLine& COutputLine::operator=(const COutputLine& source)
+COutputLine&
+COutputLine::operator=(const COutputLine& source)
 {
     if (this == &source) return *this;
 
@@ -102,7 +106,8 @@ COutputLine& COutputLine::operator=(const COutputLine& source)
     return *this;
 }
 
-COutputLine& COutputLine::operator=(COutputLine&& source) noexcept
+COutputLine&
+COutputLine::operator=(COutputLine&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -121,7 +126,8 @@ COutputLine& COutputLine::operator=(COutputLine&& source) noexcept
     return *this;
 }
 
-bool COutputLine::operator==(const COutputLine& other) const
+bool
+COutputLine::operator==(const COutputLine& other) const
 {
     if (_line != other._line) return false;
 
@@ -138,12 +144,15 @@ bool COutputLine::operator==(const COutputLine& other) const
     return true;
 }
 
-bool COutputLine::operator!=(const COutputLine& other) const
+bool
+COutputLine::operator!=(const COutputLine& other) const
 {
     return !(*this == other);
 }
 
-std::ofstream& operator<<(std::ofstream& output, const COutputLine& source)
+std::ofstream&
+operator<<(      std::ofstream& output,
+           const COutputLine&   source)
 {
     std::string str(source._offset, source._fillSymbol);
 
@@ -169,7 +178,9 @@ std::ofstream& operator<<(std::ofstream& output, const COutputLine& source)
     return output;
 }
 
-std::ostream& operator<<(std::ostream& output, const COutputLine&  source)
+std::ostream&
+operator<<(      std::ostream& output,
+           const COutputLine&  source)
 {
     output << std::endl;
 

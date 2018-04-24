@@ -14,7 +14,8 @@
 #include "EnvironmentReader.hpp"
 #include "JobsManager.hpp"
 
-CAppManager::CAppManager(int argc, char** argv)
+CAppManager::CAppManager(int    argc,
+                         char** argv)
 
     : _state(true)
 
@@ -54,7 +55,8 @@ CAppManager::~CAppManager()
 
 }
 
-void CAppManager::execute()
+void
+CAppManager::execute()
 {
     COutputStream ostream(_oFilename);
     
@@ -123,12 +125,14 @@ void CAppManager::execute()
     ostream.flush();
 }
 
-void CAppManager::updateState(const bool state)
+void
+CAppManager::updateState(const bool state)
 {
     if (_state) _state = state;
 }
 
-bool CAppManager::getState() const
+bool
+CAppManager::getState() const
 {
     return _state;
 }
@@ -185,8 +189,9 @@ CAppManager::_printFinishHeader(COutputStream& oStream)
     oStream << fmt::end << fmt::tsep;
 }
 
-void CAppManager::_setEnvironment(const CInputData& inputData,
-                                  COutputStream& oStream)
+void
+CAppManager::_setEnvironment(const CInputData&    inputData,
+                                   COutputStream& oStream)
 {
     if (_globRank == mpi::master())
     {

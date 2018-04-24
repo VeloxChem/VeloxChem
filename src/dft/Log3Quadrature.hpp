@@ -46,7 +46,8 @@ public:
      @param nRadialPoints the number of radial points.
      @param idElemental the identifier of chemical element.
      */
-    CLog3Quadrature(const int32_t nRadialPoints, const int32_t idElemental);
+    CLog3Quadrature(const int32_t nRadialPoints,
+                    const int32_t idElemental);
 
     /**
      Destroys a Log3 quadrature object.

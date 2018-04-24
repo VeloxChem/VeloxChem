@@ -80,7 +80,8 @@ public:
      @param globRank the the rank of MPI process.
      @param globNodes the total number of MPI processes.
      */
-    CJobsManager(const int32_t globRank, const int32_t globNodes);
+    CJobsManager(const int32_t globRank,
+                 const int32_t globNodes);
 
     /**
      Destroys a basic job object.
@@ -95,7 +96,8 @@ public:
      @param inputData the input data object.
      @param oStream the output stream.
      */
-    void setJobs(const CInputData& inputData, COutputStream& oStream);
+    void setJobs(const CInputData&    inputData,
+                       COutputStream& oStream);
 
     /**
      Executes job objects stored in vector of job objects using input data for
@@ -105,8 +107,9 @@ public:
      @param inputData the input data object.
      @param oStream the output stream.
      */
-    void runJobs(const std::string& pathToBasisSets, const CInputData& inputData,
-                 COutputStream& oStream);
+    void runJobs(const std::string&   pathToBasisSets,
+                 const CInputData&    inputData,
+                       COutputStream& oStream);
 
     /**
      Get a state of jobs manager.

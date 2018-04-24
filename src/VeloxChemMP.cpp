@@ -19,7 +19,9 @@
  @return the program state: EXIT_SUCCESS for normal state and EXIT_FAILURE
          for abnormal state
  */
-int main(int argc, char** argv)
+int
+main(int    argc,
+     char** argv)
 {
     // initialize global MPI communicator
 

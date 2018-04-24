@@ -29,13 +29,16 @@ CMolXYZReader::~CMolXYZReader()
 
 }
 
-bool CMolXYZReader::getState() const
+bool
+CMolXYZReader::getState() const
 {
     return _state;
 }
 
-void CMolXYZReader::parse(CMolecule& molecule, const CInputData& inputData,
-                          COutputStream& oStream)
+void
+CMolXYZReader::parse(      CMolecule&     molecule,
+                     const CInputData&    inputData,
+                           COutputStream& oStream)
 {
     auto nGroups = inputData.getNumberOfControlGroups("molxyz");
 
@@ -52,8 +55,11 @@ void CMolXYZReader::parse(CMolecule& molecule, const CInputData& inputData,
     }
 }
 
-void CMolXYZReader::parse(CMolecule& molecule, const CInputData& inputData,
-                          const int32_t iGroup, COutputStream &oStream)
+void
+CMolXYZReader::parse(      CMolecule&     molecule,
+                     const CInputData&    inputData,
+                     const int32_t        iGroup,
+                           COutputStream& oStream)
 {
     auto nGroups = inputData.getNumberOfControlGroups("molxyz");
     
@@ -114,8 +120,9 @@ void CMolXYZReader::parse(CMolecule& molecule, const CInputData& inputData,
     }
 }
 
-void CMolXYZReader::_parseHeader(const CInputLine& inputLine,
-                                 COutputStream& oStream)
+void
+CMolXYZReader::_parseHeader(const CInputLine&    inputLine,
+                                  COutputStream& oStream)
 {
     auto nkeys = inputLine.getNumberOfKeywords();
 
@@ -151,8 +158,10 @@ void CMolXYZReader::_parseHeader(const CInputLine& inputLine,
     }
 }
 
-void CMolXYZReader::_parseAtom(const CInputLine& inputLine, const int32_t iAtom,
-                               COutputStream& oStream)
+void
+CMolXYZReader::_parseAtom(const CInputLine&    inputLine,
+                          const int32_t        iAtom,
+                                COutputStream& oStream)
 {
     auto nkeys = inputLine.getNumberOfKeywords();
 
@@ -238,8 +247,9 @@ void CMolXYZReader::_parseAtom(const CInputLine& inputLine, const int32_t iAtom,
     }
 }
 
-void CMolXYZReader::_parseUnits(const CInputLine& inputLine,
-                                COutputStream& oStream)
+void
+CMolXYZReader::_parseUnits(const CInputLine&    inputLine,
+                                 COutputStream& oStream)
 {
     _needUnitConversion = true;
 
@@ -264,7 +274,8 @@ void CMolXYZReader::_parseUnits(const CInputLine& inputLine,
     _errorUnits(inputLine, oStream);
 }
 
-void CMolXYZReader::_errorUniqueGroup(COutputStream& oStream)
+void
+CMolXYZReader::_errorUniqueGroup(COutputStream& oStream)
 {
     _state = false;
 
@@ -279,8 +290,9 @@ void CMolXYZReader::_errorUniqueGroup(COutputStream& oStream)
     oStream << fmt::end << fmt::blank;
 }
 
-void CMolXYZReader::_errorMultiplicity(const CInputLine& inputLine,
-                                       COutputStream& oStream)
+void
+CMolXYZReader::_errorMultiplicity(const CInputLine&    inputLine,
+                                        COutputStream& oStream)
 {
     _state = false;
 
@@ -295,8 +307,9 @@ void CMolXYZReader::_errorMultiplicity(const CInputLine& inputLine,
     oStream << inputLine.getOriginalString() << fmt::blank;
 }
 
-void CMolXYZReader::_errorUnits(const CInputLine& inputLine,
-                                COutputStream& oStream)
+void
+CMolXYZReader::_errorUnits(const CInputLine&    inputLine,
+                                 COutputStream& oStream)
 {
     _state = false;
 
@@ -309,8 +322,9 @@ void CMolXYZReader::_errorUnits(const CInputLine& inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-void CMolXYZReader::_errorChemicalElement(const CInputLine& inputLine,
-                                          COutputStream& oStream)
+void
+CMolXYZReader::_errorChemicalElement(const CInputLine&    inputLine,
+                                           COutputStream& oStream)
 {
     _state = false;
 
@@ -323,8 +337,9 @@ void CMolXYZReader::_errorChemicalElement(const CInputLine& inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-void CMolXYZReader::_errorIsotope(const CInputLine& inputLine,
-                                  COutputStream& oStream)
+void
+CMolXYZReader::_errorIsotope(const CInputLine&    inputLine,
+                                   COutputStream& oStream)
 {
     _state = false;
 
@@ -339,7 +354,8 @@ void CMolXYZReader::_errorIsotope(const CInputLine& inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-void CMolXYZReader::_syntaxIncompleteGroup(COutputStream& oStream)
+void
+CMolXYZReader::_syntaxIncompleteGroup(COutputStream& oStream)
 {
     _state = false;
 
@@ -354,8 +370,9 @@ void CMolXYZReader::_syntaxIncompleteGroup(COutputStream& oStream)
     oStream << "...." << fmt::end << fmt::blank;
 }
 
-void CMolXYZReader::_syntaxHeader(const CInputLine& inputLine,
-                                  COutputStream& oStream)
+void
+CMolXYZReader::_syntaxHeader(const CInputLine&    inputLine,
+                                   COutputStream& oStream)
 {
     _state = false;
 
@@ -380,8 +397,9 @@ void CMolXYZReader::_syntaxHeader(const CInputLine& inputLine,
     oStream << inputLine.getOriginalString() << fmt::end << fmt::blank;
 }
 
-void CMolXYZReader::_syntaxAtom(const CInputLine& inputLine,
-                                COutputStream& oStream)
+void
+CMolXYZReader::_syntaxAtom(const CInputLine&    inputLine,
+                                 COutputStream& oStream)
 {
     _state = false;
 
@@ -418,9 +436,10 @@ void CMolXYZReader::_syntaxAtom(const CInputLine& inputLine,
     oStream << inputLine.getOriginalString() << fmt::end << fmt::blank;
 }
 
-void CMolXYZReader::_checkMultiplicity(const CMolecule& molecule,
-                                       const CInputLine& inputLine,
-                                       COutputStream& oStream)
+void
+CMolXYZReader::_checkMultiplicity(const CMolecule&     molecule,
+                                  const CInputLine&    inputLine,
+                                        COutputStream& oStream)
 {
     auto multip = molecule.getMultiplicity() % 2;
 
@@ -433,7 +452,8 @@ void CMolXYZReader::_checkMultiplicity(const CMolecule& molecule,
     if (!_state) _errorMultiplicity(inputLine, oStream);
 }
 
-void CMolXYZReader::_setDimensions(const int32_t nAtoms)
+void
+CMolXYZReader::_setDimensions(const int32_t nAtoms)
 {
     _coordinates = std::vector<double>(3 * nAtoms, 0.0);
     

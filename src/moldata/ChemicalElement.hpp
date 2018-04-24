@@ -1707,8 +1707,10 @@ public:
      @param atomicMass the mass.
      @paeam atomicNumber the chemical element number.
      */
-    CChemicalElement(const std::string& atomicLabel, const double atomicCharge,
-                     const double atomicMass, const int32_t atomicNumber);
+    CChemicalElement(const std::string& atomicLabel,
+                     const double       atomicCharge,
+                     const double       atomicMass,
+                     const int32_t      atomicNumber);
 
     /**
      Destroys a chemical element object.
@@ -1805,7 +1807,7 @@ public:
      @param output the output text stream.
      @param source the chemical element object.
      */
-    friend std::ostream& operator<<(std::ostream& output,
+    friend std::ostream& operator<<(      std::ostream&     output,
                                     const CChemicalElement& source);
 };
 

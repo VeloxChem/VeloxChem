@@ -40,7 +40,8 @@ class CEnvironmentReader
      @param nGroups the number of @progenv control groups.
      @param oStream the output stream.
      */
-    void _errorUniqueGroup(const size_t nGroups, COutputStream& oStream);
+    void _errorUniqueGroup(const size_t   nGroups,
+                           COutputStream& oStream);
 
     /**
      Prints unknown environment variable error messeage to output stream and
@@ -49,8 +50,8 @@ class CEnvironmentReader
      @param inputLine the input line object with unknown environmental variable.
      @param oStream the output stream.
      */
-    void _errorUnknownVariable(const CInputLine& inputLine,
-                               COutputStream& oStream);
+    void _errorUnknownVariable(const CInputLine&    inputLine,
+                                     COutputStream& oStream);
 
     /**
      Reads path to basis set library from @progenv control group.
@@ -60,8 +61,8 @@ class CEnvironmentReader
      @return true if parsing of path to basis set library is successful, false
              otherwise.
      */
-    bool _addPathToBasisSets(const CInputLine& inputLine,
-                             COutputStream& oStream);
+    bool _addPathToBasisSets(const CInputLine&    inputLine,
+                                   COutputStream& oStream);
 
     /**
      Prints syntax error message for definition of path to basis set library to
@@ -70,8 +71,8 @@ class CEnvironmentReader
      @param inputLine the input line object with syntax error.
      @param oStream the output stream.
      */
-    void _syntaxBasisLibrary(const CInputLine& inputLine,
-                             COutputStream& oStream);
+    void _syntaxBasisLibrary(const CInputLine&    inputLine,
+                                   COutputStream& oStream);
 
 public:
 
@@ -99,7 +100,8 @@ public:
      @param inputData the input data object.
      @param oStream the output stream.
      */
-    void parse(const CInputData& inputData, COutputStream& oStream);
+    void parse(const CInputData&    inputData,
+                     COutputStream& oStream);
 
     /**
      Gets path to basis set library defined in @progenv group.

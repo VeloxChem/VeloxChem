@@ -14,7 +14,8 @@
 #include "SinglePointEnergy.hpp"
 #include "OptimizationGeometry.hpp"
 
-CJobsManager::CJobsManager(const int32_t globRank, const int32_t globNodes)
+CJobsManager::CJobsManager(const int32_t globRank,
+                           const int32_t globNodes)
 
     : _state(true)
 
@@ -35,7 +36,9 @@ CJobsManager::~CJobsManager()
     }
 }
 
-void CJobsManager::setJobs(const CInputData& inputData, COutputStream& oStream)
+void
+CJobsManager::setJobs(const CInputData&    inputData,
+                            COutputStream& oStream)
 {
     std::vector<int32_t> idsjobs;
 
@@ -61,8 +64,10 @@ void CJobsManager::setJobs(const CInputData& inputData, COutputStream& oStream)
     _assignJobs(idsjobs);
 }
 
-void CJobsManager::runJobs(const std::string& pathToBasisSets,
-                           const CInputData& inputData, COutputStream& oStream)
+void
+CJobsManager::runJobs(const std::string&   pathToBasisSets,
+                      const CInputData&    inputData,
+                            COutputStream& oStream)
 {
     for (size_t i = 0; i < _listOfJobs.size(); i++)
     {
@@ -84,12 +89,14 @@ void CJobsManager::runJobs(const std::string& pathToBasisSets,
     };
 }
 
-bool CJobsManager::getState() const
+bool
+CJobsManager::getState() const
 {
     return _state;
 }
 
-void CJobsManager::_assignJobs(const std::vector<int32_t>& listOfJobIds)
+void
+CJobsManager::_assignJobs(const std::vector<int32_t>& listOfJobIds)
 {
     for (size_t i = 0; i < listOfJobIds.size(); i++)
     {
@@ -115,7 +122,8 @@ void CJobsManager::_assignJobs(const std::vector<int32_t>& listOfJobIds)
     }
 }
 
-void CJobsManager::_assignRunMode(const execmode runMode)
+void
+CJobsManager::_assignRunMode(const execmode runMode)
 {
     int32_t keyval = to_int(runMode);
     
@@ -128,7 +136,8 @@ void CJobsManager::_assignRunMode(const execmode runMode)
     // TODO: add other execution mode...
 }
 
-void CJobsManager::_updateState(const bool state)
+void
+CJobsManager::_updateState(const bool state)
 {
     if (_state) _state = state;
 }

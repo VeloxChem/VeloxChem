@@ -30,11 +30,17 @@ namespace partfunc { // partfunc namespace
      @param partWeights the temporary SSF weights.
      @param idAtom the identifier of atom associated with grid points.
      */
-    void ssf(double* gridCoordsX, double* gridCoordsY, double* gridCoordsZ,
-             double* gridWeights, const int32_t nGridPoints,
-             const double* molCoordsX, const double* molCoordsY,
-             const double* molCoordsZ, const int32_t nAtoms,
-             double* partWeights, const int32_t idAtom);
+    void ssf(      double* gridCoordsX,
+                   double* gridCoordsY,
+                   double* gridCoordsZ,
+                   double* gridWeights,
+             const int32_t nGridPoints,
+             const double* molCoordsX,
+             const double* molCoordsY,
+             const double* molCoordsZ,
+             const int32_t nAtoms,
+                   double* partWeights,
+             const int32_t idAtom);
     
     /**
      Computes polynomial weight function in eliptical coordinates. See Eq. 14

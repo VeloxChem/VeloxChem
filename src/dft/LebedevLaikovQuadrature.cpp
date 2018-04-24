@@ -22,7 +22,8 @@ CLebedevLaikovQuadrature::~CLebedevLaikovQuadrature()
 
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::generate() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::generate() const
 {
     if (_nAngularPoints == 6) return _generateQuadratureWith6Points();
 
@@ -47,7 +48,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::generate() const
     return CMemBlock2D<double>();
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith6Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith6Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -56,7 +58,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith6Points() c
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith50Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith50Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -71,7 +74,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith50Points() 
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith110Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith110Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -90,7 +94,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith110Points()
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith194Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith194Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -116,7 +121,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith194Points()
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith302Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith302Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -149,7 +155,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith302Points()
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith434Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith434Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -192,7 +199,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith434Points()
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith590Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith590Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -245,7 +253,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith590Points()
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith770Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith770Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -311,7 +320,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith770Points()
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith974Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith974Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -390,7 +400,8 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith974Points()
     return qpoints;
 }
 
-CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith2030Points() const
+CMemBlock2D<double>
+CLebedevLaikovQuadrature::_generateQuadratureWith2030Points() const
 {
     CMemBlock2D<double> qpoints(_nAngularPoints, 4);
 
@@ -539,9 +550,10 @@ CMemBlock2D<double> CLebedevLaikovQuadrature::_generateQuadratureWith2030Points(
     return qpoints;
 }
 
-void CLebedevLaikovQuadrature::_generateCaseOne(CMemBlock2D<double>& gridPoints,
-                                                const int32_t offset,
-                                                const double weight) const
+void
+CLebedevLaikovQuadrature::_generateCaseOne(      CMemBlock2D<double>& gridPoints,
+                                           const int32_t              offset,
+                                           const double               weight) const
 {
     auto x = gridPoints.data(0, offset);
 
@@ -564,9 +576,10 @@ void CLebedevLaikovQuadrature::_generateCaseOne(CMemBlock2D<double>& gridPoints,
     x[5] =  0.0; y[5] =  0.0; z[5] = -1.0; w[5] = weight;
 }
 
-void CLebedevLaikovQuadrature::_generateCaseTwo(CMemBlock2D<double>& gridPoints,
-                                                const int32_t offset,
-                                                const double weight) const
+void
+CLebedevLaikovQuadrature::_generateCaseTwo(      CMemBlock2D<double>& gridPoints,
+                                           const int32_t              offset,
+                                           const double               weight) const
 {
     auto x = gridPoints.data(0, offset);
     
@@ -603,9 +616,10 @@ void CLebedevLaikovQuadrature::_generateCaseTwo(CMemBlock2D<double>& gridPoints,
     x[11] =  -a; y[11] =  -a; z[11] = 0.0; w[11] = weight;
 }
 
-void CLebedevLaikovQuadrature::_generateCaseThree(CMemBlock2D<double>& gridPoints,
-                                                  const int32_t offset,
-                                                  const double weight) const
+void
+CLebedevLaikovQuadrature::_generateCaseThree(      CMemBlock2D<double>& gridPoints,
+                                             const int32_t              offset,
+                                             const double               weight) const
 {
     auto x = gridPoints.data(0, offset);
     
@@ -634,10 +648,11 @@ void CLebedevLaikovQuadrature::_generateCaseThree(CMemBlock2D<double>& gridPoint
     x[7] =  -a; y[7] =  -a; z[7] =  -a; w[7] = weight;
 }
 
-void CLebedevLaikovQuadrature::_generateCaseFour(CMemBlock2D<double>& gridPoints,
-                                                 const int32_t offset,
-                                                 const double  factor,
-                                                 const double  weight) const
+void
+CLebedevLaikovQuadrature::_generateCaseFour(      CMemBlock2D<double>& gridPoints,
+                                            const int32_t              offset,
+                                            const double               factor,
+                                            const double               weight) const
 {
     auto x = gridPoints.data(0, offset);
     
@@ -700,10 +715,11 @@ void CLebedevLaikovQuadrature::_generateCaseFour(CMemBlock2D<double>& gridPoints
     x[23] =  -b; y[23] =  -a; z[23] =  -a; w[23] = weight;
 }
 
-void CLebedevLaikovQuadrature::_generateCaseFive(CMemBlock2D<double>& gridPoints,
-                                                 const int32_t offset,
-                                                 const double factor,
-                                                 const double weight) const
+void
+CLebedevLaikovQuadrature::_generateCaseFive(      CMemBlock2D<double>& gridPoints,
+                                            const int32_t              offset,
+                                            const double               factor,
+                                            const double               weight) const
 {
     auto x = gridPoints.data(0, offset);
     
@@ -766,11 +782,12 @@ void CLebedevLaikovQuadrature::_generateCaseFive(CMemBlock2D<double>& gridPoints
     x[23] = 0.0; y[23] =  -b; z[23] =  -a; w[23] = weight;
 }
 
-void CLebedevLaikovQuadrature::_generateCaseSix(CMemBlock2D<double>& gridPoints,
-                                                const int32_t offset,
-                                                const double factorA,
-                                                const double factorB,
-                                                const double weight) const
+void
+CLebedevLaikovQuadrature::_generateCaseSix(      CMemBlock2D<double>& gridPoints,
+                                           const int32_t              offset,
+                                           const double               factorA,
+                                           const double               factorB,
+                                           const double               weight) const
 {
     auto x = gridPoints.data(0, offset);
     

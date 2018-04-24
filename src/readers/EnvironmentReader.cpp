@@ -26,7 +26,8 @@ CEnvironmentReader::getState() const
     return _state;
 }
 
-void CEnvironmentReader::parse(const CInputData&    inputData,
+void
+CEnvironmentReader::parse(const CInputData&    inputData,
                                 COutputStream& oStream)
 {
     oStream << fmt::info << "Parsing mandatory @progenv group..." << fmt::end;
@@ -62,13 +63,15 @@ void CEnvironmentReader::parse(const CInputData&    inputData,
     }
 }
 
-std::string CEnvironmentReader::getPathToBasisSets() const
+std::string
+CEnvironmentReader::getPathToBasisSets() const
 {
     return _pathToBasisSets;
 }
 
-void CEnvironmentReader::_errorUniqueGroup(const size_t nGroups,
-                                           COutputStream& oStream)
+void
+CEnvironmentReader::_errorUniqueGroup(const size_t         nGroups,
+                                            COutputStream& oStream)
 {
     _state = false;
 
@@ -96,8 +99,9 @@ void CEnvironmentReader::_errorUniqueGroup(const size_t nGroups,
     oStream << fmt::blank;
 }
 
-void CEnvironmentReader::_errorUnknownVariable(const CInputLine& inputLine,
-                                               COutputStream& oStream)
+void
+CEnvironmentReader::_errorUnknownVariable(const CInputLine&    inputLine,
+                                                COutputStream& oStream)
 {
     _state = false;
 
@@ -110,8 +114,9 @@ void CEnvironmentReader::_errorUnknownVariable(const CInputLine& inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-bool CEnvironmentReader::_addPathToBasisSets(const CInputLine& inputLine,
-                                             COutputStream& oStream)
+bool
+CEnvironmentReader::_addPathToBasisSets(const CInputLine&    inputLine,
+                                              COutputStream& oStream)
 {
     if (inputLine.isKeyword(0, "BasisLibrary:"))
     {
@@ -135,8 +140,9 @@ bool CEnvironmentReader::_addPathToBasisSets(const CInputLine& inputLine,
     return false;
 }
 
-void CEnvironmentReader::_syntaxBasisLibrary(const CInputLine& inputLine,
-                                             COutputStream& oStream)
+void
+CEnvironmentReader::_syntaxBasisLibrary(const CInputLine&    inputLine,
+                                              COutputStream& oStream)
 {
     _state = false;
 

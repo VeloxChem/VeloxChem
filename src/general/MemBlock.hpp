@@ -195,7 +195,8 @@ public:
      @param iPosition the starting position of subblock.
      @return the memory block object.
      */
-    CMemBlock<T> pick(const int32_t nSubBlocks, const int32_t iPosition) const;
+    CMemBlock<T> pick(const int32_t nSubBlocks,
+                      const int32_t iPosition) const;
     
     /**
      Broadcasts memory block object within domain of MPI communicator.
@@ -203,7 +204,8 @@ public:
      @param rank the rank of MPI process.
      @param comm the MPI communicator.
      */
-    void broadcast(int32_t rank, MPI_Comm comm);
+    void broadcast(int32_t  rank,
+                   MPI_Comm comm);
     
     /**
      Creates memory block object on master MPI process by gathering memory
@@ -215,7 +217,9 @@ public:
      @return the memory block object: (a) on master node with gathered data;
              (b) on worker nodes empty.
      */
-    CMemBlock<T> gather(int32_t rank, int32_t nodes, MPI_Comm comm);
+    CMemBlock<T> gather(int32_t  rank,
+                        int32_t  nodes,
+                        MPI_Comm comm);
     
     /**
      Reasigns memory block object on all MPI process within domain of MPI
@@ -225,7 +229,9 @@ public:
      @param nodes the number of MPI processes in MPI communicator.
      @param comm the MPI communicator.
      */
-    void scatter(int32_t rank, int32_t nodes, MPI_Comm comm);
+    void scatter(int32_t  rank,
+                 int32_t  nodes,
+                 MPI_Comm comm);
 
     /**
      Converts memory block object to text output and insert it into output text
@@ -235,7 +241,7 @@ public:
      @param source the memory block object.
      */
     template <class U>
-    friend std::ostream& operator<<(std::ostream& output,
+    friend std::ostream& operator<<(      std::ostream& output,
                                     const CMemBlock<U>& source);
 };
 
@@ -302,7 +308,8 @@ CMemBlock<T>::~CMemBlock()
 }
 
 template<class T>
-CMemBlock<T>& CMemBlock<T>::operator=(const CMemBlock<T>& source)
+CMemBlock<T>&
+CMemBlock<T>::operator=(const CMemBlock<T>& source)
 {
     if (this == &source) return *this;
 
@@ -316,7 +323,8 @@ CMemBlock<T>& CMemBlock<T>::operator=(const CMemBlock<T>& source)
 }
 
 template<class T>
-CMemBlock<T>& CMemBlock<T>::operator=(CMemBlock<T>&& source) noexcept
+CMemBlock<T>&
+CMemBlock<T>::operator=(CMemBlock<T>&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -332,7 +340,8 @@ CMemBlock<T>& CMemBlock<T>::operator=(CMemBlock<T>&& source) noexcept
 }
 
 template<class T>
-bool CMemBlock<T>::operator==(const CMemBlock<T>& other) const
+bool
+CMemBlock<T>::operator==(const CMemBlock<T>& other) const
 {
     if (_nElements != other._nElements) return false;
 
@@ -345,43 +354,50 @@ bool CMemBlock<T>::operator==(const CMemBlock<T>& other) const
 }
 
 template<class T>
-bool CMemBlock<T>::operator!=(const CMemBlock<T>& other) const
+bool
+CMemBlock<T>::operator!=(const CMemBlock<T>& other) const
 {
     return !(*this == other);
 }
 
 template<class T>
-T* CMemBlock<T>::data()
+T*
+CMemBlock<T>::data()
 {
     return _data;
 }
 
 template<class T>
-const T* CMemBlock<T>::data() const
+const T*
+CMemBlock<T>::data() const
 {
     return _data;
 }
 
 template<class T>
-T* CMemBlock<T>::data(const int32_t iElement)
+T*
+CMemBlock<T>::data(const int32_t iElement)
 {
     return &(_data[iElement]);
 }
 
 template<class T>
-const T* CMemBlock<T>::data(const int32_t iElement) const
+const T*
+CMemBlock<T>::data(const int32_t iElement) const
 {
     return &(_data[iElement]);
 }
 
 template <class T>
-int32_t CMemBlock<T>::size() const
+int32_t
+CMemBlock<T>::size() const
 {
     return _nElements;
 }
 
 template <class T>
-void CMemBlock<T>::zero()
+void
+CMemBlock<T>::zero()
 {
     auto t0value = static_cast<T>(0);
 
@@ -392,19 +408,22 @@ void CMemBlock<T>::zero()
 }
 
 template <class T>
-inline T& CMemBlock<T>::at(const int32_t iElement)
+inline T&
+CMemBlock<T>::at(const int32_t iElement)
 {
     return _data[iElement];
 }
 
 template <class T>
-inline const T& CMemBlock<T>::at(const int32_t iElement) const 
+inline const T&
+CMemBlock<T>::at(const int32_t iElement) const
 {
     return _data[iElement];
 }
 
 template <class T>
-CMemBlock<T> CMemBlock<T>::pack(const int32_t nSubBlocks) const
+CMemBlock<T>
+CMemBlock<T>::pack(const int32_t nSubBlocks) const
 {
     auto numelem = _nElements / nSubBlocks;
     
@@ -439,8 +458,9 @@ CMemBlock<T> CMemBlock<T>::pack(const int32_t nSubBlocks) const
 }
 
 template <class T>
-CMemBlock<T> CMemBlock<T>::pick(const int32_t nSubBlocks,
-                                const int32_t iPosition) const
+CMemBlock<T>
+CMemBlock<T>::pick(const int32_t nSubBlocks,
+                   const int32_t iPosition) const
 {
     auto numelem = _nElements / nSubBlocks;
     
@@ -460,7 +480,9 @@ CMemBlock<T> CMemBlock<T>::pick(const int32_t nSubBlocks,
 }
 
 template <>
-inline void CMemBlock<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
+inline void
+CMemBlock<int32_t>::broadcast(int32_t  rank,
+                              MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -476,7 +498,9 @@ inline void CMemBlock<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
 }
 
 template <>
-inline void CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
+inline void
+CMemBlock<double>::broadcast(int32_t  rank,
+                             MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -493,7 +517,9 @@ inline void CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
 
 template <>
 inline CMemBlock<int32_t>
-CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock<int32_t>::gather(int32_t  rank,
+                           int32_t  nodes,
+                           MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -549,7 +575,9 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
 template <>
 inline CMemBlock<double>
-CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock<double>::gather(int32_t  rank,
+                          int32_t  nodes,
+                          MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -602,7 +630,9 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
 template <>
 inline void
-CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock<int32_t>::scatter(int32_t  rank,
+                            int32_t  nodes,
+                            MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -666,7 +696,9 @@ CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
 template <>
 inline void
-CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock<double>::scatter(int32_t  rank,
+                           int32_t  nodes,
+                           MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -729,7 +761,8 @@ CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 }
 
 template <class T>
-void CMemBlock<T>::_allocate()
+void
+CMemBlock<T>::_allocate()
 {
     if (_nElements > 0)
     {
@@ -742,7 +775,8 @@ void CMemBlock<T>::_allocate()
 }
 
 template <class T>
-void CMemBlock<T>::_copy(const T* source)
+void
+CMemBlock<T>::_copy(const T* source)
 {
     auto pdata = _data;
 
@@ -750,9 +784,10 @@ void CMemBlock<T>::_copy(const T* source)
     for (int32_t i = 0; i < _nElements; i++) pdata[i] = source[i];
 }
 
-
 template<class U>
-std::ostream& operator<<(std::ostream& output, const CMemBlock<U>& source)
+std::ostream&
+operator<<(      std::ostream& output,
+           const CMemBlock<U>& source)
 {
     output << std::endl;
 

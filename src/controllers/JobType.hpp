@@ -22,7 +22,8 @@
 
 enum class job : int32_t
 {
-    sp_energy, opt_geometry
+    sp_energy,
+    opt_geometry
 };
 
 /**

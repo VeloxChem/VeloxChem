@@ -22,11 +22,11 @@ CMolecule::CMolecule()
 
 }
 
-CMolecule::CMolecule(const std::vector<double>& atomCoordinates,
-                     const std::vector<double>& atomCharges,
-                     const std::vector<double>& atomMasses,
+CMolecule::CMolecule(const std::vector<double>&      atomCoordinates,
+                     const std::vector<double>&      atomCharges,
+                     const std::vector<double>&      atomMasses,
                      const std::vector<std::string>& atomLabels,
-                     const std::vector<int32_t>& idsElemental)
+                     const std::vector<int32_t>&     idsElemental)
 
     : _charge(0.0)
 
@@ -98,7 +98,8 @@ CMolecule::~CMolecule()
 
 }
 
-CMolecule& CMolecule::operator=(const CMolecule& source)
+CMolecule&
+CMolecule::operator=(const CMolecule& source)
 {
     if (this == &source) return *this;
 
@@ -121,7 +122,8 @@ CMolecule& CMolecule::operator=(const CMolecule& source)
     return *this;
 }
 
-CMolecule& CMolecule::operator=(CMolecule&& source) noexcept
+CMolecule&
+CMolecule::operator=(CMolecule&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -144,7 +146,8 @@ CMolecule& CMolecule::operator=(CMolecule&& source) noexcept
     return *this;
 }
 
-bool CMolecule::operator==(const CMolecule& other) const
+bool
+CMolecule::operator==(const CMolecule& other) const
 {
     if (std::fabs(_charge - other._charge) > 1.0e-13) return false;
 
@@ -170,12 +173,14 @@ bool CMolecule::operator==(const CMolecule& other) const
     return true;
 }
 
-bool CMolecule::operator!=(const CMolecule& other) const
+bool
+CMolecule::operator!=(const CMolecule& other) const
 {
     return !(*this == other);
 }
 
-void CMolecule::setAtomicIndexes(const int32_t startIndex)
+void
+CMolecule::setAtomicIndexes(const int32_t startIndex)
 {
     for (int32_t i = 0; i < _idsAtomic.size(); i++)
     {
@@ -183,32 +188,38 @@ void CMolecule::setAtomicIndexes(const int32_t startIndex)
     }
 }
 
-void CMolecule::setCharge(const double charge)
+void
+CMolecule::setCharge(const double charge)
 {
     _charge = charge;
 }
 
-void CMolecule::setMultiplicity(const int32_t multiplicity)
+void
+CMolecule::setMultiplicity(const int32_t multiplicity)
 {
     _multiplicity = multiplicity; 
 }
 
-double CMolecule::getCharge() const
+double
+CMolecule::getCharge() const
 {
     return _charge;
 }
 
-int32_t CMolecule::getMultiplicity() const
+int32_t
+CMolecule::getMultiplicity() const
 {
     return _multiplicity;
 }
 
-int32_t CMolecule::getNumberOfAtoms() const
+int32_t
+CMolecule::getNumberOfAtoms() const
 {
     return _idsElemental.size();
 }
 
-int32_t CMolecule::getNumberOfAtoms(const int32_t idElemental) const
+int32_t
+CMolecule::getNumberOfAtoms(const int32_t idElemental) const
 {
     int32_t natoms = 0;
     
@@ -220,7 +231,8 @@ int32_t CMolecule::getNumberOfAtoms(const int32_t idElemental) const
     return natoms;
 }
 
-std::set<int32_t> CMolecule::getElementalComposition() const
+std::set<int32_t>
+CMolecule::getElementalComposition() const
 {
     std::set<int32_t> elemset;
     
@@ -232,39 +244,45 @@ std::set<int32_t> CMolecule::getElementalComposition() const
     return elemset;
 }
 
-int32_t CMolecule::getNumberOfElectrons() const
+int32_t
+CMolecule::getNumberOfElectrons() const
 {
-    double nElectrons = -_charge;
+    double nelectrons = -_charge;
     
     for (int32_t i = 0; i < _atomCharges.size(); i++)
     {
-        nElectrons += _atomCharges.at(i);
+        nelectrons += _atomCharges.at(i);
     }
     
-    return static_cast<int32_t>(nElectrons);
+    return static_cast<int32_t>(nelectrons);
 }
 
-const int32_t* CMolecule::getIdsElemental() const
+const int32_t*
+CMolecule::getIdsElemental() const
 {
     return _idsElemental.data();
 }
 
-const double* CMolecule::getCoordinatesX() const
+const double*
+CMolecule::getCoordinatesX() const
 {
     return _atomCoordinates.data(0);
 }
 
-const double* CMolecule::getCoordinatesY() const
+const double*
+CMolecule::getCoordinatesY() const
 {
     return _atomCoordinates.data(1);
 }
 
-const double* CMolecule::getCoordinatesZ() const
+const double*
+CMolecule::getCoordinatesZ() const
 {
     return _atomCoordinates.data(2);
 }
 
-void CMolecule::printGeometry(COutputStream& oStream) const
+void
+CMolecule::printGeometry(COutputStream& oStream) const
 {
     oStream << fmt::header;
     
@@ -314,7 +332,8 @@ void CMolecule::printGeometry(COutputStream& oStream) const
     oStream << fmt::blank;
 }
 
-bool CMolecule::checkProximity(const double minDistance,
+bool
+CMolecule::checkProximity(const double        minDistance,
                                COutputStream& oStream) const
 {
     auto natoms = _atomCoordinates.size(0);
@@ -344,8 +363,9 @@ bool CMolecule::checkProximity(const double minDistance,
     return true;
 }
 
-
-void CMolecule::broadcast(int32_t rank, MPI_Comm comm)
+void
+CMolecule::broadcast(int32_t  rank,
+                     MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -367,9 +387,11 @@ void CMolecule::broadcast(int32_t rank, MPI_Comm comm)
     }
 }
 
-void CMolecule::_errorAtomsToClose(const int32_t iAtomA, const int32_t iAtomB,
-                                   const double minDistance,
-                                   COutputStream &oStream) const
+void
+CMolecule::_errorAtomsToClose(const int32_t        iAtomA,
+                              const int32_t        iAtomB,
+                              const double         minDistance,
+                                    COutputStream& oStream) const
 {
     oStream << fmt::cerror << "Distance between atoms:" << fmt::end;
     
@@ -384,7 +406,9 @@ void CMolecule::_errorAtomsToClose(const int32_t iAtomA, const int32_t iAtomB,
     oStream << "Please correct Your input!" << fmt::end << fmt::blank;
 }
 
-std::ostream& operator<<(std::ostream& output, const CMolecule& source)
+std::ostream&
+operator<<(      std::ostream& output,
+           const CMolecule&    source)
 {
     output << std::endl;
 

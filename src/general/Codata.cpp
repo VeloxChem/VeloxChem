@@ -10,12 +10,14 @@
 
 namespace units { // units namespace
 
-double getBohrValueInAngstroms()
+double
+getBohrValueInAngstroms()
 {
     return 0.52917721092;
 }
 
-double getHatreeValueInElectronVolts()
+double
+getHatreeValueInElectronVolts()
 {
     return 27.21138505;
 }

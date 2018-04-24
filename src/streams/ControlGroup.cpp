@@ -38,7 +38,8 @@ CControlGroup::~CControlGroup()
 
 }
 
-CControlGroup& CControlGroup::operator=(const CControlGroup& source)
+CControlGroup&
+CControlGroup::operator=(const CControlGroup& source)
 {
     if (this == &source) return *this;
 
@@ -49,7 +50,8 @@ CControlGroup& CControlGroup::operator=(const CControlGroup& source)
     return *this;
 }
 
-CControlGroup& CControlGroup::operator=(CControlGroup&& source) noexcept
+CControlGroup&
+CControlGroup::operator=(CControlGroup&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -60,7 +62,8 @@ CControlGroup& CControlGroup::operator=(CControlGroup&& source) noexcept
     return *this;
 }
 
-bool CControlGroup::operator==(const CControlGroup& other) const
+bool
+CControlGroup::operator==(const CControlGroup& other) const
 {
     if (_header != other._header) return false;
 
@@ -74,49 +77,58 @@ bool CControlGroup::operator==(const CControlGroup& other) const
     return true;
 }
 
-bool CControlGroup::operator!=(const CControlGroup& other) const
+bool
+CControlGroup::operator!=(const CControlGroup& other) const
 {
     return !(*this == other);
 }
 
-void CControlGroup::setHeader(const CInputLine& header)
+void
+CControlGroup::setHeader(const CInputLine& header)
 {
     _header = header;
 }
 
-void CControlGroup::addCommand(const CInputLine& command)
+void
+CControlGroup::addCommand(const CInputLine& command)
 {
     _commands.push_back(command);
 }
 
-void CControlGroup::clear()
+void
+CControlGroup::clear()
 {
     _header.clear();
 
     _commands.clear();
 }
 
-bool CControlGroup::isEmpty() const
+bool
+CControlGroup::isEmpty() const
 {
     return _commands.empty();
 }
 
-bool CControlGroup::isNameOfControlGroup(const std::string& name) const
+bool
+CControlGroup::isNameOfControlGroup(const std::string& name) const
 {
     return _header.isControlKeyword(name);
 }
 
-bool CControlGroup::isNameOfControlGroup(const char* name) const
+bool
+CControlGroup::isNameOfControlGroup(const char* name) const
 {
     return isNameOfControlGroup(std::string(name));
 }
 
-int32_t CControlGroup::getNumberOfCommands() const
+int32_t
+CControlGroup::getNumberOfCommands() const
 {
     return static_cast<int32_t>(_commands.size());
 }
 
-int32_t CControlGroup::getNumberOfCommands(const std::string& keyword) const
+int32_t
+CControlGroup::getNumberOfCommands(const std::string& keyword) const
 {
     int32_t nkeys = 0;
 
@@ -128,17 +140,20 @@ int32_t CControlGroup::getNumberOfCommands(const std::string& keyword) const
     return nkeys;
 }
 
-int32_t CControlGroup::getNumberOfCommands(const char* keyword) const
+int32_t
+CControlGroup::getNumberOfCommands(const char* keyword) const
 {
     return getNumberOfCommands(std::string(keyword));
 }
 
-CInputLine CControlGroup::getCommand(const int32_t index) const
+CInputLine
+CControlGroup::getCommand(const int32_t index) const
 {
     return _commands[index];
 }
 
-CInputLine CControlGroup::getCommand(const std::string& keyword) const
+CInputLine
+CControlGroup::getCommand(const std::string& keyword) const
 {
     for (size_t i = 0; i < _commands.size(); i++)
     {
@@ -148,12 +163,15 @@ CInputLine CControlGroup::getCommand(const std::string& keyword) const
     return CInputLine();
 }
 
-CInputLine CControlGroup::getCommand(const char* keyword) const
+CInputLine
+CControlGroup::getCommand(const char* keyword) const
 {
     return getCommand(std::string(keyword));
 }
 
-std::ostream& operator<<(std::ostream&  output, const CControlGroup& source)
+std::ostream&
+operator<<(      std::ostream&  output,
+           const CControlGroup& source)
 {
     output << std::endl;
 

@@ -47,7 +47,8 @@ public:
      @param argc the number of command line arguments.
      @param argv the array of command line arguments.
      */
-    CCommandLineReader(int argc, char** argv);
+    CCommandLineReader(int    argc,
+                       char** argv);
 
     /**
      Destroys a command line reader object.

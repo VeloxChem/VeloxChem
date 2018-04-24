@@ -12,7 +12,9 @@
 
 namespace mpi { // mpi namespace
 
-bool init(int argc, char** argv)
+bool
+init(int    argc,
+     char** argv)
 {
     if (ENABLE_MPI)
     {
@@ -32,7 +34,8 @@ bool init(int argc, char** argv)
     return true;
 }
 
-bool finalize()
+bool
+finalize()
 {
     if (ENABLE_MPI)
     {
@@ -49,7 +52,8 @@ bool finalize()
     return true;
 }
     
-int32_t rank(MPI_Comm comm)
+int32_t
+rank(MPI_Comm comm)
 {
     int32_t mrank = 0;
 
@@ -58,7 +62,8 @@ int32_t rank(MPI_Comm comm)
     return mrank;
 }
 
-int32_t nodes(MPI_Comm comm)
+int32_t
+nodes(MPI_Comm comm)
 {
     int32_t mnodes = 1;
 
@@ -67,7 +72,9 @@ int32_t nodes(MPI_Comm comm)
     return mnodes;
 }
     
-bool compare(MPI_Comm comm1, MPI_Comm comm2)
+bool
+compare(MPI_Comm comm1,
+        MPI_Comm comm2)
 {
     if (ENABLE_MPI)
     {
@@ -90,7 +97,9 @@ bool compare(MPI_Comm comm1, MPI_Comm comm2)
     return true;
 }
     
-void bcast(int32_t& value, MPI_Comm comm)
+void
+bcast(int32_t& value,
+      MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -100,7 +109,9 @@ void bcast(int32_t& value, MPI_Comm comm)
     }
 }
 
-void bcast(double& value, MPI_Comm comm)
+void
+bcast(double&  value,
+      MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -110,7 +121,10 @@ void bcast(double& value, MPI_Comm comm)
     }
 }
 
-void bcast(bool& value, int32_t rank, MPI_Comm comm)
+void
+bcast(bool&    value,
+      int32_t  rank,
+      MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -124,7 +138,9 @@ void bcast(bool& value, int32_t rank, MPI_Comm comm)
     }
 }
 
-void bcast(char& value, MPI_Comm comm)
+void
+bcast(char&    value,
+      MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -134,7 +150,10 @@ void bcast(char& value, MPI_Comm comm)
     }
 }
     
-void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
+void
+bcast(std::vector<int32_t>& vector,
+      int32_t               rank,
+      MPI_Comm              comm)
 {
     if (ENABLE_MPI)
     {
@@ -161,7 +180,10 @@ void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
     }
 }
  
-void bcast(std::string& str, int32_t rank, MPI_Comm comm)
+void
+bcast(std::string& str,
+      int32_t      rank,
+      MPI_Comm     comm)
 {
     if (ENABLE_MPI)
     {
@@ -188,7 +210,10 @@ void bcast(std::string& str, int32_t rank, MPI_Comm comm)
     }
 }
     
-void bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm)
+void
+bcast(std::vector<std::string>& vector,
+      int32_t                   rank,
+      MPI_Comm                  comm)
 {
     if (ENABLE_MPI)
     {
@@ -215,8 +240,10 @@ void bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm)
     }
 }
 
-int32_t batch_size(const int32_t nElements, const int32_t rank,
-                   const int32_t nodes)
+int32_t
+batch_size(const int32_t nElements,
+           const int32_t rank,
+           const int32_t nodes)
 {
     int32_t numelem = nElements / nodes;
 
@@ -227,8 +254,10 @@ int32_t batch_size(const int32_t nElements, const int32_t rank,
     return numelem;
 }
 
-int32_t batch_offset(const int32_t nElements, const int32_t rank,
-                     const int32_t nodes)
+int32_t
+batch_offset(const int32_t nElements,
+             const int32_t rank,
+             const int32_t nodes)
 {
     int32_t index = 0;
 
@@ -240,8 +269,10 @@ int32_t batch_offset(const int32_t nElements, const int32_t rank,
     return index;
 }
 
-void batches_pattern(int32_t* pattern, const int32_t  nElements,
-                     const int32_t nodes)
+void
+batches_pattern(      int32_t* pattern,
+                const int32_t  nElements,
+                const int32_t  nodes)
 {
     for (int32_t i = 0; i < nodes; i++)
     {
@@ -249,7 +280,11 @@ void batches_pattern(int32_t* pattern, const int32_t  nElements,
     }
 }
 
-void gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm)
+void
+gather(int32_t* vector,
+       int32_t  value,
+       int32_t  rank,
+       MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -266,7 +301,9 @@ void gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm)
     
 // TODO: Add other MPI functions for generic types
     
-void abort(const int errorcode, const char* label)
+void
+abort(const int   errorcode,
+      const char* label)
 {
     if (ENABLE_MPI)
     {

@@ -55,7 +55,8 @@ public:
      @param globNodes the total number of MPI processes.
      @param runMode the execution mode of job.
      */
-    CBaseJob(const int32_t globRank, const int32_t globNodes,
+    CBaseJob(const int32_t  globRank,
+             const int32_t  globNodes,
              const execmode runMode);
     
     /**
@@ -77,8 +78,9 @@ public:
      @param inputData the input data object.
      @param oStream the output stream.
      */
-    virtual void set(const std::string& pathToBasisSets,
-                     const CInputData& inputData, COutputStream& oStream) = 0;
+    virtual void set(const std::string&   pathToBasisSets,
+                     const CInputData&    inputData,
+                           COutputStream& oStream) = 0;
 
     /**
      Executes basic job.
@@ -86,7 +88,8 @@ public:
      @param comm the MPI communicator.
      @param oStream the output stream.
      */
-    virtual void run(COutputStream& oStream, MPI_Comm comm) = 0;
+    virtual void run(COutputStream& oStream,
+                     MPI_Comm       comm) = 0;
 };
 
 #endif /* BaseJob_hpp */

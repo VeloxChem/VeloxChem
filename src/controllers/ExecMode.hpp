@@ -21,7 +21,8 @@
 
 enum class execmode : int32_t
 {
-    cpu, cpu_gpu
+    cpu,
+    cpu_gpu
 };
 
 /**

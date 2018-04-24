@@ -133,7 +133,8 @@ public:
      @param output the output stream.
      @param source the formatting key.
      */
-    friend COutputStream& operator<<(COutputStream& output, const fmt& source);
+    friend COutputStream& operator<<(      COutputStream& output,
+                                     const fmt&           source);
 
     /**
      Inserts string into temporary output line.
@@ -141,8 +142,8 @@ public:
      @param output the output stream.
      @param source the string.
      */
-    friend COutputStream& operator<<(COutputStream& output,
-                                     const std::string& source);
+    friend COutputStream& operator<<(      COutputStream& output,
+                                     const std::string&   source);
 
     /**
      Inserts C string into temporary output line.
@@ -150,7 +151,8 @@ public:
      @param output the output stream.
      @param source the C string.
      */
-    friend COutputStream& operator<<(COutputStream& output, const char* source);
+    friend COutputStream& operator<<(      COutputStream& output,
+                                     const char*          source);
 };
 
 #endif /* OutputStream_hpp */

@@ -24,18 +24,22 @@ CJobsReader::~CJobsReader()
 
 }
 
-bool CJobsReader::getState() const
+bool
+CJobsReader::getState() const
 {
     return _state;
 }
 
-execmode CJobsReader::getRunMode() const
+execmode
+CJobsReader::getRunMode() const
 {
     return _runMode;
 }
 
-void CJobsReader::parse(std::vector<int32_t>& listOfJobIds,
-                        const CInputData& inputData, COutputStream& oStream)
+void
+CJobsReader::parse(      std::vector<int32_t>& listOfJobIds,
+                   const CInputData&           inputData,
+                         COutputStream&        oStream)
 {
     oStream << fmt::info << "Parsing mandatory @jobs group..." << fmt::end;
 
@@ -83,8 +87,9 @@ void CJobsReader::parse(std::vector<int32_t>& listOfJobIds,
     }
 }
 
-void CJobsReader::_errorUniqueGroup(const size_t nGroups,
-                                    COutputStream& oStream)
+void
+CJobsReader::_errorUniqueGroup(const size_t         nGroups,
+                                     COutputStream& oStream)
 {
     _state = false;
 
@@ -112,8 +117,9 @@ void CJobsReader::_errorUniqueGroup(const size_t nGroups,
     oStream << fmt::blank;
 }
 
-void CJobsReader::_errorUnknownJobType(const CInputLine& inputLine,
-                                       COutputStream& oStream)
+void
+CJobsReader::_errorUnknownJobType(const CInputLine&    inputLine,
+                                        COutputStream& oStream)
 {
     _state = false;
 
@@ -124,8 +130,9 @@ void CJobsReader::_errorUnknownJobType(const CInputLine& inputLine,
     oStream << fmt::end << fmt::blank;
 }
                 
-bool CJobsReader::_addExecutionMode(const CInputLine& inputLine,
-                                    COutputStream& oStream)
+bool
+CJobsReader::_addExecutionMode(const CInputLine&    inputLine,
+                                     COutputStream& oStream)
 {
     if (inputLine.isKeyword(0, "RunMode:"))
     {
@@ -158,9 +165,10 @@ bool CJobsReader::_addExecutionMode(const CInputLine& inputLine,
     return false;
 }
 
-bool CJobsReader::_addSinglePoint(std::vector<int32_t>& listOfJobIds,
-                                  const CInputLine& inputLine,
-                                  COutputStream& oStream)
+bool
+CJobsReader::_addSinglePoint(      std::vector<int32_t>& listOfJobIds,
+                             const CInputLine&           inputLine,
+                                   COutputStream&        oStream)
 {
     if (inputLine.isKeyword(0, "SinglePoint:"))
     {
@@ -186,9 +194,10 @@ bool CJobsReader::_addSinglePoint(std::vector<int32_t>& listOfJobIds,
     return false;
 }
 
-bool CJobsReader::_addOptimization(std::vector<int32_t>& listOfJobIds,
-                                   const CInputLine& inputLine,
-                                   COutputStream& oStream)
+bool
+CJobsReader::_addOptimization(      std::vector<int32_t>& listOfJobIds,
+                              const CInputLine&           inputLine,
+                                    COutputStream&        oStream)
 {
     if (inputLine.isKeyword(0, "Optimization:"))
     {
@@ -214,8 +223,9 @@ bool CJobsReader::_addOptimization(std::vector<int32_t>& listOfJobIds,
     return false;
 }
 
-void CJobsReader::_syntaxRunMode(const CInputLine& inputLine,
-                                 COutputStream& oStream)
+void
+CJobsReader::_syntaxRunMode(const CInputLine&    inputLine,
+                                  COutputStream& oStream)
 {
     _state = false;
     
@@ -230,8 +240,9 @@ void CJobsReader::_syntaxRunMode(const CInputLine& inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-void CJobsReader::_syntaxSinglePoint(const CInputLine& inputLine,
-                                     COutputStream& oStream)
+void
+CJobsReader::_syntaxSinglePoint(const CInputLine&    inputLine,
+                                      COutputStream& oStream)
 {
     _state = false;
 
@@ -246,9 +257,10 @@ void CJobsReader::_syntaxSinglePoint(const CInputLine& inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-void CJobsReader::_errorUnknownCalculationType(const char* calcType,
-                                               const CInputLine& inputLine,
-                                               COutputStream& oStream)
+void
+CJobsReader::_errorUnknownCalculationType(const char*          calcType,
+                                          const CInputLine&    inputLine,
+                                                COutputStream& oStream)
 {
     _state = false;
 
@@ -261,8 +273,9 @@ void CJobsReader::_errorUnknownCalculationType(const char* calcType,
     oStream << fmt::end << fmt::blank;
 }
 
-void CJobsReader::_syntaxOptimization(const CInputLine& inputLine,
-                                      COutputStream& oStream)
+void
+CJobsReader::_syntaxOptimization(const CInputLine&    inputLine,
+                                       COutputStream& oStream)
 {
     _state = false;
 

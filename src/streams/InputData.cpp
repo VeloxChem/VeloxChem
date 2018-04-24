@@ -18,7 +18,8 @@ CInputData::~CInputData()
 
 }
 
-bool CInputData::operator==(const CInputData& other) const
+bool
+CInputData::operator==(const CInputData& other) const
 {
     if (_controlGroups.size() != other._controlGroups.size()) return false;
 
@@ -30,22 +31,26 @@ bool CInputData::operator==(const CInputData& other) const
     return true;
 }
 
-bool CInputData::operator!=(const CInputData& other) const
+bool
+CInputData::operator!=(const CInputData& other) const
 {
     return !(*this == other);
 }
 
-void CInputData::addControlGroup(const CControlGroup& controlGroup)
+void
+CInputData::addControlGroup(const CControlGroup& controlGroup)
 {
     _controlGroups.push_back(controlGroup);
 }
 
-int32_t CInputData::getNumberOfControlGroups() const
+int32_t
+CInputData::getNumberOfControlGroups() const
 {
     return static_cast<int32_t>(_controlGroups.size());
 }
 
-int32_t CInputData::getNumberOfControlGroups(const std::string& nameOfControlGroup) const
+int32_t
+CInputData::getNumberOfControlGroups(const std::string& nameOfControlGroup) const
 {
     int32_t ngroups = 0;
 
@@ -60,18 +65,21 @@ int32_t CInputData::getNumberOfControlGroups(const std::string& nameOfControlGro
     return ngroups;
 }
 
-int32_t CInputData::getNumberOfControlGroups(const char* nameOfControlGroup) const
+int32_t
+CInputData::getNumberOfControlGroups(const char* nameOfControlGroup) const
 {
     return getNumberOfControlGroups(std::string(nameOfControlGroup));
 }
 
-CControlGroup CInputData::getControlGroup(const size_t indexOfControlGroup) const
+CControlGroup
+CInputData::getControlGroup(const size_t indexOfControlGroup) const
 {
     return _controlGroups[indexOfControlGroup];
 }
 
-CControlGroup CInputData::getControlGroup(const size_t       indexOfControlGroup,
-                                          const std::string& nameOfControlGroup) const
+CControlGroup
+CInputData::getControlGroup(const size_t       indexOfControlGroup,
+                            const std::string& nameOfControlGroup) const
 {
     if (indexOfControlGroup < getNumberOfControlGroups(nameOfControlGroup))
     {
@@ -91,8 +99,9 @@ CControlGroup CInputData::getControlGroup(const size_t       indexOfControlGroup
     return CControlGroup();
 }
 
-CControlGroup CInputData::getControlGroup(const size_t indexOfControlGroup,
-                                          const char*  nameOfControlGroup) const
+CControlGroup
+CInputData::getControlGroup(const size_t indexOfControlGroup,
+                            const char*  nameOfControlGroup) const
 {
     return getControlGroup(indexOfControlGroup,
                            std::string(nameOfControlGroup));

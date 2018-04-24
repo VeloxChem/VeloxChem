@@ -138,7 +138,9 @@ public:
      @param nodes the number of nodes in MPI domain.
      @param comm he MPI communicator.
      */
-    void distribute(int32_t rank, int32_t nodes, MPI_Comm comm);
+    void distribute(int32_t  rank,
+                    int32_t  nodes,
+                    MPI_Comm comm);
 
     /**
      Converts molecular grid object to text and insert it into output text
@@ -147,7 +149,7 @@ public:
      @param output the output text stream.
      @param source the molecular grid.
      */
-    friend std::ostream& operator<<(std::ostream& output,
+    friend std::ostream& operator<<(      std::ostream&   output,
                                     const CMolecularGrid& source);
 };
 

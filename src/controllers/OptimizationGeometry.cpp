@@ -10,8 +10,8 @@
 
 #include "MpiFunc.hpp"
 
-COptimizationGeometry::COptimizationGeometry(const int32_t globRank,
-                                             const int32_t globNodes,
+COptimizationGeometry::COptimizationGeometry(const int32_t  globRank,
+                                             const int32_t  globNodes,
                                              const execmode runMode)
 
     : CBaseJob(globRank, globNodes, runMode)
@@ -19,21 +19,25 @@ COptimizationGeometry::COptimizationGeometry(const int32_t globRank,
 
 }
 
-void COptimizationGeometry::set(const std::string& pathToBasisSets,
-                                const CInputData& inputData,
-                                COutputStream& oStream)
+void
+COptimizationGeometry::set(const std::string&   pathToBasisSets,
+                           const CInputData&    inputData,
+                                 COutputStream& oStream)
 {
     if (_globRank == mpi::master()) _startHeader(oStream);
 
     // FIX ME: read data
 }
 
-void COptimizationGeometry::run(COutputStream& oStream, MPI_Comm comm)
+void
+COptimizationGeometry::run(COutputStream& oStream,
+                           MPI_Comm       comm)
 {
     // FIX ME: perform geometry optimization
 }
 
-void COptimizationGeometry::_startHeader(COutputStream& oStream) const
+void
+COptimizationGeometry::_startHeader(COutputStream& oStream) const
 {
     oStream << fmt::header;
 

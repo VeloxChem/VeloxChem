@@ -68,9 +68,12 @@ public:
      @param fillSymbol the background symbol in formatted output line.
      @param width the width of formatted output line.
      */
-    COutputLine(const std::string& line, const size_t offset,
-                const char leftSymol, const char rightSymbol,
-                const char fillSymbol, const size_t width);
+    COutputLine(const std::string& line,
+                const size_t       offset,
+                const char         leftSymol,
+                const char         rightSymbol,
+                const char         fillSymbol,
+                const size_t       width);
 
     /**
      Creates an output line object by copying other output line object.
@@ -128,8 +131,8 @@ public:
      @param output the output file stream.
      @param source the output line object.
      */
-    friend std::ofstream& operator<<(std::ofstream& output,
-                                     const COutputLine& source);
+    friend std::ofstream& operator<<(      std::ofstream& output,
+                                     const COutputLine&   source);
 
     /**
      Converts output line object to formatted text line and insert it into
@@ -138,8 +141,8 @@ public:
      @param output the output text stream.
      @param source the output line object.
      */
-    friend std::ostream& operator<<(std::ostream& output,
-                                    const COutputLine& source);
+    friend std::ostream& operator<<(      std::ostream& output,
+                                    const COutputLine&  source);
 };
 
 #endif /* OutputLine_hpp */

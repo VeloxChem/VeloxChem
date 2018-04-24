@@ -18,8 +18,10 @@
 #include "MathConst.hpp"
 #include "PartitionFunc.hpp"
 
-CGridDriver::CGridDriver(const int32_t globRank, const int32_t globNodes,
-                         execmode runMode, MPI_Comm comm)
+CGridDriver::CGridDriver(const int32_t  globRank,
+                         const int32_t  globNodes,
+                         const execmode runMode,
+                               MPI_Comm comm)
 
     : _gridLevel(5)
 
@@ -45,7 +47,9 @@ CGridDriver::~CGridDriver()
 
 }
 
-void CGridDriver::setLevel(const int32_t gridLevel, MPI_Comm comm)
+void
+CGridDriver::setLevel(const int32_t  gridLevel,
+                            MPI_Comm comm)
 {
     if (_globRank == mpi::master())
     {
@@ -60,9 +64,10 @@ void CGridDriver::setLevel(const int32_t gridLevel, MPI_Comm comm)
     mpi::bcast(_gridLevel, comm);
 }
 
-CMolecularGrid CGridDriver::generate(const CMolecule& molecule,
-                                     COutputStream& oStream,
-                                     MPI_Comm comm) const
+CMolecularGrid
+CGridDriver::generate(const CMolecule&     molecule,
+                            COutputStream& oStream,
+                            MPI_Comm       comm) const
 {
     CSystemClock tim;
     
@@ -96,7 +101,8 @@ CMolecularGrid CGridDriver::generate(const CMolecule& molecule,
     return molgrid;
 }
 
-int32_t CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
+int32_t
+CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
 {
     // H, He atoms
 
@@ -148,7 +154,8 @@ int32_t CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
     return 0;
 }
 
-int32_t CGridDriver::_getNumberOfAngularPoints(const int32_t idElemental) const
+int32_t
+CGridDriver::_getNumberOfAngularPoints(const int32_t idElemental) const
 {
     // H, He atoms
 
@@ -182,8 +189,9 @@ int32_t CGridDriver::_getNumberOfAngularPoints(const int32_t idElemental) const
     return 0;
 }
 
-void CGridDriver::_startHeader(const CMolecule& molecule,
-                               COutputStream& oStream) const
+void
+CGridDriver::_startHeader(const CMolecule&     molecule,
+                                COutputStream& oStream) const
 {
     oStream << fmt::header << "Numerical Grid For DFT Integration" << fmt::end;
     
@@ -253,9 +261,10 @@ void CGridDriver::_startHeader(const CMolecule& molecule,
     oStream << fstr::format(str, 54, fmt::left) << fmt::end;
 }
 
-void CGridDriver::_finishHeader(const CSystemClock& time,
-                                const CMolecularGrid& molecularGrid,
-                                COutputStream&  oStream) const
+void
+CGridDriver::_finishHeader(const CSystemClock&   time,
+                           const CMolecularGrid& molecularGrid,
+                                 COutputStream&  oStream) const
 {
     std::string str("Pruned Grid     : ");
     
@@ -270,8 +279,9 @@ void CGridDriver::_finishHeader(const CSystemClock& time,
     oStream << fstr::format(str, 54, fmt::left) << fmt::end << fmt::blank;
 }
 
-CMolecularGrid CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
-                                                MPI_Comm comm) const
+CMolecularGrid
+CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
+                                       MPI_Comm   comm) const
 {
     // determine dimensions of atoms batch for each MPI node
     
@@ -336,9 +346,10 @@ CMolecularGrid CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
     return CMolecularGrid(prngrid);
 }
 
-int32_t CGridDriver::_getBatchOfGridPoints(const int32_t* idsElemental,
-                                           const int32_t offset,
-                                           const int32_t nAtoms) const
+int32_t
+CGridDriver::_getBatchOfGridPoints(const int32_t* idsElemental,
+                                   const int32_t offset,
+                                   const int32_t nAtoms) const
 {
     int32_t npoints = 0;
     
@@ -352,10 +363,11 @@ int32_t CGridDriver::_getBatchOfGridPoints(const int32_t* idsElemental,
     return npoints;
 }
 
-CMemBlock2D<double> CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
-                                                 const CMemBlock2D<double>& angPoints,
-                                                 const CMolecule& molecule,
-                                                 const int32_t idAtom) const
+CMemBlock2D<double>
+CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
+                             const CMemBlock2D<double>& angPoints,
+                             const CMolecule&           molecule,
+                             const int32_t              idAtom) const
 {
     // set up atomic grid dimensions
     
@@ -462,9 +474,10 @@ CMemBlock2D<double> CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radP
     return agrid;
 }
 
-void CGridDriver::_screenAtomGridPoints(CMemBlock2D<double>& molGridPoints,
-                                        int32_t& nGridPoints,
-                                        const CMemBlock2D<double>& atomGridPoints) const
+void
+CGridDriver::_screenAtomGridPoints(      CMemBlock2D<double>& molGridPoints,
+                                         int32_t&             nGridPoints,
+                                   const CMemBlock2D<double>& atomGridPoints) const
 {
     // atomic grid dimensions
     

@@ -60,7 +60,8 @@ class CMemBlock2D
      @param nElements the number of elements in data chunk.
      @param nBlocks the number of data chunks.
      */
-    void _setOriginalSizes(const int32_t nElements, const int32_t nBlocks);
+    void _setOriginalSizes(const int32_t nElements,
+                           const int32_t nBlocks);
     
     /**
      Sets dimensions, padding for all data chunks.
@@ -87,7 +88,8 @@ public:
      @param nElements the number of elements in data chunk.
      @param nBlocks the number of data chunks.
      */
-    CMemBlock2D(const int32_t nElements, const int32_t nBlocks);
+    CMemBlock2D(const int32_t nElements,
+                const int32_t nBlocks);
     
     /**
      Creates an 2D memory block object.
@@ -110,8 +112,9 @@ public:
      @param nElements the number of elements in data chunk.
      @param nBlocks the number of data chunks.
      */
-    CMemBlock2D(const std::vector<T>& dataVector, const int32_t nElements,
-                const int32_t nBlocks);
+    CMemBlock2D(const std::vector<T>& dataVector,
+                const int32_t         nElements,
+                const int32_t         nBlocks);
     
     /**
      Creates an 2D memory block object.
@@ -119,7 +122,7 @@ public:
      @param dataVector the vector with data elements.
      @param dimVector the vector of data chunk sizes.
      */
-    CMemBlock2D(const std::vector<T>& dataVector,
+    CMemBlock2D(const std::vector<T>&       dataVector,
                 const std::vector<int32_t>& dimVector);
 
     /**
@@ -199,7 +202,8 @@ public:
      @param iElement the index of element in memory block.
      @return the pointer to data chunk.
      */
-    T* data(const int32_t iBlock, const int32_t iElement);
+    T* data(const int32_t iBlock,
+            const int32_t iElement);
     
     /**
      Gets constant pointer to specific elment of selected data chunk in 2D
@@ -209,7 +213,8 @@ public:
      @param iElement the index of element in memory block.
      @return the pointer to data chunk.
      */
-    const T* data(const int32_t iBlock, const int32_t iElement) const;
+    const T* data(const int32_t iBlock,
+                  const int32_t iElement) const;
     
     /**
      Gets number of elements in specific data chunk.
@@ -232,7 +237,8 @@ public:
      @param rank the rank of MPI process.
      @param comm the MPI communicator.
      */
-    void broadcast(int32_t rank, MPI_Comm comm);
+    void broadcast(int32_t  rank,
+                   MPI_Comm comm);
     
     /**
      Creates 2D memory block object on master MPI process by gathering 2D memory
@@ -244,7 +250,9 @@ public:
      @return the 2D memory block object: (a) on master node with gathered data;
              (b) on worker nodes empty.
      */
-    CMemBlock2D<T> gather(int32_t rank, int32_t nodes, MPI_Comm comm);
+    CMemBlock2D<T> gather(int32_t  rank,
+                          int32_t  nodes,
+                          MPI_Comm comm);
     
     /**
      Reasigns 2D memory block object on all MPI process within domain of MPI
@@ -254,7 +262,9 @@ public:
      @param nodes the number of MPI processes in MPI communicator.
      @param comm the MPI communicator.
      */
-    void scatter(int32_t rank, int32_t nodes, MPI_Comm comm);
+    void scatter(int32_t  rank,
+                 int32_t  nodes,
+                 MPI_Comm comm);
     
     /**
      Converts 2D memory block object to text output and insert it into output
@@ -264,7 +274,7 @@ public:
      @param source the 2D memory block object.
      */
     template <class U>
-    friend std::ostream& operator<<(std::ostream& output,
+    friend std::ostream& operator<<(      std::ostream&   output,
                                     const CMemBlock2D<U>& source);
 };
 
@@ -277,7 +287,8 @@ CMemBlock2D<T>::CMemBlock2D()
 }
 
 template <class T>
-CMemBlock2D<T>::CMemBlock2D(const int32_t nElements, const int32_t nBlocks)
+CMemBlock2D<T>::CMemBlock2D(const int32_t nElements,
+                            const int32_t nBlocks)
 
     : _nElements(0)
 {
@@ -310,7 +321,8 @@ CMemBlock2D<T>::CMemBlock2D(const CMemBlock<int32_t> originalSizes)
 
 template<class T>
 CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector,
-                            const int32_t nElements, const int32_t nBlocks)
+                            const int32_t         nElements,
+                            const int32_t         nBlocks)
 
     : _nElements(0)
 {
@@ -326,7 +338,7 @@ CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector,
  }
 
 template<class T>
-CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector,
+CMemBlock2D<T>::CMemBlock2D(const std::vector<T>&       dataVector,
                             const std::vector<int32_t>& dimVector)
 {
     _originalSizes = CMemBlock<int32_t>(dimVector);
@@ -378,7 +390,8 @@ CMemBlock2D<T>::~CMemBlock2D()
 }
 
 template<class T>
-CMemBlock2D<T>& CMemBlock2D<T>::operator=(const CMemBlock2D<T>& source)
+CMemBlock2D<T>&
+CMemBlock2D<T>::operator=(const CMemBlock2D<T>& source)
 {
     if (this == &source) return *this;
 
@@ -396,7 +409,8 @@ CMemBlock2D<T>& CMemBlock2D<T>::operator=(const CMemBlock2D<T>& source)
 }
 
 template<class T>
-CMemBlock2D<T>& CMemBlock2D<T>::operator=(CMemBlock2D<T>&& source) noexcept
+CMemBlock2D<T>&
+CMemBlock2D<T>::operator=(CMemBlock2D<T>&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -414,7 +428,8 @@ CMemBlock2D<T>& CMemBlock2D<T>::operator=(CMemBlock2D<T>&& source) noexcept
 }
 
 template<class T>
-bool CMemBlock2D<T>::operator==(const CMemBlock2D<T>& other) const
+bool
+CMemBlock2D<T>::operator==(const CMemBlock2D<T>& other) const
 {
     if (_nElements != other._nElements) return false;
     
@@ -430,19 +445,22 @@ bool CMemBlock2D<T>::operator==(const CMemBlock2D<T>& other) const
 }
 
 template<class T>
-bool CMemBlock2D<T>::operator!=(const CMemBlock2D<T>& other) const
+bool
+CMemBlock2D<T>::operator!=(const CMemBlock2D<T>& other) const
 {
     return !(*this == other);
 }
 
 template <class T>
-void CMemBlock2D<T>::zero()
+void
+CMemBlock2D<T>::zero()
 {
     _data.zero(); 
 }
 
 template<class T>
-T* CMemBlock2D<T>::data(const int32_t iBlock)
+T*
+CMemBlock2D<T>::data(const int32_t iBlock)
 {
     if (_originalSizes.size() > 0)
     {
@@ -453,7 +471,8 @@ T* CMemBlock2D<T>::data(const int32_t iBlock)
 }
 
 template<class T>
-const T* CMemBlock2D<T>::data(const int32_t iBlock) const 
+const T*
+CMemBlock2D<T>::data(const int32_t iBlock) const
 {
     if (_originalSizes.size() > 0)
     {
@@ -464,7 +483,9 @@ const T* CMemBlock2D<T>::data(const int32_t iBlock) const
 }
 
 template<class T>
-T* CMemBlock2D<T>::data(const int32_t iBlock, const int32_t iElement)
+T*
+CMemBlock2D<T>::data(const int32_t iBlock,
+                     const int32_t iElement)
 {
     if (_originalSizes.size() > 0)
     {
@@ -482,7 +503,9 @@ T* CMemBlock2D<T>::data(const int32_t iBlock, const int32_t iElement)
 }
 
 template<class T>
-const T* CMemBlock2D<T>::data(const int32_t iBlock, const int32_t iElement) const
+const T*
+CMemBlock2D<T>::data(const int32_t iBlock,
+                     const int32_t iElement) const
 {
     if (_originalSizes.size() > 0)
     {
@@ -500,7 +523,8 @@ const T* CMemBlock2D<T>::data(const int32_t iBlock, const int32_t iElement) cons
 }
 
 template <class T>
-int32_t CMemBlock2D<T>::size(const int32_t iBlock) const
+int32_t
+CMemBlock2D<T>::size(const int32_t iBlock) const
 {
     if (iBlock < _originalSizes.size()) return _originalSizes.at(iBlock);
     
@@ -508,13 +532,16 @@ int32_t CMemBlock2D<T>::size(const int32_t iBlock) const
 }
 
 template <class T>
-int32_t CMemBlock2D<T>::blocks() const
+int32_t
+CMemBlock2D<T>::blocks() const
 {
     return _originalSizes.size();
 }
 
 template <>
-inline void CMemBlock2D<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
+inline void
+CMemBlock2D<int32_t>::broadcast(int32_t  rank,
+                                MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -531,7 +558,9 @@ inline void CMemBlock2D<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
 }
 
 template <>
-inline void CMemBlock2D<double>::broadcast(int32_t rank, MPI_Comm comm)
+inline void
+CMemBlock2D<double>::broadcast(int32_t  rank,
+                               MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -549,7 +578,9 @@ inline void CMemBlock2D<double>::broadcast(int32_t rank, MPI_Comm comm)
 
 template <>
 inline CMemBlock2D<int32_t>
-CMemBlock2D<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock2D<int32_t>::gather(int32_t  rank,
+                             int32_t  nodes,
+                             MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -612,7 +643,9 @@ CMemBlock2D<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
 template <>
 inline CMemBlock2D<double>
-CMemBlock2D<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock2D<double>::gather(int32_t  rank,
+                            int32_t  nodes,
+                            MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -675,7 +708,9 @@ CMemBlock2D<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
 template <>
 inline void
-CMemBlock2D<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock2D<int32_t>::scatter(int32_t  rank,
+                              int32_t  nodes,
+                              MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -763,7 +798,9 @@ CMemBlock2D<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
 template <>
 inline void
-CMemBlock2D<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
+CMemBlock2D<double>::scatter(int32_t  rank,
+                             int32_t  nodes,
+                             MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -850,8 +887,9 @@ CMemBlock2D<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 }
 
 template <class T>
-void CMemBlock2D<T>::_setOriginalSizes(const int32_t nElements,
-                                       const int32_t nBlocks)
+void
+CMemBlock2D<T>::_setOriginalSizes(const int32_t nElements,
+                                  const int32_t nBlocks)
 {
     _originalSizes = CMemBlock<int32_t>(nBlocks);
     
@@ -859,7 +897,8 @@ void CMemBlock2D<T>::_setOriginalSizes(const int32_t nElements,
 }
 
 template <class T>
-void CMemBlock2D<T>::_setDimensions()
+void
+CMemBlock2D<T>::_setDimensions()
 {
     auto numblocks = _originalSizes.size();
     
@@ -892,7 +931,8 @@ void CMemBlock2D<T>::_setDimensions()
 }
 
 template <class T>
-void CMemBlock2D<T>::_copy(const std::vector<T>& dataVector)
+void
+CMemBlock2D<T>::_copy(const std::vector<T>& dataVector)
 {
     int32_t pindex = 0;
     

@@ -78,10 +78,11 @@ class CAppManager
      Sets environmental variables by reading @progenv control group from input
      data object. Errors are printed to output stream.
 
-     @param inpData the input data object.
+     @param inputData the input data object.
      @param oStream the output stream.
      */
-    void _setEnvironment(const CInputData& inpData, COutputStream& oStream);
+    void _setEnvironment(const CInputData&    inputData,
+                               COutputStream& oStream);
     
 public:
     
@@ -91,7 +92,8 @@ public:
      @param argc the number of command line arguments.
      @param argv the array of command line arguments.
      */
-    CAppManager(int argc, char** argv);
+    CAppManager(int    argc,
+                char** argv);
     
     /**
      Destroys an application manager object.

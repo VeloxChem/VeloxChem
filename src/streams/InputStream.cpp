@@ -8,7 +8,8 @@
 
 #include "InputStream.hpp"
 
-CInputStream::CInputStream(const std::string& iFilename, COutputStream& oStream)
+CInputStream::CInputStream(const std::string&   iFilename,
+                                 COutputStream& oStream)
 
     : _iFilename(iFilename)
 
@@ -31,7 +32,9 @@ CInputStream::~CInputStream()
 
 }
 
-void CInputStream::read(CInputData& inputData, COutputStream& oStream)
+void
+CInputStream::read(CInputData&    inputData,
+                   COutputStream& oStream)
 {
     if (!_iFilename.empty())
     {
@@ -112,12 +115,14 @@ void CInputStream::read(CInputData& inputData, COutputStream& oStream)
     }
 }
 
-bool CInputStream::getState() const
+bool
+CInputStream::getState() const
 {
     return _state;
 }
 
-void CInputStream::_errorFileOpen(COutputStream& oStream)
+void
+CInputStream::_errorFileOpen(COutputStream& oStream)
 {
     _state = false;
 
@@ -126,8 +131,9 @@ void CInputStream::_errorFileOpen(COutputStream& oStream)
     oStream << _iFilename << "!" << fmt::end << fmt::blank;
 }
 
-void CInputStream::_errorControlGroup(const CInputLine& inputLine,
-                                      COutputStream& oStream)
+void
+CInputStream::_errorControlGroup(const CInputLine&    inputLine,
+                                       COutputStream& oStream)
 {
     _state = false;
 
@@ -140,16 +146,18 @@ void CInputStream::_errorControlGroup(const CInputLine& inputLine,
     oStream << inputLine.getOriginalString() << fmt::end;
 }
 
-void CInputStream::_startMessage(COutputStream& oStream) const
+void
+CInputStream::_startMessage(COutputStream& oStream) const
 {
     oStream << fmt::info << "Reading input file ";
 
     oStream << _iFilename << "..." << fmt::end;
 }
 
-void CInputStream::_finishMessage(const CInputData& inpuData,
-                                  const size_t nEmptyGroups,
-                                  COutputStream& oStream) const
+void
+CInputStream::_finishMessage(const CInputData&    inpuData,
+                             const size_t         nEmptyGroups,
+                                   COutputStream& oStream) const
 {
     auto ngroups = inpuData.getNumberOfControlGroups() + nEmptyGroups;
 

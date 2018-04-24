@@ -14,7 +14,7 @@
 
 #include "FmtType.hpp"
 
-namespace fstr { // start of fstr namespace
+namespace fstr { // fstr namespace
 
     /**
      Creates uppercased string from string.
@@ -32,8 +32,9 @@ namespace fstr { // start of fstr namespace
      @param aligment the alignment of formatted string.
      @return the formatted string.
      */
-    std::string format(const std::string& source, const size_t width,
-                       const fmt aligment);
+    std::string format(const std::string& source,
+                       const size_t       width,
+                       const fmt          aligment);
 
     /**
      Creates formatted string with requested width from C string.
@@ -43,8 +44,9 @@ namespace fstr { // start of fstr namespace
      @param aligment the alignment of formatted string.
      @return the formatted string.
      */
-    std::string to_string(const char* source, const size_t width,
-                          const fmt aligment);
+    std::string to_string(const char*  source,
+                          const size_t width,
+                          const fmt    aligment);
 
     /**
      Creates centered string with requested width from C string.
@@ -53,7 +55,8 @@ namespace fstr { // start of fstr namespace
      @param width the width of centered string.
      @return the centered string.
      */
-    std::string to_string(const char* source, const size_t width);
+    std::string to_string(const char*  source,
+                          const size_t width);
 
     /**
      Creates formatted string with requested width from real number.
@@ -64,8 +67,10 @@ namespace fstr { // start of fstr namespace
      @param aligment the alignment of formatted string.
      @return the formatted string.
      */
-    std::string to_string(const double source, const size_t presicion,
-                          const size_t width, const fmt aligment);
+    std::string to_string(const double source,
+                          const size_t presicion,
+                          const size_t width,
+                          const fmt    aligment);
 
     /**
      Creates formatted string with requested width from integer number.
@@ -75,8 +80,9 @@ namespace fstr { // start of fstr namespace
      @param aligment the alignment of formatted string.
      @return the formatted string.
      */
-    std::string to_string(const int32_t source, const size_t width,
-                          const fmt aligment);
+    std::string to_string(const int32_t source,
+                          const size_t  width,
+                          const fmt     aligment);
 
     /**
      Creates formatted string with requested width from unsigned integer number.
@@ -86,8 +92,9 @@ namespace fstr { // start of fstr namespace
      @param aligment the alignment of formatted string.
      @return the formatted string.
      */
-    std::string to_string(const size_t source, const size_t width,
-                          const fmt aligment);
+    std::string to_string(const size_t source,
+                          const size_t width,
+                          const fmt    aligment);
 
     /**
      Converts angular momentum label to angular momentum quantum number.
@@ -107,6 +114,6 @@ namespace fstr { // start of fstr namespace
      */
     std::string to_AngularMomentum(const int32_t angularmomentum);
 
-} // end of fstr namespace
+} // fstr namespace
 
 #endif /* StringFormat_hpp */

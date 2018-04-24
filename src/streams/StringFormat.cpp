@@ -12,7 +12,8 @@
 
 namespace fstr { // fstr namespace
 
-std::string upcase(const std::string& source)
+std::string
+upcase(const std::string& source)
 {
     auto str = source;
 
@@ -24,8 +25,10 @@ std::string upcase(const std::string& source)
     return str;
 }
 
-std::string format(const std::string& source, const size_t width,
-                   const fmt aligment)
+std::string
+format(const std::string& source,
+       const size_t       width,
+       const fmt          aligment)
 {
     auto str = source;
 
@@ -56,19 +59,26 @@ std::string format(const std::string& source, const size_t width,
     return str;
 }
 
-std::string to_string(const char* source, const size_t width,
-                      const fmt aligment)
+std::string
+to_string(const char*  source,
+          const size_t width,
+          const fmt    aligment)
 {
     return fstr::format(std::string(source), width, aligment);
 }
 
-std::string to_string(const char* source, const size_t width)
+std::string
+to_string(const char*  source,
+          const size_t width)
 {
     return fstr::to_string(source, width, fmt::center);
 }
 
-std::string to_string(const double source, const size_t presicion,
-                      const size_t width, const fmt aligment)
+std::string
+to_string(const double source,
+          const size_t presicion,
+          const size_t width,
+          const fmt    aligment)
 {
     std::stringstream sStream;
 
@@ -85,8 +95,10 @@ std::string to_string(const double source, const size_t presicion,
     return fstr::format(str, width, aligment);
 }
 
-std::string to_string(const int32_t source, const size_t width,
-                      const fmt aligment)
+std::string
+to_string(const int32_t source,
+          const size_t  width,
+          const fmt     aligment)
 {
     auto str = std::to_string(source);
 
@@ -95,15 +107,18 @@ std::string to_string(const int32_t source, const size_t width,
     return fstr::format(str, width, aligment);
 }
 
-std::string to_string(const size_t source, const size_t width,
-                      const fmt aligment)
+std::string
+to_string(const size_t source,
+          const size_t width,
+          const fmt    aligment)
 {
     auto str = std::to_string(source);
 
     return fstr::format(str, width, aligment);
 }
 
-int32_t to_AngularMomentum(const std::string& label)
+int32_t
+to_AngularMomentum(const std::string& label)
 {
     auto key = fstr::upcase(label);
 
@@ -124,7 +139,8 @@ int32_t to_AngularMomentum(const std::string& label)
     return -1;
 }
 
-std::string to_AngularMomentum(const int32_t angularmomentum)
+std::string
+to_AngularMomentum(const int32_t angularmomentum)
 {
     if (angularmomentum == 0) return std::string("S");
 

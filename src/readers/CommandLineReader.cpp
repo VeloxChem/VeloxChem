@@ -10,7 +10,8 @@
 
 #include <iostream>
 
-CCommandLineReader::CCommandLineReader(int argc, char** argv)
+CCommandLineReader::CCommandLineReader(int    argc,
+                                       char** argv)
 
     : _state(false)
 {
@@ -29,24 +30,28 @@ CCommandLineReader::~CCommandLineReader()
 
 }
 
-std::string CCommandLineReader::getInputFilename() const
+std::string
+CCommandLineReader::getInputFilename() const
 {
     return _iFilename;
 }
 
-std::string CCommandLineReader::getOutputFilename() const
+std::string
+CCommandLineReader::getOutputFilename() const
 {
     return _oFilename;
 }
 
-bool CCommandLineReader::checkParameters() const
+bool
+CCommandLineReader::checkParameters() const
 {
     if (!_state) _printSyntaxHelp();
 
     return _state;
 }
 
-void CCommandLineReader::_printSyntaxHelp() const
+void
+CCommandLineReader::_printSyntaxHelp() const
 {
     std::cout << "@ Usage: VeloxChemMP.x [input file] [output file]";
 

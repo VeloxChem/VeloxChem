@@ -12,19 +12,26 @@
 
 namespace mathfunc { // mathfunc namespace
 
-    void zero(double* vector, const int32_t nElements)
+    void
+    zero(      double* vector,
+         const int32_t nElements)
     {
         #pragma omp simd aligned (vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) vector[i] = 0.0;
     }
 
-    void set_to(double* vector, const double value, const int32_t nElements)
+    void
+    set_to(      double* vector,
+           const double  value,
+           const int32_t nElements)
     {
         #pragma omp simd aligned (vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) vector[i] = value;
     }
 
-    double sum(const double* vector, const int32_t nElements)
+    double
+    sum(const double* vector,
+        const int32_t nElements)
     {
         double fsum = 0.0;
 
@@ -34,7 +41,9 @@ namespace mathfunc { // mathfunc namespace
         return fsum;
     }
 
-    int32_t sum(const int32_t* vector, const int32_t nElements)
+    int32_t
+    sum(const int32_t* vector,
+        const int32_t  nElements)
     {
         int32_t isum = 0;
 
@@ -44,7 +53,9 @@ namespace mathfunc { // mathfunc namespace
         return isum;
     }
 
-    void normalize(double* vector, const int32_t nElements)
+    void
+    normalize(      double* vector,
+              const int32_t nElements)
     {
         auto factor = 1.0 / mathfunc::sum(vector, nElements);
 
@@ -52,8 +63,10 @@ namespace mathfunc { // mathfunc namespace
         for (int32_t i = 0; i < nElements; i++) vector[i] *= factor;
     }
 
-    void indexes(int32_t* aVector, const int32_t* bVector,
-                 const int32_t nElements)
+    void
+    indexes(      int32_t* aVector,
+            const int32_t* bVector,
+            const int32_t  nElements)
     {
         int32_t index = 0;
 
@@ -65,8 +78,10 @@ namespace mathfunc { // mathfunc namespace
         }
     }
     
-    void quadChebyshevOfKindTwo(double* coordinates, double* weights,
-                                const int32_t nPoints)
+    void
+    quadChebyshevOfKindTwo(      double* coordinates,
+                                 double* weights,
+                           const int32_t nPoints)
     {
         // prefactor
         

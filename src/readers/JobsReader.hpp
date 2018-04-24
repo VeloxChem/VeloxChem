@@ -41,7 +41,8 @@ class CJobsReader
      @param nGroups the number of @jobs control groups.
      @param oStream the output stream.
      */
-    void _errorUniqueGroup(const size_t nGroups, COutputStream& oStream);
+    void _errorUniqueGroup(const size_t         nGroups,
+                                 COutputStream& oStream);
 
     /**
      Prints unknown job type error message to output stream and sets jobs
@@ -50,8 +51,8 @@ class CJobsReader
      @param inputLine the input line object with unknown job type.
      @param oStream the output stream.
      */
-    void _errorUnknownJobType(const CInputLine& inputLine,
-                              COutputStream& oStream);
+    void _errorUnknownJobType(const CInputLine&    inputLine,
+                                    COutputStream& oStream);
     
     /**
      Reads a execution mode by parsing input line object. Errors are printed to
@@ -61,7 +62,8 @@ class CJobsReader
      @param oStream the output stream.
      @return true if execution mode is read, false otherwise.
      */
-    bool _addExecutionMode(const CInputLine& inputLine, COutputStream& oStream);
+    bool _addExecutionMode(const CInputLine&    inputLine,
+                                 COutputStream& oStream);
 
     /**
      Adds a single point job identifier to vector of job identifiers by
@@ -73,8 +75,9 @@ class CJobsReader
      @return true if identifier is added to vector of job identifiers, false
              otherwise.
      */
-    bool _addSinglePoint(std::vector<int32_t>& listOfJobIds,
-                         const CInputLine& inputLine, COutputStream& oStream);
+    bool _addSinglePoint(      std::vector<int32_t>& listOfJobIds,
+                         const CInputLine&           inputLine,
+                               COutputStream&        oStream);
     
     /**
      Adds a optimization job identifier to vector of job identifiers by parsing
@@ -86,8 +89,9 @@ class CJobsReader
      @return true if identifier is added to vector of job identifiers, false
              otherwise.
      */
-    bool _addOptimization(std::vector<int32_t>& listOfJobIds,
-                          const CInputLine& inputLine, COutputStream& oStream);
+    bool _addOptimization(      std::vector<int32_t>& listOfJobIds,
+                          const CInputLine&           inputLine,
+                                COutputStream&        oStream);
 
     /**
      Prints syntax error message for run mode selection to output stream and
@@ -96,7 +100,8 @@ class CJobsReader
      @param inputLine the input line object with syntax error.
      @param oStream the output stream.
      */
-    void _syntaxRunMode(const CInputLine& inputLine, COutputStream& oStream);
+    void _syntaxRunMode(const CInputLine&    inputLine,
+                              COutputStream& oStream);
     
     /**
      Prints syntax error message for single point job to output stream and sets
@@ -105,8 +110,8 @@ class CJobsReader
      @param inputLine the input line object with syntax error.
      @param oStream the output stream.
      */
-    void _syntaxSinglePoint(const CInputLine& inputLine,
-                            COutputStream& oStream);
+    void _syntaxSinglePoint(const CInputLine&    inputLine,
+                                  COutputStream& oStream);
     
     /**
      Prints syntax error message for definition of optimization job to output
@@ -115,8 +120,8 @@ class CJobsReader
      @param inputLine the input line object with syntax error.
      @param oStream the output stream.
      */
-    void _syntaxOptimization(const CInputLine& inputLine,
-                             COutputStream& oStream);
+    void _syntaxOptimization(const CInputLine&    inputLine,
+                                   COutputStream& oStream);
 
     /**
      Prints unknown calculation type error message to output stream and sets
@@ -126,9 +131,9 @@ class CJobsReader
      @param inputLine the input line object with unknown calculation type.
      @param oStream the output stream.
      */
-    void _errorUnknownCalculationType(const char* calcType,
-                                      const CInputLine& inputLine,
-                                      COutputStream& oStream);
+    void _errorUnknownCalculationType(const char*          calcType,
+                                      const CInputLine&    inputLine,
+                                            COutputStream& oStream);
 public:
 
     /**
@@ -163,8 +168,9 @@ public:
      @param inputData the input data object.
      @param oStream the output stream.
      */
-    void parse(std::vector<int32_t>& listOfJobIds, const CInputData& inputData,
-               COutputStream& oStream);
+    void parse(      std::vector<int32_t>& listOfJobIds,
+               const CInputData&           inputData,
+                     COutputStream&        oStream);
 };
 
 #endif /* JobsReader_hpp */

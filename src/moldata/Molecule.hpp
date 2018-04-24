@@ -75,9 +75,10 @@ class CMolecule
      @param minDistance the minimal distance between atoms.
      @param oStream the output stream.
      */
-    void _errorAtomsToClose(const int32_t iAtomA, const int32_t iAtomB,
-                            const double minDistance,
-                            COutputStream& oStream) const;
+    void _errorAtomsToClose(const int32_t        iAtomA,
+                            const int32_t        iAtomB,
+                            const double         minDistance,
+                                  COutputStream& oStream) const;
 
 public:
 
@@ -95,11 +96,11 @@ public:
      @param atomLabels the vector of atomic names.
      @param idsElemental the vector of atomic identifiers.
      */
-    CMolecule(const std::vector<double>& atomCoordinates,
-              const std::vector<double>& atomCharges,
-              const std::vector<double>& atomMasses,
+    CMolecule(const std::vector<double>&      atomCoordinates,
+              const std::vector<double>&      atomCharges,
+              const std::vector<double>&      atomMasses,
               const std::vector<std::string>& atomLabels,
-              const std::vector<int32_t>& idsElemental);
+              const std::vector<int32_t>&     idsElemental);
 
     /**
      Creates a molecule object by copying other molecule object.
@@ -265,7 +266,8 @@ public:
      @param oStream the output stream.
      @return true if proximity condition is not violated, false otherwise.
      */
-    bool checkProximity(const double minDistance, COutputStream& oStream) const;
+    bool checkProximity(const double         minDistance,
+                              COutputStream& oStream) const;
     
     /**
      Broadcasts molecule object within domain of MPI communicator.
@@ -282,8 +284,8 @@ public:
      @param output the output text stream.
      @param source the molecule object.
      */
-    friend std::ostream& operator<<(std::ostream& output,
-                                    const CMolecule& source);
+    friend std::ostream& operator<<(      std::ostream& output,
+                                    const CMolecule&    source);
 };
 
 #endif /* Molecule_hpp */

@@ -194,7 +194,7 @@ public:
      @param output the output text stream.
      @param source the output line object.
      */
-    friend std::ostream& operator<<(std::ostream& output,
+    friend std::ostream& operator<<(      std::ostream&  output,
                                     const CControlGroup& source);
 };
 

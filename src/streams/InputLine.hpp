@@ -162,7 +162,8 @@ public:
      @param keyLabel the label.
      @return true if requested keyword is equal label, false otherwise.
      */
-    bool isKeyword(const size_t iKeyword, const std::string& keyLabel) const;
+    bool isKeyword(const size_t       iKeyword,
+                   const std::string& keyLabel) const;
 
     /**
      Determines if requested keyword is equal to label.
@@ -171,7 +172,8 @@ public:
      @param keyLabel the label.
      @return true if requested keyword is equal label, false otherwise.
      */
-    bool isKeyword(const size_t iKeyword, const char* keyLabel) const;
+    bool isKeyword(const size_t iKeyword,
+                   const char*  keyLabel) const;
 
     /**
      Determines if parsed input line starts from conrol keyword equal to label.
@@ -232,8 +234,8 @@ public:
      @param output the output text stream.
      @param source the input line object.
      */
-    friend std::ostream& operator<<(std::ostream& output,
-                                    const CInputLine& source);
+    friend std::ostream& operator<<(      std::ostream& output,
+                                    const CInputLine&   source);
 };
 
 #endif /* InputLine_hpp */

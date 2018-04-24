@@ -22,9 +22,9 @@ CChemicalElement::CChemicalElement()
 }
 
 CChemicalElement::CChemicalElement(const std::string& atomicLabel,
-                                   const double atomicCharge,
-                                   const double atomicMass,
-                                   const int32_t atomicNumber)
+                                   const double       atomicCharge,
+                                   const double       atomicMass,
+                                   const int32_t      atomicNumber)
 
     : _atomicLabel(atomicLabel)
 
@@ -42,7 +42,8 @@ CChemicalElement::~CChemicalElement()
 
 }
 
-bool CChemicalElement::operator==(const CChemicalElement& other) const
+bool
+CChemicalElement::operator==(const CChemicalElement& other) const
 {
     if (_atomicLabel != other._atomicLabel) return false;
 
@@ -55,12 +56,14 @@ bool CChemicalElement::operator==(const CChemicalElement& other) const
     return true;
 }
 
-bool CChemicalElement::operator!=(const CChemicalElement& other) const
+bool
+CChemicalElement::operator!=(const CChemicalElement& other) const
 {
     return !(*this == other);
 }
 
-bool CChemicalElement::setAtomType(const std::string& atomLabel)
+bool
+CChemicalElement::setAtomType(const std::string& atomLabel)
 {
     if (atomLabel.compare("BQ") == 0)
     {
@@ -673,7 +676,8 @@ bool CChemicalElement::setAtomType(const std::string& atomLabel)
     return false;
 }
 
-bool CChemicalElement::setAtomType(const int32_t idElemental)
+bool
+CChemicalElement::setAtomType(const int32_t idElemental)
 {
     bool fg = true;
 
@@ -1205,7 +1209,8 @@ bool CChemicalElement::setAtomType(const int32_t idElemental)
     return fg;
 }
 
-bool CChemicalElement::setIsotope(const int32_t isotopeLabel)
+bool
+CChemicalElement::setIsotope(const int32_t isotopeLabel)
 {
     if (_atomicNumber < 0)
 
@@ -1819,27 +1824,32 @@ bool CChemicalElement::setIsotope(const int32_t isotopeLabel)
     return false;
 }
 
-std::string CChemicalElement::getName() const
+std::string
+CChemicalElement::getName() const
 {
     return _atomicLabel;
 }
 
-int32_t CChemicalElement::getIdentifier() const
+int32_t
+CChemicalElement::getIdentifier() const
 {
     return _atomicNumber;
 }
 
-double CChemicalElement::getAtomicCharge() const
+double
+CChemicalElement::getAtomicCharge() const
 {
     return _atomicCharge;
 }
 
-double CChemicalElement::getAtomicMass() const
+double
+CChemicalElement::getAtomicMass() const
 {
     return _atomicMass;
 }
 
-void CChemicalElement::_selectDummyAtom()
+void
+CChemicalElement::_selectDummyAtom()
 {
     _atomicLabel.assign("Bq");
 
@@ -1850,7 +1860,8 @@ void CChemicalElement::_selectDummyAtom()
     _atomicMass = 0.0;
 }
 
-void CChemicalElement::_selectHydrogenAtom()
+void
+CChemicalElement::_selectHydrogenAtom()
 {
     _atomicLabel.assign("H");
 
@@ -1861,7 +1872,8 @@ void CChemicalElement::_selectHydrogenAtom()
     _atomicMass = 1.007825;
 }
 
-void CChemicalElement::_selectHeliumAtom()
+void
+CChemicalElement::_selectHeliumAtom()
 {
     _atomicLabel.assign("He");
 
@@ -1872,7 +1884,8 @@ void CChemicalElement::_selectHeliumAtom()
     _atomicMass = 4.002603;
 }
 
-void CChemicalElement::_selectLithiumAtom()
+void
+CChemicalElement::_selectLithiumAtom()
 {
     _atomicLabel.assign("Li");
 
@@ -1883,7 +1896,8 @@ void CChemicalElement::_selectLithiumAtom()
     _atomicMass = 7.016005;
 }
 
-void CChemicalElement::_selectBerylliumAtom()
+void
+CChemicalElement::_selectBerylliumAtom()
 {
     _atomicLabel.assign("Be");
 
@@ -1894,7 +1908,8 @@ void CChemicalElement::_selectBerylliumAtom()
     _atomicMass = 9.012182;
 }
 
-void CChemicalElement::_selectBoronAtom()
+void
+CChemicalElement::_selectBoronAtom()
 {
     _atomicLabel.assign("B");
 
@@ -1905,7 +1920,8 @@ void CChemicalElement::_selectBoronAtom()
     _atomicMass = 11.009305;
 }
 
-void CChemicalElement::_selectCarbonAtom()
+void
+CChemicalElement::_selectCarbonAtom()
 {
     _atomicLabel.assign("C");
 
@@ -1916,7 +1932,8 @@ void CChemicalElement::_selectCarbonAtom()
     _atomicMass = 12.000000;
 }
 
-void CChemicalElement::_selectNitrogenAtom()
+void
+CChemicalElement::_selectNitrogenAtom()
 {
     _atomicLabel.assign("N");
 
@@ -1927,7 +1944,8 @@ void CChemicalElement::_selectNitrogenAtom()
     _atomicMass = 14.003074;
 }
 
-void CChemicalElement::_selectOxygenAtom()
+void
+CChemicalElement::_selectOxygenAtom()
 {
     _atomicLabel.assign("O");
 
@@ -1938,7 +1956,8 @@ void CChemicalElement::_selectOxygenAtom()
     _atomicMass = 15.994915;
 }
 
-void CChemicalElement::_selectFlourineAtom()
+void
+CChemicalElement::_selectFlourineAtom()
 {
     _atomicLabel.assign("F");
 
@@ -1949,7 +1968,8 @@ void CChemicalElement::_selectFlourineAtom()
     _atomicMass = 18.998403;
 }
 
-void CChemicalElement::_selectNeonAtom()
+void
+CChemicalElement::_selectNeonAtom()
 {
     _atomicLabel.assign("Ne");
 
@@ -1960,7 +1980,8 @@ void CChemicalElement::_selectNeonAtom()
     _atomicMass = 19.992440;
 }
 
-void CChemicalElement::_selectSodiumAtom()
+void
+CChemicalElement::_selectSodiumAtom()
 {
     _atomicLabel.assign("Na");
 
@@ -1971,7 +1992,8 @@ void CChemicalElement::_selectSodiumAtom()
     _atomicMass = 22.989769;
 }
 
-void CChemicalElement::_selectMagnesiumAtom()
+void
+CChemicalElement::_selectMagnesiumAtom()
 {
     _atomicLabel.assign("Mg");
 
@@ -1982,7 +2004,8 @@ void CChemicalElement::_selectMagnesiumAtom()
     _atomicMass = 23.985042;
 }
 
-void CChemicalElement::_selectAluminiumAtom()
+void
+CChemicalElement::_selectAluminiumAtom()
 {
     _atomicLabel.assign("Al");
 
@@ -1993,7 +2016,8 @@ void CChemicalElement::_selectAluminiumAtom()
     _atomicMass = 26.981539;
 }
 
-void CChemicalElement::_selectSiliconAtom()
+void
+CChemicalElement::_selectSiliconAtom()
 {
     _atomicLabel.assign("Si");
 
@@ -2004,7 +2028,8 @@ void CChemicalElement::_selectSiliconAtom()
     _atomicMass = 27.976927;
 }
 
-void CChemicalElement::_selectPhosphorusAtom()
+void
+CChemicalElement::_selectPhosphorusAtom()
 {
     _atomicLabel.assign("P");
 
@@ -2015,7 +2040,8 @@ void CChemicalElement::_selectPhosphorusAtom()
     _atomicMass = 30.973762;
 }
 
-void CChemicalElement::_selectSulfurAtom()
+void
+CChemicalElement::_selectSulfurAtom()
 {
     _atomicLabel.assign("S");
 
@@ -2026,7 +2052,8 @@ void CChemicalElement::_selectSulfurAtom()
     _atomicMass = 31.972071;
 }
 
-void CChemicalElement::_selectChlorineAtom()
+void
+CChemicalElement::_selectChlorineAtom()
 {
     _atomicLabel.assign("Cl");
 
@@ -2037,7 +2064,8 @@ void CChemicalElement::_selectChlorineAtom()
     _atomicMass = 34.968853;
 }
 
-void CChemicalElement::_selectArgonAtom()
+void
+CChemicalElement::_selectArgonAtom()
 {
     _atomicLabel.assign("Ar");
 
@@ -2048,7 +2076,8 @@ void CChemicalElement::_selectArgonAtom()
     _atomicMass = 39.962383;
 }
 
-void CChemicalElement::_selectPotasiumAtom()
+void
+CChemicalElement::_selectPotasiumAtom()
 {
     _atomicLabel.assign("K");
 
@@ -2059,7 +2088,8 @@ void CChemicalElement::_selectPotasiumAtom()
     _atomicMass = 38.963707;
 }
 
-void CChemicalElement::_selectCalciumAtom()
+void
+CChemicalElement::_selectCalciumAtom()
 {
     _atomicLabel.assign("Ca");
 
@@ -2070,7 +2100,8 @@ void CChemicalElement::_selectCalciumAtom()
     _atomicMass = 39.962591;
 }
 
-void CChemicalElement::_selectScandiumAtom()
+void
+CChemicalElement::_selectScandiumAtom()
 {
     _atomicLabel.assign("Sc");
 
@@ -2081,7 +2112,8 @@ void CChemicalElement::_selectScandiumAtom()
     _atomicMass = 44.955912;
 }
 
-void CChemicalElement::_selectTitaniumAtom()
+void
+CChemicalElement::_selectTitaniumAtom()
 {
     _atomicLabel.assign("Ti");
 
@@ -2092,7 +2124,8 @@ void CChemicalElement::_selectTitaniumAtom()
     _atomicMass = 47.947946;
 }
 
-void CChemicalElement::_selectVanadiumAtom()
+void
+CChemicalElement::_selectVanadiumAtom()
 {
     _atomicLabel.assign("V");
 
@@ -2103,7 +2136,8 @@ void CChemicalElement::_selectVanadiumAtom()
     _atomicMass = 50.943960;
 }
 
-void CChemicalElement::_selectChromiumAtom()
+void
+CChemicalElement::_selectChromiumAtom()
 {
     _atomicLabel.assign("Cr");
 
@@ -2114,7 +2148,8 @@ void CChemicalElement::_selectChromiumAtom()
     _atomicMass = 51.940508;
 }
 
-void CChemicalElement::_selectManganeseAtom()
+void
+CChemicalElement::_selectManganeseAtom()
 {
     _atomicLabel.assign("Mn");
 
@@ -2125,7 +2160,8 @@ void CChemicalElement::_selectManganeseAtom()
     _atomicMass = 54.938045;
 }
 
-void CChemicalElement::_selectIronAtom()
+void
+CChemicalElement::_selectIronAtom()
 {
     _atomicLabel.assign("Fe");
 
@@ -2136,7 +2172,8 @@ void CChemicalElement::_selectIronAtom()
     _atomicMass = 55.934938;
 }
 
-void CChemicalElement::_selectCobaltAtom()
+void
+CChemicalElement::_selectCobaltAtom()
 {
     _atomicLabel.assign("Co");
 
@@ -2147,7 +2184,8 @@ void CChemicalElement::_selectCobaltAtom()
     _atomicMass = 58.933195;
 }
 
-void CChemicalElement::_selectNickelAtom()
+void
+CChemicalElement::_selectNickelAtom()
 {
     _atomicLabel.assign("Ni");
 
@@ -2158,7 +2196,8 @@ void CChemicalElement::_selectNickelAtom()
     _atomicMass = 57.935343;
 }
 
-void CChemicalElement::_selectCopperAtom()
+void
+CChemicalElement::_selectCopperAtom()
 {
     _atomicLabel.assign("Cu");
 
@@ -2169,7 +2208,8 @@ void CChemicalElement::_selectCopperAtom()
     _atomicMass = 62.929598;
 }
 
-void CChemicalElement::_selectZincAtom()
+void
+CChemicalElement::_selectZincAtom()
 {
     _atomicLabel.assign("Zn");
 
@@ -2180,7 +2220,8 @@ void CChemicalElement::_selectZincAtom()
     _atomicMass = 63.929142;
 }
 
-void CChemicalElement::_selectGaliumAtom()
+void
+CChemicalElement::_selectGaliumAtom()
 {
     _atomicLabel.assign("Ga");
 
@@ -2191,7 +2232,8 @@ void CChemicalElement::_selectGaliumAtom()
     _atomicMass = 68.925574;
 }
 
-void CChemicalElement::_selectGermaniumAtom()
+void
+CChemicalElement::_selectGermaniumAtom()
 {
     _atomicLabel.assign("Ge");
 
@@ -2202,7 +2244,8 @@ void CChemicalElement::_selectGermaniumAtom()
     _atomicMass = 73.921178;
 }
 
-void CChemicalElement::_selectArsenicAtom()
+void
+CChemicalElement::_selectArsenicAtom()
 {
     _atomicLabel.assign("As");
 
@@ -2213,7 +2256,8 @@ void CChemicalElement::_selectArsenicAtom()
     _atomicMass = 74.921597;
 }
 
-void CChemicalElement::_selectSeleniumAtom()
+void
+CChemicalElement::_selectSeleniumAtom()
 {
     _atomicLabel.assign("Se");
 
@@ -2224,7 +2268,8 @@ void CChemicalElement::_selectSeleniumAtom()
     _atomicMass = 79.916521;
 }
 
-void CChemicalElement::_selectBromineAtom()
+void
+CChemicalElement::_selectBromineAtom()
 {
     _atomicLabel.assign("Br");
 
@@ -2235,7 +2280,8 @@ void CChemicalElement::_selectBromineAtom()
     _atomicMass = 78.918337;
 }
 
-void CChemicalElement::_selectKryptonAtom()
+void
+CChemicalElement::_selectKryptonAtom()
 {
     _atomicLabel.assign("Kr");
 
@@ -2246,7 +2292,8 @@ void CChemicalElement::_selectKryptonAtom()
     _atomicMass = 83.911507;
 }
 
-void CChemicalElement::_selectRubidiumAtom()
+void
+CChemicalElement::_selectRubidiumAtom()
 {
     _atomicLabel.assign("Rb");
 
@@ -2257,7 +2304,8 @@ void CChemicalElement::_selectRubidiumAtom()
     _atomicMass = 84.911790;
 }
 
-void CChemicalElement::_selectStrontiumAtom()
+void
+CChemicalElement::_selectStrontiumAtom()
 {
     _atomicLabel.assign("Sr");
 
@@ -2268,7 +2316,8 @@ void CChemicalElement::_selectStrontiumAtom()
     _atomicMass = 87.905612;
 }
 
-void CChemicalElement::_selectYttriumAtom()
+void
+CChemicalElement::_selectYttriumAtom()
 {
     _atomicLabel.assign("Y");
 
@@ -2279,7 +2328,8 @@ void CChemicalElement::_selectYttriumAtom()
     _atomicMass = 88.905848;
 }
 
-void CChemicalElement::_selectZirconiumAtom()
+void
+CChemicalElement::_selectZirconiumAtom()
 {
     _atomicLabel.assign("Zr");
 
@@ -2290,7 +2340,8 @@ void CChemicalElement::_selectZirconiumAtom()
     _atomicMass = 89.904704;
 }
 
-void CChemicalElement::_selectNiobiumAtom()
+void
+CChemicalElement::_selectNiobiumAtom()
 {
     _atomicLabel.assign("Nb");
 
@@ -2301,7 +2352,8 @@ void CChemicalElement::_selectNiobiumAtom()
     _atomicMass = 92.906378;
 }
 
-void CChemicalElement::_selectMolybdenumAtom()
+void
+CChemicalElement::_selectMolybdenumAtom()
 {
     _atomicLabel.assign("Mo");
 
@@ -2312,7 +2364,8 @@ void CChemicalElement::_selectMolybdenumAtom()
     _atomicMass = 97.905408;
 }
 
-void CChemicalElement::_selectTechnetiumAtom()
+void
+CChemicalElement::_selectTechnetiumAtom()
 {
     _atomicLabel.assign("Tc");
 
@@ -2323,7 +2376,8 @@ void CChemicalElement::_selectTechnetiumAtom()
     _atomicMass = 97.907216;
 }
 
-void CChemicalElement::_selectRutheniumAtom()
+void
+CChemicalElement::_selectRutheniumAtom()
 {
     _atomicLabel.assign("Ru");
 
@@ -2334,7 +2388,8 @@ void CChemicalElement::_selectRutheniumAtom()
     _atomicMass = 101.904349;
 }
 
-void CChemicalElement::_selectRhodiumAtom()
+void
+CChemicalElement::_selectRhodiumAtom()
 {
     _atomicLabel.assign("Rh");
 
@@ -2345,7 +2400,8 @@ void CChemicalElement::_selectRhodiumAtom()
     _atomicMass = 102.905504;
 }
 
-void CChemicalElement::_selectPaladiumAtom()
+void
+CChemicalElement::_selectPaladiumAtom()
 {
     _atomicLabel.assign("Pd");
 
@@ -2356,7 +2412,8 @@ void CChemicalElement::_selectPaladiumAtom()
     _atomicMass = 105.903486;
 }
 
-void CChemicalElement::_selectSilverAtom()
+void
+CChemicalElement::_selectSilverAtom()
 {
     _atomicLabel.assign("Ag");
 
@@ -2367,7 +2424,8 @@ void CChemicalElement::_selectSilverAtom()
     _atomicMass = 106.905097;
 }
 
-void CChemicalElement::_selectCadmiumAtom()
+void
+CChemicalElement::_selectCadmiumAtom()
 {
     _atomicLabel.assign("Cd");
 
@@ -2378,7 +2436,8 @@ void CChemicalElement::_selectCadmiumAtom()
     _atomicMass = 113.903359;
 }
 
-void CChemicalElement::_selectIndiumAtom()
+void
+CChemicalElement::_selectIndiumAtom()
 {
     _atomicLabel.assign("In");
 
@@ -2389,7 +2448,8 @@ void CChemicalElement::_selectIndiumAtom()
     _atomicMass = 114.903878;
 }
 
-void CChemicalElement::_selectTinAtom()
+void
+CChemicalElement::_selectTinAtom()
 {
     _atomicLabel.assign("Sn");
 
@@ -2400,7 +2460,8 @@ void CChemicalElement::_selectTinAtom()
     _atomicMass = 119.902195;
 }
 
-void CChemicalElement::_selectAntimonyAtom()
+void
+CChemicalElement::_selectAntimonyAtom()
 {
     _atomicLabel.assign("Sb");
 
@@ -2411,7 +2472,8 @@ void CChemicalElement::_selectAntimonyAtom()
     _atomicMass = 120.903816;
 }
 
-void CChemicalElement::_selectTelluriumAtom()
+void
+CChemicalElement::_selectTelluriumAtom()
 {
     _atomicLabel.assign("Te");
 
@@ -2422,7 +2484,8 @@ void CChemicalElement::_selectTelluriumAtom()
     _atomicMass = 129.906224;
 }
 
-void CChemicalElement::_selectIodineAtom()
+void
+CChemicalElement::_selectIodineAtom()
 {
     _atomicLabel.assign("I");
 
@@ -2433,7 +2496,8 @@ void CChemicalElement::_selectIodineAtom()
     _atomicMass = 126.904473;
 }
 
-void CChemicalElement::_selectXenonAtom()
+void
+CChemicalElement::_selectXenonAtom()
 {
     _atomicLabel.assign("Xe");
 
@@ -2444,7 +2508,8 @@ void CChemicalElement::_selectXenonAtom()
     _atomicMass = 131.904153;
 }
 
-void CChemicalElement::_selectCesiumAtom()
+void
+CChemicalElement::_selectCesiumAtom()
 {
     _atomicLabel.assign("Cs");
 
@@ -2455,7 +2520,8 @@ void CChemicalElement::_selectCesiumAtom()
     _atomicMass = 132.905452;
 }
 
-void CChemicalElement::_selectBariumAtom()
+void
+CChemicalElement::_selectBariumAtom()
 {
     _atomicLabel.assign("Ba");
 
@@ -2466,7 +2532,8 @@ void CChemicalElement::_selectBariumAtom()
     _atomicMass = 137.905247;
 }
 
-void CChemicalElement::_selectLanthanumAtom()
+void
+CChemicalElement::_selectLanthanumAtom()
 {
     _atomicLabel.assign("La");
 
@@ -2477,7 +2544,8 @@ void CChemicalElement::_selectLanthanumAtom()
     _atomicMass = 138.906353;
 }
 
-void CChemicalElement::_selectCeriumAtom()
+void
+CChemicalElement::_selectCeriumAtom()
 {
     _atomicLabel.assign("Ce");
 
@@ -2488,7 +2556,8 @@ void CChemicalElement::_selectCeriumAtom()
     _atomicMass = 139.905439;
 }
 
-void CChemicalElement::_selectPraseodymiumAtom()
+void
+CChemicalElement::_selectPraseodymiumAtom()
 {
     _atomicLabel.assign("Pr");
 
@@ -2499,7 +2568,8 @@ void CChemicalElement::_selectPraseodymiumAtom()
     _atomicMass = 140.907653;
 }
 
-void CChemicalElement::_selectNeodymiumAtom()
+void
+CChemicalElement::_selectNeodymiumAtom()
 {
     _atomicLabel.assign("Nd");
 
@@ -2510,7 +2580,8 @@ void CChemicalElement::_selectNeodymiumAtom()
     _atomicMass = 141.907723;
 }
 
-void CChemicalElement::_selectPromethiumAtom()
+void
+CChemicalElement::_selectPromethiumAtom()
 {
     _atomicLabel.assign("Pm");
 
@@ -2521,7 +2592,8 @@ void CChemicalElement::_selectPromethiumAtom()
     _atomicMass = 146.915139;
 }
 
-void CChemicalElement::_selectSamariumAtom()
+void
+CChemicalElement::_selectSamariumAtom()
 {
     _atomicLabel.assign("Sm");
 
@@ -2532,7 +2604,8 @@ void CChemicalElement::_selectSamariumAtom()
     _atomicMass = 151.919732;
 }
 
-void CChemicalElement::_selectEuropiumAtom()
+void
+CChemicalElement::_selectEuropiumAtom()
 {
     _atomicLabel.assign("Eu");
 
@@ -2543,7 +2616,8 @@ void CChemicalElement::_selectEuropiumAtom()
     _atomicMass = 152.921230;
 }
 
-void CChemicalElement::_selectGadoliniumAtom()
+void
+CChemicalElement::_selectGadoliniumAtom()
 {
     _atomicLabel.assign("Gd");
 
@@ -2554,7 +2628,8 @@ void CChemicalElement::_selectGadoliniumAtom()
     _atomicMass = 157.924104;
 }
 
-void CChemicalElement::_selectTerbiumAtom()
+void
+CChemicalElement::_selectTerbiumAtom()
 {
     _atomicLabel.assign("Tb");
 
@@ -2565,7 +2640,8 @@ void CChemicalElement::_selectTerbiumAtom()
     _atomicMass = 158.925347;
 }
 
-void CChemicalElement::_selectDysprosiumAtom()
+void
+CChemicalElement::_selectDysprosiumAtom()
 {
     _atomicLabel.assign("Dy");
 
@@ -2576,7 +2652,8 @@ void CChemicalElement::_selectDysprosiumAtom()
     _atomicMass = 163.929175;
 }
 
-void CChemicalElement::_selectHolmiumAtom()
+void
+CChemicalElement::_selectHolmiumAtom()
 {
     _atomicLabel.assign("Ho");
 
@@ -2587,7 +2664,8 @@ void CChemicalElement::_selectHolmiumAtom()
     _atomicMass = 164.930322;
 }
 
-void CChemicalElement::_selectErbiumAtom()
+void
+CChemicalElement::_selectErbiumAtom()
 {
     _atomicLabel.assign("Er");
 
@@ -2598,7 +2676,8 @@ void CChemicalElement::_selectErbiumAtom()
     _atomicMass = 165.930293;
 }
 
-void CChemicalElement::_selectThuliumAtom()
+void
+CChemicalElement::_selectThuliumAtom()
 {
     _atomicLabel.assign("Tm");
 
@@ -2609,7 +2688,8 @@ void CChemicalElement::_selectThuliumAtom()
     _atomicMass = 168.934213;
 }
 
-void CChemicalElement::_selectYtterbiumAtom()
+void
+CChemicalElement::_selectYtterbiumAtom()
 {
     _atomicLabel.assign("Tm");
 
@@ -2620,7 +2700,8 @@ void CChemicalElement::_selectYtterbiumAtom()
     _atomicMass = 173.938862;
 }
 
-void CChemicalElement::_selectLutheniumAtom()
+void
+CChemicalElement::_selectLutheniumAtom()
 {
     _atomicLabel.assign("Lu");
 
@@ -2631,7 +2712,8 @@ void CChemicalElement::_selectLutheniumAtom()
     _atomicMass = 174.940772;
 }
 
-void CChemicalElement::_selectHafniumAtom()
+void
+CChemicalElement::_selectHafniumAtom()
 {
     _atomicLabel.assign("Hf");
 
@@ -2642,7 +2724,8 @@ void CChemicalElement::_selectHafniumAtom()
     _atomicMass = 179.946550;
 }
 
-void CChemicalElement::_selectTantalumAtom()
+void
+CChemicalElement::_selectTantalumAtom()
 {
     _atomicLabel.assign("Ta");
 
@@ -2653,7 +2736,8 @@ void CChemicalElement::_selectTantalumAtom()
     _atomicMass = 180.947996;
 }
 
-void CChemicalElement::_selectTungstenAtom()
+void
+CChemicalElement::_selectTungstenAtom()
 {
     _atomicLabel.assign("W");
 
@@ -2664,7 +2748,8 @@ void CChemicalElement::_selectTungstenAtom()
     _atomicMass = 183.950931;
 }
 
-void CChemicalElement::_selectRheniumAtom()
+void
+CChemicalElement::_selectRheniumAtom()
 {
     _atomicLabel.assign("Re");
 
@@ -2675,7 +2760,8 @@ void CChemicalElement::_selectRheniumAtom()
     _atomicMass = 186.955753;
 }
 
-void CChemicalElement::_selectOsmiumAtom()
+void
+CChemicalElement::_selectOsmiumAtom()
 {
     _atomicLabel.assign("Os");
 
@@ -2686,7 +2772,8 @@ void CChemicalElement::_selectOsmiumAtom()
     _atomicMass = 191.961481;
 }
 
-void CChemicalElement::_selectIridiumAtom()
+void
+CChemicalElement::_selectIridiumAtom()
 {
     _atomicLabel.assign("Ir");
 
@@ -2697,7 +2784,8 @@ void CChemicalElement::_selectIridiumAtom()
     _atomicMass = 192.962926;
 }
 
-void CChemicalElement::_selectPlatinumAtom()
+void
+CChemicalElement::_selectPlatinumAtom()
 {
     _atomicLabel.assign("Pt");
 
@@ -2708,7 +2796,8 @@ void CChemicalElement::_selectPlatinumAtom()
     _atomicMass = 194.964791;
 }
 
-void CChemicalElement::_selectGoldAtom()
+void
+CChemicalElement::_selectGoldAtom()
 {
     _atomicLabel.assign("Au");
 
@@ -2719,7 +2808,8 @@ void CChemicalElement::_selectGoldAtom()
     _atomicMass = 196.966569;
 }
 
-void CChemicalElement::_selectMercuryAtom()
+void
+CChemicalElement::_selectMercuryAtom()
 {
     _atomicLabel.assign("Hg");
 
@@ -2730,7 +2820,8 @@ void CChemicalElement::_selectMercuryAtom()
     _atomicMass = 201.970643;
 }
 
-void CChemicalElement::_selectThalliumAtom()
+void
+CChemicalElement::_selectThalliumAtom()
 {
     _atomicLabel.assign("Tl");
 
@@ -2741,7 +2832,8 @@ void CChemicalElement::_selectThalliumAtom()
     _atomicMass = 204.974428;
 }
 
-void CChemicalElement::_selectLeadAtom()
+void
+CChemicalElement::_selectLeadAtom()
 {
     _atomicLabel.assign("Pb");
 
@@ -2752,7 +2844,8 @@ void CChemicalElement::_selectLeadAtom()
     _atomicMass = 207.976652;
 }
 
-void CChemicalElement::_selectBismuthAtom()
+void
+CChemicalElement::_selectBismuthAtom()
 {
     _atomicLabel.assign("Bi");
 
@@ -2763,7 +2856,8 @@ void CChemicalElement::_selectBismuthAtom()
     _atomicMass = 208.980399;
 }
 
-void CChemicalElement::_selectPoloniumAtom()
+void
+CChemicalElement::_selectPoloniumAtom()
 {
     _atomicLabel.assign("Po");
 
@@ -2774,7 +2868,8 @@ void CChemicalElement::_selectPoloniumAtom()
     _atomicMass = 208.982430;
 }
 
-void CChemicalElement::_selectAstatineAtom()
+void
+CChemicalElement::_selectAstatineAtom()
 {
     _atomicLabel.assign("At");
 
@@ -2785,7 +2880,8 @@ void CChemicalElement::_selectAstatineAtom()
     _atomicMass = 209.987148;
 }
 
-void CChemicalElement::_selectRadonAtom()
+void
+CChemicalElement::_selectRadonAtom()
 {
     _atomicLabel.assign("Rn");
 
@@ -2796,7 +2892,8 @@ void CChemicalElement::_selectRadonAtom()
     _atomicMass = 222.017578;
 }
 
-bool CChemicalElement::_selectHydrogenIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectHydrogenIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -2840,7 +2937,8 @@ bool CChemicalElement::_selectHydrogenIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectHeliumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectHeliumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -2876,7 +2974,8 @@ bool CChemicalElement::_selectHeliumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectLithiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectLithiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -2912,7 +3011,8 @@ bool CChemicalElement::_selectLithiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectBerylliumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectBerylliumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -2940,7 +3040,8 @@ bool CChemicalElement::_selectBerylliumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectBoronIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectBoronIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -2976,7 +3077,8 @@ bool CChemicalElement::_selectBoronIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectCarbonIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectCarbonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3012,7 +3114,8 @@ bool CChemicalElement::_selectCarbonIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectNitrogenIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectNitrogenIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3048,7 +3151,8 @@ bool CChemicalElement::_selectNitrogenIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectOxygenIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectOxygenIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3092,7 +3196,8 @@ bool CChemicalElement::_selectOxygenIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectFlourineIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectFlourineIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3120,7 +3225,8 @@ bool CChemicalElement::_selectFlourineIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectNeonIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectNeonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3164,7 +3270,8 @@ bool CChemicalElement::_selectNeonIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectSodiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectSodiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3192,7 +3299,8 @@ bool CChemicalElement::_selectSodiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectMagnesiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectMagnesiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3236,7 +3344,8 @@ bool CChemicalElement::_selectMagnesiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectAluminiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectAluminiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3264,7 +3373,8 @@ bool CChemicalElement::_selectAluminiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectSiliconIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectSiliconIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3308,7 +3418,8 @@ bool CChemicalElement::_selectSiliconIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectPhosphorusIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectPhosphorusIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3336,7 +3447,8 @@ bool CChemicalElement::_selectPhosphorusIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectSulfurIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectSulfurIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3388,7 +3500,8 @@ bool CChemicalElement::_selectSulfurIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectChlorineIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectChlorineIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3424,7 +3537,8 @@ bool CChemicalElement::_selectChlorineIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectArgonIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectArgonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3468,7 +3582,8 @@ bool CChemicalElement::_selectArgonIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectPotasiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectPotasiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3512,7 +3627,8 @@ bool CChemicalElement::_selectPotasiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectCalciumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectCalciumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3580,7 +3696,8 @@ bool CChemicalElement::_selectCalciumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectScandiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectScandiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3608,7 +3725,8 @@ bool CChemicalElement::_selectScandiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectTitaniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectTitaniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3668,7 +3786,8 @@ bool CChemicalElement::_selectTitaniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectVanadiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectVanadiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3704,7 +3823,8 @@ bool CChemicalElement::_selectVanadiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectChromiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectChromiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3756,7 +3876,8 @@ bool CChemicalElement::_selectChromiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectManganeseIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectManganeseIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3782,7 +3903,8 @@ bool CChemicalElement::_selectManganeseIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectIronIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectIronIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3834,7 +3956,8 @@ bool CChemicalElement::_selectIronIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectCobaltIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectCobaltIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3863,7 +3986,8 @@ bool CChemicalElement::_selectCobaltIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectNickelIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectNickelIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3924,7 +4048,8 @@ bool CChemicalElement::_selectNickelIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectCopperIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectCopperIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -3961,7 +4086,8 @@ bool CChemicalElement::_selectCopperIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectZincIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectZincIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4022,7 +4148,8 @@ bool CChemicalElement::_selectZincIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectGalliumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectGalliumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4058,7 +4185,8 @@ bool CChemicalElement::_selectGalliumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectGermaniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectGermaniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4119,7 +4247,8 @@ bool CChemicalElement::_selectGermaniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectArsenicIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectArsenicIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4147,7 +4276,8 @@ bool CChemicalElement::_selectArsenicIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectSeleniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectSeleniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4216,7 +4346,8 @@ bool CChemicalElement::_selectSeleniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectBromineIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectBromineIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4252,7 +4383,8 @@ bool CChemicalElement::_selectBromineIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectKryptonIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectKryptonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4320,7 +4452,8 @@ bool CChemicalElement::_selectKryptonIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectRubidiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectRubidiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4356,7 +4489,8 @@ bool CChemicalElement::_selectRubidiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectStrontiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectStrontiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4408,7 +4542,8 @@ bool CChemicalElement::_selectStrontiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectYttriumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectYttriumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4437,7 +4572,8 @@ bool CChemicalElement::_selectYttriumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectZirconiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectZirconiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4497,7 +4633,8 @@ bool CChemicalElement::_selectZirconiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectNiobiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectNiobiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4526,7 +4663,8 @@ bool CChemicalElement::_selectNiobiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectMolybdenumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectMolybdenumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4603,7 +4741,8 @@ bool CChemicalElement::_selectMolybdenumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectTechnetiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectTechnetiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4632,7 +4771,8 @@ bool CChemicalElement::_selectTechnetiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectRutheniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectRutheniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4709,7 +4849,8 @@ bool CChemicalElement::_selectRutheniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectRhodiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectRhodiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4738,7 +4879,8 @@ bool CChemicalElement::_selectRhodiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectPaladiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectPaladiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4807,7 +4949,8 @@ bool CChemicalElement::_selectPaladiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectSilverIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectSilverIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4844,7 +4987,8 @@ bool CChemicalElement::_selectSilverIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectCadmiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectCadmiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4929,7 +5073,8 @@ bool CChemicalElement::_selectCadmiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectIndiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectIndiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -4966,7 +5111,8 @@ bool CChemicalElement::_selectIndiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectTinIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectTinIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5067,7 +5213,8 @@ bool CChemicalElement::_selectTinIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectAntimonyIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectAntimonyIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5104,7 +5251,8 @@ bool CChemicalElement::_selectAntimonyIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectTelluriumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectTelluriumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5189,7 +5337,8 @@ bool CChemicalElement::_selectTelluriumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectIodineIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectIodineIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5218,7 +5367,8 @@ bool CChemicalElement::_selectIodineIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectXenonIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectXenonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5311,7 +5461,8 @@ bool CChemicalElement::_selectXenonIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectCesiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectCesiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5340,7 +5491,8 @@ bool CChemicalElement::_selectCesiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectBariumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectBariumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5417,7 +5569,8 @@ bool CChemicalElement::_selectBariumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectLanthanumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectLanthanumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5454,7 +5607,8 @@ bool CChemicalElement::_selectLanthanumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectCeriumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectCeriumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5507,7 +5661,8 @@ bool CChemicalElement::_selectCeriumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectPraseodymiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectPraseodymiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5536,7 +5691,8 @@ bool CChemicalElement::_selectPraseodymiumIsotopeMass(const int32_t isotopeLabel
     }
 }
 
-bool CChemicalElement::_selectNeodymiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectNeodymiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5613,7 +5769,8 @@ bool CChemicalElement::_selectNeodymiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectPromethiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectPromethiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5642,7 +5799,8 @@ bool CChemicalElement::_selectPromethiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectSamariumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectSamariumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5719,7 +5877,8 @@ bool CChemicalElement::_selectSamariumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectEuropiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectEuropiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5756,7 +5915,8 @@ bool CChemicalElement::_selectEuropiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectGadoliniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectGadoliniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5833,7 +5993,8 @@ bool CChemicalElement::_selectGadoliniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectTerbiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectTerbiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5862,7 +6023,8 @@ bool CChemicalElement::_selectTerbiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectDysprosiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectDysprosiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5939,7 +6101,8 @@ bool CChemicalElement::_selectDysprosiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectHolmiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectHolmiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -5968,7 +6131,8 @@ bool CChemicalElement::_selectHolmiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectErbiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectErbiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6037,7 +6201,8 @@ bool CChemicalElement::_selectErbiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectThuliumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectThuliumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6066,7 +6231,8 @@ bool CChemicalElement::_selectThuliumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectYtterbiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectYtterbiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6143,7 +6309,8 @@ bool CChemicalElement::_selectYtterbiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectLutheniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectLutheniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6180,7 +6347,8 @@ bool CChemicalElement::_selectLutheniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectHafniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectHafniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6249,7 +6417,8 @@ bool CChemicalElement::_selectHafniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectTantalumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectTantalumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6286,7 +6455,8 @@ bool CChemicalElement::_selectTantalumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectTungstenIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectTungstenIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6347,7 +6517,8 @@ bool CChemicalElement::_selectTungstenIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectRheniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectRheniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6384,7 +6555,8 @@ bool CChemicalElement::_selectRheniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectOsmiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectOsmiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6461,7 +6633,8 @@ bool CChemicalElement::_selectOsmiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectIridiumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectIridiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6498,7 +6671,8 @@ bool CChemicalElement::_selectIridiumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectPlatinumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectPlatinumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6567,7 +6741,8 @@ bool CChemicalElement::_selectPlatinumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectGoldIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectGoldIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6595,7 +6770,8 @@ bool CChemicalElement::_selectGoldIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectMercuryIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectMercuryIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6671,7 +6847,8 @@ bool CChemicalElement::_selectMercuryIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectThalliumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectThalliumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6707,7 +6884,8 @@ bool CChemicalElement::_selectThalliumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectLeadIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectLeadIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6760,7 +6938,8 @@ bool CChemicalElement::_selectLeadIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectBismuthIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectBismuthIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6789,7 +6968,8 @@ bool CChemicalElement::_selectBismuthIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectPoloniumIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectPoloniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6818,7 +6998,8 @@ bool CChemicalElement::_selectPoloniumIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectAstatineIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectAstatineIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6847,7 +7028,8 @@ bool CChemicalElement::_selectAstatineIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-bool CChemicalElement::_selectRadonIsotopeMass(const int32_t isotopeLabel)
+bool
+CChemicalElement::_selectRadonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
@@ -6876,7 +7058,9 @@ bool CChemicalElement::_selectRadonIsotopeMass(const int32_t isotopeLabel)
     }
 }
 
-std::ostream& operator<<(std::ostream& output, const CChemicalElement& source)
+std::ostream&
+operator<<(      std::ostream&     output,
+           const CChemicalElement& source)
 {
     output << std::endl;
 

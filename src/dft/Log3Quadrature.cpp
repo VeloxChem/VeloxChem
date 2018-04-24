@@ -28,7 +28,8 @@ CLog3Quadrature::~CLog3Quadrature()
 
 }
 
-CMemBlock2D<double> CLog3Quadrature::generate() const
+CMemBlock2D<double>
+CLog3Quadrature::generate() const
 {
     if (_nRadialPoints > 0)
     {
@@ -82,7 +83,8 @@ CMemBlock2D<double> CLog3Quadrature::generate() const
     return CMemBlock2D<double>();
 }
 
-double CLog3Quadrature::_getXiFactor() const
+double
+CLog3Quadrature::_getXiFactor() const
 {
     // H atom
 

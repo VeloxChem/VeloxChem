@@ -47,12 +47,14 @@ COutputStream::~COutputStream()
 
 }
 
-bool COutputStream::getState() const
+bool
+COutputStream::getState() const
 {
     return _state;
 }
 
-void COutputStream::flush()
+void
+COutputStream::flush()
 {
     if (!_filename.empty())
     {
@@ -77,14 +79,16 @@ void COutputStream::flush()
     }
 }
 
-void COutputStream::_errorFileOpen() const
+void
+COutputStream::_errorFileOpen() const
 {
     std::cerr << "*** ERROR @ COutputStream @: ";
 
     std::cerr << "failed to open file " << _filename  << std::endl;
 }
 
-void COutputStream::_addLineToBuffer()
+void
+COutputStream::_addLineToBuffer()
 {
     if (!_filename.empty())
     {
@@ -98,7 +102,8 @@ void COutputStream::_addLineToBuffer()
     }
 }
 
-size_t COutputStream::_getLinePosition() const
+size_t
+COutputStream::_getLinePosition() const
 {
     auto linwidth = _line.size();
 
@@ -111,13 +116,16 @@ size_t COutputStream::_getLinePosition() const
     return 0;
 }
 
-void COutputStream::_appendToLine(const std::string& line)
+void
+COutputStream::_appendToLine(const std::string& line)
 {
     _line.append(line);
 }
 
 
-COutputStream& operator<<(COutputStream& output, const fmt& source)
+COutputStream&
+operator<<(      COutputStream& output,
+           const fmt&           source)
 {
     switch (source)
     {
@@ -251,14 +259,18 @@ COutputStream& operator<<(COutputStream& output, const fmt& source)
     return output;
 }
 
-COutputStream& operator<<(COutputStream& output, const std::string& source)
+COutputStream&
+operator<<(      COutputStream& output,
+           const std::string&   source)
 {
     output._appendToLine(source);
 
     return output;
 }
 
-COutputStream& operator<<(COutputStream& output, const char* source)
+COutputStream&
+operator<<(      COutputStream& output,
+           const char*          source)
 {
     output._appendToLine(std::string(source));
 
