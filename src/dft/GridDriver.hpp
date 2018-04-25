@@ -132,6 +132,7 @@ class CGridDriver
      Generates grid points for specific atom in molecule.
 
      @param rawGridPoints the raw grid points.
+     @param minDistance the distance to closest neighbouring atom.
      @param gridOffset the atom grid points offset in raw grid points. 
      @param atomCoordinatesX the vector of Cartesian X coordinates of atoms.
      @param atomCoordinatesY the vector of Cartesian Y coordinates of atoms.
@@ -141,6 +142,7 @@ class CGridDriver
      @param idAtomic the index of atom.
      */
     void _genAtomGridPoints(      CMemBlock2D<double>* rawGridPoints,
+                            const double               minDistance,
                             const int32_t              gridOffset,
                             const double*              atomCoordinatesX,
                             const double*              atomCoordinatesY,
@@ -157,37 +159,6 @@ class CGridDriver
      @return the number of pruned grid points. 
      */
     int32_t _screenRawGridPoints(CMemBlock2D<double>* rawGridPoints) const;
-    
-    
-    
-    /**
-     Generates partitioned atomic grid from radial and angular quadratures for
-     specific atom.
-
-     @param radPoints the radial quadrature points.
-     @param angPoints the angular quadrature points.
-     @param molecule the molecule.
-     @param minDistanceAB the distance between specific atom and closest
-     neighbouring atom.
-     @param idAtom the index of atom.
-     @return the partitioned atomic grid.
-     */
-    CMemBlock2D<double> _combAtomicGrid(const CMemBlock2D<double>& radPoints,
-                                        const CMemBlock2D<double>& angPoints,
-                                        const CMolecule&           molecule,
-                                        const double               minDistanceAB,
-                                        const int32_t              idAtom) const;
-    /**
-     Screens weights of grid points in atom grid and adds grid points with
-     weight larger than cuttoff threshold to molecular grid.
-
-     @param molGridPoints the molecular grid.
-     @param nGridPoints the number of grid points in molecular grid.
-     @param atomGridPoints the atomic grid.
-     */
-    void _screenAtomGridPoints(      CMemBlock2D<double>& molGridPoints,
-                                     int32_t&             nGridPoints,
-                               const CMemBlock2D<double>& atomGridPoints) const;
     
 public:
 

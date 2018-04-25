@@ -295,6 +295,10 @@ CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
     
     auto molrz = molecule.getCoordinatesZ();
     
+    auto mdist = molecule.getMinDistances();
+    
+    auto molrm = mdist.data();
+    
     // determine dimensions of atoms batch for each MPI node
     
     auto nodatm = mpi::batch_size(natoms, _locRank, _locNodes);
@@ -309,8 +313,8 @@ CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
     
     // generate atomic grid for each atom in molecule
     
-    #pragma omp parallel shared(rawgrid, idselem, molrx, molry, molrz, natoms,\
-                                nodatm, nodoff)
+    #pragma omp parallel shared(rawgrid, idselem, molrx, molry, molrz, molrm,\
+                                natoms, nodatm, nodoff)
     {
         #pragma omp single nowait
         {
@@ -322,9 +326,12 @@ CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
                 
                 auto ielem = idselem[iatom];
                 
-                #pragma omp task firstprivate(i, ielem, iatom, gridoff)
+                auto minrad = molrm[iatom];
+                
+                #pragma omp task firstprivate(ielem, iatom, minrad, gridoff)
                 {
-                    _genAtomGridPoints(rawgrid, gridoff, molrx, molry, molrz,
+                    _genAtomGridPoints(rawgrid, minrad, gridoff,
+                                       molrx, molry, molrz,
                                        natoms, ielem, iatom);
                 }
                 
@@ -369,6 +376,7 @@ CGridDriver::_getBatchSize(const int32_t* idsElemental,
 
 void
 CGridDriver::_genAtomGridPoints(      CMemBlock2D<double>* rawGridPoints,
+                                const double               minDistance, 
                                 const int32_t              gridOffset,
                                 const double*              atomCoordinatesX,
                                 const double*              atomCoordinatesY,
@@ -454,7 +462,7 @@ CGridDriver::_genAtomGridPoints(      CMemBlock2D<double>* rawGridPoints,
     
     // apply partitioning function
     
-    partfunc::ssf(rawGridPoints, gridOffset, nrpoints * napoints,
+    partfunc::ssf(rawGridPoints, minDistance, gridOffset, nrpoints * napoints,
                   atomCoordinatesX, atomCoordinatesY, atomCoordinatesZ,
                   nAtoms, idAtomic);
 }
@@ -495,175 +503,3 @@ CGridDriver::_screenRawGridPoints(CMemBlock2D<double>* rawGridPoints) const
     return cpoints;
 }
 
-CMemBlock2D<double>
-CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
-                             const CMemBlock2D<double>& angPoints,
-                             const CMolecule&           molecule,
-                             const double               minDistanceAB,
-                             const int32_t              idAtom) const
-{
-    // set up atomic grid dimensions
-    
-    auto nrpoints = radPoints.size(0);
-    
-    auto napoints = angPoints.size(0);
-    
-    // allocate atomic grid
-    
-    CMemBlock2D<double> agrid(napoints, 4 * nrpoints);
-    
-    auto pagrid = &agrid;
-    
-    // set up molecular data
-    
-    auto natoms = molecule.getNumberOfAtoms();
-    
-    auto mcoordsx = molecule.getCoordinatesX();
-    
-    auto mcoordsy = molecule.getCoordinatesY();
-    
-    auto mcoordsz = molecule.getCoordinatesZ();
-    
-    // atom coordinates
-    
-    auto coordx = mcoordsx[idAtom];
-    
-    auto coordy = mcoordsy[idAtom];
-    
-    auto coordz = mcoordsz[idAtom];
-
-    // radial grid data
-    
-    auto rcoords = radPoints.data(0);
-    
-    auto rweights = radPoints.data(1);
-    
-    auto rfactor = 4.0 * mathconst::getPiValue();
-    
-    // angular grid data
-    
-    auto acoordsx = angPoints.data(0);
-    
-    auto acoordsy = angPoints.data(1);
-    
-    auto acoordsz = angPoints.data(2);
-    
-    auto aweights = angPoints.data(3);
-    
-    // set up partial weights storage
-    
-    CMemBlock2D<double> partweights(natoms, 10);
-    
-    auto ppartweights = &partweights;
-    
-    // OMP parallel region
-    
-    #pragma omp parallel shared(pagrid, ppartweights, rcoords, rweights, rfactor,\
-                                acoordsx, acoordsy, acoordsz, aweights,\
-                                mcoordsx, mcoordsy, mcoordsz, idAtom,\
-                                coordx, coordy, coordz, minDistanceAB,\
-                                nrpoints, napoints, natoms)
-    {
-        // loop over radial points
-        
-        #pragma omp for
-        for (int32_t i = 0; i < nrpoints; i++)
-        {
-            auto rr = rcoords[i];
-            
-            auto fw = rfactor * rweights[i];
-            
-            // atomic grid for i-th radial point
-            
-            auto rx = pagrid->data(4 * i);
-            
-            auto ry = pagrid->data(4 * i + 1);
-            
-            auto rz = pagrid->data(4 * i + 2);
-            
-            auto rw = pagrid->data(4 * i + 3);
-            
-            // generate raw grid points for i-th radial point
-            
-            #pragma omp simd aligned(rx:VLX_ALIGN, ry:VLX_ALIGN, rz:VLX_ALIGN,\
-                                     acoordsx:VLX_ALIGN, acoordsy:VLX_ALIGN, \
-                                     acoordsz:VLX_ALIGN, aweights:VLX_ALIGN)
-            for (int32_t j = 0; j < napoints; j++)
-            {
-                rx[j] = rr * acoordsx[j] + coordx;
-                
-                ry[j] = rr * acoordsy[j] + coordy;
-                
-                rz[j] = rr * acoordsz[j] + coordz;
-                
-                rw[j] = fw * aweights[j];
-            }
-            
-            // apply partitioning function
-            
-            
-            partfunc::ssf(rx, ry, rz, rw, napoints, mcoordsx, mcoordsy,
-                          mcoordsz, natoms, ppartweights->data(0),
-                          minDistanceAB, idAtom);
-        }
-    }
-    
-    return agrid;
-}
-
-void
-CGridDriver::_screenAtomGridPoints(      CMemBlock2D<double>& molGridPoints,
-                                         int32_t&             nGridPoints,
-                                   const CMemBlock2D<double>& atomGridPoints) const
-{
-    // atomic grid dimensions
-    
-    auto nrpoints = atomGridPoints.blocks() / 4;
-    
-    auto napoints = atomGridPoints.size(0);
-    
-    // set up pointers to molecular grid data
-    
-    auto mx = molGridPoints.data(0);
-    
-    auto my = molGridPoints.data(1);
-    
-    auto mz = molGridPoints.data(2);
-    
-    auto mw = molGridPoints.data(3);
-    
-    // loop over radial grid batches
-    
-    for (int32_t i = 0; i < nrpoints; i++)
-    {
-        // select batch of grid points
-        
-        auto rx = atomGridPoints.data(4 * i);
-        
-        auto ry = atomGridPoints.data(4 * i + 1);
-        
-        auto rz = atomGridPoints.data(4 * i + 2);
-        
-        auto rw = atomGridPoints.data(4 * i + 3);
-        
-        // loop over angular batches
-        
-        for (int32_t j = 0; j < napoints; j++)
-        {
-            // add screened grid points
-            
-            if (rw[j] > _thresholdOfWeight)
-            {
-                mx[nGridPoints] = rx[j];
-                
-                my[nGridPoints] = ry[j];
-                
-                mz[nGridPoints] = rz[j];
-                
-                mw[nGridPoints] = rw[j];
-                
-                nGridPoints++;
-            }
-        }
-    }
-}

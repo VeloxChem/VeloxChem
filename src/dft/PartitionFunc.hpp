@@ -21,6 +21,7 @@ namespace partfunc { // partfunc namespace
      Lett., 213 (257), 1996.
 
      @param rawGridPoints the raw grid points.
+     @param minDistance the distance to closest neighbouring atom.
      @param gridOffset the atom grid points offset in raw grid points.
      @param nGridPoints the number of grid points.
      @param atomCoordinatesX the vector of Cartesian X coordinates of atoms.
@@ -30,6 +31,7 @@ namespace partfunc { // partfunc namespace
      @param idAtomic the index of atom.
      */
     void ssf(      CMemBlock2D<double>* rawGridPoints,
+             const double               minDistance,
              const int32_t              gridOffset,
              const int32_t              nGridPoints,
              const double*              atomCoordinatesX,
@@ -37,38 +39,6 @@ namespace partfunc { // partfunc namespace
              const double*              atomCoordinatesZ,
              const int32_t              nAtoms,
              const int32_t              idAtomic);
-    
-    /**
-     Applies SSF partitioning scheme to grid weights.
-     Reference: R. E. Stratmann, G. E. Scuseria, and M. J. Frisch, Chem. Phys.
-     Lett., 213 (257), 1996.
-
-     @param gridCoordsX the vector of Cartesian X coordinates of grid points.
-     @param gridCoordsY the vector of Cartesian Y coordinates of grid points.
-     @param gridCoordsZ the vector of Cartesian Z coordinates of grid points.
-     @param gridWeights the vector of weights of grid points.
-     @param nGridPoints the number of grid points.
-     @param molCoordsX the vector of Cartesian X coordinates of atoms in molecule.
-     @param molCoordsY the vector of Cartesian Y coordinates of atoms in molecule.
-     @param molCoordsZ the vector of Cartesian Z coordinates of atoms in molecule.
-     @param nAtoms the number of atoms in molecule.
-     @param partWeights the temporary SSF weights.
-     @param minDistanceAB the distance between specific atom and closest
-     neighbouring atom.
-     @param idAtom the identifier of atom associated with grid points.
-     */
-    void ssf(      double* gridCoordsX,
-                   double* gridCoordsY,
-                   double* gridCoordsZ,
-                   double* gridWeights,
-             const int32_t nGridPoints,
-             const double* molCoordsX,
-             const double* molCoordsY,
-             const double* molCoordsZ,
-             const int32_t nAtoms,
-                   double* partWeights,
-             const double  minDistanceAB,
-             const int32_t idAtom);
     
     /**
      Computes polynomial weight function in eliptical coordinates. See Eq. 14
