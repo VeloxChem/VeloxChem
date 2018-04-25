@@ -135,12 +135,15 @@ class CGridDriver
      @param radPoints the radial quadrature points.
      @param angPoints the angular quadrature points.
      @param molecule the molecule.
+     @param minDistanceAB the distance between specific atom and closest
+     neighbouring atom.
      @param idAtom the index of atom.
      @return the partitioned atomic grid.
      */
     CMemBlock2D<double> _combAtomicGrid(const CMemBlock2D<double>& radPoints,
                                         const CMemBlock2D<double>& angPoints,
                                         const CMolecule&           molecule,
+                                        const double               minDistanceAB,
                                         const int32_t              idAtom) const;
     /**
      Screens weights of grid points in atom grid and adds grid points with

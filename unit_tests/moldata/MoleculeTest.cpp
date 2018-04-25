@@ -143,4 +143,12 @@ TEST_F(CMoleculeTest, GetCoordinatesZ)
     vlxtest::compare({0.0, 1.2}, mol.getCoordinatesZ());
 }
 
-
+TEST_F(CMoleculeTest, GetMinDistances)
+{
+    CMolecule mol = vlxmol::getMoleculeH2O();
+    
+    CMemBlock<double> mdist({1.78044938147649, 1.78044938147649,
+                             1.78044938147649});
+    
+    ASSERT_EQ(mdist, mol.getMinDistances());
+}

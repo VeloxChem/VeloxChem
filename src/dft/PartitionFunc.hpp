@@ -28,6 +28,8 @@ namespace partfunc { // partfunc namespace
      @param molCoordsZ the vector of Cartesian Z coordinates of atoms in molecule.
      @param nAtoms the number of atoms in molecule.
      @param partWeights the temporary SSF weights.
+     @param minDistanceAB the distance between specific atom and closest
+     neighbouring atom.
      @param idAtom the identifier of atom associated with grid points.
      */
     void ssf(      double* gridCoordsX,
@@ -40,6 +42,7 @@ namespace partfunc { // partfunc namespace
              const double* molCoordsZ,
              const int32_t nAtoms,
                    double* partWeights,
+             const double  minDistanceAB,
              const int32_t idAtom);
     
     /**

@@ -86,6 +86,21 @@ TEST_F(CMemBlock2DTest, MoveAssignment)
     ASSERT_EQ(ma, mb);
 }
 
+TEST_F(CMemBlock2DTest, Slice)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    CMemBlock2D<double> mb({1.0, 3.0}, 1, 2);
+    
+    CMemBlock2D<double> mc({2.0, 6.0}, 1, 2);
+    
+    ASSERT_EQ(ma, ma.slice(0, 2));
+    
+    ASSERT_EQ(mb, ma.slice(0, 1));
+    
+    ASSERT_EQ(mc, ma.slice(1, 1));
+}
+
 TEST_F(CMemBlock2DTest, Zero)
 {
     CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);

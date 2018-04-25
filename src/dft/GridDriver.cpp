@@ -69,7 +69,7 @@ CGridDriver::generate(const CMolecule&     molecule,
                             COutputStream& oStream,
                             MPI_Comm       comm) const
 {
-    CSystemClock tim;
+    CSystemClock time;
     
     if (_globRank == mpi::master()) _startHeader(molecule, oStream);
     
@@ -81,7 +81,7 @@ CGridDriver::generate(const CMolecule&     molecule,
     
     if (_runMode == execmode::cpu)
     {
-        _genGridPointsOnCPU(molecule, comm); 
+        molgrid = _genGridPointsOnCPU(molecule, comm);
     }
     
     // execution mode: CPU/GPU
@@ -96,7 +96,7 @@ CGridDriver::generate(const CMolecule&     molecule,
         // FIX ME: add tranfer from local master to global master
     }
     
-    if (_globRank == mpi::master()) _finishHeader(tim, molgrid, oStream);
+    if (_globRank == mpi::master()) _finishHeader(time, molgrid, oStream);
     
     return molgrid;
 }
@@ -299,6 +299,12 @@ CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
     
     CMemBlock2D<double> rawgrid(mpoints, 4);
     
+    // determine minimum distances between closest atoms
+    
+    auto mdistances = molecule.getMinDistances();
+    
+    auto pmdistances = mdistances.data();
+    
     // loop over batch of atoms
     
     int32_t curpoints = 0;
@@ -310,6 +316,8 @@ CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
         auto iatom = nodoffset + i;
 
         auto ielem = idselem[iatom];
+        
+        auto rmin = pmdistances[iatom];
 
         // determine number of grid points
 
@@ -331,17 +339,24 @@ CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
 
         // combine atomic grid points
 
-        auto atmgrid = _combAtomicGrid(rpoints, apoints, molecule, iatom);
+        auto atmgrid = _combAtomicGrid(rpoints, apoints, molecule, rmin, iatom);
 
         // add screened atomic grid to molecular grid
 
         _screenAtomGridPoints(rawgrid, curpoints, atmgrid);
     }
     
+    // set up prunned grid points
+    
+    printf("node (%i) data: %i %i npoints: %i\n",
+           _locRank, nodatoms, nodoffset, rawgrid.size(0));
+    
+    rawgrid = rawgrid.slice(0, curpoints);
+    
     auto prngrid = rawgrid.gather(_locRank, _locNodes, comm);
     
-    printf("node (%i) data: %i %i npoints: %i -> %i\n",
-            _locRank, nodatoms, nodoffset, rawgrid.size(0), curpoints);
+    printf("node (%i) data: %i %i prunned npoints: %i\n",
+           _locRank, nodatoms, nodoffset, prngrid.size(0));
     
     return CMolecularGrid(prngrid);
 }
@@ -367,6 +382,7 @@ CMemBlock2D<double>
 CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
                              const CMemBlock2D<double>& angPoints,
                              const CMolecule&           molecule,
+                             const double               minDistanceAB,
                              const int32_t              idAtom) const
 {
     // set up atomic grid dimensions
@@ -422,7 +438,7 @@ CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
     #pragma omp parallel shared(pagrid, rcoords, rweights, rfactor,\
                                 acoordsx, acoordsy, acoordsz, aweights,\
                                 mcoordsx, mcoordsy, mcoordsz, idAtom,\
-                                coordx, coordy, coordz,\
+                                coordx, coordy, coordz, minDistanceAB,\
                                 nrpoints, napoints, natoms)
     {
         // allocate partial weights for each thread
@@ -467,7 +483,8 @@ CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
             // apply partitioning function
             
             partfunc::ssf(rx, ry, rz, rw, napoints, mcoordsx, mcoordsy,
-                          mcoordsz, natoms, partweights.data(), idAtom); 
+                          mcoordsz, natoms, partweights.data(),
+                          minDistanceAB, idAtom);
         }
     }
     

@@ -251,6 +251,13 @@ public:
     const double* getCoordinatesZ() const;
     
     /**
+     Computes vector of distances to closest neighbouring atom for each atom.
+
+     @return the vector of distances.
+     */
+    CMemBlock<double> getMinDistances() const;
+    
+    /**
      Prints geometry of molecule as table to output stream.
 
      @param oStream the output stream.

@@ -12,6 +12,7 @@
 
 #include "StringFormat.hpp"
 #include "Codata.hpp"
+#include "MathFunc.hpp"
 
 CMolecule::CMolecule()
 
@@ -279,6 +280,45 @@ const double*
 CMolecule::getCoordinatesZ() const
 {
     return _atomCoordinates.data(2);
+}
+
+CMemBlock<double>
+CMolecule::getMinDistances() const
+{
+    // allocate and initialize distances
+    
+    auto natoms = getNumberOfAtoms();
+    
+    CMemBlock<double> mdists(natoms);
+    
+    auto rmin = mdists.data();
+    
+    mathfunc::set_to(rmin, 1.0e24, natoms);
+    
+    // set pointers to coordinates
+    
+    auto rx = getCoordinatesX();
+    
+    auto ry = getCoordinatesY();
+    
+    auto rz = getCoordinatesZ();
+    
+    // determine distance to closest neighbouring atom
+    
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        for (int32_t j = i + 1; j < natoms; j++)
+        {
+            auto rab = mathfunc::distance(rx[i], ry[i], rz[i],
+                                          rx[j], ry[j], rz[j]);
+            
+            if (rab < rmin[i]) rmin[i] = rab;
+            
+            if (rab < rmin[j]) rmin[j] = rab;
+        }
+    }
+    
+    return mdists;
 }
 
 void

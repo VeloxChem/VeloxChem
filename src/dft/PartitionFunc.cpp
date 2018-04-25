@@ -23,8 +23,13 @@ namespace partfunc { // partfunc namespace
         const double* molCoordsZ,
         const int32_t nAtoms,
               double* partWeights,
+        const double  minDistanceAB, 
         const int32_t idAtom)
     {
+        // SSF parameter: 0.5 * (1 - a)
+        
+        const double parssf = 0.180;
+        
         // loop over grid points
         
         for (int32_t i = 0; i < nGridPoints; i++)
@@ -37,6 +42,15 @@ namespace partfunc { // partfunc namespace
             
             double rgz = gridCoordsZ[i];
             
+            // weights screening
+            
+            auto rig = mathfunc::distance(molCoordsX[idAtom],
+                                          molCoordsY[idAtom],
+                                          molCoordsZ[idAtom],
+                                          rgx, rgy, rgz);
+            
+            if (rig < parssf * minDistanceAB) continue;
+    
             // initialize weights
             
             mathfunc::set_to(partWeights, 1.0, nAtoms);
@@ -100,19 +114,19 @@ namespace partfunc { // partfunc namespace
     {
         // efefctive SSF radius
         
-        double radSSF = 0.64;
+        const double radssf = 0.64;
         
         // lower boundary
         
-        if (eRadius <= -radSSF) return -1.0;
+        if (eRadius <= -radssf) return -1.0;
         
         // upper boundary
         
-        if (eRadius >= radSSF) return 1.0;
+        if (eRadius >= radssf) return 1.0;
         
-        // midle interval
+        // middle interval
         
-        auto mab  = eRadius / radSSF;
+        auto mab  = eRadius / radssf;
         
         auto mab2 = mab * mab;
         
