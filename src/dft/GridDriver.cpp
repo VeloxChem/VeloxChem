@@ -10,8 +10,6 @@
 
 #include <array>
 
-#include "omp.h"
-
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"
 #include "ChemicalElement.hpp"
@@ -75,7 +73,7 @@ CGridDriver::generate(const CMolecule&     molecule,
     
     if (_globRank == mpi::master()) _startHeader(molecule, oStream);
     
-    // initialize molecular grid.
+    // initialize molecular grid
     
     CMolecularGrid molgrid;
     
@@ -285,88 +283,75 @@ CMolecularGrid
 CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule,
                                        MPI_Comm   comm) const
 {
-    // determine dimensions of atoms batch for each MPI node
+    // molecular data
     
-    auto totatoms = molecule.getNumberOfAtoms();
-    
-    auto nodatoms = mpi::batch_size(totatoms, _locRank, _locNodes);
-    
-    auto nodoffset = mpi::batch_offset(totatoms, _locRank, _locNodes);
-    
-    // allocate raw grid
+    auto natoms = molecule.getNumberOfAtoms();
     
     auto idselem = molecule.getIdsElemental();
     
-    int32_t mpoints = _getBatchOfGridPoints(idselem, nodoffset, nodatoms);
+    auto molrx = molecule.getCoordinatesX();
     
-    CMemBlock2D<double> rawgrid(mpoints, 4);
+    auto molry = molecule.getCoordinatesY();
     
-    // determine minimum distances between closest atoms
+    auto molrz = molecule.getCoordinatesZ();
     
-    auto mdistances = molecule.getMinDistances();
+    // determine dimensions of atoms batch for each MPI node
     
-    auto pmdistances = mdistances.data();
+    auto nodatm = mpi::batch_size(natoms, _locRank, _locNodes);
     
-    // loop over batch of atoms
+    auto nodoff = mpi::batch_offset(natoms, _locRank, _locNodes);
     
-    int32_t curpoints = 0;
+    // allocate raw grid
     
-    for (int32_t i = 0; i < nodatoms; i++)
+    int32_t bpoints = _getBatchSize(idselem, nodoff, nodatm);
+    
+    CMemBlock2D<double>* rawgrid = new CMemBlock2D<double>(bpoints, 4);
+    
+    // generate atomic grid for each atom in molecule
+    
+    #pragma omp parallel shared(rawgrid, idselem, molrx, molry, molrz, natoms,\
+                                nodatm, nodoff)
     {
-        // set up i-th atom data
-
-        auto iatom = nodoffset + i;
-
-        auto ielem = idselem[iatom];
-        
-        auto rmin = pmdistances[iatom];
-
-        // determine number of grid points
-
-        auto nrpoints = _getNumberOfRadialPoints(ielem);
-
-        auto napoints = _getNumberOfAngularPoints(ielem);
-
-        // generate radial grid points
-
-        CLog3Quadrature rquad(nrpoints, ielem);
-
-        auto rpoints = rquad.generate();
-
-        // generate angular grid points
-
-        CLebedevLaikovQuadrature aquad(napoints);
-
-        auto apoints = aquad.generate();
-
-        // combine atomic grid points
-
-        auto atmgrid = _combAtomicGrid(rpoints, apoints, molecule, rmin, iatom);
-
-        // add screened atomic grid to molecular grid
-
-        _screenAtomGridPoints(rawgrid, curpoints, atmgrid);
+        #pragma omp single nowait
+        {
+            int32_t gridoff = 0;
+            
+            for (int32_t i = 0; i < nodatm; i++)
+            {
+                auto iatom = nodoff + i;
+                
+                auto ielem = idselem[iatom];
+                
+                #pragma omp task firstprivate(i, ielem, iatom, gridoff)
+                {
+                    _genAtomGridPoints(rawgrid, gridoff, molrx, molry, molrz,
+                                       natoms, ielem, iatom);
+                }
+                
+                gridoff += _getNumberOfRadialPoints(ielem)
+                
+                         * _getNumberOfAngularPoints(ielem);
+            }
+        }
     }
     
-    // set up prunned grid points
+    // screen raw grid points & create prunned grid
     
-    printf("node (%i) data: %i %i npoints: %i\n",
-           _locRank, nodatoms, nodoffset, rawgrid.size(0));
+    bpoints = _screenRawGridPoints(rawgrid);
     
-    rawgrid = rawgrid.slice(0, curpoints);
+    auto prngrid = rawgrid->slice(0, bpoints);
     
-    auto prngrid = rawgrid.gather(_locRank, _locNodes, comm);
+    delete rawgrid;
     
-    printf("node (%i) data: %i %i prunned npoints: %i\n",
-           _locRank, nodatoms, nodoffset, prngrid.size(0));
+    // create molecular grid on master node 
     
-    return CMolecularGrid(prngrid);
+    return CMolecularGrid(prngrid.gather(_locRank, _locNodes, comm));
 }
 
 int32_t
-CGridDriver::_getBatchOfGridPoints(const int32_t* idsElemental,
-                                   const int32_t offset,
-                                   const int32_t nAtoms) const
+CGridDriver::_getBatchSize(const int32_t* idsElemental,
+                           const int32_t  offset,
+                           const int32_t  nAtoms) const
 {
     int32_t npoints = 0;
     
@@ -374,10 +359,140 @@ CGridDriver::_getBatchOfGridPoints(const int32_t* idsElemental,
     {
         auto idx = idsElemental[offset + i];
         
-        npoints += _getNumberOfRadialPoints(idx) * _getNumberOfAngularPoints(idx);
+        npoints += _getNumberOfRadialPoints(idx)
+        
+                * _getNumberOfAngularPoints(idx);
     }
     
     return npoints;
+}
+
+void
+CGridDriver::_genAtomGridPoints(      CMemBlock2D<double>* rawGridPoints,
+                                const int32_t              gridOffset,
+                                const double*              atomCoordinatesX,
+                                const double*              atomCoordinatesY,
+                                const double*              atomCoordinatesZ,
+                                const int32_t              nAtoms,
+                                const int32_t              idElemental,
+                                const int32_t              idAtomic) const
+{
+    // determine number of grid points
+    
+    auto nrpoints = _getNumberOfRadialPoints(idElemental);
+    
+    auto napoints = _getNumberOfAngularPoints(idElemental);
+    
+    // generate radial grid points
+    
+    CLog3Quadrature rquad(nrpoints, idElemental);
+    
+    auto rpoints = rquad.generate();
+    
+    auto rrx = rpoints.data(0);
+    
+    auto rrw = rpoints.data(1);
+    
+    auto rrf = 4.0 * mathconst::getPiValue();
+    
+    // generate angular grid points
+    
+    CLebedevLaikovQuadrature aquad(napoints);
+    
+    auto apoints = aquad.generate();
+    
+    auto rax = apoints.data(0);
+    
+    auto ray = apoints.data(1);
+    
+    auto raz = apoints.data(2);
+    
+    auto raw = apoints.data(3);
+    
+    // atom coordinates
+    
+    auto atmx = atomCoordinatesX[idAtomic];
+    
+    auto atmy = atomCoordinatesY[idAtomic];
+    
+    auto atmz = atomCoordinatesZ[idAtomic];
+    
+    // assemble atom grid points from quadratures
+    
+    for (int32_t i = 0; i < nrpoints; i++)
+    {
+        // radial quadrature point
+        
+        auto crx = rrx[i];
+        
+        auto crw = rrf * rrw[i];
+        
+        // set up pointers to raw grid
+        
+        auto gx = rawGridPoints->data(0, gridOffset + i * napoints);
+        
+        auto gy = rawGridPoints->data(1, gridOffset + i * napoints);
+        
+        auto gz = rawGridPoints->data(2, gridOffset + i * napoints);
+        
+        auto gw = rawGridPoints->data(3, gridOffset + i * napoints);
+        
+        // contract with angular quadrature
+        
+        #pragma omp simd
+        for (int32_t j = 0; j < napoints; j++)
+        {
+            gx[j] = crx * rax[j] + atmx;
+            
+            gy[j] = crx * ray[j] + atmy;
+            
+            gz[j] = crx * raz[j] + atmz;
+            
+            gw[j] = crw * raw[j];
+        }
+    }
+    
+    // apply partitioning function
+    
+    partfunc::ssf(rawGridPoints, gridOffset, nrpoints * napoints,
+                  atomCoordinatesX, atomCoordinatesY, atomCoordinatesZ,
+                  nAtoms, idAtomic);
+}
+
+int32_t
+CGridDriver::_screenRawGridPoints(CMemBlock2D<double>* rawGridPoints) const
+{
+    // set up pointers to grid points data
+    
+    auto gx = rawGridPoints->data(0);
+    
+    auto gy = rawGridPoints->data(1);
+    
+    auto gz = rawGridPoints->data(2);
+    
+    auto gw = rawGridPoints->data(3);
+    
+    // loop over grid points
+    
+    int32_t cpoints = 0;
+
+    for (int32_t i = 0; i < rawGridPoints->size(0); i++)
+    {
+        if (gw[i] > _thresholdOfWeight)
+        {
+            gx[cpoints] = gx[i];
+            
+            gy[cpoints] = gy[i];
+            
+            gz[cpoints] = gz[i];
+            
+            gw[cpoints] = gw[i];
+            
+            cpoints++;
+        }
+    }
+    
+    return cpoints;
 }
 
 CMemBlock2D<double>
@@ -436,10 +551,8 @@ CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
     auto aweights = angPoints.data(3);
     
     // set up partial weights storage
-
-    auto nthreads = omp_get_max_threads(); 
     
-    CMemBlock2D<double> partweights(natoms, nthreads);
+    CMemBlock2D<double> partweights(natoms, 10);
     
     auto ppartweights = &partweights;
     
@@ -488,10 +601,9 @@ CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
             
             // apply partitioning function
             
-            auto idx = omp_get_thread_num();
             
             partfunc::ssf(rx, ry, rz, rw, napoints, mcoordsx, mcoordsy,
-                          mcoordsz, natoms, ppartweights->data(idx),
+                          mcoordsz, natoms, ppartweights->data(0),
                           minDistanceAB, idAtom);
         }
     }

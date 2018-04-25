@@ -124,9 +124,41 @@ class CGridDriver
      @param nAtoms the number of atoms in batch.
      @return the number of grid points.
      */
-    int32_t _getBatchOfGridPoints(const int32_t* idsElemental,
-                                  const int32_t  offset,
-                                  const int32_t  nAtoms) const;
+    int32_t _getBatchSize(const int32_t* idsElemental,
+                          const int32_t  offset,
+                          const int32_t  nAtoms) const;
+    
+    /**
+     Generates grid points for specific atom in molecule.
+
+     @param rawGridPoints the raw grid points.
+     @param gridOffset the atom grid points offset in raw grid points. 
+     @param atomCoordinatesX the vector of Cartesian X coordinates of atoms.
+     @param atomCoordinatesY the vector of Cartesian Y coordinates of atoms.
+     @param atomCoordinatesZ the vector of Cartesian Z coordinates of atoms.
+     @param nAtoms the number of atoms.
+     @param idElemental the chemical element identifier of atom.
+     @param idAtomic the index of atom.
+     */
+    void _genAtomGridPoints(      CMemBlock2D<double>* rawGridPoints,
+                            const int32_t              gridOffset,
+                            const double*              atomCoordinatesX,
+                            const double*              atomCoordinatesY,
+                            const double*              atomCoordinatesZ,
+                            const int32_t              nAtoms,
+                            const int32_t              idElemental,
+                            const int32_t              idAtomic) const;
+    
+    /**
+     Prunes raw grid points by screening weights and discarding all grid point
+     with weights bellow cutoff threshold.
+
+     @param rawGridPoints the raw grid points.
+     @return the number of pruned grid points. 
+     */
+    int32_t _screenRawGridPoints(CMemBlock2D<double>* rawGridPoints) const;
+    
+    
     
     /**
      Generates partitioned atomic grid from radial and angular quadratures for

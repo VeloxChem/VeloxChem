@@ -11,7 +11,32 @@
 
 #include <cstdint>
 
+#include "MemBlock2D.hpp"
+
 namespace partfunc { // partfunc namespace
+    
+    /**
+     Applies SSF partitioning scheme to selecte grid weights.
+     Reference: R. E. Stratmann, G. E. Scuseria, and M. J. Frisch, Chem. Phys.
+     Lett., 213 (257), 1996.
+
+     @param rawGridPoints the raw grid points.
+     @param gridOffset the atom grid points offset in raw grid points.
+     @param nGridPoints the number of grid points.
+     @param atomCoordinatesX the vector of Cartesian X coordinates of atoms.
+     @param atomCoordinatesY the vector of Cartesian Y coordinates of atoms.
+     @param atomCoordinatesZ the vector of Cartesian Z coordinates of atoms.
+     @param nAtoms the number of atoms.
+     @param idAtomic the index of atom.
+     */
+    void ssf(      CMemBlock2D<double>* rawGridPoints,
+             const int32_t              gridOffset,
+             const int32_t              nGridPoints,
+             const double*              atomCoordinatesX,
+             const double*              atomCoordinatesY,
+             const double*              atomCoordinatesZ,
+             const int32_t              nAtoms,
+             const int32_t              idAtomic);
     
     /**
      Applies SSF partitioning scheme to grid weights.
