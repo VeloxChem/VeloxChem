@@ -10,6 +10,8 @@
 
 #include <array>
 
+#include "omp.h"
+
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"
 #include "ChemicalElement.hpp"
@@ -433,18 +435,22 @@ CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
     
     auto aweights = angPoints.data(3);
     
+    // set up partial weights storage
+
+    auto nthreads = omp_get_max_threads(); 
+    
+    CMemBlock2D<double> partweights(natoms, nthreads);
+    
+    auto ppartweights = &partweights;
+    
     // OMP parallel region
     
-    #pragma omp parallel shared(pagrid, rcoords, rweights, rfactor,\
+    #pragma omp parallel shared(pagrid, ppartweights, rcoords, rweights, rfactor,\
                                 acoordsx, acoordsy, acoordsz, aweights,\
                                 mcoordsx, mcoordsy, mcoordsz, idAtom,\
                                 coordx, coordy, coordz, minDistanceAB,\
                                 nrpoints, napoints, natoms)
     {
-        // allocate partial weights for each thread
-        
-        CMemBlock<double> partweights(natoms);
-        
         // loop over radial points
         
         #pragma omp for
@@ -482,8 +488,10 @@ CGridDriver::_combAtomicGrid(const CMemBlock2D<double>& radPoints,
             
             // apply partitioning function
             
+            auto idx = omp_get_thread_num();
+            
             partfunc::ssf(rx, ry, rz, rw, napoints, mcoordsx, mcoordsy,
-                          mcoordsz, natoms, partweights.data(),
+                          mcoordsz, natoms, ppartweights->data(idx),
                           minDistanceAB, idAtom);
         }
     }
