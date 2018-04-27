@@ -368,7 +368,7 @@ CGridDriver::_getBatchSize(const int32_t* idsElemental,
         
         npoints += _getNumberOfRadialPoints(idx)
         
-                * _getNumberOfAngularPoints(idx);
+                 * _getNumberOfAngularPoints(idx);
     }
     
     return npoints;

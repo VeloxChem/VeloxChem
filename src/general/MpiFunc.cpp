@@ -179,6 +179,36 @@ bcast(std::vector<int32_t>& vector,
         }
     }
 }
+    
+void
+bcast(std::vector<double>& vector,
+      int32_t              rank,
+      MPI_Comm             comm)
+{
+    if (ENABLE_MPI)
+    {
+        int32_t veclen = 0;
+
+        if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
+
+        mpi::bcast(veclen, comm);
+        
+        if (rank != mpi::master()) vector.clear();
+
+        for (int32_t i = 0; i < veclen; i++)
+        {
+            double mvalue = 0;
+
+            if (rank == mpi::master()) mvalue = vector[i];
+
+            mpi::bcast(mvalue, comm);
+
+            if (rank != mpi::master()) vector.push_back(mvalue);
+        
+            MPI_Barrier(comm);
+        }
+    }
+}
  
 void
 bcast(std::string& str,

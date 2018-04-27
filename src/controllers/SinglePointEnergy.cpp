@@ -65,6 +65,8 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
         _state = _molecule.checkProximity(0.1, oStream);
     }
 
+    oStream.flush();
+    
     mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
 
     if (!_state) return;

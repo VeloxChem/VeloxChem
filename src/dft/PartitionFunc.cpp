@@ -58,6 +58,8 @@ namespace partfunc { // partfunc namespace
                                           atomCoordinatesZ[idAtomic],
                                           rgx, rgy, rgz);
             
+            // min. distance scale 0.5 * (1 - a), SSF parameter a = 0.64
+            
             if (rig < 0.18 * minDistance) continue;
             
             // initialize weights
@@ -121,6 +123,8 @@ namespace partfunc { // partfunc namespace
     inline double
     zeta(const double eRadius)
     {
+        // SSF parameter a = 0.64
+        
         // lower boundary
         
         if (eRadius <= -0.64) return -1.0;

@@ -109,13 +109,6 @@ public:
      */
     CMolecule(const CMolecule& source);
 
-    // CMolecule(CMolecule&& source):
-    //
-    // Constructs a molecule by moving other moelcule.
-    //
-    // Input:
-    // source (CMolecule&&) - the molecule being moved.
-
     /**
      Creates a molecule object by moving other molecule object.
      

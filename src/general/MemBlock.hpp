@@ -716,7 +716,7 @@ CMemBlock<double>::scatter(int32_t  rank,
 
         // allocate local data chunk
 
-        auto nsizes =  static_cast<size_t>(_nElements) * sizeof(double);
+        auto nsizes = static_cast<size_t>(_nElements) * sizeof(double);
 
         double* bdata = (double*) mem::malloc(nsizes);
 

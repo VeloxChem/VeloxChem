@@ -115,6 +115,17 @@ void bcast(char&    value,
 void bcast(std::vector<int32_t>& vector,
            int32_t               rank,
            MPI_Comm              comm);
+    
+/**
+ Broadcasts vector of real numbers within domain of MPI communicator.
+
+ @param vector the vector of real numbers.
+ @param rank the rank of MPI process.
+ @param comm the MPI communicator.
+ */
+void bcast(std::vector<double>& vector,
+           int32_t              rank,
+           MPI_Comm             comm);
   
 /**
  Broadcasts a string within domain of MPI communicator.
