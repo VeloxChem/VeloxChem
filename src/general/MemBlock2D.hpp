@@ -634,6 +634,18 @@ CMemBlock2D<int32_t>::gather(int32_t  rank,
         
         auto nsizes = orgsizes.pack(nodes);
         
+        // testing start
+        
+        std::cout << "rank:" << rank << "origsizes:" << orgsizes << std::endl;
+        
+        MPI_Barrier(comm);
+        
+        std::cout << "rank:" << rank << "nsizes"<< nsizes << std::endl;
+        
+        MPI_Barrier(comm); 
+        
+        // teting end
+        
         CMemBlock2D<int32_t> mblock(nsizes);
         
         mblock.zero();
@@ -697,15 +709,20 @@ CMemBlock2D<double>::gather(int32_t  rank,
         
         // create 2D memory block
         
-        auto nsizes = orgsizes.pack(nodes);
+        CMemBlock2D<double> mblock;
         
-        CMemBlock2D<double> mblock(nsizes);
-        
-        mblock.zero();
+        if (rank == mpi::master())
+        {
+            auto nsizes = orgsizes.pack(nodes);
+            
+            mblock = CMemBlock2D<double>(nsizes);
+        }
         
         // distribute number of data chunks
         
-        auto nchunks = mblock.blocks();
+        int32_t nchunks = 0;
+        
+        if (rank == mpi::master()) nchunks = mblock.blocks();
         
         mpi::bcast(nchunks, comm);
         
