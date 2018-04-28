@@ -181,10 +181,12 @@ public:
      Creates a memory block object by subdividing data in memory block object
      into specific number of subblocks and summing up all subblocks.
 
-     @param nSubBlocks the number of subblocks.
+     @param nElements the number elements in subblock.
+     @param nBlocks the number of summed subblocks.
      @return the memory block object.
      */
-    CMemBlock<T> pack(const int32_t nSubBlocks) const;
+    CMemBlock<T> pack(const int32_t nElements,
+                      const int32_t nBlocks) const;
     
     /**
      Creates a memory block object by subdividing data in memory block object
@@ -423,38 +425,29 @@ CMemBlock<T>::at(const int32_t iElement) const
 
 template <class T>
 CMemBlock<T>
-CMemBlock<T>::pack(const int32_t nSubBlocks) const
+CMemBlock<T>::pack(const int32_t nElements,
+                   const int32_t nBlocks) const
 {
-    auto numelem = _nElements / nSubBlocks;
+    auto nelem = nElements * nBlocks;
     
-    if (numelem > 0)
+    if (nelem <= _nElements)
     {
-        CMemBlock<T> mblock(numelem);
+        CMemBlock<T> mblock(nelem);
         
         mblock.zero();
         
-        for (int32_t i = 0; i < nSubBlocks; i++)
+        for (int32_t i = 0; i < nBlocks; i++)
         {
-            for (int32_t j = 0; j < numelem; j++)
+            for (int32_t j = 0; j < nElements; j++)
             {
-                mblock.at(j) += _data[i * numelem + j];
+                mblock.at(j) += _data[i * nElements + j];
             }
         }
-        
-        auto nremind = _nElements % nSubBlocks;
-        
-        if (nremind != 0)
-        {
-            for (int32_t i = 0; i < nremind; i++)
-            {
-                mblock.at(i) += _data[nSubBlocks * numelem + i]; 
-            }
-        }
-        
+
         return mblock;
     }
     
-    return CMemBlock<T>(*this);
+    return CMemBlock<T>();
 }
 
 template <class T>
