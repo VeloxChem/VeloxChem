@@ -632,29 +632,14 @@ CMemBlock2D<int32_t>::gather(int32_t  rank,
         
         // create 2D memory block
         
-        auto nsizes = orgsizes.pack(nodes);
+        CMemBlock2D<int32_t> mblock;
         
-        // testing start
-        
-        std::cout << "rank:" << rank << "origsizes:" << orgsizes << std::endl;
-        
-        MPI_Barrier(comm);
-        
-        std::cout << "rank:" << rank << "nsizes"<< nsizes << std::endl;
-        
-        MPI_Barrier(comm); 
-        
-        // teting end
-        
-        CMemBlock2D<int32_t> mblock(nsizes);
-        
-        mblock.zero();
-        
-        // collect data elements from nodes
-        
-        auto nchunks = mblock.blocks();
-        
-        mpi::bcast(nchunks, comm);
+        if (rank == mpi::master())
+        {
+            auto nsizes = orgsizes.pack(blocks(), nodes);
+            
+            mblock = CMemBlock2D<int32_t>(nsizes);
+        }
         
         // set up gathering pattern
         
@@ -666,11 +651,11 @@ CMemBlock2D<int32_t>::gather(int32_t  rank,
         
         // gather data chunks
         
-        for (int32_t i = 0; i < nchunks; i++)
+        for (int32_t i = 0; i < blocks(); i++)
         {
             if (rank == mpi::master())
             {
-                bsizes = orgsizes.pick(nodes, i);
+                bsizes = orgsizes.pick(blocks(), nodes, i);
                 
                 mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
             }
@@ -713,18 +698,10 @@ CMemBlock2D<double>::gather(int32_t  rank,
         
         if (rank == mpi::master())
         {
-            auto nsizes = orgsizes.pack(nodes);
+            auto nsizes = orgsizes.pack(blocks(), nodes);
             
             mblock = CMemBlock2D<double>(nsizes);
         }
-        
-        // distribute number of data chunks
-        
-        int32_t nchunks = 0;
-        
-        if (rank == mpi::master()) nchunks = mblock.blocks();
-        
-        mpi::bcast(nchunks, comm);
         
         // set up gathering pattern
         
@@ -736,11 +713,11 @@ CMemBlock2D<double>::gather(int32_t  rank,
         
         // gather data chunks
         
-        for (int32_t i = 0; i < nchunks; i++)
+        for (int32_t i = 0; i < blocks(); i++)
         {
             if (rank == mpi::master())
             {
-                bsizes = orgsizes.pick(nodes, i);
+                bsizes = orgsizes.pick(blocks(), nodes, i);
                 
                 mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
             }

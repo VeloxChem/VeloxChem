@@ -180,62 +180,62 @@ TEST_F(CMemBlockTest, Pack)
 {
     CMemBlock<double> ma({1.0, 2.0, 3.0, 6.0});
     
-    auto mb = ma.pack(2);
+    auto mb = ma.pack(2, 1);
     
-    ASSERT_EQ(mb, CMemBlock<double>({4.0, 8.0}));
+    ASSERT_EQ(mb, CMemBlock<double>({1.0, 2.0}));
     
-    auto mc = ma.pack(3);
+    auto mc = ma.pack(2, 2);
     
-    ASSERT_EQ(mc, CMemBlock<double>(std::vector<double>({12.0})));
+    ASSERT_EQ(mc, CMemBlock<double>({4.0, 8.0}));
     
-    auto md = ma.pack(4);
+    auto md = ma.pack(3, 1);
     
-    ASSERT_EQ(md, CMemBlock<double>(std::vector<double>({12.0})));
+    ASSERT_EQ(md, CMemBlock<double>({1.0, 2.0, 3.0}));
     
-    auto mf = ma.pack(1);
+    auto mf = ma.pack(1, 4);
     
-    ASSERT_EQ(mf, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+    ASSERT_EQ(mf, CMemBlock<double>(std::vector<double>{12.0}));
     
-    auto me = ma.pack(5);
+    auto me = ma.pack(3, 2);
     
-    ASSERT_EQ(me, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+    ASSERT_EQ(me, CMemBlock<double>());
 }
 
 TEST_F(CMemBlockTest, Pick)
 {
     CMemBlock<double> ma({1.0, 2.0, 3.0, 6.0});
     
-    auto mb = ma.pick(2, 0);
+    auto mb = ma.pick(2, 2, 0);
     
     ASSERT_EQ(mb, CMemBlock<double>({1.0, 3.0}));
     
-    auto mc = ma.pick(2, 1);
+    auto mc = ma.pick(2, 2, 1);
     
     ASSERT_EQ(mc, CMemBlock<double>({2.0, 6.0}));
     
-    auto md = ma.pick(4, 0);
+    auto md = ma.pick(3, 1, 0);
     
     ASSERT_EQ(md, CMemBlock<double>(std::vector<double>({1.0})));
     
-    auto mf = ma.pick(4, 1);
+    auto mf = ma.pick(4, 1, 1);
     
     ASSERT_EQ(mf, CMemBlock<double>(std::vector<double>({2.0})));
 
-    auto me = ma.pick(4, 2);
+    auto me = ma.pick(3, 1, 2);
     
     ASSERT_EQ(me, CMemBlock<double>(std::vector<double>({3.0})));
     
-    auto mg = ma.pick(4, 3);
+    auto mg = ma.pick(4, 1, 3);
     
     ASSERT_EQ(mg, CMemBlock<double>(std::vector<double>({6.0})));
     
-    auto mk = ma.pick(1, 0);
+    auto mk = ma.pick(1, 4, 0);
     
     ASSERT_EQ(mk, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
     
-    auto ml = ma.pick(5, 0);
+    auto ml = ma.pick(5, 1, 0);
     
-    ASSERT_EQ(ml, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+    ASSERT_EQ(ml, CMemBlock<double>());
 }
 
 TEST_F(CMemBlockTest, BroadcastIntegers)

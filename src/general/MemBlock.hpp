@@ -182,7 +182,7 @@ public:
      into specific number of subblocks and summing up all subblocks.
 
      @param nElements the number elements in subblock.
-     @param nBlocks the number of summed subblocks.
+     @param nBlocks the number of subblocks.
      @return the memory block object.
      */
     CMemBlock<T> pack(const int32_t nElements,
@@ -193,11 +193,13 @@ public:
      into specific number of subblocks and picking specific element from each
      subblock.
 
-     @param nSubBlocks the number of subblocks.
-     @param iPosition the starting position of subblock.
+     @param nElements the number elements in subblock.
+     @param nBlocks the number of subblocks.
+     @param iPosition the position of picked element in subblock.
      @return the memory block object.
      */
-    CMemBlock<T> pick(const int32_t nSubBlocks,
+    CMemBlock<T> pick(const int32_t nElements,
+                      const int32_t nBlocks,
                       const int32_t iPosition) const;
     
     /**
@@ -432,7 +434,7 @@ CMemBlock<T>::pack(const int32_t nElements,
     
     if (nelem <= _nElements)
     {
-        CMemBlock<T> mblock(nelem);
+        CMemBlock<T> mblock(nElements);
         
         mblock.zero();
         
@@ -452,24 +454,25 @@ CMemBlock<T>::pack(const int32_t nElements,
 
 template <class T>
 CMemBlock<T>
-CMemBlock<T>::pick(const int32_t nSubBlocks,
+CMemBlock<T>::pick(const int32_t nElements,
+                   const int32_t nBlocks,
                    const int32_t iPosition) const
 {
-    auto numelem = _nElements / nSubBlocks;
+    auto nelem = nElements * nBlocks;
     
-    if ((numelem > 0) && (nSubBlocks > 1))
+    if ((nelem <= _nElements) && (iPosition < nElements))
     {
-        CMemBlock<T> mblock(numelem);
+        CMemBlock<T> mblock(nBlocks);
         
-        for (int32_t i = 0; i < numelem; i++)
+        for (int32_t i = 0; i < nBlocks; i++)
         {
-            mblock.at(i) = _data[i * numelem + iPosition];
+            mblock.at(i) = _data[i * nElements + iPosition];
         }
         
         return mblock;
     }
     
-    return CMemBlock<T>(*this);
+    return CMemBlock<T>();
 }
 
 template <>
@@ -526,10 +529,7 @@ CMemBlock<int32_t>::gather(int32_t  rank,
 
         int32_t* bsizes = nullptr;
 
-        if (rank == mpi::master())
-        {
-            bsizes = (int32_t*) mem::malloc(nsizes);
-        }
+        if (rank == mpi::master()) bsizes = (int32_t*) mem::malloc(nsizes);
 
         mpi::gather(bsizes, _nElements, rank, comm);
         
