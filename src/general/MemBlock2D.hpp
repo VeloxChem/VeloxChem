@@ -752,15 +752,15 @@ CMemBlock2D<int32_t>::scatter(int32_t  rank,
         
         // save old dimensions
         
-        CMemBlock<int32_t> oldSizes;
+        CMemBlock<int32_t> oldsizes;
         
-        CMemBlock<int32_t> oldPositions;
+        CMemBlock<int32_t> oldpositions;
         
         if (rank == mpi::master())
         {
-            oldSizes = _originalSizes;
+            oldsizes = _originalSizes;
             
-            oldPositions = _positions;
+            oldpositions = _positions;
         }
         
         // update dimensions on all nodes
@@ -804,11 +804,11 @@ CMemBlock2D<int32_t>::scatter(int32_t  rank,
             
             if (rank == mpi::master())
             {
-                mpi::batches_pattern(bsizes.data(), oldSizes.at(i), nodes);
+                mpi::batches_pattern(bsizes.data(), oldsizes.at(i), nodes);
                 
                 mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
                 
-                pdata = _data.data(oldPositions.at(i));
+                pdata = _data.data(oldpositions.at(i));
             }
             
             // scatter data chunk
@@ -842,15 +842,15 @@ CMemBlock2D<double>::scatter(int32_t  rank,
         
         // save old dimensions
         
-        CMemBlock<int32_t> oldSizes;
+        CMemBlock<int32_t> oldsizes;
         
-        CMemBlock<int32_t> oldPositions;
+        CMemBlock<int32_t> oldpositions;
         
         if (rank == mpi::master())
         {
-            oldSizes = _originalSizes;
+            oldsizes = _originalSizes;
             
-            oldPositions = _positions;
+            oldpositions = _positions;
         }
         
         // update dimensions on all nodes
@@ -894,11 +894,11 @@ CMemBlock2D<double>::scatter(int32_t  rank,
             
             if (rank == mpi::master())
             {
-                mpi::batches_pattern(bsizes.data(), oldSizes.at(i), nodes);
+                mpi::batches_pattern(bsizes.data(), oldsizes.at(i), nodes);
                 
                 mathfunc::indexes(bindexes.data(), bsizes.data(), nodes);
                 
-                pdata = _data.data(oldPositions.at(i));
+                pdata = _data.data(oldpositions.at(i));
             }
             
             // scatter data chunk

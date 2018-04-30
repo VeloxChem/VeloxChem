@@ -21,6 +21,6 @@ namespace vlxmol { // vlxmol namespace
     
     CMolecule getMoleculeH2O();
     
-} // vlxmol namespac
+} // vlxmol namespace
 
 #endif /* MoleculeSetter_hpp */
