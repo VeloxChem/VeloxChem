@@ -14,8 +14,8 @@
 //#include "AtomicDensityReader.hpp"
 
 #include "GridDriver.hpp"
-//#include "DensityGridDriver.hpp"
-//#include "XCFuncType.hpp"
+#include "DensityGridDriver.hpp"
+#include "XCFuncType.hpp"
 
 #include "MemBlock2D.hpp"
 
@@ -133,12 +133,11 @@ CSinglePointEnergy::run(COutputStream& oStream,
 
     molgrid.distribute(_globRank, _globNodes, comm);
 
-//
-//    // generate density grid
-//
-//    CDensityGridDriver drvDenGrid(_globRank, _globNodes, MPI_COMM_WORLD);
-//
-//    drvDenGrid.generate(_molecule, _aoBasis, molGrid, xcfun::lda, oStream, MPI_COMM_WORLD);
+    // generate density grid
+
+    CDensityGridDriver drvDenGrid(_globRank, _globNodes, comm);
+
+    drvDenGrid.generate(_molecule, _aoBasis, molgrid, xcfun::lda, oStream, comm);
 }
 
 void
