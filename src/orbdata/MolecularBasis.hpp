@@ -183,15 +183,26 @@ public:
                                                const int32_t    angularMomentum) const;
 
     /**
-     Determines size of contracted AO basis for given molecule.
+     Determines size of contracted AO basis for selected molecule.
 
      @param molecule the molecule.
      @return the size of contracted AO basis.
      */
     int32_t getDimensionsOfBasis(const CMolecule& molecule) const;
+    
+    /**
+     Determines partial size up to specific angular momentum of contracted AO
+     basis for selected molecule.
+
+     @param molecule the molecule.
+     @param angularMomentum the angular momentum.
+     @return the partial size of contracted AO basis.
+     */
+    int32_t getPartialDimensionsOfBasis(const CMolecule& molecule,
+                                        const int32_t    angularMomentum) const;
 
     /**
-     Determines size of primitive AO basis for given molecule.
+     Determines size of primitive AO basis for selected molecule.
 
      @param molecule the molecule.
      @return the size of primitive AO basis.

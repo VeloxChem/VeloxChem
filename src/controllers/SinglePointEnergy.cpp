@@ -10,7 +10,7 @@
 
 #include "MpiFunc.hpp"
 #include "MolXYZReader.hpp"
-//#include "BasisReader.hpp"
+#include "BasisReader.hpp"
 //#include "AtomicDensityReader.hpp"
 
 #include "GridDriver.hpp"
@@ -71,42 +71,38 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
 
     if (!_state) return;
     
-    
-    
-//    // read AO basis from basis set library
-//
-//    if (_globRank == mpi::master())
-//    {
-//        CBasisReader rdrAOBasis;
-//
-//        rdrAOBasis.parse(inputData, oStream);
-//
-//         _state = rdrAOBasis.getState();
-//
-//        if (_state)
-//        {
-//             _aoBasis = rdrAOBasis.getAOBasis(pathToBasisSets, _molecule,
-//                                              oStream);
-//        }
-//
-//        _state = rdrAOBasis.getState();
-//    }
-//
-//    mpi::bcast_bool(_state, _globRank, MPI_COMM_WORLD);
-//
-//    if (!_state) return;
-//
-//    // broadcast AO basis
-//
-//    _aoBasis.broadcast(_globRank, MPI_COMM_WORLD);
-//
-//    // print atomic orbitals i.e. AO basis
-//
-//    if (_globRank == mpi::master())
-//    {
-//        _aoBasis.printBasis("Atomic Orbitals", _molecule, oStream);
-//    }
-//
+    // read AO basis from basis set library
+
+    if (_globRank == mpi::master())
+    {
+        CBasisReader rdraobasis;
+
+        rdraobasis.parse(inputData, oStream);
+
+         _state = rdraobasis.getState();
+
+        if (_state)
+        {
+             _aoBasis = rdraobasis.getAOBasis(pathToBasisSets, _molecule,
+                                              oStream);
+        }
+
+        _state = rdraobasis.getState();
+    }
+
+    mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+
+    if (!_state) return;
+
+    // broadcast AO basis
+
+    _aoBasis.broadcast(_globRank, MPI_COMM_WORLD);
+
+    // print atomic orbitals i.e. AO basis
+
+    if (_globRank == mpi::master()) _aoBasis.printBasis("Atomic Orbitals",
+                                                        _molecule, oStream);
+
 //    if (_globRank == mpi::master())
 //    {
 //        // TODO: move to proper initial guess object
@@ -133,15 +129,10 @@ CSinglePointEnergy::run(COutputStream& oStream,
 
     CGridDriver drvgrid(_globRank, _globNodes, _runMode, comm);
 
-    auto molGrid = drvgrid.generate(_molecule, oStream, comm);
-    
-    
-//
-//    std::cout << "Before: Rank: " << _globRank << " Grid. Points: " << molGrid.getNumberOfGridPoints() << std::endl;
-//
-//    molGrid.distribute(_globRank, _globNodes, MPI_COMM_WORLD);
-//
-//    std::cout << "After: Rank: " << _globRank << " Grid. Points: " << molGrid.getNumberOfGridPoints() << std::endl;
+    auto molgrid = drvgrid.generate(_molecule, oStream, comm);
+
+    molgrid.distribute(_globRank, _globNodes, comm);
+
 //
 //    // generate density grid
 //

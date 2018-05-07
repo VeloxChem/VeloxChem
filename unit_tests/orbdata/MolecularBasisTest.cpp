@@ -162,6 +162,21 @@ TEST_F(CMolecularBasisTest, GetDimensionsOfBasis)
     ASSERT_EQ(14, ambas.getDimensionsOfBasis(lih));
 }
 
+TEST_F(CMolecularBasisTest, GetPartialDimensionsOfBasis)
+{
+    CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(0, ambas.getPartialDimensionsOfBasis(lih, 0));
+    
+    ASSERT_EQ(5, ambas.getPartialDimensionsOfBasis(lih, 1));
+    
+    ASSERT_EQ(14, ambas.getPartialDimensionsOfBasis(lih, 2));
+    
+    ASSERT_EQ(14, ambas.getPartialDimensionsOfBasis(lih, 3));
+}
+
 TEST_F(CMolecularBasisTest, GetDimensionsOfPrimitiveBasis)
 {
     CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();

@@ -221,6 +221,31 @@ CMolecularBasis::getDimensionsOfBasis(const CMolecule& molecule) const
 }
 
 int32_t
+CMolecularBasis::getPartialDimensionsOfBasis(const CMolecule& molecule,
+                                             const int32_t    angularMomentum) const
+{
+    int32_t ndim = 0;
+    
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    {
+        auto idelem = _atomicBasisSets[i].getIdElemental();
+        
+        auto natoms = molecule.getNumberOfAtoms(idelem);
+        
+        for (int32_t j = 0; j < angularMomentum; j++)
+        {
+            ndim += natoms * angmom::to_SphericalComponents(j)
+            
+                  * _atomicBasisSets[i].getNumberOfBasisFunctions(j);
+        }
+    }
+    
+    return ndim;
+}
+
+
+
+int32_t
 CMolecularBasis::getDimensionsOfPrimitiveBasis(const CMolecule& molecule) const
 {
     int32_t ndim = 0;
