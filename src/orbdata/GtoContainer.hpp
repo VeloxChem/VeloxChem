@@ -11,14 +11,16 @@
 
 #include <vector>
 
+#include "GtoBlock.hpp"
+#include "MemBlock.hpp"
+#include "VecMemBlocks.hpp"
+
 /**
  Class CGtoBlock stores vector of GTOs block objects and provides set of methods
  for manipulating with basis functions of various angular momentum.
  
  @author Z. Rinkevicius
  */
-#include "GtoBlock.hpp"
-
 class CGtoContainer
 {
     /**
@@ -102,6 +104,20 @@ public:
      @return true if GTOs container objects are not equal, false otherwise.
      */
     bool operator!=(const CGtoContainer& other) const;
+    
+    /**
+     Compresses the other GTOs container object into GTOs container object by
+     applying specific screening pattern.
+     
+     @param source the other GTOs container.
+     @param reducedDimensions the reduced dimensions of GTOs container.
+     @param screeningFactors the vector of screening factors.
+     @param screeningThreshold the screening threshold.
+     */
+    void compress(const CGtoContainer&        source,
+                        CMemBlock2D<int32_t>& reducedDimensions,
+                  const CVecMemBlock<double>& screeningFactors,
+                  const double                screeningThreshold);
     
     /**
      Gets maximum angular momentum of GTOs block objects in GTOs container.
@@ -233,6 +249,14 @@ public:
      @return the exponents of primitive Gaussian functions.
      */
     const double* getCoordinatesZ(const int32_t iBlock) const;
+    
+    /**
+     Creates vector of memory block objects according to dimensions of primitive
+     Gaussian functions space in each GTOs block object in GTOs container.
+
+     @return the vector of memory block objects.
+     */
+    CVecMemBlock<double> getPrimBuffer() const;
     
     /**
      Converts GTOs container object to text output and insert it into output

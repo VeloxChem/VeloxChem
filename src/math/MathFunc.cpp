@@ -52,6 +52,38 @@ namespace mathfunc { // mathfunc namespace
 
         return isum;
     }
+    
+    double
+    max(const double* vector,
+        const int32_t nElements)
+    {
+        double fmax = vector[0];
+        
+        for (int32_t i = 1; i < nElements; i++)
+        {
+            auto cmax = vector[i];
+            
+            if (cmax > fmax) fmax = cmax;
+        }
+        
+        return fmax;
+    }
+    
+    int32_t
+    max(const int32_t* vector,
+        const int32_t  nElements)
+    {
+        auto imax = vector[0];
+        
+        for (int32_t i = 1; i < nElements; i++)
+        {
+            auto cmax = vector[i];
+            
+            if (cmax > imax) imax= cmax;
+        }
+        
+        return imax;
+    }
 
     void
     normalize(      double* vector,

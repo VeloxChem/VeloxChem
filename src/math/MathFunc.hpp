@@ -53,6 +53,26 @@ namespace mathfunc { // mathfunc namespace
      */
     int32_t sum(const int32_t* vector,
                 const int32_t  nElements);
+    
+    /**
+     Determines largest element in real numbers vector.
+
+     @param vector the vector of real numbers.
+     @param nElements the number of elements in vector.
+     @return the largest element in real numbers vector.
+     */
+    double max(const double* vector,
+               const int32_t nElements);
+    
+    /**
+     Determines largest element in integer numbers vector.
+     
+     @param vector the vector of integer numbers.
+     @param nElements the number of elements in vector.
+     @return the largest element in integer numbers vector.
+     */
+    int32_t max(const int32_t* vector,
+                const int32_t  nElements);
 
     /**
      Normalizes vector of real numbers.

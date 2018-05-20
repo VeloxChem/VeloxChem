@@ -47,6 +47,20 @@ TEST_F(CMathFuncTest, SumInteger)
     ASSERT_EQ(mathfunc::sum(vec, 5), 19);
 }
 
+TEST_F(CMathFuncTest, MaxReal)
+{
+    double vec[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
+    
+    ASSERT_NEAR(mathfunc::max(vec, 5), 8.0, 1.0e-13);
+}
+
+TEST_F(CMathFuncTest, MaxInteger)
+{
+    int32_t vec[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, -1, 3, 41};
+    
+    ASSERT_EQ(mathfunc::max(vec, 5), 41);
+}
+
 TEST_F(CMathFuncTest, Normalize)
 {
     double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 9.0, -1.0, 3.0, 4.0};

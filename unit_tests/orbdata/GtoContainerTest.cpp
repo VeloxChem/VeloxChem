@@ -16,6 +16,7 @@
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"
 #include "CheckFunctions.hpp"
+#include "VecMemBlocks.hpp"
 
 TEST_F(CGtoContainerTest, DefaultConstructor)
 {
@@ -95,6 +96,141 @@ TEST_F(CGtoContainerTest, MoveAssignment)
     CGtoContainer bcont = CGtoContainer(lih, bas);
     
     ASSERT_EQ(acont, bcont);
+}
+
+TEST_F(CGtoContainerTest, Compress)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    CGtoContainer bcont(acont);
+    
+    // screening factors
+    
+    CVecMemBlock<double> tscreen;
+    
+    CMemBlock<double> sscreen({0.001, 0.005, 1.000, 3.000, 0.040, 2.000, 0.002,
+                               2.000, 4.000, 0.001, 4.000});
+    
+    tscreen.push_back(sscreen);
+    
+    CMemBlock<double> pscreen({0.300, 0.000, 0.400, 0.000});
+    
+    tscreen.push_back(pscreen);
+    
+    // reduced dimensions
+    
+    CMemBlock2D<int32_t> redim(2, 2);
+    
+    bcont.compress(acont, redim, tscreen, 0.1);
+    
+    // check reduced dimensions
+    
+    vlxtest::compare({6, 2}, redim.data(0));
+    
+    vlxtest::compare({4, 2}, redim.data(1));
+    
+    // check number of GTOs blocks
+    
+    ASSERT_EQ(2, bcont.getNumberOfGtoBlocks());
+    
+    // check angular momentum
+    
+    ASSERT_EQ(0, bcont.getAngularMomentum(0));
+    
+    ASSERT_EQ(1, bcont.getAngularMomentum(1));
+    
+    // check original primitive GTOs dimensions
+    
+    ASSERT_EQ(11, bcont.getNumberOfPrimGtos(0));
+    
+    ASSERT_EQ(4, bcont.getNumberOfPrimGtos(1));
+    
+    // check original contracted GTOs dimensions
+    
+    ASSERT_EQ(5, bcont.getNumberOfContrGtos(0));
+    
+    ASSERT_EQ(3, bcont.getNumberOfContrGtos(1));
+    
+    // check start positions
+    
+    vlxtest::compare({0, 2, 3, 5, 0}, bcont.getStartPositions(0));
+    
+    vlxtest::compare({0, 1, 0}, bcont.getStartPositions(1));
+    
+    // check end positions
+    
+    vlxtest::compare({2, 3, 5, 6, 0}, bcont.getEndPositions(0));
+    
+    vlxtest::compare({1, 2, 0}, bcont.getEndPositions(1));
+    
+    // check identifiers
+    
+    vlxtest::compare({0, 1, 3, 4, 0}, bcont.getIdentifiers(0, 0));
+    
+    vlxtest::compare({5, 6, 0}, bcont.getIdentifiers(1, 0));
+    
+    vlxtest::compare({8, 9, 0}, bcont.getIdentifiers(1, 1));
+    
+    vlxtest::compare({11, 12, 0}, bcont.getIdentifiers(1, 2));
+    
+    // check exponents
+    
+    vlxtest::compare({9.055994438900e+00, 2.450300905100e+00, 5.281088472100e-02,
+                      1.301070100000e+01, 1.962257200000e+00, 1.219496200000e-01,
+                      0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00},
+                      bcont.getExponents(0));
+    
+    vlxtest::compare({1.450000000000e+00, 8.200000000000e-02, 0.000000000000e+00,
+                      0.000000000000e+00}, bcont.getExponents(1));
+    
+    // check normalization factors
+    
+    vlxtest::compare({2.026879611100e-01, 4.860657481700e-01, 1.000000000000e+00,
+                      1.968215800000e-02, 1.379652400000e-01, 1.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00},
+                     bcont.getNormFactors(0));
+    
+    vlxtest::compare({2.586000000000e-01, 1.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00}, bcont.getNormFactors(1));
+    
+    // check coordinates X
+    
+    vlxtest::compare({0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00},
+                     bcont.getCoordinatesX(0));
+    
+    vlxtest::compare({0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00}, bcont.getCoordinatesX(1));
+    
+    // check coordinates Y
+    
+    vlxtest::compare({0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00},
+                     bcont.getCoordinatesY(0));
+    
+    vlxtest::compare({0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00}, bcont.getCoordinatesY(1));
+    
+    // check coordinates Z
+    
+    vlxtest::compare({0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      1.200000000000e+00, 1.200000000000e+00, 1.200000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00, 0.000000000000e+00},
+                      bcont.getCoordinatesZ(0));
+    
+    vlxtest::compare({0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                      0.000000000000e+00}, bcont.getCoordinatesZ(1));
 }
 
 TEST_F(CGtoContainerTest, GetMaxAngularMomentum)
@@ -312,3 +448,5 @@ TEST_F(CGtoContainerTest, GetCoordinatesZ)
     vlxtest::compare({0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
                       1.200000000000e+00}, acont.getCoordinatesZ(1));
 }
+
+

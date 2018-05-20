@@ -9,6 +9,7 @@
 #include "MemBlock2DTest.hpp"
 
 #include "MemBlock2D.hpp"
+#include "MatOrder.hpp"
 
 TEST_F(CMemBlock2DTest, DefaultConstructor)
 {
@@ -48,6 +49,21 @@ TEST_F(CMemBlock2DTest, ConstructorWithDataVector)
     CMemBlock2D<double> mb({1.0, 2.0, 3.0, 6.0}, 2, 2);
     
     ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CMemBlock2DTest, ConstructorWithDataVectorAndOrder)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, matorder::row_major, 2, 2);
+    
+    CMemBlock2D<double> mb({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    ASSERT_EQ(ma, mb);
+    
+    CMemBlock2D<double> mc({1.0, 2.0, 3.0, 6.0}, matorder::col_major, 2, 2);
+    
+    CMemBlock2D<double> md({1.0, 3.0, 2.0, 6.0}, 2, 2);
+    
+    ASSERT_EQ(mc, md);
 }
 
 TEST_F(CMemBlock2DTest, CopyConstructor)

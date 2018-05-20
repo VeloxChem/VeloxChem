@@ -112,6 +112,32 @@ CGtoContainer::operator!=(const CGtoContainer& other) const
     return !(*this == other);
 }
 
+void
+CGtoContainer::compress(const CGtoContainer&        source,
+                              CMemBlock2D<int32_t>& reducedDimensions,
+                        const CVecMemBlock<double>& screeningFactors,
+                        const double                screeningThreshold)
+{
+    // set up pointers to reduced dimensions
+    
+    auto pidx = reducedDimensions.data(0);
+    
+    auto cidx = reducedDimensions.data(1);
+    
+    // loop over GTOs blocks
+    
+    for (size_t i = 0; i < _gtoBlocks.size(); i++)
+    {
+        auto cdim  = _gtoBlocks[i].compress(source._gtoBlocks[i],
+                                            screeningFactors[i],
+                                            screeningThreshold);
+        
+        pidx[i] = std::get<0>(cdim);
+        
+        cidx[i] = std::get<1>(cdim);
+    }
+}
+
 int32_t
 CGtoContainer::getMaxAngularMomentum() const
 {
@@ -228,6 +254,19 @@ const double*
 CGtoContainer::getCoordinatesZ(const int32_t iBlock) const
 {
     return _gtoBlocks[iBlock].getCoordinatesZ();
+}
+
+CVecMemBlock<double>
+CGtoContainer::getPrimBuffer() const
+{
+    CVecMemBlock<double> mbvec;
+    
+    for (size_t i = 0; i < _gtoBlocks.size(); i++)
+    {
+        mbvec.push_back(CMemBlock<double>(_gtoBlocks[i].getNumberOfPrimGtos()));
+    }
+    
+    return mbvec;
 }
 
 std::ostream&

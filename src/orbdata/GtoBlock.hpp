@@ -9,6 +9,9 @@
 #ifndef GtoBlock_hpp
 #define GtoBlock_hpp
 
+#include <tuple>
+
+#include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
@@ -120,6 +123,21 @@ public:
     bool operator!=(const CGtoBlock& other) const;
     
     /**
+     Compresses other GTOs block data into GTOs block object without changing
+     dimensions of GTOs block object. Compression is performed using specified
+     screening pattern.
+
+     @param source the other GTOs block object.
+     @param screeningFactors the vector of screening factors.
+     @param screeningThreshold the screening threshold.
+     @return the number of primitive GTOs functions and number of contracted
+             basis functions.
+     */
+    std::tuple<int32_t, int32_t> compress(const CGtoBlock&         source,
+                                          const CMemBlock<double>& screeningFactors,
+                                          const double             screeningThreshold);
+    
+    /**
      Gets angular momentum of GTOs block.
 
      @return the angular momentum.
@@ -156,6 +174,14 @@ public:
     const int32_t* getStartPositions() const;
     
     /**
+     Gets pointer to basis function start positions in primitive
+     Gaussian functions vector.
+     
+     @return the start positions of basis fucntions.
+     */
+    int32_t* getStartPositions();
+    
+    /**
      Gets constant pointer to basis function end positions in primitive
      Gaussian functions vector.
 
@@ -164,13 +190,30 @@ public:
     const int32_t* getEndPositions() const;
     
     /**
+     Gets pointer to basis function end positions in primitive
+     Gaussian functions vector.
+     
+     @return the end positions of basis fucntions.
+     */
+    int32_t* getEndPositions();
+    
+    /**
      Gets constant pointer to basis function indexes in full AO basis for
      specific angular momentum component.
 
      @param iComponent the component of angular momentum.
      @return the indexes in full AO basis.
      */
-    const int32_t* getIdentifiers(const int32_t iComponent) const; 
+    const int32_t* getIdentifiers(const int32_t iComponent) const;
+    
+    /**
+     Gets pointer to basis function indexes in full AO basis for
+     specific angular momentum component.
+     
+     @param iComponent the component of angular momentum.
+     @return the indexes in full AO basis.
+     */
+    int32_t* getIdentifiers(const int32_t iComponent);
     
     /**
      Gets constant pointer to exponents of primitive Gaussian functions.
@@ -178,6 +221,13 @@ public:
      @return the exponents of primitive Gaussian functions.
      */
     const double* getExponents() const;
+    
+    /**
+     Gets pointer to exponents of primitive Gaussian functions.
+     
+     @return the exponents of primitive Gaussian functions.
+     */
+    double* getExponents();
     
     /**
      Gets constant pointer to normalization factors of primitive Gaussian
@@ -188,12 +238,27 @@ public:
     const double* getNormFactors() const;
     
     /**
+     Gets pointer to normalization factors of primitive Gaussian
+     functions.
+     
+     @return the normalization factors of primitive Gaussian functions.
+     */
+    double* getNormFactors();
+    
+    /**
      Gets constant pointer to Cartesian X coordinates of primitive Gaussian
      functions.
      
      @return the exponents of primitive Gaussian functions.
      */
     const double* getCoordinatesX() const;
+    
+    /**
+     Gets pointer to Cartesian X coordinates of primitive Gaussian functions.
+     
+     @return the exponents of primitive Gaussian functions.
+     */
+    double* getCoordinatesX();
     
     /**
      Gets constant pointer to Cartesian Y coordinates of primitive Gaussian
@@ -204,12 +269,26 @@ public:
     const double* getCoordinatesY() const;
     
     /**
+     Gets pointer to Cartesian Y coordinates of primitive Gaussian functions.
+     
+     @return the exponents of primitive Gaussian functions.
+     */
+    double* getCoordinatesY();
+    
+    /**
      Gets constant pointer to Cartesian Z coordinates of primitive Gaussian
      functions.
      
      @return the exponents of primitive Gaussian functions.
      */
     const double* getCoordinatesZ() const;
+    
+    /**
+     Gets pointer to Cartesian Z coordinates of primitive Gaussian functions.
+     
+     @return the exponents of primitive Gaussian functions.
+     */
+    double* getCoordinatesZ();
     
     /**
      Converts GTOs block object to text output and insert it into output
