@@ -9,6 +9,7 @@
 #include "GridDriver.hpp"
 
 #include <array>
+#include <cmath>
 
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"
@@ -486,7 +487,7 @@ CGridDriver::_screenRawGridPoints(CMemBlock2D<double>* rawGridPoints) const
 
     for (int32_t i = 0; i < rawGridPoints->size(0); i++)
     {
-        if (gw[i] > _thresholdOfWeight)
+        if (std::fabs(gw[i]) > _thresholdOfWeight)
         {
             gx[cpoints] = gx[i];
             
