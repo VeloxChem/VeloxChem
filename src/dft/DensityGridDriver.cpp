@@ -10,6 +10,7 @@
 
 #include "SystemClock.hpp"
 #include "OMPTasks.hpp"
+#include "SphericalMomentum.hpp"
 
 CDensityGridDriver::CDensityGridDriver(const int32_t  globRank,
                                        const int32_t  globNodes,
@@ -154,6 +155,12 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
     // allocate screening data
     
     auto scrdata = gtovec.getPrimBuffer();
+    
+    // set up spherical angular momentum
+    
+    // here we need array of spherical momentum objects..
+    
+    // CSphericalMomentum sphermom(gtor.)
     
     // loop over batch of grid points
     

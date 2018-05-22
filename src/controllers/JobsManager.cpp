@@ -13,6 +13,7 @@
 #include "JobType.hpp"
 #include "SinglePointEnergy.hpp"
 #include "OptimizationGeometry.hpp"
+#include "PropertyPlasmon.hpp"
 
 CJobsManager::CJobsManager(const int32_t globRank,
                            const int32_t globNodes)
@@ -116,6 +117,14 @@ CJobsManager::_assignJobs(const std::vector<int32_t>& listOfJobIds)
             _listOfJobs.push_back(new COptimizationGeometry(_globRank,
                                                             _globNodes,
                                                             _runMode));
+        }
+        
+        // add CMM plasmon job
+        
+        if (listOfJobIds[i] == to_int(job::prop_cmmplasmon))
+        {
+            _listOfJobs.push_back(new CPropertyPlasmon(_globRank, _globNodes,
+                                                       _runMode));
         }
 
         // TODO: Add other types of jobs...

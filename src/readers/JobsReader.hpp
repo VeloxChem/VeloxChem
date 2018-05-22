@@ -92,6 +92,20 @@ class CJobsReader
     bool _addOptimization(      std::vector<int32_t>& listOfJobIds,
                           const CInputLine&           inputLine,
                                 COutputStream&        oStream);
+    
+    /**
+     Adds a property job identifier to vector of job identifiers by parsing
+     input line object. Errors are printed to output stream.
+
+     @param listOfJobIds the vector of job identifiers.
+     @param inputLine the input line object.
+     @param oStream the output stream.
+     @return true if identifier is added to vector of job identifiers, false
+             otherwise.
+     */
+    bool _addProperty(      std::vector<int32_t>& listOfJobIds,
+                      const CInputLine&           inputLine,
+                            COutputStream&        oStream);
 
     /**
      Prints syntax error message for run mode selection to output stream and
@@ -122,6 +136,15 @@ class CJobsReader
      */
     void _syntaxOptimization(const CInputLine&    inputLine,
                                    COutputStream& oStream);
+    
+    /**
+     Prints syntax error message for definition of property job to output
+     stream and sets jobs reader object state to abnormal.
+     
+     @param inputLine the input line object with syntax error.
+     @param oStream the output stream.
+     */
+    void _syntaxProperty(const CInputLine& inputLine, COutputStream& oStream);
 
     /**
      Prints unknown calculation type error message to output stream and sets
