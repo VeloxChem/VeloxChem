@@ -12,7 +12,7 @@
 #include <string>
 
 /**
- Enumerate class xcfun:
+ Enumerate class cmmtyp:
  
  Defines supported exchange-correlation functional keys:
  cmmtyp::original - the original CMM parameters model
@@ -26,15 +26,15 @@ enum class cmmtyp
 /**
  Converts enumerate class value to it's string label.
 
- @param functional the enumerate class value.
+ @param cmmModel the enumerate class value.
  @return the label of enumerate class value.
  */
-inline std::string to_string(const cmmtyp modeltype)
+inline std::string to_string(const cmmtyp cmmModel)
 {
-    if (modeltype == cmmtyp::original)
+    if (cmmModel == cmmtyp::original)
         return std::string("Origial Parameterization");
     
-    if (modeltype == cmmtyp::enhanced)
+    if (cmmModel == cmmtyp::enhanced)
         return std::string("Enhanced Parameterization");
     
     return std::string("Unknown Parameterization");

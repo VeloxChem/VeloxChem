@@ -9,6 +9,8 @@
 #include "PropertyPlasmon.hpp"
 
 #include "MpiFunc.hpp"
+#include "MolXYZReader.hpp"
+#include "CMMParamReader.hpp"
 
 CPropertyPlasmon::CPropertyPlasmon(const int32_t  globRank,
                                    const int32_t  globNodes,
@@ -27,7 +29,43 @@ CPropertyPlasmon::set(const std::string&   pathToBasisSets,
 {
     if (_globRank == mpi::master()) _startHeader(oStream);
 
-    // FIX ME: read data
+    // read molecular geometry
+    
+    if (_globRank == mpi::master())
+    {
+        CMolXYZReader rdrmolxyz;
+        
+        rdrmolxyz.parse(_molecule, inputData, oStream);
+        
+        _state = rdrmolxyz.getState();
+    }
+    
+    mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+    
+    if (!_state) return;
+    
+    // read force field data from force fields library
+    
+    if (_globRank == mpi::master())
+    {
+        CCMMParamReader rdrparams;
+        
+        rdrparams.parse(inputData, oStream);
+        
+        _state = rdrparams.getState();
+        
+        if (_state)
+        {
+            _cmmParameters = rdrparams.getCMMParameters(pathToForceFields,
+                                                        _molecule, oStream);
+        }
+        
+        _state = rdrparams.getState();
+    }
+    
+    mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
+    
+    if (!_state) return;
 }
 
 void

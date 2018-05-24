@@ -19,6 +19,8 @@ CCMMParameters::CCMMParameters()
 
     : _paramModel(cmmtyp::original)
 
+    , _polarizability(0.0)
+
     , _exponent(1.0)
 
     , _refCoordNumber(0.0)
@@ -29,6 +31,7 @@ CCMMParameters::CCMMParameters()
 }
 
 CCMMParameters::CCMMParameters(const cmmtyp               paramModel,
+                               const double               polarizability,
                                const double               exponent,
                                const double               refCoordNumber,
                                const double               factCoordNumber,
@@ -37,6 +40,8 @@ CCMMParameters::CCMMParameters(const cmmtyp               paramModel,
                                const std::vector<double>& refScaleFactors)
 
     : _paramModel(paramModel)
+
+    , _polarizability(polarizability)
 
     , _exponent(exponent)
 
@@ -57,6 +62,8 @@ CCMMParameters::CCMMParameters(const CCMMParameters& source)
 
     : _paramModel(source._paramModel)
 
+    , _polarizability(source._polarizability)
+
     , _exponent(source._exponent)
 
     , _refCoordNumber(source._refCoordNumber)
@@ -75,6 +82,8 @@ CCMMParameters::CCMMParameters(const CCMMParameters& source)
 CCMMParameters::CCMMParameters(CCMMParameters&& source) noexcept
 
     : _paramModel(std::move(source._paramModel))
+
+    , _polarizability(std::move(source._polarizability))
 
     , _exponent(std::move(source._exponent))
 
@@ -103,6 +112,8 @@ CCMMParameters::operator=(const CCMMParameters& source)
 
     _paramModel = source._paramModel;
     
+    _polarizability = source._polarizability;
+    
     _exponent = source._exponent;
     
     _refCoordNumber = source._refCoordNumber;
@@ -124,6 +135,8 @@ CCMMParameters::operator=(CCMMParameters&& source) noexcept
     if (this == &source) return *this;
 
     _paramModel = std::move(source._paramModel);
+    
+    _polarizability = std::move(source._polarizability);
     
     _exponent = std::move(source._exponent);
     
@@ -196,6 +209,48 @@ CCMMParameters::operator!=(const CCMMParameters& other) const
     return !(*this == other);
 }
 
+void
+CCMMParameters::setForceFieldModel(const cmmtyp paramModel)
+{
+    _paramModel = paramModel; 
+}
+
+void
+CCMMParameters::setPolarizability(const double polarizability)
+{
+    _polarizability = polarizability;
+}
+
+void
+CCMMParameters::setExponent(const double exponent)
+{
+    _exponent = exponent;
+}
+
+void
+CCMMParameters::setCoordinationNumber(const double refCoordNumber)
+{
+    _refCoordNumber = refCoordNumber;
+}
+
+void
+CCMMParameters::setCoordinationFactor(const double factCoordNumber)
+{
+    _factCoordNumber = factCoordNumber;
+}
+
+void
+CCMMParameters::addFrequency(const double refFrequency,
+                             const double refGamma,
+                             const double refScaleFactor)
+{
+    _refFrequencies.push_back(refFrequency);
+    
+    _refGammas.push_back(refGamma);
+    
+    _refScaleFactors.push_back(refScaleFactor); 
+}
+
 std::ostream&
 operator<<(      std::ostream&   output, 
            const CCMMParameters& source)
@@ -205,6 +260,8 @@ operator<<(      std::ostream&   output,
     output << "[CCMMParameters (Object):" << &source << "]" << std::endl;
     
     output << "_paramModel: " << to_string(source._paramModel) << std::endl;
+    
+    output << "_polarizability: " << source._polarizability << std::endl;
     
     output << "_exponent: " << source._exponent << std::endl;
     

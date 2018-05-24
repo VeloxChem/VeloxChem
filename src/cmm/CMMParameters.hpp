@@ -28,6 +28,11 @@ class CCMMParameters
     cmmtyp _paramModel;
     
     /**
+     The polarizability of Gaussian charge function.
+     */
+    double _polarizability;
+    
+    /**
      The exponent of Gaussian charge function.
      */
     double _exponent;
@@ -68,6 +73,7 @@ public:
      Creates a CMM parameters object.
      
      @param paramModel the parameterization of CMM model.
+     @param polarizability the atomic polarizability. 
      @param exponent the exponent of Gaussian charge function.
      @param refCoordNumber the reference coordination number.
      @param factCoordNumber the coordination numbers difference scaling factor.
@@ -76,6 +82,7 @@ public:
      @param refScaleFactors the vector of Lorentzian scaling factors.
      */
     CCMMParameters(const cmmtyp               paramModel,
+                   const double               polarizability,
                    const double               exponent,
                    const double               refCoordNumber,
                    const double               factCoordNumber,
@@ -131,7 +138,53 @@ public:
      @return true if CMM parameters objects are not equal, false otherwise.
      */
     bool operator!=(const CCMMParameters& other) const;
+    
+    /**
+     Sets model of CMM force field.
 
+     @param paramModel the model of CMM force field.
+     */
+    void setForceFieldModel(const cmmtyp paramModel);
+    
+    /**
+     Sets atomic polarizability.
+
+     @param polarizability the atomic polarizability.
+     */
+    void setPolarizability(const double polarizability);
+    
+    /**
+     Sets exponent of Gaussian charge.
+
+     @param exponent the exponent of Gaussian charge.
+     */
+    void setExponent(const double exponent);
+    
+    /**
+     Sets reference coordination number.
+
+     @param refCoordNumber the reference coordination number.
+     */
+    void setCoordinationNumber(const double refCoordNumber);
+    
+    /**
+     Sets reference coordination factor.
+     
+     @param factCoordNumber the reference coordination factor.
+     */
+    void setCoordinationFactor(const double factCoordNumber);
+
+    /**
+     Adds Lorentzian with frequency to dynamic atomic polarizability expansion.
+
+     @param refFrequency the fundamental frequency of Lorentzian.
+     @param refGamma the damping value.
+     @param refScaleFactor the Lorentzian scaling factor.
+     */
+    void addFrequency(const double refFrequency,
+                      const double refGamma,
+                      const double refScaleFactor);
+    
     /**
      Converts CMM parameters object to text output and insert it into output
      text stream.

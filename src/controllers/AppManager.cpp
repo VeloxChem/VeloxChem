@@ -208,7 +208,7 @@ CAppManager::_setEnvironment(const CInputData&    inputData,
         {
             _pathToBasLib = rdrenvironment.getPathToBasisSets();
             
-            _pathToFFLib = rdrenvironment.getPathToBasisSets(); 
+            _pathToFFLib = rdrenvironment.getPathToForceFields(); 
         }
     }
     

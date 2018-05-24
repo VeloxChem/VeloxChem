@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "BaseJob.hpp"
+#include "Molecule.hpp"
 #include "CMMParameters.hpp"
 
 /**
@@ -22,6 +23,11 @@
  */
 class CPropertyPlasmon : public CBaseJob
 {
+    /**
+     The molecular data.
+     */
+    CMolecule _molecule;
+    
     /**
      The vector of CMM model parameters.
      */

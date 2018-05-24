@@ -132,7 +132,7 @@ CEnvironmentReader::_addPathToBasisSets(const CInputLine&    inputLine,
         {
             _pathToBasisSets = inputLine.getKeyword(1);
 
-            if (_pathToBasisSets[_pathToBasisSets.size()] != '/')
+            if (_pathToBasisSets[_pathToBasisSets.size() - 1] != '/')
             {
                 _pathToBasisSets.append("/");
             }
@@ -158,7 +158,7 @@ CEnvironmentReader::_addPathToForceFields(const CInputLine&    inputLine,
         {
             _pathToForceFields = inputLine.getKeyword(1);
             
-            if (_pathToForceFields[_pathToForceFields.size()] != '/')
+            if (_pathToForceFields[_pathToForceFields.size() - 1] != '/')
             {
                 _pathToForceFields.append("/");
             }
