@@ -56,6 +56,11 @@ class CAppManager
     std::string _pathToBasLib;
     
     /**
+     The path to force fields library.
+     */
+    std::string _pathToFFLib;
+    
+    /**
      The application manager object's timer.
      */
     CSystemClock _sysClock;

@@ -20,7 +20,8 @@ CPropertyPlasmon::CPropertyPlasmon(const int32_t  globRank,
 }
 
 void
-CPropertyPlasmon::set(const std::string&   pathToBasisSets,
+CPropertyPlasmon::set(const std::string&   pathToBasisSets, 
+                      const std::string&   pathToForceFields,
                       const CInputData&    inputData,
                             COutputStream& oStream)
 {

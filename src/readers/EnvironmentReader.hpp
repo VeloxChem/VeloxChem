@@ -32,6 +32,11 @@ class CEnvironmentReader
      The path to basis set library.
      */
     std::string _pathToBasisSets;
+    
+    /**
+     The path to force fields library.
+     */
+    std::string _pathToForceFields;
 
     /**
      Prints multiple definitions error message for @progenv control group to
@@ -63,6 +68,17 @@ class CEnvironmentReader
      */
     bool _addPathToBasisSets(const CInputLine&    inputLine,
                                    COutputStream& oStream);
+    
+    /**
+     Reads path to force fields library from @progenv control group.
+     
+     @param inputLine the input line object with path to force fields library.
+     @param oStream the output stream.
+     @return true if parsing of path to force fields library is successful,
+             false otherwise.
+     */
+    bool _addPathToForceFields(const CInputLine&    inputLine,
+                                     COutputStream& oStream);
 
     /**
      Prints syntax error message for definition of path to basis set library to
@@ -73,6 +89,16 @@ class CEnvironmentReader
      */
     void _syntaxBasisLibrary(const CInputLine&    inputLine,
                                    COutputStream& oStream);
+    
+    /**
+     Prints syntax error message for definition of path to force fields library
+     to output stream and sets environment reader object state to abnormal.
+     
+     @param inputLine the input line object with syntax error.
+     @param oStream the output stream.
+     */
+    void _syntaxForceFieldsLibrary(const CInputLine&    inputLine,
+                                         COutputStream& oStream);
 
 public:
 
@@ -109,6 +135,13 @@ public:
      @return the path to basis set library.
      */
     std::string getPathToBasisSets() const;
+    
+    /**
+     Gets path to force fields library defined in @progenv group.
+     
+     @return the path to force fields library.
+     */
+    std::string getPathToForceFields() const;
 };
 
 #endif /* EnvironmentReader_hpp */

@@ -32,6 +32,7 @@ CSinglePointEnergy::CSinglePointEnergy(const int32_t  globRank,
 
 void
 CSinglePointEnergy::set(const std::string&   pathToBasisSets,
+                        const std::string&   pathToForceFields, 
                         const CInputData&    inputData,
                               COutputStream& oStream)
 {

@@ -67,12 +67,14 @@ CJobsManager::setJobs(const CInputData&    inputData,
 
 void
 CJobsManager::runJobs(const std::string&   pathToBasisSets,
+                      const std::string&   pathToForceFields, 
                       const CInputData&    inputData,
                             COutputStream& oStream)
 {
     for (size_t i = 0; i < _listOfJobs.size(); i++)
     {
-        _listOfJobs[i]->set(pathToBasisSets, inputData, oStream);
+        _listOfJobs[i]->set(pathToBasisSets, pathToForceFields, inputData,
+                            oStream);
 
         _updateState(_listOfJobs[i]->getState());
 

@@ -21,6 +21,7 @@ COptimizationGeometry::COptimizationGeometry(const int32_t  globRank,
 
 void
 COptimizationGeometry::set(const std::string&   pathToBasisSets,
+                           const std::string&   pathToForceFields, 
                            const CInputData&    inputData,
                                  COutputStream& oStream)
 {

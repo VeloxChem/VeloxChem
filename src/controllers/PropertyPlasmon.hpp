@@ -9,7 +9,10 @@
 #ifndef PropertyPlasmon_hpp
 #define PropertyPlasmon_hpp
 
+#include <vector>
+
 #include "BaseJob.hpp"
+#include "CMMParameters.hpp"
 
 /**
  Class CPropertyPlasmon manages classical CMM plasmon job for case of
@@ -19,6 +22,11 @@
  */
 class CPropertyPlasmon : public CBaseJob
 {
+    /**
+     The vector of CMM model parameters.
+     */
+    std::vector<CCMMParameters> _cmmParameters;
+    
     /**
      Prints start message for classical CMM plasmon job to output stream.
 
@@ -42,11 +50,13 @@ public:
     /**
      Sets parameters of classical CMM plasmon job.
 
-     @param pathToBasisSets the path to basis set library.
+     @param pathToBasisSets the path to basis sets library.
+     @param pathToForceFields the path to force fields library.
      @param inputData the input data object.
      @param oStream the output stream.
      */
     void set(const std::string&   pathToBasisSets,
+             const std::string&   pathToForceFields,
              const CInputData&    inputData,
                    COutputStream& oStream) override;
 
