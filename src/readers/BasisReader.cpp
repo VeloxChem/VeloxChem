@@ -78,7 +78,7 @@ CBasisReader::parse(const CInputData&    inputData,
     {
         oStream << fmt::info << "Setting default AO basis set to def2-SVP.";
 
-        oStream << fmt::end;
+        oStream << fmt::end << fmt::blank;
 
         _label = std::string("DEF2-SVP");
     }

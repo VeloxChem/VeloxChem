@@ -28,6 +28,11 @@ class CCMMParameters
     cmmtyp _paramModel;
     
     /**
+     The identifier of chemical element.
+     */
+    int32_t _idElemental;
+    
+    /**
      The polarizability of Gaussian charge function.
      */
     double _polarizability;
@@ -73,6 +78,7 @@ public:
      Creates a CMM parameters object.
      
      @param paramModel the parameterization of CMM model.
+     @param idElemental the identifier of chemical element.
      @param polarizability the atomic polarizability. 
      @param exponent the exponent of Gaussian charge function.
      @param refCoordNumber the reference coordination number.
@@ -82,6 +88,7 @@ public:
      @param refScaleFactors the vector of Lorentzian scaling factors.
      */
     CCMMParameters(const cmmtyp               paramModel,
+                   const int32_t              idElemental,
                    const double               polarizability,
                    const double               exponent,
                    const double               refCoordNumber,
@@ -147,6 +154,13 @@ public:
     void setForceFieldModel(const cmmtyp paramModel);
     
     /**
+     Sets identifier of chemical element.
+     
+     @param idElemental the identifier of chemical elemental.
+     */
+    void setIdElemental(const int32_t idElemental);
+    
+    /**
      Sets atomic polarizability.
 
      @param polarizability the atomic polarizability.
@@ -185,6 +199,48 @@ public:
                       const double refGamma,
                       const double refScaleFactor);
     
+    /**
+     Gets model of CMM force field.
+
+     @return the model of CMM force field.
+     */
+    cmmtyp getForceFieldModel() const;
+    
+    /**
+     Gets identifier of chemical element.
+
+     @return the identifier of chemical elemental.
+     */
+    int32_t getIdElemental() const;
+    
+    /**
+     Gets atomic polarizability.
+
+     @return the atomic polarizability.
+     */
+    double getPolarizability() const;
+    
+    /**
+     Gets exponent of Gaussian charge.
+
+     @return the exponent of Gaussian charge.
+     */
+    double getExponent() const;
+    
+    /**
+     Gets reference coordination number.
+
+     @return the reference coordination number.
+     */
+    double getCoordinationNumber() const;
+    
+    /**
+      Gets reference coordination factor.
+
+     @return the reference coordination factor.
+     */
+    double getCoordinationFactor() const;
+
     /**
      Converts CMM parameters object to text output and insert it into output
      text stream.

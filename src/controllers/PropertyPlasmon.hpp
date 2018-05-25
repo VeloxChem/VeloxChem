@@ -39,6 +39,13 @@ class CPropertyPlasmon : public CBaseJob
      @param oStream the output stream.
      */
     void _startHeader(COutputStream& oStream) const;
+    
+    /**
+     Prints setup of classical CMM computation to output stream.
+
+     @param oStream the output stream.
+     */
+    void _printSetup(COutputStream& oStream) const; 
 
 public:
     

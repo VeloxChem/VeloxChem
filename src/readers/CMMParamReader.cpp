@@ -78,7 +78,7 @@ CCMMParamReader::parse(const CInputData&    inputData,
     {
         oStream << fmt::info << "Setting default CMM force field parameters.";
 
-        oStream << fmt::end;
+        oStream << fmt::end << fmt::blank;
 
         _label = std::string("CMM-FF-JENSEN");
     }
@@ -221,6 +221,8 @@ CCMMParamReader::_readAtomForceField(const int32_t        idElemental,
     }
 
     istream.close();
+    
+    atmparam.setIdElemental(idElemental); 
 
     return atmparam;
 }
