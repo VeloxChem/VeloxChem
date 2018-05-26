@@ -17,15 +17,13 @@
  Defines all allowed key values for derrived class of base job class:
  job::sp_energy       - the single point energy calculation
  job::opt_geometry    - the geometry optimzation calculation
- job::prop_cmmplasmon - the classical CMM plasmon calculation
 
  */
 
 enum class job : int32_t
 {
     sp_energy,
-    opt_geometry,
-    prop_cmmplasmon
+    opt_geometry
 };
 
 /**

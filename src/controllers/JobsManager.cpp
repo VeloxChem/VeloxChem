@@ -13,7 +13,6 @@
 #include "JobType.hpp"
 #include "SinglePointEnergy.hpp"
 #include "OptimizationGeometry.hpp"
-#include "PropertyPlasmon.hpp"
 
 CJobsManager::CJobsManager(const int32_t globRank,
                            const int32_t globNodes)
@@ -67,13 +66,12 @@ CJobsManager::setJobs(const CInputData&    inputData,
 
 void
 CJobsManager::runJobs(const std::string&   pathToBasisSets,
-                      const std::string&   pathToForceFields, 
                       const CInputData&    inputData,
                             COutputStream& oStream)
 {
     for (size_t i = 0; i < _listOfJobs.size(); i++)
     {
-        _listOfJobs[i]->set(pathToBasisSets, pathToForceFields, inputData,
+        _listOfJobs[i]->set(pathToBasisSets, inputData,
                             oStream);
 
         _updateState(_listOfJobs[i]->getState());
@@ -121,14 +119,6 @@ CJobsManager::_assignJobs(const std::vector<int32_t>& listOfJobIds)
                                                             _runMode));
         }
         
-        // add CMM plasmon job
-        
-        if (listOfJobIds[i] == to_int(job::prop_cmmplasmon))
-        {
-            _listOfJobs.push_back(new CPropertyPlasmon(_globRank, _globNodes,
-                                                       _runMode));
-        }
-
         // TODO: Add other types of jobs...
     }
 }

@@ -70,11 +70,6 @@ CJobsReader::parse(      std::vector<int32_t>& listOfJobIds,
                 continue;
             }
             
-            if (_addProperty(listOfJobIds, iline, oStream))
-            {
-                continue;
-            }
-
             // TODO: add other types of jobs
 
             if (!_state) return;
@@ -228,35 +223,6 @@ CJobsReader::_addOptimization(      std::vector<int32_t>& listOfJobIds,
     return false;
 }
 
-bool
-CJobsReader::_addProperty(      std::vector<int32_t>& listOfJobIds,
-                          const CInputLine&           inputLine,
-                                COutputStream&        oStream)
-{
-    if (inputLine.isKeyword(0, "Property:"))
-    {
-        if (inputLine.getNumberOfKeywords() == 2)
-        {
-            if (inputLine.isKeyword(1, "CMMPlasmon"))
-            {
-                listOfJobIds.push_back(to_int(job::prop_cmmplasmon));
-                
-                return true;
-            }
-            
-            // TODO: Other types of optimization calculations
-            
-            _errorUnknownCalculationType("Property", inputLine, oStream);
-        }
-        else
-        {
-            _syntaxOptimization(inputLine, oStream);
-        }
-    }
-    
-    return false;
-}
-
 void
 CJobsReader::_syntaxRunMode(const CInputLine&    inputLine,
                                   COutputStream& oStream)
@@ -324,19 +290,3 @@ CJobsReader::_syntaxOptimization(const CInputLine&    inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-void
-CJobsReader::_syntaxProperty(const CInputLine&    inputLine,
-                                   COutputStream& oStream)
-{
-    _state = false;
-    
-    oStream << fmt::error << "A Property calculation is defined as: ";
-    
-    oStream << fmt::end;
-    
-    oStream << fmt::error << "Property: [calculation type] " << fmt::end;
-    
-    oStream << "Please correct input line: " << inputLine.getOriginalString();
-    
-    oStream << fmt::end << fmt::blank;
-}

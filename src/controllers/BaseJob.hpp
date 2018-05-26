@@ -75,12 +75,10 @@ public:
      Sets parameters of basic job.
 
      @param pathToBasisSets the path to basis sets library.
-     @param pathToForceFields the path to force fields library.
      @param inputData the input data object.
      @param oStream the output stream.
      */
     virtual void set(const std::string&   pathToBasisSets,
-                     const std::string&   pathToForceFields,
                      const CInputData&    inputData,
                            COutputStream& oStream) = 0;
 

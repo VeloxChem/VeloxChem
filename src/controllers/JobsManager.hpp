@@ -104,12 +104,10 @@ public:
      additional parameters. Errors are printed to output stream.
 
      @param pathToBasisSets the path to basis set library.
-     @param pathToForceFields the path to force fields library.
      @param inputData the input data object.
      @param oStream the output stream.
      */
     void runJobs(const std::string&   pathToBasisSets,
-                 const std::string&   pathToForceFields,
                  const CInputData&    inputData,
                        COutputStream& oStream);
 

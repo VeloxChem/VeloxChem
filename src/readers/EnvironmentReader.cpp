@@ -45,8 +45,6 @@ CEnvironmentReader::parse(const CInputData&    inputData,
             auto iline = cgroup.getCommand(i);
 
             if (_addPathToBasisSets(iline, oStream)) continue;
-            
-            if (_addPathToForceFields(iline, oStream)) continue;
 
             // TODO: add other types of jobs
 
@@ -69,12 +67,6 @@ std::string
 CEnvironmentReader::getPathToBasisSets() const
 {
     return _pathToBasisSets;
-}
-
-std::string
-CEnvironmentReader::getPathToForceFields() const
-{
-    return _pathToForceFields;
 }
 
 void
@@ -148,32 +140,6 @@ CEnvironmentReader::_addPathToBasisSets(const CInputLine&    inputLine,
     return false;
 }
 
-bool
-CEnvironmentReader::_addPathToForceFields(const CInputLine&    inputLine,
-                                                COutputStream& oStream)
-{
-    if (inputLine.isKeyword(0, "ForceFieldsLibrary:"))
-    {
-        if (inputLine.getNumberOfKeywords() == 2)
-        {
-            _pathToForceFields = inputLine.getKeyword(1);
-            
-            if (_pathToForceFields[_pathToForceFields.size() - 1] != '/')
-            {
-                _pathToForceFields.append("/");
-            }
-            
-            return true;
-        }
-        else
-        {
-            _syntaxForceFieldsLibrary(inputLine, oStream);
-        }
-    }
-    
-    return false;
-}
-
 void
 CEnvironmentReader::_syntaxBasisLibrary(const CInputLine&    inputLine,
                                               COutputStream& oStream)
@@ -193,21 +159,3 @@ CEnvironmentReader::_syntaxBasisLibrary(const CInputLine&    inputLine,
     oStream << fmt::end << fmt::blank;
 }
 
-void
-CEnvironmentReader::_syntaxForceFieldsLibrary(const CInputLine&    inputLine,
-                                                    COutputStream& oStream)
-{
-    _state = false;
-    
-    oStream << fmt::error << "An environmental variable ForceFieldsLibrary ";
-    
-    oStream << "must be defined as: " << fmt::end;
-    
-    oStream << fmt::error << "ForceFieldsLibrary: [Full Path To Force Fields ";
-    
-    oStream << "Library]" << fmt::end;
-    
-    oStream << "Please correct input line: " << inputLine.getOriginalString();
-    
-    oStream << fmt::end << fmt::blank;
-}

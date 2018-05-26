@@ -108,8 +108,7 @@ CAppManager::execute()
             
             // run jobs in list of jobs
             
-            if (_state) jobsManager.runJobs(_pathToBasLib, _pathToFFLib,
-                                            inpdata, ostream);
+            if (_state) jobsManager.runJobs(_pathToBasLib, inpdata, ostream);
             
             updateState(jobsManager.getState());
             
@@ -207,8 +206,8 @@ CAppManager::_setEnvironment(const CInputData&    inputData,
         if (_state)
         {
             _pathToBasLib = rdrenvironment.getPathToBasisSets();
-            
-            _pathToFFLib = rdrenvironment.getPathToForceFields(); 
+        
+            // TODO: add other variables
         }
     }
     
