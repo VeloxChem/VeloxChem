@@ -773,7 +773,7 @@ CMemBlock<T>::_copy(const T* source)
 {
     auto pdata = _data;
 
-    #pragma omp simd aligned(pdata:VLX_ALIGN, source:VLX_ALIGN)
+    #pragma omp simd aligned(pdata, source:VLX_ALIGN)
     for (int32_t i = 0; i < _nElements; i++) pdata[i] = source[i];
 }
 
