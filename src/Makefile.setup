@@ -1,14 +1,16 @@
 #
-#                      V.E.L.O.X. C.H.E.M. MP
+#                     V.E.L.O.X. C.H.E.M. MP
 #      ---------------------------------------------------
 #           An Electronic Structure Code for Nanoscale
 #
 #  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 #  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
+# NOTE: setup for monkey.theochem.kth.se
+
 # C++ compiler & linker
 
-CXX := mpiCXX
+CXX := mpiicpc
 
 # Compiler flags for generic intel CPUs
 
@@ -18,12 +20,23 @@ CXX_DEB_FLG += -qopt-report-phase=vec
 
 # Generic preprocessor flags
 
-CPP_REL_FLG := -DENABLE_MPI=1 -DVLX_ALIGN=64
-CPP_DEB_FLG := -DVAR_DEBUG=1 -DENABLE_MPI=1 -DVLX_ALIGN=64
+CPP_REL_FLG := -DVLX_ALIGN=64 -DENABLE_MPI=1 -DENABLE_GPU=1
+CPP_DEB_FLG := -DVAR_DEBUG=1 -DVLX_ALIGN=64 -DENABLE_MPI=1 -DENABLE_GPU=1
 
-# Google test root directory
+# CUDA compiler & linker
 
-GST_ROOT := /Users/rinkevic/Frameworks/GoogleTest/googletest
+CUDA_ROOT := /usr/local/cuda
+NVCC := ${CUDA_ROOT}/bin/nvcc
+
+NVCC_REL_FLG := -std=c++11 -O3 --compiler-options "-fopenmp"
+NVCC_DEB_FLG := -std=c++11 -O3 --compiler-options "-fopenmp"
+
+NVCC_REL_FLG += --compiler-options "-Wall" 
+NVCC_DEB_FLG += --compiler-options "-Wall" --compiler-options "-g"
+
+# Google Test root directory
+
+GST_ROOT := /home/rinkevic/Development/FrameWorks/GoogleTest/googletest
 
 GST_LIB := $(GST_ROOT)/lib/gtest_main.a
 
@@ -35,6 +48,7 @@ MKL_INCLUDES := $(MKLROOT)/include
 
 LIB_LIST := -L${MKLROOT}/lib -Wl,-rpath,${MKLROOT}/lib -lmkl_intel_lp64
 LIB_LIST += -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
+LIB_LIST += -L${CUDA_ROOT}/lib64 -lcuda -lcudart
 
 # Native shell commands
 

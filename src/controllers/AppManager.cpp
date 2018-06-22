@@ -13,6 +13,7 @@
 #include "InputStream.hpp"
 #include "EnvironmentReader.hpp"
 #include "JobsManager.hpp"
+#include "DeviceProp.hpp"
 
 CAppManager::CAppManager(int    argc,
                          char** argv)
@@ -42,6 +43,16 @@ CAppManager::CAppManager(int    argc,
             _iFilename.assign(rdrcomline.getInputFilename());
             
             _oFilename.assign(rdrcomline.getOutputFilename());
+        }
+    }
+
+    // detect gpu
+
+    if (_globRank == mpi::master())
+    {
+        if (_state)
+        {
+            gpu::get_device_prop();
         }
     }
     

@@ -10,13 +10,13 @@
 
 # C++ compiler & linker
 
-CXX := mpiicpc
+CXX := mpicxx
 
 # Compiler flags for generic intel CPUs
 
-CXX_REL_FLG := -std=c++11 -Wall -O3 -xHost -qopenmp
-CXX_DEB_FLG := -std=c++11 -Wall -O3 -xHost -qopenmp -g -qopt-report=5
-CXX_DEB_FLG += -qopt-report-phase=vec
+CXX_REL_FLG := -std=c++11 -Wall -Ofast -fopenmp
+CXX_DEB_FLG := -std=c++11 -Wall -Ofast -fopenmp -g
+CXX_DEB_FLG += 
 
 # Generic preprocessor flags
 
@@ -36,9 +36,9 @@ NVCC_DEB_FLG += --compiler-options "-Wall" --compiler-options "-g"
 
 # Google Test root directory
 
-GST_ROOT := /home/rinkevic/Development/FrameWorks/GoogleTest/googletest
+GST_ROOT := /home/xinli/gitlab/fiesta/external/googletest
 
-GST_LIB := $(GST_ROOT)/lib/gtest_main.a
+GST_LIB := /home/xinli/gitlab/fiesta/lib/libgtest.a
 
 # MKL includes
 
