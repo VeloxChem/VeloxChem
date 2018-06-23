@@ -8,6 +8,8 @@
 
 before_script:
   - source /opt/intel/bin/compilervars.sh intel64
+  - export PATH=/usr/local/cuda/bin:$PATH
+  - export DYLD_LIBRARY_PATH=/usr/local/cuda/lib:$DYLD_LIBRARY_PATH
 
 after_script:
   - echo "Done..."
@@ -45,4 +47,4 @@ run_unit_test:
     - cd ../unit_tests/
     - make release
     - cd ../bin/
-    - ./UnitTestVeloxChemMP.x  
+    - ./UnitTestVeloxChemMP.x
