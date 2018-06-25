@@ -6,6 +6,7 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
+#include <cmath>
 #include <cstdio>
 
 #include "DeviceProp.hpp"
@@ -16,7 +17,7 @@ namespace gpu { // gpu namespace
     {
         #ifdef ENABLE_GPU
 
-        int nDevices;
+        int nDevices = 0;
 
         cudaGetDeviceCount(&nDevices);
 
@@ -28,16 +29,21 @@ namespace gpu { // gpu namespace
 
             cudaGetDeviceProperties(&prop, i);
 
-            printf("Device number: %d\n", i);
+            printf("Device ID: %d\n", i);
 
-            printf("  Device name: %s\n", prop.name);
+            printf("  Device name:                 %s\n", prop.name);
 
-            printf("  Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
+            printf("  Compute Capability:          %d.%d\n", prop.major, prop.minor);
 
-            printf("  Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
+            printf("  Number of Multiprocessors:   %d\n", prop.multiProcessorCount);
 
-            printf("  Peak Memory Bandwidth (GB/s): %f\n",
-                    2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+            printf("  GPU Max Clock Rate:          %.2f GHz\n", prop.clockRate * 1.0e-6);
+
+            printf("  Global Memory on GPU:        %.0f GB\n", (float)prop.totalGlobalMem/pow(1024,3));
+
+            printf("  Peak Memory Bandwidth:       %.0f GB/s\n",
+                    2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e+6);
+
         }
 
         #endif
