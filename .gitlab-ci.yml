@@ -10,6 +10,7 @@ before_script:
   - source /opt/intel/bin/compilervars.sh intel64
   - export PATH=/usr/local/cuda/bin:$PATH
   - export DYLD_LIBRARY_PATH=/usr/local/cuda/lib:$DYLD_LIBRARY_PATH
+  - export LD_LIBRARY_PATH=/home/xinli/software/boost/lib:$LD_LIBRARY_PATH
 
 after_script:
   - echo "Done..."
@@ -33,7 +34,7 @@ build_unit_test:
   stage: build
   script: 
     - cd src
-    - cp ../config/Setup.Monkey Makefile.setup
+    - cp ../config/Setup.Monkey.NoMPI Makefile.setup
     - cd ../unit_tests/
     - make release 
 

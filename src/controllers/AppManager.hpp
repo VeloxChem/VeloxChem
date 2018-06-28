@@ -10,7 +10,10 @@
 #define AppManager_hpp
 
 #include <cstdint>
+#include <cstring>
+#include <vector>
 #include <string>
+#include <memory>
 
 #include "OutputStream.hpp"
 #include "SystemClock.hpp"
@@ -100,6 +103,12 @@ public:
      */
     ~CAppManager();
     
+    /**
+     Creates an application manager object (for boost python).
+     */
+    static std::shared_ptr<CAppManager>
+    create(std::string input_string, std::string output_string);
+
     /**
      Executes a list of jobs assigned to application manager object.
      */

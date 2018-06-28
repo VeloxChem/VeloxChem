@@ -11,7 +11,11 @@
 
 namespace gpu {
 
+    #ifdef ENABLE_GPU
+
     void get_device_prop();
+
+    #endif
 
 }
 

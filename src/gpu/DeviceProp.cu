@@ -13,9 +13,10 @@
 
 namespace gpu { // gpu namespace
 
+    #ifdef ENABLE_GPU
+
     void get_device_prop()
     {
-        #ifdef ENABLE_GPU
 
         int nDevices = 0;
 
@@ -31,22 +32,23 @@ namespace gpu { // gpu namespace
 
             printf("Device ID: %d\n", i);
 
-            printf("  Device name:                 %s\n", prop.name);
+            printf("  Device name:             %s\n", prop.name);
 
-            printf("  Compute Capability:          %d.%d\n", prop.major, prop.minor);
+            printf("  Compute Capability:      %d.%d\n", prop.major, prop.minor);
 
-            printf("  Number of Multiprocessors:   %d\n", prop.multiProcessorCount);
+            printf("  Multiprocessor Count:    %d\n", prop.multiProcessorCount);
 
-            printf("  GPU Max Clock Rate:          %.2f GHz\n", prop.clockRate * 1.0e-6);
+            printf("  Max Clock Rate:          %.2f GHz\n", prop.clockRate * 1.0e-6);
 
-            printf("  Global Memory on GPU:        %.0f GB\n", (float)prop.totalGlobalMem/pow(1024,3));
+            printf("  Global Memory:           %.0f GB\n", (float)prop.totalGlobalMem/pow(1024,3));
 
-            printf("  Peak Memory Bandwidth:       %.0f GB/s\n",
+            printf("  Peak Memory Bandwidth:   %.0f GB/s\n",
                     2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e+6);
 
         }
 
-        #endif
     }
+
+    #endif
 
 }

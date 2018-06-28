@@ -52,7 +52,11 @@ CAppManager::CAppManager(int    argc,
     {
         if (_state)
         {
+            #ifdef ENABLE_GPU
+
             gpu::get_device_prop();
+
+            #endif
         }
     }
     
@@ -64,6 +68,37 @@ CAppManager::CAppManager(int    argc,
 CAppManager::~CAppManager()
 {
 
+}
+
+std::shared_ptr<CAppManager>
+CAppManager::create(std::string input_string, std::string output_string)
+{
+    int argc = 3;
+
+    char* argv[argc];
+
+    std::vector<std::string> inputs;
+
+    inputs.push_back("exe");
+
+    inputs.push_back(input_string);
+
+    inputs.push_back(output_string);
+
+    for (int i = 0; i < argc; i++)
+    {
+        const char* text = inputs[i].c_str();
+
+        argv[i] = (char*)malloc(sizeof(char) * (strlen(text) + 1));
+
+        memset(argv[i], '\0', sizeof(char) * (strlen(text) + 1));
+
+        memcpy(argv[i], text, sizeof(char) * strlen(text));
+    }
+
+    mpi::init(argc, argv);
+
+    return std::shared_ptr<CAppManager>(new CAppManager (argc, argv));
 }
 
 void
