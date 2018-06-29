@@ -19,6 +19,10 @@
 
 #include "MpiFunc.hpp"
 #include "AppManager.hpp"
+#include "InputStream.hpp"
+#include "OutputStream.hpp"
+#include "MolXYZReader.hpp"
+#include "Molecule.hpp"
 
 namespace bp = boost::python;
 
@@ -93,6 +97,8 @@ namespace PyVLX { // PyVLX namespace
             memcpy(argv[iarg], text, sizeof(char) * strlen(text));
         }
 
+        // run VeloxChem
+
         return vlx_run(argc, argv);
     }
 
@@ -103,15 +109,95 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
     // initialize mpi4py's C-API
     //if (import_mpi4py() < 0) return;
 
-    // ==> initialize module <==
+    // ==> expose functions <==
 
-    // VeloxChem
+    // run VeloxChem
     bp::def("run", PyVLX::py_vlx_run);
 
-    // classes
-    bp::class_< CAppManager, std::shared_ptr<CAppManager> > ("CAppManager", bp::init<int, char**>())
-        .def("create", &CAppManager::create)
+    // ==> expose classes <==
+
+    // CAppManager class
+    // Note: "create" is a static method that returns a CAppManager object
+
+    bp::class_< CAppManager, std::shared_ptr<CAppManager> >
+        (
+            "CAppManager",
+            bp::init<int, char**>()
+        )
+        .def("create",    &CAppManager::create)
+        .def("execute",   &CAppManager::execute)
+        .def("get_state", &CAppManager::getState)
         .staticmethod("create")
-        .def("execute", &CAppManager::execute)
     ;
+
+    // COutputStream class
+
+    bp::class_< COutputStream, std::shared_ptr<COutputStream> >
+        (
+            "COutputStream",
+            bp::init<const std::string&>()
+        )
+        .def("get_state", &COutputStream::getState)
+        .def("flush",     &COutputStream::flush)
+    ;
+
+    // CInputStream class
+
+    bp::class_< CInputStream, std::shared_ptr<CInputStream> >
+        (
+            "CInputStream",
+            bp::init<const std::string&, COutputStream&>()
+        )
+        .def("read",      &CInputStream::read)
+        .def("get_state", &CInputStream::getState)
+    ;
+
+    // CInputData class
+
+    bp::class_< CInputData, std::shared_ptr<CInputData> >
+        (
+            "CInputData", bp::init<>()
+        )
+    ;
+
+    // CMolecule class
+    // Note: CMolecule has two constructors
+
+    bp::class_< CMolecule, std::shared_ptr<CMolecule> >
+        (
+            "CMolecule", bp::init<
+                const std::vector<double>&,
+                const std::vector<double>&,
+                const std::vector<double>&,
+                const std::vector<std::string>&,
+                const std::vector<int32_t>&
+                >()
+        )
+        .def(bp::init<>())
+        .def("print_geometry", &CMolecule::printGeometry)
+    ;
+
+    // CMolXYZReader class
+    // Note: Need member function pointers for proper overloading
+
+    void (CMolXYZReader::*parse_1)(      CMolecule&     molecule,
+                                   const CInputData&    inputData,
+                                         COutputStream& oStream)
+        = &CMolXYZReader::parse;
+
+    void (CMolXYZReader::*parse_2)(      CMolecule&     molecule,
+                                   const CInputData&    inputData,
+                                   const int32_t        iGroup,
+                                         COutputStream& oStream)
+        = &CMolXYZReader::parse;
+
+    bp::class_< CMolXYZReader >
+        (
+            "CMolXYZReader", bp::init<>()
+        )
+        .def("parse", parse_1)
+        .def("parse", parse_2)
+        .def("get_state", &CMolXYZReader::getState)
+    ;
+
 }
