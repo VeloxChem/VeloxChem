@@ -6,14 +6,17 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include "gtest/gtest.h"
-#include "../src/general/MpiFunc.hpp"
+#ifndef DeviceProp_hpp
+#define DeviceProp_hpp
 
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
+namespace gpu {
 
-    mpi::init(argc, argv);
+    #ifdef ENABLE_GPU
 
-    return RUN_ALL_TESTS();
+    void get_device_prop();
+
+    #endif
+
 }
+
+#endif

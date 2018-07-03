@@ -12,24 +12,45 @@ include Makefile.setup
 
 # Set TARGET for VeloxChemMP package
 
-VLX_TARGET   := VeloxChemMP.x
-VLX_MAIN_SCR := $(subst .x,.cpp,$(VLX_TARGET))
-VLX_MAIN_OBJ := $(subst .x,.o,$(VLX_TARGET))
-VLX_MAIN_DEP := $(subst .x,.d,$(VLX_TARGET))
-VLX_MAIN_OPT := $(subst .x,.optrpt,$(VLX_TARGET))
-VLX_MAIN_OPT += ipo_out.optrpt
+ifeq ($(USE_PYTHON),true)
+  VLX_TARGET   := VeloxChemMP.so
+  VLX_MAIN_SCR := $(subst .so,.cpp,$(VLX_TARGET))
+  VLX_MAIN_OBJ := $(subst .so,.o,$(VLX_TARGET))
+  VLX_MAIN_DEP := $(subst .so,.d,$(VLX_TARGET))
+  VLX_MAIN_OPT := $(subst .so,.optrpt,$(VLX_TARGET))
+  VLX_MAIN_OPT += ipo_out.optrpt
+else
+  VLX_TARGET   := VeloxChemMP.x
+  VLX_MAIN_SCR := $(subst .x,.cpp,$(VLX_TARGET))
+  VLX_MAIN_OBJ := $(subst .x,.o,$(VLX_TARGET))
+  VLX_MAIN_DEP := $(subst .x,.d,$(VLX_TARGET))
+  VLX_MAIN_OPT := $(subst .x,.optrpt,$(VLX_TARGET))
+  VLX_MAIN_OPT += ipo_out.optrpt
+endif
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
-CXXFLAGS := $(CXX_DEB_FLG)
-CPPFLAGS := $(CPP_DEB_FLG)
+  CXXFLAGS := $(CXX_DEB_FLG)
+  CPPFLAGS := $(CPP_DEB_FLG)
 else
-CXXFLAGS := $(CXX_REL_FLG)
-CPPFLAGS := $(CPP_REL_FLG)
+  CXXFLAGS := $(CXX_REL_FLG)
+  CPPFLAGS := $(CPP_REL_FLG)
 endif 
 
 # Add includes directories
-VLX_INCLUDES := ${shell find * -type d -print}
+ifeq ($(USE_PYTHON),true)
+  ifeq ($(USE_GPU),true)
+    VLX_INCLUDES := ${shell find * -type d -print}
+  else
+    VLX_INCLUDES := ${shell find * -not -path gpu -type d -print}
+  endif
+else
+  ifeq ($(USE_GPU),true)
+    VLX_INCLUDES := ${shell find * -not -path python -type d -print}
+  else
+    VLX_INCLUDES := ${shell find * -not -path python -not -path gpu -type d -print}
+  endif
+endif
 
 # Update CXX flags & includes path
 CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
@@ -39,7 +60,19 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS +=  -I $(MKL_INCLUDES)
 
 # Add list of internal libraries
-VLX_LIBS_DIR := ${shell find * -type d -print}
+ifeq ($(USE_PYTHON),true)
+  ifeq ($(USE_GPU),true)
+    VLX_LIBS_DIR := ${shell find * -type d -print}
+  else
+    VLX_LIBS_DIR := ${shell find * -not -path gpu -type d -print}
+  endif
+else
+  ifeq ($(USE_GPU),true)
+    VLX_LIBS_DIR := ${shell find * -not -path python -type d -print}
+  else
+    VLX_LIBS_DIR := ${shell find * -not -path python -not -path gpu -type d -print}
+  endif
+endif
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))

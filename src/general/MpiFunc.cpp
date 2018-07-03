@@ -18,6 +18,15 @@ init(int    argc,
 {
     if (ENABLE_MPI)
     {
+        int initialized = 0;
+
+        MPI_Initialized(&initialized);
+
+        if (initialized)
+        {
+            return true;
+        }
+
         int32_t mlevel = 0;
 
         auto merror = MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED,
@@ -337,7 +346,17 @@ abort(const int   errorcode,
 {
     if (ENABLE_MPI)
     {
-        std::cerr << "MPI ERROR - " << label << " : " << errorcode << std::endl;
+        int err_class, err_len;
+
+        char err_string[MPI_MAX_ERROR_STRING];
+
+        MPI_Error_class(errorcode, &err_class);
+
+        MPI_Error_string(errorcode, err_string, &err_len);
+
+        std::cerr << "MPI ERROR " << err_class << ": " << err_string << std::endl;
+
+        //std::cerr << "MPI ERROR - " << label << " : " << errorcode << std::endl;
         
         MPI_Abort(MPI_COMM_WORLD, errorcode);
     }

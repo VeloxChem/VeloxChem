@@ -11,6 +11,10 @@
 #include "MpiFunc.hpp"
 #include "AppManager.hpp"
 
+// Main function is needed by C++ VeloxChem but not Python VeloxChem.
+
+#ifndef ENABLE_PYTHON
+
 /**
  Executes a VeloxChemMP program.
 
@@ -19,6 +23,7 @@
  @return the program state: EXIT_SUCCESS for normal state and EXIT_FAILURE
          for abnormal state
  */
+
 int
 main(int    argc,
      char** argv)
@@ -55,3 +60,5 @@ main(int    argc,
 
     return EXIT_SUCCESS;
 }
+
+#endif

@@ -10,7 +10,7 @@
 
 USE_MPI    := true
 USE_GPU    := true
-USE_PYTHON := false
+USE_PYTHON := true
 
 # C++ compiler & linker
 
