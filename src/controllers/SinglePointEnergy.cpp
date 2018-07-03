@@ -137,7 +137,7 @@ CSinglePointEnergy::run(COutputStream& oStream,
 
     CDensityGridDriver drvDenGrid(_globRank, _globNodes, _runMode, comm);
 
-    drvDenGrid.generate(_molecule, _aoBasis, molgrid, xcfun::lda, oStream, comm);
+    drvDenGrid.generate(_molecule, _aoBasis, molgrid, xcfun::mgga, oStream, comm);
 }
 
 void

@@ -49,7 +49,7 @@ CLog3Quadrature::generate() const
 
         auto fxi = _getXiFactor() / std::log(2.0);
 
-        #pragma omp simd aligned(rcoords:VLX_ALIGN, rweights:VLX_ALIGN)
+        #pragma omp simd aligned(rcoords, rweights:VLX_ALIGN)
         for (int32_t i = 0; i < _nRadialPoints; i++)
         {
             // set up parameters

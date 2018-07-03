@@ -100,30 +100,32 @@ class CDensityGridDriver
             points.
      @param gridOffset the batch offset in vector grid points. 
      @param nGridPoints the number of grid points in batch.
+     @param xcFunctional the exchange-correlation functional type.
      */
     void _genBatchOfDensityGridPoints(const CGtoContainer* gtoContainer,
                                       const double*        gridCoordinatesX,
                                       const double*        gridCoordinatesY,
                                       const double*        gridCoordinatesZ,
                                       const int32_t        gridOffset,
-                                      const int32_t        nGridPoints);
+                                      const int32_t        nGridPoints,
+                                      const xcfun          xcFunctional);
     
     /**
      Computes screening factors  vector for primitive Gaussian functions for
      specific grid point using GTOs container.
 
+     @param screenFactors the screening factors vector for each GTOs block
+     object in GTOs container.
      @param gtoContainer the GTOs container.
      @param gridCoordinateX the Cartesian X coordinate of grid point.
      @param gridCoordinateY the Cartesian Y coordinate of grid point.
      @param gridCoordinateZ the Cartesian Z coordinate of grid point.
-     @param screenFactors the screening factors vector for each GTOs block
-            object in GTOs container.
      */
-    void _compScreeningFactors(const CGtoContainer&        gtoContainer,
+    void _compScreeningFactors(      CVecMemBlock<double>& screenFactors,
+                               const CGtoContainer&        gtoContainer,
                                const double                gridCoordinateX,
                                const double                gridCoordinateY,
-                               const double                gridCoordinateZ,
-                                     CVecMemBlock<double>& screenFactors);
+                               const double                gridCoordinateZ);
     
     /**
      Gets scaling factor of screening factor for specific angular momemntum.
@@ -134,6 +136,102 @@ class CDensityGridDriver
      */
     double _getScaleFactor(const int32_t angularMomentum,
                            const double  maxRadius) const;
+    
+    /**
+     Computes vector of distances between grid point and centers of primitive
+     Gaussian functions for specific GTOs block.
+
+     @param distances the vector of distances.
+     @param gtoContainer the GTOs container.
+     @param redDimensions the vector of reduced dimensions.
+     @param iGtoBlock the index of GTOs block.
+     @param gridCoordinateX the Cartesian X coordinate of grid point.
+     @param gridCoordinateY the Cartesian Y coordinate of grid point.
+     @param gridCoordinateZ the Cartesian Z coordinate of grid point.
+     */
+    void _compDistances(      CMemBlock2D<double>&  distances,
+                        const CGtoContainer&        gtoContainer,
+                        const CMemBlock2D<int32_t>& redDimensions,
+                        const int32_t               iGtoBlock,
+                        const double                gridCoordinateX,
+                        const double                gridCoordinateY,
+                        const double                gridCoordinateZ) const;
+    
+    
+    /**
+     Gets number of components required for compupation of all relevant density
+     contributions for specific type of exchange-correlation functions.
+
+     @param xcFunctional the exchange-correlations functional type.
+     @return the number of components.
+     */
+    int32_t _getNumberOfXCComponents(const xcfun xcFunctional) const;
+    
+    
+    /**
+     Computes primitive Gaussian function values for specific GTOs block.
+
+     @param gtoValues the vector of primitive Gaussian functions.
+     @param distances the vector of distances.
+     @param gtoContainer the GTOs container.
+     @param redDimensions the vector of reduced dimensions.
+     @param iGtoBlock the index of GTOs block.
+     @param xcFunctional the exchange-correlation functional type.
+     */
+    void _compPrimGtoValues(      CMemBlock2D<double>&  gtoValues,
+                            const CMemBlock2D<double>&  distances,
+                            const CGtoContainer&        gtoContainer,
+                            const CMemBlock2D<int32_t>& redDimensions,
+                            const int32_t               iGtoBlock,
+                            const xcfun                 xcFunctional) const;
+    
+    /**
+     Computes primitive Gaussian function values for specific GTOs block at
+     local density approximation level.
+     
+     @param gtoValues the vector of primitive Gaussian functions.
+     @param distances the vector of distances.
+     @param gtoContainer the GTOs container.
+     @param redDimensions the vector of reduced dimensions.
+     @param iGtoBlock the index of GTOs block.
+     */
+    void _compPrimGtoValuesForLDA(      CMemBlock2D<double>&  gtoValues,
+                                  const CMemBlock2D<double>&  distances,
+                                  const CGtoContainer&        gtoContainer,
+                                  const CMemBlock2D<int32_t>& redDimensions,
+                                  const int32_t               iGtoBlock) const;
+    
+    /**
+     Computes primitive Gaussian function values for specific GTOs block at
+     generalized gradient approximation level.
+     
+     @param gtoValues the vector of primitive Gaussian functions.
+     @param distances the vector of distances.
+     @param gtoContainer the GTOs container.
+     @param redDimensions the vector of reduced dimensions.
+     @param iGtoBlock the index of GTOs block.
+     */
+    void _compPrimGtoValuesForGGA(      CMemBlock2D<double>&  gtoValues,
+                                  const CMemBlock2D<double>&  distances,
+                                  const CGtoContainer&        gtoContainer,
+                                  const CMemBlock2D<int32_t>& redDimensions,
+                                  const int32_t               iGtoBlock) const;
+    
+    /**
+     Computes primitive Gaussian function values for specific GTOs block at
+     meta generalized gradient approximation level.
+     
+     @param gtoValues the vector of primitive Gaussian functions.
+     @param distances the vector of distances.
+     @param gtoContainer the GTOs container.
+     @param redDimensions the vector of reduced dimensions.
+     @param iGtoBlock the index of GTOs block.
+     */
+    void _compPrimGtoValuesForMGGA(      CMemBlock2D<double>&  gtoValues,
+                                   const CMemBlock2D<double>&  distances,
+                                   const CGtoContainer&        gtoContainer,
+                                   const CMemBlock2D<int32_t>& redDimensions,
+                                   const int32_t               iGtoBlock) const;
     
 public:
     

@@ -31,7 +31,15 @@ class CGtoContainer
     /**
      The vector of GTOs block objects.
      */
-    std::vector<CGtoBlock> _gtoBlocks; 
+    std::vector<CGtoBlock> _gtoBlocks;
+    
+    /**
+     Gets number of buffer components for specific angular momentum.
+
+     @param angularMomentum the angular momentum.
+     @return the number of buffer components.
+     */
+    int32_t _getPrimAngComponents(const int32_t angularMomentum) const;
 
 public:
 
@@ -252,11 +260,20 @@ public:
     
     /**
      Creates vector of memory block objects according to dimensions of primitive
-     Gaussian functions space in each GTOs block object in GTOs container.
+     Gaussian functions space of each GTOs block object in GTOs container.
 
      @return the vector of memory block objects.
      */
     CVecMemBlock<double> getPrimBuffer() const;
+    
+    /**
+     Creates vector of 2D memory block objects according to dimensions of
+     primitive Gaussian functions space and angular momentum of each GTOs block
+     object in GTOs container.
+     
+     @return the vector of 2D memory block objects.
+     */
+    CVecMemBlock2D<double> getPrimAngBuffer(const int32_t nComponents) const;
     
     /**
      Converts GTOs container object to text output and insert it into output

@@ -8,6 +8,8 @@
 
 #include "GtoContainer.hpp"
 
+#include "AngularMomentum.hpp"
+
 CGtoContainer::CGtoContainer()
 
     : _maxAngularMomentum(-1)
@@ -267,6 +269,35 @@ CGtoContainer::getPrimBuffer() const
     }
     
     return mbvec;
+}
+
+CVecMemBlock2D<double>
+CGtoContainer::getPrimAngBuffer(const int32_t nComponents) const
+{
+    CVecMemBlock2D<double> mbvec;
+    
+    for (size_t i = 0; i < _gtoBlocks.size(); i++)
+    {
+        auto cang = _getPrimAngComponents(_gtoBlocks[i].getAngularMomentum());
+        
+        mbvec.push_back(CMemBlock2D<double>(_gtoBlocks[i].getNumberOfPrimGtos(),
+                                            nComponents * cang));
+    }
+    
+    return mbvec;
+}
+
+int32_t
+CGtoContainer::_getPrimAngComponents(const int32_t angularMomentum) const
+{
+    int32_t ncomp = 0;
+    
+    for (int32_t i = 0; i <= angularMomentum; i++)
+    {
+        ncomp += angmom::to_CartesianComponents(i);
+    }
+    
+    return ncomp;
 }
 
 std::ostream&

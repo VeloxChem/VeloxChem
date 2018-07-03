@@ -16,7 +16,7 @@ namespace mathfunc { // mathfunc namespace
     zero(      double* vector,
          const int32_t nElements)
     {
-        #pragma omp simd aligned (vector: VLX_ALIGN)
+        #pragma omp simd aligned(vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) vector[i] = 0.0;
     }
 
@@ -25,7 +25,7 @@ namespace mathfunc { // mathfunc namespace
            const double  value,
            const int32_t nElements)
     {
-        #pragma omp simd aligned (vector: VLX_ALIGN)
+        #pragma omp simd aligned(vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) vector[i] = value;
     }
 
@@ -35,7 +35,7 @@ namespace mathfunc { // mathfunc namespace
     {
         double fsum = 0.0;
 
-        #pragma omp simd aligned (vector: VLX_ALIGN)
+        #pragma omp simd aligned(vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) fsum += vector[i];
 
         return fsum;
@@ -47,7 +47,7 @@ namespace mathfunc { // mathfunc namespace
     {
         int32_t isum = 0;
 
-        #pragma omp simd aligned (vector: VLX_ALIGN)
+        #pragma omp simd aligned(vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) isum += vector[i];
 
         return isum;
@@ -91,7 +91,7 @@ namespace mathfunc { // mathfunc namespace
     {
         auto factor = 1.0 / mathfunc::sum(vector, nElements);
 
-        #pragma omp simd aligned (vector: VLX_ALIGN)
+        #pragma omp simd aligned(vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) vector[i] *= factor;
     }
 

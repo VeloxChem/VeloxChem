@@ -11,6 +11,7 @@
 #include "SystemClock.hpp"
 #include "OMPTasks.hpp"
 #include "SphericalMomentum.hpp"
+#include "GtoRecFunc.hpp"
 
 CDensityGridDriver::CDensityGridDriver(const int32_t  globRank,
                                        const int32_t  globNodes,
@@ -106,7 +107,7 @@ CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
     // generate density on grid points
     
     #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz,\
-                                gtovec)
+                                gtovec, xcFunctional)
     {
         #pragma omp single nowait
         {
@@ -123,7 +124,8 @@ CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _genBatchOfDensityGridPoints(gtovec, mgx, mgy, mgz,
-                                                 tbposition, tbsize);
+                                                 tbposition, tbsize,
+                                                 xcFunctional);
                 }
             }
         }
@@ -140,7 +142,8 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
                                                  const double*        gridCoordinatesY,
                                                  const double*        gridCoordinatesZ,
                                                  const int32_t        gridOffset,
-                                                 const int32_t        nGridPoints)
+                                                 const int32_t        nGridPoints,
+                                                 const xcfun          xcFunctional)
 {
     // local copy of GTOs containers
     
@@ -156,7 +159,15 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
     
     auto scrdata = gtovec.getPrimBuffer();
     
-    // set up spherical angular momentum
+    // set up distances vector
+    
+    CMemBlock2D<double> rdist(gtovec.getMaxNumberOfPrimGtos(), 3);
+    
+    // set up recursion buffers
+    
+    auto nvcomp = _getNumberOfXCComponents(xcFunctional);
+    
+    auto pbuffers = gtovec.getPrimAngBuffer(nvcomp);
     
     // here we need array of spherical momentum objects..
     
@@ -176,22 +187,37 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
         
         // compute screening factors
         
-        _compScreeningFactors(gtovec, gx, gy, gz, scrdata);
+        _compScreeningFactors(scrdata, gtovec, gx, gy, gz);
         
         // update screened GTOs container
         
         cmpvec.compress(gtovec, redidx, scrdata, _thresholdOfPrimGTOs);
+        
+        // loop over GTOs blocks in GTOs container
+        
+        for (int32_t j = 0; j < gtovec.getNumberOfGtoBlocks(); j++)
+        {
+            // compute distances
+            
+            _compDistances(rdist, cmpvec, redidx, j, gx, gy, gz);
+            
+            // compute primitive GTOs values at grid point
+            
+            _compPrimGtoValues(pbuffers[j], rdist, cmpvec, redidx, j,
+                               xcFunctional);
+        
+        }
     }
     
     printf("task: size: %i pos %i\n", nGridPoints, gridOffset);
 }
 
 void
-CDensityGridDriver::_compScreeningFactors(const CGtoContainer&        gtoContainer,
+CDensityGridDriver::_compScreeningFactors(      CVecMemBlock<double>& screenFactors,
+                                          const CGtoContainer&        gtoContainer,
                                           const double                gridCoordinateX,
                                           const double                gridCoordinateY,
-                                          const double                gridCoordinateZ,
-                                                CVecMemBlock<double>& screenFactors)
+                                          const double                gridCoordinateZ)
 {
     for (int32_t i = 0; i < gtoContainer.getNumberOfGtoBlocks(); i++)
     {
@@ -273,3 +299,227 @@ CDensityGridDriver::_getScaleFactor(const int32_t angularMomentum,
     return 0.0;
 }
 
+void
+CDensityGridDriver::_compDistances(      CMemBlock2D<double>&  distances,
+                                   const CGtoContainer&        gtoContainer,
+                                   const CMemBlock2D<int32_t>& redDimensions,
+                                   const int32_t               iGtoBlock,
+                                   const double                gridCoordinateX,
+                                   const double                gridCoordinateY,
+                                   const double                gridCoordinateZ) const
+{
+    // set up primitive GTOs coordinates
+    
+    auto coordsx = gtoContainer.getCoordinatesX(iGtoBlock);
+    
+    auto coordsy = gtoContainer.getCoordinatesY(iGtoBlock);
+    
+    auto coordsz = gtoContainer.getCoordinatesZ(iGtoBlock);
+    
+    // set up distances
+    
+    auto distx = distances.data(0);
+    
+    auto disty = distances.data(1);
+    
+    auto distz = distances.data(2);
+    
+    // set up number of primitive GTOs
+    
+    auto reddim = redDimensions.data(0);
+    
+    auto pnum = reddim[iGtoBlock];
+    
+    // loop over primitive GTOs
+    
+    #pragma omp simd aligned(distx, disty, distz, coordsx, coordsy, coordsz:\
+                             VLX_ALIGN)
+    for (int32_t i = 0; i < pnum; i++)
+    {
+        distx[i] = gridCoordinateX - coordsx[i];
+        
+        disty[i] = gridCoordinateY - coordsy[i];
+        
+        distz[i] = gridCoordinateZ - coordsz[i];
+    }
+}
+
+int32_t
+CDensityGridDriver::_getNumberOfXCComponents(const xcfun xcFunctional) const
+{
+    if (xcFunctional == xcfun::lda) return 1;
+    
+    if (xcFunctional == xcfun::gga) return 4;
+    
+    if (xcFunctional == xcfun::mgga) return 5;
+    
+    return 0;
+}
+
+void
+CDensityGridDriver::_compPrimGtoValues(      CMemBlock2D<double>&  gtoValues,
+                                       const CMemBlock2D<double>&  distances,
+                                       const CGtoContainer&        gtoContainer,
+                                       const CMemBlock2D<int32_t>& redDimensions,
+                                       const int32_t               iGtoBlock,
+                                       const xcfun                 xcFunctional) const
+{
+    // local density approximation
+    
+    if (xcFunctional == xcfun::lda)
+    {
+        _compPrimGtoValuesForLDA(gtoValues, distances, gtoContainer,
+                                 redDimensions, iGtoBlock);
+        
+        return;
+    }
+    
+    // generalized gradient approximation
+    
+    if (xcFunctional == xcfun::gga)
+    {
+        _compPrimGtoValuesForGGA(gtoValues, distances, gtoContainer,
+                                 redDimensions, iGtoBlock);
+        
+        return;
+    }
+    
+    // meta generalized gradient approximation
+    
+    if (xcFunctional == xcfun::mgga)
+    {
+        _compPrimGtoValuesForMGGA(gtoValues, distances, gtoContainer,
+                                  redDimensions, iGtoBlock);
+        
+        return;
+    }
+}
+
+void
+CDensityGridDriver::_compPrimGtoValuesForLDA(      CMemBlock2D<double>&  gtoValues,
+                                             const CMemBlock2D<double>&  distances,
+                                             const CGtoContainer&        gtoContainer,
+                                             const CMemBlock2D<int32_t>& redDimensions,
+                                             const int32_t               iGtoBlock) const
+{
+    auto mang = gtoContainer.getAngularMomentum(iGtoBlock);
+    
+    // s-type functions
+    
+    gtorec::compGtoTypeSForLDA(gtoValues, distances, gtoContainer, redDimensions,
+                               iGtoBlock);
+    
+    if (mang == 0) return;
+    
+    // p-type functions
+    
+    gtorec::compGtoTypePForLDA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 1) return;
+    
+    // d-type functions
+    
+    gtorec::compGtoTypeDForLDA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 2) return;
+    
+    // f-type functions
+    
+    gtorec::compGtoTypeFForLDA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 3) return;
+    
+    // g-type functions
+    
+    gtorec::compGtoTypeGForLDA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 4) return;
+    
+    // TODO: Implement higher angular momentum (l > 4) 
+}
+
+void
+CDensityGridDriver::_compPrimGtoValuesForGGA(      CMemBlock2D<double>&  gtoValues,
+                                             const CMemBlock2D<double>&  distances,
+                                             const CGtoContainer&        gtoContainer,
+                                             const CMemBlock2D<int32_t>& redDimensions,
+                                             const int32_t               iGtoBlock) const
+{
+    auto mang = gtoContainer.getAngularMomentum(iGtoBlock);
+    
+    // s-type functions
+    
+    gtorec::compGtoTypeSForGGA(gtoValues, distances, gtoContainer, redDimensions,
+                               iGtoBlock);
+    
+    if (mang == 0) return;
+    
+    // p-type functions
+    
+    gtorec::compGtoTypePForGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 1) return;
+    
+    // d-type functions
+    
+    gtorec::compGtoTypeDForGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 2) return;
+    
+    // f-type functions
+    
+    gtorec::compGtoTypeFForGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 3) return;
+    
+    // g-type functions
+    
+    gtorec::compGtoTypeGForGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 4) return;
+    
+    // TODO: Implement higher angular momentum (l > 4) 
+}
+
+void
+CDensityGridDriver::_compPrimGtoValuesForMGGA(      CMemBlock2D<double>&  gtoValues,
+                                              const CMemBlock2D<double>&  distances,
+                                              const CGtoContainer&        gtoContainer,
+                                              const CMemBlock2D<int32_t>& redDimensions,
+                                              const int32_t               iGtoBlock) const
+{
+    auto mang = gtoContainer.getAngularMomentum(iGtoBlock);
+    
+    // s-type functions
+    
+    gtorec::compGtoTypeSForMGGA(gtoValues, distances, gtoContainer, redDimensions,
+                               iGtoBlock);
+    
+    if (mang == 0) return;
+    
+    // p-type functions
+    
+    gtorec::compGtoTypePForMGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 1) return;
+    
+    // d-type functions
+    
+    gtorec::compGtoTypeDForMGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 2) return;
+    
+    // f-type functions
+    
+    gtorec::compGtoTypeFForMGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 3) return;
+    
+    // g-type functions
+    
+    gtorec::compGtoTypeGForMGGA(gtoValues, distances, redDimensions, iGtoBlock);
+    
+    if (mang == 4) return;
+    
+    // TODO: Implement higher angular momentum (l > 4) 
+}

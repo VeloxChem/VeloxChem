@@ -449,4 +449,57 @@ TEST_F(CGtoContainerTest, GetCoordinatesZ)
                       1.200000000000e+00}, acont.getCoordinatesZ(1));
 }
 
+TEST_F(CGtoContainerTest, GetPrimBuffer)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    auto pbuff = acont.getPrimBuffer();
+    
+    ASSERT_EQ(2, pbuff.size());
+    
+    ASSERT_EQ(pbuff[0].size(), 11);
+    
+    ASSERT_EQ(pbuff[1].size(), 4);
+}
+
+TEST_F(CGtoContainerTest, GetPrimAngBuffer)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    auto abuff = acont.getPrimAngBuffer(2);
+    
+    ASSERT_EQ(2, abuff.size());
+    
+    ASSERT_EQ(abuff[0].size(0), 11);
+    
+    ASSERT_EQ(abuff[0].size(1), 11);
+    
+    ASSERT_EQ(abuff[0].blocks(), 2);
+    
+    ASSERT_EQ(abuff[1].size(0), 4);
+    
+    ASSERT_EQ(abuff[1].size(1), 4);
+    
+    ASSERT_EQ(abuff[1].size(2), 4);
+    
+    ASSERT_EQ(abuff[1].size(3), 4);
+    
+    ASSERT_EQ(abuff[1].size(4), 4);
+    
+    ASSERT_EQ(abuff[1].size(5), 4);
+    
+    ASSERT_EQ(abuff[1].size(6), 4);
+    
+    ASSERT_EQ(abuff[1].size(7), 4);
+    
+    ASSERT_EQ(abuff[1].blocks(), 8);
+}
 
