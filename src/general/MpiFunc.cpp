@@ -18,14 +18,11 @@ init(int    argc,
 {
     if (ENABLE_MPI)
     {
-        int initialized = 0;
+        int32_t minit = 0;
 
-        MPI_Initialized(&initialized);
+        MPI_Initialized(&minit);
 
-        if (initialized)
-        {
-            return true;
-        }
+        if (minit) return true;
 
         int32_t mlevel = 0;
 
@@ -346,17 +343,17 @@ abort(const int   errorcode,
 {
     if (ENABLE_MPI)
     {
-        int err_class, err_len;
+        int32_t errclass = 0;
 
-        char err_string[MPI_MAX_ERROR_STRING];
+        MPI_Error_class(errorcode, &errclass);
+        
+        int32_t errlen =0;
+        
+        char errstr[MPI_MAX_ERROR_STRING];
+        
+        MPI_Error_string(errorcode, errstr, &errlen);
 
-        MPI_Error_class(errorcode, &err_class);
-
-        MPI_Error_string(errorcode, err_string, &err_len);
-
-        std::cerr << "MPI ERROR " << err_class << ": " << err_string << std::endl;
-
-        //std::cerr << "MPI ERROR - " << label << " : " << errorcode << std::endl;
+        std::cerr << "MPI ERROR " << errclass << ": " << errstr << std::endl;
         
         MPI_Abort(MPI_COMM_WORLD, errorcode);
     }
