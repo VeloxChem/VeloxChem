@@ -128,7 +128,7 @@ public:
      screening pattern.
 
      @param source the other GTOs block object.
-     @param screeningFactors the vector of screening factors.
+     @param screeningFactors the vector of screening factors (absolute values).
      @param screeningThreshold the screening threshold.
      @return the number of primitive GTOs functions and number of contracted
              basis functions.

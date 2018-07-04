@@ -119,7 +119,7 @@ public:
      
      @param source the other GTOs container.
      @param reducedDimensions the reduced dimensions of GTOs container.
-     @param screeningFactors the vector of screening factors.
+     @param screeningFactors the vector of screening factors (absolute values).
      @param screeningThreshold the screening threshold.
      */
     void compress(const CGtoContainer&        source,
@@ -271,9 +271,33 @@ public:
      primitive Gaussian functions space and angular momentum of each GTOs block
      object in GTOs container.
      
+     @param nComponents the number of buffer vectors for each angular momentum
+             component.
      @return the vector of 2D memory block objects.
      */
     CVecMemBlock2D<double> getPrimAngBuffer(const int32_t nComponents) const;
+    
+    /**
+     Creates vector of 2D memory block objects according to dimensions of
+     contracted Gaussian functions space and Cartesian angular momentum of
+     each GTOs block object in GTOs container.
+     
+     @param nComponents the number of buffer vectors for each angular momentum
+            component.
+     @return the vector of 2D memory block objects.
+     */
+    CVecMemBlock2D<double> getCartesianBuffer(const int32_t nComponents) const;
+    
+    /**
+     Creates vector of 2D memory block objects according to dimensions of
+     contracted Gaussian functions space and spherical angular momentum of
+     each GTOs block object in GTOs container.
+     
+     @param nComponents the number of buffer vectors for each angular momentum
+            component.
+     @return the vector of 2D memory block objects.
+     */
+    CVecMemBlock2D<double> getSphericalBuffer(const int32_t nComponents) const;
     
     /**
      Converts GTOs container object to text output and insert it into output

@@ -233,6 +233,24 @@ class CDensityGridDriver
                                    const CMemBlock2D<int32_t>& redDimensions,
                                    const int32_t               iGtoBlock) const;
     
+    
+    /**
+     Contracts primitive Gaussian function values for specific GTOs block.
+     
+     @param cartGtoValues the vector of contracted Cartesian Gaussian function
+            values.
+     @param primGtoValues the vector of primitive Gaussian function values.
+     @param gtoContainer the GTOs container.
+     @param redDimensions the vector of reduced dimensions.
+     @param iGtoBlock the index of GTOs block.
+     */
+    void _contrPrimGtoValues(      CMemBlock2D<double>&  cartGtoValues,
+                             const CMemBlock2D<double>&  primGtoValues,
+                             const CGtoContainer&        gtoContainer,
+                             const CMemBlock2D<int32_t>& redDimensions,
+                             const int32_t               iGtoBlock) const;
+    
+    
 public:
     
     /**

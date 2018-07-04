@@ -317,7 +317,7 @@ CGtoBlock::compress(const CGtoBlock&         source,
         
         for (int32_t j = srcspos[i]; j < srcepos[i]; j++)
         {
-            if (std::fabs(sfacts[j]) > screeningThreshold)
+            if (sfacts[j] > screeningThreshold)
             {
                 auto poff = npgto + cprim;
                 

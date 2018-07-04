@@ -8,10 +8,13 @@
 
 #include "DensityGridDriver.hpp"
 
+#include <cmath>
+
 #include "SystemClock.hpp"
 #include "OMPTasks.hpp"
 #include "SphericalMomentum.hpp"
 #include "GtoRecFunc.hpp"
+#include "GenFunc.hpp"
 
 CDensityGridDriver::CDensityGridDriver(const int32_t  globRank,
                                        const int32_t  globNodes,
@@ -163,11 +166,25 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
     
     CMemBlock2D<double> rdist(gtovec.getMaxNumberOfPrimGtos(), 3);
     
-    // set up recursion buffers
+    // set up primitive recursion buffers
     
     auto nvcomp = _getNumberOfXCComponents(xcFunctional);
     
     auto pbuffers = gtovec.getPrimAngBuffer(nvcomp);
+    
+    // set up contracted Cartesian GTOs buffers
+    
+    auto cartbuffers = gtovec.getCartesianBuffer(nvcomp);
+    
+    // set up contracted Spherical GTOs buffers
+    
+    auto spherbuffer = gtovec.getSphericalBuffer(nvcomp);
+    
+    printf("buffer:");
+    for (size_t i = 0; i < spherbuffer.size(); i++)
+        printf(" (%zu: %i, %i) ", i, cartbuffers[i].blocks(),
+               spherbuffer[i].blocks());
+    printf("\n");
     
     // here we need array of spherical momentum objects..
     
@@ -205,8 +222,18 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
             
             _compPrimGtoValues(pbuffers[j], rdist, cmpvec, redidx, j,
                                xcFunctional);
-        
+            
+            // contract Cartesian GTOs values
+            
+            _contrPrimGtoValues(cartbuffers[j], pbuffers[j], cmpvec, redidx, j);
+            
+            // transform to spherical GTOs values
         }
+        
+        // set full size vectors of GTOs values
+        
+        // sparse V * M * V 
+        
     }
     
     printf("task: size: %i pos %i\n", nGridPoints, gridOffset);
@@ -268,6 +295,10 @@ CDensityGridDriver::_compScreeningFactors(      CVecMemBlock<double>& screenFact
             // compose screening factor
             
             sfacts[j] *= _getScaleFactor(bang, rmax);
+            
+            // absolute value of screening factor
+            
+            sfacts[j] = std::fabs(sfacts[j]);
         }
     }
 }
@@ -522,4 +553,35 @@ CDensityGridDriver::_compPrimGtoValuesForMGGA(      CMemBlock2D<double>&  gtoVal
     if (mang == 4) return;
     
     // TODO: Implement higher angular momentum (l > 4) 
+}
+
+void
+CDensityGridDriver::_contrPrimGtoValues(      CMemBlock2D<double>&  cartGtoValues,
+                                        const CMemBlock2D<double>&  primGtoValues,
+                                        const CGtoContainer&        gtoContainer,
+                                        const CMemBlock2D<int32_t>& redDimensions,
+                                        const int32_t               iGtoBlock) const
+{
+    // contraction pattern (start, end positions)
+    
+    auto spos = gtoContainer.getStartPositions(iGtoBlock);
+    
+    auto epos = gtoContainer.getEndPositions(iGtoBlock);
+    
+    // set up number of contracted GTOs
+    
+    auto reddim = redDimensions.data(1);
+    
+    auto ngto = reddim[iGtoBlock];
+    
+    // set up contracted vectors dimensions, indexes
+    
+    auto nvec = cartGtoValues.blocks();
+    
+    auto pidx = primGtoValues.blocks() - nvec;
+    
+    // contract GTOs
+    
+    genfunc::contract(cartGtoValues, 0, primGtoValues, pidx, spos, epos,
+                      nvec, ngto);
 }

@@ -133,7 +133,7 @@ namespace mathfunc { // mathfunc namespace
             weights[i - 1] = fstep * warg * warg;
         }
     }
-
+    
 } // mathfunc namespace
 
 

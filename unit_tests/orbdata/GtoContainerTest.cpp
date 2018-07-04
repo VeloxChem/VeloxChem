@@ -503,3 +503,68 @@ TEST_F(CGtoContainerTest, GetPrimAngBuffer)
     ASSERT_EQ(abuff[1].blocks(), 8);
 }
 
+TEST_F(CGtoContainerTest, GetCartesianBuffer)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    auto abuff = acont.getCartesianBuffer(2);
+    
+    ASSERT_EQ(2, abuff.size());
+    
+    ASSERT_EQ(abuff[0].size(0), 5);
+    
+    ASSERT_EQ(abuff[0].size(1), 5);
+    
+    ASSERT_EQ(abuff[0].blocks(), 2);
+    
+    ASSERT_EQ(abuff[1].size(0), 3);
+    
+    ASSERT_EQ(abuff[1].size(1), 3);
+    
+    ASSERT_EQ(abuff[1].size(2), 3);
+    
+    ASSERT_EQ(abuff[1].size(3), 3);
+    
+    ASSERT_EQ(abuff[1].size(4), 3);
+    
+    ASSERT_EQ(abuff[1].size(5), 3);
+    
+    ASSERT_EQ(abuff[1].blocks(), 6);
+}
+
+TEST_F(CGtoContainerTest, GetSphericalBuffer)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    auto abuff = acont.getSphericalBuffer(2);
+    
+    ASSERT_EQ(2, abuff.size());
+    
+    ASSERT_EQ(abuff[0].size(0), 5);
+    
+    ASSERT_EQ(abuff[0].size(1), 5);
+    
+    ASSERT_EQ(abuff[0].blocks(), 2);
+    
+    ASSERT_EQ(abuff[1].size(0), 3);
+    
+    ASSERT_EQ(abuff[1].size(1), 3);
+    
+    ASSERT_EQ(abuff[1].size(2), 3);
+    
+    ASSERT_EQ(abuff[1].size(3), 3);
+    
+    ASSERT_EQ(abuff[1].size(4), 3);
+    
+    ASSERT_EQ(abuff[1].size(5), 3);
+    
+    ASSERT_EQ(abuff[1].blocks(), 6);
+}

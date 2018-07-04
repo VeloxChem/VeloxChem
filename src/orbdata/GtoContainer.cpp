@@ -287,6 +287,42 @@ CGtoContainer::getPrimAngBuffer(const int32_t nComponents) const
     return mbvec;
 }
 
+CVecMemBlock2D<double>
+CGtoContainer::getCartesianBuffer(const int32_t nComponents) const
+{
+    CVecMemBlock2D<double> mbvec;
+    
+    for (size_t i = 0; i < _gtoBlocks.size(); i++)
+    {
+        auto mang = _gtoBlocks[i].getAngularMomentum();
+        
+        auto cang = angmom::to_CartesianComponents(mang);
+        
+        mbvec.push_back(CMemBlock2D<double>(_gtoBlocks[i].getNumberOfContrGtos(),
+                                            nComponents * cang));
+    }
+    
+    return mbvec;
+}
+
+CVecMemBlock2D<double>
+CGtoContainer::getSphericalBuffer(const int32_t nComponents) const
+{
+    CVecMemBlock2D<double> mbvec;
+    
+    for (size_t i = 0; i < _gtoBlocks.size(); i++)
+    {
+        auto mang = _gtoBlocks[i].getAngularMomentum();
+        
+        auto cang = angmom::to_SphericalComponents(mang);
+        
+        mbvec.push_back(CMemBlock2D<double>(_gtoBlocks[i].getNumberOfContrGtos(),
+                                            nComponents * cang));
+    }
+    
+    return mbvec;
+}
+
 int32_t
 CGtoContainer::_getPrimAngComponents(const int32_t angularMomentum) const
 {
