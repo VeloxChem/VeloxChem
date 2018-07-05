@@ -21,6 +21,7 @@
 #include "ExecMode.hpp"
 #include "GtoContainer.hpp"
 #include "VecMemBlocks.hpp"
+#include "SphericalMomentum.hpp"
 
 /**
  Class CDensityGridDriver generates density grid for usage in numerical
@@ -249,6 +250,23 @@ class CDensityGridDriver
                              const CGtoContainer&        gtoContainer,
                              const CMemBlock2D<int32_t>& redDimensions,
                              const int32_t               iGtoBlock) const;
+    
+    /**
+     Transforms contracted Cartesian GTOs values to spherical GTOs values.
+
+     @param spherGtoValues the spherical GTOs values.
+     @param cartGtoValues the Cartesian GTOs values.
+     @param spherMomentum the sphericla momentum object.
+     @param redDimensions the vector of reduced dimensions.
+     @param iGtoBlock the index of GTOs block.
+     @param xcFunctional the exchange-correlation functional type.
+     */
+    void _transContrGtoValues(      CMemBlock2D<double>&  spherGtoValues,
+                              const CMemBlock2D<double>&  cartGtoValues,
+                              const CSphericalMomentum&   spherMomentum,
+                              const CMemBlock2D<int32_t>& redDimensions,
+                              const int32_t               iGtoBlock,
+                              const xcfun                 xcFunctional) const;
     
     
 public:

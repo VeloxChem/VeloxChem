@@ -49,19 +49,19 @@ TEST_F(CSphericalMomentumTest, ConstructorForP)
     
     ASSERT_EQ(1, ma.getNumberOfFactors(0));
     
-    vlxtest::compare(std::vector<int32_t>({0}), ma.getIndexes(0));
+    vlxtest::compare(std::vector<int32_t>({1}), ma.getIndexes(0));
     
     vlxtest::compare(std::vector<double>({1.0}), ma.getFactors(1));
     
     ASSERT_EQ(1, ma.getNumberOfFactors(1));
     
-    vlxtest::compare(std::vector<int32_t>({1}), ma.getIndexes(1));
+    vlxtest::compare(std::vector<int32_t>({2}), ma.getIndexes(1));
     
     vlxtest::compare(std::vector<double>({1.0}), ma.getFactors(2));
     
     ASSERT_EQ(1, ma.getNumberOfFactors(2));
     
-    vlxtest::compare(std::vector<int32_t>({2}), ma.getIndexes(2));
+    vlxtest::compare(std::vector<int32_t>({0}), ma.getIndexes(2));
 }
 
 TEST_F(CSphericalMomentumTest, ConstructorForD)

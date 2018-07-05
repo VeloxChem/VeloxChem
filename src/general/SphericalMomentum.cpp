@@ -36,11 +36,11 @@ CSphericalMomentum::CSphericalMomentum(const int32_t angularMomentum)
 
     if (_angularMomentum == 1)
     {
-        // order: px, py, pz i.e p_1, p_-1, p_0
+        // order: p_-1, p_0, p_1 i.e. p_y, p_z, p_x
         
         _factors = CMemBlock2D<double>({1.0, 1.0, 1.0}, {1, 1, 1});
         
-        _indexes = CMemBlock2D<int32_t>({0, 1, 2}, {1, 1, 1});
+        _indexes = CMemBlock2D<int32_t>({1, 2, 0}, {1, 1, 1});
     }
 
     // d-type angular momentum

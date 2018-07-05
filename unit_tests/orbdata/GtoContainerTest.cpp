@@ -17,6 +17,7 @@
 #include "MoleculeSetter.hpp"
 #include "CheckFunctions.hpp"
 #include "VecMemBlocks.hpp"
+#include "SphericalMomentum.hpp"
 
 TEST_F(CGtoContainerTest, DefaultConstructor)
 {
@@ -567,4 +568,21 @@ TEST_F(CGtoContainerTest, GetSphericalBuffer)
     ASSERT_EQ(abuff[1].size(5), 3);
     
     ASSERT_EQ(abuff[1].blocks(), 6);
+}
+
+TEST_F(CGtoContainerTest, GetSphericalMomentumVector)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    auto momvec = acont.getSphericalMomentumVector();
+    
+    ASSERT_EQ(2, momvec.size());
+    
+    ASSERT_EQ(momvec[0], CSphericalMomentum(0));
+    
+    ASSERT_EQ(momvec[1], CSphericalMomentum(1));
 }

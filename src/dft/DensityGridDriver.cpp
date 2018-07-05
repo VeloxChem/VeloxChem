@@ -12,7 +12,6 @@
 
 #include "SystemClock.hpp"
 #include "OMPTasks.hpp"
-#include "SphericalMomentum.hpp"
 #include "GtoRecFunc.hpp"
 #include "GenFunc.hpp"
 
@@ -180,15 +179,9 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
     
     auto spherbuffer = gtovec.getSphericalBuffer(nvcomp);
     
-    printf("buffer:");
-    for (size_t i = 0; i < spherbuffer.size(); i++)
-        printf(" (%zu: %i, %i) ", i, cartbuffers[i].blocks(),
-               spherbuffer[i].blocks());
-    printf("\n");
+    // set up spherical momentum vectore
     
-    // here we need array of spherical momentum objects..
-    
-    // CSphericalMomentum sphermom(gtor.)
+    auto smomvec = gtovec.getSphericalMomentumVector();
     
     // loop over batch of grid points
     
@@ -228,6 +221,9 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
             _contrPrimGtoValues(cartbuffers[j], pbuffers[j], cmpvec, redidx, j);
             
             // transform to spherical GTOs values
+            
+           _transContrGtoValues(spherbuffer[j], cartbuffers[j], smomvec[j],
+                                redidx, j, xcFunctional);
         }
         
         // set full size vectors of GTOs values
@@ -583,5 +579,28 @@ CDensityGridDriver::_contrPrimGtoValues(      CMemBlock2D<double>&  cartGtoValue
     // contract GTOs
     
     genfunc::contract(cartGtoValues, 0, primGtoValues, pidx, spos, epos,
-                      nvec, ngto);
+                      ngto, nvec);
+}
+
+void
+CDensityGridDriver::_transContrGtoValues(      CMemBlock2D<double>&  spherGtoValues,
+                                         const CMemBlock2D<double>&  cartGtoValues,
+                                         const CSphericalMomentum&   spherMomentum,
+                                         const CMemBlock2D<int32_t>& redDimensions,
+                                         const int32_t               iGtoBlock,
+                                         const xcfun                 xcFunctional) const
+{
+    // set up number of contracted GTOs
+    
+    auto reddim = redDimensions.data(1);
+    
+    auto ngto = reddim[iGtoBlock];
+    
+    // set up number of functional contributions
+    
+    auto nvcomp = _getNumberOfXCComponents(xcFunctional);
+    
+    // transform GTOs
+    
+    genfunc::transform(spherGtoValues, cartGtoValues, spherMomentum, ngto, nvcomp);
 }

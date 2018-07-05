@@ -17,8 +17,8 @@ contract(      CMemBlock2D<double>& contrData,
          const int32_t              primIndex,
          const int32_t*             startPositions,
          const int32_t*             endPositions,
-         const int32_t              nBlocks,
-         const int32_t              nElements)
+         const int32_t              nElements, 
+         const int32_t              nBlocks)
 {
     for (int32_t i = 0; i < nBlocks; i++)
     {
@@ -40,6 +40,61 @@ contract(      CMemBlock2D<double>& contrData,
             }
             
             cdat[j] = fsum;
+        }
+    }
+}
+    
+void
+transform(      CMemBlock2D<double>& spherData,
+          const CMemBlock2D<double>& cartData,
+          const CSphericalMomentum&  spherMomentum,
+          const int32_t              nElements,
+          const int32_t              nBlocks)
+{
+    auto ncomp = spherMomentum.getNumberOfComponents();
+    
+    for (int32_t i = 0; i < ncomp; i++)
+    {
+        // set up Cartesian to spherical transformation data
+        
+        auto nfact = spherMomentum.getNumberOfFactors(i);
+        
+        auto tidx = spherMomentum.getIndexes(i);
+        
+        auto tfact = spherMomentum.getFactors(i);
+        
+        for (int32_t j = 0; j < nBlocks; j++)
+        {
+            // set up spherical data vector
+            
+            auto sphervec = spherData.data(i * nBlocks + j);
+            
+            // first term: assignment
+            
+            auto cartvec = cartData.data(tidx[0] * nBlocks + j);
+            
+            auto cfact = tfact[0];
+            
+            #pragma omp simd aligned(sphervec, cartvec: VLX_ALIGN)
+            for (int32_t k = 0; k < nElements; k++)
+            {
+                sphervec[k] = cfact * cartvec[k];
+            }
+            
+            // remaining terms: addition
+            
+            for (int32_t k = 1; k < nfact; k++)
+            {
+                cartvec = cartData.data(tidx[k] * nBlocks + j);
+                
+                cfact = tfact[k];
+                
+                #pragma omp simd aligned(sphervec, cartvec: VLX_ALIGN)
+                for (int32_t l = 0; l < nElements; l++)
+                {
+                    sphervec[l] += cfact * cartvec[l];
+                }
+            }
         }
     }
 }

@@ -14,6 +14,7 @@
 #include "GtoBlock.hpp"
 #include "MemBlock.hpp"
 #include "VecMemBlocks.hpp"
+#include "SphericalMomentum.hpp"
 
 /**
  Class CGtoBlock stores vector of GTOs block objects and provides set of methods
@@ -298,6 +299,14 @@ public:
      @return the vector of 2D memory block objects.
      */
     CVecMemBlock2D<double> getSphericalBuffer(const int32_t nComponents) const;
+    
+    /**
+     Creates vector of spherical momentum objects corresponding to angular
+     momentum of each GTOs block object.
+
+     @return the vector of spherical momentum objects.
+     */
+    std::vector<CSphericalMomentum> getSphericalMomentumVector() const;
     
     /**
      Converts GTOs container object to text output and insert it into output

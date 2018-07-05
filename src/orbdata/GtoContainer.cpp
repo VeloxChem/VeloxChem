@@ -263,6 +263,8 @@ CGtoContainer::getPrimBuffer() const
 {
     CVecMemBlock<double> mbvec;
     
+    mbvec.reserve(_gtoBlocks.size());
+    
     for (size_t i = 0; i < _gtoBlocks.size(); i++)
     {
         mbvec.push_back(CMemBlock<double>(_gtoBlocks[i].getNumberOfPrimGtos()));
@@ -275,6 +277,8 @@ CVecMemBlock2D<double>
 CGtoContainer::getPrimAngBuffer(const int32_t nComponents) const
 {
     CVecMemBlock2D<double> mbvec;
+    
+    mbvec.reserve(_gtoBlocks.size());
     
     for (size_t i = 0; i < _gtoBlocks.size(); i++)
     {
@@ -291,6 +295,8 @@ CVecMemBlock2D<double>
 CGtoContainer::getCartesianBuffer(const int32_t nComponents) const
 {
     CVecMemBlock2D<double> mbvec;
+    
+    mbvec.reserve(_gtoBlocks.size());
     
     for (size_t i = 0; i < _gtoBlocks.size(); i++)
     {
@@ -310,6 +316,8 @@ CGtoContainer::getSphericalBuffer(const int32_t nComponents) const
 {
     CVecMemBlock2D<double> mbvec;
     
+    mbvec.reserve(_gtoBlocks.size());
+    
     for (size_t i = 0; i < _gtoBlocks.size(); i++)
     {
         auto mang = _gtoBlocks[i].getAngularMomentum();
@@ -321,6 +329,21 @@ CGtoContainer::getSphericalBuffer(const int32_t nComponents) const
     }
     
     return mbvec;
+}
+
+std::vector<CSphericalMomentum>
+CGtoContainer::getSphericalMomentumVector() const
+{
+    std::vector<CSphericalMomentum> momvec;
+    
+    momvec.reserve(_gtoBlocks.size());
+    
+    for (size_t i = 0; i < _gtoBlocks.size(); i++)
+    {
+        momvec.push_back(CSphericalMomentum(_gtoBlocks[i].getAngularMomentum()));
+    }
+    
+    return momvec;
 }
 
 int32_t
