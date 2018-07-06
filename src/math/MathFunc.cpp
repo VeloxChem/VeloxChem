@@ -19,11 +19,28 @@ namespace mathfunc { // mathfunc namespace
         #pragma omp simd aligned(vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) vector[i] = 0.0;
     }
+    
+    void
+    zero(      int32_t* vector,
+         const int32_t nElements)
+    {
+        #pragma omp simd aligned(vector: VLX_ALIGN)
+        for (int32_t i = 0; i < nElements; i++) vector[i] = 0;
+    }
 
     void
     set_to(      double* vector,
            const double  value,
            const int32_t nElements)
+    {
+        #pragma omp simd aligned(vector: VLX_ALIGN)
+        for (int32_t i = 0; i < nElements; i++) vector[i] = value;
+    }
+    
+    void
+    set_to(      int32_t* vector,
+           const int32_t  value,
+           const int32_t  nElements)
     {
         #pragma omp simd aligned(vector: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++) vector[i] = value;

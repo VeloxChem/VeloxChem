@@ -11,7 +11,7 @@
 #include "MathFunc.hpp"
 #include "CheckFunctions.hpp"
 
-TEST_F(CMathFuncTest, Max)
+TEST_F(CMathFuncTest, ZeroReal)
 {
     double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
 
@@ -22,7 +22,18 @@ TEST_F(CMathFuncTest, Max)
     vlxtest::compare(veca, vecb, 5);
 }
 
-TEST_F(CMathFuncTest, Set_To)
+TEST_F(CMathFuncTest, ZeroInteger)
+{
+    int32_t veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, -1, 3, 4};
+    
+    int32_t vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {0, 0,  0, 0, 0};
+    
+    mathfunc::zero(veca, 5);
+    
+    vlxtest::compare(veca, vecb, 5);
+}
+
+TEST_F(CMathFuncTest, Set_ToReal)
 {
     double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
 
@@ -30,6 +41,17 @@ TEST_F(CMathFuncTest, Set_To)
 
     mathfunc::set_to(veca, 2.0, 5);
 
+    vlxtest::compare(veca, vecb, 5);
+}
+
+TEST_F(CMathFuncTest, Set_ToInteger)
+{
+    int32_t veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, -1, 3, 4};
+    
+    int32_t vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {2, 2,  2, 2, 2};
+    
+    mathfunc::set_to(veca, 2, 5);
+    
     vlxtest::compare(veca, vecb, 5);
 }
 

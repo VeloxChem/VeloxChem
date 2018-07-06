@@ -22,6 +22,15 @@ namespace mathfunc { // mathfunc namespace
      */
     void zero(      double* vector,
               const int32_t nElements);
+    
+    /**
+     Sets all elements of integer numbers vector to zero.
+     
+     @param vector the vector of integer numbers.
+     @param nElements the number of elements in vector.
+     */
+    void zero(      int32_t* vector,
+              const int32_t nElements);
 
     /**
      Sets all elements of real numbers vector to specific value.
@@ -33,6 +42,17 @@ namespace mathfunc { // mathfunc namespace
     void set_to(      double* vector,
                 const double  value,
                 const int32_t nElements);
+    
+    /**
+     Sets all elements of integer numbers vector to specific value.
+     
+     @param vector the vector of integer numbers.
+     @param value the value of element.
+     @param nElements the number of elements in vector.
+     */
+    void set_to(      int32_t* vector,
+                const int32_t  value,
+                const int32_t  nElements);
 
     /**
      Computes sum of all elements in real numbers vector.
