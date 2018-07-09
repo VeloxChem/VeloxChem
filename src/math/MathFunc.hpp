@@ -151,7 +151,37 @@ namespace mathfunc { // mathfunc namespace
     void quadChebyshevOfKindTwo(      double* coordinates,
                                       double* weights,
                                 const int32_t nPoints);
+    
+    /**
+     Copies integer numbers from one vector to another vector.
 
+     @param aVector the destination vector.
+     @param aPosition the position of first copied element in destination vector.
+     @param bVector the source vector.
+     @param bPosition the position of first copied element in source vector.
+     @param nElements the number of elements.
+     */
+    void copy(      int32_t* aVector,
+              const int32_t  aPosition,
+              const int32_t* bVector,
+              const int32_t  bPosition,
+              const int32_t  nElements);
+    
+    /**
+     Copies real numbers from one vector to another vector.
+     
+     @param aVector the destination vector.
+     @param aPosition the position of first copied element in destination vector.
+     @param bVector the source vector.
+     @param bPosition the position of first copied element in source vector.
+     @param nElements the number of elements.
+     */
+    void copy(      double* aVector,
+              const int32_t aPosition,
+              const double* bVector,
+              const int32_t bPosition,
+              const int32_t nElements);
+    
 } // mathfunc namespace
 
 #endif /* MathFunc_hpp */

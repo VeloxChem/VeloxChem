@@ -80,6 +80,30 @@ class CSparseMatrix
      */
     void _setAccessPattern();
     
+    /**
+     Determines if given row is last initialized row in sparse matrix. 
+
+     @param iRow the index of row.
+     @return true if specific row is last initialized row in sparse matrix,
+             false - otherwise.
+     */
+    bool _isLastRow(const int32_t iRow) const;
+    
+    /**
+     Gets number of additional row added to sparse matrix.
+
+     @param iRow the index of row.
+     @return the number of additional rows.
+     */
+    int32_t _getAdditionalRows(const int32_t iRow) const;
+    
+    /**
+     Sets initial maximum number of elements in data buffers of sparse matrix.
+
+     @return the maximum number of elements.
+     */
+    int32_t _setMaxNumberOfElements() const;
+    
 public:
     
     /**
@@ -104,6 +128,18 @@ public:
                   const int32_t               nRows,
                   const int32_t               nColumns,
                   const double                threshold);
+    
+    /**
+     Creates an empty sparse matrix object with specific number of rows and
+     columns.
+     
+     @param nRows the number of rows in matrix.
+     @param nColumns the number of columns in matrix.
+     @param threshold the cut-off thrshold for small matrix elements.
+     */
+    CSparseMatrix(const int32_t nRows,
+                  const int32_t nColumns,
+                  const double  threshold);
     
     /**
      Creates a sparse matrix object by copying other sparse matrix object.
@@ -153,6 +189,108 @@ public:
      @return true if sparse matrix objects are not equal, false otherwise.
      */
     bool operator!=(const CSparseMatrix& other) const;
+    
+    /**
+     Appends new row (values and indexes) of specified size to sparse matrix.
+     NOTE: The index of new row must be greater than index of last initialized
+     row in sparse matrix.
+
+     @param rowValues the vector of values.
+     @param rowColumns the vector of column indexes.
+     @param nElementsInRow the number of elements in added row.
+     @param iRow the index of row.
+     */
+    void append(const CMemBlock<double>&  rowValues,
+                const CMemBlock<int32_t>& rowColumns,
+                const int32_t             nElementsInRow,
+                const int32_t             iRow);
+    
+    /**
+     Appends new row (values and indexes) of specified size to sparse matrix.
+     NOTE: The index of new row must be greater than index of last initialized
+     row in sparse matrix.
+     
+     @param rowValues the vector of values.
+     @param rowColumns the vector of column indexes.
+     @param iRow the index of row.
+     */
+    void append(const CMemBlock<double>&  rowValues,
+                const CMemBlock<int32_t>& rowColumns,
+                const int32_t             iRow);
+    
+    /**
+     Gets number of rows in sparse matrix.
+
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows() const;
+    
+    /**
+     Gets number of columns in sparse matrix.
+
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns() const;
+
+    /**
+     Gets number of elements in sparse matrix.
+
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements() const;
+    
+    /**
+     Gets number of elements in specific row of sparse matrix.
+     
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements(const int32_t iRow) const;
+    
+    /**
+     Gets cut-off threshold of matrix elements.
+
+     @return the cut-off threshold.
+     */
+    double getThreshold() const;
+    
+    /**
+     Computes sparsity number for sparse matrix.
+
+     @return the sparsity number.
+     */
+    double getSparsity() const;
+    
+    /**
+     Get constant pointer to selected row in sparse matrix.
+
+     @param iRow the index of row.
+     @return the constant pointer to first element in row.
+     */
+    const double* getRow(const int32_t iRow) const;
+    
+    /**
+     Get  pointer to selected row in sparse matrix.
+     
+     @param iRow the index of row.
+     @return the pointer to first element in row.
+     */
+    double* getRow(const int32_t iRow);
+    
+    /**
+     Get constant pointer to column indexes of selected row in sparse matrix.
+     
+     @param iRow the index of row.
+     @return the constant pointer to first column index of selected row.
+     */
+    const int32_t* getRowIndexes(const int32_t iRow) const;
+    
+    /**
+     Get pointer to column indexes of selected row in sparse matrix.
+     
+     @param iRow the index of row.
+     @return the pointer to first column index of selected row.
+     */
+    int32_t* getRowIndexes(const int32_t iRow);
     
     /**
      Converts sparse matrix object to text output and insert it into output

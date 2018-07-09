@@ -151,6 +151,32 @@ namespace mathfunc { // mathfunc namespace
         }
     }
     
+    void
+    copy(      int32_t* aVector,
+         const int32_t  aPosition,
+         const int32_t* bVector,
+         const int32_t  bPosition,
+         const int32_t  nElements)
+    {
+        for (int32_t i = 0; i < nElements; i++)
+        {
+            aVector[aPosition + i] = bVector[bPosition + i];
+        }
+    }
+    
+    void
+    copy(      double* aVector,
+         const int32_t aPosition,
+         const double* bVector,
+         const int32_t bPosition,
+         const int32_t nElements)
+    {
+        for (int32_t i = 0; i < nElements; i++)
+        {
+            aVector[aPosition + i] = bVector[bPosition + i];
+        }
+    }
+    
 } // mathfunc namespace
 
 

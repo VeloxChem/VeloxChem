@@ -134,3 +134,29 @@ TEST_F(CMathFuncTest, QuadChebyshevOfKindTwo)
     
     vlxtest::compare(weights, refwgt, 5);
 }
+
+TEST_F(CMathFuncTest, CopyReal)
+{
+    double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
+    
+    double vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {3.0, 1.0,  4.0, 5.0, 6.0};
+    
+    mathfunc::copy(veca, 1, vecb, 2, 2);
+    
+    double vecc[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 4.0,  5.0, 3.0, 4.0};
+    
+    vlxtest::compare(veca, vecc, 5);
+}
+
+TEST_F(CMathFuncTest, CopyInteger)
+{
+    int32_t veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, -1, 3, 4};
+    
+    int32_t vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {1, 2,  4, 6, 3};
+    
+    mathfunc::copy(veca, 0, vecb, 3, 2);
+    
+    int32_t vecc[5] __attribute__ ((aligned(VLX_ALIGN))) = {6, 3, -1, 3, 4};
+    
+    vlxtest::compare(veca, vecc, 5);
+}
