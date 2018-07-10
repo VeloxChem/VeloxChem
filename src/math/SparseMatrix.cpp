@@ -205,8 +205,7 @@ CSparseMatrix::operator==(const CSparseMatrix& other) const
     if (_nColumns != other._nColumns) return false;
     
     // NOTE: max size of buffer is not uniquely defined and depends on
-    // constructor used to initialize sparse matrix. 
-    // if (_nMaxElements != other._nMaxElements) return false;
+    // constructor used to initialize sparse matrix.
     
     if (_nElements != other._nElements) return false;
     
@@ -354,7 +353,7 @@ CSparseMatrix::getSparsity() const
 }
 
 const double*
-CSparseMatrix::getRow(const int32_t iRow) const
+CSparseMatrix::row(const int32_t iRow) const
 {
     if (iRow < _nRows)
     {
@@ -370,7 +369,7 @@ CSparseMatrix::getRow(const int32_t iRow) const
 }
 
 double*
-CSparseMatrix::getRow(const int32_t iRow)
+CSparseMatrix::row(const int32_t iRow)
 {
     if (iRow < _nRows)
     {
@@ -386,7 +385,7 @@ CSparseMatrix::getRow(const int32_t iRow)
 }
 
 const int32_t*
-CSparseMatrix::getRowIndexes(const int32_t iRow) const
+CSparseMatrix::indexes(const int32_t iRow) const
 {
     if (iRow < _nRows)
     {
@@ -402,7 +401,7 @@ CSparseMatrix::getRowIndexes(const int32_t iRow) const
 }
 
 int32_t*
-CSparseMatrix::getRowIndexes(const int32_t iRow)
+CSparseMatrix::indexes(const int32_t iRow)
 {
     if (iRow < _nRows)
     {
@@ -415,6 +414,30 @@ CSparseMatrix::getRowIndexes(const int32_t iRow)
     }
     
     return nullptr;
+}
+
+const double*
+CSparseMatrix::values() const
+{
+    return _values.data();
+}
+
+double*
+CSparseMatrix::values()
+{
+    return _values.data();
+}
+
+const int32_t*
+CSparseMatrix::rows() const
+{
+    return _rows.data();
+}
+
+const int32_t*
+CSparseMatrix::columns() const
+{
+    return _columns.data();
 }
 
 void

@@ -316,54 +316,54 @@ TEST_F(CSparseMatrixTest, GetSparsity)
     ASSERT_NEAR(ma.getSparsity(), 0.25, 1.0e-13);
 }
 
-TEST_F(CSparseMatrixTest, GetRowConstant)
+TEST_F(CSparseMatrixTest,RowConstant)
 {
     const CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
                             7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
                             5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
                             1.0e-13);
     
-    vlxtest::compare({1.0, -1.0, -3.0}, ma.getRow(0));
+    vlxtest::compare({1.0, -1.0, -3.0}, ma.row(0));
     
-    vlxtest::compare({-2.0, 5.0}, ma.getRow(1));
+    vlxtest::compare({-2.0, 5.0}, ma.row(1));
     
-    vlxtest::compare({4.0, 6.0, 4.0}, ma.getRow(2));
+    vlxtest::compare({4.0, 6.0, 4.0}, ma.row(2));
     
-    vlxtest::compare({-4.0, 2.0, 7.0}, ma.getRow(3));
+    vlxtest::compare({-4.0, 2.0, 7.0}, ma.row(3));
     
-    ASSERT_TRUE(ma.getRow(4) == nullptr);
+    ASSERT_TRUE(ma.row(4) == nullptr);
     
-    vlxtest::compare({8.0, -5.0}, ma.getRow(5));
+    vlxtest::compare({8.0, -5.0}, ma.row(5));
     
-    ASSERT_TRUE(ma.getRow(6) == nullptr);
+    ASSERT_TRUE(ma.row(6) == nullptr);
     
-    ASSERT_TRUE(ma.getRow(7) == nullptr);
+    ASSERT_TRUE(ma.row(7) == nullptr);
 }
 
-TEST_F(CSparseMatrixTest, GetRow)
+TEST_F(CSparseMatrixTest, Row)
 {
     CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
                       7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
                       5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
                       1.0e-13);
     
-    vlxtest::compare({1.0, -1.0, -3.0}, ma.getRow(0));
+    vlxtest::compare({1.0, -1.0, -3.0}, ma.row(0));
     
-    vlxtest::compare({-2.0, 5.0}, ma.getRow(1));
+    vlxtest::compare({-2.0, 5.0}, ma.row(1));
     
-    vlxtest::compare({4.0, 6.0, 4.0}, ma.getRow(2));
+    vlxtest::compare({4.0, 6.0, 4.0}, ma.row(2));
     
-    vlxtest::compare({-4.0, 2.0, 7.0}, ma.getRow(3));
+    vlxtest::compare({-4.0, 2.0, 7.0}, ma.row(3));
     
-    ASSERT_TRUE(ma.getRow(4) == nullptr);
+    ASSERT_TRUE(ma.row(4) == nullptr);
     
-    vlxtest::compare({8.0, -5.0}, ma.getRow(5));
+    vlxtest::compare({8.0, -5.0}, ma.row(5));
     
-    ASSERT_TRUE(ma.getRow(6) == nullptr);
+    ASSERT_TRUE(ma.row(6) == nullptr);
     
-    ASSERT_TRUE(ma.getRow(7) == nullptr);
+    ASSERT_TRUE(ma.row(7) == nullptr);
     
-    auto r2dat = ma.getRow(2);
+    auto r2dat = ma.row(2);
     
     r2dat[1] = 7.0;
     
@@ -375,28 +375,28 @@ TEST_F(CSparseMatrixTest, GetRow)
     ASSERT_EQ(ma, mb);
 }
 
-TEST_F(CSparseMatrixTest, GetRowIndexesConstant)
+TEST_F(CSparseMatrixTest, IndexesConstant)
 {
     const CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
                             7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
                             5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
                             1.0e-13);
     
-    vlxtest::compare({0, 1, 2,}, ma.getRowIndexes(0));
+    vlxtest::compare({0, 1, 2}, ma.indexes(0));
     
-    vlxtest::compare({0, 1}, ma.getRowIndexes(1));
+    vlxtest::compare({0, 1}, ma.indexes(1));
     
-    vlxtest::compare({2, 3, 4}, ma.getRowIndexes(2));
+    vlxtest::compare({2, 3, 4}, ma.indexes(2));
     
-    vlxtest::compare({0, 2, 3}, ma.getRowIndexes(3));
+    vlxtest::compare({0, 2, 3}, ma.indexes(3));
     
-    ASSERT_TRUE(ma.getRow(4) == nullptr);
+    ASSERT_TRUE(ma.indexes(4) == nullptr);
     
-    vlxtest::compare({1, 4}, ma.getRowIndexes(5));
+    vlxtest::compare({1, 4}, ma.indexes(5));
     
-    ASSERT_TRUE(ma.getRow(6) == nullptr);
+    ASSERT_TRUE(ma.indexes(6) == nullptr);
     
-    ASSERT_TRUE(ma.getRow(7) == nullptr);
+    ASSERT_TRUE(ma.indexes(7) == nullptr);
 }
 
 TEST_F(CSparseMatrixTest, GetRowIndexes)
@@ -405,23 +405,23 @@ TEST_F(CSparseMatrixTest, GetRowIndexes)
                       7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
                       5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6, 1.0e-13);
     
-    vlxtest::compare({0, 1, 2,}, ma.getRowIndexes(0));
+    vlxtest::compare({0, 1, 2}, ma.indexes(0));
     
-    vlxtest::compare({0, 1}, ma.getRowIndexes(1));
+    vlxtest::compare({0, 1}, ma.indexes(1));
     
-    vlxtest::compare({2, 3, 4}, ma.getRowIndexes(2));
+    vlxtest::compare({2, 3, 4}, ma.indexes(2));
     
-    vlxtest::compare({0, 2, 3}, ma.getRowIndexes(3));
+    vlxtest::compare({0, 2, 3}, ma.indexes(3));
     
-    ASSERT_TRUE(ma.getRow(4) == nullptr);
+    ASSERT_TRUE(ma.indexes(4) == nullptr);
     
-    vlxtest::compare({1, 4}, ma.getRowIndexes(5));
+    vlxtest::compare({1, 4}, ma.indexes(5));
     
-    ASSERT_TRUE(ma.getRow(6) == nullptr);
+    ASSERT_TRUE(ma.indexes(6) == nullptr);
     
-    ASSERT_TRUE(ma.getRow(7) == nullptr);
+    ASSERT_TRUE(ma.indexes(7) == nullptr);
     
-    auto r2idx = ma.getRowIndexes(2);
+    auto r2idx = ma.indexes(2);
     
     r2idx[2] = 5;
     
@@ -431,3 +431,58 @@ TEST_F(CSparseMatrixTest, GetRowIndexes)
     
     ASSERT_EQ(ma, mb);
 }
+
+TEST_F(CSparseMatrixTest, ValuesConstant)
+{
+    const CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
+                            7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
+                            5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
+                            1.0e-13);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
+                      7.0, 8.0, -5.0}, ma.values());
+}
+
+TEST_F(CSparseMatrixTest, Values)
+{
+    CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
+                      7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
+                      5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
+                      1.0e-13);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
+                      7.0, 8.0, -5.0}, ma.values());
+    
+    auto mdat = ma.values();
+    
+    mdat[1] = 2.0; mdat[6] = -1.0;
+    
+    CSparseMatrix mb({1.0, 2.0, -3.0, -2.0, 5.0, 4.0, -1.0, 4.0, -4.0, 2.0,
+                      7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
+                      5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
+                      1.0e-13);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CSparseMatrixTest, Rows)
+{
+    const CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
+                            7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
+                            5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
+                            1.0e-13);
+    
+    vlxtest::compare({0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5, 5}, ma.rows());
+}
+
+TEST_F(CSparseMatrixTest, Columns)
+{
+    const CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0,
+                            7.0, 8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5,
+                            5}, {0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, 6, 6,
+                            1.0e-13);
+    
+    vlxtest::compare({0, 1, 2, 0, 1, 2, 3, 4, 0, 2, 3, 1, 4}, ma.columns());
+}
+
+

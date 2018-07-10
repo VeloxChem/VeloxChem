@@ -120,7 +120,7 @@ public:
      @param columns the vector of column indexes (Coordinate format).
      @param nRows the number of rows in matrix.
      @param nColumns the number of columns in matrix.
-     @param threshold the cut-off thrshold for small matrix elements.
+     @param threshold the cut-off threshold for small matrix elements.
      */
     CSparseMatrix(const std::vector<double>&  values,
                   const std::vector<int32_t>& rows,
@@ -135,7 +135,7 @@ public:
      
      @param nRows the number of rows in matrix.
      @param nColumns the number of columns in matrix.
-     @param threshold the cut-off thrshold for small matrix elements.
+     @param threshold the cut-off threshold for small matrix elements.
      */
     CSparseMatrix(const int32_t nRows,
                   const int32_t nColumns,
@@ -170,7 +170,7 @@ public:
     /**
      Assigns a sparse matrix object by moving other sparse matrix object.
      
-     @param source the basis function object.
+     @param source the sparse matrix object.
      */
     CSparseMatrix& operator=(CSparseMatrix&& source) noexcept;
     
@@ -266,15 +266,15 @@ public:
      @param iRow the index of row.
      @return the constant pointer to first element in row.
      */
-    const double* getRow(const int32_t iRow) const;
+    const double* row(const int32_t iRow) const;
     
     /**
-     Get  pointer to selected row in sparse matrix.
+     Get pointer to selected row in sparse matrix.
      
      @param iRow the index of row.
      @return the pointer to first element in row.
      */
-    double* getRow(const int32_t iRow);
+    double* row(const int32_t iRow);
     
     /**
      Get constant pointer to column indexes of selected row in sparse matrix.
@@ -282,7 +282,7 @@ public:
      @param iRow the index of row.
      @return the constant pointer to first column index of selected row.
      */
-    const int32_t* getRowIndexes(const int32_t iRow) const;
+    const int32_t* indexes(const int32_t iRow) const;
     
     /**
      Get pointer to column indexes of selected row in sparse matrix.
@@ -290,8 +290,36 @@ public:
      @param iRow the index of row.
      @return the pointer to first column index of selected row.
      */
-    int32_t* getRowIndexes(const int32_t iRow);
+    int32_t* indexes(const int32_t iRow);
     
+    /**
+     Gets constant pointer to sparse matrix data.
+
+     @return the constant pointer to first data element in sparse matrix.
+     */
+    const double* values() const;
+    
+    /**
+     Gets pointer to sparse matrix data.
+     
+     @return the pointer to first data element in sparse matrix.
+     */
+    double* values();
+    
+    /**
+     Gets constant pointer to indexes of rows in sparse matrix.
+     
+     @return the constant pointer to first index of rows.
+     */
+    const int32_t* rows() const;
+    
+    /**
+     Gets constant pointer to indexes of columns in sparse matrix.
+     
+     @return the constant pointer to first index of columns.
+     */
+    const int32_t* columns() const;
+
     /**
      Converts sparse matrix object to text output and insert it into output
      text stream.
