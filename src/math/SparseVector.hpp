@@ -24,6 +24,11 @@
 class CSparseVector
 {
     /**
+     The length of vector.
+     */
+    int32_t _nLength;
+    
+    /**
      The values of vector elements.
      */
     CMemBlock<double> _values;
@@ -48,6 +53,11 @@ class CSparseVector
      */
     double _threshold;
     
+    /**
+     Sets maximum number of initial elments in sparse vector.
+     */
+    int32_t _setMaxNumberOfElements() const;
+    
 public:
     
     /**
@@ -60,10 +70,12 @@ public:
      
      @param values the vector of matrix elements.
      @param indexes the vector of indexes.
+     @param nLength the length of vector.
      @param threshold the cut-off threshold for small elements in vector.
      */
     CSparseVector(const std::vector<double>&  values,
                   const std::vector<int32_t>& indexes,
+                  const int32_t               nLength,
                   const double                threshold);
     
     /**
@@ -123,6 +135,41 @@ public:
      @return true if sparse vector objects are not equal, false otherwise.
      */
     bool operator!=(const CSparseVector& other) const;
+    
+    /**
+     Gets constant pointer to sparse vector data.
+     
+     @return the constant pointer to first data element in vector matrix.
+     */
+    const double* values() const;
+    
+    /**
+     Gets pointer to vector matrix data.
+     
+     @return the pointer to first data element in vector matrix.
+     */
+    double* values();
+    
+    /**
+     Gets constant pointer to indexes of sparse vector.
+     
+     @return the constant pointer to first element of indexing vector.
+     */
+    const int32_t* indexes() const;
+    
+    /**
+     Gets cut-off threshold of vector elements.
+     
+     @return the cut-off threshold.
+     */
+    double getThreshold() const;
+    
+    /**
+     Computes sparsity number for sparse vector.
+     
+     @return the sparsity number.
+     */
+    double getSparsity() const;
     
     /**
      Converts sparse vector object to text output and insert it into output

@@ -45,13 +45,13 @@ CSparseMatrix::CSparseMatrix(const std::vector<double>&  values,
 
     , _nColumns(nColumns)
 
-    , _rowPositions(CMemBlock<int32_t>(_nRows))
+    , _rowPositions(CMemBlock<int32_t>(nRows))
 
-    , _rowSizes(CMemBlock<int32_t>(_nRows))
+    , _rowSizes(CMemBlock<int32_t>(nRows))
 
-    , _nElements(_values.size())
+    , _nElements(static_cast<int32_t>(values.size()))
 
-    , _nMaxElements(_values.size())
+    , _nMaxElements(static_cast<int32_t>(values.size()))
 
     , _threshold(threshold)
 {
@@ -66,9 +66,9 @@ CSparseMatrix::CSparseMatrix(const int32_t nRows,
 
     , _nColumns(nColumns)
 
-    , _rowPositions(CMemBlock<int32_t>(_nRows))
+    , _rowPositions(CMemBlock<int32_t>(nRows))
 
-    , _rowSizes(CMemBlock<int32_t>(_nRows))
+    , _rowSizes(CMemBlock<int32_t>(nRows))
 
     , _nElements(0)
 
@@ -349,7 +349,12 @@ CSparseMatrix::getThreshold() const
 double
 CSparseMatrix::getSparsity() const
 {
-    return static_cast<double>(_nElements) / static_cast<double>(_nRows * _nColumns);
+    if ((_nRows > 0) && (_nColumns >0))
+    {
+        return static_cast<double>(_nElements) / static_cast<double>(_nRows * _nColumns);
+    }
+    
+    return 0.0; 
 }
 
 const double*
