@@ -14,10 +14,12 @@
 #include "OutputStream.hpp"
 #include "MoleculeSetter.hpp"
 #include "MathConst.hpp"
+#include "MpiFunc.hpp"
 
 TEST_F(CGridDriverTest, DefaultConstructor)
 {
-    CGridDriver gdrv(0, 1, execmode::cpu, MPI_COMM_WORLD);
+    CGridDriver gdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD), execmode::cpu,
+                     MPI_COMM_WORLD);
     
     gdrv.setLevel(6, MPI_COMM_WORLD);
     
