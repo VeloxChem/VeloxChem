@@ -457,7 +457,7 @@ CGridDriver::_genAtomGridPoints(      CMemBlock2D<double>* rawGridPoints,
             
             gz[j] = crx * raz[j] + atmz;
             
-            gw[j] = crw * raw[j];
+            gw[j] = crw * crx * crx * raw[j];
         }
     }
     
