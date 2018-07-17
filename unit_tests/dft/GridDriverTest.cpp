@@ -17,15 +17,15 @@
 
 TEST_F(CGridDriverTest, DefaultConstructor)
 {
-    CGridDriver gdrv(0, 1, execmode::cpu, MPI_COMM_NULL);
+    CGridDriver gdrv(0, 1, execmode::cpu, MPI_COMM_WORLD);
     
-    gdrv.setLevel(6, MPI_COMM_NULL);
+    gdrv.setLevel(6, MPI_COMM_WORLD);
     
     COutputStream ost(std::string("dummy.out"));
     
     auto mlih = vlxmol::getMoleculeLiH();
     
-    auto mgrid = gdrv.generate(mlih, ost, MPI_COMM_NULL);
+    auto mgrid = gdrv.generate(mlih, ost, MPI_COMM_WORLD);
     
     auto npnt = mgrid.getNumberOfGridPoints();
     
