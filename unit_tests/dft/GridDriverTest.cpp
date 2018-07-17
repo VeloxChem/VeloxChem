@@ -60,9 +60,9 @@ TEST_F(CGridDriverTest, DefaultConstructor)
        fab += w[i] * std::exp(-2.3 * r2a) * std::exp(-0.5 * r2b);
     }
     
-    EXPECT_NEAR(fa, 1.5963681525241624, 1.0e-13);
+    EXPECT_NEAR(fa, 1.5963681525241624, 1.0e-10);
     
-    EXPECT_NEAR(fb, 15.749609945385632, 1.0e-13);
+    EXPECT_NEAR(fb, 15.749609945385632, 1.0e-10);
     
-    EXPECT_NEAR(fab, 0.65786017622805693, 1.0e-13);
+    EXPECT_NEAR(fab, 0.65786017622805693, 1.0e-10);
 }
