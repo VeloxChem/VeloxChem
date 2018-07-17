@@ -7,7 +7,7 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include "gtest/gtest.h"
-#include "MpiFunc.hpp"
+#include "../src/general/MpiFunc.hpp"
 
 int main(int argc, char** argv)
 {
