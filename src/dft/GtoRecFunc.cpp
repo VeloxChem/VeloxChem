@@ -1385,7 +1385,7 @@ compGtoTypeGForGGA(      CMemBlock2D<double>&  gtoValues,
         
         gy_yyzz[i] = fact * gy_yyz[i];
         
-        gz_yyzz[i] = g0_yyy[i] + fact * gz_yyz[i];
+        gz_yyzz[i] = g0_yyz[i] + fact * gz_yyz[i];
         
         // yzzz component
         
@@ -2582,9 +2582,9 @@ compGtoTypeGForMGGA(      CMemBlock2D<double>&  gtoValues,
         
         gy_yyzz[i] = fact * gy_yyz[i];
         
-        gz_yyzz[i] = g0_yyy[i] + fact * gz_yyz[i];
+        gz_yyzz[i] = g0_yyz[i] + fact * gz_yyz[i];
         
-        g2_yyzz[i] = 2.0 * gy_yyz[i] + fact * g2_yyz[i];
+        g2_yyzz[i] = 2.0 * gz_yyz[i] + fact * g2_yyz[i];
         
         // yzzz component
         
