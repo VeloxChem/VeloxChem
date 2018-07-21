@@ -10,6 +10,36 @@
 
 #include "GtoRecFunc.hpp"
 #include "MemBlock2D.hpp"
+#include "MoleculeSetter.hpp"
+#include "MolecularBasisSetter.hpp"
+
+TEST_F(CGtoRecFuncTest, CompGtoTypeSForLDA)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    CMemBlock2D<double> dist({1.00, 1.20, 0.40, 1.00, 5.60,
+                              0.20, 0.30, 0.80, 1.50, 8.00,
+                              1.20, 0.80, 0.90, 1.90, 2.10},
+                              5, 3);
+    
+    CMemBlock2D<int32_t> ridx({2, 4, 1, 3}, 2, 2);
+    
+    CMemBlock2D<double> buffa(5, 1);
+    
+    buffa.zero();
+    
+    gtorec::compGtoTypeSForLDA(buffa, dist, acont, ridx, 1);
+    
+    CMemBlock2D<double> buffb({0.00709423488613152, 0.52152399192015800,
+                               0.87632346843473900, 0.00413610812379884,
+                               0.00000000000000000}, 5, 1);
+    
+    ASSERT_EQ(buffa, buffb);
+}
 
 TEST_F(CGtoRecFuncTest, CompGtoTypePForLDA)
 {
@@ -716,6 +746,43 @@ TEST_F(CGtoRecFuncTest, CompGtoTypeGForLDA)
 
     pb[3] = 1.52;
 
+    ASSERT_EQ(buffa, buffb);
+}
+
+TEST_F(CGtoRecFuncTest, CompGtoTypeSForGGA)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    CMemBlock2D<double> dist({1.00, 1.20, 0.40, 1.00, 5.60,
+                              0.20, 0.30, 0.80, 1.50, 8.00,
+                              1.20, 0.80, 0.90, 1.90, 2.10},
+                              5, 3);
+    
+    CMemBlock2D<int32_t> ridx({2, 4, 1, 3}, 2, 2);
+    
+    CMemBlock2D<double> buffa(5, 4);
+    
+    buffa.zero();
+    
+    gtorec::compGtoTypeSForGGA(buffa, dist, acont, ridx, 1);
+    
+    CMemBlock2D<double> buffb({ 0.00709423488613152,  0.52152399192015800,
+                                0.87632346843473900,  0.00413610812379884,
+                                0.00000000000000000,
+                               -0.02057328116978140, -0.37549727418251300,
+                               -0.05748681952931890, -0.00661777299807815,
+                                0.00000000000000000,
+                               -0.00411465623395628, -0.09387431854562830,
+                               -0.11497363905863800, -0.00992665949711722,
+                                0.00000000000000000,
+                               -0.02468793740373770, -0.25033151612167600,
+                               -0.12934534394096700, -0.01257376869634850,
+                                0.00000000000000000}, 5, 4);
+    
     ASSERT_EQ(buffa, buffb);
 }
 
@@ -3286,6 +3353,47 @@ TEST_F(CGtoRecFuncTest, CompGtoTypeGForGGA)
 
     ASSERT_EQ(buffa, buffb);
 }
+
+TEST_F(CGtoRecFuncTest, CompGtoTypeSForMGGA)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    CMemBlock2D<double> dist({1.00, 1.20, 0.40, 1.00, 5.60,
+                              0.20, 0.30, 0.80, 1.50, 8.00,
+                              1.20, 0.80, 0.90, 1.90, 2.10},
+                              5, 3);
+    
+    CMemBlock2D<int32_t> ridx({2, 4, 1, 3}, 2, 2);
+    
+    CMemBlock2D<double> buffa(5, 5);
+    
+    buffa.zero();
+    
+    gtorec::compGtoTypeSForMGGA(buffa, dist, acont, ridx, 1);
+    
+    CMemBlock2D<double> buffb({ 0.00709423488613152,  0.52152399192015800,
+                                0.87632346843473900,  0.00413610812379884,
+                                0.00000000000000000,
+                               -0.02057328116978140, -0.37549727418251300,
+                               -0.05748681952931890, -0.00661777299807815,
+                                0.00000000000000000,
+                               -0.00411465623395628, -0.09387431854562830,
+                               -0.11497363905863800, -0.00992665949711722,
+                                0.00000000000000000,
+                               -0.02468793740373770, -0.25033151612167600,
+                               -0.12934534394096700, -0.01257376869634850,
+                                0.00000000000000000,
+                                0.08624319466372370, -0.53132864296825600,
+                               -0.39320409689858800,  0.05278335743267130,
+                                0.00000000000000000}, 5, 5);
+    
+    ASSERT_EQ(buffa, buffb);
+}
+
 
 TEST_F(CGtoRecFuncTest, CompGtoTypePForMGGA)
 {
