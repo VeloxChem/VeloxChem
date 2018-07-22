@@ -85,7 +85,6 @@ CSparseMatrix::CSparseMatrix(const int32_t nRows,
     _setAccessPattern();
 }
 
-
 CSparseMatrix::CSparseMatrix(const CSparseMatrix& source)
 
     : _nRows(source._nRows)
