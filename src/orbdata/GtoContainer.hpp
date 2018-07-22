@@ -309,6 +309,14 @@ public:
     std::vector<CSphericalMomentum> getSphericalMomentumVector() const;
     
     /**
+     Gets specific GTOs block object from GTOs container.
+     
+     @param iBlock the index of GTOs block object in GTOs container.
+     @return the GTOs block object.
+     */
+    CGtoBlock getGtoBlock(const int32_t iBlock) const;
+    
+    /**
      Converts GTOs container object to text output and insert it into output
      text stream.
      

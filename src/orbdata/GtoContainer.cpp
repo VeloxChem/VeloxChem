@@ -346,6 +346,12 @@ CGtoContainer::getSphericalMomentumVector() const
     return momvec;
 }
 
+CGtoBlock
+CGtoContainer::getGtoBlock(const int32_t iBlock) const
+{
+    return _gtoBlocks[iBlock]; 
+}
+
 int32_t
 CGtoContainer::_getPrimAngComponents(const int32_t angularMomentum) const
 {

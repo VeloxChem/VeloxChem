@@ -291,6 +291,14 @@ public:
     double* getCoordinatesZ();
     
     /**
+     Gets maximum contraction depth of primitive Gaussian functions i.e. maximum
+     number of primitive Gaussian functions in contracted basis fucntion.
+
+     @return the contraction depth.
+     */
+    int32_t getMaxContractionDepth() const;
+    
+    /**
      Converts GTOs block object to text output and insert it into output
      text stream.
      

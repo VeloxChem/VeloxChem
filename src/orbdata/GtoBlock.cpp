@@ -495,7 +495,24 @@ CGtoBlock::getCoordinatesZ()
     return _gtoPrimitives.data(4);
 }
 
-
+int32_t
+CGtoBlock::getMaxContractionDepth() const
+{
+    int32_t ndim = 0;
+    
+    auto spos = getStartPositions();
+    
+    auto epos = getEndPositions();
+    
+    for (int32_t i = 0; i < getNumberOfContrGtos(); i++)
+    {
+        auto cdim = epos[i] - spos[i];
+        
+        if (cdim > ndim) ndim = cdim;
+    }
+    
+    return ndim; 
+}
 
 std::ostream&
 operator<<(      std::ostream& output,

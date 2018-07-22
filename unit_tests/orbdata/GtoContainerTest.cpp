@@ -586,3 +586,16 @@ TEST_F(CGtoContainerTest, GetSphericalMomentumVector)
     
     ASSERT_EQ(momvec[1], CSphericalMomentum(1));
 }
+
+TEST_F(CGtoContainerTest, GetGtoBlock)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+
+    ASSERT_EQ(acont.getGtoBlock(0), CGtoBlock(lih, bas, 0));
+    
+    ASSERT_EQ(acont.getGtoBlock(1), CGtoBlock(lih, bas, 1));
+}

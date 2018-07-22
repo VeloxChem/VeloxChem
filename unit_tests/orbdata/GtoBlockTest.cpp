@@ -576,3 +576,22 @@ TEST_F(CGtoBlockTest, Compress)
     ASSERT_EQ(sdat, redorb);
 }
 
+TEST_F(CGtoBlockTest, GetMaxContractionDepth)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(5, agto.getMaxContractionDepth());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(2, bgto.getMaxContractionDepth());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getMaxContractionDepth());
+}
+

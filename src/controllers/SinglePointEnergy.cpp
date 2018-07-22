@@ -17,6 +17,8 @@
 #include "DensityGridDriver.hpp"
 #include "XCFuncType.hpp"
 
+#include "OverlapIntegralsDriver.hpp"
+
 #include "MemBlock2D.hpp"
 
 #include <iostream>
@@ -132,12 +134,18 @@ CSinglePointEnergy::run(COutputStream& oStream,
     auto molgrid = drvgrid.generate(_molecule, oStream, comm);
 
     molgrid.distribute(_globRank, _globNodes, comm);
+    
+    // compute overlap integrals
+    
+    COverlapIntegralsDriver ovldrv(_globRank, _globNodes, comm);
+    
+    auto ovlmat = ovldrv.compute(_molecule, _aoBasis, comm); 
 
     // generate density grid
 
-    CDensityGridDriver drvDenGrid(_globRank, _globNodes, _runMode, comm);
+    //CDensityGridDriver drvDenGrid(_globRank, _globNodes, _runMode, comm);
 
-    drvDenGrid.generate(_molecule, _aoBasis, molgrid, xcfun::mgga, oStream, comm);
+    //drvDenGrid.generate(_molecule, _aoBasis, molgrid, xcfun::mgga, oStream, comm);
 }
 
 void

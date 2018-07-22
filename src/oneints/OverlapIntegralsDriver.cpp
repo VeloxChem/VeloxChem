@@ -10,7 +10,6 @@
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
                                                  const int32_t  globNodes,
-                                                 const execmode runMode,
                                                        MPI_Comm comm)
 
     : _globRank(globRank)
@@ -18,8 +17,6 @@ COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
     , _globNodes(globNodes)
 
     , _isLocalMode(false)
-
-    , _runMode(runMode)
 {
     _locRank  = mpi::rank(comm);
     
@@ -37,9 +34,18 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
                                        MPI_Comm         comm) const 
 {
-    COverlapMatrix ovlmat;
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs container
+        
+        CGtoContainer bracontr(molecule, basis);
+        
+        // compute overlap integrals
+        
+        _compOverlapIntegrals(&bracontr, &bracontr);
+    }
     
-    return ovlmat;
+    return COverlapMatrix();
 }
 
 COverlapMatrix
@@ -48,9 +54,20 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                  const CMolecularBasis& ketBasis,
                                        MPI_Comm         comm) const
 {
-    COverlapMatrix ovlmat;
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs containers
+        
+        CGtoContainer bracontr(molecule, braBasis);
+        
+        CGtoContainer ketcontr(molecule, ketBasis);
+        
+        // compute overlap integrals
+        
+        _compOverlapIntegrals(&bracontr, &ketcontr);
+    }
     
-    return ovlmat;
+    return COverlapMatrix();
 }
 
 COverlapMatrix
@@ -59,9 +76,20 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
                                  const CMolecularBasis& basis,
                                        MPI_Comm         comm) const
 {
-    COverlapMatrix ovlmat;
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs containers
+        
+        CGtoContainer bracontr(braMolecule, basis);
+        
+        CGtoContainer ketcontr(ketMolecule, basis);
+        
+        // compute overlap integrals
+        
+        _compOverlapIntegrals(&bracontr, &ketcontr);
+    }
     
-    return ovlmat;
+    return COverlapMatrix();
 }
 
 COverlapMatrix
@@ -71,7 +99,69 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
                                  const CMolecularBasis& ketBasis,
                                        MPI_Comm         comm) const
 {
-    COverlapMatrix ovlmat;
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs containers
+        
+        CGtoContainer bracontr(braMolecule, braBasis);
+        
+        CGtoContainer ketcontr(ketMolecule, ketBasis);
+        
+        // compute overlap integrals
+        
+        _compOverlapIntegrals(&bracontr, &ketcontr);
+    }
     
-    return ovlmat;
+    return COverlapMatrix();
+}
+
+void
+COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                               const CGtoContainer* ketGtoContainer) const
+{
+    // compute overlap integral blocks
+    
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs blocks in bra/ket sides
+            
+            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+            
+            auto nket = ketGtoContainer->getNumberOfGtoBlocks();
+            
+            // loop over pairs of GTOs blocks
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                for (int32_t j = 0; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(i, j)
+                    {
+                        _compOverlapForGtoBlocks(braGtoContainer, i,
+                                                 ketGtoContainer, j);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+void
+COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoContainer,
+                                                  const int32_t        iBraGtoBlock,
+                                                  const CGtoContainer* ketGtoContainer,
+                                                  const int32_t        iKetGtoBlock) const
+{
+    // copy GTOs blocks for bra and ket sides
+    
+    auto bragtos = braGtoContainer->getGtoBlock(iBraGtoBlock);
+    
+    auto ketgtos = ketGtoContainer->getGtoBlock(iKetGtoBlock);
+    
+    printf("(%i,%i) pair: bra %i ket %i prim (%i,%i) \n", iBraGtoBlock, iKetGtoBlock,
+           bragtos.getAngularMomentum(), ketgtos.getAngularMomentum(),
+           bragtos.getNumberOfPrimGtos(), ketgtos.getNumberOfPrimGtos());
 }

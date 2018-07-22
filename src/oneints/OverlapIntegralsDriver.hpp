@@ -17,6 +17,7 @@
 #include "OutputStream.hpp"
 #include "ExecMode.hpp"
 #include "OverlapMatrix.hpp"
+#include "GtoContainer.hpp"
 
 /**
  Class COverlapIntegralsDriver computes one-electron integrals.
@@ -51,9 +52,28 @@ class COverlapIntegralsDriver
     bool _isLocalMode;
     
     /**
-     The execution mode of grid driver object.
+     Comutes overlap integrals for pair of GTOs containers.
+
+     @param braGtoContainer the GTOs container for bra side.
+     @param ketGtoContainer the GTOs container for ket side.
      */
-    execmode _runMode;
+    void _compOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                               const CGtoContainer* ketGtoContainer) const;
+    
+    /**
+     Computes overlap integrals for specific pair of GTOs blocks.
+
+     @param braGtoContainer the GTOs container for bra side.
+     @param iBraGtoBlock the index of GTOs block object in GTOs container for
+            bra side.
+     @param ketGtoContainer the GTOs container for ket side.
+     @param iKetGtoBlock the index of GTOs block object in GTOs container for
+            ket side.
+     */
+    void _compOverlapForGtoBlocks(const CGtoContainer* braGtoContainer,
+                                  const int32_t        iBraGtoBlock,
+                                  const CGtoContainer* ketGtoContainer,
+                                  const int32_t        iKetGtoBlock) const;
     
 public:
     
@@ -62,12 +82,10 @@ public:
      
      @param globRank the the rank of MPI process.
      @param globNodes the total number of MPI processes.
-     @param runMode the execution mode.
      @param comm the MPI communicator.
      */
     COverlapIntegralsDriver(const int32_t  globRank,
                             const int32_t  globNodes,
-                            const execmode runMode,
                                   MPI_Comm comm);
     
     /**
