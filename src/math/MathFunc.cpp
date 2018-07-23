@@ -128,9 +128,9 @@ namespace mathfunc { // mathfunc namespace
     }
     
     void
-    distances(      double* abCoordsX,
-                    double* abCoordsY,
-                    double* abCoordsZ,
+    distances(      double* abDistancesX,
+                    double* abDistancesY,
+                    double* abDistancesZ,
               const double  aCoordX,
               const double  aCoordY,
               const double  aCoordZ,
@@ -139,15 +139,15 @@ namespace mathfunc { // mathfunc namespace
               const double* bCoordsZ,
               const int32_t nElements)
     {
-        #pragma omp simd aligned(abCoordsX, abCoordsY, abCoordsZ, bCoordsX,\
-                                 bCoordsY, bCoordsZ: VLX_ALIGN)
+        #pragma omp simd aligned(abDistancesX, abDistancesY, abDistancesZ,\
+                                 bCoordsX, bCoordsY, bCoordsZ: VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++)
         {
-            abCoordsX[i] = aCoordX - bCoordsX[i];
+            abDistancesX[i] = aCoordX - bCoordsX[i];
             
-            abCoordsY[i] = aCoordY - bCoordsY[i];
+            abDistancesY[i] = aCoordY - bCoordsY[i];
             
-            abCoordsZ[i] = aCoordZ - bCoordsZ[i];
+            abDistancesZ[i] = aCoordZ - bCoordsZ[i];
         }
     }
     

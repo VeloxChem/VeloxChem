@@ -101,31 +101,31 @@ TEST_F(CMathFuncTest, Distance)
 
 TEST_F(CMathFuncTest, Distances)
 {
-    double vecax[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0,  8.0, -1.0, 3.0, 4.0};
+    double rbx[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0,  8.0, -1.0, 3.0, 4.0};
     
-    double vecay[5] __attribute__ ((aligned(VLX_ALIGN))) = {0.0,  1.0, -2.0, 7.0, 3.0};
+    double rby[5] __attribute__ ((aligned(VLX_ALIGN))) = {0.0,  1.0, -2.0, 7.0, 3.0};
     
-    double vecaz[5] __attribute__ ((aligned(VLX_ALIGN))) = {1.0, -2.0,  0.0, 5.0, 2.0};
+    double rbz[5] __attribute__ ((aligned(VLX_ALIGN))) = {1.0, -2.0,  0.0, 5.0, 2.0};
     
-    double vecbx[4] __attribute__ ((aligned(VLX_ALIGN)));
+    double abx[4] __attribute__ ((aligned(VLX_ALIGN)));
     
-    double vecby[4] __attribute__ ((aligned(VLX_ALIGN)));
+    double aby[4] __attribute__ ((aligned(VLX_ALIGN)));
     
-    double vecbz[4] __attribute__ ((aligned(VLX_ALIGN)));
+    double abz[4] __attribute__ ((aligned(VLX_ALIGN)));
     
-    mathfunc::distances(vecbx, vecby, vecbz, 6.0, 4.0, -1.0, vecax, vecay, vecaz, 4);
+    mathfunc::distances(abx, aby, abz, 6.0, 4.0, -1.0, rbx, rby, rbz, 4);
     
-    double veccx[4] __attribute__ ((aligned(VLX_ALIGN))) = {1.0, -2.0,  7.0, 3.0};
+    double rdx[4] __attribute__ ((aligned(VLX_ALIGN))) = {1.0, -2.0, 7.0, 3.0};
     
-    vlxtest::compare(vecbx, veccx, 4);
+    vlxtest::compare(abx, rdx, 4);
     
-    double veccy[4] __attribute__ ((aligned(VLX_ALIGN))) = {4.0, 3.0,  6.0, -3.0};
+    double rdy[4] __attribute__ ((aligned(VLX_ALIGN))) = {4.0, 3.0, 6.0, -3.0};
     
-    vlxtest::compare(vecby, veccy, 4);
+    vlxtest::compare(aby, rdy, 4);
     
-    double veccz[4] __attribute__ ((aligned(VLX_ALIGN))) = {-2.0, 1.0,  -1.0, -6.0};
+    double rdz[4] __attribute__ ((aligned(VLX_ALIGN))) = {-2.0, 1.0, -1.0, -6.0};
     
-    vlxtest::compare(vecbz, veccz, 4);
+    vlxtest::compare(abz, rdz, 4);
 }
 
 TEST_F(CMathFuncTest, Indexes)
