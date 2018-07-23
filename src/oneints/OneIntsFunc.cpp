@@ -79,9 +79,9 @@ namespace intsfunc { // intsfunc namespace
             #pragma omp simd aligned(fx, fz, kexp: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                fx[i] = 1.0 / (fb + kexp[j]);
+                fx[j] = 1.0 / (fb + kexp[j]);
                 
-                fz[i] = fb * kexp[i] * fx[i];
+                fz[j] = fb * kexp[j] * fx[j];
             }
             
             idx++;
@@ -143,13 +143,13 @@ namespace intsfunc { // intsfunc namespace
                                      paz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                double fact = -kexp[i] * fx[i];
+                double fact = -kexp[j] * fx[j];
                 
-                pax[i] = fact * abx[i];
+                pax[j] = fact * abx[j];
                 
-                pay[i] = fact * aby[i];
+                pay[j] = fact * aby[j];
                 
-                paz[i] = fact * abz[i];
+                paz[j] = fact * abz[j];
             }
             
             idx++;
@@ -212,84 +212,16 @@ namespace intsfunc { // intsfunc namespace
             #pragma omp simd aligned(abx, aby, abz, fx, pbx, pby, pbz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                double fact = fb * fx[i];
+                double fact = fb * fx[j];
                 
-                pbx[i] = fact * abx[i];
+                pbx[j] = fact * abx[j];
                 
-                pby[i] = fact * aby[i];
+                pby[j] = fact * aby[j];
                 
-                pbz[i] = fact * abz[i];
+                pbz[j] = fact * abz[j];
             }
             
             idx++;
-        }
-    }
-    
-    void
-    compXiAndZeta(      double* factorsXi,
-                        double* factorsZeta,
-                  const double  braExponent,
-                  const double* ketExponents,
-                  const int32_t nElements)
-    {
-        #pragma omp simd aligned(factorsXi, factorsZeta, ketExponents: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            factorsXi[i] = 1.0 / (braExponent + ketExponents[i]);
-            
-            factorsZeta[i] = braExponent * ketExponents[i] * factorsXi[i];
-        }
-    }
-    
-    void
-    compDistancesPA(      double* xDistancesPA,
-                          double* yDistancesPA,
-                          double* zDistancesPA,
-                    const double* ketExponents,
-                    const double* factorsXi,
-                    const double* xDistancesAB,
-                    const double* yDistancesAB,
-                    const double* zDistancesAB,
-                    const int32_t nElements)
-    {
-        #pragma omp simd aligned(xDistancesPA, yDistancesPA, zDistancesPA,\
-                                 ketExponents, factorsXi, xDistancesAB, \
-                                 yDistancesAB, zDistancesAB: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            double fact = - ketExponents[i] * factorsXi[i];
-            
-            xDistancesPA[i] = fact * xDistancesAB[i];
-            
-            yDistancesPA[i] = fact * yDistancesAB[i];
-            
-            zDistancesPA[i] = fact * zDistancesAB[i];
-        }
-    }
-    
-    void
-    compDistancesPB(      double* xDistancesPB,
-                          double* yDistancesPB,
-                          double* zDistancesPB,
-                    const double  braExponent,
-                    const double* factorsXi,
-                    const double* xDistancesAB,
-                    const double* yDistancesAB,
-                    const double* zDistancesAB,
-                    const int32_t nElements)
-    {
-       #pragma omp simd aligned(xDistancesPB, yDistancesPB, zDistancesPB,\
-                                factorsXi, xDistancesAB, yDistancesAB,\
-                                zDistancesAB: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            double fact = braExponent * factorsXi[i];
-            
-            xDistancesPB[i] = fact * xDistancesAB[i];
-            
-            yDistancesPB[i] = fact * yDistancesAB[i];
-            
-            zDistancesPB[i] = fact * zDistancesAB[i];
         }
     }
     
