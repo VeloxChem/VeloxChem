@@ -8,6 +8,8 @@
 
 #include "OverlapIntegralsDriver.hpp"
 
+#include "OneIntsFunc.hpp"
+
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
                                                  const int32_t  globNodes,
                                                        MPI_Comm comm)
@@ -160,6 +162,103 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
     auto bragtos = braGtoContainer->getGtoBlock(iBraGtoBlock);
     
     auto ketgtos = ketGtoContainer->getGtoBlock(iKetGtoBlock);
+    
+    // allocate prefactors used in Obara-Saika recursion
+    
+    auto pdim = ketgtos.getNumberOfPrimGtos();
+    
+    auto pmax = bragtos.getMaxContractionDepth();
+    
+    CMemBlock2D<double> rab(pdim, 3);
+    
+    CMemBlock2D<double> rfacts(pdim, 2 * pmax);
+    
+    CMemBlock2D<double> rpa(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rpb(pdim, 3 * pmax);
+    
+    // set up pointers to primitives data in bra side
+    
+    auto brx = bragtos.getCoordinatesX();
+    
+    auto bry = bragtos.getCoordinatesY();
+    
+    auto brz = bragtos.getCoordinatesZ();
+    
+    auto bexp = bragtos.getExponents();
+    
+    auto bang = bragtos.getAngularMomentum();
+    
+    // set up pointets to primitives data in ket side
+    
+    auto krx = ketgtos.getCoordinatesX();
+    
+    auto kry = ketgtos.getCoordinatesY();
+    
+    auto krz = ketgtos.getCoordinatesZ();
+    
+    auto kexp = ketgtos.getExponents();
+    
+    auto kang = ketgtos.getAngularMomentum();
+    
+    // loop over contracted functions in bra side
+    
+    auto spos = bragtos.getStartPositions();
+    
+    auto epos = bragtos.getEndPositions();
+    
+    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    {
+        // compute various prefactors for contracted GTO
+        
+        int32_t idx = 0;
+        
+        for (int32_t j = spos[i]; j < epos[i]; j++)
+        {
+            // compute distances: R(A-B)
+            
+            if (idx == 0)
+            {
+                mathfunc::distances(rab.data(0), rab.data(1), rab.data(2),
+                                    brx[j], bry[j], brz[j], krx, kry, krz,
+                                    pdim);
+            }
+            
+            // compute Xi and Zeta factors
+            
+            intsfunc::compXiAndZeta(rfacts.data(2 * idx), rfacts.data(2 * idx + 1),
+                                    bexp[j], kexp, pdim);
+            
+            // compute P-A distances
+            
+            if (bang > 0)
+            {
+                intsfunc::compDistancesPA(rpa.data(3 * idx), rpa.data(3 * idx + 1),
+                                          rpa.data(3 * idx + 2), kexp,
+                                          rfacts.data(2 * idx), rab.data(0),
+                                          rab.data(1), rab.data(2), pdim);
+            }
+            
+            // compute P-B distances
+            
+            if (kang > 0)
+            {
+                intsfunc::compDistancesPB(rpb.data(3 * idx), rpb.data(3 * idx + 1),
+                                          rpb.data(3 * idx + 2), bexp[j],
+                                          rfacts.data(2 * idx), rab.data(0),
+                                          rab.data(1), rab.data(2), pdim);
+            }
+            
+            // compute batch of primitive overlap integrals
+            
+            //_compPrimOverlap()
+            
+            idx++;
+        }
+        
+        // contract primitive overlap integrals
+        
+    }
     
     printf("(%i,%i) pair: bra %i ket %i prim (%i,%i) \n", iBraGtoBlock, iKetGtoBlock,
            bragtos.getAngularMomentum(), ketgtos.getAngularMomentum(),

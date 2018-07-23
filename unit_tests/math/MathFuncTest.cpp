@@ -99,6 +99,35 @@ TEST_F(CMathFuncTest, Distance)
     ASSERT_NEAR(mathfunc::distance(4.0, 5.0, 2.0, 3.0, 3.0, 0.0), 3.0, 1.0e-13);
 }
 
+TEST_F(CMathFuncTest, Distances)
+{
+    double vecax[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0,  8.0, -1.0, 3.0, 4.0};
+    
+    double vecay[5] __attribute__ ((aligned(VLX_ALIGN))) = {0.0,  1.0, -2.0, 7.0, 3.0};
+    
+    double vecaz[5] __attribute__ ((aligned(VLX_ALIGN))) = {1.0, -2.0,  0.0, 5.0, 2.0};
+    
+    double vecbx[4] __attribute__ ((aligned(VLX_ALIGN)));
+    
+    double vecby[4] __attribute__ ((aligned(VLX_ALIGN)));
+    
+    double vecbz[4] __attribute__ ((aligned(VLX_ALIGN)));
+    
+    mathfunc::distances(vecbx, vecby, vecbz, 6.0, 4.0, -1.0, vecax, vecay, vecaz, 4);
+    
+    double veccx[4] __attribute__ ((aligned(VLX_ALIGN))) = {1.0, -2.0,  7.0, 3.0};
+    
+    vlxtest::compare(vecbx, veccx, 4);
+    
+    double veccy[4] __attribute__ ((aligned(VLX_ALIGN))) = {4.0, 3.0,  6.0, -3.0};
+    
+    vlxtest::compare(vecby, veccy, 4);
+    
+    double veccz[4] __attribute__ ((aligned(VLX_ALIGN))) = {-2.0, 1.0,  -1.0, -6.0};
+    
+    vlxtest::compare(vecbz, veccz, 4);
+}
+
 TEST_F(CMathFuncTest, Indexes)
 {
     int32_t veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, 4, 3, 4};
@@ -160,3 +189,5 @@ TEST_F(CMathFuncTest, CopyInteger)
     
     vlxtest::compare(veca, vecc, 5);
 }
+
+

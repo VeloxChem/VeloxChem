@@ -335,40 +335,18 @@ CDensityGridDriver::_compDistances(      CMemBlock2D<double>&  distances,
                                    const double                gridCoordinateY,
                                    const double                gridCoordinateZ) const
 {
-    // set up primitive GTOs coordinates
-    
-    auto coordsx = gtoContainer.getCoordinatesX(iGtoBlock);
-    
-    auto coordsy = gtoContainer.getCoordinatesY(iGtoBlock);
-    
-    auto coordsz = gtoContainer.getCoordinatesZ(iGtoBlock);
-    
-    // set up distances
-    
-    auto distx = distances.data(0);
-    
-    auto disty = distances.data(1);
-    
-    auto distz = distances.data(2);
-    
-    // set up number of primitive GTOs
+    // set up pointer to reduced dimensions
     
     auto reddim = redDimensions.data(0);
     
-    auto pnum = reddim[iGtoBlock];
+    // compute distances
     
-    // loop over primitive GTOs
-    
-    #pragma omp simd aligned(distx, disty, distz, coordsx, coordsy, coordsz:\
-                             VLX_ALIGN)
-    for (int32_t i = 0; i < pnum; i++)
-    {
-        distx[i] = gridCoordinateX - coordsx[i];
-        
-        disty[i] = gridCoordinateY - coordsy[i];
-        
-        distz[i] = gridCoordinateZ - coordsz[i];
-    }
+    mathfunc::distances(distances.data(0), distances.data(1), distances.data(2),
+                        gridCoordinateX, gridCoordinateY, gridCoordinateZ,
+                        gtoContainer.getCoordinatesX(iGtoBlock),
+                        gtoContainer.getCoordinatesY(iGtoBlock),
+                        gtoContainer.getCoordinatesZ(iGtoBlock),
+                        reddim[iGtoBlock]);
 }
 
 int32_t

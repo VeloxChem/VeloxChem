@@ -142,6 +142,32 @@ namespace mathfunc { // mathfunc namespace
     }
     
     /**
+     Computes vector of distances between reference point A and vector of
+     points B.
+
+     @param abCoordsX the vector of distances RAB_x = A_x - B_x.
+     @param abCoordsY the vector of distances RAB_y = A_y - B_y.
+     @param abCoordsZ the vector of distances RAB_z = A_z - B_z.
+     @param aCoordX the Cartesian X coordinate of point A.
+     @param aCoordY the Cartesian Y coordinate of point A.
+     @param aCoordZ the Cartesian Z coordinate of point A.
+     @param bCoordsX the vector of Cartesian X coordinates of points B.
+     @param bCoordsY the vector of Cartesian Y coordinates of points B.
+     @param bCoordsZ the vector of Cartesian Z coordinates of points B.
+     @param nElements the number of points B.
+     */
+    void distances(      double* abCoordsX,
+                         double* abCoordsY,
+                         double* abCoordsZ,
+                   const double  aCoordX,
+                   const double  aCoordY,
+                   const double  aCoordZ,
+                   const double* bCoordsX,
+                   const double* bCoordsY,
+                   const double* bCoordsZ,
+                   const int32_t nElements);
+
+    /**
      Computes Chebtshev quadrature of second kind in [-1,1] interval.
 
      @param coordinates the vector of quadature coordinates.

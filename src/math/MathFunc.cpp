@@ -128,6 +128,30 @@ namespace mathfunc { // mathfunc namespace
     }
     
     void
+    distances(      double* abCoordsX,
+                    double* abCoordsY,
+                    double* abCoordsZ,
+              const double  aCoordX,
+              const double  aCoordY,
+              const double  aCoordZ,
+              const double* bCoordsX,
+              const double* bCoordsY,
+              const double* bCoordsZ,
+              const int32_t nElements)
+    {
+        #pragma omp simd aligned(abCoordsX, abCoordsY, abCoordsZ, bCoordsX,\
+                                 bCoordsY, bCoordsZ: VLX_ALIGN)
+        for (int32_t i = 0; i < nElements; i++)
+        {
+            abCoordsX[i] = aCoordX - bCoordsX[i];
+            
+            abCoordsY[i] = aCoordY - bCoordsY[i];
+            
+            abCoordsZ[i] = aCoordZ - bCoordsZ[i];
+        }
+    }
+    
+    void
     quadChebyshevOfKindTwo(      double* coordinates,
                                  double* weights,
                            const int32_t nPoints)
