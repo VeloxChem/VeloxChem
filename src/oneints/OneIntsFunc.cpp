@@ -131,7 +131,7 @@ namespace intsfunc { // intsfunc namespace
             
             auto fx = osFactors.data(nFactors * idx);
            
-            // set up pointers to distances
+            // set up pointers to distances R(PA)
             
             auto pax = paDistances.data(3 * idx);
             
@@ -201,7 +201,7 @@ namespace intsfunc { // intsfunc namespace
             
             auto fb = bexp[i];
             
-            // set up pointers to distances
+            // set up pointers to distances R(PB)
             
             auto pbx = pbDistances.data(3 * idx);
             
@@ -209,7 +209,8 @@ namespace intsfunc { // intsfunc namespace
             
             auto pbz = pbDistances.data(3 * idx + 2);
             
-            #pragma omp simd aligned(abx, aby, abz, fx, pbx, pby, pbz: VLX_ALIGN)
+            #pragma omp simd aligned(abx, aby, abz, fx, pbx, pby,\
+                                     pbz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fact = fb * fx[j];

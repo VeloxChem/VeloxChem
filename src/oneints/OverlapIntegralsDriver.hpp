@@ -75,6 +75,43 @@ class COverlapIntegralsDriver
                                   const CGtoContainer* ketGtoContainer,
                                   const int32_t        iKetGtoBlock) const;
     
+    /**
+     Gets number of blocks in Obara-Saika recursion buffer for specific
+     combination of GTOs blocks on bra and ket sides.
+
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param maxPrimGtos the maximum number of primitives in contracted GTO.
+     @return the number of blocks in recursion buffer.
+     */
+    int32_t _getNumberOfPrimBlocks(const CGtoBlock& braGtoBlock,
+                                   const CGtoBlock& ketGtoBlock,
+                                   const int32_t    maxPrimGtos) const;
+    
+    /**
+     Computes batch of primitive overlap integrals using Obara-Saika recursion
+     and stores results in primitives buffer.
+     
+     Batch size: (one contracted GTO on bra side) x (all contracted GTOs on ket side).
+
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param abDistances the vector of distances R(AB) = A - B.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param pbDistances the vector of distances R(PB) = P - B.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void _compPrimOverlapInts(      CMemBlock2D<double>& primBuffer,
+                              const CMemBlock2D<double>& osFactors,
+                              const CMemBlock2D<double>& abDistances,
+                              const CMemBlock2D<double>& paDistances,
+                              const CMemBlock2D<double>& pbDistances,
+                              const CGtoBlock&           braGtoBlock,
+                              const CGtoBlock&           ketGtoBlock,
+                              const int32_t              iContrGto) const;
+    
 public:
     
     /**
