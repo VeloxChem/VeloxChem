@@ -112,6 +112,8 @@ class COverlapIntegralsDriver
                               const CGtoBlock&           ketGtoBlock,
                               const int32_t              iContrGto) const;
     
+    
+    
 public:
     
     /**

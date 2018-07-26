@@ -103,6 +103,186 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                           const int32_t              iContrGto);
     
     /**
+     Computes batch of primitive (P|P) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForPPOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (P|D) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForPDOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (P|F) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForPFOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (P|G) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForPGOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (D|D) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForDDOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (D|F) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForDFOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (D|G) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForDGOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (F|F) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForFFOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (F|G) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForFGOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
+     Computes batch of primitive (G|G) overlap integrals and stores results in
+     primitives buffer. VRR order: first ket side, later bra size.
+     
+     @param primBuffer the primitives buffer.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForGGOnKet(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
+    
+    /**
      Computes batch of primitive (P|S) overlap integrals and stores results in
      primitives buffer.
      
@@ -117,6 +297,23 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                           const CGtoBlock&           braGtoBlock,
                           const CGtoBlock&           ketGtoBlock,
                           const int32_t              iContrGto);
+    
+    
+    /**
+     Gets relative, unscaled starting position of overlap (x|y) integrals in
+     primitives buffer.
+     NOTE: position must be scaled by number of primitive Gaussian functions
+     in contracted GTO on bra side in order to get absolute position of (x|y)
+     intgerals in primitives byffer.
+
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @return the relative position of (x|y) integrals.
+     */
+    int32_t getPositionInBuffer(const int32_t    braAngularMomentum,
+                                const int32_t    ketAngularMomentum,
+                                const CGtoBlock& ketGtoBlock);
 
 } // ovlrecfunc namespace
 

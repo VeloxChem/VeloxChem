@@ -552,6 +552,10 @@ CMemBlock2D<T>::data(const int32_t iBlock)
 {
     if (_originalSizes.size() > 0)
     {
+        if (iBlock < 0) return nullptr;
+        
+        if (iBlock >= blocks()) return nullptr;
+        
         return _data.data(_positions.at(iBlock));
     }
     
@@ -564,6 +568,10 @@ CMemBlock2D<T>::data(const int32_t iBlock) const
 {
     if (_originalSizes.size() > 0)
     {
+        if (iBlock < 0) return nullptr;
+        
+        if (iBlock >= blocks()) return nullptr;
+        
         return _data.data(_positions.at(iBlock));
     }
     

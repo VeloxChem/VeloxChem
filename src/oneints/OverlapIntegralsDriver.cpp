@@ -181,12 +181,13 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
     
     // allocate primitives buffer
     
+    printf("\n*** Computing overlap integrals (%i|%i):\n",
+           bragtos.getAngularMomentum(),
+           ketgtos.getAngularMomentum());
+    
     auto nblk = _getNumberOfPrimBlocks(bragtos, ketgtos, pmax);
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
-    
-    printf("buffer: %i %i => %i x %i\n", bragtos.getAngularMomentum(),
-           ketgtos.getAngularMomentum(), nblk, pdim);
 
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -210,10 +211,6 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
         
         _compPrimOverlapInts(pbuffer, rfacts, rab, rpa, rpb, bragtos, ketgtos, i);
     }
-    
-    printf("(%i,%i) pair: bra %i ket %i prim (%i,%i) \n", iBraGtoBlock, iKetGtoBlock,
-           bragtos.getAngularMomentum(), ketgtos.getAngularMomentum(),
-           bragtos.getNumberOfPrimGtos(), ketgtos.getNumberOfPrimGtos());
 }
 
 int32_t
@@ -226,6 +223,8 @@ COverlapIntegralsDriver::_getNumberOfPrimBlocks(const CGtoBlock& braGtoBlock,
     auto bang = braGtoBlock.getAngularMomentum();
     
     auto kang = ketGtoBlock.getAngularMomentum();
+    
+    printf(" - Primitives buffer size:\n");
     
     // compute number of blocks in recursion buffer
     
@@ -261,6 +260,9 @@ COverlapIntegralsDriver::_getNumberOfPrimBlocks(const CGtoBlock& braGtoBlock,
             }
         }
     }
+    
+    printf("Max primitives (%i) adjusted buffer size: %i\n",
+           maxPrimGtos, ndim * maxPrimGtos); 
     
     return ndim * maxPrimGtos;
 }
@@ -304,19 +306,71 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>& primBuf
         
         if ((bang == 0) && (kang == 1)) return;
         
+        ovlrecfunc::compOverlapForPPOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 1) && (kang == 1)) return;
+        
         ovlrecfunc::compOverlapForSD(primBuffer, osFactors, pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         if ((bang == 0) && (kang == 2)) return;
+        
+        ovlrecfunc::compOverlapForPDOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 1) && (kang == 2)) return;
+        
+        ovlrecfunc::compOverlapForDDOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 2) && (kang == 2)) return;
         
         ovlrecfunc::compOverlapForSF(primBuffer, osFactors, pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         if ((bang == 0) && (kang == 3)) return;
         
+        ovlrecfunc::compOverlapForPFOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 1) && (kang == 3)) return;
+        
+        ovlrecfunc::compOverlapForDFOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 2) && (kang == 3)) return;
+        
+        ovlrecfunc::compOverlapForFFOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 3) && (kang == 3)) return;
+        
         ovlrecfunc::compOverlapForSG(primBuffer, osFactors, pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         if ((bang == 0) && (kang == 4)) return;
+        
+        ovlrecfunc::compOverlapForPGOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 1) && (kang == 4)) return;
+        
+        ovlrecfunc::compOverlapForDGOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 2) && (kang == 4)) return;
+        
+        ovlrecfunc::compOverlapForFGOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 3) && (kang == 4)) return;
+        
+        ovlrecfunc::compOverlapForGGOnKet(primBuffer, osFactors, paDistances,
+                                          braGtoBlock, ketGtoBlock, iContrGto);
+        
+        if ((bang == 4) && (kang == 4)) return;
+        
+        // NOTE: add l > 4 recursion here
     }
 }
