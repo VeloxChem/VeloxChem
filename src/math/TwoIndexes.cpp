@@ -107,6 +107,16 @@ CTwoIndexes::second() const
     return _jIndex;
 }
 
+bool
+CTwoIndexes::isValidPair() const
+{
+    if (_iIndex < 0) return false;
+    
+    if (_jIndex < 0) return false; 
+    
+    return true;
+}
+
 std::ostream&
 operator<<(      std::ostream& output,
            const CTwoIndexes&  source)

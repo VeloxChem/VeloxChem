@@ -99,4 +99,43 @@ transform(      CMemBlock2D<double>& spherData,
     }
 }
     
+    
+bool
+isInVector(const CVecTwoIndexes& vector,
+           const CTwoIndexes&    pair)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (pair == vector[i]) return true;
+    }
+    
+    return false;
+}
+
+bool
+addValidAndUniquePair(      CVecTwoIndexes& vector,
+                      const CTwoIndexes&    pair)
+{
+    if (!pair.isValidPair()) return false;
+    
+    if (genfunc::isInVector(vector, pair)) return false;
+    
+    vector.push_back(pair);
+    
+    return true;
+}
+
+int32_t
+findPairIndex(const std::vector<int32_t>& indexes,
+              const CVecTwoIndexes&       vector,
+              const CTwoIndexes&          pair)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (pair == vector[i]) return indexes[i];
+    }
+ 
+    return -1;
+}
+    
 } // genfunc namespace

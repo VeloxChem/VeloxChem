@@ -11,6 +11,7 @@
 #include "OneIntsFunc.hpp"
 #include "AngularMomentum.hpp"
 #include "OverlapRecFunc.hpp"
+#include "GenFunc.hpp"
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
                                                  const int32_t  globNodes,
@@ -185,10 +186,29 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
            bragtos.getAngularMomentum(),
            ketgtos.getAngularMomentum());
     
-    auto nblk = _getNumberOfPrimBlocks(bragtos, ketgtos, pmax);
+    // generate recursion pattern
+    
+    auto recvec = _getRecursionPattern(bragtos, ketgtos);
+    
+    // set up primitives buffer indexes
+    
+    std::vector<int32_t> recidx;
+    
+    auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
+    
+    // allocate primitives buffer
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
 
+    printf("Max GTOs: %i Rec. Blocks: %i x Pdim: %i\n", pmax, nblk, pdim);
+    
+    for (size_t i = 0; i < recvec.size(); i++)
+    {
+        printf("IDX = %zu VRR (%i|%i) Pos: %i\n", i, recvec[i].first(),
+               recvec[i].second(), recidx[i]);
+    }
+    
+    
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
         // compute distances: R(AB) = A - B
@@ -209,168 +229,270 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
         
         // compite primitive overlap integrals
         
-        _compPrimOverlapInts(pbuffer, rfacts, rab, rpa, rpb, bragtos, ketgtos, i);
+        _compPrimOverlapInts(pbuffer, recvec, recidx, rfacts, rab, rpa, rpb,
+                             bragtos, ketgtos, i);
     }
-}
-
-int32_t
-COverlapIntegralsDriver::_getNumberOfPrimBlocks(const CGtoBlock& braGtoBlock,
-                                                const CGtoBlock& ketGtoBlock,
-                                                const int32_t    maxPrimGtos) const
-{
-    // set up angular momentum data
-    
-    auto bang = braGtoBlock.getAngularMomentum();
-    
-    auto kang = ketGtoBlock.getAngularMomentum();
-    
-    printf(" - Primitives buffer size:\n");
-    
-    // compute number of blocks in recursion buffer
-    
-    int32_t ndim = 0;
-    
-    if (bang > kang)
-    {
-        // add ket side recursion blocks
-        
-        for (int32_t i = 0; i <= kang; i++)
-        {
-            auto kdim = angmom::to_CartesianComponents(i);
-            
-            for (int32_t j = i; j <= bang; j++)
-            {
-                ndim += kdim * angmom::to_CartesianComponents(j);
-                
-                printf("(%i,%i) %i\n", j, i, ndim);
-            }
-        }
-    }
-    else
-    {
-        for (int32_t i = 0; i <= bang; i++)
-        {
-            auto bdim = angmom::to_CartesianComponents(i);
-            
-            for (int32_t j = i; j <= kang; j++)
-            {
-                ndim += bdim * angmom::to_CartesianComponents(j);
-                
-                printf("(%i,%i) %i\n", i, j, ndim);
-            }
-        }
-    }
-    
-    printf("Max primitives (%i) adjusted buffer size: %i\n",
-           maxPrimGtos, ndim * maxPrimGtos); 
-    
-    return ndim * maxPrimGtos;
 }
 
 void
-COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>& primBuffer,
-                                              const CMemBlock2D<double>& osFactors,
-                                              const CMemBlock2D<double>& abDistances,
-                                              const CMemBlock2D<double>& paDistances,
-                                              const CMemBlock2D<double>& pbDistances,
-                                              const CGtoBlock&           braGtoBlock,
-                                              const CGtoBlock&           ketGtoBlock,
-                                              const int32_t              iContrGto) const
+COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBuffer,
+                                              const CVecTwoIndexes&       recPattern,
+                                              const std::vector<int32_t>& recIndexes,
+                                              const CMemBlock2D<double>&  osFactors,
+                                              const CMemBlock2D<double>&  abDistances,
+                                              const CMemBlock2D<double>&  paDistances,
+                                              const CMemBlock2D<double>&  pbDistances,
+                                              const CGtoBlock&            braGtoBlock,
+                                              const CGtoBlock&            ketGtoBlock,
+                                              const int32_t               iContrGto) const
 {
-    // set up angular momentum information
+    // compute (s|s) integrals
+    
+    ovlrecfunc::compOverlapForSS(primBuffer, recPattern, recIndexes, osFactors,
+                                 abDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (s|p) integrals
+    
+    ovlrecfunc::compOverlapForSP(primBuffer, recPattern, recIndexes, pbDistances,
+                                 braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (p|s) integrals
+    
+    ovlrecfunc::compOverlapForPS(primBuffer, recPattern, recIndexes, paDistances,
+                                 braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (p|p) integrals
+    
+    ovlrecfunc::compOverlapForPP(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (s|d) integrals
+    
+    ovlrecfunc::compOverlapForSD(primBuffer, recPattern, recIndexes, osFactors,
+                                 pbDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+
+    // compute (d|s) integrals
+    
+    ovlrecfunc::compOverlapForDS(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (p|d) integrals
+    
+    ovlrecfunc::compOverlapForPD(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // FIX ME: add (d|p)
+    
+    // compute (d|d) integrals
+    
+    ovlrecfunc::compOverlapForDD(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (s|f) integrals
+    
+    ovlrecfunc::compOverlapForSF(primBuffer, recPattern, recIndexes, osFactors,
+                                 pbDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (f|s) integrals
+    
+    ovlrecfunc::compOverlapForFS(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (p|f) integrals
+    
+    ovlrecfunc::compOverlapForPF(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // FIX ME: add (f|p)
+    
+    // compute (d|f) integrals
+    
+    ovlrecfunc::compOverlapForDF(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // FIX ME: add (f|d)
+
+    ovlrecfunc::compOverlapForFF(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (s|g) integrals
+    
+    ovlrecfunc::compOverlapForSG(primBuffer, recPattern, recIndexes, osFactors,
+                                 pbDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (g|s) integrals
+    
+    ovlrecfunc::compOverlapForGS(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // compute (p|g) integrals
+   
+    ovlrecfunc::compOverlapForPG(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // FIX ME: add (g|p)
+    
+    // compute (d|g) integrals
+    
+    ovlrecfunc::compOverlapForDG(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // FIX ME: add (g|d)
+    
+    // compute (f|g) integrals
+    
+    ovlrecfunc::compOverlapForFG(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+    
+    // FIX ME: add (g|f)
+
+    // compute (g|g) integrals
+    
+    ovlrecfunc::compOverlapForGG(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
+
+    // NOTE: add l > 4 recursion here
+}
+
+CVecTwoIndexes
+COverlapIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock,
+                                              const CGtoBlock& ketGtoBlock) const
+{
+    // set up angular momentum
     
     auto bang = braGtoBlock.getAngularMomentum();
     
     auto kang = ketGtoBlock.getAngularMomentum();
+ 
+    // set up recursion buffer
     
-    // compute (s|s) integrals
+    CVecTwoIndexes recvec;
     
-    ovlrecfunc::compOverlapForSS(primBuffer, osFactors, abDistances, braGtoBlock,
-                                 ketGtoBlock, iContrGto);
+    recvec.reserve((bang + 1) * (kang + 1));
     
-    if ((bang == 0) && (kang == 0)) return;
+    // set up indexing counters
     
-    // split Obara-Saika recursion into two alternative paths
+    int32_t spos = 0;
     
-    if (bang > kang)
+    int32_t epos = 1;
+    
+    // set up initial state of recursion buffer
+    
+    recvec.push_back(CTwoIndexes(bang, kang));
+    
+    
+    while (true)
     {
-        ovlrecfunc::compOverlapForPS(primBuffer, paDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+        // internal new recursion terms counter
         
-        if ((bang == 1) && (kang == 0)) return;
+        int32_t nterms = 0;
+        
+        // generate bra and ket Obara-Saika recursion terms
+        
+        for (int32_t i = spos; i < epos; i++)
+        {
+            CTwoIndexes cidx(recvec[i]);
+        
+            if (cidx.first() != 0)
+            {
+                // general recursion for bra and ket sides
+                
+                // (a - 1 | b) term
+            
+                CTwoIndexes t1idx(cidx.first() - 1,  cidx.second());
+            
+                if (genfunc::addValidAndUniquePair(recvec, t1idx)) nterms++;
+            
+                // (a - 2 | b) term
+            
+                CTwoIndexes t2idx(cidx.first() - 2,  cidx.second());
+            
+                if (genfunc::addValidAndUniquePair(recvec, t2idx)) nterms++;
+            
+                // (a - 1 | b - 1) term
+            
+                CTwoIndexes tkidx(cidx.first() - 1,  cidx.second() - 1);
+            
+                if (genfunc::addValidAndUniquePair(recvec, tkidx)) nterms++;
+            }
+            else
+            {
+                // reduced recursion for ket side
+                
+                // (0 | b - 1) term
+                
+                CTwoIndexes t1idx(cidx.first(),  cidx.second() - 1);
+                
+                if (genfunc::addValidAndUniquePair(recvec, t1idx)) nterms++;
+                
+                // (0 | b - 2) term
+                
+                CTwoIndexes t2idx(cidx.first(),  cidx.second() - 2);
+                
+                if (genfunc::addValidAndUniquePair(recvec, t2idx)) nterms++;
+            }
+                
+        }
+        
+        // break loop, all recursion terms are generrated
+        
+        if (nterms == 0) break;
+        
+        // update counters
+        
+        spos = epos;
+        
+        epos += nterms;
     }
-    else
-    {
-        ovlrecfunc::compOverlapForSP(primBuffer, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
-        
-        if ((bang == 0) && (kang == 1)) return;
-        
-        ovlrecfunc::compOverlapForPPOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 1) && (kang == 1)) return;
-        
-        ovlrecfunc::compOverlapForSD(primBuffer, osFactors, pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 0) && (kang == 2)) return;
-        
-        ovlrecfunc::compOverlapForPDOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 1) && (kang == 2)) return;
-        
-        ovlrecfunc::compOverlapForDDOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 2) && (kang == 2)) return;
-        
-        ovlrecfunc::compOverlapForSF(primBuffer, osFactors, pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 0) && (kang == 3)) return;
-        
-        ovlrecfunc::compOverlapForPFOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 1) && (kang == 3)) return;
-        
-        ovlrecfunc::compOverlapForDFOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 2) && (kang == 3)) return;
-        
-        ovlrecfunc::compOverlapForFFOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 3) && (kang == 3)) return;
-        
-        ovlrecfunc::compOverlapForSG(primBuffer, osFactors, pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 0) && (kang == 4)) return;
-        
-        ovlrecfunc::compOverlapForPGOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 1) && (kang == 4)) return;
-        
-        ovlrecfunc::compOverlapForDGOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 2) && (kang == 4)) return;
-        
-        ovlrecfunc::compOverlapForFGOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 3) && (kang == 4)) return;
-        
-        ovlrecfunc::compOverlapForGGOnKet(primBuffer, osFactors, paDistances,
-                                          braGtoBlock, ketGtoBlock, iContrGto);
-        
-        if ((bang == 4) && (kang == 4)) return;
-        
-        // NOTE: add l > 4 recursion here
-    }
+    
+    return recvec;
 }
+
+
+int32_t
+COverlapIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
+                                                        const CVecTwoIndexes&       recPattern,
+                                                        const int32_t               maxPrimGtos) const
+{
+    // clear vector and reserve memory
+    
+    recIndexes.clear();
+    
+    recIndexes.reserve(recPattern.size() + 1);
+ 
+    // loop over recursion pattern
+    
+    int32_t nblk = 0;
+    
+    for (size_t i = 0; i < recPattern.size(); i++)
+    {
+        recIndexes.push_back(nblk);
+        
+        auto bcomp = angmom::to_CartesianComponents(recPattern[i].first());
+        
+        auto kcomp = angmom::to_CartesianComponents(recPattern[i].second());
+        
+        nblk += maxPrimGtos * bcomp * kcomp;
+    }
+    
+    return nblk;
+}
+
+

@@ -12,18 +12,22 @@
 
 #include "MathConst.hpp"
 #include "AngularMomentum.hpp"
+#include "GenFunc.hpp"
 
 namespace ovlrecfunc { // ovlrecfunc namespace
     
     void
-    compOverlapForSS(      CMemBlock2D<double>& primBuffer,
-                     const CMemBlock2D<double>& osFactors,
-                     const CMemBlock2D<double>& abDistances,
-                     const CGtoBlock&           braGtoBlock,
-                     const CGtoBlock&           ketGtoBlock,
-                     const int32_t              iContrGto)
+    compOverlapForSS(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  abDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
-        if (iContrGto  == 0) printf(" * VRR: (0|0)\n");
+        
+        if (iContrGto == 0) printf(" * VRR: (0|0)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -51,6 +55,10 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         auto fpi = mathconst::getPiValue();
         
+        // get position of integrals in primitves buffer
+        
+        auto soff = genfunc::findPairIndex(recIndexes, recPattern, {0, 0});
+        
         // loop over contracted GTO on bra side
         
         int32_t idx = 0;
@@ -67,7 +75,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             
             // set up primitives buffer data
             
-            auto fovl = primBuffer.data(idx);
+            auto fovl = primBuffer.data(soff + idx);
             
             #pragma omp simd aligned(fovl, fx, fz, knorm, abx, aby,\
                                      abz: VLX_ALIGN)
@@ -85,12 +93,18 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     }
     
     void
-    compOverlapForSP(      CMemBlock2D<double>& primBuffer,
-                     const CMemBlock2D<double>& pbDistances,
-                     const CGtoBlock&           braGtoBlock,
-                     const CGtoBlock&           ketGtoBlock,
-                     const int32_t              iContrGto)
+    compOverlapForSP(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  pbDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {0, 1})) return;
+        
         if (iContrGto  == 0) printf(" * VRR: (0|1)\n");
         
         // set up pointers to primitives data on bra side
@@ -103,9 +117,11 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
         
-        // compute number of primitives of bra side
+        // get position of integrals in primitves buffer
         
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {0, 1});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 0});
         
         // loop over contracted GTO on bra side
         
@@ -123,15 +139,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             
             // set up pointers to (S|S) integrals
             
-            auto fovl = primBuffer.data(idx);
+            auto fovl = primBuffer.data(t1off + idx);
             
             // set up pointers to (S|P) integrals
             
-            auto s_0_x = primBuffer.data(bdim + 3 * idx);
+            auto s_0_x = primBuffer.data(soff + 3 * idx);
             
-            auto s_0_y = primBuffer.data(bdim + 3 * idx + 1);
+            auto s_0_y = primBuffer.data(soff + 3 * idx + 1);
             
-            auto s_0_z = primBuffer.data(bdim + 3 * idx + 2);
+            auto s_0_z = primBuffer.data(soff + 3 * idx + 2);
             
             #pragma omp simd aligned(pbx, pby, pbz, fovl, s_0_x, s_0_y,\
                                      s_0_z: VLX_ALIGN)
@@ -151,13 +167,221 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     }
     
     void
-    compOverlapForSD(      CMemBlock2D<double>& primBuffer,
-                     const CMemBlock2D<double>& osFactors,
-                     const CMemBlock2D<double>& pbDistances,
-                     const CGtoBlock&           braGtoBlock,
-                     const CGtoBlock&           ketGtoBlock,
-                     const int32_t              iContrGto)
+    compOverlapForPS(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {1, 0})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (1|0)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {1, 0});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 0});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (S|S) integrals
+            
+            auto fovl = primBuffer.data(t1off + idx);
+            
+            // set up pointers to (P|S) integrals
+            
+            auto s_x_0 = primBuffer.data(soff + 3 * idx);
+            
+            auto s_y_0 = primBuffer.data(soff + 3 * idx + 1);
+            
+            auto s_z_0 = primBuffer.data(soff + 3 * idx + 2);
+            
+            #pragma omp simd aligned(pax, pay, paz, fovl, s_x_0, s_y_0,\
+                                     s_z_0: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                double fact = fovl[j];
+                
+                s_x_0[j] = pax[j] * fact;
+                
+                s_y_0[j] = pay[j] * fact;
+                
+                s_z_0[j] = paz[j] * fact;
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compOverlapForPP(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {1, 1})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (1|1)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {1, 1});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 1});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {0, 0});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (S|S) integrals
+            
+            auto s_0_0 = primBuffer.data(tkoff + idx);
+            
+            // set up pointers to (S|P) integrals
+            
+            auto s_0_x = primBuffer.data(t1off + 3 * idx);
+            
+            auto s_0_y = primBuffer.data(t1off + 3 * idx + 1);
+            
+            auto s_0_z = primBuffer.data(t1off + 3 * idx + 2);
+            
+            // set up pointers to (P|P) integrals
+            
+            auto s_x_x = primBuffer.data(soff + 9 * idx);
+            
+            auto s_x_y = primBuffer.data(soff + 9 * idx + 1);
+            
+            auto s_x_z = primBuffer.data(soff + 9 * idx + 2);
+            
+            auto s_y_x = primBuffer.data(soff + 9 * idx + 3);
+            
+            auto s_y_y = primBuffer.data(soff + 9 * idx + 4);
+            
+            auto s_y_z = primBuffer.data(soff + 9 * idx + 5);
+            
+            auto s_z_x = primBuffer.data(soff + 9 * idx + 6);
+            
+            auto s_z_y = primBuffer.data(soff + 9 * idx + 7);
+            
+            auto s_z_z = primBuffer.data(soff + 9 * idx + 8);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_0_x, s_0_y, s_0_z,\
+                                     s_x_x, s_x_y, s_x_z, s_y_x, s_y_y, s_y_z,\
+                                     s_z_x, s_z_y, s_z_z: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_x_x[j] = fr * s_0_x[j] + f2t * s_0_0[j];
+                
+                s_x_y[j] = fr * s_0_y[j];
+                
+                s_x_z[j] = fr * s_0_z[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_y_x[j] = fr * s_0_x[j];
+                
+                s_y_y[j] = fr * s_0_y[j] + f2t * s_0_0[j];
+                
+                s_y_z[j] = fr * s_0_z[j];
+                
+                // leading z component
+                
+                fr = paz[j];
+                
+                s_z_x[j] = fr * s_0_x[j];
+                
+                s_z_y[j] = fr * s_0_y[j];
+                
+                s_z_z[j] = fr * s_0_z[j] + f2t * s_0_0[j];
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compOverlapForSD(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  pbDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {0, 2})) return;
+        
         if (iContrGto  == 0) printf(" * VRR: (0|2)\n");
         
         // set up pointers to primitives data on bra side
@@ -170,9 +394,13 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
         
-        // compute number of primitives of bra side
+        // get position of integrals in primitves buffer
         
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {0, 2});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 1});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 0});
         
         // loop over contracted GTO on bra side
         
@@ -194,19 +422,17 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             
             // set up pointers to (S|S) integrals
             
-            auto s_0_0 = primBuffer.data(idx);
+            auto s_0_0 = primBuffer.data(t2off + idx);
             
             // set up pointers to (S|P) integrals
             
-            auto s_0_x = primBuffer.data(bdim + 3 * idx);
+            auto s_0_x = primBuffer.data(t1off + 3 * idx);
             
-            auto s_0_y = primBuffer.data(bdim + 3 * idx + 1);
+            auto s_0_y = primBuffer.data(t1off + 3 * idx + 1);
             
-            auto s_0_z = primBuffer.data(bdim + 3 * idx + 2);
+            auto s_0_z = primBuffer.data(t1off + 3 * idx + 2);
             
             // set up pointers to (S|D) integrals
-            
-            int32_t soff = 4 * bdim;
             
             auto s_0_xx = primBuffer.data(soff + 6 * idx);
             
@@ -255,15 +481,624 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             idx++;
         }
     }
+    
+    void
+    compOverlapForDS(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {2, 0})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (2|0)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {2, 0});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {1, 0});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 0});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (S|S) integrals
+            
+            auto s_0_0 = primBuffer.data(t2off + idx);
+            
+            // set up pointers to (P|S) integrals
+            
+            auto s_x_0 = primBuffer.data(t1off + 3 * idx);
+            
+            auto s_y_0 = primBuffer.data(t1off + 3 * idx + 1);
+            
+            auto s_z_0 = primBuffer.data(t1off + 3 * idx + 2);
+            
+            // set up pointers to (D|S) integrals
+            
+            auto s_xx_0 = primBuffer.data(soff + 6 * idx);
+            
+            auto s_xy_0 = primBuffer.data(soff + 6 * idx + 1);
+            
+            auto s_xz_0 = primBuffer.data(soff + 6 * idx + 2);
+            
+            auto s_yy_0 = primBuffer.data(soff + 6 * idx + 3);
+            
+            auto s_yz_0 = primBuffer.data(soff + 6 * idx + 4);
+            
+            auto s_zz_0 = primBuffer.data(soff + 6 * idx + 5);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_0_0, s_x_0, s_y_0,\
+                                     s_z_0, s_xx_0, s_xy_0, s_xz_0, s_yy_0,\
+                                     s_yz_0,s_zz_0: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_xx_0[j] = fr * s_x_0[j] + f2t * s_0_0[j];
+                
+                s_xy_0[j] = fr * s_y_0[j];
+                
+                s_xz_0[j] = fr * s_z_0[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_yy_0[j] = fr * s_y_0[j] + f2t * s_0_0[j];
+                
+                s_yz_0[j] = fr * s_z_0[j];
+                
+                // leading z component
+                
+                s_zz_0[j] = paz[j] * s_z_0[j] + f2t * s_0_0[j];
+            }
+            
+            idx++;
+        }
+    }
 
     void
-    compOverlapForSF(      CMemBlock2D<double>& primBuffer,
-                     const CMemBlock2D<double>& osFactors,
-                     const CMemBlock2D<double>& pbDistances,
-                     const CGtoBlock&           braGtoBlock,
-                     const CGtoBlock&           ketGtoBlock,
-                     const int32_t              iContrGto)
+    compOverlapForPD(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {1, 2})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (1|2)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {1, 2});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 2});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {0, 1});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (S|P) integrals
+            
+            auto s_0_x = primBuffer.data(tkoff + 3 * idx);
+            
+            auto s_0_y = primBuffer.data(tkoff + 3 * idx + 1);
+            
+            auto s_0_z = primBuffer.data(tkoff + 3 * idx + 2);
+            
+            // set up pointers to (S|D) integrals
+            
+            auto s_0_xx = primBuffer.data(t1off + 6 * idx);
+            
+            auto s_0_xy = primBuffer.data(t1off + 6 * idx + 1);
+            
+            auto s_0_xz = primBuffer.data(t1off + 6 * idx + 2);
+            
+            auto s_0_yy = primBuffer.data(t1off + 6 * idx + 3);
+            
+            auto s_0_yz = primBuffer.data(t1off + 6 * idx + 4);
+            
+            auto s_0_zz = primBuffer.data(t1off + 6 * idx + 5);
+            
+            // set up pointers to (P|D) integrals
+            
+            auto s_x_xx = primBuffer.data(soff + 18 * idx);
+            
+            auto s_x_xy = primBuffer.data(soff + 18 * idx + 1);
+            
+            auto s_x_xz = primBuffer.data(soff + 18 * idx + 2);
+            
+            auto s_x_yy = primBuffer.data(soff + 18 * idx + 3);
+            
+            auto s_x_yz = primBuffer.data(soff + 18 * idx + 4);
+            
+            auto s_x_zz = primBuffer.data(soff + 18 * idx + 5);
+            
+            auto s_y_xx = primBuffer.data(soff + 18 * idx + 6);
+            
+            auto s_y_xy = primBuffer.data(soff + 18 * idx + 7);
+            
+            auto s_y_xz = primBuffer.data(soff + 18 * idx + 8);
+            
+            auto s_y_yy = primBuffer.data(soff + 18 * idx + 9);
+            
+            auto s_y_yz = primBuffer.data(soff + 18 * idx + 10);
+            
+            auto s_y_zz = primBuffer.data(soff + 18 * idx + 11);
+            
+            auto s_z_xx = primBuffer.data(soff + 18 * idx + 12);
+            
+            auto s_z_xy = primBuffer.data(soff + 18 * idx + 13);
+            
+            auto s_z_xz = primBuffer.data(soff + 18 * idx + 14);
+            
+            auto s_z_yy = primBuffer.data(soff + 18 * idx + 15);
+            
+            auto s_z_yz = primBuffer.data(soff + 18 * idx + 16);
+            
+            auto s_z_zz = primBuffer.data(soff + 18 * idx + 17);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_0_x, s_0_y, s_0_z,\
+                                     s_0_xx, s_0_xy, s_0_xz, s_0_yy, s_0_yz,\
+                                     s_0_zz, s_x_xx, s_x_xy, s_x_xz, s_x_yy,\
+                                     s_x_yz, s_x_zz, s_y_xx, s_y_xy, s_y_xz,\
+                                     s_y_yy, s_y_yz, s_y_zz, s_z_xx, s_z_xy,\
+                                     s_z_xz, s_z_yy, s_z_yz, s_z_zz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_x_xx[j] = fr * s_0_xx[j] + f2t * 2.0 * s_0_x[j];
+                
+                s_x_xy[j] = fr * s_0_xy[j] + f2t * s_0_y[j];
+                
+                s_x_xz[j] = fr * s_0_xz[j] + f2t * s_0_z[j];
+                
+                s_x_yy[j] = fr * s_0_yy[j];
+                
+                s_x_yz[j] = fr * s_0_yz[j];
+                
+                s_x_zz[j] = fr * s_0_zz[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_y_xx[j] = fr * s_0_xx[j];
+                
+                s_y_xy[j] = fr * s_0_xy[j] + f2t * s_0_x[j];
+                
+                s_y_xz[j] = fr * s_0_xz[j];
+                
+                s_y_yy[j] = fr * s_0_yy[j] + f2t * 2.0 * s_0_y[j];
+                
+                s_y_yz[j] = fr * s_0_yz[j] + f2t * s_0_z[j];
+                
+                s_y_zz[j] = fr * s_0_zz[j];
+                
+                // leading z component
+                
+                fr = paz[j];
+                
+                s_z_xx[j] = fr * s_0_xx[j];
+                
+                s_z_xy[j] = fr * s_0_xy[j];
+                
+                s_z_xz[j] = fr * s_0_xz[j] + f2t * s_0_x[j];
+                
+                s_z_yy[j] = fr * s_0_yy[j];
+                
+                s_z_yz[j] = fr * s_0_yz[j] + f2t * s_0_y[j];
+                
+                s_z_zz[j] = fr * s_0_zz[j] + f2t * 2.0 * s_0_z[j];
+            }
+            
+            idx++;
+        }
+    }
+    
+    // FIX ME: d,p
+    
+    void
+    compOverlapForDD(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {2, 2})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (2|2)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {2, 2});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {1, 2});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 2});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {1, 1});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (P|P) integrals
+            
+            auto s_x_x = primBuffer.data(tkoff + 9 * idx);
+            
+            auto s_x_y = primBuffer.data(tkoff + 9 * idx + 1);
+            
+            auto s_x_z = primBuffer.data(tkoff + 9 * idx + 2);
+            
+            auto s_y_x = primBuffer.data(tkoff + 9 * idx + 3);
+            
+            auto s_y_y = primBuffer.data(tkoff + 9 * idx + 4);
+            
+            auto s_y_z = primBuffer.data(tkoff + 9 * idx + 5);
+            
+            auto s_z_x = primBuffer.data(tkoff + 9 * idx + 6);
+            
+            auto s_z_y = primBuffer.data(tkoff + 9 * idx + 7);
+            
+            auto s_z_z = primBuffer.data(tkoff + 9 * idx + 8);
+            
+            // set up pointers to (S|D) integrals
+            
+            auto s_0_xx = primBuffer.data(t2off + 6 * idx);
+            
+            auto s_0_xy = primBuffer.data(t2off + 6 * idx + 1);
+            
+            auto s_0_xz = primBuffer.data(t2off + 6 * idx + 2);
+            
+            auto s_0_yy = primBuffer.data(t2off + 6 * idx + 3);
+            
+            auto s_0_yz = primBuffer.data(t2off + 6 * idx + 4);
+            
+            auto s_0_zz = primBuffer.data(t2off + 6 * idx + 5);
+            
+            // set up pointers to (P|D) integrals
+            
+            auto s_x_xx = primBuffer.data(t1off + 18 * idx);
+            
+            auto s_x_xy = primBuffer.data(t1off + 18 * idx + 1);
+            
+            auto s_x_xz = primBuffer.data(t1off + 18 * idx + 2);
+            
+            auto s_x_yy = primBuffer.data(t1off + 18 * idx + 3);
+            
+            auto s_x_yz = primBuffer.data(t1off + 18 * idx + 4);
+            
+            auto s_x_zz = primBuffer.data(t1off + 18 * idx + 5);
+            
+            auto s_y_xx = primBuffer.data(t1off + 18 * idx + 6);
+            
+            auto s_y_xy = primBuffer.data(t1off + 18 * idx + 7);
+            
+            auto s_y_xz = primBuffer.data(t1off + 18 * idx + 8);
+            
+            auto s_y_yy = primBuffer.data(t1off + 18 * idx + 9);
+            
+            auto s_y_yz = primBuffer.data(t1off + 18 * idx + 10);
+            
+            auto s_y_zz = primBuffer.data(t1off + 18 * idx + 11);
+            
+            auto s_z_xx = primBuffer.data(t1off + 18 * idx + 12);
+            
+            auto s_z_xy = primBuffer.data(t1off + 18 * idx + 13);
+            
+            auto s_z_xz = primBuffer.data(t1off + 18 * idx + 14);
+            
+            auto s_z_yy = primBuffer.data(t1off + 18 * idx + 15);
+            
+            auto s_z_yz = primBuffer.data(t1off + 18 * idx + 16);
+            
+            auto s_z_zz = primBuffer.data(t1off + 18 * idx + 17);
+            
+            // set up pointers to (D|D) integrals
+            
+            auto s_xx_xx = primBuffer.data(soff + 36 * idx);
+            
+            auto s_xx_xy = primBuffer.data(soff + 36 * idx + 1);
+            
+            auto s_xx_xz = primBuffer.data(soff + 36 * idx + 2);
+            
+            auto s_xx_yy = primBuffer.data(soff + 36 * idx + 3);
+            
+            auto s_xx_yz = primBuffer.data(soff + 36 * idx + 4);
+            
+            auto s_xx_zz = primBuffer.data(soff + 36 * idx + 5);
+            
+            auto s_xy_xx = primBuffer.data(soff + 36 * idx + 6);
+            
+            auto s_xy_xy = primBuffer.data(soff + 36 * idx + 7);
+            
+            auto s_xy_xz = primBuffer.data(soff + 36 * idx + 8);
+            
+            auto s_xy_yy = primBuffer.data(soff + 36 * idx + 9);
+            
+            auto s_xy_yz = primBuffer.data(soff + 36 * idx + 10);
+            
+            auto s_xy_zz = primBuffer.data(soff + 36 * idx + 11);
+            
+            auto s_xz_xx = primBuffer.data(soff + 36 * idx + 12);
+            
+            auto s_xz_xy = primBuffer.data(soff + 36 * idx + 13);
+            
+            auto s_xz_xz = primBuffer.data(soff + 36 * idx + 14);
+            
+            auto s_xz_yy = primBuffer.data(soff + 36 * idx + 15);
+            
+            auto s_xz_yz = primBuffer.data(soff + 36 * idx + 16);
+            
+            auto s_xz_zz = primBuffer.data(soff + 36 * idx + 17);
+            
+            auto s_yy_xx = primBuffer.data(soff + 36 * idx + 18);
+            
+            auto s_yy_xy = primBuffer.data(soff + 36 * idx + 19);
+            
+            auto s_yy_xz = primBuffer.data(soff + 36 * idx + 20);
+            
+            auto s_yy_yy = primBuffer.data(soff + 36 * idx + 21);
+            
+            auto s_yy_yz = primBuffer.data(soff + 36 * idx + 22);
+            
+            auto s_yy_zz = primBuffer.data(soff + 36 * idx + 23);
+            
+            auto s_yz_xx = primBuffer.data(soff + 36 * idx + 24);
+            
+            auto s_yz_xy = primBuffer.data(soff + 36 * idx + 25);
+            
+            auto s_yz_xz = primBuffer.data(soff + 36 * idx + 26);
+            
+            auto s_yz_yy = primBuffer.data(soff + 36 * idx + 27);
+            
+            auto s_yz_yz = primBuffer.data(soff + 36 * idx + 28);
+            
+            auto s_yz_zz = primBuffer.data(soff + 36 * idx + 29);
+            
+            auto s_zz_xx = primBuffer.data(soff + 36 * idx + 30);
+            
+            auto s_zz_xy = primBuffer.data(soff + 36 * idx + 31);
+            
+            auto s_zz_xz = primBuffer.data(soff + 36 * idx + 32);
+            
+            auto s_zz_yy = primBuffer.data(soff + 36 * idx + 33);
+            
+            auto s_zz_yz = primBuffer.data(soff + 36 * idx + 34);
+            
+            auto s_zz_zz = primBuffer.data(soff + 36 * idx + 35);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_x_x, s_x_y, s_x_z,\
+                                     s_y_x, s_y_y, s_y_z, s_z_x, s_z_y, s_z_z,\
+                                     s_0_xx, s_0_xy, s_0_xz, s_0_yy, s_0_yz,\
+                                     s_0_zz, s_x_xx, s_x_xy, s_x_xz, s_x_yy,\
+                                     s_x_yz, s_x_zz, s_y_xx, s_y_xy, s_y_xz,\
+                                     s_y_yy, s_y_yz, s_y_zz, s_z_xx, s_z_xy,\
+                                     s_z_xz, s_z_yy, s_z_yz, s_z_zz, s_xx_xx,\
+                                     s_xx_xy, s_xx_xz, s_xx_yy, s_xx_yz, s_xx_zz,\
+                                     s_xy_xx, s_xy_xy, s_xy_xz, s_xy_yy, s_xy_yz,\
+                                     s_xy_zz, s_xz_xx, s_xz_xy, s_xz_xz, s_xz_yy,\
+                                     s_xz_yz, s_xz_zz, s_yy_xx, s_yy_xy, s_yy_xz,\
+                                     s_yy_yy, s_yy_yz, s_yy_zz, s_yz_xx, s_yz_xy,\
+                                     s_yz_xz, s_yz_yy, s_yz_yz, s_yz_zz, s_zz_xx,\
+                                     s_zz_xy, s_zz_xz, s_zz_yy, s_zz_yz,\
+                                     s_zz_zz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_xx_xx[j] = fr * s_x_xx[j] + f2t * (s_0_xx[j] + 2.0 * s_x_x[j]);
+                
+                s_xx_xy[j] = fr * s_x_xy[j] + f2t * (s_0_xy[j] + s_x_y[j]);
+                
+                s_xx_xz[j] = fr * s_x_xz[j] + f2t * (s_0_xz[j] + s_x_z[j]);
+                
+                s_xx_yy[j] = fr * s_x_yy[j] + f2t * s_0_yy[j];
+                
+                s_xx_yz[j] = fr * s_x_yz[j] + f2t * s_0_yz[j];
+                
+                s_xx_zz[j] = fr * s_x_zz[j] + f2t * s_0_zz[j];
+                
+                s_xy_xx[j] = fr * s_y_xx[j] + f2t * 2.0 * s_y_x[j];
+                
+                s_xy_xy[j] = fr * s_y_xy[j] + f2t * s_y_y[j];
+                
+                s_xy_xz[j] = fr * s_y_xz[j] + f2t * s_y_z[j];
+                
+                s_xy_yy[j] = fr * s_y_yy[j];
+                
+                s_xy_yz[j] = fr * s_y_yz[j];
+                
+                s_xy_zz[j] = fr * s_y_zz[j];
+                
+                s_xz_xx[j] = fr * s_z_xx[j] + f2t * 2.0 * s_z_x[j];
+                
+                s_xz_xy[j] = fr * s_z_xy[j] + f2t * s_z_y[j];
+                
+                s_xz_xz[j] = fr * s_z_xz[j] + f2t * s_z_z[j];
+                
+                s_xz_yy[j] = fr * s_z_yy[j];
+                
+                s_xz_yz[j] = fr * s_z_yz[j];
+                
+                s_xz_zz[j] = fr * s_z_zz[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_yy_xx[j] = fr * s_y_xx[j] + f2t * s_0_xx[j];
+                
+                s_yy_xy[j] = fr * s_y_xy[j] + f2t * (s_0_xy[j] + s_y_x[j]);
+                
+                s_yy_xz[j] = fr * s_y_xz[j] + f2t * s_0_xz[j];
+                
+                s_yy_yy[j] = fr * s_y_yy[j] + f2t * (s_0_yy[j] + 2.0 * s_y_y[j]);
+                
+                s_yy_yz[j] = fr * s_y_yz[j] + f2t * (s_0_yz[j] + s_y_z[j]);
+                
+                s_yy_zz[j] = fr * s_y_zz[j] + f2t * s_0_zz[j];
+                
+                s_yz_xx[j] = fr * s_z_xx[j];
+                
+                s_yz_xy[j] = fr * s_z_xy[j] + f2t * s_z_x[j];
+                
+                s_yz_xz[j] = fr * s_z_xz[j];
+                
+                s_yz_yy[j] = fr * s_z_yy[j] + f2t * 2.0 * s_z_y[j];
+                
+                s_yz_yz[j] = fr * s_z_yz[j] + f2t * s_z_z[j];
+                
+                s_yz_zz[j] = fr * s_z_zz[j];
+                
+                // leading z component
+                
+                fr = paz[j];
+                
+                s_zz_xx[j] = fr * s_z_xx[j] + f2t * s_0_xx[j];
+                
+                s_zz_xy[j] = fr * s_z_xy[j] + f2t * s_0_xy[j];
+                
+                s_zz_xz[j] = fr * s_z_xz[j] + f2t * (s_0_xz[j] + s_z_x[j]);
+                
+                s_zz_yy[j] = fr * s_z_yy[j] + f2t * s_0_yy[j];
+                
+                s_zz_yz[j] = fr * s_z_yz[j] + f2t * (s_0_yz[j] + s_z_y[j]);
+                
+                s_zz_zz[j] = fr * s_z_zz[j] + f2t * (s_0_zz[j] + 2.0 * s_z_z[j]);
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compOverlapForSF(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  pbDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {0, 3})) return;
+        
         if (iContrGto  == 0) printf(" * VRR: (0|3)\n");
         
         // set up pointers to primitives data on bra side
@@ -275,10 +1110,14 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // set up pointers to primitives data on ket side
 
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {0, 3});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 2});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 1});
 
         // loop over contracted GTO on bra side
 
@@ -300,15 +1139,13 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             // set up pointers to (S|P) integrals
 
-            auto s_0_x = primBuffer.data(bdim + 3 * idx);
+            auto s_0_x = primBuffer.data(t2off + 3 * idx);
 
-            auto s_0_y = primBuffer.data(bdim + 3 * idx + 1);
+            auto s_0_y = primBuffer.data(t2off + 3 * idx + 1);
 
-            auto s_0_z = primBuffer.data(bdim + 3 * idx + 2);
+            auto s_0_z = primBuffer.data(t2off + 3 * idx + 2);
 
             // set up pointers to (S|D) integrals
-
-            int32_t t1off = 4 * bdim;
 
             auto s_0_xx = primBuffer.data(t1off + 6 * idx);
 
@@ -323,8 +1160,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_0_zz = primBuffer.data(t1off + 6 * idx + 5);
 
             // set up pointers to (S|F) integrals
-
-            int32_t soff = 10 * bdim;
 
             auto s_0_xxx = primBuffer.data(soff + 10 * idx);
 
@@ -391,15 +1226,1670 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             idx++;
         }
     }
+    
+    void
+    compOverlapForFS(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {3, 0})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (3|0)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {3, 0});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {3, 0});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {1, 0});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (P|S) integrals
+            
+            auto s_x_0 = primBuffer.data(t2off + 3 * idx);
+            
+            auto s_y_0 = primBuffer.data(t2off + 3 * idx + 1);
+            
+            auto s_z_0 = primBuffer.data(t2off + 3 * idx + 2);
+            
+            // set up pointers to (D|S) integrals
+            
+            auto s_xx_0 = primBuffer.data(t1off + 6 * idx);
+            
+            auto s_xy_0 = primBuffer.data(t1off + 6 * idx + 1);
+            
+            auto s_xz_0 = primBuffer.data(t1off + 6 * idx + 2);
+            
+            auto s_yy_0 = primBuffer.data(t1off + 6 * idx + 3);
+            
+            auto s_yz_0 = primBuffer.data(t1off + 6 * idx + 4);
+            
+            auto s_zz_0 = primBuffer.data(t1off + 6 * idx + 5);
+            
+            // set up pointers to (F|S) integrals
+            
+            auto s_xxx_0 = primBuffer.data(soff + 10 * idx);
+            
+            auto s_xxy_0 = primBuffer.data(soff + 10 * idx + 1);
+            
+            auto s_xxz_0 = primBuffer.data(soff + 10 * idx + 2);
+            
+            auto s_xyy_0 = primBuffer.data(soff + 10 * idx + 3);
+            
+            auto s_xyz_0 = primBuffer.data(soff + 10 * idx + 4);
+            
+            auto s_xzz_0 = primBuffer.data(soff + 10 * idx + 5);
+            
+            auto s_yyy_0 = primBuffer.data(soff + 10 * idx + 6);
+            
+            auto s_yyz_0 = primBuffer.data(soff + 10 * idx + 7);
+            
+            auto s_yzz_0 = primBuffer.data(soff + 10 * idx + 8);
+            
+            auto s_zzz_0 = primBuffer.data(soff + 10 * idx + 9);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_x_0, s_y_0, s_z_0,\
+                                     s_xx_0, s_xy_0, s_xz_0, s_yy_0, s_yz_0,\
+                                     s_zz_0, s_xxx_0, s_xxy_0, s_xxz_0,\
+                                     s_xyy_0, s_xyz_0, s_xzz_0, s_yyy_0,\
+                                     s_yyz_0, s_yzz_0, s_zzz_0: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_xxx_0[j] = fr * s_xx_0[j] + 2.0 * f2t * s_x_0[j];
+                
+                s_xxy_0[j] = fr * s_xy_0[j] + f2t * s_y_0[j];
+                
+                s_xxz_0[j] = fr * s_xz_0[j] + f2t * s_z_0[j];
+                
+                s_xyy_0[j] = fr * s_yy_0[j];
+                
+                s_xyz_0[j] = fr * s_yz_0[j];
+                
+                s_xzz_0[j] = fr * s_zz_0[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_yyy_0[j] = fr * s_yy_0[j] + 2.0 * f2t * s_y_0[j];
+                
+                s_yyz_0[j] = fr * s_yz_0[j] + f2t * s_z_0[j];
+                
+                s_yzz_0[j] = fr * s_zz_0[j];
+                
+                // leading z component
+                
+                s_zzz_0[j] = paz[j] * s_zz_0[j] + 2.0 * f2t * s_z_0[j];
+            }
+            
+            idx++;
+        }
+    }
 
     void
-    compOverlapForSG(      CMemBlock2D<double>& primBuffer,
-                     const CMemBlock2D<double>& osFactors,
-                     const CMemBlock2D<double>& pbDistances,
-                     const CGtoBlock&           braGtoBlock,
-                     const CGtoBlock&           ketGtoBlock,
-                     const int32_t              iContrGto)
+    compOverlapForPF(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {1, 3})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (1|3)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {1, 3});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 3});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {0, 2});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (S|D) integrals
+            
+            auto s_0_xx = primBuffer.data(tkoff + 6 * idx);
+            
+            auto s_0_xy = primBuffer.data(tkoff + 6 * idx + 1);
+            
+            auto s_0_xz = primBuffer.data(tkoff + 6 * idx + 2);
+            
+            auto s_0_yy = primBuffer.data(tkoff + 6 * idx + 3);
+            
+            auto s_0_yz = primBuffer.data(tkoff + 6 * idx + 4);
+            
+            auto s_0_zz = primBuffer.data(tkoff + 6 * idx + 5);
+            
+            // set up pointers to (S|F) integrals
+            
+            auto s_0_xxx = primBuffer.data(t1off + 10 * idx);
+            
+            auto s_0_xxy = primBuffer.data(t1off + 10 * idx + 1);
+            
+            auto s_0_xxz = primBuffer.data(t1off + 10 * idx + 2);
+            
+            auto s_0_xyy = primBuffer.data(t1off + 10 * idx + 3);
+            
+            auto s_0_xyz = primBuffer.data(t1off + 10 * idx + 4);
+            
+            auto s_0_xzz = primBuffer.data(t1off + 10 * idx + 5);
+            
+            auto s_0_yyy = primBuffer.data(t1off + 10 * idx + 6);
+            
+            auto s_0_yyz = primBuffer.data(t1off + 10 * idx + 7);
+            
+            auto s_0_yzz = primBuffer.data(t1off + 10 * idx + 8);
+            
+            auto s_0_zzz = primBuffer.data(t1off + 10 * idx + 9);
+            
+            // set up pointers to (P|F) integrals
+            
+            auto s_x_xxx = primBuffer.data(soff + 30 * idx);
+            
+            auto s_x_xxy = primBuffer.data(soff + 30 * idx + 1);
+            
+            auto s_x_xxz = primBuffer.data(soff + 30 * idx + 2);
+            
+            auto s_x_xyy = primBuffer.data(soff + 30 * idx + 3);
+            
+            auto s_x_xyz = primBuffer.data(soff + 30 * idx + 4);
+            
+            auto s_x_xzz = primBuffer.data(soff + 30 * idx + 5);
+            
+            auto s_x_yyy = primBuffer.data(soff + 30 * idx + 6);
+            
+            auto s_x_yyz = primBuffer.data(soff + 30 * idx + 7);
+            
+            auto s_x_yzz = primBuffer.data(soff + 30 * idx + 8);
+            
+            auto s_x_zzz = primBuffer.data(soff + 30 * idx + 9);
+            
+            auto s_y_xxx = primBuffer.data(soff + 30 * idx + 10);
+            
+            auto s_y_xxy = primBuffer.data(soff + 30 * idx + 11);
+            
+            auto s_y_xxz = primBuffer.data(soff + 30 * idx + 12);
+            
+            auto s_y_xyy = primBuffer.data(soff + 30 * idx + 13);
+            
+            auto s_y_xyz = primBuffer.data(soff + 30 * idx + 14);
+            
+            auto s_y_xzz = primBuffer.data(soff + 30 * idx + 15);
+            
+            auto s_y_yyy = primBuffer.data(soff + 30 * idx + 16);
+            
+            auto s_y_yyz = primBuffer.data(soff + 30 * idx + 17);
+            
+            auto s_y_yzz = primBuffer.data(soff + 30 * idx + 18);
+            
+            auto s_y_zzz = primBuffer.data(soff + 30 * idx + 19);
+            
+            auto s_z_xxx = primBuffer.data(soff + 30 * idx + 20);
+            
+            auto s_z_xxy = primBuffer.data(soff + 30 * idx + 21);
+            
+            auto s_z_xxz = primBuffer.data(soff + 30 * idx + 22);
+            
+            auto s_z_xyy = primBuffer.data(soff + 30 * idx + 23);
+            
+            auto s_z_xyz = primBuffer.data(soff + 30 * idx + 24);
+            
+            auto s_z_xzz = primBuffer.data(soff + 30 * idx + 25);
+            
+            auto s_z_yyy = primBuffer.data(soff + 30 * idx + 26);
+            
+            auto s_z_yyz = primBuffer.data(soff + 30 * idx + 27);
+            
+            auto s_z_yzz = primBuffer.data(soff + 30 * idx + 28);
+            
+            auto s_z_zzz = primBuffer.data(soff + 30 * idx + 29);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_0_xx, s_0_xy, s_0_xz,\
+                                     s_0_yy, s_0_yz, s_0_zz, s_0_xxx, s_0_xxy,\
+                                     s_0_xxz, s_0_xyy, s_0_xyz, s_0_xzz, s_0_yyy,\
+                                     s_0_yyz, s_0_yzz, s_0_zzz, s_x_xxx, s_x_xxy,\
+                                     s_x_xxz, s_x_xyy, s_x_xyz, s_x_xzz, s_x_yyy,\
+                                     s_x_yyz, s_x_yzz, s_x_zzz, s_y_xxx, s_y_xxy,\
+                                     s_y_xxz, s_y_xyy, s_y_xyz, s_y_xzz, s_y_yyy,\
+                                     s_y_yyz, s_y_yzz, s_y_zzz, s_z_xxx, s_z_xxy,\
+                                     s_z_xxz, s_z_xyy, s_z_xyz, s_z_xzz, s_z_yyy,\
+                                     s_z_yyz, s_z_yzz, s_z_zzz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_x_xxx[j] = fr * s_0_xxx[j] + f2t * 3.0 * s_0_xx[j];
+                
+                s_x_xxy[j] = fr * s_0_xxy[j] + f2t * 2.0 * s_0_xy[j];
+                
+                s_x_xxz[j] = fr * s_0_xxz[j] + f2t * 2.0 * s_0_xz[j];
+                
+                s_x_xyy[j] = fr * s_0_xyy[j] + f2t * s_0_yy[j];
+                
+                s_x_xyz[j] = fr * s_0_xyz[j] + f2t * s_0_yz[j];
+                
+                s_x_xzz[j] = fr * s_0_xzz[j] + f2t * s_0_zz[j];
+                
+                s_x_yyy[j] = fr * s_0_yyy[j];
+                
+                s_x_yyz[j] = fr * s_0_yyz[j];
+                
+                s_x_yzz[j] = fr * s_0_yzz[j];
+                
+                s_x_zzz[j] = fr * s_0_zzz[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_y_xxx[j] = fr * s_0_xxx[j];
+                
+                s_y_xxy[j] = fr * s_0_xxy[j] + f2t * s_0_xx[j];
+                
+                s_y_xxz[j] = fr * s_0_xxz[j];
+                
+                s_y_xyy[j] = fr * s_0_xyy[j] + f2t * 2.0 * s_0_xy[j];
+                
+                s_y_xyz[j] = fr * s_0_xyz[j] + f2t * s_0_xz[j];
+                
+                s_y_xzz[j] = fr * s_0_xzz[j];
+                
+                s_y_yyy[j] = fr * s_0_yyy[j] + f2t * 3.0 * s_0_yy[j];
+                
+                s_y_yyz[j] = fr * s_0_yyz[j] + f2t * 2.0 * s_0_yz[j];
+                
+                s_y_yzz[j] = fr * s_0_yzz[j] + f2t * s_0_zz[j];
+                
+                s_y_zzz[j] = fr * s_0_zzz[j];
+                
+                // leading z component
+                
+                fr = paz[j];
+                
+                s_z_xxx[j] = fr * s_0_xxx[j];
+                
+                s_z_xxy[j] = fr * s_0_xxy[j];
+                
+                s_z_xxz[j] = fr * s_0_xxz[j] + f2t * s_0_xx[j];
+                
+                s_z_xyy[j] = fr * s_0_xyy[j];
+                
+                s_z_xyz[j] = fr * s_0_xyz[j] + f2t * s_0_xy[j];
+                
+                s_z_xzz[j] = fr * s_0_xzz[j] + f2t * 2.0 * s_0_xz[j];
+                
+                s_z_yyy[j] = fr * s_0_yyy[j];
+                
+                s_z_yyz[j] = fr * s_0_yyz[j] + f2t * s_0_yy[j];
+                
+                s_z_yzz[j] = fr * s_0_yzz[j] + f2t * 2.0 * s_0_yz[j];
+                
+                s_z_zzz[j] = fr * s_0_zzz[j] + f2t * 3.0 * s_0_zz[j];
+            }
+            
+            idx++;
+        }
+    }
+    
+    // FIX ME: add (f,p)
+    
+    void
+    compOverlapForDF(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {2, 3})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (2|3)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {2, 3});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {1, 3});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 3});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {1, 2});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (P|D) integrals
+            
+            auto s_x_xx = primBuffer.data(tkoff + 18 * idx);
+            
+            auto s_x_xy = primBuffer.data(tkoff + 18 * idx + 1);
+            
+            auto s_x_xz = primBuffer.data(tkoff + 18 * idx + 2);
+            
+            auto s_x_yy = primBuffer.data(tkoff + 18 * idx + 3);
+            
+            auto s_x_yz = primBuffer.data(tkoff + 18 * idx + 4);
+            
+            auto s_x_zz = primBuffer.data(tkoff + 18 * idx + 5);
+            
+            auto s_y_xx = primBuffer.data(tkoff + 18 * idx + 6);
+            
+            auto s_y_xy = primBuffer.data(tkoff + 18 * idx + 7);
+            
+            auto s_y_xz = primBuffer.data(tkoff + 18 * idx + 8);
+            
+            auto s_y_yy = primBuffer.data(tkoff + 18 * idx + 9);
+            
+            auto s_y_yz = primBuffer.data(tkoff + 18 * idx + 10);
+            
+            auto s_y_zz = primBuffer.data(tkoff + 18 * idx + 11);
+            
+            auto s_z_xx = primBuffer.data(tkoff + 18 * idx + 12);
+            
+            auto s_z_xy = primBuffer.data(tkoff + 18 * idx + 13);
+            
+            auto s_z_xz = primBuffer.data(tkoff + 18 * idx + 14);
+            
+            auto s_z_yy = primBuffer.data(tkoff + 18 * idx + 15);
+            
+            auto s_z_yz = primBuffer.data(tkoff + 18 * idx + 16);
+            
+            auto s_z_zz = primBuffer.data(tkoff + 18 * idx + 17);
+            
+            // set up pointers to (S|F) integrals
+            
+            auto s_0_xxx = primBuffer.data(t2off + 10 * idx);
+            
+            auto s_0_xxy = primBuffer.data(t2off + 10 * idx + 1);
+            
+            auto s_0_xxz = primBuffer.data(t2off + 10 * idx + 2);
+            
+            auto s_0_xyy = primBuffer.data(t2off + 10 * idx + 3);
+            
+            auto s_0_xyz = primBuffer.data(t2off + 10 * idx + 4);
+            
+            auto s_0_xzz = primBuffer.data(t2off + 10 * idx + 5);
+            
+            auto s_0_yyy = primBuffer.data(t2off + 10 * idx + 6);
+            
+            auto s_0_yyz = primBuffer.data(t2off + 10 * idx + 7);
+            
+            auto s_0_yzz = primBuffer.data(t2off + 10 * idx + 8);
+            
+            auto s_0_zzz = primBuffer.data(t2off + 10 * idx + 9);
+            
+            // set up pointers to (P|F) integrals
+            
+            auto s_x_xxx = primBuffer.data(t1off + 30 * idx);
+            
+            auto s_x_xxy = primBuffer.data(t1off + 30 * idx + 1);
+            
+            auto s_x_xxz = primBuffer.data(t1off + 30 * idx + 2);
+            
+            auto s_x_xyy = primBuffer.data(t1off + 30 * idx + 3);
+            
+            auto s_x_xyz = primBuffer.data(t1off + 30 * idx + 4);
+            
+            auto s_x_xzz = primBuffer.data(t1off + 30 * idx + 5);
+            
+            auto s_x_yyy = primBuffer.data(t1off + 30 * idx + 6);
+            
+            auto s_x_yyz = primBuffer.data(t1off + 30 * idx + 7);
+            
+            auto s_x_yzz = primBuffer.data(t1off + 30 * idx + 8);
+            
+            auto s_x_zzz = primBuffer.data(t1off + 30 * idx + 9);
+            
+            auto s_y_xxx = primBuffer.data(t1off + 30 * idx + 10);
+            
+            auto s_y_xxy = primBuffer.data(t1off + 30 * idx + 11);
+            
+            auto s_y_xxz = primBuffer.data(t1off + 30 * idx + 12);
+            
+            auto s_y_xyy = primBuffer.data(t1off + 30 * idx + 13);
+            
+            auto s_y_xyz = primBuffer.data(t1off + 30 * idx + 14);
+            
+            auto s_y_xzz = primBuffer.data(t1off + 30 * idx + 15);
+            
+            auto s_y_yyy = primBuffer.data(t1off + 30 * idx + 16);
+            
+            auto s_y_yyz = primBuffer.data(t1off + 30 * idx + 17);
+            
+            auto s_y_yzz = primBuffer.data(t1off + 30 * idx + 18);
+            
+            auto s_y_zzz = primBuffer.data(t1off + 30 * idx + 19);
+            
+            auto s_z_xxx = primBuffer.data(t1off + 30 * idx + 20);
+            
+            auto s_z_xxy = primBuffer.data(t1off + 30 * idx + 21);
+            
+            auto s_z_xxz = primBuffer.data(t1off + 30 * idx + 22);
+            
+            auto s_z_xyy = primBuffer.data(t1off + 30 * idx + 23);
+            
+            auto s_z_xyz = primBuffer.data(t1off + 30 * idx + 24);
+            
+            auto s_z_xzz = primBuffer.data(t1off + 30 * idx + 25);
+            
+            auto s_z_yyy = primBuffer.data(t1off + 30 * idx + 26);
+            
+            auto s_z_yyz = primBuffer.data(t1off + 30 * idx + 27);
+            
+            auto s_z_yzz = primBuffer.data(t1off + 30 * idx + 28);
+            
+            auto s_z_zzz = primBuffer.data(t1off + 30 * idx + 29);
+            
+            // set up pointers to (D|F) integrals
+            
+            auto s_xx_xxx = primBuffer.data(soff + 60 * idx);
+            
+            auto s_xx_xxy = primBuffer.data(soff + 60 * idx + 1);
+            
+            auto s_xx_xxz = primBuffer.data(soff + 60 * idx + 2);
+            
+            auto s_xx_xyy = primBuffer.data(soff + 60 * idx + 3);
+            
+            auto s_xx_xyz = primBuffer.data(soff + 60 * idx + 4);
+            
+            auto s_xx_xzz = primBuffer.data(soff + 60 * idx + 5);
+            
+            auto s_xx_yyy = primBuffer.data(soff + 60 * idx + 6);
+            
+            auto s_xx_yyz = primBuffer.data(soff + 60 * idx + 7);
+            
+            auto s_xx_yzz = primBuffer.data(soff + 60 * idx + 8);
+            
+            auto s_xx_zzz = primBuffer.data(soff + 60 * idx + 9);
+            
+            auto s_xy_xxx = primBuffer.data(soff + 60 * idx + 10);
+            
+            auto s_xy_xxy = primBuffer.data(soff + 60 * idx + 11);
+            
+            auto s_xy_xxz = primBuffer.data(soff + 60 * idx + 12);
+            
+            auto s_xy_xyy = primBuffer.data(soff + 60 * idx + 13);
+            
+            auto s_xy_xyz = primBuffer.data(soff + 60 * idx + 14);
+            
+            auto s_xy_xzz = primBuffer.data(soff + 60 * idx + 15);
+            
+            auto s_xy_yyy = primBuffer.data(soff + 60 * idx + 16);
+            
+            auto s_xy_yyz = primBuffer.data(soff + 60 * idx + 17);
+            
+            auto s_xy_yzz = primBuffer.data(soff + 60 * idx + 18);
+            
+            auto s_xy_zzz = primBuffer.data(soff + 60 * idx + 19);
+            
+            auto s_xz_xxx = primBuffer.data(soff + 60 * idx + 20);
+            
+            auto s_xz_xxy = primBuffer.data(soff + 60 * idx + 21);
+            
+            auto s_xz_xxz = primBuffer.data(soff + 60 * idx + 22);
+            
+            auto s_xz_xyy = primBuffer.data(soff + 60 * idx + 23);
+            
+            auto s_xz_xyz = primBuffer.data(soff + 60 * idx + 24);
+            
+            auto s_xz_xzz = primBuffer.data(soff + 60 * idx + 25);
+            
+            auto s_xz_yyy = primBuffer.data(soff + 60 * idx + 26);
+            
+            auto s_xz_yyz = primBuffer.data(soff + 60 * idx + 27);
+            
+            auto s_xz_yzz = primBuffer.data(soff + 60 * idx + 28);
+            
+            auto s_xz_zzz = primBuffer.data(soff + 60 * idx + 29);
+            
+            auto s_yy_xxx = primBuffer.data(soff + 60 * idx + 30);
+            
+            auto s_yy_xxy = primBuffer.data(soff + 60 * idx + 31);
+            
+            auto s_yy_xxz = primBuffer.data(soff + 60 * idx + 32);
+            
+            auto s_yy_xyy = primBuffer.data(soff + 60 * idx + 33);
+            
+            auto s_yy_xyz = primBuffer.data(soff + 60 * idx + 34);
+            
+            auto s_yy_xzz = primBuffer.data(soff + 60 * idx + 35);
+            
+            auto s_yy_yyy = primBuffer.data(soff + 60 * idx + 36);
+            
+            auto s_yy_yyz = primBuffer.data(soff + 60 * idx + 37);
+            
+            auto s_yy_yzz = primBuffer.data(soff + 60 * idx + 38);
+            
+            auto s_yy_zzz = primBuffer.data(soff + 60 * idx + 39);
+            
+            auto s_yz_xxx = primBuffer.data(soff + 60 * idx + 40);
+            
+            auto s_yz_xxy = primBuffer.data(soff + 60 * idx + 41);
+            
+            auto s_yz_xxz = primBuffer.data(soff + 60 * idx + 42);
+            
+            auto s_yz_xyy = primBuffer.data(soff + 60 * idx + 43);
+            
+            auto s_yz_xyz = primBuffer.data(soff + 60 * idx + 44);
+            
+            auto s_yz_xzz = primBuffer.data(soff + 60 * idx + 45);
+            
+            auto s_yz_yyy = primBuffer.data(soff + 60 * idx + 46);
+            
+            auto s_yz_yyz = primBuffer.data(soff + 60 * idx + 47);
+            
+            auto s_yz_yzz = primBuffer.data(soff + 60 * idx + 48);
+            
+            auto s_yz_zzz = primBuffer.data(soff + 60 * idx + 49);
+            
+            auto s_zz_xxx = primBuffer.data(soff + 60 * idx + 50);
+            
+            auto s_zz_xxy = primBuffer.data(soff + 60 * idx + 51);
+            
+            auto s_zz_xxz = primBuffer.data(soff + 60 * idx + 52);
+            
+            auto s_zz_xyy = primBuffer.data(soff + 60 * idx + 53);
+            
+            auto s_zz_xyz = primBuffer.data(soff + 60 * idx + 54);
+            
+            auto s_zz_xzz = primBuffer.data(soff + 60 * idx + 55);
+            
+            auto s_zz_yyy = primBuffer.data(soff + 60 * idx + 56);
+            
+            auto s_zz_yyz = primBuffer.data(soff + 60 * idx + 57);
+            
+            auto s_zz_yzz = primBuffer.data(soff + 60 * idx + 58);
+            
+            auto s_zz_zzz = primBuffer.data(soff + 60 * idx + 59);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_x_xx, s_x_xy, s_x_xz,\
+                                     s_x_yy, s_x_yz, s_x_zz, s_y_xx, s_y_xy,\
+                                     s_y_xz, s_y_yy, s_y_yz, s_y_zz, s_z_xx,\
+                                     s_z_xy, s_z_xz, s_z_yy, s_z_yz, s_z_zz,\
+                                     s_0_xxx, s_0_xxy, s_0_xxz, s_0_xyy, s_0_xyz,\
+                                     s_0_xzz, s_0_yyy, s_0_yyz, s_0_yzz, s_0_zzz,\
+                                     s_x_xxx, s_x_xxy, s_x_xxz, s_x_xyy, s_x_xyz,\
+                                     s_x_xzz, s_x_yyy, s_x_yyz, s_x_yzz, s_x_zzz,\
+                                     s_y_xxx, s_y_xxy, s_y_xxz, s_y_xyy, s_y_xyz,\
+                                     s_y_xzz, s_y_yyy, s_y_yyz, s_y_yzz, s_y_zzz,\
+                                     s_z_xxx, s_z_xxy, s_z_xxz, s_z_xyy, s_z_xyz,\
+                                     s_z_xzz, s_z_yyy, s_z_yyz, s_z_yzz, s_z_zzz,\
+                                     s_xx_xxx, s_xx_xxy, s_xx_xxz, s_xx_xyy,\
+                                     s_xx_xyz, s_xx_xzz, s_xx_yyy, s_xx_yyz,\
+                                     s_xx_yzz, s_xx_zzz, s_xy_xxx, s_xy_xxy,\
+                                     s_xy_xxz, s_xy_xyy, s_xy_xyz, s_xy_xzz,\
+                                     s_xy_yyy, s_xy_yyz, s_xy_yzz, s_xy_zzz,\
+                                     s_xz_xxx, s_xz_xxy, s_xz_xxz, s_xz_xyy,\
+                                     s_xz_xyz, s_xz_xzz, s_xz_yyy, s_xz_yyz,\
+                                     s_xz_yzz, s_xz_zzz, s_yy_xxx, s_yy_xxy,\
+                                     s_yy_xxz, s_yy_xyy, s_yy_xyz, s_yy_xzz,\
+                                     s_yy_yyy, s_yy_yyz, s_yy_yzz, s_yy_zzz,\
+                                     s_yz_xxx, s_yz_xxy, s_yz_xxz, s_yz_xyy,\
+                                     s_yz_xyz, s_yz_xzz, s_yz_yyy, s_yz_yyz,\
+                                     s_yz_yzz, s_yz_zzz, s_zz_xxx, s_zz_xxy,\
+                                     s_zz_xxz, s_zz_xyy, s_zz_xyz, s_zz_xzz,\
+                                     s_zz_yyy, s_zz_yyz, s_zz_yzz,\
+                                     s_zz_zzz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_xx_xxx[j] = fr * s_x_xxx[j] + f2t * (s_0_xxx[j] + 3.0 * s_x_xx[j]);
+                
+                s_xx_xxy[j] = fr * s_x_xxy[j] + f2t * (s_0_xxy[j] + 2.0 * s_x_xy[j]);
+                
+                s_xx_xxz[j] = fr * s_x_xxz[j] + f2t * (s_0_xxz[j] + 2.0 * s_x_xz[j]);
+                
+                s_xx_xyy[j] = fr * s_x_xyy[j] + f2t * (s_0_xyy[j] + s_x_yy[j]);
+                
+                s_xx_xyz[j] = fr * s_x_xyz[j] + f2t * (s_0_xyz[j] + s_x_yz[j]);
+                
+                s_xx_xzz[j] = fr * s_x_xzz[j] + f2t * (s_0_xzz[j] + s_x_zz[j]);
+                
+                s_xx_yyy[j] = fr * s_x_yyy[j] + f2t * s_0_yyy[j];
+                
+                s_xx_yyz[j] = fr * s_x_yyz[j] + f2t * s_0_yyz[j];
+                
+                s_xx_yzz[j] = fr * s_x_yzz[j] + f2t * s_0_yzz[j];
+                
+                s_xx_zzz[j] = fr * s_x_zzz[j] + f2t * s_0_zzz[j];
+                
+                s_xy_xxx[j] = fr * s_y_xxx[j] + f2t * 3.0 * s_y_xx[j];
+                
+                s_xy_xxy[j] = fr * s_y_xxy[j] + f2t * 2.0 * s_y_xy[j];
+                
+                s_xy_xxz[j] = fr * s_y_xxz[j] + f2t * 2.0 * s_y_xz[j];
+                
+                s_xy_xyy[j] = fr * s_y_xyy[j] + f2t * s_y_yy[j];
+                
+                s_xy_xyz[j] = fr * s_y_xyz[j] + f2t * s_y_yz[j];
+                
+                s_xy_xzz[j] = fr * s_y_xzz[j] + f2t * s_y_zz[j];
+                
+                s_xy_yyy[j] = fr * s_y_yyy[j];
+                
+                s_xy_yyz[j] = fr * s_y_yyz[j];
+                
+                s_xy_yzz[j] = fr * s_y_yzz[j];
+                
+                s_xy_zzz[j] = fr * s_y_zzz[j];
+                
+                s_xz_xxx[j] = fr * s_z_xxx[j] + f2t * 3.0 * s_z_xx[j];
+                
+                s_xz_xxy[j] = fr * s_z_xxy[j] + f2t * 2.0 * s_z_xy[j];
+                
+                s_xz_xxz[j] = fr * s_z_xxz[j] + f2t * 2.0 * s_z_xz[j];
+                
+                s_xz_xyy[j] = fr * s_z_xyy[j] + f2t * s_z_yy[j];
+                
+                s_xz_xyz[j] = fr * s_z_xyz[j] + f2t * s_z_yz[j];
+                
+                s_xz_xzz[j] = fr * s_z_xzz[j] + f2t * s_z_zz[j];
+                
+                s_xz_yyy[j] = fr * s_z_yyy[j];
+                
+                s_xz_yyz[j] = fr * s_z_yyz[j];
+                
+                s_xz_yzz[j] = fr * s_z_yzz[j];
+                
+                s_xz_zzz[j] = fr * s_z_zzz[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_yy_xxx[j] = fr * s_y_xxx[j] + f2t * s_0_xxx[j];
+                
+                s_yy_xxy[j] = fr * s_y_xxy[j] + f2t * (s_0_xxy[j] + s_y_xx[j]);
+                
+                s_yy_xxz[j] = fr * s_y_xxz[j] + f2t * s_0_xxz[j];
+                
+                s_yy_xyy[j] = fr * s_y_xyy[j] + f2t * (s_0_xyy[j] + 2.0 * s_y_xy[j]);
+                
+                s_yy_xyz[j] = fr * s_y_xyz[j] + f2t * (s_0_xyz[j] + s_y_xz[j]);
+                
+                s_yy_xzz[j] = fr * s_y_xzz[j] + f2t * s_0_xzz[j];
+                
+                s_yy_yyy[j] = fr * s_y_yyy[j] + f2t * (s_0_yyy[j] + 3.0 * s_y_yy[j]);
+                
+                s_yy_yyz[j] = fr * s_y_yyz[j] + f2t * (s_0_yyz[j] + 2.0 * s_y_yz[j]);
+                
+                s_yy_yzz[j] = fr * s_y_yzz[j] + f2t * (s_0_yzz[j] + s_y_zz[j]);
+                
+                s_yy_zzz[j] = fr * s_y_zzz[j] + f2t * s_0_zzz[j];
+                
+                s_yz_xxx[j] = fr * s_z_xxx[j];
+                
+                s_yz_xxy[j] = fr * s_z_xxy[j] + f2t * s_z_xx[j];
+                
+                s_yz_xxz[j] = fr * s_z_xxz[j];
+                
+                s_yz_xyy[j] = fr * s_z_xyy[j] + f2t * 2.0 * s_z_xy[j];
+                
+                s_yz_xyz[j] = fr * s_z_xyz[j] + f2t * s_z_xz[j];
+                
+                s_yz_xzz[j] = fr * s_z_xzz[j];
+                
+                s_yz_yyy[j] = fr * s_z_yyy[j] + f2t * 3.0 * s_z_yy[j];
+                
+                s_yz_yyz[j] = fr * s_z_yyz[j] + f2t * 2.0 * s_z_yz[j];
+                
+                s_yz_yzz[j] = fr * s_z_yzz[j] + f2t * s_z_zz[j];
+                
+                s_yz_zzz[j] = fr * s_z_zzz[j];
+                
+                // leading z component
+                
+                fr = paz[j];
+                
+                s_zz_xxx[j] = fr * s_z_xxx[j] + f2t * s_0_xxx[j];
+                
+                s_zz_xxy[j] = fr * s_z_xxy[j] + f2t * s_0_xxy[j];
+                
+                s_zz_xxz[j] = fr * s_z_xxz[j] + f2t * (s_0_xxz[j] + s_z_xx[j]);
+                
+                s_zz_xyy[j] = fr * s_z_xyy[j] + f2t * s_0_xyy[j];
+                
+                s_zz_xyz[j] = fr * s_z_xyz[j] + f2t * (s_0_xyz[j] + s_z_xy[j]);
+                
+                s_zz_xzz[j] = fr * s_z_xzz[j] + f2t * (s_0_xzz[j] + 2.0 * s_z_xz[j]);
+                
+                s_zz_yyy[j] = fr * s_z_yyy[j] + f2t * s_0_yyy[j];
+                
+                s_zz_yyz[j] = fr * s_z_yyz[j] + f2t * (s_0_yyz[j] + s_z_yy[j]);
+                
+                s_zz_yzz[j] = fr * s_z_yzz[j] + f2t * (s_0_yzz[j] + 2.0 * s_z_yz[j]);
+                
+                s_zz_zzz[j] = fr * s_z_zzz[j] + f2t * (s_0_zzz[j] + 3.0 * s_z_zz[j]);
+            }
+            
+            idx++;
+        }
+    }
+
+    // FIX ME: (f|d)
+    
+    void
+    compOverlapForFF(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {3, 3})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (3|3)\n");
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {3, 3});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {2, 3});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {1, 3});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {2, 2});
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(2 * idx);
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            // set up pointers to (D|D) integrals
+            
+            auto s_xx_xx = primBuffer.data(tkoff + 36 * idx);
+            
+            auto s_xx_xy = primBuffer.data(tkoff + 36 * idx + 1);
+            
+            auto s_xx_xz = primBuffer.data(tkoff + 36 * idx + 2);
+            
+            auto s_xx_yy = primBuffer.data(tkoff + 36 * idx + 3);
+            
+            auto s_xx_yz = primBuffer.data(tkoff + 36 * idx + 4);
+            
+            auto s_xx_zz = primBuffer.data(tkoff + 36 * idx + 5);
+            
+            auto s_xy_xx = primBuffer.data(tkoff + 36 * idx + 6);
+            
+            auto s_xy_xy = primBuffer.data(tkoff + 36 * idx + 7);
+            
+            auto s_xy_xz = primBuffer.data(tkoff + 36 * idx + 8);
+            
+            auto s_xy_yy = primBuffer.data(tkoff + 36 * idx + 9);
+            
+            auto s_xy_yz = primBuffer.data(tkoff + 36 * idx + 10);
+            
+            auto s_xy_zz = primBuffer.data(tkoff + 36 * idx + 11);
+            
+            auto s_xz_xx = primBuffer.data(tkoff + 36 * idx + 12);
+            
+            auto s_xz_xy = primBuffer.data(tkoff + 36 * idx + 13);
+            
+            auto s_xz_xz = primBuffer.data(tkoff + 36 * idx + 14);
+            
+            auto s_xz_yy = primBuffer.data(tkoff + 36 * idx + 15);
+            
+            auto s_xz_yz = primBuffer.data(tkoff + 36 * idx + 16);
+            
+            auto s_xz_zz = primBuffer.data(tkoff + 36 * idx + 17);
+            
+            auto s_yy_xx = primBuffer.data(tkoff + 36 * idx + 18);
+            
+            auto s_yy_xy = primBuffer.data(tkoff + 36 * idx + 19);
+            
+            auto s_yy_xz = primBuffer.data(tkoff + 36 * idx + 20);
+            
+            auto s_yy_yy = primBuffer.data(tkoff + 36 * idx + 21);
+            
+            auto s_yy_yz = primBuffer.data(tkoff + 36 * idx + 22);
+            
+            auto s_yy_zz = primBuffer.data(tkoff + 36 * idx + 23);
+            
+            auto s_yz_xx = primBuffer.data(tkoff + 36 * idx + 24);
+            
+            auto s_yz_xy = primBuffer.data(tkoff + 36 * idx + 25);
+            
+            auto s_yz_xz = primBuffer.data(tkoff + 36 * idx + 26);
+            
+            auto s_yz_yy = primBuffer.data(tkoff + 36 * idx + 27);
+            
+            auto s_yz_yz = primBuffer.data(tkoff + 36 * idx + 28);
+            
+            auto s_yz_zz = primBuffer.data(tkoff + 36 * idx + 29);
+            
+            auto s_zz_xx = primBuffer.data(tkoff + 36 * idx + 30);
+            
+            auto s_zz_xy = primBuffer.data(tkoff + 36 * idx + 31);
+            
+            auto s_zz_xz = primBuffer.data(tkoff + 36 * idx + 32);
+            
+            auto s_zz_yy = primBuffer.data(tkoff + 36 * idx + 33);
+            
+            auto s_zz_yz = primBuffer.data(tkoff + 36 * idx + 34);
+            
+            auto s_zz_zz = primBuffer.data(tkoff + 36 * idx + 35);
+            
+            // set up pointers to (P|F) integrals
+            
+            auto s_x_xxx = primBuffer.data(t2off + 30 * idx);
+            
+            auto s_x_xxy = primBuffer.data(t2off + 30 * idx + 1);
+            
+            auto s_x_xxz = primBuffer.data(t2off + 30 * idx + 2);
+            
+            auto s_x_xyy = primBuffer.data(t2off + 30 * idx + 3);
+            
+            auto s_x_xyz = primBuffer.data(t2off + 30 * idx + 4);
+            
+            auto s_x_xzz = primBuffer.data(t2off + 30 * idx + 5);
+            
+            auto s_x_yyy = primBuffer.data(t2off + 30 * idx + 6);
+            
+            auto s_x_yyz = primBuffer.data(t2off + 30 * idx + 7);
+            
+            auto s_x_yzz = primBuffer.data(t2off + 30 * idx + 8);
+            
+            auto s_x_zzz = primBuffer.data(t2off + 30 * idx + 9);
+            
+            auto s_y_xxx = primBuffer.data(t2off + 30 * idx + 10);
+            
+            auto s_y_xxy = primBuffer.data(t2off + 30 * idx + 11);
+            
+            auto s_y_xxz = primBuffer.data(t2off + 30 * idx + 12);
+            
+            auto s_y_xyy = primBuffer.data(t2off + 30 * idx + 13);
+            
+            auto s_y_xyz = primBuffer.data(t2off + 30 * idx + 14);
+            
+            auto s_y_xzz = primBuffer.data(t2off + 30 * idx + 15);
+            
+            auto s_y_yyy = primBuffer.data(t2off + 30 * idx + 16);
+            
+            auto s_y_yyz = primBuffer.data(t2off + 30 * idx + 17);
+            
+            auto s_y_yzz = primBuffer.data(t2off + 30 * idx + 18);
+            
+            auto s_y_zzz = primBuffer.data(t2off + 30 * idx + 19);
+            
+            auto s_z_xxx = primBuffer.data(t2off + 30 * idx + 20);
+            
+            auto s_z_xxy = primBuffer.data(t2off + 30 * idx + 21);
+            
+            auto s_z_xxz = primBuffer.data(t2off + 30 * idx + 22);
+            
+            auto s_z_xyy = primBuffer.data(t2off + 30 * idx + 23);
+            
+            auto s_z_xyz = primBuffer.data(t2off + 30 * idx + 24);
+            
+            auto s_z_xzz = primBuffer.data(t2off + 30 * idx + 25);
+            
+            auto s_z_yyy = primBuffer.data(t2off + 30 * idx + 26);
+            
+            auto s_z_yyz = primBuffer.data(t2off + 30 * idx + 27);
+            
+            auto s_z_yzz = primBuffer.data(t2off + 30 * idx + 28);
+            
+            auto s_z_zzz = primBuffer.data(t2off + 30 * idx + 29);
+            
+            // set up pointers to (D|F) integrals
+            
+            auto s_xx_xxx = primBuffer.data(t1off + 60 * idx);
+            
+            auto s_xx_xxy = primBuffer.data(t1off + 60 * idx + 1);
+            
+            auto s_xx_xxz = primBuffer.data(t1off + 60 * idx + 2);
+            
+            auto s_xx_xyy = primBuffer.data(t1off + 60 * idx + 3);
+            
+            auto s_xx_xyz = primBuffer.data(t1off + 60 * idx + 4);
+            
+            auto s_xx_xzz = primBuffer.data(t1off + 60 * idx + 5);
+            
+            auto s_xx_yyy = primBuffer.data(t1off + 60 * idx + 6);
+            
+            auto s_xx_yyz = primBuffer.data(t1off + 60 * idx + 7);
+            
+            auto s_xx_yzz = primBuffer.data(t1off + 60 * idx + 8);
+            
+            auto s_xx_zzz = primBuffer.data(t1off + 60 * idx + 9);
+            
+            auto s_xy_xxx = primBuffer.data(t1off + 60 * idx + 10);
+            
+            auto s_xy_xxy = primBuffer.data(t1off + 60 * idx + 11);
+            
+            auto s_xy_xxz = primBuffer.data(t1off + 60 * idx + 12);
+            
+            auto s_xy_xyy = primBuffer.data(t1off + 60 * idx + 13);
+            
+            auto s_xy_xyz = primBuffer.data(t1off + 60 * idx + 14);
+            
+            auto s_xy_xzz = primBuffer.data(t1off + 60 * idx + 15);
+            
+            auto s_xy_yyy = primBuffer.data(t1off + 60 * idx + 16);
+            
+            auto s_xy_yyz = primBuffer.data(t1off + 60 * idx + 17);
+            
+            auto s_xy_yzz = primBuffer.data(t1off + 60 * idx + 18);
+            
+            auto s_xy_zzz = primBuffer.data(t1off + 60 * idx + 19);
+            
+            auto s_xz_xxx = primBuffer.data(t1off + 60 * idx + 20);
+            
+            auto s_xz_xxy = primBuffer.data(t1off + 60 * idx + 21);
+            
+            auto s_xz_xxz = primBuffer.data(t1off + 60 * idx + 22);
+            
+            auto s_xz_xyy = primBuffer.data(t1off + 60 * idx + 23);
+            
+            auto s_xz_xyz = primBuffer.data(t1off + 60 * idx + 24);
+            
+            auto s_xz_xzz = primBuffer.data(t1off + 60 * idx + 25);
+            
+            auto s_xz_yyy = primBuffer.data(t1off + 60 * idx + 26);
+            
+            auto s_xz_yyz = primBuffer.data(t1off + 60 * idx + 27);
+            
+            auto s_xz_yzz = primBuffer.data(t1off + 60 * idx + 28);
+            
+            auto s_xz_zzz = primBuffer.data(t1off + 60 * idx + 29);
+            
+            auto s_yy_xxx = primBuffer.data(t1off + 60 * idx + 30);
+            
+            auto s_yy_xxy = primBuffer.data(t1off + 60 * idx + 31);
+            
+            auto s_yy_xxz = primBuffer.data(t1off + 60 * idx + 32);
+            
+            auto s_yy_xyy = primBuffer.data(t1off + 60 * idx + 33);
+            
+            auto s_yy_xyz = primBuffer.data(t1off + 60 * idx + 34);
+            
+            auto s_yy_xzz = primBuffer.data(t1off + 60 * idx + 35);
+            
+            auto s_yy_yyy = primBuffer.data(t1off + 60 * idx + 36);
+            
+            auto s_yy_yyz = primBuffer.data(t1off + 60 * idx + 37);
+            
+            auto s_yy_yzz = primBuffer.data(t1off + 60 * idx + 38);
+            
+            auto s_yy_zzz = primBuffer.data(t1off + 60 * idx + 39);
+            
+            auto s_yz_xxx = primBuffer.data(t1off + 60 * idx + 40);
+            
+            auto s_yz_xxy = primBuffer.data(t1off + 60 * idx + 41);
+            
+            auto s_yz_xxz = primBuffer.data(t1off + 60 * idx + 42);
+            
+            auto s_yz_xyy = primBuffer.data(t1off + 60 * idx + 43);
+            
+            auto s_yz_xyz = primBuffer.data(t1off + 60 * idx + 44);
+            
+            auto s_yz_xzz = primBuffer.data(t1off + 60 * idx + 45);
+            
+            auto s_yz_yyy = primBuffer.data(t1off + 60 * idx + 46);
+            
+            auto s_yz_yyz = primBuffer.data(t1off + 60 * idx + 47);
+            
+            auto s_yz_yzz = primBuffer.data(t1off + 60 * idx + 48);
+            
+            auto s_yz_zzz = primBuffer.data(t1off + 60 * idx + 49);
+            
+            auto s_zz_xxx = primBuffer.data(t1off + 60 * idx + 50);
+            
+            auto s_zz_xxy = primBuffer.data(t1off + 60 * idx + 51);
+            
+            auto s_zz_xxz = primBuffer.data(t1off + 60 * idx + 52);
+            
+            auto s_zz_xyy = primBuffer.data(t1off + 60 * idx + 53);
+            
+            auto s_zz_xyz = primBuffer.data(t1off + 60 * idx + 54);
+            
+            auto s_zz_xzz = primBuffer.data(t1off + 60 * idx + 55);
+            
+            auto s_zz_yyy = primBuffer.data(t1off + 60 * idx + 56);
+            
+            auto s_zz_yyz = primBuffer.data(t1off + 60 * idx + 57);
+            
+            auto s_zz_yzz = primBuffer.data(t1off + 60 * idx + 58);
+            
+            auto s_zz_zzz = primBuffer.data(t1off + 60 * idx + 59);
+            
+            // set up pointers to (F|F) integrals
+            
+            auto s_xxx_xxx = primBuffer.data(soff + 100 * idx);
+            
+            auto s_xxx_xxy = primBuffer.data(soff + 100 * idx + 1);
+            
+            auto s_xxx_xxz = primBuffer.data(soff + 100 * idx + 2);
+            
+            auto s_xxx_xyy = primBuffer.data(soff + 100 * idx + 3);
+            
+            auto s_xxx_xyz = primBuffer.data(soff + 100 * idx + 4);
+            
+            auto s_xxx_xzz = primBuffer.data(soff + 100 * idx + 5);
+            
+            auto s_xxx_yyy = primBuffer.data(soff + 100 * idx + 6);
+            
+            auto s_xxx_yyz = primBuffer.data(soff + 100 * idx + 7);
+            
+            auto s_xxx_yzz = primBuffer.data(soff + 100 * idx + 8);
+            
+            auto s_xxx_zzz = primBuffer.data(soff + 100 * idx + 9);
+            
+            auto s_xxy_xxx = primBuffer.data(soff + 100 * idx + 10);
+            
+            auto s_xxy_xxy = primBuffer.data(soff + 100 * idx + 11);
+            
+            auto s_xxy_xxz = primBuffer.data(soff + 100 * idx + 12);
+            
+            auto s_xxy_xyy = primBuffer.data(soff + 100 * idx + 13);
+            
+            auto s_xxy_xyz = primBuffer.data(soff + 100 * idx + 14);
+            
+            auto s_xxy_xzz = primBuffer.data(soff + 100 * idx + 15);
+            
+            auto s_xxy_yyy = primBuffer.data(soff + 100 * idx + 16);
+            
+            auto s_xxy_yyz = primBuffer.data(soff + 100 * idx + 17);
+            
+            auto s_xxy_yzz = primBuffer.data(soff + 100 * idx + 18);
+            
+            auto s_xxy_zzz = primBuffer.data(soff + 100 * idx + 19);
+            
+            auto s_xxz_xxx = primBuffer.data(soff + 100 * idx + 20);
+            
+            auto s_xxz_xxy = primBuffer.data(soff + 100 * idx + 21);
+            
+            auto s_xxz_xxz = primBuffer.data(soff + 100 * idx + 22);
+            
+            auto s_xxz_xyy = primBuffer.data(soff + 100 * idx + 23);
+            
+            auto s_xxz_xyz = primBuffer.data(soff + 100 * idx + 24);
+            
+            auto s_xxz_xzz = primBuffer.data(soff + 100 * idx + 25);
+            
+            auto s_xxz_yyy = primBuffer.data(soff + 100 * idx + 26);
+            
+            auto s_xxz_yyz = primBuffer.data(soff + 100 * idx + 27);
+            
+            auto s_xxz_yzz = primBuffer.data(soff + 100 * idx + 28);
+            
+            auto s_xxz_zzz = primBuffer.data(soff + 100 * idx + 29);
+            
+            auto s_xyy_xxx = primBuffer.data(soff + 100 * idx + 30);
+            
+            auto s_xyy_xxy = primBuffer.data(soff + 100 * idx + 31);
+            
+            auto s_xyy_xxz = primBuffer.data(soff + 100 * idx + 32);
+            
+            auto s_xyy_xyy = primBuffer.data(soff + 100 * idx + 33);
+            
+            auto s_xyy_xyz = primBuffer.data(soff + 100 * idx + 34);
+            
+            auto s_xyy_xzz = primBuffer.data(soff + 100 * idx + 35);
+            
+            auto s_xyy_yyy = primBuffer.data(soff + 100 * idx + 36);
+            
+            auto s_xyy_yyz = primBuffer.data(soff + 100 * idx + 37);
+            
+            auto s_xyy_yzz = primBuffer.data(soff + 100 * idx + 38);
+            
+            auto s_xyy_zzz = primBuffer.data(soff + 100 * idx + 39);
+            
+            auto s_xyz_xxx = primBuffer.data(soff + 100 * idx + 40);
+            
+            auto s_xyz_xxy = primBuffer.data(soff + 100 * idx + 41);
+            
+            auto s_xyz_xxz = primBuffer.data(soff + 100 * idx + 42);
+            
+            auto s_xyz_xyy = primBuffer.data(soff + 100 * idx + 43);
+            
+            auto s_xyz_xyz = primBuffer.data(soff + 100 * idx + 44);
+            
+            auto s_xyz_xzz = primBuffer.data(soff + 100 * idx + 45);
+            
+            auto s_xyz_yyy = primBuffer.data(soff + 100 * idx + 46);
+            
+            auto s_xyz_yyz = primBuffer.data(soff + 100 * idx + 47);
+            
+            auto s_xyz_yzz = primBuffer.data(soff + 100 * idx + 48);
+            
+            auto s_xyz_zzz = primBuffer.data(soff + 100 * idx + 49);
+            
+            auto s_xzz_xxx = primBuffer.data(soff + 100 * idx + 50);
+            
+            auto s_xzz_xxy = primBuffer.data(soff + 100 * idx + 51);
+            
+            auto s_xzz_xxz = primBuffer.data(soff + 100 * idx + 52);
+            
+            auto s_xzz_xyy = primBuffer.data(soff + 100 * idx + 53);
+            
+            auto s_xzz_xyz = primBuffer.data(soff + 100 * idx + 54);
+            
+            auto s_xzz_xzz = primBuffer.data(soff + 100 * idx + 55);
+            
+            auto s_xzz_yyy = primBuffer.data(soff + 100 * idx + 56);
+            
+            auto s_xzz_yyz = primBuffer.data(soff + 100 * idx + 57);
+            
+            auto s_xzz_yzz = primBuffer.data(soff + 100 * idx + 58);
+            
+            auto s_xzz_zzz = primBuffer.data(soff + 100 * idx + 59);
+            
+            auto s_yyy_xxx = primBuffer.data(soff + 100 * idx + 60);
+            
+            auto s_yyy_xxy = primBuffer.data(soff + 100 * idx + 61);
+            
+            auto s_yyy_xxz = primBuffer.data(soff + 100 * idx + 62);
+            
+            auto s_yyy_xyy = primBuffer.data(soff + 100 * idx + 63);
+            
+            auto s_yyy_xyz = primBuffer.data(soff + 100 * idx + 64);
+            
+            auto s_yyy_xzz = primBuffer.data(soff + 100 * idx + 65);
+            
+            auto s_yyy_yyy = primBuffer.data(soff + 100 * idx + 66);
+            
+            auto s_yyy_yyz = primBuffer.data(soff + 100 * idx + 67);
+            
+            auto s_yyy_yzz = primBuffer.data(soff + 100 * idx + 68);
+            
+            auto s_yyy_zzz = primBuffer.data(soff + 100 * idx + 69);
+            
+            auto s_yyz_xxx = primBuffer.data(soff + 100 * idx + 70);
+            
+            auto s_yyz_xxy = primBuffer.data(soff + 100 * idx + 71);
+            
+            auto s_yyz_xxz = primBuffer.data(soff + 100 * idx + 72);
+            
+            auto s_yyz_xyy = primBuffer.data(soff + 100 * idx + 73);
+            
+            auto s_yyz_xyz = primBuffer.data(soff + 100 * idx + 74);
+            
+            auto s_yyz_xzz = primBuffer.data(soff + 100 * idx + 75);
+            
+            auto s_yyz_yyy = primBuffer.data(soff + 100 * idx + 76);
+            
+            auto s_yyz_yyz = primBuffer.data(soff + 100 * idx + 77);
+            
+            auto s_yyz_yzz = primBuffer.data(soff + 100 * idx + 78);
+            
+            auto s_yyz_zzz = primBuffer.data(soff + 100 * idx + 79);
+            
+            auto s_yzz_xxx = primBuffer.data(soff + 100 * idx + 80);
+            
+            auto s_yzz_xxy = primBuffer.data(soff + 100 * idx + 81);
+            
+            auto s_yzz_xxz = primBuffer.data(soff + 100 * idx + 82);
+            
+            auto s_yzz_xyy = primBuffer.data(soff + 100 * idx + 83);
+            
+            auto s_yzz_xyz = primBuffer.data(soff + 100 * idx + 84);
+            
+            auto s_yzz_xzz = primBuffer.data(soff + 100 * idx + 85);
+            
+            auto s_yzz_yyy = primBuffer.data(soff + 100 * idx + 86);
+            
+            auto s_yzz_yyz = primBuffer.data(soff + 100 * idx + 87);
+            
+            auto s_yzz_yzz = primBuffer.data(soff + 100 * idx + 88);
+            
+            auto s_yzz_zzz = primBuffer.data(soff + 100 * idx + 89);
+            
+            auto s_zzz_xxx = primBuffer.data(soff + 100 * idx + 90);
+            
+            auto s_zzz_xxy = primBuffer.data(soff + 100 * idx + 91);
+            
+            auto s_zzz_xxz = primBuffer.data(soff + 100 * idx + 92);
+            
+            auto s_zzz_xyy = primBuffer.data(soff + 100 * idx + 93);
+            
+            auto s_zzz_xyz = primBuffer.data(soff + 100 * idx + 94);
+            
+            auto s_zzz_xzz = primBuffer.data(soff + 100 * idx + 95);
+            
+            auto s_zzz_yyy = primBuffer.data(soff + 100 * idx + 96);
+            
+            auto s_zzz_yyz = primBuffer.data(soff + 100 * idx + 97);
+            
+            auto s_zzz_yzz = primBuffer.data(soff + 100 * idx + 98);
+            
+            auto s_zzz_zzz = primBuffer.data(soff + 100 * idx + 99);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_xx_xx, s_xx_xy, s_xx_xz,\
+                                     s_xx_yy, s_xx_yz, s_xx_zz, s_xy_xx, s_xy_xy,\
+                                     s_xy_xz, s_xy_yy, s_xy_yz, s_xy_zz, s_xz_xx,\
+                                     s_xz_xy,s_xz_xz, s_xz_yy, s_xz_yz, s_xz_zz,\
+                                     s_yy_xx, s_yy_xy, s_yy_xz, s_yy_yy, s_yy_yz,\
+                                     s_yy_zz, s_yz_xx, s_yz_xy, s_yz_xz, s_yz_yy,\
+                                     s_yz_yz, s_yz_zz, s_zz_xx, s_zz_xy, s_zz_xz,\
+                                     s_zz_yy, s_zz_yz, s_zz_zz, s_x_xxx, s_x_xxy,\
+                                     s_x_xxz, s_x_xyy, s_x_xyz, s_x_xzz, s_x_yyy,\
+                                     s_x_yyz, s_x_yzz, s_x_zzz, s_y_xxx, s_y_xxy,\
+                                     s_y_xxz, s_y_xyy, s_y_xyz, s_y_xzz, s_y_yyy,\
+                                     s_y_yyz, s_y_yzz, s_y_zzz, s_z_xxx, s_z_xxy,\
+                                     s_z_xxz, s_z_xyy, s_z_xyz, s_z_xzz, s_z_yyy,\
+                                     s_z_yyz, s_z_yzz, s_z_zzz, s_xx_xxx, s_xx_xxy,\
+                                     s_xx_xxz, s_xx_xyy, s_xx_xyz, s_xx_xzz,\
+                                     s_xx_yyy, s_xx_yyz, s_xx_yzz, s_xx_zzz,\
+                                     s_xy_xxx, s_xy_xxy, s_xy_xxz, s_xy_xyy,\
+                                     s_xy_xyz, s_xy_xzz, s_xy_yyy, s_xy_yyz,\
+                                     s_xy_yzz, s_xy_zzz, s_xz_xxx, s_xz_xxy,\
+                                     s_xz_xxz, s_xz_xyy, s_xz_xyz, s_xz_xzz,\
+                                     s_xz_yyy, s_xz_yyz, s_xz_yzz, s_xz_zzz,\
+                                     s_yy_xxx, s_yy_xxy, s_yy_xxz, s_yy_xyy,\
+                                     s_yy_xyz, s_yy_xzz, s_yy_yyy, s_yy_yyz,\
+                                     s_yy_yzz, s_yy_zzz, s_yz_xxx, s_yz_xxy,\
+                                     s_yz_xxz, s_yz_xyy, s_yz_xyz, s_yz_xzz,\
+                                     s_yz_yyy, s_yz_yyz, s_yz_yzz, s_yz_zzz,\
+                                     s_zz_xxx, s_zz_xxy, s_zz_xxz, s_zz_xyy,\
+                                     s_zz_xyz, s_zz_xzz, s_zz_yyy, s_zz_yyz,\
+                                     s_zz_yzz, s_zz_zzz, s_xxx_xxx, s_xxx_xxy,\
+                                     s_xxx_xxz, s_xxx_xyy, s_xxx_xyz, s_xxx_xzz,\
+                                     s_xxx_yyy, s_xxx_yyz, s_xxx_yzz, s_xxx_zzz,\
+                                     s_xxy_xxx, s_xxy_xxy, s_xxy_xxz, s_xxy_xyy,\
+                                     s_xxy_xyz, s_xxy_xzz, s_xxy_yyy, s_xxy_yyz,\
+                                     s_xxy_yzz, s_xxy_zzz, s_xxz_xxx, s_xxz_xxy,\
+                                     s_xxz_xxz, s_xxz_xyy, s_xxz_xyz, s_xxz_xzz,\
+                                     s_xxz_yyy, s_xxz_yyz, s_xxz_yzz, s_xxz_zzz,\
+                                     s_xyy_xxx, s_xyy_xxy, s_xyy_xxz, s_xyy_xyy,\
+                                     s_xyy_xyz, s_xyy_xzz, s_xyy_yyy, s_xyy_yyz,\
+                                     s_xyy_yzz, s_xyy_zzz, s_xyz_xxx, s_xyz_xxy,\
+                                     s_xyz_xxz, s_xyz_xyy, s_xyz_xyz, s_xyz_xzz,\
+                                     s_xyz_yyy, s_xyz_yyz, s_xyz_yzz, s_xyz_zzz,\
+                                     s_xzz_xxx, s_xzz_xxy, s_xzz_xxz, s_xzz_xyy,\
+                                     s_xzz_xyz, s_xzz_xzz, s_xzz_yyy, s_xzz_yyz,\
+                                     s_xzz_yzz, s_xzz_zzz, s_yyy_xxx, s_yyy_xxy,\
+                                     s_yyy_xxz, s_yyy_xyy, s_yyy_xyz, s_yyy_xzz,\
+                                     s_yyy_yyy, s_yyy_yyz, s_yyy_yzz, s_yyy_zzz,\
+                                     s_yyz_xxx, s_yyz_xxy, s_yyz_xxz, s_yyz_xyy,\
+                                     s_yyz_xyz, s_yyz_xzz, s_yyz_yyy, s_yyz_yyz,\
+                                     s_yyz_yzz, s_yyz_zzz, s_yzz_xxx, s_yzz_xxy,\
+                                     s_yzz_xxz, s_yzz_xyy, s_yzz_xyz, s_yzz_xzz,\
+                                     s_yzz_yyy, s_yzz_yyz, s_yzz_yzz, s_yzz_zzz,\
+                                     s_zzz_xxx, s_zzz_xxy, s_zzz_xxz, s_zzz_xyy,\
+                                     s_zzz_xyz, s_zzz_xzz, s_zzz_yyy, s_zzz_yyz,\
+                                     s_zzz_yzz, s_zzz_zzz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+                
+                double f2t = 0.50 * fx[j];
+                
+                // leading x component
+                
+                double fr = pax[j];
+                
+                s_xxx_xxx[j] = fr * s_xx_xxx[j] + f2t * (2.0 * s_x_xxx[j] + 3.0 * s_xx_xx[j]);
+                
+                s_xxx_xxy[j] = fr * s_xx_xxy[j] + f2t * (2.0 * s_x_xxy[j] + 2.0 * s_xx_xy[j]);
+                
+                s_xxx_xxz[j] = fr * s_xx_xxz[j] + f2t * (2.0 * s_x_xxz[j] + 2.0 * s_xx_xz[j]);
+                
+                s_xxx_xyy[j] = fr * s_xx_xyy[j] + f2t * (2.0 * s_x_xyy[j] + s_xx_yy[j]);
+                
+                s_xxx_xyz[j] = fr * s_xx_xyz[j] + f2t * (2.0 * s_x_xyz[j] + s_xx_yz[j]);
+                
+                s_xxx_xzz[j] = fr * s_xx_xzz[j] + f2t * (2.0 * s_x_xzz[j] + s_xx_zz[j]);
+                
+                s_xxx_yyy[j] = fr * s_xx_yyy[j] + f2t * 2.0 * s_x_yyy[j];
+                
+                s_xxx_yyz[j] = fr * s_xx_yyz[j] + f2t * 2.0 * s_x_yyz[j];
+                
+                s_xxx_yzz[j] = fr * s_xx_yzz[j] + f2t * 2.0 * s_x_yzz[j];
+                
+                s_xxx_zzz[j] = fr * s_xx_zzz[j] + f2t * 2.0 * s_x_zzz[j];
+                
+                s_xxy_xxx[j] = fr * s_xy_xxx[j] + f2t * (s_y_xxx[j] + 3.0 * s_xy_xx[j]);
+                
+                s_xxy_xxy[j] = fr * s_xy_xxy[j] + f2t * (s_y_xxy[j] + 2.0 * s_xy_xy[j]);
+                
+                s_xxy_xxz[j] = fr * s_xy_xxz[j] + f2t * (s_y_xxz[j] + 2.0 * s_xy_xz[j]);
+                
+                s_xxy_xyy[j] = fr * s_xy_xyy[j] + f2t * (s_y_xyy[j] + s_xy_yy[j]);
+                
+                s_xxy_xyz[j] = fr * s_xy_xyz[j] + f2t * (s_y_xyz[j] + s_xy_yz[j]);
+                
+                s_xxy_xzz[j] = fr * s_xy_xzz[j] + f2t * (s_y_xzz[j] + s_xy_zz[j]);
+                
+                s_xxy_yyy[j] = fr * s_xy_yyy[j] + f2t * s_y_yyy[j];
+                
+                s_xxy_yyz[j] = fr * s_xy_yyz[j] + f2t * s_y_yyz[j];
+                
+                s_xxy_yzz[j] = fr * s_xy_yzz[j] + f2t * s_y_yzz[j];
+                
+                s_xxy_zzz[j] = fr * s_xy_zzz[j] + f2t * s_y_zzz[j];
+                
+                s_xxz_xxx[j] = fr * s_xz_xxx[j] + f2t * (s_z_xxx[j] + 3.0 * s_xz_xx[j]);
+                
+                s_xxz_xxy[j] = fr * s_xz_xxy[j] + f2t * (s_z_xxy[j] + 2.0 * s_xz_xy[j]);
+                
+                s_xxz_xxz[j] = fr * s_xz_xxz[j] + f2t * (s_z_xxz[j] + 2.0 * s_xz_xz[j]);
+                
+                s_xxz_xyy[j] = fr * s_xz_xyy[j] + f2t * (s_z_xyy[j] + s_xz_yy[j]);
+                
+                s_xxz_xyz[j] = fr * s_xz_xyz[j] + f2t * (s_z_xyz[j] + s_xz_yz[j]);
+                
+                s_xxz_xzz[j] = fr * s_xz_xzz[j] + f2t * (s_z_xzz[j] + s_xz_zz[j]);
+                
+                s_xxz_yyy[j] = fr * s_xz_yyy[j] + f2t * s_z_yyy[j];
+                
+                s_xxz_yyz[j] = fr * s_xz_yyz[j] + f2t * s_z_yyz[j];
+                
+                s_xxz_yzz[j] = fr * s_xz_yzz[j] + f2t * s_z_yzz[j];
+                
+                s_xxz_zzz[j] = fr * s_xz_zzz[j] + f2t * s_z_zzz[j];
+                
+                s_xyy_xxx[j] = fr * s_yy_xxx[j] + f2t * 3.0 * s_yy_xx[j];
+                
+                s_xyy_xxy[j] = fr * s_yy_xxy[j] + f2t * 2.0 * s_yy_xy[j];
+                
+                s_xyy_xxz[j] = fr * s_yy_xxz[j] + f2t * 2.0 * s_yy_xz[j];
+                
+                s_xyy_xyy[j] = fr * s_yy_xyy[j] + f2t * s_yy_yy[j];
+                
+                s_xyy_xyz[j] = fr * s_yy_xyz[j] + f2t * s_yy_yz[j];
+                
+                s_xyy_xzz[j] = fr * s_yy_xzz[j] + f2t * s_yy_zz[j];
+                
+                s_xyy_yyy[j] = fr * s_yy_yyy[j];
+                
+                s_xyy_yyz[j] = fr * s_yy_yyz[j];
+                
+                s_xyy_yzz[j] = fr * s_yy_yzz[j];
+                
+                s_xyy_zzz[j] = fr * s_yy_zzz[j];
+                
+                s_xyz_xxx[j] = fr * s_yz_xxx[j] + f2t * 3.0 * s_yz_xx[j];
+                
+                s_xyz_xxy[j] = fr * s_yz_xxy[j] + f2t * 2.0 * s_yz_xy[j];
+                
+                s_xyz_xxz[j] = fr * s_yz_xxz[j] + f2t * 2.0 * s_yz_xz[j];
+                
+                s_xyz_xyy[j] = fr * s_yz_xyy[j] + f2t * s_yz_yy[j];
+                
+                s_xyz_xyz[j] = fr * s_yz_xyz[j] + f2t * s_yz_yz[j];
+                
+                s_xyz_xzz[j] = fr * s_yz_xzz[j] + f2t * s_yz_zz[j];
+                
+                s_xyz_yyy[j] = fr * s_yz_yyy[j];
+                
+                s_xyz_yyz[j] = fr * s_yz_yyz[j];
+                
+                s_xyz_yzz[j] = fr * s_yz_yzz[j];
+                
+                s_xyz_zzz[j] = fr * s_yz_zzz[j];
+                
+                s_xzz_xxx[j] = fr * s_zz_xxx[j] + f2t * 3.0 * s_zz_xx[j];
+                
+                s_xzz_xxy[j] = fr * s_zz_xxy[j] + f2t * 2.0 * s_zz_xy[j];
+                
+                s_xzz_xxz[j] = fr * s_zz_xxz[j] + f2t * 2.0 * s_zz_xz[j];
+                
+                s_xzz_xyy[j] = fr * s_zz_xyy[j] + f2t * s_zz_yy[j];
+                
+                s_xzz_xyz[j] = fr * s_zz_xyz[j] + f2t * s_zz_yz[j];
+                
+                s_xzz_xzz[j] = fr * s_zz_xzz[j] + f2t * s_zz_zz[j];
+                
+                s_xzz_yyy[j] = fr * s_zz_yyy[j];
+                
+                s_xzz_yyz[j] = fr * s_zz_yyz[j];
+                
+                s_xzz_yzz[j] = fr * s_zz_yzz[j];
+                
+                s_xzz_zzz[j] = fr * s_zz_zzz[j];
+                
+                // leading y component
+                
+                fr = pay[j];
+                
+                s_yyy_xxx[j] = fr * s_yy_xxx[j] + f2t * 2.0 * s_y_xxx[j];
+                
+                s_yyy_xxy[j] = fr * s_yy_xxy[j] + f2t * (2.0 * s_y_xxy[j] + s_yy_xx[j]);
+                
+                s_yyy_xxz[j] = fr * s_yy_xxz[j] + f2t * 2.0 * s_y_xxz[j];
+                
+                s_yyy_xyy[j] = fr * s_yy_xyy[j] + f2t * (2.0 * s_y_xyy[j] + 2.0 * s_yy_xy[j]);
+                
+                s_yyy_xyz[j] = fr * s_yy_xyz[j] + f2t * (2.0 * s_y_xyz[j] + s_yy_xz[j]);
+                
+                s_yyy_xzz[j] = fr * s_yy_xzz[j] + f2t * 2.0 * s_y_xzz[j];
+                
+                s_yyy_yyy[j] = fr * s_yy_yyy[j] + f2t * (2.0 * s_y_yyy[j] + 3.0 * s_yy_yy[j]);
+                
+                s_yyy_yyz[j] = fr * s_yy_yyz[j] + f2t * (2.0 * s_y_yyz[j] + 2.0 * s_yy_yz[j]);
+                
+                s_yyy_yzz[j] = fr * s_yy_yzz[j] + f2t * (2.0 * s_y_yzz[j] + s_yy_zz[j]);
+                
+                s_yyy_zzz[j] = fr * s_yy_zzz[j] + f2t * 2.0 * s_y_zzz[j];
+                
+                s_yyz_xxx[j] = fr * s_yz_xxx[j] + f2t * s_z_xxx[j];
+                
+                s_yyz_xxy[j] = fr * s_yz_xxy[j] + f2t * (s_z_xxy[j] + s_yz_xx[j]);
+                
+                s_yyz_xxz[j] = fr * s_yz_xxz[j] + f2t * s_z_xxz[j];
+                
+                s_yyz_xyy[j] = fr * s_yz_xyy[j] + f2t * (s_z_xyy[j] + 2.0 * s_yz_xy[j]);
+                
+                s_yyz_xyz[j] = fr * s_yz_xyz[j] + f2t * (s_z_xyz[j] + s_yz_xz[j]);
+                
+                s_yyz_xzz[j] = fr * s_yz_xzz[j] + f2t * s_z_xzz[j];
+                
+                s_yyz_yyy[j] = fr * s_yz_yyy[j] + f2t * (s_z_yyy[j] + 3.0 * s_yz_yy[j]);
+                
+                s_yyz_yyz[j] = fr * s_yz_yyz[j] + f2t * (s_z_yyz[j] + 2.0 * s_yz_yz[j]);
+                
+                s_yyz_yzz[j] = fr * s_yz_yzz[j] + f2t * (s_z_yzz[j] + s_yz_zz[j]);
+                
+                s_yyz_zzz[j] = fr * s_yz_zzz[j] + f2t * s_z_zzz[j];
+                
+                s_yzz_xxx[j] = fr * s_zz_xxx[j];
+                
+                s_yzz_xxy[j] = fr * s_zz_xxy[j] + f2t * s_zz_xx[j];
+                
+                s_yzz_xxz[j] = fr * s_zz_xxz[j];
+                
+                s_yzz_xyy[j] = fr * s_zz_xyy[j] + f2t * 2.0 * s_zz_xy[j];
+                
+                s_yzz_xyz[j] = fr * s_zz_xyz[j] + f2t * s_zz_xz[j];
+                
+                s_yzz_xzz[j] = fr * s_zz_xzz[j];
+                
+                s_yzz_yyy[j] = fr * s_zz_yyy[j] + f2t * 3.0 * s_zz_yy[j];
+                
+                s_yzz_yyz[j] = fr * s_zz_yyz[j] + f2t * 2.0 * s_zz_yz[j];
+                
+                s_yzz_yzz[j] = fr * s_zz_yzz[j] + f2t * s_zz_zz[j];
+                
+                s_yzz_zzz[j] = fr * s_zz_zzz[j];
+                
+                // leading z component
+                
+                fr = paz[j];
+                
+                s_zzz_xxx[j] = fr * s_zz_xxx[j] + f2t * 2.0 * s_z_xxx[j];
+                
+                s_zzz_xxy[j] = fr * s_zz_xxy[j] + f2t * 2.0 * s_z_xxy[j];
+                
+                s_zzz_xxz[j] = fr * s_zz_xxz[j] + f2t * (2.0 * s_z_xxz[j] + s_zz_xx[j]);
+                
+                s_zzz_xyy[j] = fr * s_zz_xyy[j] + f2t * 2.0 * s_z_xyy[j];
+                
+                s_zzz_xyz[j] = fr * s_zz_xyz[j] + f2t * (2.0 * s_z_xyz[j] + s_zz_xy[j]);
+                
+                s_zzz_xzz[j] = fr * s_zz_xzz[j] + f2t * (2.0 * s_z_xzz[j] + 2.0 * s_zz_xz[j]);
+                
+                s_zzz_yyy[j] = fr * s_zz_yyy[j] + f2t * 2.0 * s_z_yyy[j];
+                
+                s_zzz_yyz[j] = fr * s_zz_yyz[j] + f2t * (2.0 * s_z_yyz[j] + s_zz_yy[j]);
+                
+                s_zzz_yzz[j] = fr * s_zz_yzz[j] + f2t * (2.0 * s_z_yzz[j] + 2.0 * s_zz_yz[j]);
+                
+                s_zzz_zzz[j] = fr * s_zz_zzz[j] + f2t * (2.0 * s_z_zzz[j] + 3.0 * s_zz_zz[j]);
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compOverlapForSG(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  pbDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {0, 4})) return;
+        
         if (iContrGto  == 0) printf(" * VRR: (0|4)\n");
         
         // set up pointers to primitives data on bra side
@@ -411,10 +2901,14 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // set up pointers to primitives data on ket side
 
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {0, 4});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 3});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 2});
 
         // loop over contracted GTO on bra side
 
@@ -436,8 +2930,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             // set up pointers to (S|D) integrals
 
-            int32_t t2off = 4 * bdim;
-
             auto s_0_xx = primBuffer.data(t2off + 6 * idx);
 
             auto s_0_xy = primBuffer.data(t2off + 6 * idx + 1);
@@ -451,8 +2943,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_0_zz = primBuffer.data(t2off + 6 * idx + 5);
 
             // set up pointers to (S|F) integrals
-
-            int32_t t1off = 10 * bdim;
 
             auto s_0_xxx = primBuffer.data(t1off + 10 * idx);
 
@@ -475,8 +2965,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_0_zzz = primBuffer.data(t1off + 10 * idx + 9);
 
             // set up pointers to (S|G) integrals
-
-            int32_t soff = 20 * bdim;
 
             auto s_0_xxxx = primBuffer.data(soff + 15 * idx);
 
@@ -568,582 +3056,197 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     }
     
     void
-    compOverlapForPPOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
+    compOverlapForGS(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if (bang == 0) return;
+        // skip integrals if not included in recursion pattern
         
-        if ((bang == 1) && (kang > 1)) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (1|1)\n");
-
+        if (!genfunc::isInVector(recPattern, {4, 0})) return;
+        
+        if (iContrGto  == 0) printf(" * VRR: (4|0)\n");
+        
         // set up pointers to primitives data on bra side
-
+        
         auto spos = braGtoBlock.getStartPositions();
-
+        
         auto epos = braGtoBlock.getEndPositions();
-
+        
         // set up pointers to primitives data on ket side
-
+        
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
-
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {4, 0});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {3, 0});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {2, 0});
+        
         // loop over contracted GTO on bra side
-
+        
         int32_t idx = 0;
-
+        
         for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
         {
             // set up pointers to Obara-Saika factors
-
+            
             auto fx = osFactors.data(2 * idx);
-
+            
             // set up pointers to distances R(PA)
-
+            
             auto pax = paDistances.data(3 * idx);
-
+            
             auto pay = paDistances.data(3 * idx + 1);
-
+            
             auto paz = paDistances.data(3 * idx + 2);
-
-            // set up pointers to (S|S) integrals
-
-            auto s_0_0 = primBuffer.data(idx);
-
-            // set up pointers to (S|P) integrals
-
-            auto s_0_x = primBuffer.data(bdim + 3 * idx);
-
-            auto s_0_y = primBuffer.data(bdim + 3 * idx + 1);
-
-            auto s_0_z = primBuffer.data(bdim + 3 * idx + 2);
-
-            // set up pointers to (P|P) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(1, 1, ketGtoBlock) * bdim;
-
-            auto s_x_x = primBuffer.data(soff + 9 * idx);
-
-            auto s_x_y = primBuffer.data(soff + 9 * idx + 1);
-
-            auto s_x_z = primBuffer.data(soff + 9 * idx + 2);
-
-            auto s_y_x = primBuffer.data(soff + 9 * idx + 3);
-
-            auto s_y_y = primBuffer.data(soff + 9 * idx + 4);
-
-            auto s_y_z = primBuffer.data(soff + 9 * idx + 5);
-
-            auto s_z_x = primBuffer.data(soff + 9 * idx + 6);
-
-            auto s_z_y = primBuffer.data(soff + 9 * idx + 7);
-
-            auto s_z_z = primBuffer.data(soff + 9 * idx + 8);
-
-            #pragma omp simd aligned(fx, pax, pay, paz, s_0_x, s_0_y, s_0_z,\
-                                     s_x_x, s_x_y, s_x_z, s_y_x, s_y_y, s_y_z,\
-                                     s_z_x, s_z_y, s_z_z: VLX_ALIGN)
+            
+            // set up pointers to (D|S) integrals
+            
+            auto s_xx_0 = primBuffer.data(t2off + 6 * idx);
+            
+            auto s_xy_0 = primBuffer.data(t2off + 6 * idx + 1);
+            
+            auto s_xz_0 = primBuffer.data(t2off + 6 * idx + 2);
+            
+            auto s_yy_0 = primBuffer.data(t2off + 6 * idx + 3);
+            
+            auto s_yz_0 = primBuffer.data(t2off + 6 * idx + 4);
+            
+            auto s_zz_0 = primBuffer.data(t2off + 6 * idx + 5);
+            
+            // set up pointers to (F|S) integrals
+            
+            auto s_xxx_0 = primBuffer.data(t1off + 10 * idx);
+            
+            auto s_xxy_0 = primBuffer.data(t1off + 10 * idx + 1);
+            
+            auto s_xxz_0 = primBuffer.data(t1off + 10 * idx + 2);
+            
+            auto s_xyy_0 = primBuffer.data(t1off + 10 * idx + 3);
+            
+            auto s_xyz_0 = primBuffer.data(t1off + 10 * idx + 4);
+            
+            auto s_xzz_0 = primBuffer.data(t1off + 10 * idx + 5);
+            
+            auto s_yyy_0 = primBuffer.data(t1off + 10 * idx + 6);
+            
+            auto s_yyz_0 = primBuffer.data(t1off + 10 * idx + 7);
+            
+            auto s_yzz_0 = primBuffer.data(t1off + 10 * idx + 8);
+            
+            auto s_zzz_0 = primBuffer.data(t1off + 10 * idx + 9);
+            
+            // set up pointers to (G|S) integrals
+            
+            auto s_xxxx_0 = primBuffer.data(soff + 15 * idx);
+            
+            auto s_xxxy_0 = primBuffer.data(soff + 15 * idx + 1);
+            
+            auto s_xxxz_0 = primBuffer.data(soff + 15 * idx + 2);
+            
+            auto s_xxyy_0 = primBuffer.data(soff + 15 * idx + 3);
+            
+            auto s_xxyz_0 = primBuffer.data(soff + 15 * idx + 4);
+            
+            auto s_xxzz_0 = primBuffer.data(soff + 15 * idx + 5);
+            
+            auto s_xyyy_0 = primBuffer.data(soff + 15 * idx + 6);
+            
+            auto s_xyyz_0 = primBuffer.data(soff + 15 * idx + 7);
+            
+            auto s_xyzz_0 = primBuffer.data(soff + 15 * idx + 8);
+            
+            auto s_xzzz_0 = primBuffer.data(soff + 15 * idx + 9);
+            
+            auto s_yyyy_0 = primBuffer.data(soff + 15 * idx + 10);
+            
+            auto s_yyyz_0 = primBuffer.data(soff + 15 * idx + 11);
+            
+            auto s_yyzz_0 = primBuffer.data(soff + 15 * idx + 12);
+            
+            auto s_yzzz_0 = primBuffer.data(soff + 15 * idx + 13);
+            
+            auto s_zzzz_0 = primBuffer.data(soff + 15 * idx + 14);
+            
+            #pragma omp simd aligned(fx, pax, pay, paz, s_xx_0, s_xy_0, s_xz_0,\
+                                     s_yy_0, s_yz_0, s_zz_0, s_xxx_0, s_xxy_0,\
+                                     s_xxz_0, s_xyy_0, s_xyz_0, s_xzz_0, s_yyy_0,\
+                                     s_yyz_0, s_yzz_0, s_zzz_0, s_xxxx_0,\
+                                     s_xxxy_0, s_xxxz_0, s_xxyy_0, s_xxyz_0,\
+                                     s_xxzz_0, s_xyyy_0, s_xyyz_0, s_xyzz_0,\
+                                     s_xzzz_0, s_yyyy_0, s_yyyz_0, s_yyzz_0,\
+                                     s_yzzz_0, s_zzzz_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 // scaled prefactor
-
+                
                 double f2t = 0.50 * fx[j];
-
+                
                 // leading x component
-
+                
                 double fr = pax[j];
-
-                s_x_x[j] = fr * s_0_x[j] + f2t * s_0_0[j];
-
-                s_x_y[j] = fr * s_0_y[j];
-
-                s_x_z[j] = fr * s_0_z[j];
-
+                
+                s_xxxx_0[j] = fr * s_xxx_0[j] + 3.0 * f2t * s_xx_0[j];
+                
+                s_xxxy_0[j] = fr * s_xxy_0[j] + 2.0 * f2t * s_xy_0[j];
+                
+                s_xxxz_0[j] = fr * s_xxz_0[j] + 2.0 * f2t * s_xz_0[j];
+                
+                s_xxyy_0[j] = fr * s_xyy_0[j] + f2t * s_yy_0[j];
+                
+                s_xxyz_0[j] = fr * s_xyz_0[j] + f2t * s_yz_0[j];
+                
+                s_xxzz_0[j] = fr * s_xzz_0[j] + f2t * s_zz_0[j];
+                
+                s_xyyy_0[j] = fr * s_yyy_0[j];
+                
+                s_xyyz_0[j] = fr * s_yyz_0[j];
+                
+                s_xyzz_0[j] = fr * s_yzz_0[j];
+                
+                s_xzzz_0[j] = fr * s_zzz_0[j];
+                
                 // leading y component
-
+                
                 fr = pay[j];
-
-                s_y_x[j] = fr * s_0_x[j];
-
-                s_y_y[j] = fr * s_0_y[j] + f2t * s_0_0[j];
-
-                s_y_z[j] = fr * s_0_z[j];
-
+                
+                s_yyyy_0[j] = fr * s_yyy_0[j] + 3.0 * f2t * s_yy_0[j];
+                
+                s_yyyz_0[j] = fr * s_yyz_0[j] + 2.0 * f2t * s_yz_0[j];
+                
+                s_yyzz_0[j] = fr * s_yzz_0[j] + f2t * s_zz_0[j];
+                
+                s_yzzz_0[j] = fr * s_zzz_0[j];
+                
                 // leading z component
                 
-                fr = paz[j];
-
-                s_z_x[j] = fr * s_0_x[j];
-
-                s_z_y[j] = fr * s_0_y[j];
-
-                s_z_z[j] = fr * s_0_z[j] + f2t * s_0_0[j];
+                s_zzzz_0[j] = paz[j] * s_zzz_0[j] + 3.0 * f2t * s_zz_0[j];
             }
-
+            
             idx++;
         }
     }
 
     void
-    compOverlapForPDOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
+    compOverlapForPG(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if (bang == 0) return;
+        // skip integrals if not included in recursion pattern
         
-        if ((bang == 1) && (kang > 2)) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (1|2)\n");
-
-        // set up pointers to primitives data on bra side
-
-        auto spos = braGtoBlock.getStartPositions();
-
-        auto epos = braGtoBlock.getEndPositions();
-
-        // set up pointers to primitives data on ket side
-
-        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
-
-        // loop over contracted GTO on bra side
-
-        int32_t idx = 0;
-
-        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
-        {
-            // set up pointers to Obara-Saika factors
-
-            auto fx = osFactors.data(2 * idx);
-
-            // set up pointers to distances R(PA)
-
-            auto pax = paDistances.data(3 * idx);
-
-            auto pay = paDistances.data(3 * idx + 1);
-
-            auto paz = paDistances.data(3 * idx + 2);
-
-            // set up pointers to (S|P) integrals
-
-            auto s_0_x = primBuffer.data(bdim + 3 * idx);
-
-            auto s_0_y = primBuffer.data(bdim + 3 * idx + 1);
-
-            auto s_0_z = primBuffer.data(bdim + 3 * idx + 2);
-
-            // set up pointers to (S|D) integrals
-
-            int32_t t1off = 4 * bdim;
-
-            auto s_0_xx = primBuffer.data(t1off + 6 * idx);
-
-            auto s_0_xy = primBuffer.data(t1off + 6 * idx + 1);
-
-            auto s_0_xz = primBuffer.data(t1off + 6 * idx + 2);
-
-            auto s_0_yy = primBuffer.data(t1off + 6 * idx + 3);
-
-            auto s_0_yz = primBuffer.data(t1off + 6 * idx + 4);
-
-            auto s_0_zz = primBuffer.data(t1off + 6 * idx + 5);
-
-            // set up pointers to (P|D) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(1, 2, ketGtoBlock) * bdim;
-
-            auto s_x_xx = primBuffer.data(soff + 18 * idx);
-
-            auto s_x_xy = primBuffer.data(soff + 18 * idx + 1);
-
-            auto s_x_xz = primBuffer.data(soff + 18 * idx + 2);
-
-            auto s_x_yy = primBuffer.data(soff + 18 * idx + 3);
-
-            auto s_x_yz = primBuffer.data(soff + 18 * idx + 4);
-
-            auto s_x_zz = primBuffer.data(soff + 18 * idx + 5);
-
-            auto s_y_xx = primBuffer.data(soff + 18 * idx + 6);
-
-            auto s_y_xy = primBuffer.data(soff + 18 * idx + 7);
-
-            auto s_y_xz = primBuffer.data(soff + 18 * idx + 8);
-
-            auto s_y_yy = primBuffer.data(soff + 18 * idx + 9);
-
-            auto s_y_yz = primBuffer.data(soff + 18 * idx + 10);
-
-            auto s_y_zz = primBuffer.data(soff + 18 * idx + 11);
-
-            auto s_z_xx = primBuffer.data(soff + 18 * idx + 12);
-
-            auto s_z_xy = primBuffer.data(soff + 18 * idx + 13);
-
-            auto s_z_xz = primBuffer.data(soff + 18 * idx + 14);
-
-            auto s_z_yy = primBuffer.data(soff + 18 * idx + 15);
-
-            auto s_z_yz = primBuffer.data(soff + 18 * idx + 16);
-
-            auto s_z_zz = primBuffer.data(soff + 18 * idx + 17);
-
-            #pragma omp simd aligned(fx, pax, pay, paz, s_0_x, s_0_y, s_0_z,\
-                                     s_0_xx, s_0_xy, s_0_xz, s_0_yy, s_0_yz,\
-                                     s_0_zz, s_x_xx, s_x_xy, s_x_xz, s_x_yy,\
-                                     s_x_yz, s_x_zz, s_y_xx, s_y_xy, s_y_xz,\
-                                     s_y_yy, s_y_yz, s_y_zz, s_z_xx, s_z_xy,\
-                                     s_z_xz, s_z_yy, s_z_yz, s_z_zz: VLX_ALIGN)
-            for (int32_t j = 0; j < nprim; j++)
-            {
-                // scaled prefactor
-
-                double f2t = 0.50 * fx[j];
-
-                // leading x component
-
-                double fr = pax[j];
-
-                s_x_xx[j] = fr * s_0_xx[j] + f2t * 2.0 * s_0_x[j];
-
-                s_x_xy[j] = fr * s_0_xy[j] + f2t * s_0_y[j];
-
-                s_x_xz[j] = fr * s_0_xz[j] + f2t * s_0_z[j];
-
-                s_x_yy[j] = fr * s_0_yy[j];
-
-                s_x_yz[j] = fr * s_0_yz[j];
-
-                s_x_zz[j] = fr * s_0_zz[j];
-
-                // leading y component
-
-                fr = pay[j];
-
-                s_y_xx[j] = fr * s_0_xx[j];
-
-                s_y_xy[j] = fr * s_0_xy[j] + f2t * s_0_x[j];
-
-                s_y_xz[j] = fr * s_0_xz[j];
-
-                s_y_yy[j] = fr * s_0_yy[j] + f2t * 2.0 * s_0_y[j];
-
-                s_y_yz[j] = fr * s_0_yz[j] + f2t * s_0_z[j];
-
-                s_y_zz[j] = fr * s_0_zz[j];
-
-                // leading z component
-                
-                fr = paz[j];
-
-                s_z_xx[j] = fr * s_0_xx[j];
-
-                s_z_xy[j] = fr * s_0_xy[j];
-
-                s_z_xz[j] = fr * s_0_xz[j] + f2t * s_0_x[j];
-
-                s_z_yy[j] = fr * s_0_yy[j];
-
-                s_z_yz[j] = fr * s_0_yz[j] + f2t * s_0_y[j];
-
-                s_z_zz[j] = fr * s_0_zz[j] + f2t * 2.0 * s_0_z[j];
-            }
-
-            idx++;
-        }
-    }
-
-    void
-    compOverlapForPFOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
-    {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if (bang == 0) return;
-        
-        if ((bang == 1) && (kang > 3)) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (1|3)\n");
-
-        // set up pointers to primitives data on bra side
-
-        auto spos = braGtoBlock.getStartPositions();
-
-        auto epos = braGtoBlock.getEndPositions();
-
-        // set up pointers to primitives data on ket side
-
-        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
-
-        // loop over contracted GTO on bra side
-
-        int32_t idx = 0;
-
-        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
-        {
-            // set up pointers to Obara-Saika factors
-
-            auto fx = osFactors.data(2 * idx);
-
-            // set up pointers to distances R(PA)
-
-            auto pax = paDistances.data(3 * idx);
-
-            auto pay = paDistances.data(3 * idx + 1);
-
-            auto paz = paDistances.data(3 * idx + 2);
-
-            // set up pointers to (S|D) integrals
-
-            int32_t tkoff = 4 * bdim;
-
-            auto s_0_xx = primBuffer.data(tkoff + 6 * idx);
-
-            auto s_0_xy = primBuffer.data(tkoff + 6 * idx + 1);
-
-            auto s_0_xz = primBuffer.data(tkoff + 6 * idx + 2);
-
-            auto s_0_yy = primBuffer.data(tkoff + 6 * idx + 3);
-
-            auto s_0_yz = primBuffer.data(tkoff + 6 * idx + 4);
-
-            auto s_0_zz = primBuffer.data(tkoff + 6 * idx + 5);
-
-            // set up pointers to (S|F) integrals
-
-            int32_t t1off = 10 * bdim;
-
-            auto s_0_xxx = primBuffer.data(t1off + 10 * idx);
-
-            auto s_0_xxy = primBuffer.data(t1off + 10 * idx + 1);
-
-            auto s_0_xxz = primBuffer.data(t1off + 10 * idx + 2);
-
-            auto s_0_xyy = primBuffer.data(t1off + 10 * idx + 3);
-
-            auto s_0_xyz = primBuffer.data(t1off + 10 * idx + 4);
-
-            auto s_0_xzz = primBuffer.data(t1off + 10 * idx + 5);
-
-            auto s_0_yyy = primBuffer.data(t1off + 10 * idx + 6);
-
-            auto s_0_yyz = primBuffer.data(t1off + 10 * idx + 7);
-
-            auto s_0_yzz = primBuffer.data(t1off + 10 * idx + 8);
-
-            auto s_0_zzz = primBuffer.data(t1off + 10 * idx + 9);
-
-            // set up pointers to (P|F) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(1, 3, ketGtoBlock) * bdim;
-
-            auto s_x_xxx = primBuffer.data(soff + 30 * idx);
-
-            auto s_x_xxy = primBuffer.data(soff + 30 * idx + 1);
-
-            auto s_x_xxz = primBuffer.data(soff + 30 * idx + 2);
-
-            auto s_x_xyy = primBuffer.data(soff + 30 * idx + 3);
-
-            auto s_x_xyz = primBuffer.data(soff + 30 * idx + 4);
-
-            auto s_x_xzz = primBuffer.data(soff + 30 * idx + 5);
-
-            auto s_x_yyy = primBuffer.data(soff + 30 * idx + 6);
-
-            auto s_x_yyz = primBuffer.data(soff + 30 * idx + 7);
-
-            auto s_x_yzz = primBuffer.data(soff + 30 * idx + 8);
-
-            auto s_x_zzz = primBuffer.data(soff + 30 * idx + 9);
-
-            auto s_y_xxx = primBuffer.data(soff + 30 * idx + 10);
-
-            auto s_y_xxy = primBuffer.data(soff + 30 * idx + 11);
-
-            auto s_y_xxz = primBuffer.data(soff + 30 * idx + 12);
-
-            auto s_y_xyy = primBuffer.data(soff + 30 * idx + 13);
-
-            auto s_y_xyz = primBuffer.data(soff + 30 * idx + 14);
-
-            auto s_y_xzz = primBuffer.data(soff + 30 * idx + 15);
-
-            auto s_y_yyy = primBuffer.data(soff + 30 * idx + 16);
-
-            auto s_y_yyz = primBuffer.data(soff + 30 * idx + 17);
-
-            auto s_y_yzz = primBuffer.data(soff + 30 * idx + 18);
-
-            auto s_y_zzz = primBuffer.data(soff + 30 * idx + 19);
-
-            auto s_z_xxx = primBuffer.data(soff + 30 * idx + 20);
-
-            auto s_z_xxy = primBuffer.data(soff + 30 * idx + 21);
-
-            auto s_z_xxz = primBuffer.data(soff + 30 * idx + 22);
-
-            auto s_z_xyy = primBuffer.data(soff + 30 * idx + 23);
-
-            auto s_z_xyz = primBuffer.data(soff + 30 * idx + 24);
-
-            auto s_z_xzz = primBuffer.data(soff + 30 * idx + 25);
-
-            auto s_z_yyy = primBuffer.data(soff + 30 * idx + 26);
-
-            auto s_z_yyz = primBuffer.data(soff + 30 * idx + 27);
-
-            auto s_z_yzz = primBuffer.data(soff + 30 * idx + 28);
-
-            auto s_z_zzz = primBuffer.data(soff + 30 * idx + 29);
-
-            #pragma omp simd aligned(fx, pax, pay, paz, s_0_xx, s_0_xy, s_0_xz,\
-                                     s_0_yy, s_0_yz, s_0_zz, s_0_xxx, s_0_xxy,\
-                                     s_0_xxz, s_0_xyy, s_0_xyz, s_0_xzz, s_0_yyy,\
-                                     s_0_yyz, s_0_yzz, s_0_zzz, s_x_xxx, s_x_xxy,\
-                                     s_x_xxz, s_x_xyy, s_x_xyz, s_x_xzz, s_x_yyy,\
-                                     s_x_yyz, s_x_yzz, s_x_zzz, s_y_xxx, s_y_xxy,\
-                                     s_y_xxz, s_y_xyy, s_y_xyz, s_y_xzz, s_y_yyy,\
-                                     s_y_yyz, s_y_yzz, s_y_zzz, s_z_xxx, s_z_xxy,\
-                                     s_z_xxz, s_z_xyy, s_z_xyz, s_z_xzz, s_z_yyy,\
-                                     s_z_yyz, s_z_yzz, s_z_zzz: VLX_ALIGN)
-            for (int32_t j = 0; j < nprim; j++)
-            {
-                // scaled prefactor
-
-                double f2t = 0.50 * fx[j];
-
-                // leading x component
-
-                double fr = pax[j];
-
-                s_x_xxx[j] = fr * s_0_xxx[j] + f2t * 3.0 * s_0_xx[j];
-
-                s_x_xxy[j] = fr * s_0_xxy[j] + f2t * 2.0 * s_0_xy[j];
-
-                s_x_xxz[j] = fr * s_0_xxz[j] + f2t * 2.0 * s_0_xz[j];
-
-                s_x_xyy[j] = fr * s_0_xyy[j] + f2t * s_0_yy[j];
-
-                s_x_xyz[j] = fr * s_0_xyz[j] + f2t * s_0_yz[j];
-
-                s_x_xzz[j] = fr * s_0_xzz[j] + f2t * s_0_zz[j];
-
-                s_x_yyy[j] = fr * s_0_yyy[j];
-
-                s_x_yyz[j] = fr * s_0_yyz[j];
-
-                s_x_yzz[j] = fr * s_0_yzz[j];
-
-                s_x_zzz[j] = fr * s_0_zzz[j];
-
-                // leading y component
-
-                fr = pay[j];
-
-                s_y_xxx[j] = fr * s_0_xxx[j];
-
-                s_y_xxy[j] = fr * s_0_xxy[j] + f2t * s_0_xx[j];
-
-                s_y_xxz[j] = fr * s_0_xxz[j];
-
-                s_y_xyy[j] = fr * s_0_xyy[j] + f2t * 2.0 * s_0_xy[j];
-
-                s_y_xyz[j] = fr * s_0_xyz[j] + f2t * s_0_xz[j];
-
-                s_y_xzz[j] = fr * s_0_xzz[j];
-
-                s_y_yyy[j] = fr * s_0_yyy[j] + f2t * 3.0 * s_0_yy[j];
-
-                s_y_yyz[j] = fr * s_0_yyz[j] + f2t * 2.0 * s_0_yz[j];
-
-                s_y_yzz[j] = fr * s_0_yzz[j] + f2t * s_0_zz[j];
-
-                s_y_zzz[j] = fr * s_0_zzz[j];
-
-                // leading z component
-                
-                fr = paz[j];
-
-                s_z_xxx[j] = fr * s_0_xxx[j];
-
-                s_z_xxy[j] = fr * s_0_xxy[j];
-
-                s_z_xxz[j] = fr * s_0_xxz[j] + f2t * s_0_xx[j];
-
-                s_z_xyy[j] = fr * s_0_xyy[j];
-
-                s_z_xyz[j] = fr * s_0_xyz[j] + f2t * s_0_xy[j];
-
-                s_z_xzz[j] = fr * s_0_xzz[j] + f2t * 2.0 * s_0_xz[j];
-
-                s_z_yyy[j] = fr * s_0_yyy[j];
-
-                s_z_yyz[j] = fr * s_0_yyz[j] + f2t * s_0_yy[j];
-
-                s_z_yzz[j] = fr * s_0_yzz[j] + f2t * 2.0 * s_0_yz[j];
-
-                s_z_zzz[j] = fr * s_0_zzz[j] + f2t * 3.0 * s_0_zz[j];
-            }
-
-            idx++;
-        }
-    }
-
-    void
-    compOverlapForPGOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
-    {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if (bang == 0) return;
-        
-        if ((bang == 1) && (kang > 4)) return;
+        if (!genfunc::isInVector(recPattern, {1, 4})) return;
 
         if (iContrGto  == 0) printf(" * VRR: (1|4)\n");
 
@@ -1156,10 +3259,14 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // set up pointers to primitives data on ket side
 
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {1, 4});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {0, 4});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {0, 3});
 
         // loop over contracted GTO on bra side
 
@@ -1180,8 +3287,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto paz = paDistances.data(3 * idx + 2);
 
             // set up pointers to (S|F) integrals
-
-            int32_t tkoff = 10 * bdim;
 
             auto s_0_xxx = primBuffer.data(tkoff + 10 * idx);
 
@@ -1204,8 +3309,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_0_zzz = primBuffer.data(tkoff + 10 * idx + 9);
 
             // set up pointers to (S|G) integrals
-
-            int32_t t1off = 20 * bdim;
 
             auto s_0_xxxx = primBuffer.data(t1off + 15 * idx);
 
@@ -1238,8 +3341,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_0_zzzz = primBuffer.data(t1off + 15 * idx + 14);
 
             // set up pointers to (P|G) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(1, 4, ketGtoBlock) * bdim;
 
             auto s_x_xxxx = primBuffer.data(soff + 45 * idx);
 
@@ -1462,814 +3563,21 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
 
+    // FIX ME: add (g|p)
+    
     void
-    compOverlapForDDOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
+    compOverlapForDG(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if ( bang < 2) return;
-
-        if ((bang == 2) && (kang < 2)) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (2|2)\n");
-
-        // set up pointers to primitives data on bra side
-
-        auto spos = braGtoBlock.getStartPositions();
-
-        auto epos = braGtoBlock.getEndPositions();
-
-        // set up pointers to primitives data on ket side
-
-        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
-
-        // loop over contracted GTO on bra side
-
-        int32_t idx = 0;
-
-        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
-        {
-            // set up pointers to Obara-Saika factors
-
-            auto fx = osFactors.data(2 * idx);
-
-            // set up pointers to distances R(PA)
-
-            auto pax = paDistances.data(3 * idx);
-
-            auto pay = paDistances.data(3 * idx + 1);
-
-            auto paz = paDistances.data(3 * idx + 2);
-
-            // set up pointers to (P|P) integrals
-
-            int32_t tkoff = ovlrecfunc::getPositionInBuffer(1, 1, ketGtoBlock) * bdim;
-
-            auto s_x_x = primBuffer.data(tkoff + 9 * idx);
-
-            auto s_x_y = primBuffer.data(tkoff + 9 * idx + 1);
-
-            auto s_x_z = primBuffer.data(tkoff + 9 * idx + 2);
-
-            auto s_y_x = primBuffer.data(tkoff + 9 * idx + 3);
-
-            auto s_y_y = primBuffer.data(tkoff + 9 * idx + 4);
-
-            auto s_y_z = primBuffer.data(tkoff + 9 * idx + 5);
-
-            auto s_z_x = primBuffer.data(tkoff + 9 * idx + 6);
-
-            auto s_z_y = primBuffer.data(tkoff + 9 * idx + 7);
-
-            auto s_z_z = primBuffer.data(tkoff + 9 * idx + 8);
-
-            // set up pointers to (S|D) integrals
-
-            int32_t t2off = 4 * bdim;
-
-            auto s_0_xx = primBuffer.data(t2off + 6 * idx);
-
-            auto s_0_xy = primBuffer.data(t2off + 6 * idx + 1);
-
-            auto s_0_xz = primBuffer.data(t2off + 6 * idx + 2);
-
-            auto s_0_yy = primBuffer.data(t2off + 6 * idx + 3);
-
-            auto s_0_yz = primBuffer.data(t2off + 6 * idx + 4);
-
-            auto s_0_zz = primBuffer.data(t2off + 6 * idx + 5);
-
-            // set up pointers to (P|D) integrals
-
-            int32_t t1off = ovlrecfunc::getPositionInBuffer(1, 2, ketGtoBlock) * bdim;
-
-            auto s_x_xx = primBuffer.data(t1off + 18 * idx);
-
-            auto s_x_xy = primBuffer.data(t1off + 18 * idx + 1);
-
-            auto s_x_xz = primBuffer.data(t1off + 18 * idx + 2);
-
-            auto s_x_yy = primBuffer.data(t1off + 18 * idx + 3);
-
-            auto s_x_yz = primBuffer.data(t1off + 18 * idx + 4);
-
-            auto s_x_zz = primBuffer.data(t1off + 18 * idx + 5);
-
-            auto s_y_xx = primBuffer.data(t1off + 18 * idx + 6);
-
-            auto s_y_xy = primBuffer.data(t1off + 18 * idx + 7);
-
-            auto s_y_xz = primBuffer.data(t1off + 18 * idx + 8);
-
-            auto s_y_yy = primBuffer.data(t1off + 18 * idx + 9);
-
-            auto s_y_yz = primBuffer.data(t1off + 18 * idx + 10);
-
-            auto s_y_zz = primBuffer.data(t1off + 18 * idx + 11);
-
-            auto s_z_xx = primBuffer.data(t1off + 18 * idx + 12);
-
-            auto s_z_xy = primBuffer.data(t1off + 18 * idx + 13);
-
-            auto s_z_xz = primBuffer.data(t1off + 18 * idx + 14);
-
-            auto s_z_yy = primBuffer.data(t1off + 18 * idx + 15);
-
-            auto s_z_yz = primBuffer.data(t1off + 18 * idx + 16);
-
-            auto s_z_zz = primBuffer.data(t1off + 18 * idx + 17);
-
-            // set up pointers to (D|D) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(2, 2, ketGtoBlock) * bdim;
-
-            auto s_xx_xx = primBuffer.data(soff + 36 * idx);
-
-            auto s_xx_xy = primBuffer.data(soff + 36 * idx + 1);
-
-            auto s_xx_xz = primBuffer.data(soff + 36 * idx + 2);
-
-            auto s_xx_yy = primBuffer.data(soff + 36 * idx + 3);
-
-            auto s_xx_yz = primBuffer.data(soff + 36 * idx + 4);
-
-            auto s_xx_zz = primBuffer.data(soff + 36 * idx + 5);
-
-            auto s_xy_xx = primBuffer.data(soff + 36 * idx + 6);
-
-            auto s_xy_xy = primBuffer.data(soff + 36 * idx + 7);
-
-            auto s_xy_xz = primBuffer.data(soff + 36 * idx + 8);
-
-            auto s_xy_yy = primBuffer.data(soff + 36 * idx + 9);
-
-            auto s_xy_yz = primBuffer.data(soff + 36 * idx + 10);
-
-            auto s_xy_zz = primBuffer.data(soff + 36 * idx + 11);
-
-            auto s_xz_xx = primBuffer.data(soff + 36 * idx + 12);
-
-            auto s_xz_xy = primBuffer.data(soff + 36 * idx + 13);
-
-            auto s_xz_xz = primBuffer.data(soff + 36 * idx + 14);
-
-            auto s_xz_yy = primBuffer.data(soff + 36 * idx + 15);
-
-            auto s_xz_yz = primBuffer.data(soff + 36 * idx + 16);
-
-            auto s_xz_zz = primBuffer.data(soff + 36 * idx + 17);
-
-            auto s_yy_xx = primBuffer.data(soff + 36 * idx + 18);
-
-            auto s_yy_xy = primBuffer.data(soff + 36 * idx + 19);
-
-            auto s_yy_xz = primBuffer.data(soff + 36 * idx + 20);
-
-            auto s_yy_yy = primBuffer.data(soff + 36 * idx + 21);
-
-            auto s_yy_yz = primBuffer.data(soff + 36 * idx + 22);
-
-            auto s_yy_zz = primBuffer.data(soff + 36 * idx + 23);
-
-            auto s_yz_xx = primBuffer.data(soff + 36 * idx + 24);
-
-            auto s_yz_xy = primBuffer.data(soff + 36 * idx + 25);
-
-            auto s_yz_xz = primBuffer.data(soff + 36 * idx + 26);
-
-            auto s_yz_yy = primBuffer.data(soff + 36 * idx + 27);
-
-            auto s_yz_yz = primBuffer.data(soff + 36 * idx + 28);
-
-            auto s_yz_zz = primBuffer.data(soff + 36 * idx + 29);
-
-            auto s_zz_xx = primBuffer.data(soff + 36 * idx + 30);
-
-            auto s_zz_xy = primBuffer.data(soff + 36 * idx + 31);
-
-            auto s_zz_xz = primBuffer.data(soff + 36 * idx + 32);
-
-            auto s_zz_yy = primBuffer.data(soff + 36 * idx + 33);
-
-            auto s_zz_yz = primBuffer.data(soff + 36 * idx + 34);
-
-            auto s_zz_zz = primBuffer.data(soff + 36 * idx + 35);
-
-            #pragma omp simd aligned(fx, pax, pay, paz, s_x_x, s_x_y, s_x_z,\
-                                     s_y_x, s_y_y, s_y_z, s_z_x, s_z_y, s_z_z,\
-                                     s_0_xx, s_0_xy, s_0_xz, s_0_yy, s_0_yz,\
-                                     s_0_zz, s_x_xx, s_x_xy, s_x_xz, s_x_yy,\
-                                     s_x_yz, s_x_zz, s_y_xx, s_y_xy, s_y_xz,\
-                                     s_y_yy, s_y_yz, s_y_zz, s_z_xx, s_z_xy,\
-                                     s_z_xz, s_z_yy, s_z_yz, s_z_zz, s_xx_xx,\
-                                     s_xx_xy, s_xx_xz, s_xx_yy, s_xx_yz, s_xx_zz,\
-                                     s_xy_xx, s_xy_xy, s_xy_xz, s_xy_yy, s_xy_yz,\
-                                     s_xy_zz, s_xz_xx, s_xz_xy, s_xz_xz, s_xz_yy,\
-                                     s_xz_yz, s_xz_zz, s_yy_xx, s_yy_xy, s_yy_xz,\
-                                     s_yy_yy, s_yy_yz, s_yy_zz, s_yz_xx, s_yz_xy,\
-                                     s_yz_xz, s_yz_yy, s_yz_yz, s_yz_zz, s_zz_xx,\
-                                     s_zz_xy, s_zz_xz, s_zz_yy, s_zz_yz,\
-                                     s_zz_zz: VLX_ALIGN)
-            for (int32_t j = 0; j < nprim; j++)
-            {
-                // scaled prefactor
-
-                double f2t = 0.50 * fx[j];
-
-                // leading x component
-
-                double fr = pax[j];
-
-                s_xx_xx[j] = fr * s_x_xx[j] + f2t * (s_0_xx[j] + 2.0 * s_x_x[j]);
-
-                s_xx_xy[j] = fr * s_x_xy[j] + f2t * (s_0_xy[j] + s_x_y[j]);
-
-                s_xx_xz[j] = fr * s_x_xz[j] + f2t * (s_0_xz[j] + s_x_z[j]);
-
-                s_xx_yy[j] = fr * s_x_yy[j] + f2t * s_0_yy[j];
-
-                s_xx_yz[j] = fr * s_x_yz[j] + f2t * s_0_yz[j];
-
-                s_xx_zz[j] = fr * s_x_zz[j] + f2t * s_0_zz[j];
-
-                s_xy_xx[j] = fr * s_y_xx[j] + f2t * 2.0 * s_y_x[j];
-
-                s_xy_xy[j] = fr * s_y_xy[j] + f2t * s_y_y[j];
-
-                s_xy_xz[j] = fr * s_y_xz[j] + f2t * s_y_z[j];
-
-                s_xy_yy[j] = fr * s_y_yy[j];
-
-                s_xy_yz[j] = fr * s_y_yz[j];
-
-                s_xy_zz[j] = fr * s_y_zz[j];
-
-                s_xz_xx[j] = fr * s_z_xx[j] + f2t * 2.0 * s_z_x[j];
-
-                s_xz_xy[j] = fr * s_z_xy[j] + f2t * s_z_y[j];
-
-                s_xz_xz[j] = fr * s_z_xz[j] + f2t * s_z_z[j];
-
-                s_xz_yy[j] = fr * s_z_yy[j];
-
-                s_xz_yz[j] = fr * s_z_yz[j];
-
-                s_xz_zz[j] = fr * s_z_zz[j];
-
-                // leading y component
-
-                fr = pay[j];
-
-                s_yy_xx[j] = fr * s_y_xx[j] + f2t * s_0_xx[j];
-
-                s_yy_xy[j] = fr * s_y_xy[j] + f2t * (s_0_xy[j] + s_y_x[j]);
-
-                s_yy_xz[j] = fr * s_y_xz[j] + f2t * s_0_xz[j];
-
-                s_yy_yy[j] = fr * s_y_yy[j] + f2t * (s_0_yy[j] + 2.0 * s_y_y[j]);
-
-                s_yy_yz[j] = fr * s_y_yz[j] + f2t * (s_0_yz[j] + s_y_z[j]);
-
-                s_yy_zz[j] = fr * s_y_zz[j] + f2t * s_0_zz[j];
-
-                s_yz_xx[j] = fr * s_z_xx[j];
-
-                s_yz_xy[j] = fr * s_z_xy[j] + f2t * s_z_x[j];
-
-                s_yz_xz[j] = fr * s_z_xz[j];
-
-                s_yz_yy[j] = fr * s_z_yy[j] + f2t * 2.0 * s_z_y[j];
-
-                s_yz_yz[j] = fr * s_z_yz[j] + f2t * s_z_z[j];
-
-                s_yz_zz[j] = fr * s_z_zz[j];
-
-                // leading z component
-                
-                fr = paz[j];
-
-                s_zz_xx[j] = fr * s_z_xx[j] + f2t * s_0_xx[j];
-
-                s_zz_xy[j] = fr * s_z_xy[j] + f2t * s_0_xy[j];
-
-                s_zz_xz[j] = fr * s_z_xz[j] + f2t * (s_0_xz[j] + s_z_x[j]);
-
-                s_zz_yy[j] = fr * s_z_yy[j] + f2t * s_0_yy[j];
-
-                s_zz_yz[j] = fr * s_z_yz[j] + f2t * (s_0_yz[j] + s_z_y[j]);
-
-                s_zz_zz[j] = fr * s_z_zz[j] + f2t * (s_0_zz[j] + 2.0 * s_z_z[j]);
-            }
-
-            idx++;
-        }
-    }
-
-    void
-    compOverlapForDFOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
-    {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if ( bang < 2) return;
-
-        if ((bang == 2) && (kang < 3)) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (2|3)\n");
-
-        // set up pointers to primitives data on bra side
-
-        auto spos = braGtoBlock.getStartPositions();
-
-        auto epos = braGtoBlock.getEndPositions();
-
-        // set up pointers to primitives data on ket side
-
-        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
-
-        // loop over contracted GTO on bra side
-
-        int32_t idx = 0;
-
-        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
-        {
-            // set up pointers to Obara-Saika factors
-
-            auto fx = osFactors.data(2 * idx);
-
-            // set up pointers to distances R(PA)
-
-            auto pax = paDistances.data(3 * idx);
-
-            auto pay = paDistances.data(3 * idx + 1);
-
-            auto paz = paDistances.data(3 * idx + 2);
-
-            // set up pointers to (P|D) integrals
-
-            int32_t tkoff = ovlrecfunc::getPositionInBuffer(1, 2, ketGtoBlock) * bdim;
-
-            auto s_x_xx = primBuffer.data(tkoff + 18 * idx);
-
-            auto s_x_xy = primBuffer.data(tkoff + 18 * idx + 1);
-
-            auto s_x_xz = primBuffer.data(tkoff + 18 * idx + 2);
-
-            auto s_x_yy = primBuffer.data(tkoff + 18 * idx + 3);
-
-            auto s_x_yz = primBuffer.data(tkoff + 18 * idx + 4);
-
-            auto s_x_zz = primBuffer.data(tkoff + 18 * idx + 5);
-
-            auto s_y_xx = primBuffer.data(tkoff + 18 * idx + 6);
-
-            auto s_y_xy = primBuffer.data(tkoff + 18 * idx + 7);
-
-            auto s_y_xz = primBuffer.data(tkoff + 18 * idx + 8);
-
-            auto s_y_yy = primBuffer.data(tkoff + 18 * idx + 9);
-
-            auto s_y_yz = primBuffer.data(tkoff + 18 * idx + 10);
-
-            auto s_y_zz = primBuffer.data(tkoff + 18 * idx + 11);
-
-            auto s_z_xx = primBuffer.data(tkoff + 18 * idx + 12);
-
-            auto s_z_xy = primBuffer.data(tkoff + 18 * idx + 13);
-
-            auto s_z_xz = primBuffer.data(tkoff + 18 * idx + 14);
-
-            auto s_z_yy = primBuffer.data(tkoff + 18 * idx + 15);
-
-            auto s_z_yz = primBuffer.data(tkoff + 18 * idx + 16);
-
-            auto s_z_zz = primBuffer.data(tkoff + 18 * idx + 17);
-
-            // set up pointers to (S|F) integrals
-
-            int32_t t2off = 10 * bdim;
-
-            auto s_0_xxx = primBuffer.data(t2off + 10 * idx);
-
-            auto s_0_xxy = primBuffer.data(t2off + 10 * idx + 1);
-
-            auto s_0_xxz = primBuffer.data(t2off + 10 * idx + 2);
-
-            auto s_0_xyy = primBuffer.data(t2off + 10 * idx + 3);
-
-            auto s_0_xyz = primBuffer.data(t2off + 10 * idx + 4);
-
-            auto s_0_xzz = primBuffer.data(t2off + 10 * idx + 5);
-
-            auto s_0_yyy = primBuffer.data(t2off + 10 * idx + 6);
-
-            auto s_0_yyz = primBuffer.data(t2off + 10 * idx + 7);
-
-            auto s_0_yzz = primBuffer.data(t2off + 10 * idx + 8);
-
-            auto s_0_zzz = primBuffer.data(t2off + 10 * idx + 9);
-
-            // set up pointers to (P|F) integrals
-
-            int32_t t1off = ovlrecfunc::getPositionInBuffer(1, 3, ketGtoBlock) * bdim;
-
-            auto s_x_xxx = primBuffer.data(t1off + 30 * idx);
-
-            auto s_x_xxy = primBuffer.data(t1off + 30 * idx + 1);
-
-            auto s_x_xxz = primBuffer.data(t1off + 30 * idx + 2);
-
-            auto s_x_xyy = primBuffer.data(t1off + 30 * idx + 3);
-
-            auto s_x_xyz = primBuffer.data(t1off + 30 * idx + 4);
-
-            auto s_x_xzz = primBuffer.data(t1off + 30 * idx + 5);
-
-            auto s_x_yyy = primBuffer.data(t1off + 30 * idx + 6);
-
-            auto s_x_yyz = primBuffer.data(t1off + 30 * idx + 7);
-
-            auto s_x_yzz = primBuffer.data(t1off + 30 * idx + 8);
-
-            auto s_x_zzz = primBuffer.data(t1off + 30 * idx + 9);
-
-            auto s_y_xxx = primBuffer.data(t1off + 30 * idx + 10);
-
-            auto s_y_xxy = primBuffer.data(t1off + 30 * idx + 11);
-
-            auto s_y_xxz = primBuffer.data(t1off + 30 * idx + 12);
-
-            auto s_y_xyy = primBuffer.data(t1off + 30 * idx + 13);
-
-            auto s_y_xyz = primBuffer.data(t1off + 30 * idx + 14);
-
-            auto s_y_xzz = primBuffer.data(t1off + 30 * idx + 15);
-
-            auto s_y_yyy = primBuffer.data(t1off + 30 * idx + 16);
-
-            auto s_y_yyz = primBuffer.data(t1off + 30 * idx + 17);
-
-            auto s_y_yzz = primBuffer.data(t1off + 30 * idx + 18);
-
-            auto s_y_zzz = primBuffer.data(t1off + 30 * idx + 19);
-
-            auto s_z_xxx = primBuffer.data(t1off + 30 * idx + 20);
-
-            auto s_z_xxy = primBuffer.data(t1off + 30 * idx + 21);
-
-            auto s_z_xxz = primBuffer.data(t1off + 30 * idx + 22);
-
-            auto s_z_xyy = primBuffer.data(t1off + 30 * idx + 23);
-
-            auto s_z_xyz = primBuffer.data(t1off + 30 * idx + 24);
-
-            auto s_z_xzz = primBuffer.data(t1off + 30 * idx + 25);
-
-            auto s_z_yyy = primBuffer.data(t1off + 30 * idx + 26);
-
-            auto s_z_yyz = primBuffer.data(t1off + 30 * idx + 27);
-
-            auto s_z_yzz = primBuffer.data(t1off + 30 * idx + 28);
-
-            auto s_z_zzz = primBuffer.data(t1off + 30 * idx + 29);
-
-            // set up pointers to (D|F) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(2, 3, ketGtoBlock) * bdim;
-
-            auto s_xx_xxx = primBuffer.data(soff + 60 * idx);
-
-            auto s_xx_xxy = primBuffer.data(soff + 60 * idx + 1);
-
-            auto s_xx_xxz = primBuffer.data(soff + 60 * idx + 2);
-
-            auto s_xx_xyy = primBuffer.data(soff + 60 * idx + 3);
-
-            auto s_xx_xyz = primBuffer.data(soff + 60 * idx + 4);
-
-            auto s_xx_xzz = primBuffer.data(soff + 60 * idx + 5);
-
-            auto s_xx_yyy = primBuffer.data(soff + 60 * idx + 6);
-
-            auto s_xx_yyz = primBuffer.data(soff + 60 * idx + 7);
-
-            auto s_xx_yzz = primBuffer.data(soff + 60 * idx + 8);
-
-            auto s_xx_zzz = primBuffer.data(soff + 60 * idx + 9);
-
-            auto s_xy_xxx = primBuffer.data(soff + 60 * idx + 10);
-
-            auto s_xy_xxy = primBuffer.data(soff + 60 * idx + 11);
-
-            auto s_xy_xxz = primBuffer.data(soff + 60 * idx + 12);
-
-            auto s_xy_xyy = primBuffer.data(soff + 60 * idx + 13);
-
-            auto s_xy_xyz = primBuffer.data(soff + 60 * idx + 14);
-
-            auto s_xy_xzz = primBuffer.data(soff + 60 * idx + 15);
-
-            auto s_xy_yyy = primBuffer.data(soff + 60 * idx + 16);
-
-            auto s_xy_yyz = primBuffer.data(soff + 60 * idx + 17);
-
-            auto s_xy_yzz = primBuffer.data(soff + 60 * idx + 18);
-
-            auto s_xy_zzz = primBuffer.data(soff + 60 * idx + 19);
-
-            auto s_xz_xxx = primBuffer.data(soff + 60 * idx + 20);
-
-            auto s_xz_xxy = primBuffer.data(soff + 60 * idx + 21);
-
-            auto s_xz_xxz = primBuffer.data(soff + 60 * idx + 22);
-
-            auto s_xz_xyy = primBuffer.data(soff + 60 * idx + 23);
-
-            auto s_xz_xyz = primBuffer.data(soff + 60 * idx + 24);
-
-            auto s_xz_xzz = primBuffer.data(soff + 60 * idx + 25);
-
-            auto s_xz_yyy = primBuffer.data(soff + 60 * idx + 26);
-
-            auto s_xz_yyz = primBuffer.data(soff + 60 * idx + 27);
-
-            auto s_xz_yzz = primBuffer.data(soff + 60 * idx + 28);
-
-            auto s_xz_zzz = primBuffer.data(soff + 60 * idx + 29);
-
-            auto s_yy_xxx = primBuffer.data(soff + 60 * idx + 30);
-
-            auto s_yy_xxy = primBuffer.data(soff + 60 * idx + 31);
-
-            auto s_yy_xxz = primBuffer.data(soff + 60 * idx + 32);
-
-            auto s_yy_xyy = primBuffer.data(soff + 60 * idx + 33);
-
-            auto s_yy_xyz = primBuffer.data(soff + 60 * idx + 34);
-
-            auto s_yy_xzz = primBuffer.data(soff + 60 * idx + 35);
-
-            auto s_yy_yyy = primBuffer.data(soff + 60 * idx + 36);
-
-            auto s_yy_yyz = primBuffer.data(soff + 60 * idx + 37);
-
-            auto s_yy_yzz = primBuffer.data(soff + 60 * idx + 38);
-
-            auto s_yy_zzz = primBuffer.data(soff + 60 * idx + 39);
-
-            auto s_yz_xxx = primBuffer.data(soff + 60 * idx + 40);
-
-            auto s_yz_xxy = primBuffer.data(soff + 60 * idx + 41);
-
-            auto s_yz_xxz = primBuffer.data(soff + 60 * idx + 42);
-
-            auto s_yz_xyy = primBuffer.data(soff + 60 * idx + 43);
-
-            auto s_yz_xyz = primBuffer.data(soff + 60 * idx + 44);
-
-            auto s_yz_xzz = primBuffer.data(soff + 60 * idx + 45);
-
-            auto s_yz_yyy = primBuffer.data(soff + 60 * idx + 46);
-
-            auto s_yz_yyz = primBuffer.data(soff + 60 * idx + 47);
-
-            auto s_yz_yzz = primBuffer.data(soff + 60 * idx + 48);
-
-            auto s_yz_zzz = primBuffer.data(soff + 60 * idx + 49);
-
-            auto s_zz_xxx = primBuffer.data(soff + 60 * idx + 50);
-
-            auto s_zz_xxy = primBuffer.data(soff + 60 * idx + 51);
-
-            auto s_zz_xxz = primBuffer.data(soff + 60 * idx + 52);
-
-            auto s_zz_xyy = primBuffer.data(soff + 60 * idx + 53);
-
-            auto s_zz_xyz = primBuffer.data(soff + 60 * idx + 54);
-
-            auto s_zz_xzz = primBuffer.data(soff + 60 * idx + 55);
-
-            auto s_zz_yyy = primBuffer.data(soff + 60 * idx + 56);
-
-            auto s_zz_yyz = primBuffer.data(soff + 60 * idx + 57);
-
-            auto s_zz_yzz = primBuffer.data(soff + 60 * idx + 58);
-
-            auto s_zz_zzz = primBuffer.data(soff + 60 * idx + 59);
-
-            #pragma omp simd aligned(fx, pax, pay, paz, s_x_xx, s_x_xy, s_x_xz,\
-                                     s_x_yy, s_x_yz, s_x_zz, s_y_xx, s_y_xy,\
-                                     s_y_xz, s_y_yy, s_y_yz, s_y_zz, s_z_xx,\
-                                     s_z_xy, s_z_xz, s_z_yy, s_z_yz, s_z_zz,\
-                                     s_0_xxx, s_0_xxy, s_0_xxz, s_0_xyy, s_0_xyz,\
-                                     s_0_xzz, s_0_yyy, s_0_yyz, s_0_yzz, s_0_zzz,\
-                                     s_x_xxx, s_x_xxy, s_x_xxz, s_x_xyy, s_x_xyz,\
-                                     s_x_xzz, s_x_yyy, s_x_yyz, s_x_yzz, s_x_zzz,\
-                                     s_y_xxx, s_y_xxy, s_y_xxz, s_y_xyy, s_y_xyz,\
-                                     s_y_xzz, s_y_yyy, s_y_yyz, s_y_yzz, s_y_zzz,\
-                                     s_z_xxx, s_z_xxy, s_z_xxz, s_z_xyy, s_z_xyz,\
-                                     s_z_xzz, s_z_yyy, s_z_yyz, s_z_yzz, s_z_zzz,\
-                                     s_xx_xxx, s_xx_xxy, s_xx_xxz, s_xx_xyy,\
-                                     s_xx_xyz, s_xx_xzz, s_xx_yyy, s_xx_yyz,\
-                                     s_xx_yzz, s_xx_zzz, s_xy_xxx, s_xy_xxy,\
-                                     s_xy_xxz, s_xy_xyy, s_xy_xyz, s_xy_xzz,\
-                                     s_xy_yyy, s_xy_yyz, s_xy_yzz, s_xy_zzz,\
-                                     s_xz_xxx, s_xz_xxy, s_xz_xxz, s_xz_xyy,\
-                                     s_xz_xyz, s_xz_xzz, s_xz_yyy, s_xz_yyz,\
-                                     s_xz_yzz, s_xz_zzz, s_yy_xxx, s_yy_xxy,\
-                                     s_yy_xxz, s_yy_xyy, s_yy_xyz, s_yy_xzz,\
-                                     s_yy_yyy, s_yy_yyz, s_yy_yzz, s_yy_zzz,\
-                                     s_yz_xxx, s_yz_xxy, s_yz_xxz, s_yz_xyy,\
-                                     s_yz_xyz, s_yz_xzz, s_yz_yyy, s_yz_yyz,\
-                                     s_yz_yzz, s_yz_zzz, s_zz_xxx, s_zz_xxy,\
-                                     s_zz_xxz, s_zz_xyy, s_zz_xyz, s_zz_xzz,\
-                                     s_zz_yyy, s_zz_yyz, s_zz_yzz,\
-                                     s_zz_zzz: VLX_ALIGN)
-            for (int32_t j = 0; j < nprim; j++)
-            {
-                // scaled prefactor
-
-                double f2t = 0.50 * fx[j];
-
-                // leading x component
-
-                double fr = pax[j];
-
-                s_xx_xxx[j] = fr * s_x_xxx[j] + f2t * (s_0_xxx[j] + 3.0 * s_x_xx[j]);
-
-                s_xx_xxy[j] = fr * s_x_xxy[j] + f2t * (s_0_xxy[j] + 2.0 * s_x_xy[j]);
-
-                s_xx_xxz[j] = fr * s_x_xxz[j] + f2t * (s_0_xxz[j] + 2.0 * s_x_xz[j]);
-
-                s_xx_xyy[j] = fr * s_x_xyy[j] + f2t * (s_0_xyy[j] + s_x_yy[j]);
-
-                s_xx_xyz[j] = fr * s_x_xyz[j] + f2t * (s_0_xyz[j] + s_x_yz[j]);
-
-                s_xx_xzz[j] = fr * s_x_xzz[j] + f2t * (s_0_xzz[j] + s_x_zz[j]);
-
-                s_xx_yyy[j] = fr * s_x_yyy[j] + f2t * s_0_yyy[j];
-
-                s_xx_yyz[j] = fr * s_x_yyz[j] + f2t * s_0_yyz[j];
-
-                s_xx_yzz[j] = fr * s_x_yzz[j] + f2t * s_0_yzz[j];
-
-                s_xx_zzz[j] = fr * s_x_zzz[j] + f2t * s_0_zzz[j];
-
-                s_xy_xxx[j] = fr * s_y_xxx[j] + f2t * 3.0 * s_y_xx[j];
-
-                s_xy_xxy[j] = fr * s_y_xxy[j] + f2t * 2.0 * s_y_xy[j];
-
-                s_xy_xxz[j] = fr * s_y_xxz[j] + f2t * 2.0 * s_y_xz[j];
-
-                s_xy_xyy[j] = fr * s_y_xyy[j] + f2t * s_y_yy[j];
-
-                s_xy_xyz[j] = fr * s_y_xyz[j] + f2t * s_y_yz[j];
-
-                s_xy_xzz[j] = fr * s_y_xzz[j] + f2t * s_y_zz[j];
-
-                s_xy_yyy[j] = fr * s_y_yyy[j];
-
-                s_xy_yyz[j] = fr * s_y_yyz[j];
-
-                s_xy_yzz[j] = fr * s_y_yzz[j];
-
-                s_xy_zzz[j] = fr * s_y_zzz[j];
-
-                s_xz_xxx[j] = fr * s_z_xxx[j] + f2t * 3.0 * s_z_xx[j];
-
-                s_xz_xxy[j] = fr * s_z_xxy[j] + f2t * 2.0 * s_z_xy[j];
-
-                s_xz_xxz[j] = fr * s_z_xxz[j] + f2t * 2.0 * s_z_xz[j];
-
-                s_xz_xyy[j] = fr * s_z_xyy[j] + f2t * s_z_yy[j];
-
-                s_xz_xyz[j] = fr * s_z_xyz[j] + f2t * s_z_yz[j];
-
-                s_xz_xzz[j] = fr * s_z_xzz[j] + f2t * s_z_zz[j];
-
-                s_xz_yyy[j] = fr * s_z_yyy[j];
-
-                s_xz_yyz[j] = fr * s_z_yyz[j];
-
-                s_xz_yzz[j] = fr * s_z_yzz[j];
-
-                s_xz_zzz[j] = fr * s_z_zzz[j];
-
-                // leading y component
-
-                fr = pay[j];
-
-                s_yy_xxx[j] = fr * s_y_xxx[j] + f2t * s_0_xxx[j];
-
-                s_yy_xxy[j] = fr * s_y_xxy[j] + f2t * (s_0_xxy[j] + s_y_xx[j]);
-
-                s_yy_xxz[j] = fr * s_y_xxz[j] + f2t * s_0_xxz[j];
-
-                s_yy_xyy[j] = fr * s_y_xyy[j] + f2t * (s_0_xyy[j] + 2.0 * s_y_xy[j]);
-
-                s_yy_xyz[j] = fr * s_y_xyz[j] + f2t * (s_0_xyz[j] + s_y_xz[j]);
-
-                s_yy_xzz[j] = fr * s_y_xzz[j] + f2t * s_0_xzz[j];
-
-                s_yy_yyy[j] = fr * s_y_yyy[j] + f2t * (s_0_yyy[j] + 3.0 * s_y_yy[j]);
-
-                s_yy_yyz[j] = fr * s_y_yyz[j] + f2t * (s_0_yyz[j] + 2.0 * s_y_yz[j]);
-
-                s_yy_yzz[j] = fr * s_y_yzz[j] + f2t * (s_0_yzz[j] + s_y_zz[j]);
-
-                s_yy_zzz[j] = fr * s_y_zzz[j] + f2t * s_0_zzz[j];
-
-                s_yz_xxx[j] = fr * s_z_xxx[j];
-
-                s_yz_xxy[j] = fr * s_z_xxy[j] + f2t * s_z_xx[j];
-
-                s_yz_xxz[j] = fr * s_z_xxz[j];
-
-                s_yz_xyy[j] = fr * s_z_xyy[j] + f2t * 2.0 * s_z_xy[j];
-
-                s_yz_xyz[j] = fr * s_z_xyz[j] + f2t * s_z_xz[j];
-
-                s_yz_xzz[j] = fr * s_z_xzz[j];
-
-                s_yz_yyy[j] = fr * s_z_yyy[j] + f2t * 3.0 * s_z_yy[j];
-
-                s_yz_yyz[j] = fr * s_z_yyz[j] + f2t * 2.0 * s_z_yz[j];
-
-                s_yz_yzz[j] = fr * s_z_yzz[j] + f2t * s_z_zz[j];
-
-                s_yz_zzz[j] = fr * s_z_zzz[j];
-
-                // leading z component
-                
-                fr = paz[j];
-
-                s_zz_xxx[j] = fr * s_z_xxx[j] + f2t * s_0_xxx[j];
-
-                s_zz_xxy[j] = fr * s_z_xxy[j] + f2t * s_0_xxy[j];
-
-                s_zz_xxz[j] = fr * s_z_xxz[j] + f2t * (s_0_xxz[j] + s_z_xx[j]);
-
-                s_zz_xyy[j] = fr * s_z_xyy[j] + f2t * s_0_xyy[j];
-
-                s_zz_xyz[j] = fr * s_z_xyz[j] + f2t * (s_0_xyz[j] + s_z_xy[j]);
-
-                s_zz_xzz[j] = fr * s_z_xzz[j] + f2t * (s_0_xzz[j] + 2.0 * s_z_xz[j]);
-
-                s_zz_yyy[j] = fr * s_z_yyy[j] + f2t * s_0_yyy[j];
-
-                s_zz_yyz[j] = fr * s_z_yyz[j] + f2t * (s_0_yyz[j] + s_z_yy[j]);
-
-                s_zz_yzz[j] = fr * s_z_yzz[j] + f2t * (s_0_yzz[j] + 2.0 * s_z_yz[j]);
-
-                s_zz_zzz[j] = fr * s_z_zzz[j] + f2t * (s_0_zzz[j] + 3.0 * s_z_zz[j]);
-            }
-
-            idx++;
-        }
-    }
-
-    void
-    compOverlapForDGOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
-    {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if ( bang < 2) return;
-
-        if ((bang == 2) && (kang < 4)) return;
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {2, 4})) return;
 
         if (iContrGto  == 0) printf(" * VRR: (2|4)\n");
 
@@ -2282,10 +3590,16 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // set up pointers to primitives data on ket side
 
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {2, 4});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {1, 4});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 4});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {1, 3});
 
         // loop over contracted GTO on bra side
 
@@ -2306,8 +3620,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto paz = paDistances.data(3 * idx + 2);
 
             // set up pointers to (P|F) integrals
-
-            int32_t tkoff = ovlrecfunc::getPositionInBuffer(1, 3, ketGtoBlock) * bdim;
 
             auto s_x_xxx = primBuffer.data(tkoff + 30 * idx);
 
@@ -2371,8 +3683,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             // set up pointers to (S|G) integrals
 
-            int32_t t2off = 20 * bdim;
-
             auto s_0_xxxx = primBuffer.data(t2off + 15 * idx);
 
             auto s_0_xxxy = primBuffer.data(t2off + 15 * idx + 1);
@@ -2404,8 +3714,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_0_zzzz = primBuffer.data(t2off + 15 * idx + 14);
 
             // set up pointers to (P|G) integrals
-
-            int32_t t1off = ovlrecfunc::getPositionInBuffer(1, 4, ketGtoBlock) * bdim;
 
             auto s_x_xxxx = primBuffer.data(t1off + 45 * idx);
 
@@ -2498,8 +3806,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_z_zzzz = primBuffer.data(t1off + 45 * idx + 44);
 
             // set up pointers to (D|G) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(2, 4, ketGtoBlock) * bdim;
 
             auto s_xx_xxxx = primBuffer.data(soff + 90 * idx);
 
@@ -2928,820 +4234,21 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
 
+    // FIX ME: add (g|d) 
+   
     void
-    compOverlapForFFOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
+    compOverlapForFG(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if ( bang < 3) return;
-
-        if ((bang == 3) && (kang < 3)) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (3|3)\n");
-
-        // set up pointers to primitives data on bra side
-
-        auto spos = braGtoBlock.getStartPositions();
-
-        auto epos = braGtoBlock.getEndPositions();
-
-        // set up pointers to primitives data on ket side
-
-        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
-
-        // loop over contracted GTO on bra side
-
-        int32_t idx = 0;
-
-        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
-        {
-            // set up pointers to Obara-Saika factors
-
-            auto fx = osFactors.data(2 * idx);
-
-            // set up pointers to distances R(PA)
-
-            auto pax = paDistances.data(3 * idx);
-
-            auto pay = paDistances.data(3 * idx + 1);
-
-            auto paz = paDistances.data(3 * idx + 2);
-
-            // set up pointers to (D|D) integrals
-
-            int32_t tkoff = ovlrecfunc::getPositionInBuffer(2, 2, ketGtoBlock) * bdim;
-
-            auto s_xx_xx = primBuffer.data(tkoff + 36 * idx);
-
-            auto s_xx_xy = primBuffer.data(tkoff + 36 * idx + 1);
-
-            auto s_xx_xz = primBuffer.data(tkoff + 36 * idx + 2);
-
-            auto s_xx_yy = primBuffer.data(tkoff + 36 * idx + 3);
-
-            auto s_xx_yz = primBuffer.data(tkoff + 36 * idx + 4);
-
-            auto s_xx_zz = primBuffer.data(tkoff + 36 * idx + 5);
-
-            auto s_xy_xx = primBuffer.data(tkoff + 36 * idx + 6);
-
-            auto s_xy_xy = primBuffer.data(tkoff + 36 * idx + 7);
-
-            auto s_xy_xz = primBuffer.data(tkoff + 36 * idx + 8);
-
-            auto s_xy_yy = primBuffer.data(tkoff + 36 * idx + 9);
-
-            auto s_xy_yz = primBuffer.data(tkoff + 36 * idx + 10);
-
-            auto s_xy_zz = primBuffer.data(tkoff + 36 * idx + 11);
-
-            auto s_xz_xx = primBuffer.data(tkoff + 36 * idx + 12);
-
-            auto s_xz_xy = primBuffer.data(tkoff + 36 * idx + 13);
-
-            auto s_xz_xz = primBuffer.data(tkoff + 36 * idx + 14);
-
-            auto s_xz_yy = primBuffer.data(tkoff + 36 * idx + 15);
-
-            auto s_xz_yz = primBuffer.data(tkoff + 36 * idx + 16);
-
-            auto s_xz_zz = primBuffer.data(tkoff + 36 * idx + 17);
-
-            auto s_yy_xx = primBuffer.data(tkoff + 36 * idx + 18);
-
-            auto s_yy_xy = primBuffer.data(tkoff + 36 * idx + 19);
-
-            auto s_yy_xz = primBuffer.data(tkoff + 36 * idx + 20);
-
-            auto s_yy_yy = primBuffer.data(tkoff + 36 * idx + 21);
-
-            auto s_yy_yz = primBuffer.data(tkoff + 36 * idx + 22);
-
-            auto s_yy_zz = primBuffer.data(tkoff + 36 * idx + 23);
-
-            auto s_yz_xx = primBuffer.data(tkoff + 36 * idx + 24);
-
-            auto s_yz_xy = primBuffer.data(tkoff + 36 * idx + 25);
-
-            auto s_yz_xz = primBuffer.data(tkoff + 36 * idx + 26);
-
-            auto s_yz_yy = primBuffer.data(tkoff + 36 * idx + 27);
-
-            auto s_yz_yz = primBuffer.data(tkoff + 36 * idx + 28);
-
-            auto s_yz_zz = primBuffer.data(tkoff + 36 * idx + 29);
-
-            auto s_zz_xx = primBuffer.data(tkoff + 36 * idx + 30);
-
-            auto s_zz_xy = primBuffer.data(tkoff + 36 * idx + 31);
-
-            auto s_zz_xz = primBuffer.data(tkoff + 36 * idx + 32);
-
-            auto s_zz_yy = primBuffer.data(tkoff + 36 * idx + 33);
-
-            auto s_zz_yz = primBuffer.data(tkoff + 36 * idx + 34);
-
-            auto s_zz_zz = primBuffer.data(tkoff + 36 * idx + 35);
-
-            // set up pointers to (P|F) integrals
-
-            int32_t t2off = ovlrecfunc::getPositionInBuffer(1, 3, ketGtoBlock) * bdim;
-
-            auto s_x_xxx = primBuffer.data(t2off + 30 * idx);
-
-            auto s_x_xxy = primBuffer.data(t2off + 30 * idx + 1);
-
-            auto s_x_xxz = primBuffer.data(t2off + 30 * idx + 2);
-
-            auto s_x_xyy = primBuffer.data(t2off + 30 * idx + 3);
-
-            auto s_x_xyz = primBuffer.data(t2off + 30 * idx + 4);
-
-            auto s_x_xzz = primBuffer.data(t2off + 30 * idx + 5);
-
-            auto s_x_yyy = primBuffer.data(t2off + 30 * idx + 6);
-
-            auto s_x_yyz = primBuffer.data(t2off + 30 * idx + 7);
-
-            auto s_x_yzz = primBuffer.data(t2off + 30 * idx + 8);
-
-            auto s_x_zzz = primBuffer.data(t2off + 30 * idx + 9);
-
-            auto s_y_xxx = primBuffer.data(t2off + 30 * idx + 10);
-
-            auto s_y_xxy = primBuffer.data(t2off + 30 * idx + 11);
-
-            auto s_y_xxz = primBuffer.data(t2off + 30 * idx + 12);
-
-            auto s_y_xyy = primBuffer.data(t2off + 30 * idx + 13);
-
-            auto s_y_xyz = primBuffer.data(t2off + 30 * idx + 14);
-
-            auto s_y_xzz = primBuffer.data(t2off + 30 * idx + 15);
-
-            auto s_y_yyy = primBuffer.data(t2off + 30 * idx + 16);
-
-            auto s_y_yyz = primBuffer.data(t2off + 30 * idx + 17);
-
-            auto s_y_yzz = primBuffer.data(t2off + 30 * idx + 18);
-
-            auto s_y_zzz = primBuffer.data(t2off + 30 * idx + 19);
-
-            auto s_z_xxx = primBuffer.data(t2off + 30 * idx + 20);
-
-            auto s_z_xxy = primBuffer.data(t2off + 30 * idx + 21);
-
-            auto s_z_xxz = primBuffer.data(t2off + 30 * idx + 22);
-
-            auto s_z_xyy = primBuffer.data(t2off + 30 * idx + 23);
-
-            auto s_z_xyz = primBuffer.data(t2off + 30 * idx + 24);
-
-            auto s_z_xzz = primBuffer.data(t2off + 30 * idx + 25);
-
-            auto s_z_yyy = primBuffer.data(t2off + 30 * idx + 26);
-
-            auto s_z_yyz = primBuffer.data(t2off + 30 * idx + 27);
-
-            auto s_z_yzz = primBuffer.data(t2off + 30 * idx + 28);
-
-            auto s_z_zzz = primBuffer.data(t2off + 30 * idx + 29);
-
-            // set up pointers to (D|F) integrals
-
-            int32_t t1off = ovlrecfunc::getPositionInBuffer(2, 3, ketGtoBlock) * bdim;
-
-            auto s_xx_xxx = primBuffer.data(t1off + 60 * idx);
-
-            auto s_xx_xxy = primBuffer.data(t1off + 60 * idx + 1);
-
-            auto s_xx_xxz = primBuffer.data(t1off + 60 * idx + 2);
-
-            auto s_xx_xyy = primBuffer.data(t1off + 60 * idx + 3);
-
-            auto s_xx_xyz = primBuffer.data(t1off + 60 * idx + 4);
-
-            auto s_xx_xzz = primBuffer.data(t1off + 60 * idx + 5);
-
-            auto s_xx_yyy = primBuffer.data(t1off + 60 * idx + 6);
-
-            auto s_xx_yyz = primBuffer.data(t1off + 60 * idx + 7);
-
-            auto s_xx_yzz = primBuffer.data(t1off + 60 * idx + 8);
-
-            auto s_xx_zzz = primBuffer.data(t1off + 60 * idx + 9);
-
-            auto s_xy_xxx = primBuffer.data(t1off + 60 * idx + 10);
-
-            auto s_xy_xxy = primBuffer.data(t1off + 60 * idx + 11);
-
-            auto s_xy_xxz = primBuffer.data(t1off + 60 * idx + 12);
-
-            auto s_xy_xyy = primBuffer.data(t1off + 60 * idx + 13);
-
-            auto s_xy_xyz = primBuffer.data(t1off + 60 * idx + 14);
-
-            auto s_xy_xzz = primBuffer.data(t1off + 60 * idx + 15);
-
-            auto s_xy_yyy = primBuffer.data(t1off + 60 * idx + 16);
-
-            auto s_xy_yyz = primBuffer.data(t1off + 60 * idx + 17);
-
-            auto s_xy_yzz = primBuffer.data(t1off + 60 * idx + 18);
-
-            auto s_xy_zzz = primBuffer.data(t1off + 60 * idx + 19);
-
-            auto s_xz_xxx = primBuffer.data(t1off + 60 * idx + 20);
-
-            auto s_xz_xxy = primBuffer.data(t1off + 60 * idx + 21);
-
-            auto s_xz_xxz = primBuffer.data(t1off + 60 * idx + 22);
-
-            auto s_xz_xyy = primBuffer.data(t1off + 60 * idx + 23);
-
-            auto s_xz_xyz = primBuffer.data(t1off + 60 * idx + 24);
-
-            auto s_xz_xzz = primBuffer.data(t1off + 60 * idx + 25);
-
-            auto s_xz_yyy = primBuffer.data(t1off + 60 * idx + 26);
-
-            auto s_xz_yyz = primBuffer.data(t1off + 60 * idx + 27);
-
-            auto s_xz_yzz = primBuffer.data(t1off + 60 * idx + 28);
-
-            auto s_xz_zzz = primBuffer.data(t1off + 60 * idx + 29);
-
-            auto s_yy_xxx = primBuffer.data(t1off + 60 * idx + 30);
-
-            auto s_yy_xxy = primBuffer.data(t1off + 60 * idx + 31);
-
-            auto s_yy_xxz = primBuffer.data(t1off + 60 * idx + 32);
-
-            auto s_yy_xyy = primBuffer.data(t1off + 60 * idx + 33);
-
-            auto s_yy_xyz = primBuffer.data(t1off + 60 * idx + 34);
-
-            auto s_yy_xzz = primBuffer.data(t1off + 60 * idx + 35);
-
-            auto s_yy_yyy = primBuffer.data(t1off + 60 * idx + 36);
-
-            auto s_yy_yyz = primBuffer.data(t1off + 60 * idx + 37);
-
-            auto s_yy_yzz = primBuffer.data(t1off + 60 * idx + 38);
-
-            auto s_yy_zzz = primBuffer.data(t1off + 60 * idx + 39);
-
-            auto s_yz_xxx = primBuffer.data(t1off + 60 * idx + 40);
-
-            auto s_yz_xxy = primBuffer.data(t1off + 60 * idx + 41);
-
-            auto s_yz_xxz = primBuffer.data(t1off + 60 * idx + 42);
-
-            auto s_yz_xyy = primBuffer.data(t1off + 60 * idx + 43);
-
-            auto s_yz_xyz = primBuffer.data(t1off + 60 * idx + 44);
-
-            auto s_yz_xzz = primBuffer.data(t1off + 60 * idx + 45);
-
-            auto s_yz_yyy = primBuffer.data(t1off + 60 * idx + 46);
-
-            auto s_yz_yyz = primBuffer.data(t1off + 60 * idx + 47);
-
-            auto s_yz_yzz = primBuffer.data(t1off + 60 * idx + 48);
-
-            auto s_yz_zzz = primBuffer.data(t1off + 60 * idx + 49);
-
-            auto s_zz_xxx = primBuffer.data(t1off + 60 * idx + 50);
-
-            auto s_zz_xxy = primBuffer.data(t1off + 60 * idx + 51);
-
-            auto s_zz_xxz = primBuffer.data(t1off + 60 * idx + 52);
-
-            auto s_zz_xyy = primBuffer.data(t1off + 60 * idx + 53);
-
-            auto s_zz_xyz = primBuffer.data(t1off + 60 * idx + 54);
-
-            auto s_zz_xzz = primBuffer.data(t1off + 60 * idx + 55);
-
-            auto s_zz_yyy = primBuffer.data(t1off + 60 * idx + 56);
-
-            auto s_zz_yyz = primBuffer.data(t1off + 60 * idx + 57);
-
-            auto s_zz_yzz = primBuffer.data(t1off + 60 * idx + 58);
-
-            auto s_zz_zzz = primBuffer.data(t1off + 60 * idx + 59);
-
-            // set up pointers to (F|F) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(3, 3, ketGtoBlock) * bdim;
-
-            auto s_xxx_xxx = primBuffer.data(soff + 100 * idx);
-
-            auto s_xxx_xxy = primBuffer.data(soff + 100 * idx + 1);
-
-            auto s_xxx_xxz = primBuffer.data(soff + 100 * idx + 2);
-
-            auto s_xxx_xyy = primBuffer.data(soff + 100 * idx + 3);
-
-            auto s_xxx_xyz = primBuffer.data(soff + 100 * idx + 4);
-
-            auto s_xxx_xzz = primBuffer.data(soff + 100 * idx + 5);
-
-            auto s_xxx_yyy = primBuffer.data(soff + 100 * idx + 6);
-
-            auto s_xxx_yyz = primBuffer.data(soff + 100 * idx + 7);
-
-            auto s_xxx_yzz = primBuffer.data(soff + 100 * idx + 8);
-
-            auto s_xxx_zzz = primBuffer.data(soff + 100 * idx + 9);
-
-            auto s_xxy_xxx = primBuffer.data(soff + 100 * idx + 10);
-
-            auto s_xxy_xxy = primBuffer.data(soff + 100 * idx + 11);
-
-            auto s_xxy_xxz = primBuffer.data(soff + 100 * idx + 12);
-
-            auto s_xxy_xyy = primBuffer.data(soff + 100 * idx + 13);
-
-            auto s_xxy_xyz = primBuffer.data(soff + 100 * idx + 14);
-
-            auto s_xxy_xzz = primBuffer.data(soff + 100 * idx + 15);
-
-            auto s_xxy_yyy = primBuffer.data(soff + 100 * idx + 16);
-
-            auto s_xxy_yyz = primBuffer.data(soff + 100 * idx + 17);
-
-            auto s_xxy_yzz = primBuffer.data(soff + 100 * idx + 18);
-
-            auto s_xxy_zzz = primBuffer.data(soff + 100 * idx + 19);
-
-            auto s_xxz_xxx = primBuffer.data(soff + 100 * idx + 20);
-
-            auto s_xxz_xxy = primBuffer.data(soff + 100 * idx + 21);
-
-            auto s_xxz_xxz = primBuffer.data(soff + 100 * idx + 22);
-
-            auto s_xxz_xyy = primBuffer.data(soff + 100 * idx + 23);
-
-            auto s_xxz_xyz = primBuffer.data(soff + 100 * idx + 24);
-
-            auto s_xxz_xzz = primBuffer.data(soff + 100 * idx + 25);
-
-            auto s_xxz_yyy = primBuffer.data(soff + 100 * idx + 26);
-
-            auto s_xxz_yyz = primBuffer.data(soff + 100 * idx + 27);
-
-            auto s_xxz_yzz = primBuffer.data(soff + 100 * idx + 28);
-
-            auto s_xxz_zzz = primBuffer.data(soff + 100 * idx + 29);
-
-            auto s_xyy_xxx = primBuffer.data(soff + 100 * idx + 30);
-
-            auto s_xyy_xxy = primBuffer.data(soff + 100 * idx + 31);
-
-            auto s_xyy_xxz = primBuffer.data(soff + 100 * idx + 32);
-
-            auto s_xyy_xyy = primBuffer.data(soff + 100 * idx + 33);
-
-            auto s_xyy_xyz = primBuffer.data(soff + 100 * idx + 34);
-
-            auto s_xyy_xzz = primBuffer.data(soff + 100 * idx + 35);
-
-            auto s_xyy_yyy = primBuffer.data(soff + 100 * idx + 36);
-
-            auto s_xyy_yyz = primBuffer.data(soff + 100 * idx + 37);
-
-            auto s_xyy_yzz = primBuffer.data(soff + 100 * idx + 38);
-
-            auto s_xyy_zzz = primBuffer.data(soff + 100 * idx + 39);
-
-            auto s_xyz_xxx = primBuffer.data(soff + 100 * idx + 40);
-
-            auto s_xyz_xxy = primBuffer.data(soff + 100 * idx + 41);
-
-            auto s_xyz_xxz = primBuffer.data(soff + 100 * idx + 42);
-
-            auto s_xyz_xyy = primBuffer.data(soff + 100 * idx + 43);
-
-            auto s_xyz_xyz = primBuffer.data(soff + 100 * idx + 44);
-
-            auto s_xyz_xzz = primBuffer.data(soff + 100 * idx + 45);
-
-            auto s_xyz_yyy = primBuffer.data(soff + 100 * idx + 46);
-
-            auto s_xyz_yyz = primBuffer.data(soff + 100 * idx + 47);
-
-            auto s_xyz_yzz = primBuffer.data(soff + 100 * idx + 48);
-
-            auto s_xyz_zzz = primBuffer.data(soff + 100 * idx + 49);
-
-            auto s_xzz_xxx = primBuffer.data(soff + 100 * idx + 50);
-
-            auto s_xzz_xxy = primBuffer.data(soff + 100 * idx + 51);
-
-            auto s_xzz_xxz = primBuffer.data(soff + 100 * idx + 52);
-
-            auto s_xzz_xyy = primBuffer.data(soff + 100 * idx + 53);
-
-            auto s_xzz_xyz = primBuffer.data(soff + 100 * idx + 54);
-
-            auto s_xzz_xzz = primBuffer.data(soff + 100 * idx + 55);
-
-            auto s_xzz_yyy = primBuffer.data(soff + 100 * idx + 56);
-
-            auto s_xzz_yyz = primBuffer.data(soff + 100 * idx + 57);
-
-            auto s_xzz_yzz = primBuffer.data(soff + 100 * idx + 58);
-
-            auto s_xzz_zzz = primBuffer.data(soff + 100 * idx + 59);
-
-            auto s_yyy_xxx = primBuffer.data(soff + 100 * idx + 60);
-
-            auto s_yyy_xxy = primBuffer.data(soff + 100 * idx + 61);
-
-            auto s_yyy_xxz = primBuffer.data(soff + 100 * idx + 62);
-
-            auto s_yyy_xyy = primBuffer.data(soff + 100 * idx + 63);
-
-            auto s_yyy_xyz = primBuffer.data(soff + 100 * idx + 64);
-
-            auto s_yyy_xzz = primBuffer.data(soff + 100 * idx + 65);
-
-            auto s_yyy_yyy = primBuffer.data(soff + 100 * idx + 66);
-
-            auto s_yyy_yyz = primBuffer.data(soff + 100 * idx + 67);
-
-            auto s_yyy_yzz = primBuffer.data(soff + 100 * idx + 68);
-
-            auto s_yyy_zzz = primBuffer.data(soff + 100 * idx + 69);
-
-            auto s_yyz_xxx = primBuffer.data(soff + 100 * idx + 70);
-
-            auto s_yyz_xxy = primBuffer.data(soff + 100 * idx + 71);
-
-            auto s_yyz_xxz = primBuffer.data(soff + 100 * idx + 72);
-
-            auto s_yyz_xyy = primBuffer.data(soff + 100 * idx + 73);
-
-            auto s_yyz_xyz = primBuffer.data(soff + 100 * idx + 74);
-
-            auto s_yyz_xzz = primBuffer.data(soff + 100 * idx + 75);
-
-            auto s_yyz_yyy = primBuffer.data(soff + 100 * idx + 76);
-
-            auto s_yyz_yyz = primBuffer.data(soff + 100 * idx + 77);
-
-            auto s_yyz_yzz = primBuffer.data(soff + 100 * idx + 78);
-
-            auto s_yyz_zzz = primBuffer.data(soff + 100 * idx + 79);
-
-            auto s_yzz_xxx = primBuffer.data(soff + 100 * idx + 80);
-
-            auto s_yzz_xxy = primBuffer.data(soff + 100 * idx + 81);
-
-            auto s_yzz_xxz = primBuffer.data(soff + 100 * idx + 82);
-
-            auto s_yzz_xyy = primBuffer.data(soff + 100 * idx + 83);
-
-            auto s_yzz_xyz = primBuffer.data(soff + 100 * idx + 84);
-
-            auto s_yzz_xzz = primBuffer.data(soff + 100 * idx + 85);
-
-            auto s_yzz_yyy = primBuffer.data(soff + 100 * idx + 86);
-
-            auto s_yzz_yyz = primBuffer.data(soff + 100 * idx + 87);
-
-            auto s_yzz_yzz = primBuffer.data(soff + 100 * idx + 88);
-
-            auto s_yzz_zzz = primBuffer.data(soff + 100 * idx + 89);
-
-            auto s_zzz_xxx = primBuffer.data(soff + 100 * idx + 90);
-
-            auto s_zzz_xxy = primBuffer.data(soff + 100 * idx + 91);
-
-            auto s_zzz_xxz = primBuffer.data(soff + 100 * idx + 92);
-
-            auto s_zzz_xyy = primBuffer.data(soff + 100 * idx + 93);
-
-            auto s_zzz_xyz = primBuffer.data(soff + 100 * idx + 94);
-
-            auto s_zzz_xzz = primBuffer.data(soff + 100 * idx + 95);
-
-            auto s_zzz_yyy = primBuffer.data(soff + 100 * idx + 96);
-
-            auto s_zzz_yyz = primBuffer.data(soff + 100 * idx + 97);
-
-            auto s_zzz_yzz = primBuffer.data(soff + 100 * idx + 98);
-
-            auto s_zzz_zzz = primBuffer.data(soff + 100 * idx + 99);
-
-            #pragma omp simd aligned(fx, pax, pay, paz, s_xx_xx, s_xx_xy, s_xx_xz,\
-                                     s_xx_yy, s_xx_yz, s_xx_zz, s_xy_xx, s_xy_xy,\
-                                     s_xy_xz, s_xy_yy, s_xy_yz, s_xy_zz, s_xz_xx,\
-                                     s_xz_xy,s_xz_xz, s_xz_yy, s_xz_yz, s_xz_zz,\
-                                     s_yy_xx, s_yy_xy, s_yy_xz, s_yy_yy, s_yy_yz,\
-                                     s_yy_zz, s_yz_xx, s_yz_xy, s_yz_xz, s_yz_yy,\
-                                     s_yz_yz, s_yz_zz, s_zz_xx, s_zz_xy, s_zz_xz,\
-                                     s_zz_yy, s_zz_yz, s_zz_zz, s_x_xxx, s_x_xxy,\
-                                     s_x_xxz, s_x_xyy, s_x_xyz, s_x_xzz, s_x_yyy,\
-                                     s_x_yyz, s_x_yzz, s_x_zzz, s_y_xxx, s_y_xxy,\
-                                     s_y_xxz, s_y_xyy, s_y_xyz, s_y_xzz, s_y_yyy,\
-                                     s_y_yyz, s_y_yzz, s_y_zzz, s_z_xxx, s_z_xxy,\
-                                     s_z_xxz, s_z_xyy, s_z_xyz, s_z_xzz, s_z_yyy,\
-                                     s_z_yyz, s_z_yzz, s_z_zzz, s_xx_xxx, s_xx_xxy,\
-                                     s_xx_xxz, s_xx_xyy, s_xx_xyz, s_xx_xzz,\
-                                     s_xx_yyy, s_xx_yyz, s_xx_yzz, s_xx_zzz,\
-                                     s_xy_xxx, s_xy_xxy, s_xy_xxz, s_xy_xyy,\
-                                     s_xy_xyz, s_xy_xzz, s_xy_yyy, s_xy_yyz,\
-                                     s_xy_yzz, s_xy_zzz, s_xz_xxx, s_xz_xxy,\
-                                     s_xz_xxz, s_xz_xyy, s_xz_xyz, s_xz_xzz,\
-                                     s_xz_yyy, s_xz_yyz, s_xz_yzz, s_xz_zzz,\
-                                     s_yy_xxx, s_yy_xxy, s_yy_xxz, s_yy_xyy,\
-                                     s_yy_xyz, s_yy_xzz, s_yy_yyy, s_yy_yyz,\
-                                     s_yy_yzz, s_yy_zzz, s_yz_xxx, s_yz_xxy,\
-                                     s_yz_xxz, s_yz_xyy, s_yz_xyz, s_yz_xzz,\
-                                     s_yz_yyy, s_yz_yyz, s_yz_yzz, s_yz_zzz,\
-                                     s_zz_xxx, s_zz_xxy, s_zz_xxz, s_zz_xyy,\
-                                     s_zz_xyz, s_zz_xzz, s_zz_yyy, s_zz_yyz,\
-                                     s_zz_yzz, s_zz_zzz, s_xxx_xxx, s_xxx_xxy,\
-                                     s_xxx_xxz, s_xxx_xyy, s_xxx_xyz, s_xxx_xzz,\
-                                     s_xxx_yyy, s_xxx_yyz, s_xxx_yzz, s_xxx_zzz,\
-                                     s_xxy_xxx, s_xxy_xxy, s_xxy_xxz, s_xxy_xyy,\
-                                     s_xxy_xyz, s_xxy_xzz, s_xxy_yyy, s_xxy_yyz,\
-                                     s_xxy_yzz, s_xxy_zzz, s_xxz_xxx, s_xxz_xxy,\
-                                     s_xxz_xxz, s_xxz_xyy, s_xxz_xyz, s_xxz_xzz,\
-                                     s_xxz_yyy, s_xxz_yyz, s_xxz_yzz, s_xxz_zzz,\
-                                     s_xyy_xxx, s_xyy_xxy, s_xyy_xxz, s_xyy_xyy,\
-                                     s_xyy_xyz, s_xyy_xzz, s_xyy_yyy, s_xyy_yyz,\
-                                     s_xyy_yzz, s_xyy_zzz, s_xyz_xxx, s_xyz_xxy,\
-                                     s_xyz_xxz, s_xyz_xyy, s_xyz_xyz, s_xyz_xzz,\
-                                     s_xyz_yyy, s_xyz_yyz, s_xyz_yzz, s_xyz_zzz,\
-                                     s_xzz_xxx, s_xzz_xxy, s_xzz_xxz, s_xzz_xyy,\
-                                     s_xzz_xyz, s_xzz_xzz, s_xzz_yyy, s_xzz_yyz,\
-                                     s_xzz_yzz, s_xzz_zzz, s_yyy_xxx, s_yyy_xxy,\
-                                     s_yyy_xxz, s_yyy_xyy, s_yyy_xyz, s_yyy_xzz,\
-                                     s_yyy_yyy, s_yyy_yyz, s_yyy_yzz, s_yyy_zzz,\
-                                     s_yyz_xxx, s_yyz_xxy, s_yyz_xxz, s_yyz_xyy,\
-                                     s_yyz_xyz, s_yyz_xzz, s_yyz_yyy, s_yyz_yyz,\
-                                     s_yyz_yzz, s_yyz_zzz, s_yzz_xxx, s_yzz_xxy,\
-                                     s_yzz_xxz, s_yzz_xyy, s_yzz_xyz, s_yzz_xzz,\
-                                     s_yzz_yyy, s_yzz_yyz, s_yzz_yzz, s_yzz_zzz,\
-                                     s_zzz_xxx, s_zzz_xxy, s_zzz_xxz, s_zzz_xyy,\
-                                     s_zzz_xyz, s_zzz_xzz, s_zzz_yyy, s_zzz_yyz,\
-                                     s_zzz_yzz, s_zzz_zzz: VLX_ALIGN)
-            for (int32_t j = 0; j < nprim; j++)
-            {
-                // scaled prefactor
-
-                double f2t = 0.50 * fx[j];
-
-                // leading x component
-
-                double fr = pax[j];
-
-                s_xxx_xxx[j] = fr * s_xx_xxx[j] + f2t * (2.0 * s_x_xxx[j] + 3.0 * s_xx_xx[j]);
-
-                s_xxx_xxy[j] = fr * s_xx_xxy[j] + f2t * (2.0 * s_x_xxy[j] + 2.0 * s_xx_xy[j]);
-
-                s_xxx_xxz[j] = fr * s_xx_xxz[j] + f2t * (2.0 * s_x_xxz[j] + 2.0 * s_xx_xz[j]);
-
-                s_xxx_xyy[j] = fr * s_xx_xyy[j] + f2t * (2.0 * s_x_xyy[j] + s_xx_yy[j]);
-
-                s_xxx_xyz[j] = fr * s_xx_xyz[j] + f2t * (2.0 * s_x_xyz[j] + s_xx_yz[j]);
-
-                s_xxx_xzz[j] = fr * s_xx_xzz[j] + f2t * (2.0 * s_x_xzz[j] + s_xx_zz[j]);
-
-                s_xxx_yyy[j] = fr * s_xx_yyy[j] + f2t * 2.0 * s_x_yyy[j];
-
-                s_xxx_yyz[j] = fr * s_xx_yyz[j] + f2t * 2.0 * s_x_yyz[j];
-
-                s_xxx_yzz[j] = fr * s_xx_yzz[j] + f2t * 2.0 * s_x_yzz[j];
-
-                s_xxx_zzz[j] = fr * s_xx_zzz[j] + f2t * 2.0 * s_x_zzz[j];
-
-                s_xxy_xxx[j] = fr * s_xy_xxx[j] + f2t * (s_y_xxx[j] + 3.0 * s_xy_xx[j]);
-
-                s_xxy_xxy[j] = fr * s_xy_xxy[j] + f2t * (s_y_xxy[j] + 2.0 * s_xy_xy[j]);
-
-                s_xxy_xxz[j] = fr * s_xy_xxz[j] + f2t * (s_y_xxz[j] + 2.0 * s_xy_xz[j]);
-
-                s_xxy_xyy[j] = fr * s_xy_xyy[j] + f2t * (s_y_xyy[j] + s_xy_yy[j]);
-
-                s_xxy_xyz[j] = fr * s_xy_xyz[j] + f2t * (s_y_xyz[j] + s_xy_yz[j]);
-
-                s_xxy_xzz[j] = fr * s_xy_xzz[j] + f2t * (s_y_xzz[j] + s_xy_zz[j]);
-
-                s_xxy_yyy[j] = fr * s_xy_yyy[j] + f2t * s_y_yyy[j];
-
-                s_xxy_yyz[j] = fr * s_xy_yyz[j] + f2t * s_y_yyz[j];
-
-                s_xxy_yzz[j] = fr * s_xy_yzz[j] + f2t * s_y_yzz[j];
-
-                s_xxy_zzz[j] = fr * s_xy_zzz[j] + f2t * s_y_zzz[j];
-
-                s_xxz_xxx[j] = fr * s_xz_xxx[j] + f2t * (s_z_xxx[j] + 3.0 * s_xz_xx[j]);
-
-                s_xxz_xxy[j] = fr * s_xz_xxy[j] + f2t * (s_z_xxy[j] + 2.0 * s_xz_xy[j]);
-
-                s_xxz_xxz[j] = fr * s_xz_xxz[j] + f2t * (s_z_xxz[j] + 2.0 * s_xz_xz[j]);
-
-                s_xxz_xyy[j] = fr * s_xz_xyy[j] + f2t * (s_z_xyy[j] + s_xz_yy[j]);
-
-                s_xxz_xyz[j] = fr * s_xz_xyz[j] + f2t * (s_z_xyz[j] + s_xz_yz[j]);
-
-                s_xxz_xzz[j] = fr * s_xz_xzz[j] + f2t * (s_z_xzz[j] + s_xz_zz[j]);
-
-                s_xxz_yyy[j] = fr * s_xz_yyy[j] + f2t * s_z_yyy[j];
-
-                s_xxz_yyz[j] = fr * s_xz_yyz[j] + f2t * s_z_yyz[j];
-
-                s_xxz_yzz[j] = fr * s_xz_yzz[j] + f2t * s_z_yzz[j];
-
-                s_xxz_zzz[j] = fr * s_xz_zzz[j] + f2t * s_z_zzz[j];
-
-                s_xyy_xxx[j] = fr * s_yy_xxx[j] + f2t * 3.0 * s_yy_xx[j];
-
-                s_xyy_xxy[j] = fr * s_yy_xxy[j] + f2t * 2.0 * s_yy_xy[j];
-
-                s_xyy_xxz[j] = fr * s_yy_xxz[j] + f2t * 2.0 * s_yy_xz[j];
-
-                s_xyy_xyy[j] = fr * s_yy_xyy[j] + f2t * s_yy_yy[j];
-
-                s_xyy_xyz[j] = fr * s_yy_xyz[j] + f2t * s_yy_yz[j];
-
-                s_xyy_xzz[j] = fr * s_yy_xzz[j] + f2t * s_yy_zz[j];
-
-                s_xyy_yyy[j] = fr * s_yy_yyy[j];
-
-                s_xyy_yyz[j] = fr * s_yy_yyz[j];
-
-                s_xyy_yzz[j] = fr * s_yy_yzz[j];
-
-                s_xyy_zzz[j] = fr * s_yy_zzz[j];
-
-                s_xyz_xxx[j] = fr * s_yz_xxx[j] + f2t * 3.0 * s_yz_xx[j];
-
-                s_xyz_xxy[j] = fr * s_yz_xxy[j] + f2t * 2.0 * s_yz_xy[j];
-
-                s_xyz_xxz[j] = fr * s_yz_xxz[j] + f2t * 2.0 * s_yz_xz[j];
-
-                s_xyz_xyy[j] = fr * s_yz_xyy[j] + f2t * s_yz_yy[j];
-
-                s_xyz_xyz[j] = fr * s_yz_xyz[j] + f2t * s_yz_yz[j];
-
-                s_xyz_xzz[j] = fr * s_yz_xzz[j] + f2t * s_yz_zz[j];
-
-                s_xyz_yyy[j] = fr * s_yz_yyy[j];
-
-                s_xyz_yyz[j] = fr * s_yz_yyz[j];
-
-                s_xyz_yzz[j] = fr * s_yz_yzz[j];
-
-                s_xyz_zzz[j] = fr * s_yz_zzz[j];
-
-                s_xzz_xxx[j] = fr * s_zz_xxx[j] + f2t * 3.0 * s_zz_xx[j];
-
-                s_xzz_xxy[j] = fr * s_zz_xxy[j] + f2t * 2.0 * s_zz_xy[j];
-
-                s_xzz_xxz[j] = fr * s_zz_xxz[j] + f2t * 2.0 * s_zz_xz[j];
-
-                s_xzz_xyy[j] = fr * s_zz_xyy[j] + f2t * s_zz_yy[j];
-
-                s_xzz_xyz[j] = fr * s_zz_xyz[j] + f2t * s_zz_yz[j];
-
-                s_xzz_xzz[j] = fr * s_zz_xzz[j] + f2t * s_zz_zz[j];
-
-                s_xzz_yyy[j] = fr * s_zz_yyy[j];
-
-                s_xzz_yyz[j] = fr * s_zz_yyz[j];
-
-                s_xzz_yzz[j] = fr * s_zz_yzz[j];
-
-                s_xzz_zzz[j] = fr * s_zz_zzz[j];
-
-                // leading y component
-
-                fr = pay[j];
-
-                s_yyy_xxx[j] = fr * s_yy_xxx[j] + f2t * 2.0 * s_y_xxx[j];
-
-                s_yyy_xxy[j] = fr * s_yy_xxy[j] + f2t * (2.0 * s_y_xxy[j] + s_yy_xx[j]);
-
-                s_yyy_xxz[j] = fr * s_yy_xxz[j] + f2t * 2.0 * s_y_xxz[j];
-
-                s_yyy_xyy[j] = fr * s_yy_xyy[j] + f2t * (2.0 * s_y_xyy[j] + 2.0 * s_yy_xy[j]);
-
-                s_yyy_xyz[j] = fr * s_yy_xyz[j] + f2t * (2.0 * s_y_xyz[j] + s_yy_xz[j]);
-
-                s_yyy_xzz[j] = fr * s_yy_xzz[j] + f2t * 2.0 * s_y_xzz[j];
-
-                s_yyy_yyy[j] = fr * s_yy_yyy[j] + f2t * (2.0 * s_y_yyy[j] + 3.0 * s_yy_yy[j]);
-
-                s_yyy_yyz[j] = fr * s_yy_yyz[j] + f2t * (2.0 * s_y_yyz[j] + 2.0 * s_yy_yz[j]);
-
-                s_yyy_yzz[j] = fr * s_yy_yzz[j] + f2t * (2.0 * s_y_yzz[j] + s_yy_zz[j]);
-
-                s_yyy_zzz[j] = fr * s_yy_zzz[j] + f2t * 2.0 * s_y_zzz[j];
-
-                s_yyz_xxx[j] = fr * s_yz_xxx[j] + f2t * s_z_xxx[j];
-
-                s_yyz_xxy[j] = fr * s_yz_xxy[j] + f2t * (s_z_xxy[j] + s_yz_xx[j]);
-
-                s_yyz_xxz[j] = fr * s_yz_xxz[j] + f2t * s_z_xxz[j];
-
-                s_yyz_xyy[j] = fr * s_yz_xyy[j] + f2t * (s_z_xyy[j] + 2.0 * s_yz_xy[j]);
-
-                s_yyz_xyz[j] = fr * s_yz_xyz[j] + f2t * (s_z_xyz[j] + s_yz_xz[j]);
-
-                s_yyz_xzz[j] = fr * s_yz_xzz[j] + f2t * s_z_xzz[j];
-
-                s_yyz_yyy[j] = fr * s_yz_yyy[j] + f2t * (s_z_yyy[j] + 3.0 * s_yz_yy[j]);
-
-                s_yyz_yyz[j] = fr * s_yz_yyz[j] + f2t * (s_z_yyz[j] + 2.0 * s_yz_yz[j]);
-
-                s_yyz_yzz[j] = fr * s_yz_yzz[j] + f2t * (s_z_yzz[j] + s_yz_zz[j]);
-
-                s_yyz_zzz[j] = fr * s_yz_zzz[j] + f2t * s_z_zzz[j];
-
-                s_yzz_xxx[j] = fr * s_zz_xxx[j];
-
-                s_yzz_xxy[j] = fr * s_zz_xxy[j] + f2t * s_zz_xx[j];
-
-                s_yzz_xxz[j] = fr * s_zz_xxz[j];
-
-                s_yzz_xyy[j] = fr * s_zz_xyy[j] + f2t * 2.0 * s_zz_xy[j];
-
-                s_yzz_xyz[j] = fr * s_zz_xyz[j] + f2t * s_zz_xz[j];
-
-                s_yzz_xzz[j] = fr * s_zz_xzz[j];
-
-                s_yzz_yyy[j] = fr * s_zz_yyy[j] + f2t * 3.0 * s_zz_yy[j];
-
-                s_yzz_yyz[j] = fr * s_zz_yyz[j] + f2t * 2.0 * s_zz_yz[j];
-
-                s_yzz_yzz[j] = fr * s_zz_yzz[j] + f2t * s_zz_zz[j];
-
-                s_yzz_zzz[j] = fr * s_zz_zzz[j];
-
-                // leading z component
-                
-                fr = paz[j];
-
-                s_zzz_xxx[j] = fr * s_zz_xxx[j] + f2t * 2.0 * s_z_xxx[j];
-
-                s_zzz_xxy[j] = fr * s_zz_xxy[j] + f2t * 2.0 * s_z_xxy[j];
-
-                s_zzz_xxz[j] = fr * s_zz_xxz[j] + f2t * (2.0 * s_z_xxz[j] + s_zz_xx[j]);
-
-                s_zzz_xyy[j] = fr * s_zz_xyy[j] + f2t * 2.0 * s_z_xyy[j];
-
-                s_zzz_xyz[j] = fr * s_zz_xyz[j] + f2t * (2.0 * s_z_xyz[j] + s_zz_xy[j]);
-
-                s_zzz_xzz[j] = fr * s_zz_xzz[j] + f2t * (2.0 * s_z_xzz[j] + 2.0 * s_zz_xz[j]);
-
-                s_zzz_yyy[j] = fr * s_zz_yyy[j] + f2t * 2.0 * s_z_yyy[j];
-
-                s_zzz_yyz[j] = fr * s_zz_yyz[j] + f2t * (2.0 * s_z_yyz[j] + s_zz_yy[j]);
-
-                s_zzz_yzz[j] = fr * s_zz_yzz[j] + f2t * (2.0 * s_z_yzz[j] + 2.0 * s_zz_yz[j]);
-
-                s_zzz_zzz[j] = fr * s_zz_zzz[j] + f2t * (2.0 * s_z_zzz[j] + 3.0 * s_zz_zz[j]);
-            }
-
-            idx++;
-        }
-    }
-
-    void
-    compOverlapForFGOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
-    {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if ( bang < 3) return;
-
-        if ((bang == 3) && (kang < 4)) return;
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {3, 4})) return;
 
         if (iContrGto  == 0) printf(" * VRR: (3|4)\n");
 
@@ -3754,10 +4261,16 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // set up pointers to primitives data on ket side
 
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {3, 4});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {2, 4});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {1, 4});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {2, 3});
 
         // loop over contracted GTO on bra side
 
@@ -3778,8 +4291,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto paz = paDistances.data(3 * idx + 2);
 
             // set up pointers to (D|F) integrals
-
-            int32_t tkoff = ovlrecfunc::getPositionInBuffer(2, 3, ketGtoBlock) * bdim;
 
             auto s_xx_xxx = primBuffer.data(tkoff + 60 * idx);
 
@@ -3903,8 +4414,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             // set up pointers to (P|G) integrals
 
-            int32_t t2off = ovlrecfunc::getPositionInBuffer(1, 4, ketGtoBlock) * bdim;
-
             auto s_x_xxxx = primBuffer.data(t2off + 45 * idx);
 
             auto s_x_xxxy = primBuffer.data(t2off + 45 * idx + 1);
@@ -3996,8 +4505,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_z_zzzz = primBuffer.data(t2off + 45 * idx + 44);
 
             // set up pointers to (D|G) integrals
-
-            int32_t t1off = ovlrecfunc::getPositionInBuffer(2, 4, ketGtoBlock) * bdim;
 
             auto s_xx_xxxx = primBuffer.data(t1off + 90 * idx);
 
@@ -4180,8 +4687,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_zz_zzzz = primBuffer.data(t1off + 90 * idx + 89);
 
             // set up pointers to (F|G) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(3, 4, ketGtoBlock) * bdim;
 
             auto s_xxx_xxxx = primBuffer.data(soff + 150 * idx);
 
@@ -4893,24 +5398,22 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
 
+    // FIX ME: add (g|f)
+    
     void
-    compOverlapForGGOnKet(      CMemBlock2D<double>& primBuffer,
-                          const CMemBlock2D<double>& osFactors,
-                          const CMemBlock2D<double>& paDistances,
-                          const CGtoBlock&           braGtoBlock,
-                          const CGtoBlock&           ketGtoBlock,
-                          const int32_t              iContrGto)
+    compOverlapForGG(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
     {
-        // skip computation of overlap integrals
-
-        auto bang = braGtoBlock.getAngularMomentum();
-
-        auto kang = ketGtoBlock.getAngularMomentum();
-
-        if ( bang < 4) return;
-
-        if ((bang == 4) && (kang < 4)) return;
-
+        // skip integrals if not included in recursion pattern
+        
+        if (!genfunc::isInVector(recPattern, {4, 4})) return;
+        
         if (iContrGto  == 0) printf(" * VRR: (4|4)\n");
 
         // set up pointers to primitives data on bra side
@@ -4922,10 +5425,16 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // set up pointers to primitives data on ket side
 
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-
-        // compute number of primitives of bra side
-
-        auto bdim = epos[iContrGto] - spos[iContrGto];
+        
+        // get position of integrals in primitves buffer
+        
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {4, 4});
+        
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {3, 4});
+        
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {2, 4});
+        
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {3, 3});
 
         // loop over contracted GTO on bra side
 
@@ -4946,8 +5455,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto paz = paDistances.data(3 * idx + 2);
 
             // set up pointers to (F|F) integrals
-
-            int32_t tkoff = ovlrecfunc::getPositionInBuffer(3, 3, ketGtoBlock) * bdim;
 
             auto s_xxx_xxx = primBuffer.data(tkoff + 100 * idx);
 
@@ -5151,8 +5658,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             // set up pointers to (D|G) integrals
 
-            int32_t t2off = ovlrecfunc::getPositionInBuffer(2, 4, ketGtoBlock) * bdim;
-
             auto s_xx_xxxx = primBuffer.data(t2off + 90 * idx);
 
             auto s_xx_xxxy = primBuffer.data(t2off + 90 * idx + 1);
@@ -5334,8 +5839,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_zz_zzzz = primBuffer.data(t2off + 90 * idx + 89);
 
             // set up pointers to (F|G) integrals
-
-            int32_t t1off = ovlrecfunc::getPositionInBuffer(3, 4, ketGtoBlock) * bdim;
 
             auto s_xxx_xxxx = primBuffer.data(t1off + 150 * idx);
 
@@ -5638,8 +6141,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto s_zzz_zzzz = primBuffer.data(t1off + 150 * idx + 149);
 
             // set up pointers to (G|G) integrals
-
-            int32_t soff = ovlrecfunc::getPositionInBuffer(4, 4, ketGtoBlock) * bdim;
 
             auto s_xxxx_xxxx = primBuffer.data(soff + 225 * idx);
 
@@ -6737,103 +7238,5 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             idx++;
         }
     }
-
-    
-    
-    void
-    compOverlapForPS(      CMemBlock2D<double>& primBuffer,
-                     const CMemBlock2D<double>& paDistances,
-                     const CGtoBlock&           braGtoBlock,
-                     const CGtoBlock&           ketGtoBlock,
-                     const int32_t              iContrGto)
-    {
-        if (iContrGto  == 0) printf(" * VRR: (1|0)\n");
-        
-        // set up pointers to primitives data on bra side
-        
-        auto spos = braGtoBlock.getStartPositions();
-        
-        auto epos = braGtoBlock.getEndPositions();
-        
-        // set up pointers to primitives data on ket side
-        
-        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-        
-        // compute number of primitives of bra side
-        
-        auto bdim = epos[iContrGto] - spos[iContrGto];
-        
-        // loop over contracted GTO on bra side
-        
-        int32_t idx = 0;
-        
-        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
-        {
-            // set up pointers to distances R(PA)
-            
-            auto pax = paDistances.data(3 * idx);
-            
-            auto pay = paDistances.data(3 * idx + 1);
-            
-            auto paz = paDistances.data(3 * idx + 2);
-            
-            // set up pointers to (S|S) integrals
-            
-            auto fovl = primBuffer.data(idx);
-            
-            // set up pointers to (P|S) integrals
-            
-            auto s_x_0 = primBuffer.data(bdim + 3 * idx);
-            
-            auto s_y_0 = primBuffer.data(bdim + 3 * idx + 1);
-            
-            auto s_z_0 = primBuffer.data(bdim + 3 * idx + 2);
-            
-            #pragma omp simd aligned(pax, pay, paz, fovl, s_x_0, s_y_0,\
-                                     s_z_0: VLX_ALIGN)
-            for (int32_t j = 0; j < nprim; j++)
-            {
-                double fact = fovl[j];
-                
-                s_x_0[j] = pax[j] * fact;
-                
-                s_y_0[j] = pay[j] * fact;
-                
-                s_z_0[j] = paz[j] * fact;
-            }
-            
-            idx++;
-        }
-    }
-    
-    int32_t
-    getPositionInBuffer(const int32_t    braAngularMomentum,
-                        const int32_t    ketAngularMomentum,
-                        const CGtoBlock& ketGtoBlock)
-    {
-        int32_t ndim = 0;
-        
-        auto kang = ketGtoBlock.getAngularMomentum();
-        
-        for (int32_t i = 0; i <= (braAngularMomentum - 1); i++)
-        {
-            auto bdim = angmom::to_CartesianComponents(i);
-            
-            for (int32_t j = i; j <= kang; j++)
-            {
-                ndim += bdim * angmom::to_CartesianComponents(j);
-            }
-        }
-        
-        auto bdim = angmom::to_CartesianComponents(braAngularMomentum);
-        
-        for (int32_t i = braAngularMomentum; i < ketAngularMomentum; i++)
-        {
-             ndim += bdim * angmom::to_CartesianComponents(i);
-        }
-        
-        return ndim;
-    }
-    
     
 } // ovlrecfunc namespace

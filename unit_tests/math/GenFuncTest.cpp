@@ -92,3 +92,64 @@ TEST_F(CGenFuncTest, TransformForD)
     
     ASSERT_EQ(spherdat, tdat);
 }
+
+TEST_F(CGenFuncTest, IsInVectorForTwoIndexes)
+{
+    CVecTwoIndexes vec{{0, 1}, {2, 4}, {7, -1}, {8, 2}};
+ 
+    ASSERT_TRUE(genfunc::isInVector(vec, {0, 1}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {2, 4}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {7, -1}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {8,  2}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {0, 0}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 0}));
+
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 1}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {7, 1}));
+}
+
+TEST_F(CGenFuncTest, AddValidAndUniquePair)
+{
+    CVecTwoIndexes vec{{0, 1}, {2, 4}};
+    
+    genfunc::addValidAndUniquePair(vec, {7, -1});
+    
+    genfunc::addValidAndUniquePair(vec, {2, 1});
+    
+    genfunc::addValidAndUniquePair(vec, {2, 4});
+    
+    genfunc::addValidAndUniquePair(vec, {2, 1});
+    
+    ASSERT_EQ(vec.size(), 3);
+    
+    ASSERT_EQ(vec[0], CTwoIndexes(0, 1));
+    
+    ASSERT_EQ(vec[1], CTwoIndexes(2, 4));
+    
+    ASSERT_EQ(vec[2], CTwoIndexes(2, 1));
+}
+
+TEST_F(CGenFuncTest, FindPairIndex)
+{
+    CVecTwoIndexes vec{{0, 1}, {2, 4}, {7, -1}, {8, 2}};
+    
+    std::vector<int32_t> idx{1, 3, 7, 8};
+    
+    ASSERT_EQ(8, genfunc::findPairIndex(idx, vec, {8, 2}));
+    
+    ASSERT_EQ(7, genfunc::findPairIndex(idx, vec, {7, -1}));
+    
+    ASSERT_EQ(3, genfunc::findPairIndex(idx, vec, {2, 4}));
+    
+    ASSERT_EQ(1, genfunc::findPairIndex(idx, vec, {0, 1}));
+    
+    ASSERT_EQ(-1, genfunc::findPairIndex(idx, vec, {0, 0}));
+    
+    ASSERT_EQ(-1, genfunc::findPairIndex(idx, vec, {2, 3}));
+}

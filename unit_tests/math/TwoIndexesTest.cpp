@@ -77,3 +77,22 @@ TEST_F(CTwoIndexesTest, Second)
 
     ASSERT_EQ(3, idb.second());
 }
+
+TEST_F(CTwoIndexesTest, IsValidPair)
+{
+    CTwoIndexes ida(2, 7);
+    
+    ASSERT_TRUE(ida.isValidPair());
+    
+    CTwoIndexes idb(3, -3);
+    
+    ASSERT_FALSE(idb.isValidPair());
+    
+    CTwoIndexes idc(-3, 0);
+    
+    ASSERT_FALSE(idc.isValidPair());
+    
+    CTwoIndexes idd(0, 0);
+    
+    ASSERT_TRUE(idd.isValidPair());
+}

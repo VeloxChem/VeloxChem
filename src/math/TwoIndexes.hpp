@@ -110,6 +110,13 @@ public:
     int32_t second() const;
     
     /**
+     Check if pair of indexes represents valid index pair (0..+Inf, +0..Inf).
+
+     @return true if pair of indexes is valid index pair, false - otherwise.
+     */
+    bool isValidPair() const;
+    
+    /**
      Converts two indexes object to text output and insert it into output text
      stream.
      

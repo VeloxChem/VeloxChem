@@ -13,6 +13,7 @@
 
 #include "MemBlock2D.hpp"
 #include "SphericalMomentum.hpp"
+#include "VecIndexes.hpp"
 
 namespace genfunc { // genfunc namespace
     
@@ -53,6 +54,42 @@ namespace genfunc { // genfunc namespace
                   const int32_t              nElements,
                   const int32_t              nBlocks);
     
+    /**
+     Checks if two indexes object is inside vector of two indexes objects.
+
+     @param vector the vector of two indexes objects.
+     @param pair the two indexes object.
+     @return true if two indexes object is found in vector of two indexes
+             objects, false - otherwise.
+     */
+    bool isInVector(const CVecTwoIndexes& vector,
+                    const CTwoIndexes&    pair);
+    
+    /**
+     Conditionally adds two indexes object to vector of two indexes objects.
+     Addition is skipped if two indexes object is not valid indexing pair or
+     is already resides in vector of two indexes objects.
+
+     @param vector the vector of two indexes objects.
+     @param pair the two indexes object.
+     @return true if two indexes object is added to vector of two indexes
+             objects, false otherwise.
+     */
+    bool addValidAndUniquePair(      CVecTwoIndexes& vector,
+                               const CTwoIndexes&    pair);
+    
+    /**
+     Finds index from vector of indexes associated with two indexes object in
+     vector of two indexes objects.
+
+     @param indexes the vector of indexes.
+     @param vector the vector of two indexes objects.
+     @param pair the two indexes object.
+     @return the index assocated with two indexes object.
+     */
+    int32_t findPairIndex(const std::vector<int32_t>& indexes,
+                          const CVecTwoIndexes&       vector,
+                          const CTwoIndexes&          pair);
 
 } // genfunc namespace
 
