@@ -286,7 +286,11 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                  paDistances, braGtoBlock, ketGtoBlock,
                                  iContrGto);
     
-    // FIX ME: add (d|p)
+    // compute (d|p) integrals
+    
+    ovlrecfunc::compOverlapForDP(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
     
     // compute (d|d) integrals
     
@@ -312,7 +316,11 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                  paDistances, braGtoBlock, ketGtoBlock,
                                  iContrGto);
     
-    // FIX ME: add (f|p)
+    // compute (f|p) integrals
+    
+    ovlrecfunc::compOverlapForFP(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
     
     // compute (d|f) integrals
     
@@ -320,8 +328,14 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                  paDistances, braGtoBlock, ketGtoBlock,
                                  iContrGto);
     
-    // FIX ME: add (f|d)
+    // compute (f|d) integrals
+    
+    ovlrecfunc::compOverlapForFD(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
 
+    // compute (f|f) integrals
+    
     ovlrecfunc::compOverlapForFF(primBuffer, recPattern, recIndexes, osFactors,
                                  paDistances, braGtoBlock, ketGtoBlock,
                                  iContrGto);
@@ -344,7 +358,11 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                  paDistances, braGtoBlock, ketGtoBlock,
                                  iContrGto);
     
-    // FIX ME: add (g|p)
+    // compute (g|p) integrals
+    
+    ovlrecfunc::compOverlapForGP(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
     
     // compute (d|g) integrals
     
@@ -352,7 +370,11 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                  paDistances, braGtoBlock, ketGtoBlock,
                                  iContrGto);
     
-    // FIX ME: add (g|d)
+    // compute (g|d) integrals
+    
+    ovlrecfunc::compOverlapForGD(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
     
     // compute (f|g) integrals
     
@@ -360,7 +382,11 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                  paDistances, braGtoBlock, ketGtoBlock,
                                  iContrGto);
     
-    // FIX ME: add (g|f)
+    // compute (g|f) integrals
+    
+    ovlrecfunc::compOverlapForGF(primBuffer, recPattern, recIndexes, osFactors,
+                                 paDistances, braGtoBlock, ketGtoBlock,
+                                 iContrGto);
 
     // compute (g|g) integrals
     
@@ -396,7 +422,6 @@ COverlapIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock,
     // set up initial state of recursion buffer
     
     recvec.push_back(CTwoIndexes(bang, kang));
-    
     
     while (true)
     {

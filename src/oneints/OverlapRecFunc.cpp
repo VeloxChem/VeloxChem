@@ -773,7 +773,198 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
     
-    // FIX ME: d,p
+    void
+    compOverlapForDP(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+
+        if (!genfunc::isInVector(recPattern, {2, 1})) return;
+
+        if (iContrGto  == 0) printf(" * VRR: (2|1)\n");
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // get position of integrals in primitves buffer
+
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {2, 1});
+
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {1, 1});
+
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {0, 1});
+
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {1, 0});
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to distances R(PA)
+
+            auto pax = paDistances.data(3 * idx);
+
+            auto pay = paDistances.data(3 * idx + 1);
+
+            auto paz = paDistances.data(3 * idx + 2);
+
+            // set up pointers to (P|S) integrals
+
+            auto s_x_0 = primBuffer.data(tkoff + 3 * idx);
+
+            auto s_y_0 = primBuffer.data(tkoff + 3 * idx + 1);
+
+            auto s_z_0 = primBuffer.data(tkoff + 3 * idx + 2);
+
+            // set up pointers to (S|P) integrals
+
+            auto s_0_x = primBuffer.data(t2off + 3 * idx);
+
+            auto s_0_y = primBuffer.data(t2off + 3 * idx + 1);
+
+            auto s_0_z = primBuffer.data(t2off + 3 * idx + 2);
+
+            // set up pointers to (P|P) integrals
+
+            auto s_x_x = primBuffer.data(t1off + 9 * idx);
+
+            auto s_x_y = primBuffer.data(t1off + 9 * idx + 1);
+
+            auto s_x_z = primBuffer.data(t1off + 9 * idx + 2);
+
+            auto s_y_x = primBuffer.data(t1off + 9 * idx + 3);
+
+            auto s_y_y = primBuffer.data(t1off + 9 * idx + 4);
+
+            auto s_y_z = primBuffer.data(t1off + 9 * idx + 5);
+
+            auto s_z_x = primBuffer.data(t1off + 9 * idx + 6);
+
+            auto s_z_y = primBuffer.data(t1off + 9 * idx + 7);
+
+            auto s_z_z = primBuffer.data(t1off + 9 * idx + 8);
+
+            // set up pointers to (D|P) integrals
+
+            auto s_xx_x = primBuffer.data(soff + 18 * idx);
+
+            auto s_xx_y = primBuffer.data(soff + 18 * idx + 1);
+
+            auto s_xx_z = primBuffer.data(soff + 18 * idx + 2);
+
+            auto s_xy_x = primBuffer.data(soff + 18 * idx + 3);
+
+            auto s_xy_y = primBuffer.data(soff + 18 * idx + 4);
+
+            auto s_xy_z = primBuffer.data(soff + 18 * idx + 5);
+
+            auto s_xz_x = primBuffer.data(soff + 18 * idx + 6);
+
+            auto s_xz_y = primBuffer.data(soff + 18 * idx + 7);
+
+            auto s_xz_z = primBuffer.data(soff + 18 * idx + 8);
+
+            auto s_yy_x = primBuffer.data(soff + 18 * idx + 9);
+
+            auto s_yy_y = primBuffer.data(soff + 18 * idx + 10);
+
+            auto s_yy_z = primBuffer.data(soff + 18 * idx + 11);
+
+            auto s_yz_x = primBuffer.data(soff + 18 * idx + 12);
+
+            auto s_yz_y = primBuffer.data(soff + 18 * idx + 13);
+
+            auto s_yz_z = primBuffer.data(soff + 18 * idx + 14);
+
+            auto s_zz_x = primBuffer.data(soff + 18 * idx + 15);
+
+            auto s_zz_y = primBuffer.data(soff + 18 * idx + 16);
+
+            auto s_zz_z = primBuffer.data(soff + 18 * idx + 17);
+
+            #pragma omp simd aligned(fx, pax, pay, paz, s_x_0, s_y_0, s_z_0, s_0_x,\
+                                     s_0_y, s_0_z, s_x_x, s_x_y, s_x_z, s_y_x,\
+                                     s_y_y, s_y_z, s_z_x, s_z_y, s_z_z, s_xx_x,\
+                                     s_xx_y, s_xx_z, s_xy_x, s_xy_y, s_xy_z, s_xz_x,\
+                                     s_xz_y, s_xz_z, s_yy_x, s_yy_y, s_yy_z, s_yz_x,\
+                                     s_yz_y, s_yz_z, s_zz_x, s_zz_y, s_zz_z: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+
+                double f2t = 0.50 * fx[j];
+
+                // leading x component
+
+                double fr = pax[j];
+
+                s_xx_x[j] = fr * s_x_x[j] + f2t * (s_0_x[j] + s_x_0[j]);
+
+                s_xx_y[j] = fr * s_x_y[j] + f2t * s_0_y[j];
+
+                s_xx_z[j] = fr * s_x_z[j] + f2t * s_0_z[j];
+
+                s_xy_x[j] = fr * s_y_x[j] + f2t * s_y_0[j];
+
+                s_xy_y[j] = fr * s_y_y[j];
+
+                s_xy_z[j] = fr * s_y_z[j];
+
+                s_xz_x[j] = fr * s_z_x[j] + f2t * s_z_0[j];
+
+                s_xz_y[j] = fr * s_z_y[j];
+
+                s_xz_z[j] = fr * s_z_z[j];
+
+                // leading y component
+
+                fr = pay[j];
+
+                s_yy_x[j] = fr * s_y_x[j] + f2t * s_0_x[j];
+
+                s_yy_y[j] = fr * s_y_y[j] + f2t * (s_0_y[j] + s_y_0[j]);
+
+                s_yy_z[j] = fr * s_y_z[j] + f2t * s_0_z[j];
+
+                s_yz_x[j] = fr * s_z_x[j];
+
+                s_yz_y[j] = fr * s_z_y[j] + f2t * s_z_0[j];
+
+                s_yz_z[j] = fr * s_z_z[j];
+
+                // leading z component
+
+                fr = paz[j];
+                
+                s_zz_x[j] = fr * s_z_x[j] + f2t * s_0_x[j];
+
+                s_zz_y[j] = fr * s_z_y[j] + f2t * s_0_y[j];
+
+                s_zz_z[j] = fr * s_z_z[j] + f2t * (s_0_z[j] + s_z_0[j]);
+            }
+
+            idx++;
+        }
+    }
     
     void
     compOverlapForDD(      CMemBlock2D<double>&  primBuffer,
@@ -1612,8 +1803,289 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
     
-    // FIX ME: add (f,p)
-    
+    void
+    compOverlapForFP(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+
+        if (!genfunc::isInVector(recPattern, {3, 1})) return;
+
+        if (iContrGto  == 0) printf(" * VRR: (3|1)\n");
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // get position of integrals in primitves buffer
+
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {3, 1});
+
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {2, 1});
+
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {1, 1});
+
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {2, 0});
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to distances R(PA)
+
+            auto pax = paDistances.data(3 * idx);
+
+            auto pay = paDistances.data(3 * idx + 1);
+
+            auto paz = paDistances.data(3 * idx + 2);
+
+            // set up pointers to (D|S) integrals
+
+            auto s_xx_0 = primBuffer.data(tkoff + 6 * idx);
+
+            auto s_xy_0 = primBuffer.data(tkoff + 6 * idx + 1);
+
+            auto s_xz_0 = primBuffer.data(tkoff + 6 * idx + 2);
+
+            auto s_yy_0 = primBuffer.data(tkoff + 6 * idx + 3);
+
+            auto s_yz_0 = primBuffer.data(tkoff + 6 * idx + 4);
+
+            auto s_zz_0 = primBuffer.data(tkoff + 6 * idx + 5);
+
+            // set up pointers to (P|P) integrals
+
+            auto s_x_x = primBuffer.data(t2off + 9 * idx);
+
+            auto s_x_y = primBuffer.data(t2off + 9 * idx + 1);
+
+            auto s_x_z = primBuffer.data(t2off + 9 * idx + 2);
+
+            auto s_y_x = primBuffer.data(t2off + 9 * idx + 3);
+
+            auto s_y_y = primBuffer.data(t2off + 9 * idx + 4);
+
+            auto s_y_z = primBuffer.data(t2off + 9 * idx + 5);
+
+            auto s_z_x = primBuffer.data(t2off + 9 * idx + 6);
+
+            auto s_z_y = primBuffer.data(t2off + 9 * idx + 7);
+
+            auto s_z_z = primBuffer.data(t2off + 9 * idx + 8);
+
+            // set up pointers to (D|P) integrals
+
+            auto s_xx_x = primBuffer.data(t1off + 18 * idx);
+
+            auto s_xx_y = primBuffer.data(t1off + 18 * idx + 1);
+
+            auto s_xx_z = primBuffer.data(t1off + 18 * idx + 2);
+
+            auto s_xy_x = primBuffer.data(t1off + 18 * idx + 3);
+
+            auto s_xy_y = primBuffer.data(t1off + 18 * idx + 4);
+
+            auto s_xy_z = primBuffer.data(t1off + 18 * idx + 5);
+
+            auto s_xz_x = primBuffer.data(t1off + 18 * idx + 6);
+
+            auto s_xz_y = primBuffer.data(t1off + 18 * idx + 7);
+
+            auto s_xz_z = primBuffer.data(t1off + 18 * idx + 8);
+
+            auto s_yy_x = primBuffer.data(t1off + 18 * idx + 9);
+
+            auto s_yy_y = primBuffer.data(t1off + 18 * idx + 10);
+
+            auto s_yy_z = primBuffer.data(t1off + 18 * idx + 11);
+
+            auto s_yz_x = primBuffer.data(t1off + 18 * idx + 12);
+
+            auto s_yz_y = primBuffer.data(t1off + 18 * idx + 13);
+
+            auto s_yz_z = primBuffer.data(t1off + 18 * idx + 14);
+
+            auto s_zz_x = primBuffer.data(t1off + 18 * idx + 15);
+
+            auto s_zz_y = primBuffer.data(t1off + 18 * idx + 16);
+
+            auto s_zz_z = primBuffer.data(t1off + 18 * idx + 17);
+
+            // set up pointers to (F|P) integrals
+
+            auto s_xxx_x = primBuffer.data(soff + 30 * idx);
+
+            auto s_xxx_y = primBuffer.data(soff + 30 * idx + 1);
+
+            auto s_xxx_z = primBuffer.data(soff + 30 * idx + 2);
+
+            auto s_xxy_x = primBuffer.data(soff + 30 * idx + 3);
+
+            auto s_xxy_y = primBuffer.data(soff + 30 * idx + 4);
+
+            auto s_xxy_z = primBuffer.data(soff + 30 * idx + 5);
+
+            auto s_xxz_x = primBuffer.data(soff + 30 * idx + 6);
+
+            auto s_xxz_y = primBuffer.data(soff + 30 * idx + 7);
+
+            auto s_xxz_z = primBuffer.data(soff + 30 * idx + 8);
+
+            auto s_xyy_x = primBuffer.data(soff + 30 * idx + 9);
+
+            auto s_xyy_y = primBuffer.data(soff + 30 * idx + 10);
+
+            auto s_xyy_z = primBuffer.data(soff + 30 * idx + 11);
+
+            auto s_xyz_x = primBuffer.data(soff + 30 * idx + 12);
+
+            auto s_xyz_y = primBuffer.data(soff + 30 * idx + 13);
+
+            auto s_xyz_z = primBuffer.data(soff + 30 * idx + 14);
+
+            auto s_xzz_x = primBuffer.data(soff + 30 * idx + 15);
+
+            auto s_xzz_y = primBuffer.data(soff + 30 * idx + 16);
+
+            auto s_xzz_z = primBuffer.data(soff + 30 * idx + 17);
+
+            auto s_yyy_x = primBuffer.data(soff + 30 * idx + 18);
+
+            auto s_yyy_y = primBuffer.data(soff + 30 * idx + 19);
+
+            auto s_yyy_z = primBuffer.data(soff + 30 * idx + 20);
+
+            auto s_yyz_x = primBuffer.data(soff + 30 * idx + 21);
+
+            auto s_yyz_y = primBuffer.data(soff + 30 * idx + 22);
+
+            auto s_yyz_z = primBuffer.data(soff + 30 * idx + 23);
+
+            auto s_yzz_x = primBuffer.data(soff + 30 * idx + 24);
+
+            auto s_yzz_y = primBuffer.data(soff + 30 * idx + 25);
+
+            auto s_yzz_z = primBuffer.data(soff + 30 * idx + 26);
+
+            auto s_zzz_x = primBuffer.data(soff + 30 * idx + 27);
+
+            auto s_zzz_y = primBuffer.data(soff + 30 * idx + 28);
+
+            auto s_zzz_z = primBuffer.data(soff + 30 * idx + 29);
+
+            #pragma omp simd aligned(fx, pax, pay, paz, s_xx_0, s_xy_0, s_xz_0,\
+                                     s_yy_0, s_yz_0, s_zz_0, s_x_x, s_x_y, s_x_z,\
+                                     s_y_x, s_y_y, s_y_z, s_z_x, s_z_y, s_z_z,\
+                                     s_xx_x, s_xx_y, s_xx_z, s_xy_x, s_xy_y, s_xy_z,\
+                                     s_xz_x, s_xz_y, s_xz_z, s_yy_x, s_yy_y, s_yy_z,\
+                                     s_yz_x, s_yz_y, s_yz_z, s_zz_x, s_zz_y, s_zz_z,\
+                                     s_xxx_x, s_xxx_y, s_xxx_z, s_xxy_x, s_xxy_y,\
+                                     s_xxy_z, s_xxz_x, s_xxz_y, s_xxz_z, s_xyy_x,\
+                                     s_xyy_y, s_xyy_z, s_xyz_x, s_xyz_y, s_xyz_z,\
+                                     s_xzz_x, s_xzz_y, s_xzz_z, s_yyy_x, s_yyy_y,\
+                                     s_yyy_z, s_yyz_x, s_yyz_y, s_yyz_z, s_yzz_x,\
+                                     s_yzz_y, s_yzz_z, s_zzz_x, s_zzz_y, s_zzz_z: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+
+                double f2t = 0.50 * fx[j];
+
+                // leading x component
+
+                double fr = pax[j];
+
+                s_xxx_x[j] = fr * s_xx_x[j] + f2t * (2.0 * s_x_x[j] + s_xx_0[j]);
+
+                s_xxx_y[j] = fr * s_xx_y[j] + f2t * 2.0 * s_x_y[j];
+
+                s_xxx_z[j] = fr * s_xx_z[j] + f2t * 2.0 * s_x_z[j];
+
+                s_xxy_x[j] = fr * s_xy_x[j] + f2t * (s_y_x[j] + s_xy_0[j]);
+
+                s_xxy_y[j] = fr * s_xy_y[j] + f2t * s_y_y[j];
+
+                s_xxy_z[j] = fr * s_xy_z[j] + f2t * s_y_z[j];
+
+                s_xxz_x[j] = fr * s_xz_x[j] + f2t * (s_z_x[j] + s_xz_0[j]);
+
+                s_xxz_y[j] = fr * s_xz_y[j] + f2t * s_z_y[j];
+
+                s_xxz_z[j] = fr * s_xz_z[j] + f2t * s_z_z[j];
+
+                s_xyy_x[j] = fr * s_yy_x[j] + f2t * s_yy_0[j];
+
+                s_xyy_y[j] = fr * s_yy_y[j];
+
+                s_xyy_z[j] = fr * s_yy_z[j];
+
+                s_xyz_x[j] = fr * s_yz_x[j] + f2t * s_yz_0[j];
+
+                s_xyz_y[j] = fr * s_yz_y[j];
+
+                s_xyz_z[j] = fr * s_yz_z[j];
+
+                s_xzz_x[j] = fr * s_zz_x[j] + f2t * s_zz_0[j];
+
+                s_xzz_y[j] = fr * s_zz_y[j];
+
+                s_xzz_z[j] = fr * s_zz_z[j];
+
+                // leading y component
+
+                fr = pay[j];
+
+                s_yyy_x[j] = fr * s_yy_x[j] + f2t * 2.0 * s_y_x[j];
+
+                s_yyy_y[j] = fr * s_yy_y[j] + f2t * (2.0 * s_y_y[j] + s_yy_0[j]);
+
+                s_yyy_z[j] = fr * s_yy_z[j] + f2t * 2.0 * s_y_z[j];
+
+                s_yyz_x[j] = fr * s_yz_x[j] + f2t * s_z_x[j];
+
+                s_yyz_y[j] = fr * s_yz_y[j] + f2t * (s_z_y[j] + s_yz_0[j]);
+
+                s_yyz_z[j] = fr * s_yz_z[j] + f2t * s_z_z[j];
+
+                s_yzz_x[j] = fr * s_zz_x[j];
+
+                s_yzz_y[j] = fr * s_zz_y[j] + f2t * s_zz_0[j];
+
+                s_yzz_z[j] = fr * s_zz_z[j];
+
+                // leading z component
+
+                fr = paz[j];
+                
+                s_zzz_x[j] = fr * s_zz_x[j] + f2t * 2.0 * s_z_x[j];
+
+                s_zzz_y[j] = fr * s_zz_y[j] + f2t * 2.0 * s_z_y[j];
+
+                s_zzz_z[j] = fr * s_zz_z[j] + f2t * (2.0 * s_z_z[j] + s_zz_0[j]);
+            }
+
+            idx++;
+        }
+    }
+
     void
     compOverlapForDF(      CMemBlock2D<double>&  primBuffer,
                      const CVecTwoIndexes&       recPattern,
@@ -2083,7 +2555,500 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
 
-    // FIX ME: (f|d)
+    void
+    compOverlapForFD(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+
+        if (!genfunc::isInVector(recPattern, {3, 2})) return;
+
+        if (iContrGto  == 0) printf(" * VRR: (3|2)\n");
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // get position of integrals in primitves buffer
+
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {3, 2});
+
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {2, 2});
+
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {1, 2});
+
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {2, 1});
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to distances R(PA)
+
+            auto pax = paDistances.data(3 * idx);
+
+            auto pay = paDistances.data(3 * idx + 1);
+
+            auto paz = paDistances.data(3 * idx + 2);
+
+            // set up pointers to (D|P) integrals
+
+            auto s_xx_x = primBuffer.data(tkoff + 18 * idx);
+
+            auto s_xx_y = primBuffer.data(tkoff + 18 * idx + 1);
+
+            auto s_xx_z = primBuffer.data(tkoff + 18 * idx + 2);
+
+            auto s_xy_x = primBuffer.data(tkoff + 18 * idx + 3);
+
+            auto s_xy_y = primBuffer.data(tkoff + 18 * idx + 4);
+
+            auto s_xy_z = primBuffer.data(tkoff + 18 * idx + 5);
+
+            auto s_xz_x = primBuffer.data(tkoff + 18 * idx + 6);
+
+            auto s_xz_y = primBuffer.data(tkoff + 18 * idx + 7);
+
+            auto s_xz_z = primBuffer.data(tkoff + 18 * idx + 8);
+
+            auto s_yy_x = primBuffer.data(tkoff + 18 * idx + 9);
+
+            auto s_yy_y = primBuffer.data(tkoff + 18 * idx + 10);
+
+            auto s_yy_z = primBuffer.data(tkoff + 18 * idx + 11);
+
+            auto s_yz_x = primBuffer.data(tkoff + 18 * idx + 12);
+
+            auto s_yz_y = primBuffer.data(tkoff + 18 * idx + 13);
+
+            auto s_yz_z = primBuffer.data(tkoff + 18 * idx + 14);
+
+            auto s_zz_x = primBuffer.data(tkoff + 18 * idx + 15);
+
+            auto s_zz_y = primBuffer.data(tkoff + 18 * idx + 16);
+
+            auto s_zz_z = primBuffer.data(tkoff + 18 * idx + 17);
+
+            // set up pointers to (P|D) integrals
+
+            auto s_x_xx = primBuffer.data(t2off + 18 * idx);
+
+            auto s_x_xy = primBuffer.data(t2off + 18 * idx + 1);
+
+            auto s_x_xz = primBuffer.data(t2off + 18 * idx + 2);
+
+            auto s_x_yy = primBuffer.data(t2off + 18 * idx + 3);
+
+            auto s_x_yz = primBuffer.data(t2off + 18 * idx + 4);
+
+            auto s_x_zz = primBuffer.data(t2off + 18 * idx + 5);
+
+            auto s_y_xx = primBuffer.data(t2off + 18 * idx + 6);
+
+            auto s_y_xy = primBuffer.data(t2off + 18 * idx + 7);
+
+            auto s_y_xz = primBuffer.data(t2off + 18 * idx + 8);
+
+            auto s_y_yy = primBuffer.data(t2off + 18 * idx + 9);
+
+            auto s_y_yz = primBuffer.data(t2off + 18 * idx + 10);
+
+            auto s_y_zz = primBuffer.data(t2off + 18 * idx + 11);
+
+            auto s_z_xx = primBuffer.data(t2off + 18 * idx + 12);
+
+            auto s_z_xy = primBuffer.data(t2off + 18 * idx + 13);
+
+            auto s_z_xz = primBuffer.data(t2off + 18 * idx + 14);
+
+            auto s_z_yy = primBuffer.data(t2off + 18 * idx + 15);
+
+            auto s_z_yz = primBuffer.data(t2off + 18 * idx + 16);
+
+            auto s_z_zz = primBuffer.data(t2off + 18 * idx + 17);
+
+            // set up pointers to (D|D) integrals
+
+            auto s_xx_xx = primBuffer.data(t1off + 36 * idx);
+
+            auto s_xx_xy = primBuffer.data(t1off + 36 * idx + 1);
+
+            auto s_xx_xz = primBuffer.data(t1off + 36 * idx + 2);
+
+            auto s_xx_yy = primBuffer.data(t1off + 36 * idx + 3);
+
+            auto s_xx_yz = primBuffer.data(t1off + 36 * idx + 4);
+
+            auto s_xx_zz = primBuffer.data(t1off + 36 * idx + 5);
+
+            auto s_xy_xx = primBuffer.data(t1off + 36 * idx + 6);
+
+            auto s_xy_xy = primBuffer.data(t1off + 36 * idx + 7);
+
+            auto s_xy_xz = primBuffer.data(t1off + 36 * idx + 8);
+
+            auto s_xy_yy = primBuffer.data(t1off + 36 * idx + 9);
+
+            auto s_xy_yz = primBuffer.data(t1off + 36 * idx + 10);
+
+            auto s_xy_zz = primBuffer.data(t1off + 36 * idx + 11);
+
+            auto s_xz_xx = primBuffer.data(t1off + 36 * idx + 12);
+
+            auto s_xz_xy = primBuffer.data(t1off + 36 * idx + 13);
+
+            auto s_xz_xz = primBuffer.data(t1off + 36 * idx + 14);
+
+            auto s_xz_yy = primBuffer.data(t1off + 36 * idx + 15);
+
+            auto s_xz_yz = primBuffer.data(t1off + 36 * idx + 16);
+
+            auto s_xz_zz = primBuffer.data(t1off + 36 * idx + 17);
+
+            auto s_yy_xx = primBuffer.data(t1off + 36 * idx + 18);
+
+            auto s_yy_xy = primBuffer.data(t1off + 36 * idx + 19);
+
+            auto s_yy_xz = primBuffer.data(t1off + 36 * idx + 20);
+
+            auto s_yy_yy = primBuffer.data(t1off + 36 * idx + 21);
+
+            auto s_yy_yz = primBuffer.data(t1off + 36 * idx + 22);
+
+            auto s_yy_zz = primBuffer.data(t1off + 36 * idx + 23);
+
+            auto s_yz_xx = primBuffer.data(t1off + 36 * idx + 24);
+
+            auto s_yz_xy = primBuffer.data(t1off + 36 * idx + 25);
+
+            auto s_yz_xz = primBuffer.data(t1off + 36 * idx + 26);
+
+            auto s_yz_yy = primBuffer.data(t1off + 36 * idx + 27);
+
+            auto s_yz_yz = primBuffer.data(t1off + 36 * idx + 28);
+
+            auto s_yz_zz = primBuffer.data(t1off + 36 * idx + 29);
+
+            auto s_zz_xx = primBuffer.data(t1off + 36 * idx + 30);
+
+            auto s_zz_xy = primBuffer.data(t1off + 36 * idx + 31);
+
+            auto s_zz_xz = primBuffer.data(t1off + 36 * idx + 32);
+
+            auto s_zz_yy = primBuffer.data(t1off + 36 * idx + 33);
+
+            auto s_zz_yz = primBuffer.data(t1off + 36 * idx + 34);
+
+            auto s_zz_zz = primBuffer.data(t1off + 36 * idx + 35);
+
+            // set up pointers to (F|D) integrals
+
+            auto s_xxx_xx = primBuffer.data(soff + 60 * idx);
+
+            auto s_xxx_xy = primBuffer.data(soff + 60 * idx + 1);
+
+            auto s_xxx_xz = primBuffer.data(soff + 60 * idx + 2);
+
+            auto s_xxx_yy = primBuffer.data(soff + 60 * idx + 3);
+
+            auto s_xxx_yz = primBuffer.data(soff + 60 * idx + 4);
+
+            auto s_xxx_zz = primBuffer.data(soff + 60 * idx + 5);
+
+            auto s_xxy_xx = primBuffer.data(soff + 60 * idx + 6);
+
+            auto s_xxy_xy = primBuffer.data(soff + 60 * idx + 7);
+
+            auto s_xxy_xz = primBuffer.data(soff + 60 * idx + 8);
+
+            auto s_xxy_yy = primBuffer.data(soff + 60 * idx + 9);
+
+            auto s_xxy_yz = primBuffer.data(soff + 60 * idx + 10);
+
+            auto s_xxy_zz = primBuffer.data(soff + 60 * idx + 11);
+
+            auto s_xxz_xx = primBuffer.data(soff + 60 * idx + 12);
+
+            auto s_xxz_xy = primBuffer.data(soff + 60 * idx + 13);
+
+            auto s_xxz_xz = primBuffer.data(soff + 60 * idx + 14);
+
+            auto s_xxz_yy = primBuffer.data(soff + 60 * idx + 15);
+
+            auto s_xxz_yz = primBuffer.data(soff + 60 * idx + 16);
+
+            auto s_xxz_zz = primBuffer.data(soff + 60 * idx + 17);
+
+            auto s_xyy_xx = primBuffer.data(soff + 60 * idx + 18);
+
+            auto s_xyy_xy = primBuffer.data(soff + 60 * idx + 19);
+
+            auto s_xyy_xz = primBuffer.data(soff + 60 * idx + 20);
+
+            auto s_xyy_yy = primBuffer.data(soff + 60 * idx + 21);
+
+            auto s_xyy_yz = primBuffer.data(soff + 60 * idx + 22);
+
+            auto s_xyy_zz = primBuffer.data(soff + 60 * idx + 23);
+
+            auto s_xyz_xx = primBuffer.data(soff + 60 * idx + 24);
+
+            auto s_xyz_xy = primBuffer.data(soff + 60 * idx + 25);
+
+            auto s_xyz_xz = primBuffer.data(soff + 60 * idx + 26);
+
+            auto s_xyz_yy = primBuffer.data(soff + 60 * idx + 27);
+
+            auto s_xyz_yz = primBuffer.data(soff + 60 * idx + 28);
+
+            auto s_xyz_zz = primBuffer.data(soff + 60 * idx + 29);
+
+            auto s_xzz_xx = primBuffer.data(soff + 60 * idx + 30);
+
+            auto s_xzz_xy = primBuffer.data(soff + 60 * idx + 31);
+
+            auto s_xzz_xz = primBuffer.data(soff + 60 * idx + 32);
+
+            auto s_xzz_yy = primBuffer.data(soff + 60 * idx + 33);
+
+            auto s_xzz_yz = primBuffer.data(soff + 60 * idx + 34);
+
+            auto s_xzz_zz = primBuffer.data(soff + 60 * idx + 35);
+
+            auto s_yyy_xx = primBuffer.data(soff + 60 * idx + 36);
+
+            auto s_yyy_xy = primBuffer.data(soff + 60 * idx + 37);
+
+            auto s_yyy_xz = primBuffer.data(soff + 60 * idx + 38);
+
+            auto s_yyy_yy = primBuffer.data(soff + 60 * idx + 39);
+
+            auto s_yyy_yz = primBuffer.data(soff + 60 * idx + 40);
+
+            auto s_yyy_zz = primBuffer.data(soff + 60 * idx + 41);
+
+            auto s_yyz_xx = primBuffer.data(soff + 60 * idx + 42);
+
+            auto s_yyz_xy = primBuffer.data(soff + 60 * idx + 43);
+
+            auto s_yyz_xz = primBuffer.data(soff + 60 * idx + 44);
+
+            auto s_yyz_yy = primBuffer.data(soff + 60 * idx + 45);
+
+            auto s_yyz_yz = primBuffer.data(soff + 60 * idx + 46);
+
+            auto s_yyz_zz = primBuffer.data(soff + 60 * idx + 47);
+
+            auto s_yzz_xx = primBuffer.data(soff + 60 * idx + 48);
+
+            auto s_yzz_xy = primBuffer.data(soff + 60 * idx + 49);
+
+            auto s_yzz_xz = primBuffer.data(soff + 60 * idx + 50);
+
+            auto s_yzz_yy = primBuffer.data(soff + 60 * idx + 51);
+
+            auto s_yzz_yz = primBuffer.data(soff + 60 * idx + 52);
+
+            auto s_yzz_zz = primBuffer.data(soff + 60 * idx + 53);
+
+            auto s_zzz_xx = primBuffer.data(soff + 60 * idx + 54);
+
+            auto s_zzz_xy = primBuffer.data(soff + 60 * idx + 55);
+
+            auto s_zzz_xz = primBuffer.data(soff + 60 * idx + 56);
+
+            auto s_zzz_yy = primBuffer.data(soff + 60 * idx + 57);
+
+            auto s_zzz_yz = primBuffer.data(soff + 60 * idx + 58);
+
+            auto s_zzz_zz = primBuffer.data(soff + 60 * idx + 59);
+
+            #pragma omp simd aligned(fx, pax, pay, paz, s_xx_x, s_xx_y, s_xx_z,\
+                                     s_xy_x, s_xy_y, s_xy_z, s_xz_x, s_xz_y, s_xz_z,\
+                                     s_yy_x, s_yy_y, s_yy_z, s_yz_x, s_yz_y, s_yz_z,\
+                                     s_zz_x, s_zz_y, s_zz_z, s_x_xx, s_x_xy, s_x_xz,\
+                                     s_x_yy, s_x_yz, s_x_zz, s_y_xx, s_y_xy, s_y_xz,\
+                                     s_y_yy, s_y_yz, s_y_zz, s_z_xx, s_z_xy, s_z_xz,\
+                                     s_z_yy, s_z_yz, s_z_zz, s_xx_xx, s_xx_xy,\
+                                     s_xx_xz, s_xx_yy, s_xx_yz, s_xx_zz, s_xy_xx,\
+                                     s_xy_xy, s_xy_xz, s_xy_yy, s_xy_yz, s_xy_zz,\
+                                     s_xz_xx, s_xz_xy, s_xz_xz, s_xz_yy, s_xz_yz,\
+                                     s_xz_zz, s_yy_xx, s_yy_xy, s_yy_xz, s_yy_yy,\
+                                     s_yy_yz, s_yy_zz, s_yz_xx, s_yz_xy, s_yz_xz,\
+                                     s_yz_yy, s_yz_yz, s_yz_zz, s_zz_xx, s_zz_xy,\
+                                     s_zz_xz, s_zz_yy, s_zz_yz, s_zz_zz, s_xxx_xx,\
+                                     s_xxx_xy, s_xxx_xz, s_xxx_yy, s_xxx_yz, s_xxx_zz,\
+                                     s_xxy_xx, s_xxy_xy, s_xxy_xz, s_xxy_yy, s_xxy_yz,\
+                                     s_xxy_zz, s_xxz_xx, s_xxz_xy, s_xxz_xz, s_xxz_yy,\
+                                     s_xxz_yz, s_xxz_zz, s_xyy_xx, s_xyy_xy, s_xyy_xz,\
+                                     s_xyy_yy, s_xyy_yz, s_xyy_zz, s_xyz_xx, s_xyz_xy,\
+                                     s_xyz_xz, s_xyz_yy, s_xyz_yz, s_xyz_zz, s_xzz_xx,\
+                                     s_xzz_xy, s_xzz_xz, s_xzz_yy, s_xzz_yz, s_xzz_zz,\
+                                     s_yyy_xx, s_yyy_xy, s_yyy_xz, s_yyy_yy, s_yyy_yz,\
+                                     s_yyy_zz, s_yyz_xx, s_yyz_xy, s_yyz_xz, s_yyz_yy,\
+                                     s_yyz_yz, s_yyz_zz, s_yzz_xx, s_yzz_xy, s_yzz_xz,\
+                                     s_yzz_yy, s_yzz_yz, s_yzz_zz, s_zzz_xx, s_zzz_xy,\
+                                     s_zzz_xz, s_zzz_yy, s_zzz_yz, s_zzz_zz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+
+                double f2t = 0.50 * fx[j];
+
+                // leading x component
+
+                double fr = pax[j];
+
+                s_xxx_xx[j] = fr * s_xx_xx[j] + f2t * (2.0 * s_x_xx[j] + 2.0 * s_xx_x[j]);
+
+                s_xxx_xy[j] = fr * s_xx_xy[j] + f2t * (2.0 * s_x_xy[j] + s_xx_y[j]);
+
+                s_xxx_xz[j] = fr * s_xx_xz[j] + f2t * (2.0 * s_x_xz[j] + s_xx_z[j]);
+
+                s_xxx_yy[j] = fr * s_xx_yy[j] + f2t * 2.0 * s_x_yy[j];
+
+                s_xxx_yz[j] = fr * s_xx_yz[j] + f2t * 2.0 * s_x_yz[j];
+
+                s_xxx_zz[j] = fr * s_xx_zz[j] + f2t * 2.0 * s_x_zz[j];
+
+                s_xxy_xx[j] = fr * s_xy_xx[j] + f2t * (s_y_xx[j] + 2.0 * s_xy_x[j]);
+
+                s_xxy_xy[j] = fr * s_xy_xy[j] + f2t * (s_y_xy[j] + s_xy_y[j]);
+
+                s_xxy_xz[j] = fr * s_xy_xz[j] + f2t * (s_y_xz[j] + s_xy_z[j]);
+
+                s_xxy_yy[j] = fr * s_xy_yy[j] + f2t * s_y_yy[j];
+
+                s_xxy_yz[j] = fr * s_xy_yz[j] + f2t * s_y_yz[j];
+
+                s_xxy_zz[j] = fr * s_xy_zz[j] + f2t * s_y_zz[j];
+
+                s_xxz_xx[j] = fr * s_xz_xx[j] + f2t * (s_z_xx[j] + 2.0 * s_xz_x[j]);
+
+                s_xxz_xy[j] = fr * s_xz_xy[j] + f2t * (s_z_xy[j] + s_xz_y[j]);
+
+                s_xxz_xz[j] = fr * s_xz_xz[j] + f2t * (s_z_xz[j] + s_xz_z[j]);
+
+                s_xxz_yy[j] = fr * s_xz_yy[j] + f2t * s_z_yy[j];
+
+                s_xxz_yz[j] = fr * s_xz_yz[j] + f2t * s_z_yz[j];
+
+                s_xxz_zz[j] = fr * s_xz_zz[j] + f2t * s_z_zz[j];
+
+                s_xyy_xx[j] = fr * s_yy_xx[j] + f2t * 2.0 * s_yy_x[j];
+
+                s_xyy_xy[j] = fr * s_yy_xy[j] + f2t * s_yy_y[j];
+
+                s_xyy_xz[j] = fr * s_yy_xz[j] + f2t * s_yy_z[j];
+
+                s_xyy_yy[j] = fr * s_yy_yy[j];
+
+                s_xyy_yz[j] = fr * s_yy_yz[j];
+
+                s_xyy_zz[j] = fr * s_yy_zz[j];
+
+                s_xyz_xx[j] = fr * s_yz_xx[j] + f2t * 2.0 * s_yz_x[j];
+
+                s_xyz_xy[j] = fr * s_yz_xy[j] + f2t * s_yz_y[j];
+
+                s_xyz_xz[j] = fr * s_yz_xz[j] + f2t * s_yz_z[j];
+
+                s_xyz_yy[j] = fr * s_yz_yy[j];
+
+                s_xyz_yz[j] = fr * s_yz_yz[j];
+
+                s_xyz_zz[j] = fr * s_yz_zz[j];
+
+                s_xzz_xx[j] = fr * s_zz_xx[j] + f2t * 2.0 * s_zz_x[j];
+
+                s_xzz_xy[j] = fr * s_zz_xy[j] + f2t * s_zz_y[j];
+
+                s_xzz_xz[j] = fr * s_zz_xz[j] + f2t * s_zz_z[j];
+
+                s_xzz_yy[j] = fr * s_zz_yy[j];
+
+                s_xzz_yz[j] = fr * s_zz_yz[j];
+
+                s_xzz_zz[j] = fr * s_zz_zz[j];
+
+                // leading y component
+
+                fr = pay[j];
+
+                s_yyy_xx[j] = fr * s_yy_xx[j] + f2t * 2.0 * s_y_xx[j];
+
+                s_yyy_xy[j] = fr * s_yy_xy[j] + f2t * (2.0 * s_y_xy[j] + s_yy_x[j]);
+
+                s_yyy_xz[j] = fr * s_yy_xz[j] + f2t * 2.0 * s_y_xz[j];
+
+                s_yyy_yy[j] = fr * s_yy_yy[j] + f2t * (2.0 * s_y_yy[j] + 2.0 * s_yy_y[j]);
+
+                s_yyy_yz[j] = fr * s_yy_yz[j] + f2t * (2.0 * s_y_yz[j] + s_yy_z[j]);
+
+                s_yyy_zz[j] = fr * s_yy_zz[j] + f2t * 2.0 * s_y_zz[j];
+
+                s_yyz_xx[j] = fr * s_yz_xx[j] + f2t * s_z_xx[j];
+
+                s_yyz_xy[j] = fr * s_yz_xy[j] + f2t * (s_z_xy[j] + s_yz_x[j]);
+
+                s_yyz_xz[j] = fr * s_yz_xz[j] + f2t * s_z_xz[j];
+
+                s_yyz_yy[j] = fr * s_yz_yy[j] + f2t * (s_z_yy[j] + 2.0 * s_yz_y[j]);
+
+                s_yyz_yz[j] = fr * s_yz_yz[j] + f2t * (s_z_yz[j] + s_yz_z[j]);
+
+                s_yyz_zz[j] = fr * s_yz_zz[j] + f2t * s_z_zz[j];
+
+                s_yzz_xx[j] = fr * s_zz_xx[j];
+
+                s_yzz_xy[j] = fr * s_zz_xy[j] + f2t * s_zz_x[j];
+
+                s_yzz_xz[j] = fr * s_zz_xz[j];
+
+                s_yzz_yy[j] = fr * s_zz_yy[j] + f2t * 2.0 * s_zz_y[j];
+
+                s_yzz_yz[j] = fr * s_zz_yz[j] + f2t * s_zz_z[j];
+
+                s_yzz_zz[j] = fr * s_zz_zz[j];
+
+                // leading z component
+                
+                fr = paz[j];
+
+                s_zzz_xx[j] = fr * s_zz_xx[j] + f2t * 2.0 * s_z_xx[j];
+
+                s_zzz_xy[j] = fr * s_zz_xy[j] + f2t * 2.0 * s_z_xy[j];
+
+                s_zzz_xz[j] = fr * s_zz_xz[j] + f2t * (2.0 * s_z_xz[j] + s_zz_x[j]);
+
+                s_zzz_yy[j] = fr * s_zz_yy[j] + f2t * 2.0 * s_z_yy[j];
+
+                s_zzz_yz[j] = fr * s_zz_yz[j] + f2t * (2.0 * s_z_yz[j] + s_zz_y[j]);
+
+                s_zzz_zz[j] = fr * s_zz_zz[j] + f2t * (2.0 * s_z_zz[j] + 2.0 * s_zz_z[j]);
+            }
+
+            idx++;
+        }
+    }
     
     void
     compOverlapForFF(      CMemBlock2D<double>&  primBuffer,
@@ -3563,8 +4528,408 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
 
-    // FIX ME: add (g|p)
-    
+    void
+    compOverlapForGP(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+
+        if (!genfunc::isInVector(recPattern, {4, 1})) return;
+
+        if (iContrGto  == 0) printf(" * VRR: (4|1)\n");
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // get position of integrals in primitves buffer
+
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {4, 1});
+
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {3, 1});
+
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {2, 1});
+
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {3, 0});
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to distances R(PA)
+
+            auto pax = paDistances.data(3 * idx);
+
+            auto pay = paDistances.data(3 * idx + 1);
+
+            auto paz = paDistances.data(3 * idx + 2);
+
+            // set up pointers to (F|S) integrals
+
+            auto s_xxx_0 = primBuffer.data(tkoff + 10 * idx);
+
+            auto s_xxy_0 = primBuffer.data(tkoff + 10 * idx + 1);
+
+            auto s_xxz_0 = primBuffer.data(tkoff + 10 * idx + 2);
+
+            auto s_xyy_0 = primBuffer.data(tkoff + 10 * idx + 3);
+
+            auto s_xyz_0 = primBuffer.data(tkoff + 10 * idx + 4);
+
+            auto s_xzz_0 = primBuffer.data(tkoff + 10 * idx + 5);
+
+            auto s_yyy_0 = primBuffer.data(tkoff + 10 * idx + 6);
+
+            auto s_yyz_0 = primBuffer.data(tkoff + 10 * idx + 7);
+
+            auto s_yzz_0 = primBuffer.data(tkoff + 10 * idx + 8);
+
+            auto s_zzz_0 = primBuffer.data(tkoff + 10 * idx + 9);
+
+            // set up pointers to (D|P) integrals
+
+            auto s_xx_x = primBuffer.data(t2off + 18 * idx);
+
+            auto s_xx_y = primBuffer.data(t2off + 18 * idx + 1);
+
+            auto s_xx_z = primBuffer.data(t2off + 18 * idx + 2);
+
+            auto s_xy_x = primBuffer.data(t2off + 18 * idx + 3);
+
+            auto s_xy_y = primBuffer.data(t2off + 18 * idx + 4);
+
+            auto s_xy_z = primBuffer.data(t2off + 18 * idx + 5);
+
+            auto s_xz_x = primBuffer.data(t2off + 18 * idx + 6);
+
+            auto s_xz_y = primBuffer.data(t2off + 18 * idx + 7);
+
+            auto s_xz_z = primBuffer.data(t2off + 18 * idx + 8);
+
+            auto s_yy_x = primBuffer.data(t2off + 18 * idx + 9);
+
+            auto s_yy_y = primBuffer.data(t2off + 18 * idx + 10);
+
+            auto s_yy_z = primBuffer.data(t2off + 18 * idx + 11);
+
+            auto s_yz_x = primBuffer.data(t2off + 18 * idx + 12);
+
+            auto s_yz_y = primBuffer.data(t2off + 18 * idx + 13);
+
+            auto s_yz_z = primBuffer.data(t2off + 18 * idx + 14);
+
+            auto s_zz_x = primBuffer.data(t2off + 18 * idx + 15);
+
+            auto s_zz_y = primBuffer.data(t2off + 18 * idx + 16);
+
+            auto s_zz_z = primBuffer.data(t2off + 18 * idx + 17);
+
+            // set up pointers to (F|P) integrals
+
+            auto s_xxx_x = primBuffer.data(t1off + 30 * idx);
+
+            auto s_xxx_y = primBuffer.data(t1off + 30 * idx + 1);
+
+            auto s_xxx_z = primBuffer.data(t1off + 30 * idx + 2);
+
+            auto s_xxy_x = primBuffer.data(t1off + 30 * idx + 3);
+
+            auto s_xxy_y = primBuffer.data(t1off + 30 * idx + 4);
+
+            auto s_xxy_z = primBuffer.data(t1off + 30 * idx + 5);
+
+            auto s_xxz_x = primBuffer.data(t1off + 30 * idx + 6);
+
+            auto s_xxz_y = primBuffer.data(t1off + 30 * idx + 7);
+
+            auto s_xxz_z = primBuffer.data(t1off + 30 * idx + 8);
+
+            auto s_xyy_x = primBuffer.data(t1off + 30 * idx + 9);
+
+            auto s_xyy_y = primBuffer.data(t1off + 30 * idx + 10);
+
+            auto s_xyy_z = primBuffer.data(t1off + 30 * idx + 11);
+
+            auto s_xyz_x = primBuffer.data(t1off + 30 * idx + 12);
+
+            auto s_xyz_y = primBuffer.data(t1off + 30 * idx + 13);
+
+            auto s_xyz_z = primBuffer.data(t1off + 30 * idx + 14);
+
+            auto s_xzz_x = primBuffer.data(t1off + 30 * idx + 15);
+
+            auto s_xzz_y = primBuffer.data(t1off + 30 * idx + 16);
+
+            auto s_xzz_z = primBuffer.data(t1off + 30 * idx + 17);
+
+            auto s_yyy_x = primBuffer.data(t1off + 30 * idx + 18);
+
+            auto s_yyy_y = primBuffer.data(t1off + 30 * idx + 19);
+
+            auto s_yyy_z = primBuffer.data(t1off + 30 * idx + 20);
+
+            auto s_yyz_x = primBuffer.data(t1off + 30 * idx + 21);
+
+            auto s_yyz_y = primBuffer.data(t1off + 30 * idx + 22);
+
+            auto s_yyz_z = primBuffer.data(t1off + 30 * idx + 23);
+
+            auto s_yzz_x = primBuffer.data(t1off + 30 * idx + 24);
+
+            auto s_yzz_y = primBuffer.data(t1off + 30 * idx + 25);
+
+            auto s_yzz_z = primBuffer.data(t1off + 30 * idx + 26);
+
+            auto s_zzz_x = primBuffer.data(t1off + 30 * idx + 27);
+
+            auto s_zzz_y = primBuffer.data(t1off + 30 * idx + 28);
+
+            auto s_zzz_z = primBuffer.data(t1off + 30 * idx + 29);
+
+            // set up pointers to (G|P) integrals
+
+            auto s_xxxx_x = primBuffer.data(soff + 45 * idx);
+
+            auto s_xxxx_y = primBuffer.data(soff + 45 * idx + 1);
+
+            auto s_xxxx_z = primBuffer.data(soff + 45 * idx + 2);
+
+            auto s_xxxy_x = primBuffer.data(soff + 45 * idx + 3);
+
+            auto s_xxxy_y = primBuffer.data(soff + 45 * idx + 4);
+
+            auto s_xxxy_z = primBuffer.data(soff + 45 * idx + 5);
+
+            auto s_xxxz_x = primBuffer.data(soff + 45 * idx + 6);
+
+            auto s_xxxz_y = primBuffer.data(soff + 45 * idx + 7);
+
+            auto s_xxxz_z = primBuffer.data(soff + 45 * idx + 8);
+
+            auto s_xxyy_x = primBuffer.data(soff + 45 * idx + 9);
+
+            auto s_xxyy_y = primBuffer.data(soff + 45 * idx + 10);
+
+            auto s_xxyy_z = primBuffer.data(soff + 45 * idx + 11);
+
+            auto s_xxyz_x = primBuffer.data(soff + 45 * idx + 12);
+
+            auto s_xxyz_y = primBuffer.data(soff + 45 * idx + 13);
+
+            auto s_xxyz_z = primBuffer.data(soff + 45 * idx + 14);
+
+            auto s_xxzz_x = primBuffer.data(soff + 45 * idx + 15);
+
+            auto s_xxzz_y = primBuffer.data(soff + 45 * idx + 16);
+
+            auto s_xxzz_z = primBuffer.data(soff + 45 * idx + 17);
+
+            auto s_xyyy_x = primBuffer.data(soff + 45 * idx + 18);
+
+            auto s_xyyy_y = primBuffer.data(soff + 45 * idx + 19);
+
+            auto s_xyyy_z = primBuffer.data(soff + 45 * idx + 20);
+
+            auto s_xyyz_x = primBuffer.data(soff + 45 * idx + 21);
+
+            auto s_xyyz_y = primBuffer.data(soff + 45 * idx + 22);
+
+            auto s_xyyz_z = primBuffer.data(soff + 45 * idx + 23);
+
+            auto s_xyzz_x = primBuffer.data(soff + 45 * idx + 24);
+
+            auto s_xyzz_y = primBuffer.data(soff + 45 * idx + 25);
+
+            auto s_xyzz_z = primBuffer.data(soff + 45 * idx + 26);
+
+            auto s_xzzz_x = primBuffer.data(soff + 45 * idx + 27);
+
+            auto s_xzzz_y = primBuffer.data(soff + 45 * idx + 28);
+
+            auto s_xzzz_z = primBuffer.data(soff + 45 * idx + 29);
+
+            auto s_yyyy_x = primBuffer.data(soff + 45 * idx + 30);
+
+            auto s_yyyy_y = primBuffer.data(soff + 45 * idx + 31);
+
+            auto s_yyyy_z = primBuffer.data(soff + 45 * idx + 32);
+
+            auto s_yyyz_x = primBuffer.data(soff + 45 * idx + 33);
+
+            auto s_yyyz_y = primBuffer.data(soff + 45 * idx + 34);
+
+            auto s_yyyz_z = primBuffer.data(soff + 45 * idx + 35);
+
+            auto s_yyzz_x = primBuffer.data(soff + 45 * idx + 36);
+
+            auto s_yyzz_y = primBuffer.data(soff + 45 * idx + 37);
+
+            auto s_yyzz_z = primBuffer.data(soff + 45 * idx + 38);
+
+            auto s_yzzz_x = primBuffer.data(soff + 45 * idx + 39);
+
+            auto s_yzzz_y = primBuffer.data(soff + 45 * idx + 40);
+
+            auto s_yzzz_z = primBuffer.data(soff + 45 * idx + 41);
+
+            auto s_zzzz_x = primBuffer.data(soff + 45 * idx + 42);
+
+            auto s_zzzz_y = primBuffer.data(soff + 45 * idx + 43);
+
+            auto s_zzzz_z = primBuffer.data(soff + 45 * idx + 44);
+
+            #pragma omp simd aligned(fx, pax, pay, paz, s_xxx_0, s_xxy_0, s_xxz_0,\
+                                     s_xyy_0, s_xyz_0, s_xzz_0, s_yyy_0, s_yyz_0,\
+                                     s_yzz_0, s_zzz_0, s_xx_x, s_xx_y, s_xx_z,\
+                                     s_xy_x, s_xy_y, s_xy_z, s_xz_x, s_xz_y, s_xz_z,\
+                                     s_yy_x, s_yy_y, s_yy_z, s_yz_x, s_yz_y, s_yz_z,\
+                                     s_zz_x, s_zz_y, s_zz_z, s_xxx_x, s_xxx_y,\
+                                     s_xxx_z, s_xxy_x, s_xxy_y, s_xxy_z, s_xxz_x,\
+                                     s_xxz_y, s_xxz_z, s_xyy_x, s_xyy_y, s_xyy_z,\
+                                     s_xyz_x, s_xyz_y, s_xyz_z, s_xzz_x, s_xzz_y,\
+                                     s_xzz_z, s_yyy_x, s_yyy_y, s_yyy_z, s_yyz_x,\
+                                     s_yyz_y, s_yyz_z, s_yzz_x, s_yzz_y, s_yzz_z,\
+                                     s_zzz_x, s_zzz_y, s_zzz_z, s_xxxx_x, s_xxxx_y,\
+                                     s_xxxx_z, s_xxxy_x, s_xxxy_y, s_xxxy_z, s_xxxz_x,\
+                                     s_xxxz_y, s_xxxz_z, s_xxyy_x, s_xxyy_y, s_xxyy_z,\
+                                     s_xxyz_x, s_xxyz_y, s_xxyz_z, s_xxzz_x, s_xxzz_y,\
+                                     s_xxzz_z, s_xyyy_x, s_xyyy_y, s_xyyy_z, s_xyyz_x,\
+                                     s_xyyz_y, s_xyyz_z, s_xyzz_x, s_xyzz_y, s_xyzz_z,\
+                                     s_xzzz_x, s_xzzz_y, s_xzzz_z, s_yyyy_x, s_yyyy_y,\
+                                     s_yyyy_z, s_yyyz_x, s_yyyz_y, s_yyyz_z, s_yyzz_x,\
+                                     s_yyzz_y, s_yyzz_z, s_yzzz_x, s_yzzz_y, s_yzzz_z,\
+                                     s_zzzz_x, s_zzzz_y, s_zzzz_z: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+
+                double f2t = 0.50 * fx[j];
+
+                // leading x component
+
+                double fr = pax[j];
+
+                s_xxxx_x[j] = fr * s_xxx_x[j] + f2t * (3.0 * s_xx_x[j] + s_xxx_0[j]);
+
+                s_xxxx_y[j] = fr * s_xxx_y[j] + f2t * 3.0 * s_xx_y[j];
+
+                s_xxxx_z[j] = fr * s_xxx_z[j] + f2t * 3.0 * s_xx_z[j];
+
+                s_xxxy_x[j] = fr * s_xxy_x[j] + f2t * (2.0 * s_xy_x[j] + s_xxy_0[j]);
+
+                s_xxxy_y[j] = fr * s_xxy_y[j] + f2t * 2.0 * s_xy_y[j];
+
+                s_xxxy_z[j] = fr * s_xxy_z[j] + f2t * 2.0 * s_xy_z[j];
+
+                s_xxxz_x[j] = fr * s_xxz_x[j] + f2t * (2.0 * s_xz_x[j] + s_xxz_0[j]);
+
+                s_xxxz_y[j] = fr * s_xxz_y[j] + f2t * 2.0 * s_xz_y[j];
+
+                s_xxxz_z[j] = fr * s_xxz_z[j] + f2t * 2.0 * s_xz_z[j];
+
+                s_xxyy_x[j] = fr * s_xyy_x[j] + f2t * (s_yy_x[j] + s_xyy_0[j]);
+
+                s_xxyy_y[j] = fr * s_xyy_y[j] + f2t * s_yy_y[j];
+
+                s_xxyy_z[j] = fr * s_xyy_z[j] + f2t * s_yy_z[j];
+
+                s_xxyz_x[j] = fr * s_xyz_x[j] + f2t * (s_yz_x[j] + s_xyz_0[j]);
+
+                s_xxyz_y[j] = fr * s_xyz_y[j] + f2t * s_yz_y[j];
+
+                s_xxyz_z[j] = fr * s_xyz_z[j] + f2t * s_yz_z[j];
+
+                s_xxzz_x[j] = fr * s_xzz_x[j] + f2t * (s_zz_x[j] + s_xzz_0[j]);
+
+                s_xxzz_y[j] = fr * s_xzz_y[j] + f2t * s_zz_y[j];
+
+                s_xxzz_z[j] = fr * s_xzz_z[j] + f2t * s_zz_z[j];
+
+                s_xyyy_x[j] = fr * s_yyy_x[j] + f2t * s_yyy_0[j];
+
+                s_xyyy_y[j] = fr * s_yyy_y[j];
+
+                s_xyyy_z[j] = fr * s_yyy_z[j];
+
+                s_xyyz_x[j] = fr * s_yyz_x[j] + f2t * s_yyz_0[j];
+
+                s_xyyz_y[j] = fr * s_yyz_y[j];
+
+                s_xyyz_z[j] = fr * s_yyz_z[j];
+
+                s_xyzz_x[j] = fr * s_yzz_x[j] + f2t * s_yzz_0[j];
+
+                s_xyzz_y[j] = fr * s_yzz_y[j];
+
+                s_xyzz_z[j] = fr * s_yzz_z[j];
+
+                s_xzzz_x[j] = fr * s_zzz_x[j] + f2t * s_zzz_0[j];
+
+                s_xzzz_y[j] = fr * s_zzz_y[j];
+
+                s_xzzz_z[j] = fr * s_zzz_z[j];
+
+                // leading y component
+
+                fr = pay[j];
+
+                s_yyyy_x[j] = fr * s_yyy_x[j] + f2t * 3.0 * s_yy_x[j];
+
+                s_yyyy_y[j] = fr * s_yyy_y[j] + f2t * (3.0 * s_yy_y[j] + s_yyy_0[j]);
+
+                s_yyyy_z[j] = fr * s_yyy_z[j] + f2t * 3.0 * s_yy_z[j];
+
+                s_yyyz_x[j] = fr * s_yyz_x[j] + f2t * 2.0 * s_yz_x[j];
+
+                s_yyyz_y[j] = fr * s_yyz_y[j] + f2t * (2.0 * s_yz_y[j] + s_yyz_0[j]);
+
+                s_yyyz_z[j] = fr * s_yyz_z[j] + f2t * 2.0 * s_yz_z[j];
+
+                s_yyzz_x[j] = fr * s_yzz_x[j] + f2t * s_zz_x[j];
+
+                s_yyzz_y[j] = fr * s_yzz_y[j] + f2t * (s_zz_y[j] + s_yzz_0[j]);
+
+                s_yyzz_z[j] = fr * s_yzz_z[j] + f2t * s_zz_z[j];
+
+                s_yzzz_x[j] = fr * s_zzz_x[j];
+
+                s_yzzz_y[j] = fr * s_zzz_y[j] + f2t * s_zzz_0[j];
+
+                s_yzzz_z[j] = fr * s_zzz_z[j];
+
+                // leading z component
+                
+                fr = paz[j];
+
+                s_zzzz_x[j] = fr * s_zzz_x[j] + f2t * 3.0 * s_zz_x[j];
+
+                s_zzzz_y[j] = fr * s_zzz_y[j] + f2t * 3.0 * s_zz_y[j];
+
+                s_zzzz_z[j] = fr * s_zzz_z[j] + f2t * (3.0 * s_zz_z[j] + s_zzz_0[j]);
+            }
+
+            idx++;
+        }
+    }
+
     void
     compOverlapForDG(      CMemBlock2D<double>&  primBuffer,
                      const CVecTwoIndexes&       recPattern,
@@ -4234,7 +5599,750 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
 
-    // FIX ME: add (g|d) 
+    void
+    compOverlapForGD(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+
+        if (!genfunc::isInVector(recPattern, {4, 2})) return;
+
+        if (iContrGto  == 0) printf(" * VRR: (4|2)\n");
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // get position of integrals in primitves buffer
+
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {4, 2});
+
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {3, 2});
+
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {2, 2});
+
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {3, 1});
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to distances R(PA)
+
+            auto pax = paDistances.data(3 * idx);
+
+            auto pay = paDistances.data(3 * idx + 1);
+
+            auto paz = paDistances.data(3 * idx + 2);
+
+            // set up pointers to (F|P) integrals
+
+            auto s_xxx_x = primBuffer.data(tkoff + 30 * idx);
+
+            auto s_xxx_y = primBuffer.data(tkoff + 30 * idx + 1);
+
+            auto s_xxx_z = primBuffer.data(tkoff + 30 * idx + 2);
+
+            auto s_xxy_x = primBuffer.data(tkoff + 30 * idx + 3);
+
+            auto s_xxy_y = primBuffer.data(tkoff + 30 * idx + 4);
+
+            auto s_xxy_z = primBuffer.data(tkoff + 30 * idx + 5);
+
+            auto s_xxz_x = primBuffer.data(tkoff + 30 * idx + 6);
+
+            auto s_xxz_y = primBuffer.data(tkoff + 30 * idx + 7);
+
+            auto s_xxz_z = primBuffer.data(tkoff + 30 * idx + 8);
+
+            auto s_xyy_x = primBuffer.data(tkoff + 30 * idx + 9);
+
+            auto s_xyy_y = primBuffer.data(tkoff + 30 * idx + 10);
+
+            auto s_xyy_z = primBuffer.data(tkoff + 30 * idx + 11);
+
+            auto s_xyz_x = primBuffer.data(tkoff + 30 * idx + 12);
+
+            auto s_xyz_y = primBuffer.data(tkoff + 30 * idx + 13);
+
+            auto s_xyz_z = primBuffer.data(tkoff + 30 * idx + 14);
+
+            auto s_xzz_x = primBuffer.data(tkoff + 30 * idx + 15);
+
+            auto s_xzz_y = primBuffer.data(tkoff + 30 * idx + 16);
+
+            auto s_xzz_z = primBuffer.data(tkoff + 30 * idx + 17);
+
+            auto s_yyy_x = primBuffer.data(tkoff + 30 * idx + 18);
+
+            auto s_yyy_y = primBuffer.data(tkoff + 30 * idx + 19);
+
+            auto s_yyy_z = primBuffer.data(tkoff + 30 * idx + 20);
+
+            auto s_yyz_x = primBuffer.data(tkoff + 30 * idx + 21);
+
+            auto s_yyz_y = primBuffer.data(tkoff + 30 * idx + 22);
+
+            auto s_yyz_z = primBuffer.data(tkoff + 30 * idx + 23);
+
+            auto s_yzz_x = primBuffer.data(tkoff + 30 * idx + 24);
+
+            auto s_yzz_y = primBuffer.data(tkoff + 30 * idx + 25);
+
+            auto s_yzz_z = primBuffer.data(tkoff + 30 * idx + 26);
+
+            auto s_zzz_x = primBuffer.data(tkoff + 30 * idx + 27);
+
+            auto s_zzz_y = primBuffer.data(tkoff + 30 * idx + 28);
+
+            auto s_zzz_z = primBuffer.data(tkoff + 30 * idx + 29);
+
+            // set up pointers to (D|D) integrals
+
+            auto s_xx_xx = primBuffer.data(t2off + 36 * idx);
+
+            auto s_xx_xy = primBuffer.data(t2off + 36 * idx + 1);
+
+            auto s_xx_xz = primBuffer.data(t2off + 36 * idx + 2);
+
+            auto s_xx_yy = primBuffer.data(t2off + 36 * idx + 3);
+
+            auto s_xx_yz = primBuffer.data(t2off + 36 * idx + 4);
+
+            auto s_xx_zz = primBuffer.data(t2off + 36 * idx + 5);
+
+            auto s_xy_xx = primBuffer.data(t2off + 36 * idx + 6);
+
+            auto s_xy_xy = primBuffer.data(t2off + 36 * idx + 7);
+
+            auto s_xy_xz = primBuffer.data(t2off + 36 * idx + 8);
+
+            auto s_xy_yy = primBuffer.data(t2off + 36 * idx + 9);
+
+            auto s_xy_yz = primBuffer.data(t2off + 36 * idx + 10);
+
+            auto s_xy_zz = primBuffer.data(t2off + 36 * idx + 11);
+
+            auto s_xz_xx = primBuffer.data(t2off + 36 * idx + 12);
+
+            auto s_xz_xy = primBuffer.data(t2off + 36 * idx + 13);
+
+            auto s_xz_xz = primBuffer.data(t2off + 36 * idx + 14);
+
+            auto s_xz_yy = primBuffer.data(t2off + 36 * idx + 15);
+
+            auto s_xz_yz = primBuffer.data(t2off + 36 * idx + 16);
+
+            auto s_xz_zz = primBuffer.data(t2off + 36 * idx + 17);
+
+            auto s_yy_xx = primBuffer.data(t2off + 36 * idx + 18);
+
+            auto s_yy_xy = primBuffer.data(t2off + 36 * idx + 19);
+
+            auto s_yy_xz = primBuffer.data(t2off + 36 * idx + 20);
+
+            auto s_yy_yy = primBuffer.data(t2off + 36 * idx + 21);
+
+            auto s_yy_yz = primBuffer.data(t2off + 36 * idx + 22);
+
+            auto s_yy_zz = primBuffer.data(t2off + 36 * idx + 23);
+
+            auto s_yz_xx = primBuffer.data(t2off + 36 * idx + 24);
+
+            auto s_yz_xy = primBuffer.data(t2off + 36 * idx + 25);
+
+            auto s_yz_xz = primBuffer.data(t2off + 36 * idx + 26);
+
+            auto s_yz_yy = primBuffer.data(t2off + 36 * idx + 27);
+
+            auto s_yz_yz = primBuffer.data(t2off + 36 * idx + 28);
+
+            auto s_yz_zz = primBuffer.data(t2off + 36 * idx + 29);
+
+            auto s_zz_xx = primBuffer.data(t2off + 36 * idx + 30);
+
+            auto s_zz_xy = primBuffer.data(t2off + 36 * idx + 31);
+
+            auto s_zz_xz = primBuffer.data(t2off + 36 * idx + 32);
+
+            auto s_zz_yy = primBuffer.data(t2off + 36 * idx + 33);
+
+            auto s_zz_yz = primBuffer.data(t2off + 36 * idx + 34);
+
+            auto s_zz_zz = primBuffer.data(t2off + 36 * idx + 35);
+
+            // set up pointers to (F|D) integrals
+
+            auto s_xxx_xx = primBuffer.data(t1off + 60 * idx);
+
+            auto s_xxx_xy = primBuffer.data(t1off + 60 * idx + 1);
+
+            auto s_xxx_xz = primBuffer.data(t1off + 60 * idx + 2);
+
+            auto s_xxx_yy = primBuffer.data(t1off + 60 * idx + 3);
+
+            auto s_xxx_yz = primBuffer.data(t1off + 60 * idx + 4);
+
+            auto s_xxx_zz = primBuffer.data(t1off + 60 * idx + 5);
+
+            auto s_xxy_xx = primBuffer.data(t1off + 60 * idx + 6);
+
+            auto s_xxy_xy = primBuffer.data(t1off + 60 * idx + 7);
+
+            auto s_xxy_xz = primBuffer.data(t1off + 60 * idx + 8);
+
+            auto s_xxy_yy = primBuffer.data(t1off + 60 * idx + 9);
+
+            auto s_xxy_yz = primBuffer.data(t1off + 60 * idx + 10);
+
+            auto s_xxy_zz = primBuffer.data(t1off + 60 * idx + 11);
+
+            auto s_xxz_xx = primBuffer.data(t1off + 60 * idx + 12);
+
+            auto s_xxz_xy = primBuffer.data(t1off + 60 * idx + 13);
+
+            auto s_xxz_xz = primBuffer.data(t1off + 60 * idx + 14);
+
+            auto s_xxz_yy = primBuffer.data(t1off + 60 * idx + 15);
+
+            auto s_xxz_yz = primBuffer.data(t1off + 60 * idx + 16);
+
+            auto s_xxz_zz = primBuffer.data(t1off + 60 * idx + 17);
+
+            auto s_xyy_xx = primBuffer.data(t1off + 60 * idx + 18);
+
+            auto s_xyy_xy = primBuffer.data(t1off + 60 * idx + 19);
+
+            auto s_xyy_xz = primBuffer.data(t1off + 60 * idx + 20);
+
+            auto s_xyy_yy = primBuffer.data(t1off + 60 * idx + 21);
+
+            auto s_xyy_yz = primBuffer.data(t1off + 60 * idx + 22);
+
+            auto s_xyy_zz = primBuffer.data(t1off + 60 * idx + 23);
+
+            auto s_xyz_xx = primBuffer.data(t1off + 60 * idx + 24);
+
+            auto s_xyz_xy = primBuffer.data(t1off + 60 * idx + 25);
+
+            auto s_xyz_xz = primBuffer.data(t1off + 60 * idx + 26);
+
+            auto s_xyz_yy = primBuffer.data(t1off + 60 * idx + 27);
+
+            auto s_xyz_yz = primBuffer.data(t1off + 60 * idx + 28);
+
+            auto s_xyz_zz = primBuffer.data(t1off + 60 * idx + 29);
+
+            auto s_xzz_xx = primBuffer.data(t1off + 60 * idx + 30);
+
+            auto s_xzz_xy = primBuffer.data(t1off + 60 * idx + 31);
+
+            auto s_xzz_xz = primBuffer.data(t1off + 60 * idx + 32);
+
+            auto s_xzz_yy = primBuffer.data(t1off + 60 * idx + 33);
+
+            auto s_xzz_yz = primBuffer.data(t1off + 60 * idx + 34);
+
+            auto s_xzz_zz = primBuffer.data(t1off + 60 * idx + 35);
+
+            auto s_yyy_xx = primBuffer.data(t1off + 60 * idx + 36);
+
+            auto s_yyy_xy = primBuffer.data(t1off + 60 * idx + 37);
+
+            auto s_yyy_xz = primBuffer.data(t1off + 60 * idx + 38);
+
+            auto s_yyy_yy = primBuffer.data(t1off + 60 * idx + 39);
+
+            auto s_yyy_yz = primBuffer.data(t1off + 60 * idx + 40);
+
+            auto s_yyy_zz = primBuffer.data(t1off + 60 * idx + 41);
+
+            auto s_yyz_xx = primBuffer.data(t1off + 60 * idx + 42);
+
+            auto s_yyz_xy = primBuffer.data(t1off + 60 * idx + 43);
+
+            auto s_yyz_xz = primBuffer.data(t1off + 60 * idx + 44);
+
+            auto s_yyz_yy = primBuffer.data(t1off + 60 * idx + 45);
+
+            auto s_yyz_yz = primBuffer.data(t1off + 60 * idx + 46);
+
+            auto s_yyz_zz = primBuffer.data(t1off + 60 * idx + 47);
+
+            auto s_yzz_xx = primBuffer.data(t1off + 60 * idx + 48);
+
+            auto s_yzz_xy = primBuffer.data(t1off + 60 * idx + 49);
+
+            auto s_yzz_xz = primBuffer.data(t1off + 60 * idx + 50);
+
+            auto s_yzz_yy = primBuffer.data(t1off + 60 * idx + 51);
+
+            auto s_yzz_yz = primBuffer.data(t1off + 60 * idx + 52);
+
+            auto s_yzz_zz = primBuffer.data(t1off + 60 * idx + 53);
+
+            auto s_zzz_xx = primBuffer.data(t1off + 60 * idx + 54);
+
+            auto s_zzz_xy = primBuffer.data(t1off + 60 * idx + 55);
+
+            auto s_zzz_xz = primBuffer.data(t1off + 60 * idx + 56);
+
+            auto s_zzz_yy = primBuffer.data(t1off + 60 * idx + 57);
+
+            auto s_zzz_yz = primBuffer.data(t1off + 60 * idx + 58);
+
+            auto s_zzz_zz = primBuffer.data(t1off + 60 * idx + 59);
+
+            // set up pointers to (G|D) integrals
+
+            auto s_xxxx_xx = primBuffer.data(soff + 90 * idx);
+
+            auto s_xxxx_xy = primBuffer.data(soff + 90 * idx + 1);
+
+            auto s_xxxx_xz = primBuffer.data(soff + 90 * idx + 2);
+
+            auto s_xxxx_yy = primBuffer.data(soff + 90 * idx + 3);
+
+            auto s_xxxx_yz = primBuffer.data(soff + 90 * idx + 4);
+
+            auto s_xxxx_zz = primBuffer.data(soff + 90 * idx + 5);
+
+            auto s_xxxy_xx = primBuffer.data(soff + 90 * idx + 6);
+
+            auto s_xxxy_xy = primBuffer.data(soff + 90 * idx + 7);
+
+            auto s_xxxy_xz = primBuffer.data(soff + 90 * idx + 8);
+
+            auto s_xxxy_yy = primBuffer.data(soff + 90 * idx + 9);
+
+            auto s_xxxy_yz = primBuffer.data(soff + 90 * idx + 10);
+
+            auto s_xxxy_zz = primBuffer.data(soff + 90 * idx + 11);
+
+            auto s_xxxz_xx = primBuffer.data(soff + 90 * idx + 12);
+
+            auto s_xxxz_xy = primBuffer.data(soff + 90 * idx + 13);
+
+            auto s_xxxz_xz = primBuffer.data(soff + 90 * idx + 14);
+
+            auto s_xxxz_yy = primBuffer.data(soff + 90 * idx + 15);
+
+            auto s_xxxz_yz = primBuffer.data(soff + 90 * idx + 16);
+
+            auto s_xxxz_zz = primBuffer.data(soff + 90 * idx + 17);
+
+            auto s_xxyy_xx = primBuffer.data(soff + 90 * idx + 18);
+
+            auto s_xxyy_xy = primBuffer.data(soff + 90 * idx + 19);
+
+            auto s_xxyy_xz = primBuffer.data(soff + 90 * idx + 20);
+
+            auto s_xxyy_yy = primBuffer.data(soff + 90 * idx + 21);
+
+            auto s_xxyy_yz = primBuffer.data(soff + 90 * idx + 22);
+
+            auto s_xxyy_zz = primBuffer.data(soff + 90 * idx + 23);
+
+            auto s_xxyz_xx = primBuffer.data(soff + 90 * idx + 24);
+
+            auto s_xxyz_xy = primBuffer.data(soff + 90 * idx + 25);
+
+            auto s_xxyz_xz = primBuffer.data(soff + 90 * idx + 26);
+
+            auto s_xxyz_yy = primBuffer.data(soff + 90 * idx + 27);
+
+            auto s_xxyz_yz = primBuffer.data(soff + 90 * idx + 28);
+
+            auto s_xxyz_zz = primBuffer.data(soff + 90 * idx + 29);
+
+            auto s_xxzz_xx = primBuffer.data(soff + 90 * idx + 30);
+
+            auto s_xxzz_xy = primBuffer.data(soff + 90 * idx + 31);
+
+            auto s_xxzz_xz = primBuffer.data(soff + 90 * idx + 32);
+
+            auto s_xxzz_yy = primBuffer.data(soff + 90 * idx + 33);
+
+            auto s_xxzz_yz = primBuffer.data(soff + 90 * idx + 34);
+
+            auto s_xxzz_zz = primBuffer.data(soff + 90 * idx + 35);
+
+            auto s_xyyy_xx = primBuffer.data(soff + 90 * idx + 36);
+
+            auto s_xyyy_xy = primBuffer.data(soff + 90 * idx + 37);
+
+            auto s_xyyy_xz = primBuffer.data(soff + 90 * idx + 38);
+
+            auto s_xyyy_yy = primBuffer.data(soff + 90 * idx + 39);
+
+            auto s_xyyy_yz = primBuffer.data(soff + 90 * idx + 40);
+
+            auto s_xyyy_zz = primBuffer.data(soff + 90 * idx + 41);
+
+            auto s_xyyz_xx = primBuffer.data(soff + 90 * idx + 42);
+
+            auto s_xyyz_xy = primBuffer.data(soff + 90 * idx + 43);
+
+            auto s_xyyz_xz = primBuffer.data(soff + 90 * idx + 44);
+
+            auto s_xyyz_yy = primBuffer.data(soff + 90 * idx + 45);
+
+            auto s_xyyz_yz = primBuffer.data(soff + 90 * idx + 46);
+
+            auto s_xyyz_zz = primBuffer.data(soff + 90 * idx + 47);
+
+            auto s_xyzz_xx = primBuffer.data(soff + 90 * idx + 48);
+
+            auto s_xyzz_xy = primBuffer.data(soff + 90 * idx + 49);
+
+            auto s_xyzz_xz = primBuffer.data(soff + 90 * idx + 50);
+
+            auto s_xyzz_yy = primBuffer.data(soff + 90 * idx + 51);
+
+            auto s_xyzz_yz = primBuffer.data(soff + 90 * idx + 52);
+
+            auto s_xyzz_zz = primBuffer.data(soff + 90 * idx + 53);
+
+            auto s_xzzz_xx = primBuffer.data(soff + 90 * idx + 54);
+
+            auto s_xzzz_xy = primBuffer.data(soff + 90 * idx + 55);
+
+            auto s_xzzz_xz = primBuffer.data(soff + 90 * idx + 56);
+
+            auto s_xzzz_yy = primBuffer.data(soff + 90 * idx + 57);
+
+            auto s_xzzz_yz = primBuffer.data(soff + 90 * idx + 58);
+
+            auto s_xzzz_zz = primBuffer.data(soff + 90 * idx + 59);
+
+            auto s_yyyy_xx = primBuffer.data(soff + 90 * idx + 60);
+
+            auto s_yyyy_xy = primBuffer.data(soff + 90 * idx + 61);
+
+            auto s_yyyy_xz = primBuffer.data(soff + 90 * idx + 62);
+
+            auto s_yyyy_yy = primBuffer.data(soff + 90 * idx + 63);
+
+            auto s_yyyy_yz = primBuffer.data(soff + 90 * idx + 64);
+
+            auto s_yyyy_zz = primBuffer.data(soff + 90 * idx + 65);
+
+            auto s_yyyz_xx = primBuffer.data(soff + 90 * idx + 66);
+
+            auto s_yyyz_xy = primBuffer.data(soff + 90 * idx + 67);
+
+            auto s_yyyz_xz = primBuffer.data(soff + 90 * idx + 68);
+
+            auto s_yyyz_yy = primBuffer.data(soff + 90 * idx + 69);
+
+            auto s_yyyz_yz = primBuffer.data(soff + 90 * idx + 70);
+
+            auto s_yyyz_zz = primBuffer.data(soff + 90 * idx + 71);
+
+            auto s_yyzz_xx = primBuffer.data(soff + 90 * idx + 72);
+
+            auto s_yyzz_xy = primBuffer.data(soff + 90 * idx + 73);
+
+            auto s_yyzz_xz = primBuffer.data(soff + 90 * idx + 74);
+
+            auto s_yyzz_yy = primBuffer.data(soff + 90 * idx + 75);
+
+            auto s_yyzz_yz = primBuffer.data(soff + 90 * idx + 76);
+
+            auto s_yyzz_zz = primBuffer.data(soff + 90 * idx + 77);
+
+            auto s_yzzz_xx = primBuffer.data(soff + 90 * idx + 78);
+
+            auto s_yzzz_xy = primBuffer.data(soff + 90 * idx + 79);
+
+            auto s_yzzz_xz = primBuffer.data(soff + 90 * idx + 80);
+
+            auto s_yzzz_yy = primBuffer.data(soff + 90 * idx + 81);
+
+            auto s_yzzz_yz = primBuffer.data(soff + 90 * idx + 82);
+
+            auto s_yzzz_zz = primBuffer.data(soff + 90 * idx + 83);
+
+            auto s_zzzz_xx = primBuffer.data(soff + 90 * idx + 84);
+
+            auto s_zzzz_xy = primBuffer.data(soff + 90 * idx + 85);
+
+            auto s_zzzz_xz = primBuffer.data(soff + 90 * idx + 86);
+
+            auto s_zzzz_yy = primBuffer.data(soff + 90 * idx + 87);
+
+            auto s_zzzz_yz = primBuffer.data(soff + 90 * idx + 88);
+
+            auto s_zzzz_zz = primBuffer.data(soff + 90 * idx + 89);
+
+            #pragma omp simd aligned(fx, pax, pay, paz, s_xxx_x, s_xxx_y, s_xxx_z,\
+                                     s_xxy_x, s_xxy_y, s_xxy_z, s_xxz_x, s_xxz_y,\
+                                     s_xxz_z, s_xyy_x, s_xyy_y, s_xyy_z, s_xyz_x,\
+                                     s_xyz_y, s_xyz_z, s_xzz_x, s_xzz_y, s_xzz_z,\
+                                     s_yyy_x, s_yyy_y, s_yyy_z, s_yyz_x, s_yyz_y,\
+                                     s_yyz_z, s_yzz_x, s_yzz_y, s_yzz_z, s_zzz_x,\
+                                     s_zzz_y, s_zzz_z, s_xx_xx, s_xx_xy, s_xx_xz,\
+                                     s_xx_yy, s_xx_yz, s_xx_zz, s_xy_xx, s_xy_xy,\
+                                     s_xy_xz, s_xy_yy, s_xy_yz, s_xy_zz, s_xz_xx,\
+                                     s_xz_xy, s_xz_xz, s_xz_yy, s_xz_yz, s_xz_zz,\
+                                     s_yy_xx, s_yy_xy, s_yy_xz, s_yy_yy, s_yy_yz,\
+                                     s_yy_zz, s_yz_xx, s_yz_xy, s_yz_xz, s_yz_yy,\
+                                     s_yz_yz, s_yz_zz, s_zz_xx, s_zz_xy, s_zz_xz,\
+                                     s_zz_yy, s_zz_yz, s_zz_zz, s_xxx_xx, s_xxx_xy,\
+                                     s_xxx_xz, s_xxx_yy, s_xxx_yz, s_xxx_zz, s_xxy_xx,\
+                                     s_xxy_xy, s_xxy_xz, s_xxy_yy, s_xxy_yz, s_xxy_zz,\
+                                     s_xxz_xx, s_xxz_xy, s_xxz_xz, s_xxz_yy, s_xxz_yz,\
+                                     s_xxz_zz, s_xyy_xx, s_xyy_xy, s_xyy_xz, s_xyy_yy,\
+                                     s_xyy_yz, s_xyy_zz, s_xyz_xx, s_xyz_xy, s_xyz_xz,\
+                                     s_xyz_yy, s_xyz_yz, s_xyz_zz, s_xzz_xx, s_xzz_xy,\
+                                     s_xzz_xz, s_xzz_yy, s_xzz_yz, s_xzz_zz, s_yyy_xx,\
+                                     s_yyy_xy, s_yyy_xz, s_yyy_yy, s_yyy_yz, s_yyy_zz,\
+                                     s_yyz_xx, s_yyz_xy, s_yyz_xz, s_yyz_yy, s_yyz_yz,\
+                                     s_yyz_zz, s_yzz_xx, s_yzz_xy, s_yzz_xz, s_yzz_yy,\
+                                     s_yzz_yz, s_yzz_zz, s_zzz_xx, s_zzz_xy, s_zzz_xz,\
+                                     s_zzz_yy, s_zzz_yz, s_zzz_zz, s_xxxx_xx, s_xxxx_xy,\
+                                     s_xxxx_xz, s_xxxx_yy, s_xxxx_yz, s_xxxx_zz,\
+                                     s_xxxy_xx, s_xxxy_xy, s_xxxy_xz, s_xxxy_yy,\
+                                     s_xxxy_yz, s_xxxy_zz, s_xxxz_xx, s_xxxz_xy,\
+                                     s_xxxz_xz, s_xxxz_yy, s_xxxz_yz, s_xxxz_zz,\
+                                     s_xxyy_xx, s_xxyy_xy, s_xxyy_xz, s_xxyy_yy,\
+                                     s_xxyy_yz, s_xxyy_zz, s_xxyz_xx, s_xxyz_xy,\
+                                     s_xxyz_xz, s_xxyz_yy, s_xxyz_yz, s_xxyz_zz,\
+                                     s_xxzz_xx, s_xxzz_xy, s_xxzz_xz, s_xxzz_yy,\
+                                     s_xxzz_yz, s_xxzz_zz, s_xyyy_xx, s_xyyy_xy,\
+                                     s_xyyy_xz, s_xyyy_yy, s_xyyy_yz, s_xyyy_zz,\
+                                     s_xyyz_xx, s_xyyz_xy, s_xyyz_xz, s_xyyz_yy,\
+                                     s_xyyz_yz, s_xyyz_zz, s_xyzz_xx, s_xyzz_xy,\
+                                     s_xyzz_xz, s_xyzz_yy, s_xyzz_yz, s_xyzz_zz,\
+                                     s_xzzz_xx, s_xzzz_xy, s_xzzz_xz, s_xzzz_yy,\
+                                     s_xzzz_yz, s_xzzz_zz, s_yyyy_xx, s_yyyy_xy,\
+                                     s_yyyy_xz, s_yyyy_yy, s_yyyy_yz, s_yyyy_zz,\
+                                     s_yyyz_xx, s_yyyz_xy, s_yyyz_xz, s_yyyz_yy,\
+                                     s_yyyz_yz, s_yyyz_zz, s_yyzz_xx, s_yyzz_xy,\
+                                     s_yyzz_xz, s_yyzz_yy, s_yyzz_yz, s_yyzz_zz,\
+                                     s_yzzz_xx, s_yzzz_xy, s_yzzz_xz, s_yzzz_yy,\
+                                     s_yzzz_yz, s_yzzz_zz, s_zzzz_xx, s_zzzz_xy,\
+                                     s_zzzz_xz, s_zzzz_yy, s_zzzz_yz, s_zzzz_zz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+
+                double f2t = 0.50 * fx[j];
+
+                // leading x component
+
+                double fr = pax[j];
+
+                s_xxxx_xx[j] = fr * s_xxx_xx[j] + f2t * (3.0 * s_xx_xx[j] + 2.0 * s_xxx_x[j]);
+
+                s_xxxx_xy[j] = fr * s_xxx_xy[j] + f2t * (3.0 * s_xx_xy[j] + s_xxx_y[j]);
+
+                s_xxxx_xz[j] = fr * s_xxx_xz[j] + f2t * (3.0 * s_xx_xz[j] + s_xxx_z[j]);
+
+                s_xxxx_yy[j] = fr * s_xxx_yy[j] + f2t * 3.0 * s_xx_yy[j];
+
+                s_xxxx_yz[j] = fr * s_xxx_yz[j] + f2t * 3.0 * s_xx_yz[j];
+
+                s_xxxx_zz[j] = fr * s_xxx_zz[j] + f2t * 3.0 * s_xx_zz[j];
+
+                s_xxxy_xx[j] = fr * s_xxy_xx[j] + f2t * (2.0 * s_xy_xx[j] + 2.0 * s_xxy_x[j]);
+
+                s_xxxy_xy[j] = fr * s_xxy_xy[j] + f2t * (2.0 * s_xy_xy[j] + s_xxy_y[j]);
+
+                s_xxxy_xz[j] = fr * s_xxy_xz[j] + f2t * (2.0 * s_xy_xz[j] + s_xxy_z[j]);
+
+                s_xxxy_yy[j] = fr * s_xxy_yy[j] + f2t * 2.0 * s_xy_yy[j];
+
+                s_xxxy_yz[j] = fr * s_xxy_yz[j] + f2t * 2.0 * s_xy_yz[j];
+
+                s_xxxy_zz[j] = fr * s_xxy_zz[j] + f2t * 2.0 * s_xy_zz[j];
+
+                s_xxxz_xx[j] = fr * s_xxz_xx[j] + f2t * (2.0 * s_xz_xx[j] + 2.0 * s_xxz_x[j]);
+
+                s_xxxz_xy[j] = fr * s_xxz_xy[j] + f2t * (2.0 * s_xz_xy[j] + s_xxz_y[j]);
+
+                s_xxxz_xz[j] = fr * s_xxz_xz[j] + f2t * (2.0 * s_xz_xz[j] + s_xxz_z[j]);
+
+                s_xxxz_yy[j] = fr * s_xxz_yy[j] + f2t * 2.0 * s_xz_yy[j];
+
+                s_xxxz_yz[j] = fr * s_xxz_yz[j] + f2t * 2.0 * s_xz_yz[j];
+
+                s_xxxz_zz[j] = fr * s_xxz_zz[j] + f2t * 2.0 * s_xz_zz[j];
+
+                s_xxyy_xx[j] = fr * s_xyy_xx[j] + f2t * (s_yy_xx[j] + 2.0 * s_xyy_x[j]);
+
+                s_xxyy_xy[j] = fr * s_xyy_xy[j] + f2t * (s_yy_xy[j] + s_xyy_y[j]);
+
+                s_xxyy_xz[j] = fr * s_xyy_xz[j] + f2t * (s_yy_xz[j] + s_xyy_z[j]);
+
+                s_xxyy_yy[j] = fr * s_xyy_yy[j] + f2t * s_yy_yy[j];
+
+                s_xxyy_yz[j] = fr * s_xyy_yz[j] + f2t * s_yy_yz[j];
+
+                s_xxyy_zz[j] = fr * s_xyy_zz[j] + f2t * s_yy_zz[j];
+
+                s_xxyz_xx[j] = fr * s_xyz_xx[j] + f2t * (s_yz_xx[j] + 2.0 * s_xyz_x[j]);
+
+                s_xxyz_xy[j] = fr * s_xyz_xy[j] + f2t * (s_yz_xy[j] + s_xyz_y[j]);
+
+                s_xxyz_xz[j] = fr * s_xyz_xz[j] + f2t * (s_yz_xz[j] + s_xyz_z[j]);
+
+                s_xxyz_yy[j] = fr * s_xyz_yy[j] + f2t * s_yz_yy[j];
+
+                s_xxyz_yz[j] = fr * s_xyz_yz[j] + f2t * s_yz_yz[j];
+
+                s_xxyz_zz[j] = fr * s_xyz_zz[j] + f2t * s_yz_zz[j];
+
+                s_xxzz_xx[j] = fr * s_xzz_xx[j] + f2t * (s_zz_xx[j] + 2.0 * s_xzz_x[j]);
+
+                s_xxzz_xy[j] = fr * s_xzz_xy[j] + f2t * (s_zz_xy[j] + s_xzz_y[j]);
+
+                s_xxzz_xz[j] = fr * s_xzz_xz[j] + f2t * (s_zz_xz[j] + s_xzz_z[j]);
+
+                s_xxzz_yy[j] = fr * s_xzz_yy[j] + f2t * s_zz_yy[j];
+
+                s_xxzz_yz[j] = fr * s_xzz_yz[j] + f2t * s_zz_yz[j];
+
+                s_xxzz_zz[j] = fr * s_xzz_zz[j] + f2t * s_zz_zz[j];
+
+                s_xyyy_xx[j] = fr * s_yyy_xx[j] + f2t * 2.0 * s_yyy_x[j];
+
+                s_xyyy_xy[j] = fr * s_yyy_xy[j] + f2t * s_yyy_y[j];
+
+                s_xyyy_xz[j] = fr * s_yyy_xz[j] + f2t * s_yyy_z[j];
+
+                s_xyyy_yy[j] = fr * s_yyy_yy[j];
+
+                s_xyyy_yz[j] = fr * s_yyy_yz[j];
+
+                s_xyyy_zz[j] = fr * s_yyy_zz[j];
+
+                s_xyyz_xx[j] = fr * s_yyz_xx[j] + f2t * 2.0 * s_yyz_x[j];
+
+                s_xyyz_xy[j] = fr * s_yyz_xy[j] + f2t * s_yyz_y[j];
+
+                s_xyyz_xz[j] = fr * s_yyz_xz[j] + f2t * s_yyz_z[j];
+
+                s_xyyz_yy[j] = fr * s_yyz_yy[j];
+
+                s_xyyz_yz[j] = fr * s_yyz_yz[j];
+
+                s_xyyz_zz[j] = fr * s_yyz_zz[j];
+
+                s_xyzz_xx[j] = fr * s_yzz_xx[j] + f2t * 2.0 * s_yzz_x[j];
+
+                s_xyzz_xy[j] = fr * s_yzz_xy[j] + f2t * s_yzz_y[j];
+
+                s_xyzz_xz[j] = fr * s_yzz_xz[j] + f2t * s_yzz_z[j];
+
+                s_xyzz_yy[j] = fr * s_yzz_yy[j];
+
+                s_xyzz_yz[j] = fr * s_yzz_yz[j];
+
+                s_xyzz_zz[j] = fr * s_yzz_zz[j];
+
+                s_xzzz_xx[j] = fr * s_zzz_xx[j] + f2t * 2.0 * s_zzz_x[j];
+
+                s_xzzz_xy[j] = fr * s_zzz_xy[j] + f2t * s_zzz_y[j];
+
+                s_xzzz_xz[j] = fr * s_zzz_xz[j] + f2t * s_zzz_z[j];
+
+                s_xzzz_yy[j] = fr * s_zzz_yy[j];
+
+                s_xzzz_yz[j] = fr * s_zzz_yz[j];
+
+                s_xzzz_zz[j] = fr * s_zzz_zz[j];
+
+                // leading y component
+
+                fr = pay[j];
+
+                s_yyyy_xx[j] = fr * s_yyy_xx[j] + f2t * 3.0 * s_yy_xx[j];
+
+                s_yyyy_xy[j] = fr * s_yyy_xy[j] + f2t * (3.0 * s_yy_xy[j] + s_yyy_x[j]);
+
+                s_yyyy_xz[j] = fr * s_yyy_xz[j] + f2t * 3.0 * s_yy_xz[j];
+
+                s_yyyy_yy[j] = fr * s_yyy_yy[j] + f2t * (3.0 * s_yy_yy[j] + 2.0 * s_yyy_y[j]);
+
+                s_yyyy_yz[j] = fr * s_yyy_yz[j] + f2t * (3.0 * s_yy_yz[j] + s_yyy_z[j]);
+
+                s_yyyy_zz[j] = fr * s_yyy_zz[j] + f2t * 3.0 * s_yy_zz[j];
+
+                s_yyyz_xx[j] = fr * s_yyz_xx[j] + f2t * 2.0 * s_yz_xx[j];
+
+                s_yyyz_xy[j] = fr * s_yyz_xy[j] + f2t * (2.0 * s_yz_xy[j] + s_yyz_x[j]);
+
+                s_yyyz_xz[j] = fr * s_yyz_xz[j] + f2t * 2.0 * s_yz_xz[j];
+
+                s_yyyz_yy[j] = fr * s_yyz_yy[j] + f2t * (2.0 * s_yz_yy[j] + 2.0 * s_yyz_y[j]);
+
+                s_yyyz_yz[j] = fr * s_yyz_yz[j] + f2t * (2.0 * s_yz_yz[j] + s_yyz_z[j]);
+
+                s_yyyz_zz[j] = fr * s_yyz_zz[j] + f2t * 2.0 * s_yz_zz[j];
+
+                s_yyzz_xx[j] = fr * s_yzz_xx[j] + f2t * s_zz_xx[j];
+
+                s_yyzz_xy[j] = fr * s_yzz_xy[j] + f2t * (s_zz_xy[j] + s_yzz_x[j]);
+
+                s_yyzz_xz[j] = fr * s_yzz_xz[j] + f2t * s_zz_xz[j];
+
+                s_yyzz_yy[j] = fr * s_yzz_yy[j] + f2t * (s_zz_yy[j] + 2.0 * s_yzz_y[j]);
+
+                s_yyzz_yz[j] = fr * s_yzz_yz[j] + f2t * (s_zz_yz[j] + s_yzz_z[j]);
+
+                s_yyzz_zz[j] = fr * s_yzz_zz[j] + f2t * s_zz_zz[j];
+
+                s_yzzz_xx[j] = fr * s_zzz_xx[j];
+
+                s_yzzz_xy[j] = fr * s_zzz_xy[j] + f2t * s_zzz_x[j];
+
+                s_yzzz_xz[j] = fr * s_zzz_xz[j];
+
+                s_yzzz_yy[j] = fr * s_zzz_yy[j] + f2t * 2.0 * s_zzz_y[j];
+
+                s_yzzz_yz[j] = fr * s_zzz_yz[j] + f2t * s_zzz_z[j];
+
+                s_yzzz_zz[j] = fr * s_zzz_zz[j];
+
+                // leading z component
+                
+                fr = paz[j];
+
+                s_zzzz_xx[j] = fr * s_zzz_xx[j] + f2t * 3.0 * s_zz_xx[j];
+
+                s_zzzz_xy[j] = fr * s_zzz_xy[j] + f2t * 3.0 * s_zz_xy[j];
+
+                s_zzzz_xz[j] = fr * s_zzz_xz[j] + f2t * (3.0 * s_zz_xz[j] + s_zzz_x[j]);
+
+                s_zzzz_yy[j] = fr * s_zzz_yy[j] + f2t * 3.0 * s_zz_yy[j];
+
+                s_zzzz_yz[j] = fr * s_zzz_yz[j] + f2t * (3.0 * s_zz_yz[j] + s_zzz_y[j]);
+
+                s_zzzz_zz[j] = fr * s_zzz_zz[j] + f2t * (3.0 * s_zz_zz[j] + 2.0 * s_zzz_z[j]);
+            }
+
+            idx++;
+        }
+    }
    
     void
     compOverlapForFG(      CMemBlock2D<double>&  primBuffer,
@@ -5398,8 +7506,1218 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         }
     }
 
-    // FIX ME: add (g|f)
-    
+    void
+    compOverlapForGF(      CMemBlock2D<double>&  primBuffer,
+                     const CVecTwoIndexes&       recPattern,
+                     const std::vector<int32_t>& recIndexes,
+                     const CMemBlock2D<double>&  osFactors,
+                     const CMemBlock2D<double>&  paDistances,
+                     const CGtoBlock&            braGtoBlock,
+                     const CGtoBlock&            ketGtoBlock,
+                     const int32_t               iContrGto)
+    {
+        // skip integrals if not included in recursion pattern
+
+        if (!genfunc::isInVector(recPattern, {4, 3})) return;
+
+        if (iContrGto  == 0) printf(" * VRR: (4|3)\n");
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // get position of integrals in primitves buffer
+
+        auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {4, 3});
+
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {3, 3});
+
+        auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {2, 3});
+
+        auto tkoff = genfunc::findPairIndex(recIndexes, recPattern, {3, 2});
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to distances R(PA)
+
+            auto pax = paDistances.data(3 * idx);
+
+            auto pay = paDistances.data(3 * idx + 1);
+
+            auto paz = paDistances.data(3 * idx + 2);
+
+            // set up pointers to (F|D) integrals
+
+            auto s_xxx_xx = primBuffer.data(tkoff + 60 * idx);
+
+            auto s_xxx_xy = primBuffer.data(tkoff + 60 * idx + 1);
+
+            auto s_xxx_xz = primBuffer.data(tkoff + 60 * idx + 2);
+
+            auto s_xxx_yy = primBuffer.data(tkoff + 60 * idx + 3);
+
+            auto s_xxx_yz = primBuffer.data(tkoff + 60 * idx + 4);
+
+            auto s_xxx_zz = primBuffer.data(tkoff + 60 * idx + 5);
+
+            auto s_xxy_xx = primBuffer.data(tkoff + 60 * idx + 6);
+
+            auto s_xxy_xy = primBuffer.data(tkoff + 60 * idx + 7);
+
+            auto s_xxy_xz = primBuffer.data(tkoff + 60 * idx + 8);
+
+            auto s_xxy_yy = primBuffer.data(tkoff + 60 * idx + 9);
+
+            auto s_xxy_yz = primBuffer.data(tkoff + 60 * idx + 10);
+
+            auto s_xxy_zz = primBuffer.data(tkoff + 60 * idx + 11);
+
+            auto s_xxz_xx = primBuffer.data(tkoff + 60 * idx + 12);
+
+            auto s_xxz_xy = primBuffer.data(tkoff + 60 * idx + 13);
+
+            auto s_xxz_xz = primBuffer.data(tkoff + 60 * idx + 14);
+
+            auto s_xxz_yy = primBuffer.data(tkoff + 60 * idx + 15);
+
+            auto s_xxz_yz = primBuffer.data(tkoff + 60 * idx + 16);
+
+            auto s_xxz_zz = primBuffer.data(tkoff + 60 * idx + 17);
+
+            auto s_xyy_xx = primBuffer.data(tkoff + 60 * idx + 18);
+
+            auto s_xyy_xy = primBuffer.data(tkoff + 60 * idx + 19);
+
+            auto s_xyy_xz = primBuffer.data(tkoff + 60 * idx + 20);
+
+            auto s_xyy_yy = primBuffer.data(tkoff + 60 * idx + 21);
+
+            auto s_xyy_yz = primBuffer.data(tkoff + 60 * idx + 22);
+
+            auto s_xyy_zz = primBuffer.data(tkoff + 60 * idx + 23);
+
+            auto s_xyz_xx = primBuffer.data(tkoff + 60 * idx + 24);
+
+            auto s_xyz_xy = primBuffer.data(tkoff + 60 * idx + 25);
+
+            auto s_xyz_xz = primBuffer.data(tkoff + 60 * idx + 26);
+
+            auto s_xyz_yy = primBuffer.data(tkoff + 60 * idx + 27);
+
+            auto s_xyz_yz = primBuffer.data(tkoff + 60 * idx + 28);
+
+            auto s_xyz_zz = primBuffer.data(tkoff + 60 * idx + 29);
+
+            auto s_xzz_xx = primBuffer.data(tkoff + 60 * idx + 30);
+
+            auto s_xzz_xy = primBuffer.data(tkoff + 60 * idx + 31);
+
+            auto s_xzz_xz = primBuffer.data(tkoff + 60 * idx + 32);
+
+            auto s_xzz_yy = primBuffer.data(tkoff + 60 * idx + 33);
+
+            auto s_xzz_yz = primBuffer.data(tkoff + 60 * idx + 34);
+
+            auto s_xzz_zz = primBuffer.data(tkoff + 60 * idx + 35);
+
+            auto s_yyy_xx = primBuffer.data(tkoff + 60 * idx + 36);
+
+            auto s_yyy_xy = primBuffer.data(tkoff + 60 * idx + 37);
+
+            auto s_yyy_xz = primBuffer.data(tkoff + 60 * idx + 38);
+
+            auto s_yyy_yy = primBuffer.data(tkoff + 60 * idx + 39);
+
+            auto s_yyy_yz = primBuffer.data(tkoff + 60 * idx + 40);
+
+            auto s_yyy_zz = primBuffer.data(tkoff + 60 * idx + 41);
+
+            auto s_yyz_xx = primBuffer.data(tkoff + 60 * idx + 42);
+
+            auto s_yyz_xy = primBuffer.data(tkoff + 60 * idx + 43);
+
+            auto s_yyz_xz = primBuffer.data(tkoff + 60 * idx + 44);
+
+            auto s_yyz_yy = primBuffer.data(tkoff + 60 * idx + 45);
+
+            auto s_yyz_yz = primBuffer.data(tkoff + 60 * idx + 46);
+
+            auto s_yyz_zz = primBuffer.data(tkoff + 60 * idx + 47);
+
+            auto s_yzz_xx = primBuffer.data(tkoff + 60 * idx + 48);
+
+            auto s_yzz_xy = primBuffer.data(tkoff + 60 * idx + 49);
+
+            auto s_yzz_xz = primBuffer.data(tkoff + 60 * idx + 50);
+
+            auto s_yzz_yy = primBuffer.data(tkoff + 60 * idx + 51);
+
+            auto s_yzz_yz = primBuffer.data(tkoff + 60 * idx + 52);
+
+            auto s_yzz_zz = primBuffer.data(tkoff + 60 * idx + 53);
+
+            auto s_zzz_xx = primBuffer.data(tkoff + 60 * idx + 54);
+
+            auto s_zzz_xy = primBuffer.data(tkoff + 60 * idx + 55);
+
+            auto s_zzz_xz = primBuffer.data(tkoff + 60 * idx + 56);
+
+            auto s_zzz_yy = primBuffer.data(tkoff + 60 * idx + 57);
+
+            auto s_zzz_yz = primBuffer.data(tkoff + 60 * idx + 58);
+
+            auto s_zzz_zz = primBuffer.data(tkoff + 60 * idx + 59);
+
+            // set up pointers to (D|F) integrals
+
+            auto s_xx_xxx = primBuffer.data(t2off + 60 * idx);
+
+            auto s_xx_xxy = primBuffer.data(t2off + 60 * idx + 1);
+
+            auto s_xx_xxz = primBuffer.data(t2off + 60 * idx + 2);
+
+            auto s_xx_xyy = primBuffer.data(t2off + 60 * idx + 3);
+
+            auto s_xx_xyz = primBuffer.data(t2off + 60 * idx + 4);
+
+            auto s_xx_xzz = primBuffer.data(t2off + 60 * idx + 5);
+
+            auto s_xx_yyy = primBuffer.data(t2off + 60 * idx + 6);
+
+            auto s_xx_yyz = primBuffer.data(t2off + 60 * idx + 7);
+
+            auto s_xx_yzz = primBuffer.data(t2off + 60 * idx + 8);
+
+            auto s_xx_zzz = primBuffer.data(t2off + 60 * idx + 9);
+
+            auto s_xy_xxx = primBuffer.data(t2off + 60 * idx + 10);
+
+            auto s_xy_xxy = primBuffer.data(t2off + 60 * idx + 11);
+
+            auto s_xy_xxz = primBuffer.data(t2off + 60 * idx + 12);
+
+            auto s_xy_xyy = primBuffer.data(t2off + 60 * idx + 13);
+
+            auto s_xy_xyz = primBuffer.data(t2off + 60 * idx + 14);
+
+            auto s_xy_xzz = primBuffer.data(t2off + 60 * idx + 15);
+
+            auto s_xy_yyy = primBuffer.data(t2off + 60 * idx + 16);
+
+            auto s_xy_yyz = primBuffer.data(t2off + 60 * idx + 17);
+
+            auto s_xy_yzz = primBuffer.data(t2off + 60 * idx + 18);
+
+            auto s_xy_zzz = primBuffer.data(t2off + 60 * idx + 19);
+
+            auto s_xz_xxx = primBuffer.data(t2off + 60 * idx + 20);
+
+            auto s_xz_xxy = primBuffer.data(t2off + 60 * idx + 21);
+
+            auto s_xz_xxz = primBuffer.data(t2off + 60 * idx + 22);
+
+            auto s_xz_xyy = primBuffer.data(t2off + 60 * idx + 23);
+
+            auto s_xz_xyz = primBuffer.data(t2off + 60 * idx + 24);
+
+            auto s_xz_xzz = primBuffer.data(t2off + 60 * idx + 25);
+
+            auto s_xz_yyy = primBuffer.data(t2off + 60 * idx + 26);
+
+            auto s_xz_yyz = primBuffer.data(t2off + 60 * idx + 27);
+
+            auto s_xz_yzz = primBuffer.data(t2off + 60 * idx + 28);
+
+            auto s_xz_zzz = primBuffer.data(t2off + 60 * idx + 29);
+
+            auto s_yy_xxx = primBuffer.data(t2off + 60 * idx + 30);
+
+            auto s_yy_xxy = primBuffer.data(t2off + 60 * idx + 31);
+
+            auto s_yy_xxz = primBuffer.data(t2off + 60 * idx + 32);
+
+            auto s_yy_xyy = primBuffer.data(t2off + 60 * idx + 33);
+
+            auto s_yy_xyz = primBuffer.data(t2off + 60 * idx + 34);
+
+            auto s_yy_xzz = primBuffer.data(t2off + 60 * idx + 35);
+
+            auto s_yy_yyy = primBuffer.data(t2off + 60 * idx + 36);
+
+            auto s_yy_yyz = primBuffer.data(t2off + 60 * idx + 37);
+
+            auto s_yy_yzz = primBuffer.data(t2off + 60 * idx + 38);
+
+            auto s_yy_zzz = primBuffer.data(t2off + 60 * idx + 39);
+
+            auto s_yz_xxx = primBuffer.data(t2off + 60 * idx + 40);
+
+            auto s_yz_xxy = primBuffer.data(t2off + 60 * idx + 41);
+
+            auto s_yz_xxz = primBuffer.data(t2off + 60 * idx + 42);
+
+            auto s_yz_xyy = primBuffer.data(t2off + 60 * idx + 43);
+
+            auto s_yz_xyz = primBuffer.data(t2off + 60 * idx + 44);
+
+            auto s_yz_xzz = primBuffer.data(t2off + 60 * idx + 45);
+
+            auto s_yz_yyy = primBuffer.data(t2off + 60 * idx + 46);
+
+            auto s_yz_yyz = primBuffer.data(t2off + 60 * idx + 47);
+
+            auto s_yz_yzz = primBuffer.data(t2off + 60 * idx + 48);
+
+            auto s_yz_zzz = primBuffer.data(t2off + 60 * idx + 49);
+
+            auto s_zz_xxx = primBuffer.data(t2off + 60 * idx + 50);
+
+            auto s_zz_xxy = primBuffer.data(t2off + 60 * idx + 51);
+
+            auto s_zz_xxz = primBuffer.data(t2off + 60 * idx + 52);
+
+            auto s_zz_xyy = primBuffer.data(t2off + 60 * idx + 53);
+
+            auto s_zz_xyz = primBuffer.data(t2off + 60 * idx + 54);
+
+            auto s_zz_xzz = primBuffer.data(t2off + 60 * idx + 55);
+
+            auto s_zz_yyy = primBuffer.data(t2off + 60 * idx + 56);
+
+            auto s_zz_yyz = primBuffer.data(t2off + 60 * idx + 57);
+
+            auto s_zz_yzz = primBuffer.data(t2off + 60 * idx + 58);
+
+            auto s_zz_zzz = primBuffer.data(t2off + 60 * idx + 59);
+
+            // set up pointers to (F|F) integrals
+
+            auto s_xxx_xxx = primBuffer.data(t1off + 100 * idx);
+
+            auto s_xxx_xxy = primBuffer.data(t1off + 100 * idx + 1);
+
+            auto s_xxx_xxz = primBuffer.data(t1off + 100 * idx + 2);
+
+            auto s_xxx_xyy = primBuffer.data(t1off + 100 * idx + 3);
+
+            auto s_xxx_xyz = primBuffer.data(t1off + 100 * idx + 4);
+
+            auto s_xxx_xzz = primBuffer.data(t1off + 100 * idx + 5);
+
+            auto s_xxx_yyy = primBuffer.data(t1off + 100 * idx + 6);
+
+            auto s_xxx_yyz = primBuffer.data(t1off + 100 * idx + 7);
+
+            auto s_xxx_yzz = primBuffer.data(t1off + 100 * idx + 8);
+
+            auto s_xxx_zzz = primBuffer.data(t1off + 100 * idx + 9);
+
+            auto s_xxy_xxx = primBuffer.data(t1off + 100 * idx + 10);
+
+            auto s_xxy_xxy = primBuffer.data(t1off + 100 * idx + 11);
+
+            auto s_xxy_xxz = primBuffer.data(t1off + 100 * idx + 12);
+
+            auto s_xxy_xyy = primBuffer.data(t1off + 100 * idx + 13);
+
+            auto s_xxy_xyz = primBuffer.data(t1off + 100 * idx + 14);
+
+            auto s_xxy_xzz = primBuffer.data(t1off + 100 * idx + 15);
+
+            auto s_xxy_yyy = primBuffer.data(t1off + 100 * idx + 16);
+
+            auto s_xxy_yyz = primBuffer.data(t1off + 100 * idx + 17);
+
+            auto s_xxy_yzz = primBuffer.data(t1off + 100 * idx + 18);
+
+            auto s_xxy_zzz = primBuffer.data(t1off + 100 * idx + 19);
+
+            auto s_xxz_xxx = primBuffer.data(t1off + 100 * idx + 20);
+
+            auto s_xxz_xxy = primBuffer.data(t1off + 100 * idx + 21);
+
+            auto s_xxz_xxz = primBuffer.data(t1off + 100 * idx + 22);
+
+            auto s_xxz_xyy = primBuffer.data(t1off + 100 * idx + 23);
+
+            auto s_xxz_xyz = primBuffer.data(t1off + 100 * idx + 24);
+
+            auto s_xxz_xzz = primBuffer.data(t1off + 100 * idx + 25);
+
+            auto s_xxz_yyy = primBuffer.data(t1off + 100 * idx + 26);
+
+            auto s_xxz_yyz = primBuffer.data(t1off + 100 * idx + 27);
+
+            auto s_xxz_yzz = primBuffer.data(t1off + 100 * idx + 28);
+
+            auto s_xxz_zzz = primBuffer.data(t1off + 100 * idx + 29);
+
+            auto s_xyy_xxx = primBuffer.data(t1off + 100 * idx + 30);
+
+            auto s_xyy_xxy = primBuffer.data(t1off + 100 * idx + 31);
+
+            auto s_xyy_xxz = primBuffer.data(t1off + 100 * idx + 32);
+
+            auto s_xyy_xyy = primBuffer.data(t1off + 100 * idx + 33);
+
+            auto s_xyy_xyz = primBuffer.data(t1off + 100 * idx + 34);
+
+            auto s_xyy_xzz = primBuffer.data(t1off + 100 * idx + 35);
+
+            auto s_xyy_yyy = primBuffer.data(t1off + 100 * idx + 36);
+
+            auto s_xyy_yyz = primBuffer.data(t1off + 100 * idx + 37);
+
+            auto s_xyy_yzz = primBuffer.data(t1off + 100 * idx + 38);
+
+            auto s_xyy_zzz = primBuffer.data(t1off + 100 * idx + 39);
+
+            auto s_xyz_xxx = primBuffer.data(t1off + 100 * idx + 40);
+
+            auto s_xyz_xxy = primBuffer.data(t1off + 100 * idx + 41);
+
+            auto s_xyz_xxz = primBuffer.data(t1off + 100 * idx + 42);
+
+            auto s_xyz_xyy = primBuffer.data(t1off + 100 * idx + 43);
+
+            auto s_xyz_xyz = primBuffer.data(t1off + 100 * idx + 44);
+
+            auto s_xyz_xzz = primBuffer.data(t1off + 100 * idx + 45);
+
+            auto s_xyz_yyy = primBuffer.data(t1off + 100 * idx + 46);
+
+            auto s_xyz_yyz = primBuffer.data(t1off + 100 * idx + 47);
+
+            auto s_xyz_yzz = primBuffer.data(t1off + 100 * idx + 48);
+
+            auto s_xyz_zzz = primBuffer.data(t1off + 100 * idx + 49);
+
+            auto s_xzz_xxx = primBuffer.data(t1off + 100 * idx + 50);
+
+            auto s_xzz_xxy = primBuffer.data(t1off + 100 * idx + 51);
+
+            auto s_xzz_xxz = primBuffer.data(t1off + 100 * idx + 52);
+
+            auto s_xzz_xyy = primBuffer.data(t1off + 100 * idx + 53);
+
+            auto s_xzz_xyz = primBuffer.data(t1off + 100 * idx + 54);
+
+            auto s_xzz_xzz = primBuffer.data(t1off + 100 * idx + 55);
+
+            auto s_xzz_yyy = primBuffer.data(t1off + 100 * idx + 56);
+
+            auto s_xzz_yyz = primBuffer.data(t1off + 100 * idx + 57);
+
+            auto s_xzz_yzz = primBuffer.data(t1off + 100 * idx + 58);
+
+            auto s_xzz_zzz = primBuffer.data(t1off + 100 * idx + 59);
+
+            auto s_yyy_xxx = primBuffer.data(t1off + 100 * idx + 60);
+
+            auto s_yyy_xxy = primBuffer.data(t1off + 100 * idx + 61);
+
+            auto s_yyy_xxz = primBuffer.data(t1off + 100 * idx + 62);
+
+            auto s_yyy_xyy = primBuffer.data(t1off + 100 * idx + 63);
+
+            auto s_yyy_xyz = primBuffer.data(t1off + 100 * idx + 64);
+
+            auto s_yyy_xzz = primBuffer.data(t1off + 100 * idx + 65);
+
+            auto s_yyy_yyy = primBuffer.data(t1off + 100 * idx + 66);
+
+            auto s_yyy_yyz = primBuffer.data(t1off + 100 * idx + 67);
+
+            auto s_yyy_yzz = primBuffer.data(t1off + 100 * idx + 68);
+
+            auto s_yyy_zzz = primBuffer.data(t1off + 100 * idx + 69);
+
+            auto s_yyz_xxx = primBuffer.data(t1off + 100 * idx + 70);
+
+            auto s_yyz_xxy = primBuffer.data(t1off + 100 * idx + 71);
+
+            auto s_yyz_xxz = primBuffer.data(t1off + 100 * idx + 72);
+
+            auto s_yyz_xyy = primBuffer.data(t1off + 100 * idx + 73);
+
+            auto s_yyz_xyz = primBuffer.data(t1off + 100 * idx + 74);
+
+            auto s_yyz_xzz = primBuffer.data(t1off + 100 * idx + 75);
+
+            auto s_yyz_yyy = primBuffer.data(t1off + 100 * idx + 76);
+
+            auto s_yyz_yyz = primBuffer.data(t1off + 100 * idx + 77);
+
+            auto s_yyz_yzz = primBuffer.data(t1off + 100 * idx + 78);
+
+            auto s_yyz_zzz = primBuffer.data(t1off + 100 * idx + 79);
+
+            auto s_yzz_xxx = primBuffer.data(t1off + 100 * idx + 80);
+
+            auto s_yzz_xxy = primBuffer.data(t1off + 100 * idx + 81);
+
+            auto s_yzz_xxz = primBuffer.data(t1off + 100 * idx + 82);
+
+            auto s_yzz_xyy = primBuffer.data(t1off + 100 * idx + 83);
+
+            auto s_yzz_xyz = primBuffer.data(t1off + 100 * idx + 84);
+
+            auto s_yzz_xzz = primBuffer.data(t1off + 100 * idx + 85);
+
+            auto s_yzz_yyy = primBuffer.data(t1off + 100 * idx + 86);
+
+            auto s_yzz_yyz = primBuffer.data(t1off + 100 * idx + 87);
+
+            auto s_yzz_yzz = primBuffer.data(t1off + 100 * idx + 88);
+
+            auto s_yzz_zzz = primBuffer.data(t1off + 100 * idx + 89);
+
+            auto s_zzz_xxx = primBuffer.data(t1off + 100 * idx + 90);
+
+            auto s_zzz_xxy = primBuffer.data(t1off + 100 * idx + 91);
+
+            auto s_zzz_xxz = primBuffer.data(t1off + 100 * idx + 92);
+
+            auto s_zzz_xyy = primBuffer.data(t1off + 100 * idx + 93);
+
+            auto s_zzz_xyz = primBuffer.data(t1off + 100 * idx + 94);
+
+            auto s_zzz_xzz = primBuffer.data(t1off + 100 * idx + 95);
+
+            auto s_zzz_yyy = primBuffer.data(t1off + 100 * idx + 96);
+
+            auto s_zzz_yyz = primBuffer.data(t1off + 100 * idx + 97);
+
+            auto s_zzz_yzz = primBuffer.data(t1off + 100 * idx + 98);
+
+            auto s_zzz_zzz = primBuffer.data(t1off + 100 * idx + 99);
+
+            // set up pointers to (G|F) integrals
+
+            auto s_xxxx_xxx = primBuffer.data(soff + 150 * idx);
+
+            auto s_xxxx_xxy = primBuffer.data(soff + 150 * idx + 1);
+
+            auto s_xxxx_xxz = primBuffer.data(soff + 150 * idx + 2);
+
+            auto s_xxxx_xyy = primBuffer.data(soff + 150 * idx + 3);
+
+            auto s_xxxx_xyz = primBuffer.data(soff + 150 * idx + 4);
+
+            auto s_xxxx_xzz = primBuffer.data(soff + 150 * idx + 5);
+
+            auto s_xxxx_yyy = primBuffer.data(soff + 150 * idx + 6);
+
+            auto s_xxxx_yyz = primBuffer.data(soff + 150 * idx + 7);
+
+            auto s_xxxx_yzz = primBuffer.data(soff + 150 * idx + 8);
+
+            auto s_xxxx_zzz = primBuffer.data(soff + 150 * idx + 9);
+
+            auto s_xxxy_xxx = primBuffer.data(soff + 150 * idx + 10);
+
+            auto s_xxxy_xxy = primBuffer.data(soff + 150 * idx + 11);
+
+            auto s_xxxy_xxz = primBuffer.data(soff + 150 * idx + 12);
+
+            auto s_xxxy_xyy = primBuffer.data(soff + 150 * idx + 13);
+
+            auto s_xxxy_xyz = primBuffer.data(soff + 150 * idx + 14);
+
+            auto s_xxxy_xzz = primBuffer.data(soff + 150 * idx + 15);
+
+            auto s_xxxy_yyy = primBuffer.data(soff + 150 * idx + 16);
+
+            auto s_xxxy_yyz = primBuffer.data(soff + 150 * idx + 17);
+
+            auto s_xxxy_yzz = primBuffer.data(soff + 150 * idx + 18);
+
+            auto s_xxxy_zzz = primBuffer.data(soff + 150 * idx + 19);
+
+            auto s_xxxz_xxx = primBuffer.data(soff + 150 * idx + 20);
+
+            auto s_xxxz_xxy = primBuffer.data(soff + 150 * idx + 21);
+
+            auto s_xxxz_xxz = primBuffer.data(soff + 150 * idx + 22);
+
+            auto s_xxxz_xyy = primBuffer.data(soff + 150 * idx + 23);
+
+            auto s_xxxz_xyz = primBuffer.data(soff + 150 * idx + 24);
+
+            auto s_xxxz_xzz = primBuffer.data(soff + 150 * idx + 25);
+
+            auto s_xxxz_yyy = primBuffer.data(soff + 150 * idx + 26);
+
+            auto s_xxxz_yyz = primBuffer.data(soff + 150 * idx + 27);
+
+            auto s_xxxz_yzz = primBuffer.data(soff + 150 * idx + 28);
+
+            auto s_xxxz_zzz = primBuffer.data(soff + 150 * idx + 29);
+
+            auto s_xxyy_xxx = primBuffer.data(soff + 150 * idx + 30);
+
+            auto s_xxyy_xxy = primBuffer.data(soff + 150 * idx + 31);
+
+            auto s_xxyy_xxz = primBuffer.data(soff + 150 * idx + 32);
+
+            auto s_xxyy_xyy = primBuffer.data(soff + 150 * idx + 33);
+
+            auto s_xxyy_xyz = primBuffer.data(soff + 150 * idx + 34);
+
+            auto s_xxyy_xzz = primBuffer.data(soff + 150 * idx + 35);
+
+            auto s_xxyy_yyy = primBuffer.data(soff + 150 * idx + 36);
+
+            auto s_xxyy_yyz = primBuffer.data(soff + 150 * idx + 37);
+
+            auto s_xxyy_yzz = primBuffer.data(soff + 150 * idx + 38);
+
+            auto s_xxyy_zzz = primBuffer.data(soff + 150 * idx + 39);
+
+            auto s_xxyz_xxx = primBuffer.data(soff + 150 * idx + 40);
+
+            auto s_xxyz_xxy = primBuffer.data(soff + 150 * idx + 41);
+
+            auto s_xxyz_xxz = primBuffer.data(soff + 150 * idx + 42);
+
+            auto s_xxyz_xyy = primBuffer.data(soff + 150 * idx + 43);
+
+            auto s_xxyz_xyz = primBuffer.data(soff + 150 * idx + 44);
+
+            auto s_xxyz_xzz = primBuffer.data(soff + 150 * idx + 45);
+
+            auto s_xxyz_yyy = primBuffer.data(soff + 150 * idx + 46);
+
+            auto s_xxyz_yyz = primBuffer.data(soff + 150 * idx + 47);
+
+            auto s_xxyz_yzz = primBuffer.data(soff + 150 * idx + 48);
+
+            auto s_xxyz_zzz = primBuffer.data(soff + 150 * idx + 49);
+
+            auto s_xxzz_xxx = primBuffer.data(soff + 150 * idx + 50);
+
+            auto s_xxzz_xxy = primBuffer.data(soff + 150 * idx + 51);
+
+            auto s_xxzz_xxz = primBuffer.data(soff + 150 * idx + 52);
+
+            auto s_xxzz_xyy = primBuffer.data(soff + 150 * idx + 53);
+
+            auto s_xxzz_xyz = primBuffer.data(soff + 150 * idx + 54);
+
+            auto s_xxzz_xzz = primBuffer.data(soff + 150 * idx + 55);
+
+            auto s_xxzz_yyy = primBuffer.data(soff + 150 * idx + 56);
+
+            auto s_xxzz_yyz = primBuffer.data(soff + 150 * idx + 57);
+
+            auto s_xxzz_yzz = primBuffer.data(soff + 150 * idx + 58);
+
+            auto s_xxzz_zzz = primBuffer.data(soff + 150 * idx + 59);
+
+            auto s_xyyy_xxx = primBuffer.data(soff + 150 * idx + 60);
+
+            auto s_xyyy_xxy = primBuffer.data(soff + 150 * idx + 61);
+
+            auto s_xyyy_xxz = primBuffer.data(soff + 150 * idx + 62);
+
+            auto s_xyyy_xyy = primBuffer.data(soff + 150 * idx + 63);
+
+            auto s_xyyy_xyz = primBuffer.data(soff + 150 * idx + 64);
+
+            auto s_xyyy_xzz = primBuffer.data(soff + 150 * idx + 65);
+
+            auto s_xyyy_yyy = primBuffer.data(soff + 150 * idx + 66);
+
+            auto s_xyyy_yyz = primBuffer.data(soff + 150 * idx + 67);
+
+            auto s_xyyy_yzz = primBuffer.data(soff + 150 * idx + 68);
+
+            auto s_xyyy_zzz = primBuffer.data(soff + 150 * idx + 69);
+
+            auto s_xyyz_xxx = primBuffer.data(soff + 150 * idx + 70);
+
+            auto s_xyyz_xxy = primBuffer.data(soff + 150 * idx + 71);
+
+            auto s_xyyz_xxz = primBuffer.data(soff + 150 * idx + 72);
+
+            auto s_xyyz_xyy = primBuffer.data(soff + 150 * idx + 73);
+
+            auto s_xyyz_xyz = primBuffer.data(soff + 150 * idx + 74);
+
+            auto s_xyyz_xzz = primBuffer.data(soff + 150 * idx + 75);
+
+            auto s_xyyz_yyy = primBuffer.data(soff + 150 * idx + 76);
+
+            auto s_xyyz_yyz = primBuffer.data(soff + 150 * idx + 77);
+
+            auto s_xyyz_yzz = primBuffer.data(soff + 150 * idx + 78);
+
+            auto s_xyyz_zzz = primBuffer.data(soff + 150 * idx + 79);
+
+            auto s_xyzz_xxx = primBuffer.data(soff + 150 * idx + 80);
+
+            auto s_xyzz_xxy = primBuffer.data(soff + 150 * idx + 81);
+
+            auto s_xyzz_xxz = primBuffer.data(soff + 150 * idx + 82);
+
+            auto s_xyzz_xyy = primBuffer.data(soff + 150 * idx + 83);
+
+            auto s_xyzz_xyz = primBuffer.data(soff + 150 * idx + 84);
+
+            auto s_xyzz_xzz = primBuffer.data(soff + 150 * idx + 85);
+
+            auto s_xyzz_yyy = primBuffer.data(soff + 150 * idx + 86);
+
+            auto s_xyzz_yyz = primBuffer.data(soff + 150 * idx + 87);
+
+            auto s_xyzz_yzz = primBuffer.data(soff + 150 * idx + 88);
+
+            auto s_xyzz_zzz = primBuffer.data(soff + 150 * idx + 89);
+
+            auto s_xzzz_xxx = primBuffer.data(soff + 150 * idx + 90);
+
+            auto s_xzzz_xxy = primBuffer.data(soff + 150 * idx + 91);
+
+            auto s_xzzz_xxz = primBuffer.data(soff + 150 * idx + 92);
+
+            auto s_xzzz_xyy = primBuffer.data(soff + 150 * idx + 93);
+
+            auto s_xzzz_xyz = primBuffer.data(soff + 150 * idx + 94);
+
+            auto s_xzzz_xzz = primBuffer.data(soff + 150 * idx + 95);
+
+            auto s_xzzz_yyy = primBuffer.data(soff + 150 * idx + 96);
+
+            auto s_xzzz_yyz = primBuffer.data(soff + 150 * idx + 97);
+
+            auto s_xzzz_yzz = primBuffer.data(soff + 150 * idx + 98);
+
+            auto s_xzzz_zzz = primBuffer.data(soff + 150 * idx + 99);
+
+            auto s_yyyy_xxx = primBuffer.data(soff + 150 * idx + 100);
+
+            auto s_yyyy_xxy = primBuffer.data(soff + 150 * idx + 101);
+
+            auto s_yyyy_xxz = primBuffer.data(soff + 150 * idx + 102);
+
+            auto s_yyyy_xyy = primBuffer.data(soff + 150 * idx + 103);
+
+            auto s_yyyy_xyz = primBuffer.data(soff + 150 * idx + 104);
+
+            auto s_yyyy_xzz = primBuffer.data(soff + 150 * idx + 105);
+
+            auto s_yyyy_yyy = primBuffer.data(soff + 150 * idx + 106);
+
+            auto s_yyyy_yyz = primBuffer.data(soff + 150 * idx + 107);
+
+            auto s_yyyy_yzz = primBuffer.data(soff + 150 * idx + 108);
+
+            auto s_yyyy_zzz = primBuffer.data(soff + 150 * idx + 109);
+
+            auto s_yyyz_xxx = primBuffer.data(soff + 150 * idx + 110);
+
+            auto s_yyyz_xxy = primBuffer.data(soff + 150 * idx + 111);
+
+            auto s_yyyz_xxz = primBuffer.data(soff + 150 * idx + 112);
+
+            auto s_yyyz_xyy = primBuffer.data(soff + 150 * idx + 113);
+
+            auto s_yyyz_xyz = primBuffer.data(soff + 150 * idx + 114);
+
+            auto s_yyyz_xzz = primBuffer.data(soff + 150 * idx + 115);
+
+            auto s_yyyz_yyy = primBuffer.data(soff + 150 * idx + 116);
+
+            auto s_yyyz_yyz = primBuffer.data(soff + 150 * idx + 117);
+
+            auto s_yyyz_yzz = primBuffer.data(soff + 150 * idx + 118);
+
+            auto s_yyyz_zzz = primBuffer.data(soff + 150 * idx + 119);
+
+            auto s_yyzz_xxx = primBuffer.data(soff + 150 * idx + 120);
+
+            auto s_yyzz_xxy = primBuffer.data(soff + 150 * idx + 121);
+
+            auto s_yyzz_xxz = primBuffer.data(soff + 150 * idx + 122);
+
+            auto s_yyzz_xyy = primBuffer.data(soff + 150 * idx + 123);
+
+            auto s_yyzz_xyz = primBuffer.data(soff + 150 * idx + 124);
+
+            auto s_yyzz_xzz = primBuffer.data(soff + 150 * idx + 125);
+
+            auto s_yyzz_yyy = primBuffer.data(soff + 150 * idx + 126);
+
+            auto s_yyzz_yyz = primBuffer.data(soff + 150 * idx + 127);
+
+            auto s_yyzz_yzz = primBuffer.data(soff + 150 * idx + 128);
+
+            auto s_yyzz_zzz = primBuffer.data(soff + 150 * idx + 129);
+
+            auto s_yzzz_xxx = primBuffer.data(soff + 150 * idx + 130);
+
+            auto s_yzzz_xxy = primBuffer.data(soff + 150 * idx + 131);
+
+            auto s_yzzz_xxz = primBuffer.data(soff + 150 * idx + 132);
+
+            auto s_yzzz_xyy = primBuffer.data(soff + 150 * idx + 133);
+
+            auto s_yzzz_xyz = primBuffer.data(soff + 150 * idx + 134);
+
+            auto s_yzzz_xzz = primBuffer.data(soff + 150 * idx + 135);
+
+            auto s_yzzz_yyy = primBuffer.data(soff + 150 * idx + 136);
+
+            auto s_yzzz_yyz = primBuffer.data(soff + 150 * idx + 137);
+
+            auto s_yzzz_yzz = primBuffer.data(soff + 150 * idx + 138);
+
+            auto s_yzzz_zzz = primBuffer.data(soff + 150 * idx + 139);
+
+            auto s_zzzz_xxx = primBuffer.data(soff + 150 * idx + 140);
+
+            auto s_zzzz_xxy = primBuffer.data(soff + 150 * idx + 141);
+
+            auto s_zzzz_xxz = primBuffer.data(soff + 150 * idx + 142);
+
+            auto s_zzzz_xyy = primBuffer.data(soff + 150 * idx + 143);
+
+            auto s_zzzz_xyz = primBuffer.data(soff + 150 * idx + 144);
+
+            auto s_zzzz_xzz = primBuffer.data(soff + 150 * idx + 145);
+
+            auto s_zzzz_yyy = primBuffer.data(soff + 150 * idx + 146);
+
+            auto s_zzzz_yyz = primBuffer.data(soff + 150 * idx + 147);
+
+            auto s_zzzz_yzz = primBuffer.data(soff + 150 * idx + 148);
+
+            auto s_zzzz_zzz = primBuffer.data(soff + 150 * idx + 149);
+
+            #pragma omp simd aligned(fx, pax, pay, paz, s_xxx_xx, s_xxx_xy, s_xxx_xz,\
+                                     s_xxx_yy, s_xxx_yz, s_xxx_zz, s_xxy_xx, s_xxy_xy,\
+                                     s_xxy_xz, s_xxy_yy, s_xxy_yz, s_xxy_zz, s_xxz_xx,\
+                                     s_xxz_xy, s_xxz_xz, s_xxz_yy, s_xxz_yz, s_xxz_zz,\
+                                     s_xyy_xx, s_xyy_xy, s_xyy_xz, s_xyy_yy, s_xyy_yz,\
+                                     s_xyy_zz, s_xyz_xx, s_xyz_xy, s_xyz_xz, s_xyz_yy,\
+                                     s_xyz_yz, s_xyz_zz, s_xzz_xx, s_xzz_xy, s_xzz_xz,\
+                                     s_xzz_yy, s_xzz_yz, s_xzz_zz, s_yyy_xx, s_yyy_xy,\
+                                     s_yyy_xz, s_yyy_yy, s_yyy_yz, s_yyy_zz, s_yyz_xx,\
+                                     s_yyz_xy, s_yyz_xz, s_yyz_yy, s_yyz_yz, s_yyz_zz,\
+                                     s_yzz_xx, s_yzz_xy, s_yzz_xz, s_yzz_yy, s_yzz_yz,\
+                                     s_yzz_zz, s_zzz_xx, s_zzz_xy, s_zzz_xz, s_zzz_yy,\
+                                     s_zzz_yz, s_zzz_zz, s_xx_xxx, s_xx_xxy, s_xx_xxz,\
+                                     s_xx_xyy, s_xx_xyz, s_xx_xzz, s_xx_yyy, s_xx_yyz,\
+                                     s_xx_yzz, s_xx_zzz, s_xy_xxx, s_xy_xxy, s_xy_xxz,\
+                                     s_xy_xyy, s_xy_xyz, s_xy_xzz, s_xy_yyy, s_xy_yyz,\
+                                     s_xy_yzz, s_xy_zzz, s_xz_xxx, s_xz_xxy, s_xz_xxz,\
+                                     s_xz_xyy, s_xz_xyz, s_xz_xzz, s_xz_yyy, s_xz_yyz,\
+                                     s_xz_yzz, s_xz_zzz, s_yy_xxx, s_yy_xxy, s_yy_xxz,\
+                                     s_yy_xyy, s_yy_xyz, s_yy_xzz, s_yy_yyy, s_yy_yyz,\
+                                     s_yy_yzz, s_yy_zzz, s_yz_xxx, s_yz_xxy, s_yz_xxz,\
+                                     s_yz_xyy, s_yz_xyz, s_yz_xzz, s_yz_yyy, s_yz_yyz,\
+                                     s_yz_yzz, s_yz_zzz, s_zz_xxx, s_zz_xxy, s_zz_xxz,\
+                                     s_zz_xyy, s_zz_xyz, s_zz_xzz, s_zz_yyy, s_zz_yyz,\
+                                     s_zz_yzz, s_zz_zzz, s_xxx_xxx, s_xxx_xxy,\
+                                     s_xxx_xxz, s_xxx_xyy, s_xxx_xyz, s_xxx_xzz,\
+                                     s_xxx_yyy, s_xxx_yyz, s_xxx_yzz, s_xxx_zzz,\
+                                     s_xxy_xxx, s_xxy_xxy, s_xxy_xxz, s_xxy_xyy,\
+                                     s_xxy_xyz, s_xxy_xzz, s_xxy_yyy, s_xxy_yyz,\
+                                     s_xxy_yzz, s_xxy_zzz, s_xxz_xxx, s_xxz_xxy,\
+                                     s_xxz_xxz, s_xxz_xyy, s_xxz_xyz, s_xxz_xzz,\
+                                     s_xxz_yyy, s_xxz_yyz, s_xxz_yzz, s_xxz_zzz,\
+                                     s_xyy_xxx, s_xyy_xxy, s_xyy_xxz, s_xyy_xyy,\
+                                     s_xyy_xyz, s_xyy_xzz, s_xyy_yyy, s_xyy_yyz,\
+                                     s_xyy_yzz, s_xyy_zzz, s_xyz_xxx, s_xyz_xxy,\
+                                     s_xyz_xxz, s_xyz_xyy, s_xyz_xyz, s_xyz_xzz,\
+                                     s_xyz_yyy, s_xyz_yyz, s_xyz_yzz, s_xyz_zzz,\
+                                     s_xzz_xxx, s_xzz_xxy, s_xzz_xxz, s_xzz_xyy,\
+                                     s_xzz_xyz, s_xzz_xzz, s_xzz_yyy, s_xzz_yyz,\
+                                     s_xzz_yzz, s_xzz_zzz, s_yyy_xxx, s_yyy_xxy,\
+                                     s_yyy_xxz, s_yyy_xyy, s_yyy_xyz, s_yyy_xzz,\
+                                     s_yyy_yyy, s_yyy_yyz, s_yyy_yzz, s_yyy_zzz,\
+                                     s_yyz_xxx, s_yyz_xxy, s_yyz_xxz, s_yyz_xyy,\
+                                     s_yyz_xyz, s_yyz_xzz, s_yyz_yyy, s_yyz_yyz,\
+                                     s_yyz_yzz, s_yyz_zzz, s_yzz_xxx, s_yzz_xxy,\
+                                     s_yzz_xxz, s_yzz_xyy, s_yzz_xyz, s_yzz_xzz,\
+                                     s_yzz_yyy, s_yzz_yyz, s_yzz_yzz, s_yzz_zzz,\
+                                     s_zzz_xxx, s_zzz_xxy, s_zzz_xxz, s_zzz_xyy,\
+                                     s_zzz_xyz, s_zzz_xzz, s_zzz_yyy, s_zzz_yyz,\
+                                     s_zzz_yzz, s_zzz_zzz, s_xxxx_xxx, s_xxxx_xxy,\
+                                     s_xxxx_xxz, s_xxxx_xyy, s_xxxx_xyz, s_xxxx_xzz,\
+                                     s_xxxx_yyy, s_xxxx_yyz, s_xxxx_yzz, s_xxxx_zzz,\
+                                     s_xxxy_xxx, s_xxxy_xxy, s_xxxy_xxz, s_xxxy_xyy,\
+                                     s_xxxy_xyz, s_xxxy_xzz, s_xxxy_yyy, s_xxxy_yyz,\
+                                     s_xxxy_yzz, s_xxxy_zzz, s_xxxz_xxx, s_xxxz_xxy,\
+                                     s_xxxz_xxz, s_xxxz_xyy, s_xxxz_xyz, s_xxxz_xzz,\
+                                     s_xxxz_yyy, s_xxxz_yyz, s_xxxz_yzz, s_xxxz_zzz,\
+                                     s_xxyy_xxx, s_xxyy_xxy, s_xxyy_xxz, s_xxyy_xyy,\
+                                     s_xxyy_xyz, s_xxyy_xzz, s_xxyy_yyy, s_xxyy_yyz,\
+                                     s_xxyy_yzz, s_xxyy_zzz, s_xxyz_xxx, s_xxyz_xxy,\
+                                     s_xxyz_xxz, s_xxyz_xyy, s_xxyz_xyz, s_xxyz_xzz,\
+                                     s_xxyz_yyy, s_xxyz_yyz, s_xxyz_yzz, s_xxyz_zzz,\
+                                     s_xxzz_xxx, s_xxzz_xxy, s_xxzz_xxz, s_xxzz_xyy,\
+                                     s_xxzz_xyz, s_xxzz_xzz, s_xxzz_yyy, s_xxzz_yyz,\
+                                     s_xxzz_yzz, s_xxzz_zzz, s_xyyy_xxx, s_xyyy_xxy,\
+                                     s_xyyy_xxz, s_xyyy_xyy, s_xyyy_xyz, s_xyyy_xzz,\
+                                     s_xyyy_yyy, s_xyyy_yyz, s_xyyy_yzz, s_xyyy_zzz,\
+                                     s_xyyz_xxx, s_xyyz_xxy, s_xyyz_xxz, s_xyyz_xyy,\
+                                     s_xyyz_xyz, s_xyyz_xzz, s_xyyz_yyy, s_xyyz_yyz,\
+                                     s_xyyz_yzz, s_xyyz_zzz, s_xyzz_xxx, s_xyzz_xxy,\
+                                     s_xyzz_xxz, s_xyzz_xyy, s_xyzz_xyz, s_xyzz_xzz,\
+                                     s_xyzz_yyy, s_xyzz_yyz, s_xyzz_yzz, s_xyzz_zzz,\
+                                     s_xzzz_xxx, s_xzzz_xxy, s_xzzz_xxz, s_xzzz_xyy,\
+                                     s_xzzz_xyz, s_xzzz_xzz, s_xzzz_yyy, s_xzzz_yyz,\
+                                     s_xzzz_yzz, s_xzzz_zzz, s_yyyy_xxx, s_yyyy_xxy,\
+                                     s_yyyy_xxz, s_yyyy_xyy, s_yyyy_xyz, s_yyyy_xzz,\
+                                     s_yyyy_yyy, s_yyyy_yyz, s_yyyy_yzz, s_yyyy_zzz,\
+                                     s_yyyz_xxx, s_yyyz_xxy, s_yyyz_xxz, s_yyyz_xyy,\
+                                     s_yyyz_xyz, s_yyyz_xzz, s_yyyz_yyy, s_yyyz_yyz,\
+                                     s_yyyz_yzz, s_yyyz_zzz, s_yyzz_xxx, s_yyzz_xxy,\
+                                     s_yyzz_xxz, s_yyzz_xyy, s_yyzz_xyz, s_yyzz_xzz,\
+                                     s_yyzz_yyy, s_yyzz_yyz, s_yyzz_yzz, s_yyzz_zzz,\
+                                     s_yzzz_xxx, s_yzzz_xxy, s_yzzz_xxz, s_yzzz_xyy,\
+                                     s_yzzz_xyz, s_yzzz_xzz, s_yzzz_yyy, s_yzzz_yyz,\
+                                     s_yzzz_yzz, s_yzzz_zzz, s_zzzz_xxx, s_zzzz_xxy,\
+                                     s_zzzz_xxz, s_zzzz_xyy, s_zzzz_xyz, s_zzzz_xzz,\
+                                     s_zzzz_yyy, s_zzzz_yyz, s_zzzz_yzz, s_zzzz_zzz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                // scaled prefactor
+
+                double f2t = 0.50 * fx[j];
+
+                // leading x component
+
+                double fr = pax[j];
+
+                s_xxxx_xxx[j] = fr * s_xxx_xxx[j] + f2t * (3.0 * s_xx_xxx[j] + 3.0 * s_xxx_xx[j]);
+
+                s_xxxx_xxy[j] = fr * s_xxx_xxy[j] + f2t * (3.0 * s_xx_xxy[j] + 2.0 * s_xxx_xy[j]);
+
+                s_xxxx_xxz[j] = fr * s_xxx_xxz[j] + f2t * (3.0 * s_xx_xxz[j] + 2.0 * s_xxx_xz[j]);
+
+                s_xxxx_xyy[j] = fr * s_xxx_xyy[j] + f2t * (3.0 * s_xx_xyy[j] + s_xxx_yy[j]);
+
+                s_xxxx_xyz[j] = fr * s_xxx_xyz[j] + f2t * (3.0 * s_xx_xyz[j] + s_xxx_yz[j]);
+
+                s_xxxx_xzz[j] = fr * s_xxx_xzz[j] + f2t * (3.0 * s_xx_xzz[j] + s_xxx_zz[j]);
+
+                s_xxxx_yyy[j] = fr * s_xxx_yyy[j] + f2t * 3.0 * s_xx_yyy[j];
+
+                s_xxxx_yyz[j] = fr * s_xxx_yyz[j] + f2t * 3.0 * s_xx_yyz[j];
+
+                s_xxxx_yzz[j] = fr * s_xxx_yzz[j] + f2t * 3.0 * s_xx_yzz[j];
+
+                s_xxxx_zzz[j] = fr * s_xxx_zzz[j] + f2t * 3.0 * s_xx_zzz[j];
+
+                s_xxxy_xxx[j] = fr * s_xxy_xxx[j] + f2t * (2.0 * s_xy_xxx[j] + 3.0 * s_xxy_xx[j]);
+
+                s_xxxy_xxy[j] = fr * s_xxy_xxy[j] + f2t * (2.0 * s_xy_xxy[j] + 2.0 * s_xxy_xy[j]);
+
+                s_xxxy_xxz[j] = fr * s_xxy_xxz[j] + f2t * (2.0 * s_xy_xxz[j] + 2.0 * s_xxy_xz[j]);
+
+                s_xxxy_xyy[j] = fr * s_xxy_xyy[j] + f2t * (2.0 * s_xy_xyy[j] + s_xxy_yy[j]);
+
+                s_xxxy_xyz[j] = fr * s_xxy_xyz[j] + f2t * (2.0 * s_xy_xyz[j] + s_xxy_yz[j]);
+
+                s_xxxy_xzz[j] = fr * s_xxy_xzz[j] + f2t * (2.0 * s_xy_xzz[j] + s_xxy_zz[j]);
+
+                s_xxxy_yyy[j] = fr * s_xxy_yyy[j] + f2t * 2.0 * s_xy_yyy[j];
+
+                s_xxxy_yyz[j] = fr * s_xxy_yyz[j] + f2t * 2.0 * s_xy_yyz[j];
+
+                s_xxxy_yzz[j] = fr * s_xxy_yzz[j] + f2t * 2.0 * s_xy_yzz[j];
+
+                s_xxxy_zzz[j] = fr * s_xxy_zzz[j] + f2t * 2.0 * s_xy_zzz[j];
+
+                s_xxxz_xxx[j] = fr * s_xxz_xxx[j] + f2t * (2.0 * s_xz_xxx[j] + 3.0 * s_xxz_xx[j]);
+
+                s_xxxz_xxy[j] = fr * s_xxz_xxy[j] + f2t * (2.0 * s_xz_xxy[j] + 2.0 * s_xxz_xy[j]);
+
+                s_xxxz_xxz[j] = fr * s_xxz_xxz[j] + f2t * (2.0 * s_xz_xxz[j] + 2.0 * s_xxz_xz[j]);
+
+                s_xxxz_xyy[j] = fr * s_xxz_xyy[j] + f2t * (2.0 * s_xz_xyy[j] + s_xxz_yy[j]);
+
+                s_xxxz_xyz[j] = fr * s_xxz_xyz[j] + f2t * (2.0 * s_xz_xyz[j] + s_xxz_yz[j]);
+
+                s_xxxz_xzz[j] = fr * s_xxz_xzz[j] + f2t * (2.0 * s_xz_xzz[j] + s_xxz_zz[j]);
+
+                s_xxxz_yyy[j] = fr * s_xxz_yyy[j] + f2t * 2.0 * s_xz_yyy[j];
+
+                s_xxxz_yyz[j] = fr * s_xxz_yyz[j] + f2t * 2.0 * s_xz_yyz[j];
+
+                s_xxxz_yzz[j] = fr * s_xxz_yzz[j] + f2t * 2.0 * s_xz_yzz[j];
+
+                s_xxxz_zzz[j] = fr * s_xxz_zzz[j] + f2t * 2.0 * s_xz_zzz[j];
+
+                s_xxyy_xxx[j] = fr * s_xyy_xxx[j] + f2t * (s_yy_xxx[j] + 3.0 * s_xyy_xx[j]);
+
+                s_xxyy_xxy[j] = fr * s_xyy_xxy[j] + f2t * (s_yy_xxy[j] + 2.0 * s_xyy_xy[j]);
+
+                s_xxyy_xxz[j] = fr * s_xyy_xxz[j] + f2t * (s_yy_xxz[j] + 2.0 * s_xyy_xz[j]);
+
+                s_xxyy_xyy[j] = fr * s_xyy_xyy[j] + f2t * (s_yy_xyy[j] + s_xyy_yy[j]);
+
+                s_xxyy_xyz[j] = fr * s_xyy_xyz[j] + f2t * (s_yy_xyz[j] + s_xyy_yz[j]);
+
+                s_xxyy_xzz[j] = fr * s_xyy_xzz[j] + f2t * (s_yy_xzz[j] + s_xyy_zz[j]);
+
+                s_xxyy_yyy[j] = fr * s_xyy_yyy[j] + f2t * s_yy_yyy[j];
+
+                s_xxyy_yyz[j] = fr * s_xyy_yyz[j] + f2t * s_yy_yyz[j];
+
+                s_xxyy_yzz[j] = fr * s_xyy_yzz[j] + f2t * s_yy_yzz[j];
+
+                s_xxyy_zzz[j] = fr * s_xyy_zzz[j] + f2t * s_yy_zzz[j];
+
+                s_xxyz_xxx[j] = fr * s_xyz_xxx[j] + f2t * (s_yz_xxx[j] + 3.0 * s_xyz_xx[j]);
+
+                s_xxyz_xxy[j] = fr * s_xyz_xxy[j] + f2t * (s_yz_xxy[j] + 2.0 * s_xyz_xy[j]);
+
+                s_xxyz_xxz[j] = fr * s_xyz_xxz[j] + f2t * (s_yz_xxz[j] + 2.0 * s_xyz_xz[j]);
+
+                s_xxyz_xyy[j] = fr * s_xyz_xyy[j] + f2t * (s_yz_xyy[j] + s_xyz_yy[j]);
+
+                s_xxyz_xyz[j] = fr * s_xyz_xyz[j] + f2t * (s_yz_xyz[j] + s_xyz_yz[j]);
+
+                s_xxyz_xzz[j] = fr * s_xyz_xzz[j] + f2t * (s_yz_xzz[j] + s_xyz_zz[j]);
+
+                s_xxyz_yyy[j] = fr * s_xyz_yyy[j] + f2t * s_yz_yyy[j];
+
+                s_xxyz_yyz[j] = fr * s_xyz_yyz[j] + f2t * s_yz_yyz[j];
+
+                s_xxyz_yzz[j] = fr * s_xyz_yzz[j] + f2t * s_yz_yzz[j];
+
+                s_xxyz_zzz[j] = fr * s_xyz_zzz[j] + f2t * s_yz_zzz[j];
+
+                s_xxzz_xxx[j] = fr * s_xzz_xxx[j] + f2t * (s_zz_xxx[j] + 3.0 * s_xzz_xx[j]);
+
+                s_xxzz_xxy[j] = fr * s_xzz_xxy[j] + f2t * (s_zz_xxy[j] + 2.0 * s_xzz_xy[j]);
+
+                s_xxzz_xxz[j] = fr * s_xzz_xxz[j] + f2t * (s_zz_xxz[j] + 2.0 * s_xzz_xz[j]);
+
+                s_xxzz_xyy[j] = fr * s_xzz_xyy[j] + f2t * (s_zz_xyy[j] + s_xzz_yy[j]);
+
+                s_xxzz_xyz[j] = fr * s_xzz_xyz[j] + f2t * (s_zz_xyz[j] + s_xzz_yz[j]);
+
+                s_xxzz_xzz[j] = fr * s_xzz_xzz[j] + f2t * (s_zz_xzz[j] + s_xzz_zz[j]);
+
+                s_xxzz_yyy[j] = fr * s_xzz_yyy[j] + f2t * s_zz_yyy[j];
+
+                s_xxzz_yyz[j] = fr * s_xzz_yyz[j] + f2t * s_zz_yyz[j];
+
+                s_xxzz_yzz[j] = fr * s_xzz_yzz[j] + f2t * s_zz_yzz[j];
+
+                s_xxzz_zzz[j] = fr * s_xzz_zzz[j] + f2t * s_zz_zzz[j];
+
+                s_xyyy_xxx[j] = fr * s_yyy_xxx[j] + f2t * 3.0 * s_yyy_xx[j];
+
+                s_xyyy_xxy[j] = fr * s_yyy_xxy[j] + f2t * 2.0 * s_yyy_xy[j];
+
+                s_xyyy_xxz[j] = fr * s_yyy_xxz[j] + f2t * 2.0 * s_yyy_xz[j];
+
+                s_xyyy_xyy[j] = fr * s_yyy_xyy[j] + f2t * s_yyy_yy[j];
+
+                s_xyyy_xyz[j] = fr * s_yyy_xyz[j] + f2t * s_yyy_yz[j];
+
+                s_xyyy_xzz[j] = fr * s_yyy_xzz[j] + f2t * s_yyy_zz[j];
+
+                s_xyyy_yyy[j] = fr * s_yyy_yyy[j];
+
+                s_xyyy_yyz[j] = fr * s_yyy_yyz[j];
+
+                s_xyyy_yzz[j] = fr * s_yyy_yzz[j];
+
+                s_xyyy_zzz[j] = fr * s_yyy_zzz[j];
+
+                s_xyyz_xxx[j] = fr * s_yyz_xxx[j] + f2t * 3.0 * s_yyz_xx[j];
+
+                s_xyyz_xxy[j] = fr * s_yyz_xxy[j] + f2t * 2.0 * s_yyz_xy[j];
+
+                s_xyyz_xxz[j] = fr * s_yyz_xxz[j] + f2t * 2.0 * s_yyz_xz[j];
+
+                s_xyyz_xyy[j] = fr * s_yyz_xyy[j] + f2t * s_yyz_yy[j];
+
+                s_xyyz_xyz[j] = fr * s_yyz_xyz[j] + f2t * s_yyz_yz[j];
+
+                s_xyyz_xzz[j] = fr * s_yyz_xzz[j] + f2t * s_yyz_zz[j];
+
+                s_xyyz_yyy[j] = fr * s_yyz_yyy[j];
+
+                s_xyyz_yyz[j] = fr * s_yyz_yyz[j];
+
+                s_xyyz_yzz[j] = fr * s_yyz_yzz[j];
+
+                s_xyyz_zzz[j] = fr * s_yyz_zzz[j];
+
+                s_xyzz_xxx[j] = fr * s_yzz_xxx[j] + f2t * 3.0 * s_yzz_xx[j];
+
+                s_xyzz_xxy[j] = fr * s_yzz_xxy[j] + f2t * 2.0 * s_yzz_xy[j];
+
+                s_xyzz_xxz[j] = fr * s_yzz_xxz[j] + f2t * 2.0 * s_yzz_xz[j];
+
+                s_xyzz_xyy[j] = fr * s_yzz_xyy[j] + f2t * s_yzz_yy[j];
+
+                s_xyzz_xyz[j] = fr * s_yzz_xyz[j] + f2t * s_yzz_yz[j];
+
+                s_xyzz_xzz[j] = fr * s_yzz_xzz[j] + f2t * s_yzz_zz[j];
+
+                s_xyzz_yyy[j] = fr * s_yzz_yyy[j];
+
+                s_xyzz_yyz[j] = fr * s_yzz_yyz[j];
+
+                s_xyzz_yzz[j] = fr * s_yzz_yzz[j];
+
+                s_xyzz_zzz[j] = fr * s_yzz_zzz[j];
+
+                s_xzzz_xxx[j] = fr * s_zzz_xxx[j] + f2t * 3.0 * s_zzz_xx[j];
+
+                s_xzzz_xxy[j] = fr * s_zzz_xxy[j] + f2t * 2.0 * s_zzz_xy[j];
+
+                s_xzzz_xxz[j] = fr * s_zzz_xxz[j] + f2t * 2.0 * s_zzz_xz[j];
+
+                s_xzzz_xyy[j] = fr * s_zzz_xyy[j] + f2t * s_zzz_yy[j];
+
+                s_xzzz_xyz[j] = fr * s_zzz_xyz[j] + f2t * s_zzz_yz[j];
+
+                s_xzzz_xzz[j] = fr * s_zzz_xzz[j] + f2t * s_zzz_zz[j];
+
+                s_xzzz_yyy[j] = fr * s_zzz_yyy[j];
+
+                s_xzzz_yyz[j] = fr * s_zzz_yyz[j];
+
+                s_xzzz_yzz[j] = fr * s_zzz_yzz[j];
+
+                s_xzzz_zzz[j] = fr * s_zzz_zzz[j];
+
+                // leading y component
+
+                fr = pay[j];
+
+                s_yyyy_xxx[j] = fr * s_yyy_xxx[j] + f2t * 3.0 * s_yy_xxx[j];
+
+                s_yyyy_xxy[j] = fr * s_yyy_xxy[j] + f2t * (3.0 * s_yy_xxy[j] + s_yyy_xx[j]);
+
+                s_yyyy_xxz[j] = fr * s_yyy_xxz[j] + f2t * 3.0 * s_yy_xxz[j];
+
+                s_yyyy_xyy[j] = fr * s_yyy_xyy[j] + f2t * (3.0 * s_yy_xyy[j] + 2.0 * s_yyy_xy[j]);
+
+                s_yyyy_xyz[j] = fr * s_yyy_xyz[j] + f2t * (3.0 * s_yy_xyz[j] + s_yyy_xz[j]);
+
+                s_yyyy_xzz[j] = fr * s_yyy_xzz[j] + f2t * 3.0 * s_yy_xzz[j];
+
+                s_yyyy_yyy[j] = fr * s_yyy_yyy[j] + f2t * (3.0 * s_yy_yyy[j] + 3.0 * s_yyy_yy[j]);
+
+                s_yyyy_yyz[j] = fr * s_yyy_yyz[j] + f2t * (3.0 * s_yy_yyz[j] + 2.0 * s_yyy_yz[j]);
+
+                s_yyyy_yzz[j] = fr * s_yyy_yzz[j] + f2t * (3.0 * s_yy_yzz[j] + s_yyy_zz[j]);
+
+                s_yyyy_zzz[j] = fr * s_yyy_zzz[j] + f2t * 3.0 * s_yy_zzz[j];
+
+                s_yyyz_xxx[j] = fr * s_yyz_xxx[j] + f2t * 2.0 * s_yz_xxx[j];
+
+                s_yyyz_xxy[j] = fr * s_yyz_xxy[j] + f2t * (2.0 * s_yz_xxy[j] + s_yyz_xx[j]);
+
+                s_yyyz_xxz[j] = fr * s_yyz_xxz[j] + f2t * 2.0 * s_yz_xxz[j];
+
+                s_yyyz_xyy[j] = fr * s_yyz_xyy[j] + f2t * (2.0 * s_yz_xyy[j] + 2.0 * s_yyz_xy[j]);
+
+                s_yyyz_xyz[j] = fr * s_yyz_xyz[j] + f2t * (2.0 * s_yz_xyz[j] + s_yyz_xz[j]);
+
+                s_yyyz_xzz[j] = fr * s_yyz_xzz[j] + f2t * 2.0 * s_yz_xzz[j];
+
+                s_yyyz_yyy[j] = fr * s_yyz_yyy[j] + f2t * (2.0 * s_yz_yyy[j] + 3.0 * s_yyz_yy[j]);
+
+                s_yyyz_yyz[j] = fr * s_yyz_yyz[j] + f2t * (2.0 * s_yz_yyz[j] + 2.0 * s_yyz_yz[j]);
+
+                s_yyyz_yzz[j] = fr * s_yyz_yzz[j] + f2t * (2.0 * s_yz_yzz[j] + s_yyz_zz[j]);
+
+                s_yyyz_zzz[j] = fr * s_yyz_zzz[j] + f2t * 2.0 * s_yz_zzz[j];
+
+                s_yyzz_xxx[j] = fr * s_yzz_xxx[j] + f2t * s_zz_xxx[j];
+
+                s_yyzz_xxy[j] = fr * s_yzz_xxy[j] + f2t * (s_zz_xxy[j] + s_yzz_xx[j]);
+
+                s_yyzz_xxz[j] = fr * s_yzz_xxz[j] + f2t * s_zz_xxz[j];
+
+                s_yyzz_xyy[j] = fr * s_yzz_xyy[j] + f2t * (s_zz_xyy[j] + 2.0 * s_yzz_xy[j]);
+
+                s_yyzz_xyz[j] = fr * s_yzz_xyz[j] + f2t * (s_zz_xyz[j] + s_yzz_xz[j]);
+
+                s_yyzz_xzz[j] = fr * s_yzz_xzz[j] + f2t * s_zz_xzz[j];
+
+                s_yyzz_yyy[j] = fr * s_yzz_yyy[j] + f2t * (s_zz_yyy[j] + 3.0 * s_yzz_yy[j]);
+
+                s_yyzz_yyz[j] = fr * s_yzz_yyz[j] + f2t * (s_zz_yyz[j] + 2.0 * s_yzz_yz[j]);
+
+                s_yyzz_yzz[j] = fr * s_yzz_yzz[j] + f2t * (s_zz_yzz[j] + s_yzz_zz[j]);
+
+                s_yyzz_zzz[j] = fr * s_yzz_zzz[j] + f2t * s_zz_zzz[j];
+
+                s_yzzz_xxx[j] = fr * s_zzz_xxx[j];
+
+                s_yzzz_xxy[j] = fr * s_zzz_xxy[j] + f2t * s_zzz_xx[j];
+
+                s_yzzz_xxz[j] = fr * s_zzz_xxz[j];
+
+                s_yzzz_xyy[j] = fr * s_zzz_xyy[j] + f2t * 2.0 * s_zzz_xy[j];
+
+                s_yzzz_xyz[j] = fr * s_zzz_xyz[j] + f2t * s_zzz_xz[j];
+
+                s_yzzz_xzz[j] = fr * s_zzz_xzz[j];
+
+                s_yzzz_yyy[j] = fr * s_zzz_yyy[j] + f2t * 3.0 * s_zzz_yy[j];
+
+                s_yzzz_yyz[j] = fr * s_zzz_yyz[j] + f2t * 2.0 * s_zzz_yz[j];
+
+                s_yzzz_yzz[j] = fr * s_zzz_yzz[j] + f2t * s_zzz_zz[j];
+
+                s_yzzz_zzz[j] = fr * s_zzz_zzz[j];
+
+                // leading z component
+
+                fr = paz[j];
+                
+                s_zzzz_xxx[j] = fr * s_zzz_xxx[j] + f2t * 3.0 * s_zz_xxx[j];
+
+                s_zzzz_xxy[j] = fr * s_zzz_xxy[j] + f2t * 3.0 * s_zz_xxy[j];
+
+                s_zzzz_xxz[j] = fr * s_zzz_xxz[j] + f2t * (3.0 * s_zz_xxz[j] + s_zzz_xx[j]);
+
+                s_zzzz_xyy[j] = fr * s_zzz_xyy[j] + f2t * 3.0 * s_zz_xyy[j];
+
+                s_zzzz_xyz[j] = fr * s_zzz_xyz[j] + f2t * (3.0 * s_zz_xyz[j] + s_zzz_xy[j]);
+
+                s_zzzz_xzz[j] = fr * s_zzz_xzz[j] + f2t * (3.0 * s_zz_xzz[j] + 2.0 * s_zzz_xz[j]);
+
+                s_zzzz_yyy[j] = fr * s_zzz_yyy[j] + f2t * 3.0 * s_zz_yyy[j];
+
+                s_zzzz_yyz[j] = fr * s_zzz_yyz[j] + f2t * (3.0 * s_zz_yyz[j] + s_zzz_yy[j]);
+
+                s_zzzz_yzz[j] = fr * s_zzz_yzz[j] + f2t * (3.0 * s_zz_yzz[j] + 2.0 * s_zzz_yz[j]);
+
+                s_zzzz_zzz[j] = fr * s_zzz_zzz[j] + f2t * (3.0 * s_zz_zzz[j] + 3.0 * s_zzz_zz[j]);
+            }
+
+            idx++;
+        }
+    }
+
     void
     compOverlapForGG(      CMemBlock2D<double>&  primBuffer,
                      const CVecTwoIndexes&       recPattern,

@@ -165,8 +165,27 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                           const CGtoBlock&            ketGtoBlock,
                           const int32_t               iContrGto);
     
-    // FIX ME: d,p
-    
+    /**
+     Computes batch of primitive (D|P) overlap integrals and stores results in
+     primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForDP(      CMemBlock2D<double>&  primBuffer,
+                          const CVecTwoIndexes&       recPattern,
+                          const std::vector<int32_t>& recIndexes,
+                          const CMemBlock2D<double>&  osFactors,
+                          const CMemBlock2D<double>&  paDistances,
+                          const CGtoBlock&            braGtoBlock,
+                          const CGtoBlock&            ketGtoBlock,
+                          const int32_t               iContrGto);
     
     /**
      Computes batch of primitive (D|D) overlap integrals and stores results in
@@ -257,6 +276,28 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                           const int32_t               iContrGto);
     
     /**
+     Computes batch of primitive (F|P) overlap integrals and stores results in
+     primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForFP(      CMemBlock2D<double>&  primBuffer,
+                          const CVecTwoIndexes&       recPattern,
+                          const std::vector<int32_t>& recIndexes,
+                          const CMemBlock2D<double>&  osFactors,
+                          const CMemBlock2D<double>&  paDistances,
+                          const CGtoBlock&            braGtoBlock,
+                          const CGtoBlock&            ketGtoBlock,
+                          const int32_t               iContrGto);
+    
+    /**
      Computes batch of primitive (D|F) overlap integrals and stores results in
      primitives buffer.
      
@@ -270,6 +311,28 @@ namespace ovlrecfunc { // ovlrecfunc namespace
      @param iContrGto the index of contracted GTO on bra side.
      */
     void compOverlapForDF(      CMemBlock2D<double>&  primBuffer,
+                          const CVecTwoIndexes&       recPattern,
+                          const std::vector<int32_t>& recIndexes,
+                          const CMemBlock2D<double>&  osFactors,
+                          const CMemBlock2D<double>&  paDistances,
+                          const CGtoBlock&            braGtoBlock,
+                          const CGtoBlock&            ketGtoBlock,
+                          const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (F|D) overlap integrals and stores results in
+     primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForFD(      CMemBlock2D<double>&  primBuffer,
                           const CVecTwoIndexes&       recPattern,
                           const std::vector<int32_t>& recIndexes,
                           const CMemBlock2D<double>&  osFactors,
@@ -367,6 +430,28 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                           const int32_t               iContrGto);
     
     /**
+     Computes batch of primitive (G|P) overlap integrals and stores results in
+     primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForGP(      CMemBlock2D<double>&  primBuffer,
+                          const CVecTwoIndexes&       recPattern,
+                          const std::vector<int32_t>& recIndexes,
+                          const CMemBlock2D<double>&  osFactors,
+                          const CMemBlock2D<double>&  paDistances,
+                          const CGtoBlock&            braGtoBlock,
+                          const CGtoBlock&            ketGtoBlock,
+                          const int32_t               iContrGto);
+    
+    /**
      Computes batch of primitive (D|G) overlap integrals and stores results in
      primitives buffer.
      
@@ -389,6 +474,28 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                           const int32_t               iContrGto);
     
     /**
+     Computes batch of primitive (G|D) overlap integrals and stores results in
+     primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForGD(      CMemBlock2D<double>&  primBuffer,
+                          const CVecTwoIndexes&       recPattern,
+                          const std::vector<int32_t>& recIndexes,
+                          const CMemBlock2D<double>&  osFactors,
+                          const CMemBlock2D<double>&  paDistances,
+                          const CGtoBlock&            braGtoBlock,
+                          const CGtoBlock&            ketGtoBlock,
+                          const int32_t               iContrGto);
+    
+    /**
      Computes batch of primitive (F|G) overlap integrals and stores results in
      primitives buffer.
      
@@ -402,6 +509,28 @@ namespace ovlrecfunc { // ovlrecfunc namespace
      @param iContrGto the index of contracted GTO on bra side.
      */
     void compOverlapForFG(      CMemBlock2D<double>&  primBuffer,
+                          const CVecTwoIndexes&       recPattern,
+                          const std::vector<int32_t>& recIndexes,
+                          const CMemBlock2D<double>&  osFactors,
+                          const CMemBlock2D<double>&  paDistances,
+                          const CGtoBlock&            braGtoBlock,
+                          const CGtoBlock&            ketGtoBlock,
+                          const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (G|F) overlap integrals and stores results in
+     primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param paDistances the vector of distances R(PA) = P - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compOverlapForGF(      CMemBlock2D<double>&  primBuffer,
                           const CVecTwoIndexes&       recPattern,
                           const std::vector<int32_t>& recIndexes,
                           const CMemBlock2D<double>&  osFactors,
