@@ -166,6 +166,12 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
     
     auto ketgtos = ketGtoContainer->getGtoBlock(iKetGtoBlock);
     
+    // set up spherical angular momentum for bra and ket sides
+    
+    CSphericalMomentum bmom(bragtos.getAngularMomentum());
+    
+    CSphericalMomentum kmom(ketgtos.getAngularMomentum());
+    
     // allocate prefactors used in Obara-Saika recursion
     
     auto pdim = ketgtos.getNumberOfPrimGtos();
@@ -180,15 +186,15 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
     
     CMemBlock2D<double> rpb(pdim, 3 * pmax);
     
-    // allocate primitives buffer
-    
-    printf("\n*** Computing overlap integrals (%i|%i):\n",
-           bragtos.getAngularMomentum(),
-           ketgtos.getAngularMomentum());
-    
     // generate recursion pattern
     
     auto recvec = _getRecursionPattern(bragtos, ketgtos);
+    
+    // set up angular momentum data
+    
+    auto bang = bragtos.getAngularMomentum();
+    
+    auto kang = ketgtos.getAngularMomentum();
     
     // set up primitives buffer indexes
     
@@ -196,9 +202,31 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
     
     auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
     
-    // allocate primitives buffer
+    auto pidx = genfunc::findPairIndex(recidx, recvec, {bang, kang});
+    
+    // allocate primitives integrals buffer
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
+    
+    // allocate contracted Cartesian integrals buffer
+    
+    auto cdim = ketgtos.getNumberOfContrGtos();
+    
+    auto ncart = angmom::to_CartesianComponents(bang)
+    
+               * angmom::to_CartesianComponents(kang);
+    
+    CMemBlock2D<double> cartbuffer(cdim, ncart);
+    
+    // allocate contracted spherical integrals buffer
+    
+    auto nspher = angmom::to_SphericalComponents(bang)
+    
+                * angmom::to_SphericalComponents(kang);
+    
+    CMemBlock2D<double> spherbuffer(cdim, nspher);
+    
+    printf("\n*** Computing overlap integrals (%i|%i):\n", bang, kang);
 
     printf("Max GTOs: %i Rec. Blocks: %i x Pdim: %i\n", pmax, nblk, pdim);
     
@@ -207,7 +235,6 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
         printf("IDX = %zu VRR (%i|%i) Pos: %i\n", i, recvec[i].first(),
                recvec[i].second(), recidx[i]);
     }
-    
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -231,6 +258,18 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
         
         _compPrimOverlapInts(pbuffer, recvec, recidx, rfacts, rab, rpa, rpb,
                              bragtos, ketgtos, i);
+        
+        // contract primitive overlap integrals
+        
+        genfunc::contract(cartbuffer, pbuffer, pidx, bragtos, ketgtos, i);
+        
+        // transform Cartesian to spherical integrals
+        
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, cdim);
+        
+        // add to sparse matrix for (bang, kang)
+        
+        // FIX ME:
     }
 }
 

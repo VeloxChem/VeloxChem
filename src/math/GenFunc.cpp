@@ -8,11 +8,12 @@
 
 #include "GenFunc.hpp"
 
+#include "AngularMomentum.hpp"
+
 namespace genfunc { // genfunc namespace
 
 void
 contract(      CMemBlock2D<double>& contrData,
-         const int32_t              contrIndex,
          const CMemBlock2D<double>& primData,
          const int32_t              primIndex,
          const int32_t*             startPositions,
@@ -42,6 +43,75 @@ contract(      CMemBlock2D<double>& contrData,
             cdat[j] = fsum;
         }
     }
+}
+
+void
+contract(      CMemBlock2D<double>& contrData,
+               CMemBlock2D<double>& primData,
+         const int32_t              primIndex,
+         const CGtoBlock&           braGtoBlock,
+         const CGtoBlock&           ketGtoBlock,
+         const int32_t              iContrGto)
+{
+    // set up angular momentum
+    
+    auto bang = braGtoBlock.getAngularMomentum();
+    
+    auto kang = ketGtoBlock.getAngularMomentum();
+    
+    auto ncomp = angmom::to_CartesianComponents(bang)
+    
+               * angmom::to_CartesianComponents(kang);
+    
+    // set up pointers to primitives data on bra side
+    
+    auto spos = braGtoBlock.getStartPositions();
+    
+    auto epos = braGtoBlock.getEndPositions();
+    
+    auto bdim = epos[iContrGto] - spos[iContrGto];
+    
+    // set up pointers to primitives data on ket side
+    
+    auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+    
+    // first step: vertical summation over bra GTO
+    
+    for (int32_t i = 1; i < bdim; i++)
+    {
+        // accumulate summation over primitives on bra side
+        
+        for (int32_t j = 0; j < ncomp; j++)
+        {
+            // summation buffer
+            
+            auto sumbuf = primData.data(primIndex + j);
+            
+            // source buffer
+            
+            auto srcbuf = primData.data(primIndex + i * ncomp + j);
+            
+            // loop over primitive GTOs on ket side
+            
+            #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
+            for (int32_t k = 0; k < nprim; k++)
+            {
+                sumbuf[k] += srcbuf[k];
+            }
+        }
+    }
+    
+    // reset primitive GTOs indexing pointers to ket side
+    
+    spos = ketGtoBlock.getStartPositions();
+    
+    epos = ketGtoBlock.getEndPositions();
+    
+    auto kdim = ketGtoBlock.getNumberOfContrGtos();
+    
+    // second step: direct contraction over ket side
+    
+    genfunc::contract(contrData, primData, primIndex, spos, epos, kdim, ncomp);
 }
     
 void
@@ -98,7 +168,80 @@ transform(      CMemBlock2D<double>& spherData,
         }
     }
 }
+  
+void
+transform(      CMemBlock2D<double>& spherData,
+          const CMemBlock2D<double>& cartData,
+          const CSphericalMomentum&  braMomentum,
+          const CSphericalMomentum&  ketMomentum,
+          const int32_t              nElements)
+{
+    // set up angular momentum data
     
+    auto bcomp = braMomentum.getNumberOfComponents();
+    
+    auto kcomp = ketMomentum.getNumberOfComponents();
+    
+    // set up number of Cartisian components on ket side
+    
+    auto kcart = angmom::to_CartesianComponents(ketMomentum.getAngularMomentum());
+    
+    // zero spherical integrals
+    
+    spherData.zero();
+    
+    // loop over spherical components on bra side
+    
+    for (int32_t i = 0; i < bcomp; i++)
+    {
+        // set up transformation data for bra side
+        
+        auto bnfact = braMomentum.getNumberOfFactors(i);
+        
+        auto btidx = braMomentum.getIndexes(i);
+        
+        auto btfact = braMomentum.getFactors(i);
+        
+        // loop over spherical components on ket side
+        
+        for (int32_t j = 0; j < kcomp; j ++)
+        {
+            // set up transformation data for ket side
+            
+            auto knfact = ketMomentum.getNumberOfFactors(j);
+            
+            auto ktidx = ketMomentum.getIndexes(j);
+            
+            auto ktfact = ketMomentum.getFactors(j);
+            
+            // set up spherical integrals vector
+            
+            auto sphervec = spherData.data(i * kcomp + j);
+            
+            // apply Cartesian to spherical transformation
+            
+            for (int32_t k = 0; k < bnfact; k++)
+            {
+                for (int32_t l = 0; l < knfact; l++)
+                {
+                    // set up pointer to Cartesian component
+                    
+                    auto cartvec = cartData.data(btidx[k] * kcart + ktidx[l]);
+                    
+                    auto cfact = btfact[k] * ktfact[l];
+                    
+                    // loop over integrals
+                    
+                    #pragma omp simd aligned(sphervec, cartvec: VLX_ALIGN)
+                    for (int32_t m = 0; m < nElements; m++)
+                    {
+                        sphervec[m] += cfact * cartvec[m];
+                    }
+                }
+            }
+        }
+    }
+}
     
 bool
 isInVector(const CVecTwoIndexes& vector,

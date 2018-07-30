@@ -556,7 +556,7 @@ CDensityGridDriver::_contrPrimGtoValues(      CMemBlock2D<double>&  cartGtoValue
     
     // contract GTOs
     
-    genfunc::contract(cartGtoValues, 0, primGtoValues, pidx, spos, epos,
+    genfunc::contract(cartGtoValues, primGtoValues, pidx, spos, epos,
                       ngto, nvec);
 }
 
