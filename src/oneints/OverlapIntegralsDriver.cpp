@@ -12,6 +12,7 @@
 #include "AngularMomentum.hpp"
 #include "OverlapRecFunc.hpp"
 #include "GenFunc.hpp"
+#include "MemBlock.hpp"
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
                                                  const int32_t  globNodes,
@@ -226,6 +227,12 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
     
     CMemBlock2D<double> spherbuffer(cdim, nspher);
     
+    // allocate sparse matrix row data
+    
+    CMemBlock<double> rowvals(cdim * angmom::to_SphericalComponents(kang));
+    
+    CMemBlock<int32_t> colidx(cdim * angmom::to_SphericalComponents(kang));
+    
     printf("\n*** Computing overlap integrals (%i|%i):\n", bang, kang);
 
     printf("Max GTOs: %i Rec. Blocks: %i x Pdim: %i\n", pmax, nblk, pdim);
@@ -268,8 +275,6 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(const CGtoContainer* braGtoCon
         genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, cdim);
         
         // add to sparse matrix for (bang, kang)
-        
-        // FIX ME:
     }
 }
 

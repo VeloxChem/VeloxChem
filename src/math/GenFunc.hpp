@@ -11,6 +11,7 @@
 
 #include <cstdint>
 
+#include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "SphericalMomentum.hpp"
 #include "VecIndexes.hpp"
@@ -86,6 +87,25 @@ namespace genfunc { // genfunc namespace
                    const CSphericalMomentum&  braMomentum,
                    const CSphericalMomentum&  ketMomentum,
                    const int32_t              nElements);
+    
+    /**
+     Reshapes batch of integrals batch (1 contracted GTO on bra side x all
+     contracted GTOs on ket side) into compressed data and stores it in sparse
+     matrix.
+
+     @param rowValues the temporary buffer for values of integrals.
+     @param colIndexes the temporary buffer for indexes of integrals.
+     @param spherData the batch of integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compress(      CMemBlock<double>&   rowValues,
+                        CMemBlock<int32_t>&  colIndexes,
+                  const CMemBlock2D<double>& spherData,
+                  const CGtoBlock&           braGtoBlock,
+                  const CGtoBlock&           ketGtoBlock,
+                  const int32_t              iContrGto);
     
     /**
      Checks if two indexes object is inside vector of two indexes objects.
