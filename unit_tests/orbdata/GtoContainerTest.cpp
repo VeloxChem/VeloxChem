@@ -317,6 +317,17 @@ TEST_F(CGtoContainerTest, getNumberOfContrGtos)
     ASSERT_EQ(3, acont.getNumberOfContrGtos(1));
 }
 
+TEST_F(CGtoContainerTest, GetNumberOfAtomicOrbitals)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer acont(lih, bas);
+    
+    ASSERT_EQ(14, acont.getNumberOfAtomicOrbitals());
+}
+
 TEST_F(CGtoContainerTest, GetStartPositions)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

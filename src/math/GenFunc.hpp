@@ -16,6 +16,8 @@
 #include "SphericalMomentum.hpp"
 #include "VecIndexes.hpp"
 #include "GtoBlock.hpp"
+#include "GtoContainer.hpp"
+#include "SparseMatrix.hpp"
 
 namespace genfunc { // genfunc namespace
     
@@ -93,6 +95,7 @@ namespace genfunc { // genfunc namespace
      contracted GTOs on ket side) into compressed data and stores it in sparse
      matrix.
 
+     @param sparseMatrix the sparse matrix.
      @param rowValues the temporary buffer for values of integrals.
      @param colIndexes the temporary buffer for indexes of integrals.
      @param spherData the batch of integrals.
@@ -100,12 +103,27 @@ namespace genfunc { // genfunc namespace
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
-    void compress(      CMemBlock<double>&   rowValues,
+    void compress(      CSparseMatrix&       sparseMatrix,
+                        CMemBlock<double>&   rowValues,
                         CMemBlock<int32_t>&  colIndexes,
                   const CMemBlock2D<double>& spherData,
                   const CGtoBlock&           braGtoBlock,
                   const CGtoBlock&           ketGtoBlock,
                   const int32_t              iContrGto);
+    
+    
+    /**
+     Creates sparse matrix by distributing list of sparse matrices according to
+     pattern given by GTOs containers from bra and ket sides.
+
+     @param listOfMatrices the list of sparse matrices.
+     @param braGtoContainer the GTOs container for bra side.
+     @param ketGtoContainer the GTOs container for ket side.
+     @return the sparse matrix.
+     */
+    CSparseMatrix distribute(const CSparseMatrix* listOfMatrices,
+                             const CGtoContainer* braGtoContainer,
+                             const CGtoContainer* ketGtoContainer);
     
     /**
      Checks if two indexes object is inside vector of two indexes objects.

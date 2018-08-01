@@ -19,6 +19,7 @@
 #include "OverlapMatrix.hpp"
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
+#include "SparseMatrix.hpp"
 
 /**
  Class COverlapIntegralsDriver computes one-electron integrals.
@@ -57,13 +58,15 @@ class COverlapIntegralsDriver
 
      @param braGtoContainer the GTOs container for bra side.
      @param ketGtoContainer the GTOs container for ket side.
+     @return the overlap matrix object.
      */
-    void _compOverlapIntegrals(const CGtoContainer* braGtoContainer,
-                               const CGtoContainer* ketGtoContainer) const;
+    COverlapMatrix _compOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                         const CGtoContainer* ketGtoContainer) const;
     
     /**
      Computes overlap integrals for specific pair of GTOs blocks.
 
+     @param sparseBuffer the buffer of sparce matrices.
      @param braGtoContainer the GTOs container for bra side.
      @param iBraGtoBlock the index of GTOs block object in GTOs container for
             bra side.
@@ -71,7 +74,8 @@ class COverlapIntegralsDriver
      @param iKetGtoBlock the index of GTOs block object in GTOs container for
             ket side.
      */
-    void _compOverlapForGtoBlocks(const CGtoContainer* braGtoContainer,
+    void _compOverlapForGtoBlocks(      CSparseMatrix* sparseBuffer,
+                                  const CGtoContainer* braGtoContainer,
                                   const int32_t        iBraGtoBlock,
                                   const CGtoContainer* ketGtoContainer,
                                   const int32_t        iKetGtoBlock) const;
@@ -129,6 +133,17 @@ class COverlapIntegralsDriver
     int32_t _getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
                                            const CVecTwoIndexes&       recPattern,
                                            const int32_t               maxPrimGtos) const;
+    
+    /**
+     Creates buffer of sparse matrices for all allowed combinations of GTOs
+     blocks from GTOs containers on bra and ket sides.
+
+     @param braGtoContainer the GTOs container for bra side.
+     @param ketGtoContainer the GTOs container for ket side.
+     @return the vector of sparse matrices.
+     */
+    CSparseMatrix* _createSparseBuffer(const CGtoContainer* braGtoContainer,
+                                       const CGtoContainer* ketGtoContainer) const;
 
 public:
     

@@ -250,7 +250,7 @@ CSparseMatrix::append(const CMemBlock<double>&  rowValues,
         
         if (ndim > _nMaxElements)
         {
-            _nMaxElements += _getAdditionalRows(iRow) * _nRows;
+            _nMaxElements += _getAdditionalRows(iRow) * _nColumns;
             
             // allocate new buffers
             
@@ -501,7 +501,7 @@ CSparseMatrix::_isLastRow(const int32_t iRow) const
 int32_t
 CSparseMatrix::_getAdditionalRows(const int32_t iRow) const
 {
-    int32_t ndim = 5; 
+    int32_t ndim = _nRows / 6; 
     
     if ((iRow + ndim) > _nRows) return (_nRows - iRow);
     
@@ -511,17 +511,22 @@ CSparseMatrix::_getAdditionalRows(const int32_t iRow) const
 int32_t
 CSparseMatrix::_setMaxNumberOfElements() const
 {
+    if ((_nRows > 20000) && (_nColumns > 20000))
+    {
+        return _nRows * _nColumns / 3;
+    }
+    
     if ((_nRows > 10000) && (_nColumns > 10000))
     {
-        return _nRows * _nColumns / 20;
+        return _nRows * _nColumns / 2;
     }
     
-    if ((_nRows > 1000) && (_nColumns > 1000))
+    if ((_nRows > 5000) && (_nColumns > 5000))
     {
-        return _nRows * _nColumns / 4;
+        return 8 * _nRows * _nColumns / 10;
     }
     
-    return _nRows * _nColumns / 2;
+    return _nRows * _nColumns;
 }
 
 std::ostream&

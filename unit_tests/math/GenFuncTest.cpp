@@ -12,6 +12,9 @@
 #include "GenFunc.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
+#include "SparseMatrix.hpp"
+#include "MemBlock.hpp"
+#include "GtoContainer.hpp"
 
 TEST_F(CGenFuncTest, Contract)
 {
@@ -237,7 +240,230 @@ TEST_F(CGenFuncTest, TransformForDD)
     ASSERT_EQ(spherdat, tdat);
 }
 
+TEST_F(CGenFuncTest, Compress)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock bgtos(lih, bas, 1);
+    
+    CGtoBlock kgtos(lih, bas, 1);
+    
+    CMemBlock2D<double> adat({ 1.0,  2.0,  0.0,
+                              -3.0,  4.0,  2.0,
+                               6.0,  7.0,  8.0,
+                               1.0,  5.7, -1.0,
+                               0.0,  0.0,  2.0,
+                               0.0,  0.0,  0.0,
+                               1.0,  2.0,  3.0,
+                               0.0, -1.0,  2.0,
+                               0.1, -1.2,  0.0},
+                             3, 9);
+    
+    CSparseMatrix spmat(6, 9, 1.0e-13);
+    
+    CMemBlock<double> rvals(9);
+    
+    CMemBlock<int32_t> ridx(9);
+    
+    genfunc::compress(spmat, rvals, ridx, adat, bgtos, kgtos, 0);
+    
+    CSparseMatrix amat({1.0,  2.0, -3.0,  4.0, 2.0, 6.0,  7.0,  8.0,
+                        1.0,  5.7, -1.0, 2.0,
+                        1.0,  2.0,  3.0,  -1.0,  2.0, 0.1, -1.2},
+                       {0, 0, 0, 0, 0, 0, 0, 0,
+                        1, 1, 1, 1,
+                        2, 2, 2, 2, 2, 2, 2},
+                       {5, 6, 8, 9, 10, 11, 12, 13,
+                        5, 6, 7, 10,
+                        5, 6, 7, 9, 10, 11, 12},
+                        6, 9, 1.0e-13);
+    
+    ASSERT_EQ(spmat, amat);
+    
+    CMemBlock2D<double> bdat({ 1.0,  2.0,  0.0,
+                               0.0,  4.0,  0.0,
+                               0.0,  7.0,  8.0,
+                               0.0,  0.0, -1.0,
+                               0.0,  0.0,  2.0,
+                               0.0,  0.0,  0.0,
+                               1.0,  2.0,  3.0,
+                               0.0, -1.0,  2.0,
+                               0.1, -1.2,  0.0},
+                             3, 9);
+    
+    genfunc::compress(spmat, rvals, ridx, bdat, bgtos, kgtos, 1);
+    
+    CSparseMatrix bmat({ 1.0,  2.0, -3.0,  4.0, 2.0, 6.0,  7.0,  8.0,
+                         1.0,  5.7, -1.0,  2.0,
+                         1.0,  2.0,  3.0, -1.0,  2.0, 0.1, -1.2,
+                         1.0,  2.0,  4.0,  7.0,  8.0,
+                        -1.0,  2.0,
+                         1.0,  2.0,  3.0, -1.0,  2.0, 0.1, -1.2},
+                       {0, 0, 0, 0, 0, 0, 0, 0,
+                        1, 1, 1, 1,
+                        2, 2, 2, 2, 2, 2, 2,
+                        3, 3, 3, 3, 3,
+                        4, 4,
+                        5, 5, 5, 5, 5, 5, 5},
+                       {5, 6, 8, 9, 10, 11, 12, 13,
+                        5, 6, 7, 10,
+                        5, 6, 7, 9, 10, 11, 12,
+                        5, 6, 9, 12, 13,
+                        7, 10,
+                        5, 6, 7, 9, 10, 11, 12},
+                       6, 9, 1.0e-13);
+    
+    ASSERT_EQ(spmat, bmat);
+}
 
+TEST_F(CGenFuncTest, Distribute)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoContainer bcont(lih, bas);
+    
+    CGtoContainer kcont(lih, bas);
+    
+    // set up (s|s) integrals matrix
+    
+    CSparseMatrix matss({1.0, 2.0,  5.0,
+                         1.0, 7.2, -1.0, 3.0,
+                         2.0, 3.0, 4.0,
+                         1.0, 2.0},
+                        { 0, 0, 0,
+                          1, 1, 1, 1,
+                          3, 3, 3,
+                          4, 4},
+                        { 0, 2, 4,
+                          0, 1, 3, 4,
+                          1, 2, 3,
+                          3, 4},
+                        5, 5, 1.0e-13);
+    
+    // set up (s|p) integrals matrix
+    
+    CSparseMatrix matsp({2.0, 3.0, 4.0, 5.0, 6.0,
+                         2.0, 1.2, 1.0, 2.0,
+                         9.0, 7.0, 8.0,
+                         3.0, 6.0, 7.0, 1.0},
+                        { 0, 0, 0, 0, 0,
+                          2, 2, 2, 2,
+                          3, 3, 3,
+                          4, 4, 4, 4},
+                        { 4, 7, 10, 11, 12,
+                          4, 5, 6, 7,
+                          8, 9, 10,
+                          8, 9, 10, 11},
+                         5, 9, 1.0e-13);
+    
+    // set up (p|s) integrals matrix
+    
+    CSparseMatrix matps({2.0, 3.0, 4.0,
+                         2.0, 1.2, 2.0,
+                         9.0, 7.0, 8.0,
+                         3.0, 6.0, 7.0, 1.0,
+                         1.0, 4.0, 6.0, 1.0,
+                         2.0, 2.0, 4.0, 5.0,
+                         1.2, 3.0,
+                         4.0, 5.0,
+                         6.7, 1.9},
+                        { 0, 0, 0,
+                          1, 1, 1,
+                          2, 2, 2,
+                          3, 3, 3, 3,
+                          4, 4, 4, 4,
+                          5, 5, 5, 5,
+                          6, 6,
+                          7, 7,
+                          8, 8},
+                        { 0, 1, 2,
+                          2, 3, 4,
+                          0, 3, 4,
+                          0, 1, 2, 3,
+                          0, 2, 3, 4,
+                          1, 2, 3, 4,
+                          0, 4,
+                          1, 2,
+                          3, 4},
+                        9, 5, 1.0e-13);
+    
+    // set up (p|p) integrals matrix
+    
+    CSparseMatrix matpp({1.0, 2.0, 3.0,
+                         4.0, 5.0, 6.0,
+                         7.0, 8.0, 9.0},
+                        {0, 1, 2,
+                         3, 4, 5,
+                         6, 7, 8},
+                        { 5,  6,  7,
+                          8,  9, 10,
+                         11, 12, 13},
+                        9, 9, 1.0e-13);
+    
+    // set up list of matrices
+    
+    CSparseMatrix* matlst = new CSparseMatrix[4];
+    
+    matlst[0] = matss; matlst[1] = matsp;
+    
+    matlst[2] = matps; matlst[3] = matpp;
+    
+    auto spmat = genfunc::distribute(matlst, &bcont, &kcont);
+    
+    delete [] matlst;
+    
+    CSparseMatrix tmat({1.0, 2.0,  5.0, 2.0, 3.0, 4.0, 5.0, 6.0,
+                        1.0, 7.2, -1.0, 3.0,
+                        2.0, 1.2,  1.0, 2.0,
+                        2.0, 3.0,  4.0, 9.0, 7.0, 8.0,
+                        1.0, 2.0,  3.0, 6.0, 7.0, 1.0,
+                        2.0, 3.0, 4.0, 1.0,
+                        3.0, 6.0, 7.0, 1.0, 4.0,
+                        1.2, 3.0, 7.0,
+                        2.0, 1.2, 2.0, 2.0,
+                        1.0, 4.0, 6.0, 1.0, 5.0,
+                        4.0, 5.0, 8.0,
+                        9.0, 7.0, 8.0, 3.0,
+                        2.0, 2.0, 4.0, 5.0, 6.0,
+                        6.7, 1.9, 9.0},
+                       {0, 0, 0, 0, 0, 0, 0, 0,
+                        1, 1, 1, 1,
+                        2, 2, 2, 2,
+                        3, 3, 3, 3, 3, 3,
+                        4, 4, 4, 4, 4, 4,
+                        5, 5, 5, 5,
+                        6, 6, 6, 6, 6,
+                        7, 7, 7,
+                        8, 8, 8, 8,
+                        9, 9, 9, 9, 9,
+                        10, 10, 10,
+                        11, 11, 11, 11,
+                        12, 12, 12, 12, 12,
+                        13, 13, 13},
+                       {0, 2, 4, 4, 7, 10, 11, 12,
+                        0, 1, 3, 4,
+                        4, 5, 6, 7,
+                        1, 2, 3, 8, 9, 10,
+                        3, 4, 8, 9, 10, 11,
+                        0, 1, 2, 5,
+                        0, 1, 2, 3, 8,
+                        0, 4, 11,
+                        2, 3, 4, 6,
+                        0, 2, 3, 4, 9,
+                        1, 2, 12,
+                        0, 3, 4, 7,
+                        1, 2, 3, 4, 10,
+                        3, 4, 13},
+                        14, 14, 1.0e-13);
+    
+    std::cout << spmat; 
+    
+    ASSERT_EQ(spmat, tmat); 
+}
 
 TEST_F(CGenFuncTest, IsInVectorForTwoIndexes)
 {

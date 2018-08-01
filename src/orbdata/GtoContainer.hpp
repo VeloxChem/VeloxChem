@@ -183,6 +183,13 @@ public:
     int32_t getNumberOfContrGtos(const int32_t iBlock) const;
     
     /**
+     Gets total number of atomic orbitals.
+
+     @return the number of atomic orbitals.
+     */
+    int32_t getNumberOfAtomicOrbitals() const;
+    
+    /**
      Gets constant pointer to basis function start positions in primitive
      Gaussian functions vector from specific GTOs block object in GTOs
      container.

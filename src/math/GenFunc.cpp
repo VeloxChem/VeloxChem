@@ -243,6 +243,183 @@ transform(      CMemBlock2D<double>& spherData,
     }
 }
     
+void
+compress(      CSparseMatrix&       sparseMatrix,
+               CMemBlock<double>&   rowValues,
+               CMemBlock<int32_t>&  colIndexes,
+         const CMemBlock2D<double>& spherData,
+         const CGtoBlock&           braGtoBlock,
+         const CGtoBlock&           ketGtoBlock,
+         const int32_t              iContrGto)
+{
+    // set up angular momentum components
+    
+    auto bcomp = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
+    
+    auto kcomp = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
+    
+    // set up number of contracted GTOs on ket side
+    
+    auto kdim = ketGtoBlock.getNumberOfContrGtos();
+    
+    // set up pointers to temporary row data of sparse matrix
+    
+    auto rdat = rowValues.data();
+    
+    auto cidx = colIndexes.data();
+    
+    // set up threshold
+    
+    double fthr = sparseMatrix.getThreshold();
+    
+    // loop over bra componets
+    
+    for (int32_t i = 0; i < bcomp; i++)
+    {
+        // reset number of elements in vector
+        
+        int32_t nelem = 0;
+        
+        // loop over ket components
+        
+        for (int32_t j = 0; j < kcomp; j++)
+        {
+            // set up pointer to integrals
+            
+            auto vals = spherData.data(i * kcomp + j);
+            
+            auto vids = ketGtoBlock.getIdentifiers(j);
+            
+            // loop over integrals
+            
+            for (int32_t k = 0; k < kdim; k++)
+            {
+                if (std::fabs(vals[k]) > fthr)
+                {
+                    rdat[nelem] = vals[k];
+                    
+                    cidx[nelem] = vids[k];
+                    
+                    nelem++;
+                }
+            }
+        }
+        
+        // add row to sparce matrix
+        
+        if (nelem > 0)
+        {
+            sparseMatrix.append(rowValues, colIndexes, nelem,
+                                iContrGto * bcomp + i);
+        }
+    }
+}
+    
+    
+CSparseMatrix
+distribute(const CSparseMatrix* listOfMatrices,
+           const CGtoContainer* braGtoContainer,
+           const CGtoContainer* ketGtoContainer)
+{
+    // set up number of atomic orbitals
+    
+    auto btao = braGtoContainer->getNumberOfAtomicOrbitals();
+    
+    auto ktao = ketGtoContainer->getNumberOfAtomicOrbitals();
+    
+    // retrieve the threshold
+    
+    auto fthr = listOfMatrices[0].getThreshold();
+    
+    // initialize sparse matrix
+    
+    CSparseMatrix spmat(btao, ktao, fthr);
+    
+    // set up temporary row data
+    
+    CMemBlock<double> rowvec(ktao);
+    
+    CMemBlock<int32_t> rowidx(ktao);
+    
+    // set up number of GTOs blocks
+    
+    auto bdim = braGtoContainer->getNumberOfGtoBlocks();
+    
+    auto kdim = ketGtoContainer->getNumberOfGtoBlocks();
+    
+    // loop over GTOs blocks on bra side
+    
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        // set up data on bra side
+        
+        auto bcomp = angmom::to_SphericalComponents(braGtoContainer->getAngularMomentum(i));
+        
+        auto bcgto = braGtoContainer->getNumberOfContrGtos(i);
+        
+        // loop over angular componets on bra side
+        
+        for (int32_t j = 0; j < bcomp; j++)
+        {
+            // set up pointer to indexes of contracted GTOs on bra side
+            
+            auto bids =  braGtoContainer->getIdentifiers(i, j);
+            
+            // loop over contracted GTOs on bra side
+            
+            for (int32_t k = 0; k < bcgto; k++)
+            {
+                // reset number of elements in sparse matrix row
+                
+                int32_t nelem = 0;
+                
+                // set up row offset for all submatrices
+                
+                auto koff = bcomp * k + j;
+                
+                // add submatrices contributions to sparse matrix row
+                
+                for (int32_t l = 0; l < kdim; l++)
+                {
+                    // set submatrix offset
+                    
+                    auto loff = i * bdim + l;
+                    
+                    // add submatrix row data to sparse matrix row data
+                    
+                    auto celem = listOfMatrices[loff].getNumberOfElements(koff);
+                    
+                    if (celem > 0)
+                    {
+                        // set up pointers to submatrix
+                        
+                        auto rdat = listOfMatrices[loff].row(koff);
+                        
+                        auto ridx = listOfMatrices[loff].indexes(koff);
+                        
+                        // copy submatrix data
+                        
+                        mathfunc::copy(rowvec.data(), nelem, rdat, 0, celem); 
+                        
+                        mathfunc::copy(rowidx.data(), nelem, ridx, 0, celem);
+                        
+                        nelem += celem;
+                    }
+                }
+                
+                // add row to sparse matrix
+                
+                if (nelem > 0)
+                {
+                    spmat.append(rowvec, rowidx, nelem, bids[k]);
+                }
+            }
+        }
+    }
+    
+    return spmat;
+}
+    
 bool
 isInVector(const CVecTwoIndexes& vector,
            const CTwoIndexes&    pair)

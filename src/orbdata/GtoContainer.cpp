@@ -209,6 +209,21 @@ CGtoContainer::getNumberOfContrGtos(const int32_t iBlock) const
     return _gtoBlocks[iBlock].getNumberOfContrGtos();
 }
 
+int32_t
+CGtoContainer::getNumberOfAtomicOrbitals() const
+{
+    int32_t ntao = 0;
+    
+    for (size_t i = 0; i < _gtoBlocks.size(); i++)
+    {
+        auto ncomp = angmom::to_SphericalComponents(_gtoBlocks[i].getAngularMomentum());
+        
+        ntao += ncomp * _gtoBlocks[i].getNumberOfContrGtos();
+    }
+    
+    return ntao;
+}
+
 const int32_t*
 CGtoContainer::getStartPositions(const int32_t iBlock) const
 {

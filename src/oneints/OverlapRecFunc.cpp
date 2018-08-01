@@ -26,9 +26,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                      const CGtoBlock&            ketGtoBlock,
                      const int32_t               iContrGto)
     {
-        
-        if (iContrGto == 0) printf(" * VRR: (0|0)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto bnorm = braGtoBlock.getNormFactors();
@@ -105,8 +102,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         if (!genfunc::isInVector(recPattern, {0, 1})) return;
         
-        if (iContrGto  == 0) printf(" * VRR: (0|1)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -178,8 +173,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {1, 0})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (1|0)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -253,8 +246,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {1, 1})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (1|1)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -382,8 +373,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         if (!genfunc::isInVector(recPattern, {0, 2})) return;
         
-        if (iContrGto  == 0) printf(" * VRR: (0|2)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -496,8 +485,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         if (!genfunc::isInVector(recPattern, {2, 0})) return;
         
-        if (iContrGto  == 0) printf(" * VRR: (2|0)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -609,8 +596,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {1, 2})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (1|2)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -786,8 +771,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
 
         if (!genfunc::isInVector(recPattern, {2, 1})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (2|1)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -979,8 +962,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {2, 2})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (2|2)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -1290,8 +1271,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         if (!genfunc::isInVector(recPattern, {0, 3})) return;
         
-        if (iContrGto  == 0) printf(" * VRR: (0|3)\n");
-        
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -1432,8 +1411,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         if (!genfunc::isInVector(recPattern, {3, 0})) return;
         
-        if (iContrGto  == 0) printf(" * VRR: (3|0)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -1573,8 +1550,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {1, 3})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (1|3)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -1816,8 +1791,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
 
         if (!genfunc::isInVector(recPattern, {3, 1})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (3|1)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -2099,8 +2072,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {2, 3})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (2|3)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -2568,8 +2539,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
 
         if (!genfunc::isInVector(recPattern, {3, 2})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (3|2)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -3063,8 +3032,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {3, 3})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (3|3)\n");
         
         // set up pointers to primitives data on bra side
         
@@ -3855,8 +3822,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         if (!genfunc::isInVector(recPattern, {0, 4})) return;
         
-        if (iContrGto  == 0) printf(" * VRR: (0|4)\n");
-        
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -4034,8 +3999,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         if (!genfunc::isInVector(recPattern, {4, 0})) return;
         
-        if (iContrGto  == 0) printf(" * VRR: (4|0)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -4212,8 +4175,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {1, 4})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (1|4)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -4541,8 +4502,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
 
         if (!genfunc::isInVector(recPattern, {4, 1})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (4|1)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -4943,8 +4902,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {2, 4})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (2|4)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -5612,8 +5569,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
 
         if (!genfunc::isInVector(recPattern, {4, 2})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (4|2)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -6357,8 +6312,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {3, 4})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (3|4)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -7519,8 +7472,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
 
         if (!genfunc::isInVector(recPattern, {4, 3})) return;
-
-        if (iContrGto  == 0) printf(" * VRR: (4|3)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -8731,8 +8682,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         // skip integrals if not included in recursion pattern
         
         if (!genfunc::isInVector(recPattern, {4, 4})) return;
-        
-        if (iContrGto  == 0) printf(" * VRR: (4|4)\n");
 
         // set up pointers to primitives data on bra side
 
