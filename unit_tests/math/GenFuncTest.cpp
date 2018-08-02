@@ -460,8 +460,6 @@ TEST_F(CGenFuncTest, Distribute)
                         3, 4, 13},
                         14, 14, 1.0e-13);
     
-    std::cout << spmat; 
-    
     ASSERT_EQ(spmat, tmat); 
 }
 

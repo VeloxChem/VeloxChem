@@ -98,14 +98,14 @@ public:
     /**
      Gets first index from pair of indexes.
 
-     @return the first index from pait of indexes.
+     @return the first index from pair of indexes.
      */
     int32_t first() const;
 
     /**
      Gets second index from pair of indexes.
      
-     @return the second index from pait of indexes.
+     @return the second index from pair of indexes.
      */
     int32_t second() const;
     
