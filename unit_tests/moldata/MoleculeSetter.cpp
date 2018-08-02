@@ -10,12 +10,14 @@
 
 namespace vlxmol { // vlxmol namespace
 
-CMolecule getMoleculeEmpty()
+CMolecule
+getMoleculeEmpty()
 {
     return CMolecule();
 }
 
-CMolecule getMoleculeLiH()
+CMolecule
+getMoleculeLiH()
 {
     std::vector<double> coords({0.0, 0.0, 0.0, 0.0, 0.0, 1.2});
     
@@ -36,7 +38,30 @@ CMolecule getMoleculeLiH()
     return mol;
 }
 
-CMolecule getMoleculeLiHCation()
+CMolecule
+getTestLiH()
+{
+    std::vector<double> coords({0.0, 0.4, 0.0, 0.6, 0.0, 1.1});
+    
+    std::vector<double> charges({3.0, 1.0});
+    
+    std::vector<double> masses({7.016005, 1.007825});
+    
+    std::vector<std::string> labels({{"Li"}, {"H"}});
+    
+    std::vector<int32_t> idselem({3, 1});
+    
+    CMolecule mol(coords, charges, masses, labels, idselem);
+    
+    mol.setCharge(0.0);
+    
+    mol.setMultiplicity(1);
+    
+    return mol;
+}
+    
+CMolecule
+getMoleculeLiHCation()
 {
     std::vector<double> coords({0.0, 0.0, 0.0, 0.0, 0.0, 1.2});
     
@@ -57,7 +82,8 @@ CMolecule getMoleculeLiHCation()
     return mol;
 }
 
-CMolecule getMoleculeH2O()
+CMolecule
+getMoleculeH2O()
 {
     std::vector<double> coords({0.0, 0.0,  0.0,
                                 0.0, 1.4, -1.4,

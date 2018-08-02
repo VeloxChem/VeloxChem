@@ -17,6 +17,8 @@ namespace vlxmol { // vlxmol namespace
     
     CMolecule getMoleculeLiH();
     
+    CMolecule getTestLiH();
+    
     CMolecule getMoleculeLiHCation();
     
     CMolecule getMoleculeH2O();

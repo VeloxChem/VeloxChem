@@ -9,6 +9,8 @@
 #ifndef AtomBasisSetter_hpp
 #define AtomBasisSetter_hpp
 
+#include <cstdint>
+
 #include "AtomBasis.hpp"
 
 namespace vlxbas { // vlxbas namespace
@@ -18,6 +20,10 @@ CAtomBasis getAtomBasisEmpty();
 CAtomBasis getAtomBasisForH();
 
 CAtomBasis getAtomBasisForLi();
+    
+CAtomBasis getTestBasisForH(const int32_t angularMomentum);
+    
+CAtomBasis getTestBasisForLi(const int32_t angularMomentum);
 
 } // vlxbas namespace
 

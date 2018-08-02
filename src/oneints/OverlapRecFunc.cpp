@@ -1425,7 +1425,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         
         auto soff  = genfunc::findPairIndex(recIndexes, recPattern, {3, 0});
         
-        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {3, 0});
+        auto t1off = genfunc::findPairIndex(recIndexes, recPattern, {2, 0});
         
         auto t2off = genfunc::findPairIndex(recIndexes, recPattern, {1, 0});
         

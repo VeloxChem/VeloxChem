@@ -35,6 +35,22 @@ getMolecularBasisForLiH()
 
     return mbas;
 }
+
+CMolecularBasis
+getTestBasisForLiH(const int32_t angularMomentumA,
+                   const int32_t angularMomentumB)
+{
+    CMolecularBasis mbas;
+    
+    mbas.setLabel({"Test-Basis"});
+    
+    mbas.addAtomBasis(getTestBasisForLi(angularMomentumA));
+    
+    mbas.addAtomBasis(getTestBasisForH(angularMomentumB));
+    
+    return mbas;
+}
+    
     
 } // vlxbas namespace
 
