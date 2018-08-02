@@ -248,6 +248,44 @@ TEST_F(CSparseMatrixTest, AppendWithReallocation)
     ASSERT_EQ(ma, mb);
 }
 
+TEST_F(CSparseMatrixTest, Optimize_storage)
+{
+    CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0, 7.0,
+                      8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4},
+                     {0, 1, 2, 0, 1, 2, 3, 4, 9, 2, 3, 1, 4}, 5, 5, 1.0e-13);
+    
+    CSparseMatrix mb = ma;
+    
+    ma.optimize_storage();
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CSparseMatrixTest, IsOptimizedStorage)
+{
+    CSparseMatrix ma(6000, 6000, 1.0e-13);
+    
+    // 0-th row
+    
+    CMemBlock<double> r0dat({1.0, -1.0, -3.0});
+    
+    CMemBlock<int32_t> r0idx({0, 1, 2});
+    
+    ma.append(r0dat, r0idx, 3);
+    
+    ASSERT_FALSE(ma.isOptimizedStorage());
+    
+    ma.optimize_storage();
+    
+    CSparseMatrix mb({1.0, -1.0, -3.0},
+                     {3, 3, 3}, {0, 1, 2},
+                     6000, 6000, 1.0e-13);
+    
+    ASSERT_EQ(ma, mb);
+    
+    ASSERT_TRUE(ma.isOptimizedStorage());
+}
+
 TEST_F(CSparseMatrixTest, GetNumberOfRows)
 {
     CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},

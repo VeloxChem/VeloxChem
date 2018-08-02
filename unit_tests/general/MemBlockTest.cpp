@@ -238,6 +238,27 @@ TEST_F(CMemBlockTest, Pick)
     ASSERT_EQ(ml, CMemBlock<double>());
 }
 
+TEST_F(CMemBlockTest, Shrink)
+{
+    CMemBlock<double> ma({1.0, 2.0, 3.0, 6.0});
+    
+    ma.shrink(4);
+    
+    ASSERT_EQ(ma, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+    
+    ma.shrink(6);
+    
+    ASSERT_EQ(ma, CMemBlock<double>({1.0, 2.0, 3.0, 6.0}));
+    
+    ma.shrink(3);
+    
+    ASSERT_EQ(ma, CMemBlock<double>({1.0, 2.0, 3.0}));
+    
+    ma.shrink(2);
+    
+    ASSERT_EQ(ma, CMemBlock<double>({1.0, 2.0}));
+}
+
 TEST_F(CMemBlockTest, BroadcastIntegers)
 {
     CMemBlock<int32_t> ma({1, 2, 3, 9});

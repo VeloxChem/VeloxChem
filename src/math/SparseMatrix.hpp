@@ -219,6 +219,19 @@ public:
                 const int32_t             iRow);
     
     /**
+     Optimizes memory footprint of buffers used to store sparse matrix elements
+     values and indexing information.
+     */
+    void optimize_storage();
+    
+    /**
+     Check if sparse matrix data is stored im optimal way in memory.
+
+     @return true if sparse matrix is stored in optimal way, false otherwise.
+     */
+    bool isOptimizedStorage() const;
+    
+    /**
      Gets number of rows in sparse matrix.
 
      @return the number of rows.

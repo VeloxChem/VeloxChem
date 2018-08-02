@@ -313,6 +313,25 @@ CSparseMatrix::append(const CMemBlock<double>&  rowValues,
     append(rowValues, rowColumns, rowValues.size(), iRow);
 }
 
+
+void
+CSparseMatrix::optimize_storage()
+{
+    _values.shrink(_nElements);
+    
+    _rows.shrink(_nElements);
+    
+    _columns.shrink(_nElements);
+    
+    _nMaxElements = _nElements;
+}
+
+bool
+CSparseMatrix::isOptimizedStorage() const
+{
+    return (_nElements == _nMaxElements); 
+}
+
 int32_t
 CSparseMatrix::getNumberOfRows() const
 {

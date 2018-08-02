@@ -161,6 +161,10 @@ COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContai
     
     auto spmat = genfunc::distribute(matbuff, braGtoContainer, ketGtoContainer);
     
+    // optimize memory usage in sparsse matrix
+    
+    spmat.optimize_storage(); 
+    
     // deallocate buffer of sparse matrices
     
     delete [] matbuff;

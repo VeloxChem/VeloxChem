@@ -203,6 +203,15 @@ public:
                       const int32_t iPosition) const;
     
     /**
+     Shrinks memory block object by discarding all elements beyond given elements
+     number. NOTE: No action taken if given elements number is equal or larger
+     than number of elements in memory block object.
+
+     @param nElements the number of elements.
+     */
+    void shrink(const int32_t nElements);
+    
+    /**
      Broadcasts memory block object within domain of MPI communicator.
 
      @param rank the rank of MPI process.
@@ -473,6 +482,27 @@ CMemBlock<T>::pick(const int32_t nElements,
     }
     
     return CMemBlock<T>();
+}
+
+template <class T>
+void
+CMemBlock<T>::shrink(const int32_t nElements)
+{
+    if (nElements < _nElements)
+    {
+        T* tvals = (T*) mem::malloc(nElements * sizeof(T));
+        
+        auto pdata = _data;
+        
+        #pragma omp simd aligned(pdata, tvals:VLX_ALIGN)
+        for (int32_t i = 0; i < nElements; i++)  tvals[i] = pdata[i];
+        
+        mem::free(_data);
+        
+        _nElements = nElements;
+        
+        _data = tvals;
+    }
 }
 
 template <>
