@@ -282,11 +282,11 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      CSparseMatri
         
         // compute distances: R(PA) = P - A
         
-        intsfunc::compDistancesPA(rpa, rab, rfacts, 2, bragtos, ketgtos, i);
+        intsfunc::compDistancesPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
         
         // compute distances: R(PB) = P - B
         
-        intsfunc::compDistancesPB(rpb, rab, rfacts, 2, bragtos, ketgtos, i);
+        intsfunc::compDistancesPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
         
         // compite primitive kinetic energy integrals
         

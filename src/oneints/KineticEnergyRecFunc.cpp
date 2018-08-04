@@ -68,9 +68,9 @@ namespace kinrecfunc { // kinrecfunc namespace
         {
             // set up pointers to Obara-Saika factors
             
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(4 * idx);
             
-            auto fz = osFactors.data(2 * idx + 1);
+            auto fz = osFactors.data(4 * idx + 1);
             
             auto fb = bnorm[i];
             
@@ -90,7 +90,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                 
                          * std::exp(-fz[j] * r2ab);
                 
-                t_0_0[j] = fz[j] * (3.0 - 2.0 * r2ab) * s_0_0[j];
+                t_0_0[j] = fz[j] * (3.0 - 2.0 * fz[j] * r2ab) * s_0_0[j];
             }
             
             idx++;
