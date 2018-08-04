@@ -9,6 +9,8 @@
 #ifndef OverlapIntegralsDriver_hpp
 #define OverlapIntegralsDriver_hpp
 
+#include <cstdint>
+
 #include "mpi.h"
 
 #include "OutputStream.hpp"
@@ -22,7 +24,7 @@
 #include "SparseMatrix.hpp"
 
 /**
- Class COverlapIntegralsDriver computes one-electron integrals.
+ Class COverlapIntegralsDriver computes one-electron overlap integrals.
  
  @author Z. Rinkevicius
  */
@@ -83,9 +85,11 @@ class COverlapIntegralsDriver
     /**
      Computes batch of primitive overlap integrals using Obara-Saika recursion
      and stores results in primitives buffer.
+     Reference: S. Obara, A. Saika, J. Chem. Phys. 84, 3963 (1986).
      
-     Batch size: (one contracted GTO on bra side) x (all contracted GTOs on ket side).
-
+     Batch size: (one contracted GTO on bra side) x (all contracted GTOs on ket
+     side).
+     
      @param primBuffer the primitives buffer.
      @param recPattern the recursion pattern.
      @param recIndexes the indexes of data blocks in recursion pattern.

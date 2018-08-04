@@ -12,10 +12,16 @@
 #include <vector>
 
 #include "TwoIndexes.hpp"
+#include "ThreeIndexes.hpp"
 
 /**
  Defines alias to STL vector of two indexes objects.
  */
 using CVecTwoIndexes = std::vector<CTwoIndexes>;
+
+/**
+ Defines alias to STL vector of three indexes objects.
+ */
+using CVecThreeIndexes = std::vector<CThreeIndexes>;
 
 #endif /* VecIndexes_hpp */

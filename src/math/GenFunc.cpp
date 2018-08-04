@@ -431,6 +431,18 @@ isInVector(const CVecTwoIndexes& vector,
     
     return false;
 }
+    
+bool
+isInVector(const CVecThreeIndexes& vector,
+           const CThreeIndexes&    triple)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (triple == vector[i]) return true;
+    }
+        
+    return false;
+}
 
 bool
 addValidAndUniquePair(      CVecTwoIndexes& vector,
@@ -444,6 +456,19 @@ addValidAndUniquePair(      CVecTwoIndexes& vector,
     
     return true;
 }
+    
+bool
+addValidAndUniqueTriple(      CVecThreeIndexes& vector,
+                        const CThreeIndexes&    triple)
+{
+    if (!triple.isValidTriple()) return false;
+        
+    if (genfunc::isInVector(vector, triple)) return false;
+        
+    vector.push_back(triple);
+        
+    return true;
+}
 
 int32_t
 findPairIndex(const std::vector<int32_t>& indexes,
@@ -455,6 +480,19 @@ findPairIndex(const std::vector<int32_t>& indexes,
         if (pair == vector[i]) return indexes[i];
     }
  
+    return -1;
+}
+    
+int32_t
+findTripleIndex(const std::vector<int32_t>& indexes,
+                const CVecThreeIndexes&     vector,
+                const CThreeIndexes&        triple)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (triple == vector[i]) return indexes[i];
+    }
+        
     return -1;
 }
     

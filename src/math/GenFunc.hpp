@@ -137,6 +137,17 @@ namespace genfunc { // genfunc namespace
                     const CTwoIndexes&    pair);
     
     /**
+     Checks if three indexes object is inside vector of three indexes objects.
+     
+     @param vector the vector of three indexes objects.
+     @param triple the three indexes object.
+     @return true if three indexes object is found in vector of three indexes
+             objects, false - otherwise.
+     */
+    bool isInVector(const CVecThreeIndexes& vector,
+                    const CThreeIndexes&    triple);
+    
+    /**
      Conditionally adds two indexes object to vector of two indexes objects.
      Addition is skipped if two indexes object is not valid indexing pair or
      is already resides in vector of two indexes objects.
@@ -150,6 +161,19 @@ namespace genfunc { // genfunc namespace
                                const CTwoIndexes&    pair);
     
     /**
+    Conditionally adds three indexes object to vector of three indexes objects.
+    Addition is skipped if three indexes object is not valid indexing triple or
+    is already resides in vector of three indexes objects.
+        
+    @param vector the vector of three indexes objects.
+    @param triple the three indexes object.
+    @return true if three indexes object is added to vector of three indexes
+            objects, false otherwise.
+    */
+    bool addValidAndUniqueTriple(      CVecThreeIndexes& vector,
+                                 const CThreeIndexes&    triple);
+    
+    /**
      Finds index from vector of indexes associated with two indexes object in
      vector of two indexes objects.
 
@@ -161,6 +185,19 @@ namespace genfunc { // genfunc namespace
     int32_t findPairIndex(const std::vector<int32_t>& indexes,
                           const CVecTwoIndexes&       vector,
                           const CTwoIndexes&          pair);
+    
+    /**
+     Finds index from vector of indexes associated with three indexes object in
+     vector of three indexes objects.
+     
+     @param indexes the vector of indexes.
+     @param vector the vector of three indexes objects.
+     @param triple the three indexes object.
+     @return the index assocated with three indexes object.
+     */
+    int32_t findTripleIndex(const std::vector<int32_t>& indexes,
+                            const CVecThreeIndexes&     vector,
+                            const CThreeIndexes&        triple);
 
 } // genfunc namespace
 

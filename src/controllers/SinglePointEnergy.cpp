@@ -18,6 +18,7 @@
 #include "XCFuncType.hpp"
 
 #include "OverlapIntegralsDriver.hpp"
+#include "KineticEnergyIntegralsDriver.hpp"
 
 #include "MemBlock2D.hpp"
 
@@ -139,7 +140,13 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     COverlapIntegralsDriver ovldrv(_globRank, _globNodes, comm);
     
-    auto ovlmat = ovldrv.compute(_molecule, _aoBasis, comm); 
+    auto ovlmat = ovldrv.compute(_molecule, _aoBasis, comm);
+    
+    // compute kinetic energy integrals
+    
+    CKineticEnergyIntegralsDriver kindrv(_globRank, _globNodes, comm);
+    
+    auto kinmat = kindrv.compute(_molecule, _aoBasis, comm);
 
     // generate density grid
 

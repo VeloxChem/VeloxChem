@@ -67,7 +67,7 @@ public:
     /**
      Assigns a overlap matrix object by moving other overlap matrix object.
      
-     @param source the basis function object.
+     @param source the overlap matrix object.
      */
     COverlapMatrix& operator=(COverlapMatrix&& source) noexcept;
     
@@ -97,7 +97,5 @@ public:
     friend std::ostream& operator<<(      std::ostream&   output,
                                     const COverlapMatrix& source);
 };
-
-
 
 #endif /* OverlapMatrix_hpp */

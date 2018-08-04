@@ -1,0 +1,108 @@
+//
+//                     V.E.L.O.X. C.H.E.M. MP
+//      ---------------------------------------------------
+//           An Electronic Structure Code for Nanoscale
+//
+//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+
+#ifndef KineticEnergyMatrix_hpp
+#define KineticEnergyMatrix_hpp
+
+#include "SparseMatrix.hpp"
+
+/**
+ Class CKineticEnergyMatrix stores general kinetic energy matrix and provides
+ set of methods for handling of kinetic energy matrix data.
+ 
+ @author Z. Rinkevicius
+ */
+class CKineticEnergyMatrix
+{
+    /**
+     The generic sparse kinetic energy matrix (rectangular or square).
+     */
+    CSparseMatrix _matrix;
+    
+public:
+    
+    /**
+     Creates an empty kinetic energy matrix object.
+     */
+    CKineticEnergyMatrix();
+    
+    /**
+     Creates a kinetic energy matrix object.
+     
+     @param matrix the sparse matrix with kinetic energy integrals.
+     */
+    CKineticEnergyMatrix(const CSparseMatrix& matrix);
+    
+    /**
+     Creates a kinetic energy matrix object by copying other kinetic energy
+     matrix object.
+     
+     @param source the kinetic energy matrix object.
+     */
+    CKineticEnergyMatrix(const CKineticEnergyMatrix& source);
+    
+    /**
+     Creates a kinetic energy matrix object by moving other kinetic energy
+     matrix object.
+     
+     @param source the kinetic energy matrix object.
+     */
+    CKineticEnergyMatrix(CKineticEnergyMatrix&& source) noexcept;
+    
+    /**
+     Destroys a kinetic energy matrix object.
+     */
+    ~CKineticEnergyMatrix();
+    
+    /**
+     Assigns a kinetic energy matrix object by copying other kinetic energy
+     matrix object.
+     
+     @param source the kinetic energy matrix object.
+     */
+    CKineticEnergyMatrix& operator=(const CKineticEnergyMatrix& source);
+    
+    /**
+     Assigns a kinetic energy matrix object by moving other kinetic energy
+     matrix object.
+     
+     @param source the kinetic energy matrix object.
+     */
+    CKineticEnergyMatrix& operator=(CKineticEnergyMatrix&& source) noexcept;
+    
+    /**
+     Compares kinetic energy matrix object with other kinetic energy matrix
+     object.
+     
+     @param other the kinetic energy matrix object.
+     @return true if kinetic energy matrix objects are equal, false otherwise.
+     */
+    bool operator==(const CKineticEnergyMatrix& other) const;
+    
+    /**
+     Compares kinetic energy matrix object with other kinetic energy matrix
+     object.
+     
+     @param other the kinetic energy matrix object.
+     @return true if kinetic energy matrix objects are not equal, false otherwise.
+     */
+    bool operator!=(const CKineticEnergyMatrix& other) const;
+    
+    /**
+     Converts kinetic energy matrix object to text output and insert it into
+     output text stream.
+     
+     @param output the output text stream.
+     @param source the kinetic energy matrix object.
+     */
+    friend std::ostream& operator<<(      std::ostream&         output,
+                                    const CKineticEnergyMatrix& source);
+};
+
+
+#endif /* KineticEnergyMatrix_hpp */

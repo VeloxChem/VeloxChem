@@ -484,6 +484,27 @@ TEST_F(CGenFuncTest, IsInVectorForTwoIndexes)
     ASSERT_FALSE(genfunc::isInVector(vec, {7, 1}));
 }
 
+TEST_F(CGenFuncTest, IsInVectorForThreeIndexes)
+{
+    CVecThreeIndexes vec{{0, 1, 3}, {2, 4, 2}, {7, -1, 3}, {8, 2, 4}};
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {0, 1, 3}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {2, 4, 2}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {7, -1, 3}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {8,  2, 4}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {0, 0, 0}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 0, 1}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 1, 2}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {7, 1, 2}));
+}
+
 TEST_F(CGenFuncTest, AddValidAndUniquePair)
 {
     CVecTwoIndexes vec{{0, 1}, {2, 4}};
@@ -505,6 +526,29 @@ TEST_F(CGenFuncTest, AddValidAndUniquePair)
     ASSERT_EQ(vec[2], CTwoIndexes(2, 1));
 }
 
+TEST_F(CGenFuncTest, AddValidAndUniqueTriple)
+{
+    CVecThreeIndexes vec{{0, 1, 1}, {2, 4, 0}};
+    
+    genfunc::addValidAndUniqueTriple(vec, {7, -1, 1});
+    
+    genfunc::addValidAndUniqueTriple(vec, {2, 1, 1});
+    
+    genfunc::addValidAndUniqueTriple(vec, {2, 4, 0});
+    
+    genfunc::addValidAndUniqueTriple(vec, {2, 1, -1});
+    
+    genfunc::addValidAndUniqueTriple(vec, {2, 1, 1});
+    
+    ASSERT_EQ(vec.size(), 3);
+    
+    ASSERT_EQ(vec[0], CThreeIndexes(0, 1, 1));
+    
+    ASSERT_EQ(vec[1], CThreeIndexes(2, 4, 0));
+    
+    ASSERT_EQ(vec[2], CThreeIndexes(2, 1, 1));
+}
+
 TEST_F(CGenFuncTest, FindPairIndex)
 {
     CVecTwoIndexes vec{{0, 1}, {2, 4}, {7, -1}, {8, 2}};
@@ -522,4 +566,23 @@ TEST_F(CGenFuncTest, FindPairIndex)
     ASSERT_EQ(-1, genfunc::findPairIndex(idx, vec, {0, 0}));
     
     ASSERT_EQ(-1, genfunc::findPairIndex(idx, vec, {2, 3}));
+}
+
+TEST_F(CGenFuncTest, FindTripleIndex)
+{
+    CVecThreeIndexes vec{{0, 1, 1}, {2, 4, 3}, {7, -1, 2}, {8, 2, 4}};
+    
+    std::vector<int32_t> idx{1, 3, 7, 8};
+    
+    ASSERT_EQ(8, genfunc::findTripleIndex(idx, vec, {8, 2, 4}));
+    
+    ASSERT_EQ(7, genfunc::findTripleIndex(idx, vec, {7, -1, 2}));
+    
+    ASSERT_EQ(3, genfunc::findTripleIndex(idx, vec, {2, 4, 3}));
+    
+    ASSERT_EQ(1, genfunc::findTripleIndex(idx, vec, {0, 1, 1}));
+    
+    ASSERT_EQ(-1, genfunc::findTripleIndex(idx, vec, {0, 0, 0}));
+    
+    ASSERT_EQ(-1, genfunc::findTripleIndex(idx, vec, {2, 4, 2}));
 }
