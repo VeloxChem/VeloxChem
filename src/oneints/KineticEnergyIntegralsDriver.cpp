@@ -221,19 +221,7 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      CSparseMatri
     auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
     
     auto pidx = genfunc::findTripleIndex(recidx, recvec, {bang, kang, 0});
-    
-    // TESTTING:
-    
-    printf("*** Recursion Buffer for (%i|t|%i) with prim. max %i and tot. size %i\n", bang, kang, pmax, nblk);
-    
-    for (size_t i = 0; i < recvec.size(); i++)
-    {
-        if (recvec[i].third() == 0)
-            printf("T(%i,%i): %i\n", recvec[i].first(), recvec[i].second(), recidx[i]);
-        if (recvec[i].third() == 1)
-            printf("S(%i,%i): %i\n", recvec[i].first(), recvec[i].second(), recidx[i]);
-    }
-    
+        
     // allocate primitives integrals buffer
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
