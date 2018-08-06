@@ -19,6 +19,7 @@
 
 #include "OverlapIntegralsDriver.hpp"
 #include "KineticEnergyIntegralsDriver.hpp"
+#include "NuclearPotentialIntegralsDriver.hpp"
 
 #include "MemBlock2D.hpp"
 
@@ -147,6 +148,10 @@ CSinglePointEnergy::run(COutputStream& oStream,
     CKineticEnergyIntegralsDriver kindrv(_globRank, _globNodes, comm);
     
     auto kinmat = kindrv.compute(_molecule, _aoBasis, comm);
+    
+    CNuclearPotentialIntegralsDriver nucpotdrv(_globRank, _globNodes, comm);
+    
+    auto nucpotmat = nucpotdrv.compute(_molecule, _aoBasis, comm);
 
     // generate density grid
 

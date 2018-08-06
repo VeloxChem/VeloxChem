@@ -170,7 +170,7 @@ public:
     
     /**
      Computes kinetic energy integrals for molecule in specific basis set and
-     stores results in overlap matrix object.
+     stores results in kinetic energy matrix object.
      
      @param molecule the molecule.
      @param basis the molecular basis.

@@ -282,6 +282,18 @@ CMolecule::getCoordinatesZ() const
     return _atomCoordinates.data(2);
 }
 
+CMemBlock2D<double>
+CMolecule::getCoordinates() const
+{
+    return _atomCoordinates;
+}
+
+CMemBlock<double>
+CMolecule::getCharges() const
+{
+    return _atomCharges; 
+}
+
 CMemBlock<double>
 CMolecule::getMinDistances() const
 {

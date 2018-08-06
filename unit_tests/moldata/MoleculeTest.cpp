@@ -143,6 +143,24 @@ TEST_F(CMoleculeTest, GetCoordinatesZ)
     vlxtest::compare({0.0, 1.2}, mol.getCoordinatesZ());
 }
 
+TEST_F(CMoleculeTest, GetCoordinates)
+{
+    CMolecule mol = vlxmol::getMoleculeLiHCation();
+    
+    CMemBlock2D<double> coords({0.0, 0.0, 0.0, 0.0, 0.0, 1.2}, 2, 3);
+    
+    ASSERT_EQ(mol.getCoordinates(), coords);
+}
+
+TEST_F(CMoleculeTest, GetCharges)
+{
+    CMolecule mol = vlxmol::getMoleculeLiHCation();
+    
+    CMemBlock<double> chrg({3.0, 1.0});
+    
+    ASSERT_EQ(mol.getCharges(), chrg);
+}
+
 TEST_F(CMoleculeTest, GetMinDistances)
 {
     CMolecule mol = vlxmol::getMoleculeH2O();

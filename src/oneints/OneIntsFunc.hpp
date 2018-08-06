@@ -84,7 +84,7 @@ namespace intsfunc { // intsfunc namespace
      @param pbDistances the vector of Cartesian R(PB) = P - B distances.
      @param abDistances the vector of Cartesian R(AB) = A - B distances.
      @param osFactors the vector of Obara-Saika factors.
-     @param nFactors the fundamental dimensions of Obara-Saika factors vectors.
+     @param nFactors the fundamental dimension of Obara-Saika factors vectors.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
@@ -96,6 +96,81 @@ namespace intsfunc { // intsfunc namespace
                          const CGtoBlock&           braGtoBlock,
                          const CGtoBlock&           ketGtoBlock,
                          const int32_t              iContrGto);
+    
+    /**
+     Computes coordinates of combined Gaussian function, which is obtained by
+     applying Gaussian product rule to two Gaussian functions.
+
+     @param pCoordinates the vector of coordinates for combined Gaussian
+            functions.
+     @param osFactors the vector of Obara-Saika factors.
+     @param nFactors the fundamental dimension of Obara-Saika factors vectors.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compCoordinatesForP(      CMemBlock2D<double>& pCoordinates,
+                             const CMemBlock2D<double>& osFactors,
+                             const int32_t              nFactors,
+                             const CGtoBlock&           braGtoBlock,
+                             const CGtoBlock&           ketGtoBlock,
+                             const int32_t              iContrGto);
+    
+    /**
+     Computes vector of distances between center P of combined primitive GTOs
+     and center A of primitive GTO on bra side.
+
+     @param paDistances the vector of Cartesian R(PA) = P - A distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+            functions.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compDistancesPA(      CMemBlock2D<double>& paDistances,
+                         const CMemBlock2D<double>& pCoordinates,
+                         const CGtoBlock&           braGtoBlock,
+                         const CGtoBlock&           ketGtoBlock,
+                         const int32_t              iContrGto);
+    
+    /**
+     Computes vector of distances between center P of combined primitive GTOs
+     and center B of primitive GTO on bra side.
+     
+     @param pbDistances the vector of Cartesian R(PB) = P - B distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+     functions.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compDistancesPB(      CMemBlock2D<double>& pbDistances,
+                         const CMemBlock2D<double>& pCoordinates,
+                         const CGtoBlock&           braGtoBlock,
+                         const CGtoBlock&           ketGtoBlock,
+                         const int32_t              iContrGto);
+    
+    /**
+     Computes vector of distances between center P of combined primitive GTOs
+     and center C of specific point charge.
+     
+     @param pcDistances the vector of Cartesian R(PB) = P - C distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+            functions.
+     @param cCoordinates the vector of coordinates of point charges.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     @param iPointCharge the index of point charge in vector point charges
+            coordinates.
+     */
+    void compDistancesPC(      CMemBlock2D<double>& pcDistances,
+                         const CMemBlock2D<double>& pCoordinates,
+                         const CMemBlock2D<double>& cCoordinates,
+                         const CGtoBlock&           braGtoBlock,
+                         const CGtoBlock&           ketGtoBlock,
+                         const int32_t              iContrGto,
+                         const int32_t              iPointCharge);
     
 } // intsfunc namespace
 

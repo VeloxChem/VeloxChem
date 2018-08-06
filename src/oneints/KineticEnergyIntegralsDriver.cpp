@@ -230,17 +230,13 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      CSparseMatri
     
     auto cdim = ketgtos.getNumberOfContrGtos();
     
-    auto ncart = angmom::to_CartesianComponents(bang)
-    
-               * angmom::to_CartesianComponents(kang);
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
     
     CMemBlock2D<double> cartbuffer(cdim, ncart);
     
     // allocate contracted spherical integrals buffer
     
-    auto nspher = angmom::to_SphericalComponents(bang)
-    
-                * angmom::to_SphericalComponents(kang);
+    auto nspher = angmom::to_SphericalComponents(bang, kang);
     
     CMemBlock2D<double> spherbuffer(cdim, nspher);
     
@@ -667,11 +663,8 @@ CKineticEnergyIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<
     {
         recIndexes.push_back(nblk);
         
-        auto bcomp = angmom::to_CartesianComponents(recPattern[i].first());
-        
-        auto kcomp = angmom::to_CartesianComponents(recPattern[i].second());
-        
-        nblk += maxPrimGtos * bcomp * kcomp;
+        nblk += maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
+                                                             recPattern[i].second());
     }
     
     return nblk;

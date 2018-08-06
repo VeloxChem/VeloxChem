@@ -244,6 +244,20 @@ public:
     const double* getCoordinatesZ() const;
     
     /**
+     Gets coordinates of all atoms in molecule.
+
+     @return the 2D memory block object (all x, all y, all z).
+     */
+    CMemBlock2D<double> getCoordinates() const;
+    
+    /**
+     Gets charges of all atoms in molecule.
+     
+     @return the memory block object (all charges).
+     */
+    CMemBlock<double> getCharges() const;
+    
+    /**
      Computes vector of distances to closest neighbouring atom for each atom.
 
      @return the vector of distances.

@@ -306,4 +306,279 @@ namespace intsfunc { // intsfunc namespace
         }
     }
     
+    void
+    compCoordinatesForP(      CMemBlock2D<double>& pCoordinates,
+                        const CMemBlock2D<double>& osFactors,
+                        const int32_t              nFactors,
+                        const CGtoBlock&           braGtoBlock,
+                        const CGtoBlock&           ketGtoBlock,
+                        const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+        
+        auto brx = braGtoBlock.getCoordinatesX();
+        
+        auto bry = braGtoBlock.getCoordinatesY();
+        
+        auto brz = braGtoBlock.getCoordinatesZ();
+        
+        auto bexp = braGtoBlock.getExponents();
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto krx = ketGtoBlock.getCoordinatesX();
+        
+        auto kry = ketGtoBlock.getCoordinatesY();
+        
+        auto krz = ketGtoBlock.getCoordinatesZ();
+        
+        auto kexp = ketGtoBlock.getExponents();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to prefactors
+            
+            auto fx = osFactors.data(nFactors * idx);
+            
+            // set up pmitive GTO data on bra side
+            
+            auto fax = bexp[i] * brx[i];
+            
+            auto fay = bexp[i] * bry[i];
+            
+            auto faz = bexp[i] * brz[i];
+            
+            // set up pointers to coordinates of P
+            
+            auto px = pCoordinates.data(3 * idx);
+            
+            auto py = pCoordinates.data(3 * idx + 1);
+            
+            auto pz = pCoordinates.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(fx, px, py, pz, kexp, krx, kry,\
+                                     krz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                double fact = fx[j];
+                
+                px[j] = fact * (fax + kexp[j] * krx[j]);
+                
+                py[j] = fact * (fay + kexp[j] * kry[j]);
+                
+                pz[j] = fact * (faz + kexp[j] * krz[j]);
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compDistancesPA(      CMemBlock2D<double>& paDistances,
+                    const CMemBlock2D<double>& pCoordinates,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoBlock&           ketGtoBlock,
+                    const int32_t              iContrGto)
+    {
+        // skip computation for zero angular momentum on bra side
+        
+        if (braGtoBlock.getAngularMomentum() == 0) return;
+        
+        // set up pointers to primitives data on bra side
+        
+        auto brx = braGtoBlock.getCoordinatesX();
+        
+        auto bry = braGtoBlock.getCoordinatesY();
+        
+        auto brz = braGtoBlock.getCoordinatesZ();
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of P
+            
+            auto px = pCoordinates.data(3 * idx);
+            
+            auto py = pCoordinates.data(3 * idx + 1);
+            
+            auto pz = pCoordinates.data(3 * idx + 2);
+            
+            // set up pmitive GTO data on bra side
+            
+            auto ax = brx[i];
+            
+            auto ay = bry[i];
+            
+            auto az = brz[i];
+            
+            // set up pointers to distances R(PA)
+            
+            auto pax = paDistances.data(3 * idx);
+            
+            auto pay = paDistances.data(3 * idx + 1);
+            
+            auto paz = paDistances.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(px, py, pz, pax, pay, paz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                pax[j] = px[j] - ax;
+                
+                pay[j] = py[j] - ay;
+                
+                paz[j] = pz[j] - az;
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compDistancesPB(      CMemBlock2D<double>& pbDistances,
+                    const CMemBlock2D<double>& pCoordinates,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoBlock&           ketGtoBlock,
+                    const int32_t              iContrGto)
+    {
+        // skip computation for zero angular momentum on bra side
+        
+        if (ketGtoBlock.getAngularMomentum() == 0) return;
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto krx = ketGtoBlock.getCoordinatesX();
+        
+        auto kry = ketGtoBlock.getCoordinatesY();
+        
+        auto krz = ketGtoBlock.getCoordinatesZ();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of P
+            
+            auto px = pCoordinates.data(3 * idx);
+            
+            auto py = pCoordinates.data(3 * idx + 1);
+            
+            auto pz = pCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(PB)
+            
+            auto pbx = pbDistances.data(3 * idx);
+            
+            auto pby = pbDistances.data(3 * idx + 1);
+            
+            auto pbz = pbDistances.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(krx, kry, krz, px, py, pz, pbx, pby,\
+                                     pbz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                pbx[j] = px[j] - krx[j];
+                
+                pby[j] = py[j] - kry[j];
+                
+                pbz[j] = pz[j] - krz[j];
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compDistancesPC(      CMemBlock2D<double>& pcDistances,
+                    const CMemBlock2D<double>& pCoordinates,
+                    const CMemBlock2D<double>& cCoordinates,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoBlock&           ketGtoBlock,
+                    const int32_t              iContrGto,
+                    const int32_t              iPointCharge)
+    {
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // set up coordinates of point charges
+        
+        auto crx = (cCoordinates.data(0))[iPointCharge];
+        
+        auto cry = (cCoordinates.data(1))[iPointCharge];
+        
+        auto crz = (cCoordinates.data(2))[iPointCharge];
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of P
+            
+            auto px = pCoordinates.data(3 * idx);
+            
+            auto py = pCoordinates.data(3 * idx + 1);
+            
+            auto pz = pCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(PC)
+            
+            auto pcx = pcDistances.data(3 * idx);
+            
+            auto pcy = pcDistances.data(3 * idx + 1);
+            
+            auto pcz = pcDistances.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(px, py, pz, pcx, pcy, pcz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                pcx[j] = px[j] - crx;
+                
+                pcy[j] = py[j] - cry;
+                
+                pcz[j] = pz[j] - crz;
+            }
+            
+            idx++;
+        }
+    }
+    
 } // intsfunc namespace
