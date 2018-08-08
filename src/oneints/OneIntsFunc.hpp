@@ -58,6 +58,19 @@ namespace intsfunc { // intsfunc namespace
                                      const int32_t              iContrGto);
     
     /**
+     Computes Obara-Saika factors for nuclear potential integrals.
+     
+     @param osFactors the vector of Obara-Saika factors.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compFactorsForNuclearPotential(      CMemBlock2D<double>& osFactors,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
+    
+    /**
      Computes vector of distances between center P of combined primitive GTOs
      and center A of primitive GTO on bra side.
      

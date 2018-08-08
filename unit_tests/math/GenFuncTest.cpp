@@ -586,3 +586,16 @@ TEST_F(CGenFuncTest, FindTripleIndex)
     
     ASSERT_EQ(-1, genfunc::findTripleIndex(idx, vec, {2, 4, 2}));
 }
+
+TEST_F(CGenFuncTest, MaxOrderOfPair)
+{
+    CVecThreeIndexes vec{{0, 1, 1}, {2, 4, 3}, {0, 1, 0}, {0, 1, 4}};
+    
+    ASSERT_EQ(-1, genfunc::maxOrderOfPair(vec, 0, 0));
+    
+    ASSERT_EQ( 4, genfunc::maxOrderOfPair(vec, 0, 1));
+    
+    ASSERT_EQ(-1, genfunc::maxOrderOfPair(vec, 4, 2));
+    
+    ASSERT_EQ( 3, genfunc::maxOrderOfPair(vec, 2, 4));
+}

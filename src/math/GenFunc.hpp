@@ -198,6 +198,19 @@ namespace genfunc { // genfunc namespace
     int32_t findTripleIndex(const std::vector<int32_t>& indexes,
                             const CVecThreeIndexes&     vector,
                             const CThreeIndexes&        triple);
+    
+    /**
+     Gets maximum order of indexes pair in vector of triple indexes objects,
+     where third index in triple object is used to store order information.
+
+     @param vector the vector of three indexes objects.
+     @param firstIndex the first index of indexes pair.
+     @param secondIndex the second index of indexes pair.
+     @return the maximum order.
+     */
+    int32_t maxOrderOfPair(const CVecThreeIndexes& vector,
+                           const int32_t           firstIndex,
+                           const int32_t           secondIndex);
 
 } // genfunc namespace
 

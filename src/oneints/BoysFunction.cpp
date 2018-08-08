@@ -23,9 +23,9 @@ CBoysFunction::CBoysFunction()
 CBoysFunction::CBoysFunction(const int32_t order)
 
     : _order(order)
-
-    , _table(CMemBlock2D<double>(7, 121 * (order + 1)))
 {
+    _table = CMemBlock2D<double>(7, 121 * (_order + 1)); 
+    
     _setTable(); 
 }
 
@@ -452,7 +452,7 @@ CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
 
                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            val00[i] = 2.0 * fa * val00[i] + std::exp(-fa);
+            val00[i] = 2.0 * fa * val01[i] + std::exp(-fa);
         }
         else
         {

@@ -149,11 +149,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // set up pointers to (S|S) integrals
 
-            auto s_0_0 = primBuffer.data(s1off + 1 * idx);
+            auto s_0_0 = primBuffer.data(s1off + idx);
 
             // set up pointers to (S|T|S) integrals
 
-            auto t_0_0 = primBuffer.data(k1off + 1 * idx);
+            auto t_0_0 = primBuffer.data(k1off + idx);
 
             // set up pointers to (S|P) integrals
 
@@ -262,11 +262,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // set up pointers to (S|S) integrals
 
-            auto s_0_0 = primBuffer.data(s1off + 1 * idx);
+            auto s_0_0 = primBuffer.data(s1off + idx);
 
             // set up pointers to (S|T|S) integrals
 
-            auto t_0_0 = primBuffer.data(k1off + 1 * idx);
+            auto t_0_0 = primBuffer.data(k1off + idx);
 
             // set up pointers to (P|S) integrals
 
@@ -381,11 +381,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // set up pointers to (S|S) integrals
 
-            auto s_0_0 = primBuffer.data(skoff + 1 * idx);
+            auto s_0_0 = primBuffer.data(skoff + idx);
 
             // set up pointers to (S|T|S) integrals
 
-            auto t_0_0 = primBuffer.data(kkoff + 1 * idx);
+            auto t_0_0 = primBuffer.data(kkoff + idx);
 
             // set up pointers to (S|P) integrals
 
@@ -571,11 +571,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // set up pointers to (S|S) integrals
 
-            auto s_0_0 = primBuffer.data(s2off + 1 * idx);
+            auto s_0_0 = primBuffer.data(s2off + idx);
 
             // set up pointers to (S|T|S) integrals
 
-            auto t_0_0 = primBuffer.data(k2off + 1 * idx);
+            auto t_0_0 = primBuffer.data(k2off + idx);
 
             // set up pointers to (S|P) integrals
 
@@ -738,11 +738,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // set up pointers to (S|S) integrals
 
-            auto s_0_0 = primBuffer.data(s2off + 1 * idx);
+            auto s_0_0 = primBuffer.data(s2off + idx);
 
             // set up pointers to (S|T|S) integrals
 
-            auto t_0_0 = primBuffer.data(k2off + 1 * idx);
+            auto t_0_0 = primBuffer.data(k2off + idx);
 
             // set up pointers to (P|S) integrals
 

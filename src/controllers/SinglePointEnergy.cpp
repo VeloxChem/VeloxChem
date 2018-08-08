@@ -20,6 +20,7 @@
 #include "OverlapIntegralsDriver.hpp"
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "NuclearPotentialIntegralsDriver.hpp"
+#include "BoysFunction.hpp"
 
 #include "MemBlock2D.hpp"
 
@@ -149,9 +150,19 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     auto kinmat = kindrv.compute(_molecule, _aoBasis, comm);
     
-    CNuclearPotentialIntegralsDriver nucpotdrv(_globRank, _globNodes, comm);
+    CMemBlock<double> bargs({3.46, 1.97714, 0.481391});
     
-    auto nucpotmat = nucpotdrv.compute(_molecule, _aoBasis, comm);
+    CMemBlock2D<double> bvals(3, 2);
+    
+    CBoysFunction bftab(1);
+    
+    bftab.compute(bvals, bargs, 1);
+    
+    std::cout << bvals; 
+    
+    //CNuclearPotentialIntegralsDriver nucpotdrv(_globRank, _globNodes, comm);
+    
+    //auto nucpotmat = nucpotdrv.compute(_molecule, _aoBasis, comm);
 
     // generate density grid
 

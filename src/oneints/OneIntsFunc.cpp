@@ -169,6 +169,58 @@ namespace intsfunc { // intsfunc namespace
     }
     
     void
+    compFactorsForNuclearPotential(      CMemBlock2D<double>& osFactors,
+                                   const CGtoBlock&           braGtoBlock,
+                                   const CGtoBlock&           ketGtoBlock,
+                                   const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+        
+        auto bexp = braGtoBlock.getExponents();
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto kexp = ketGtoBlock.getExponents();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(3 * idx);
+            
+            auto fz = osFactors.data(3 * idx + 1);
+            
+            auto fg = osFactors.data(3 * idx + 2);
+            
+            auto fb = bexp[i];
+            
+            #pragma omp simd aligned(fx, fz, fg, kexp: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                double fact = fb + kexp[j];
+                
+                fg[j] = fact;
+                
+                fx[j] = 1.0 / fact;
+                
+                fz[j] = fb * kexp[j] * fx[j];
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
     compDistancesPA(      CMemBlock2D<double>& paDistances,
                     const CMemBlock2D<double>& abDistances,
                     const CMemBlock2D<double>& osFactors,
@@ -539,11 +591,11 @@ namespace intsfunc { // intsfunc namespace
         
         // set up coordinates of point charges
         
-        auto crx = (cCoordinates.data(0))[iPointCharge];
+        double crx = (cCoordinates.data(0))[iPointCharge];
         
-        auto cry = (cCoordinates.data(1))[iPointCharge];
+        double cry = (cCoordinates.data(1))[iPointCharge];
         
-        auto crz = (cCoordinates.data(2))[iPointCharge];
+        double crz = (cCoordinates.data(2))[iPointCharge];
         
         // loop over contracted GTO on bra side
         

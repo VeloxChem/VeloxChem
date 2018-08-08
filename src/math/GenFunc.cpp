@@ -496,4 +496,23 @@ findTripleIndex(const std::vector<int32_t>& indexes,
     return -1;
 }
     
+int32_t
+maxOrderOfPair(const CVecThreeIndexes& vector,
+               const int32_t           firstIndex,
+               const int32_t           secondIndex)
+{
+    int32_t iord = -1;
+    
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if ((vector[i].first()  == firstIndex) &&
+            (vector[i].second() == secondIndex))
+        {
+            if (vector[i].third() > iord) iord = vector[i].third(); 
+        }
+    }
+    
+    return iord;
+}
+    
 } // genfunc namespace

@@ -11,6 +11,8 @@
 #include "GenFunc.hpp"
 #include "AngularMomentum.hpp"
 #include "OneIntsFunc.hpp"
+#include "BoysFunction.hpp"
+#include "NuclearPotentialRecFunc.hpp"
 
 CNuclearPotentialIntegralsDriver::CNuclearPotentialIntegralsDriver(const int32_t  globRank,
                                                                    const int32_t  globNodes,
@@ -71,9 +73,9 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
     
     // compute kinetic energy integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, matbuff)
+    //#pragma omp parallel shared(braGtoContainer, ketGtoContainer, matbuff)
     {
-        #pragma omp single nowait
+        //#pragma omp single nowait
         {
             // determine number of GTOs blocks in bra/ket sides
             
@@ -87,7 +89,7 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
             {
                 for (int32_t j = 0; j < nket; j++)
                 {
-                    #pragma omp task firstprivate(i, j)
+                   // #pragma omp task firstprivate(i, j)
                     {
                         _compNuclearPotentialForGtoBlocks(matbuff, charges, coordinates,
                                                           braGtoContainer, i,
@@ -97,6 +99,23 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
             }
         }
     }
+    
+    // testing
+    
+//    auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+//    
+//    auto nket = ketGtoContainer->getNumberOfGtoBlocks();
+//    
+//    for (int32_t i = 0; i < nbra; i++)
+//    {
+//        for (int32_t j = 0; j < nket; j++)
+//        {
+//            std::cout << "SPMAT(" << i << "," << j << "):"<< std::endl;
+//            
+//            std::cout << matbuff[i * nbra + j];
+//        }
+//    }
+    
     
     // distribute submatrices into single sparse matrix
     
@@ -128,11 +147,11 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
     
     auto ketgtos = ketGtoContainer->getGtoBlock(iKetGtoBlock);
     
-    // copy point charges data
+    // copy charges and their coordinates
     
-    CMemBlock<double> pchrg(*charges);
+    auto qvalues = *charges;
     
-    CMemBlock2D<double> pcoords(*coordinates);
+    auto qcoords = *coordinates;
     
     // set up spherical angular momentum for bra and ket sides
     
@@ -148,7 +167,7 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
     
     auto pmax = bragtos.getMaxContractionDepth();
     
-    CMemBlock2D<double> rfacts(pdim, 2 * pmax);
+    CMemBlock2D<double> rfacts(pdim, 3 * pmax);
     
     CMemBlock2D<double> rp(pdim, 3 * pmax);
     
@@ -176,15 +195,15 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
     
     auto pidx = genfunc::findTripleIndex(recidx, recvec, {bang, kang, 0});
     
-    // allocate primitive integrals buffer
+    // allocate primitives integrals buffer
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
     
-    // allocate primitives integrals accumulation buffer
+    // allocate accumulation buffer
     
     auto ncart = angmom::to_CartesianComponents(bang, kang);
     
-     CMemBlock2D<double> accbuffer(pdim, pmax * ncart);
+    CMemBlock2D<double> accbuffer(pdim, ncart * pmax);
     
     // allocate contracted Cartesian integrals buffer
     
@@ -212,9 +231,19 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
     
     CSparseMatrix spmat(nrow, ncol, 1.0e-13);
     
+    // initialize Boys function evaluator
+    
+    auto bord = genfunc::maxOrderOfPair(recvec, 0, 0);
+    
+    CBoysFunction bftab(bord);
+    
+    CMemBlock<double> bargs(pdim);
+    
+    CMemBlock2D<double> bvals(pdim, bord + 1);
+    
     // TESTING: recursion
     
-    printf("*** RECURSION SCHEME: (%i,%i) for pmax: %i\n", bang, kang, pmax);
+    printf("*** RECURSION SCHEME: (%i,%i)\n", bang, kang);
     
     for (size_t i = 0; i < recvec.size(); i++)
     {
@@ -230,37 +259,41 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
         
         // compute Obara-Saika recursion factors
         
-        intsfunc::compFactorsForOverlap(rfacts, bragtos, ketgtos, i);
+        intsfunc::compFactorsForNuclearPotential(rfacts, bragtos, ketgtos, i);
         
-        // compute combined Gaussian coordinates: P_x, P_y, P_z
+        // compute coordinates of center P
         
-        intsfunc::compCoordinatesForP(rp, rfacts, 2, bragtos, ketgtos, i);
+        intsfunc::compCoordinatesForP(rp, rfacts, 3, bragtos, ketgtos, i);
         
-        // compute distances R(PA) = P - A
+        // compute distances: R(PA) = P - A
         
         intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
         
-        // compute distances R(PB) = P - B
+        // compute distances: R(PB) = P - B
         
         intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
         
-        // zero accumulation buffer
+        // reset accumulation buffer
         
         accbuffer.zero();
         
         // loop over charges
         
-        for (int32_t j = 0; j < pchrg.size(); j++)
+        for (int32_t j = 0; j < qvalues.size(); j++)
         {
-            // compute distances R(PC): P  - C
+            // compute distances: R(PC) = P - C
             
-            intsfunc::compDistancesPC(rpc, rp, pcoords, bragtos, ketgtos, i, j);
+            intsfunc::compDistancesPC(rpc, rp, qcoords, bragtos, ketgtos, i, j);
             
-            // apply recursion code here...
+            // compute primitive integrals
             
-            // add j-th point charge contributiion to primitive integrals buffer
+            _compPrimNuclearPotentialInts(pbuffer, recvec, recidx, bftab, bargs,
+                                          bvals, bord, rfacts, rab, rpa, rpb,
+                                          rpc, bragtos, ketgtos, i);
             
-            _addPointChargeContribution(accbuffer, pbuffer, pidx, pchrg,
+            // add scaled contribution to accumulation buffer
+            
+            _addPointChargeContribution(accbuffer, pbuffer, pidx, qvalues,
                                         bragtos, ketgtos, i, j);
         }
         
@@ -284,6 +317,81 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
     
     sparseBuffer[iBraGtoBlock * kblk + iKetGtoBlock] = spmat;
 }
+
+void
+CNuclearPotentialIntegralsDriver::_compPrimNuclearPotentialInts(      CMemBlock2D<double>&  primBuffer,
+                                                                const CVecThreeIndexes&     recPattern,
+                                                                const std::vector<int32_t>& recIndexes,
+                                                                const CBoysFunction&        bfTable,
+                                                                      CMemBlock<double>&    bfArguments,
+                                                                      CMemBlock2D<double>&  bfValues,
+                                                                const int32_t               bfOrder,
+                                                                const CMemBlock2D<double>&  osFactors,
+                                                                const CMemBlock2D<double>&  abDistances,
+                                                                const CMemBlock2D<double>&  paDistances,
+                                                                const CMemBlock2D<double>&  pbDistances,
+                                                                const CMemBlock2D<double>&  pcDistances,
+                                                                const CGtoBlock&            braGtoBlock,
+                                                                const CGtoBlock&            ketGtoBlock,
+                                                                const int32_t               iContrGto) const
+{
+    // compute (s|A(0)|s) integrals
+    
+    npotrecfunc::compNuclearPotentialForSS(primBuffer, recPattern, recIndexes,
+                                           bfTable, bfArguments, bfValues,
+                                           bfOrder, osFactors, abDistances,
+                                           pcDistances, braGtoBlock, ketGtoBlock,
+                                           iContrGto);
+    
+    // compute (s|A(0)|p) integrals
+    
+    npotrecfunc::compNuclearPotentialForSP(primBuffer, recPattern, recIndexes,
+                                           pbDistances, pcDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+    
+    // compute (p|A(0)|s) integrals
+    
+    npotrecfunc::compNuclearPotentialForPS(primBuffer, recPattern, recIndexes,
+                                           paDistances, pcDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+    
+    // compute (p|A(0)|p) integrals
+    
+    npotrecfunc::compNuclearPotentialForPP(primBuffer, recPattern, recIndexes,
+                                           osFactors, paDistances, pcDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (s|A(0)|d) integrals
+    
+    npotrecfunc::compNuclearPotentialForSD(primBuffer, recPattern, recIndexes,
+                                           osFactors, pbDistances, pcDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (d|A(0)|s) integrals
+    
+    npotrecfunc::compNuclearPotentialForDS(primBuffer, recPattern, recIndexes,
+                                           osFactors, paDistances, pcDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (p|A(0)|d) integrals
+    
+    npotrecfunc::compNuclearPotentialForPD(primBuffer, recPattern, recIndexes,
+                                           osFactors, paDistances, pcDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (d|A(0)|p) integrals
+    
+    npotrecfunc::compNuclearPotentialForDP(primBuffer, recPattern, recIndexes,
+                                           osFactors, paDistances, pcDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (d|A(0)|d) integrals
+    
+    npotrecfunc::compNuclearPotentialForDD(primBuffer, recPattern, recIndexes,
+                                           osFactors, paDistances, pcDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+}
+
 
 CSparseMatrix*
 CNuclearPotentialIntegralsDriver::_createSparseBuffer(const CGtoContainer* braGtoContainer,
@@ -505,6 +613,8 @@ CNuclearPotentialIntegralsDriver::_addPointChargeContribution(      CMemBlock2D<
     // set up point charge factor
     
     auto fact = charges.at(iPointCharge);
+    
+    printf("charge: %lf\n", fact);
     
     // loop over dimensions of contracted GTO on bra side
     
