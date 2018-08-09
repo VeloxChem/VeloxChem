@@ -6,41 +6,41 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include "KineticEnergyMatrix.hpp"
+#include "ElectronicPotentialMatrix.hpp"
 
-CKineticEnergyMatrix::CKineticEnergyMatrix()
+CElectronicPotentialMatrix::CElectronicPotentialMatrix()
 {
     
 }
 
-CKineticEnergyMatrix::CKineticEnergyMatrix(const CSparseMatrix& matrix)
+CElectronicPotentialMatrix::CElectronicPotentialMatrix(const CSparseMatrix& matrix)
 
     : _matrix(matrix)
 {
     
 }
 
-CKineticEnergyMatrix::CKineticEnergyMatrix(const CKineticEnergyMatrix& source)
+CElectronicPotentialMatrix::CElectronicPotentialMatrix(const CElectronicPotentialMatrix& source)
 
     : _matrix(source._matrix)
 {
     
 }
 
-CKineticEnergyMatrix::CKineticEnergyMatrix(CKineticEnergyMatrix&& source) noexcept
+CElectronicPotentialMatrix::CElectronicPotentialMatrix(CElectronicPotentialMatrix&& source) noexcept
 
     : _matrix(std::move(source._matrix))
 {
     
 }
 
-CKineticEnergyMatrix::~CKineticEnergyMatrix()
+CElectronicPotentialMatrix::~CElectronicPotentialMatrix()
 {
     
 }
 
-CKineticEnergyMatrix&
-CKineticEnergyMatrix::operator=(const CKineticEnergyMatrix& source)
+CElectronicPotentialMatrix&
+CElectronicPotentialMatrix::operator=(const CElectronicPotentialMatrix& source)
 {
     if (this == &source) return *this;
     
@@ -49,8 +49,8 @@ CKineticEnergyMatrix::operator=(const CKineticEnergyMatrix& source)
     return *this;
 }
 
-CKineticEnergyMatrix&
-CKineticEnergyMatrix::operator=(CKineticEnergyMatrix&& source) noexcept
+CElectronicPotentialMatrix&
+CElectronicPotentialMatrix::operator=(CElectronicPotentialMatrix&& source) noexcept
 {
     if (this == &source) return *this;
     
@@ -60,7 +60,7 @@ CKineticEnergyMatrix::operator=(CKineticEnergyMatrix&& source) noexcept
 }
 
 bool
-CKineticEnergyMatrix::operator==(const CKineticEnergyMatrix& other) const
+CElectronicPotentialMatrix::operator==(const CElectronicPotentialMatrix& other) const
 {
     if (_matrix != other._matrix) return false;
     
@@ -68,18 +68,18 @@ CKineticEnergyMatrix::operator==(const CKineticEnergyMatrix& other) const
 }
 
 bool
-CKineticEnergyMatrix::operator!=(const CKineticEnergyMatrix& other) const
+CElectronicPotentialMatrix::operator!=(const CElectronicPotentialMatrix& other) const
 {
     return !(*this == other);
 }
 
 std::ostream&
 operator<<(      std::ostream&         output,
-           const CKineticEnergyMatrix& source)
+           const CElectronicPotentialMatrix& source)
 {
     output << std::endl;
     
-    output << "[CKineticEnergyMatrix (Object):" << &source << "]" << std::endl;
+    output << "[CElectronicPotentialMatrix (Object):" << &source << "]" << std::endl;
     
     output << "_matrix: " << source._matrix << std::endl;
     
