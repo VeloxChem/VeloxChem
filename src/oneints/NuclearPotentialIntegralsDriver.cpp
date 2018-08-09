@@ -100,23 +100,6 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
         }
     }
     
-    // testing
-    
-//    auto nbra = braGtoContainer->getNumberOfGtoBlocks();
-//    
-//    auto nket = ketGtoContainer->getNumberOfGtoBlocks();
-//    
-//    for (int32_t i = 0; i < nbra; i++)
-//    {
-//        for (int32_t j = 0; j < nket; j++)
-//        {
-//            std::cout << "SPMAT(" << i << "," << j << "):"<< std::endl;
-//            
-//            std::cout << matbuff[i * nbra + j];
-//        }
-//    }
-    
-    
     // distribute submatrices into single sparse matrix
     
     auto spmat = genfunc::distribute(matbuff, braGtoContainer, ketGtoContainer);
