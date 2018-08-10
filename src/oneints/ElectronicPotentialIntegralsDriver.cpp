@@ -9,6 +9,8 @@
 #include "ElectronicPotentialIntegralsDriver.hpp"
 
 #include "GenFunc.hpp"
+#include "AngularMomentum.hpp"
+#include "OneIntsFunc.hpp"
 
 CElectronicPotentialIntegralsDriver::CElectronicPotentialIntegralsDriver(const int32_t  globRank,
                                                                          const int32_t  globNodes,
@@ -137,7 +139,120 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      
     
     // generate recursion pattern
     
-    auto recvec = _getRecursionPattern(bragtos, ketgtos); 
+    auto recvec = _getRecursionPattern(bragtos, ketgtos);
+    
+    // set up angular momentum data
+    
+    auto bang = bragtos.getAngularMomentum();
+    
+    auto kang = ketgtos.getAngularMomentum();
+    
+    // set up primitives buffer indexes
+    
+    std::vector<int32_t> recidx;
+    
+    auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
+    
+    auto pidx = genfunc::findTripleIndex(recidx, recvec, {bang, kang, 0});
+    
+    // allocate primitives integrals buffer
+    
+    CMemBlock2D<double> pbuffer(pdim, nblk);
+    
+    // allocate contracted Cartesian integrals buffer
+    
+    auto cdim = ketgtos.getNumberOfContrGtos();
+    
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
+    
+    CMemBlock2D<double> cartbuffer(cdim, ncart);
+    
+    // allocate contracted spherical integrals buffer
+    
+    auto nspher = angmom::to_SphericalComponents(bang, kang);
+    
+    CMemBlock2D<double> spherbuffer(cdim, nspher);
+    
+    // allocate sparse matrix row data
+    
+    CMemBlock<double> rowvals(cdim * angmom::to_SphericalComponents(kang));
+    
+    CMemBlock<int32_t> colidx(cdim * angmom::to_SphericalComponents(kang));
+    
+    // initialize sparce matrix
+    
+    auto nrow = bragtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(bang);
+    
+    auto ncol = ketgtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(kang);
+    
+    CSparseMatrix spmat(nrow, ncol, 1.0e-13);
+    
+    // TESTING:
+    
+    printf("** RECURSION PATTERN: (%i,%i)\n", bang, kang);
+    
+    for (size_t i = 0; i < recvec.size(); i++)
+    {
+        printf("(%i|g(r,r')|%i)^(%i)\n", recvec[i].first(), recvec[i].second(), recvec[i].third()); 
+    }
+    
+    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    {
+        // compute distances: R(AB) = A - B
+        
+        intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
+        
+        // compute Obara-Saika recursion factors
+        
+        intsfunc::compFactorsForElectronicPotential(rfacts, bragtos, ketgtos, i);
+        
+        // compute distances: R(PA) = P - A
+        
+        intsfunc::compDistancesPA(rpa, rab, rfacts, 6, bragtos, ketgtos, i);
+        
+        // compute distances: R(PB) = P - B
+        
+        intsfunc::compDistancesPB(rpb, rab, rfacts, 6, bragtos, ketgtos, i);
+        
+        // compite primitive kinetic energy integrals
+        
+        _compPrimElectronicPotentialInts(pbuffer, recvec, recidx, rfacts, rab, rpa,
+                                         rpb, bragtos, ketgtos, i);
+        
+        // contract primitive overlap integrals
+        
+        genfunc::contract(cartbuffer, pbuffer, pidx, bragtos, ketgtos, i);
+        
+        // transform Cartesian to spherical integrals
+        
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, cdim);
+        
+        // add batch of integrals to sparse matrix
+        
+        genfunc::compress(spmat, rowvals, colidx, spherbuffer, bragtos, ketgtos,
+                          i);
+    }
+    
+    // copy sparse matrix to buffer of sparce matrices
+    
+    auto kblk = ketGtoContainer->getNumberOfGtoBlocks();
+    
+    sparseBuffer[iBraGtoBlock * kblk + iKetGtoBlock] = spmat;
+}
+
+void
+CElectronicPotentialIntegralsDriver::_compPrimElectronicPotentialInts(      CMemBlock2D<double>&  primBuffer,
+                                                                      const CVecThreeIndexes&     recPattern,
+                                                                      const std::vector<int32_t>& recIndexes,
+                                                                      const CMemBlock2D<double>&  osFactors,
+                                                                      const CMemBlock2D<double>&  abDistances,
+                                                                      const CMemBlock2D<double>&  paDistances,
+                                                                      const CMemBlock2D<double>&  pbDistances,
+                                                                      const CGtoBlock&            braGtoBlock,
+                                                                      const CGtoBlock&            ketGtoBlock,
+                                                                      const int32_t               iContrGto) const
+{
+    
 }
 
 CSparseMatrix*
@@ -201,23 +316,15 @@ CElectronicPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGt
             {
                 // general recursion for bra and ket sides
                 
-                // (a - 1 |A(0)| b)^(m) term
+                // (a - 1 |g(r,r')| b)^(m+1) term
                 
-                CThreeIndexes t10idx(cidx.first() - 1,  cidx.second(),
+                CThreeIndexes t1idx(cidx.first() - 1,  cidx.second(),
                                      
-                                     cidx.third());
+                                    cidx.third() + 1);
                 
-                if (genfunc::addValidAndUniqueTriple(recvec, t10idx)) nterms++;
+                if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
                 
-                // (a - 1 |A(0)| b)^(m+1) term
-                
-                CThreeIndexes t11idx(cidx.first() - 1,  cidx.second(),
-                                     
-                                     cidx.third() + 1);
-                
-                if (genfunc::addValidAndUniqueTriple(recvec, t11idx)) nterms++;
-                
-                // (a - 2 |A(0)| b)^(m) term
+                // (a - 2 |g(r,r')| b)^(m) term
                 
                 CThreeIndexes t20idx(cidx.first() - 2,  cidx.second(),
                                      
@@ -225,7 +332,7 @@ CElectronicPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGt
                 
                 if (genfunc::addValidAndUniqueTriple(recvec, t20idx)) nterms++;
                 
-                // (a - 2 |A(0)| b)^(m+1) term
+                // (a - 2 |g(r,r')| b)^(m+1) term
                 
                 CThreeIndexes t21idx(cidx.first() - 2,  cidx.second(),
                                      
@@ -233,43 +340,27 @@ CElectronicPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGt
                 
                 if (genfunc::addValidAndUniqueTriple(recvec, t21idx)) nterms++;
                 
-                // (a - 1 |A(0)| b - 1)^(m) term
+                // (a - 1 |g(r,r')| b - 1)^(m+1) term
                 
-                CThreeIndexes tk0idx(cidx.first() - 1,  cidx.second() - 1,
-                                     
-                                     cidx.third());
-                
-                if (genfunc::addValidAndUniqueTriple(recvec, tk0idx)) nterms++;
-                
-                // (a - 1 |A(0)| b - 1)^(m+1) term
-                
-                CThreeIndexes tk1idx(cidx.first() - 1,  cidx.second() - 1,
+                CThreeIndexes tkidx(cidx.first() - 1,  cidx.second() - 1,
                                      
                                      cidx.third() + 1);
                 
-                if (genfunc::addValidAndUniqueTriple(recvec, tk1idx)) nterms++;
+                if (genfunc::addValidAndUniqueTriple(recvec, tkidx)) nterms++;
             }
             else
             {
                 // simplified recursion for ket sides
                 
-                // (0 |A(0)| b - 1)^(m) term
+                // (0 |g(r,r')| b - 1)^(m+1) term
                 
-                CThreeIndexes t10idx(cidx.first(),  cidx.second() - 1,
+                CThreeIndexes t1idx(cidx.first(),  cidx.second() - 1,
                                      
-                                     cidx.third());
+                                    cidx.third() + 1);
                 
-                if (genfunc::addValidAndUniqueTriple(recvec, t10idx)) nterms++;
+                if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
                 
-                // (0 |A(0)| b - 1)^(m+1) term
-                
-                CThreeIndexes t11idx(cidx.first(),  cidx.second() - 1,
-                                     
-                                     cidx.third() + 1);
-                
-                if (genfunc::addValidAndUniqueTriple(recvec, t11idx)) nterms++;
-                
-                // (0 |A(0)| b - 2)^(m) term
+                // (0 |g(r,r')| b - 2)^(m) term
                 
                 CThreeIndexes t20idx(cidx.first(),  cidx.second() - 2,
                                      
@@ -277,7 +368,7 @@ CElectronicPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGt
                 
                 if (genfunc::addValidAndUniqueTriple(recvec, t20idx)) nterms++;
                 
-                // (0 |A(0)| b - 2)^(m+1) term
+                // (0 |g(r,r')| b - 2)^(m+1) term
                 
                 CThreeIndexes t21idx(cidx.first(),  cidx.second() - 2,
                                      
@@ -300,3 +391,30 @@ CElectronicPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGt
     
     return recvec;
 }
+
+int32_t
+CElectronicPotentialIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
+                                                                    const CVecThreeIndexes&     recPattern,
+                                                                    const int32_t               maxPrimGtos) const
+{
+    // clear vector and reserve memory
+    
+    recIndexes.clear();
+    
+    recIndexes.reserve(recPattern.size() + 1);
+    
+    // loop over recursion pattern
+    
+    int32_t nblk = 0;
+    
+    for (size_t i = 0; i < recPattern.size(); i++)
+    {
+        recIndexes.push_back(nblk);
+        
+        nblk += maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
+                                                             recPattern[i].second());
+    }
+    
+    return nblk;
+}
+

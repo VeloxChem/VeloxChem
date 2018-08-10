@@ -102,16 +102,16 @@ class CElectronicPotentialIntegralsDriver
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
-    void _compPrimKineticEnergyInts(      CMemBlock2D<double>&  primBuffer,
-                                    const CVecThreeIndexes&     recPattern,
-                                    const std::vector<int32_t>& recIndexes,
-                                    const CMemBlock2D<double>&  osFactors,
-                                    const CMemBlock2D<double>&  abDistances,
-                                    const CMemBlock2D<double>&  paDistances,
-                                    const CMemBlock2D<double>&  pbDistances,
-                                    const CGtoBlock&            braGtoBlock,
-                                    const CGtoBlock&            ketGtoBlock,
-                                    const int32_t               iContrGto) const;
+    void _compPrimElectronicPotentialInts(      CMemBlock2D<double>&  primBuffer,
+                                          const CVecThreeIndexes&     recPattern,
+                                          const std::vector<int32_t>& recIndexes,
+                                          const CMemBlock2D<double>&  osFactors,
+                                          const CMemBlock2D<double>&  abDistances,
+                                          const CMemBlock2D<double>&  paDistances,
+                                          const CMemBlock2D<double>&  pbDistances,
+                                          const CGtoBlock&            braGtoBlock,
+                                          const CGtoBlock&            ketGtoBlock,
+                                          const int32_t               iContrGto) const;
     
     /**
      Gets Obara-Saika recursion pattern for specific combination of GTOs blocks
