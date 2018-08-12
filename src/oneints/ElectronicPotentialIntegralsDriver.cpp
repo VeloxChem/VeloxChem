@@ -11,6 +11,8 @@
 #include "GenFunc.hpp"
 #include "AngularMomentum.hpp"
 #include "OneIntsFunc.hpp"
+#include "ElectronicPotentialRecFunc.hpp"
+
 
 CElectronicPotentialIntegralsDriver::CElectronicPotentialIntegralsDriver(const int32_t  globRank,
                                                                          const int32_t  globNodes,
@@ -187,14 +189,15 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      
     
     CSparseMatrix spmat(nrow, ncol, 1.0e-13);
     
-    // TESTING:
+    // initialize Boys function evaluator
     
-    printf("** RECURSION PATTERN: (%i,%i)\n", bang, kang);
+    auto bord = genfunc::maxOrderOfPair(recvec, 0, 0);
     
-    for (size_t i = 0; i < recvec.size(); i++)
-    {
-        printf("(%i|g(r,r')|%i)^(%i)\n", recvec[i].first(), recvec[i].second(), recvec[i].third()); 
-    }
+    CBoysFunction bftab(bord);
+    
+    CMemBlock<double> bargs(pdim);
+    
+    CMemBlock2D<double> bvals(pdim, bord + 1);
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -216,8 +219,9 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      
         
         // compite primitive kinetic energy integrals
         
-        _compPrimElectronicPotentialInts(pbuffer, recvec, recidx, rfacts, rab, rpa,
-                                         rpb, bragtos, ketgtos, i);
+        _compPrimElectronicPotentialInts(pbuffer, recvec, recidx, bftab, bargs,
+                                         bvals, bord, rfacts, rab, rpa, rpb,
+                                         bragtos, ketgtos, i);
         
         // contract primitive overlap integrals
         
@@ -244,6 +248,10 @@ void
 CElectronicPotentialIntegralsDriver::_compPrimElectronicPotentialInts(      CMemBlock2D<double>&  primBuffer,
                                                                       const CVecThreeIndexes&     recPattern,
                                                                       const std::vector<int32_t>& recIndexes,
+                                                                      const CBoysFunction&        bfTable,
+                                                                            CMemBlock<double>&    bfArguments,
+                                                                            CMemBlock2D<double>&  bfValues,
+                                                                      const int32_t               bfOrder,
                                                                       const CMemBlock2D<double>&  osFactors,
                                                                       const CMemBlock2D<double>&  abDistances,
                                                                       const CMemBlock2D<double>&  paDistances,
@@ -252,7 +260,157 @@ CElectronicPotentialIntegralsDriver::_compPrimElectronicPotentialInts(      CMem
                                                                       const CGtoBlock&            ketGtoBlock,
                                                                       const int32_t               iContrGto) const
 {
+    // compute (s|g(r,r')|s) integrals
     
+    epotrecfunc::compElectronicPotentialForSS(primBuffer, recPattern, recIndexes,
+                                              bfTable, bfArguments, bfValues,
+                                              bfOrder, osFactors, abDistances,
+                                              braGtoBlock, ketGtoBlock,
+                                              iContrGto);
+    
+    // compute (s|g(r,r')|p) integrals
+    
+    epotrecfunc::compElectronicPotentialForSP(primBuffer, recPattern, recIndexes,
+                                              pbDistances, braGtoBlock, ketGtoBlock,
+                                              iContrGto);
+    
+    // compute (p|g(r,r')|s) integrals
+    
+    epotrecfunc::compElectronicPotentialForPS(primBuffer, recPattern, recIndexes,
+                                              paDistances, braGtoBlock, ketGtoBlock,
+                                              iContrGto);
+    
+    // compute (p|g(r,r')|p) integrals
+    
+    epotrecfunc::compElectronicPotentialForPP(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (s|g(r,r')|d) integrals
+    
+    epotrecfunc::compElectronicPotentialForSD(primBuffer, recPattern, recIndexes,
+                                              osFactors, pbDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (d|g(r,r')|s) integrals
+    
+    epotrecfunc::compElectronicPotentialForDS(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (p|g(r,r')|d) integrals
+    
+    epotrecfunc::compElectronicPotentialForPD(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (d|g(r,r')|p) integrals
+    
+    epotrecfunc::compElectronicPotentialForDP(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (d|g(r,r')|d) integrals
+    
+    epotrecfunc::compElectronicPotentialForDD(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (s|g(r,r')|f) integrals
+    
+    epotrecfunc::compElectronicPotentialForSF(primBuffer, recPattern, recIndexes,
+                                              osFactors, pbDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (f|g(r,r')|s) integrals
+    
+    epotrecfunc::compElectronicPotentialForFS(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (p|g(r,r')|f) integrals
+    
+    epotrecfunc::compElectronicPotentialForPF(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (f|g(r,r')|p) integrals
+    
+    epotrecfunc::compElectronicPotentialForFP(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (d|g(r,r')|f) integrals
+    
+    epotrecfunc::compElectronicPotentialForDF(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (f|g(r,r')|d) integrals
+    
+    epotrecfunc::compElectronicPotentialForFD(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (f|g(r,r')|f) integrals
+    
+    epotrecfunc::compElectronicPotentialForFF(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (s|g(r,r')|g) integrals
+    
+    epotrecfunc::compElectronicPotentialForSG(primBuffer, recPattern, recIndexes,
+                                              osFactors, pbDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (g|g(r,r')|s) integrals
+    
+    epotrecfunc::compElectronicPotentialForGS(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (p|g(r,r')|g) integrals
+    
+    epotrecfunc::compElectronicPotentialForPG(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (g|g(r,r')|p) integrals
+    
+    epotrecfunc::compElectronicPotentialForGP(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (d|g(r,r')|g) integrals
+    
+    epotrecfunc::compElectronicPotentialForDG(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (g|g(r,r')|d) integrals
+    
+    epotrecfunc::compElectronicPotentialForGD(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (f|g(r,r')|g) integrals
+    
+    epotrecfunc::compElectronicPotentialForFG(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (g|g(r,r')|f) integrals
+    
+    epotrecfunc::compElectronicPotentialForGF(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
+    
+    // compute (g|g(r,r')|g) integrals
+    
+    epotrecfunc::compElectronicPotentialForGG(primBuffer, recPattern, recIndexes,
+                                              osFactors, paDistances, braGtoBlock,
+                                              ketGtoBlock, iContrGto);
 }
 
 CSparseMatrix*

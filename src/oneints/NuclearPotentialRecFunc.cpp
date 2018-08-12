@@ -178,8 +178,6 @@ namespace npotrecfunc { // npotrecfunc namespace
             
             int32_t idx = 0;
             
-            //std::cout << "### Prim buffer: " << primBuffer;
-            
             for (int32_t j = spos[iContrGto]; j < epos[iContrGto]; j++)
             {
                 // set up pointers to distances R(PB)

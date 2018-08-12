@@ -258,60 +258,54 @@ namespace intsfunc { // intsfunc namespace
             
             auto fz = osFactors.data(6 * idx + 1);
             
+            auto fia = osFactors.data(6 * idx + 2);
+            
+            auto fib = osFactors.data(6 * idx + 4);
+            
             auto fb = bexp[i];
             
-            #pragma omp simd aligned(fx, fz, kexp: VLX_ALIGN)
+            auto fact = 1.0 / fb;
+            
+            #pragma omp simd aligned(fx, fz, fia, fib, kexp: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                double fact = fb + kexp[j];
-                
-                fx[j] = 1.0 / fact;
+                fx[j] = 1.0 / (fb + kexp[j]);
                 
                 fz[j] = fb * kexp[j] * fx[j];
+                
+                fia[j] = fact;
+                
+                fib[j] = 1.0 / kexp[j];
             }
             
-            if (bang > 1)
-            {
-                auto fact = 1.0 / fb;
-                
-                auto fia = osFactors.data(6 * idx + 2);
-                
+           if (bang > 1)
+           {
                 auto fra = osFactors.data(6 * idx + 3);
                 
-                #pragma omp simd aligned(fz, fia, fra: VLX_ALIGN)
+                #pragma omp simd aligned(fz, fra: VLX_ALIGN)
                 for (int32_t j = 0; j < nprim; j++)
                 {
-                    fia[j] = fact;
-                    
                     fra[j] = fact * fz[j];
                 }
             }
             
             if (kang > 1)
             {
-                auto fib = osFactors.data(6 * idx + 4);
-                
                 auto frb = osFactors.data(6 * idx + 5);
                 
                 if (idx == 0)
                 {
-                    #pragma omp simd aligned(fz, fib, frb, kexp: VLX_ALIGN)
+                    #pragma omp simd aligned(fz, fib, frb: VLX_ALIGN)
                     for (int32_t j = 0; j < nprim; j++)
                     {
-                        fib[j] = 1.0 / kexp[j];
-                        
                         frb[j] = fib[j] * fz[j];
                     }
                 }
                 else
                 {
-                    auto fib0 = osFactors.data(4);
-                    
-                    #pragma omp simd aligned(fz, fib, frb, fib0: VLX_ALIGN)
+                    #pragma omp simd aligned(fz, fib, frb: VLX_ALIGN)
                     for (int32_t j = 0; j < nprim; j++)
                     {
-                        fib[j] = fib0[j];
-                        
                         frb[j] = fib[j] * fz[j];
                     }
                 }

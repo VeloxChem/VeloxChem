@@ -22,6 +22,7 @@
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
 #include "SparseMatrix.hpp"
+#include "BoysFunction.hpp"
 
 /**
  Class CElectronicPotentialIntegralsDriver computes electronic potential
@@ -94,6 +95,10 @@ class CElectronicPotentialIntegralsDriver
      @param primBuffer the primitives buffer.
      @param recPattern the recursion pattern.
      @param recIndexes the indexes of data blocks in recursion pattern.
+     @param bfTable the Boys function evaluator.
+     @param bfArguments the vector of Boys function arguments.
+     @param bfValues the vector of Boys function values.
+     @param bfOrder the order of Boys function.
      @param osFactors the Obara-Saika recursion factors.
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
@@ -105,6 +110,10 @@ class CElectronicPotentialIntegralsDriver
     void _compPrimElectronicPotentialInts(      CMemBlock2D<double>&  primBuffer,
                                           const CVecThreeIndexes&     recPattern,
                                           const std::vector<int32_t>& recIndexes,
+                                          const CBoysFunction&        bfTable,
+                                                CMemBlock<double>&    bfArguments,
+                                                CMemBlock2D<double>&  bfValues,
+                                          const int32_t               bfOrder,
                                           const CMemBlock2D<double>&  osFactors,
                                           const CMemBlock2D<double>&  abDistances,
                                           const CMemBlock2D<double>&  paDistances,
