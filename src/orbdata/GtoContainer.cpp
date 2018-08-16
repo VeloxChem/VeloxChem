@@ -386,7 +386,7 @@ operator<<(      std::ostream&  output,
 {
     output << std::endl;
     
-    output << "[CCGtoContainer (Object):" << &source << "]" << std::endl;
+    output << "[CGtoContainer (Object):" << &source << "]" << std::endl;
     
     output << "_maxAngularMomentum: " << source._maxAngularMomentum << std::endl;
     

@@ -17,8 +17,8 @@
 #include "SphericalMomentum.hpp"
 
 /**
- Class CGtoBlock stores vector of GTOs block objects and provides set of methods
- for manipulating with basis functions of various angular momentum.
+ Class CGtoContainer stores vector of GTOs block objects and provides set of
+ methods for manipulating with basis functions of various angular momentum.
  
  @author Z. Rinkevicius
  */
@@ -68,14 +68,14 @@ public:
     /**
      Creates a GTOs container object by copying other GTOs container object.
      
-     @param source the GTOs block object.
+     @param source the GTOs container object.
      */
     CGtoContainer(const CGtoContainer& source);
 
     /**
      Creates a GTOs container object by moving other GTOs container object.
      
-     @param source the GTOs block object.
+     @param source the GTOs container object.
      */
     CGtoContainer(CGtoContainer&& source) noexcept;
 
@@ -87,14 +87,14 @@ public:
     /**
      Assigns a GTOs container object by copying other GTOs container object.
      
-     @param source the GTOs block object.
+     @param source the GTOs container object.
      */
     CGtoContainer& operator=(const CGtoContainer& source);
 
     /**
      Assigns a GTOs container object by moving other GTOs container object.
      
-     @param source the GTOs block object.
+     @param source the GTOs container object.
      */
     CGtoContainer& operator=(CGtoContainer&& source) noexcept;
 
@@ -328,7 +328,7 @@ public:
      text stream.
      
      @param output the output text stream.
-     @param source the GTOs block object.
+     @param source the GTOs container object.
      */
     friend std::ostream& operator<<(      std::ostream&  output,
                                     const CGtoContainer& source);
