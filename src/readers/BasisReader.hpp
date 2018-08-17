@@ -41,11 +41,13 @@ class CBasisReader
      Parsing errors are printed to output stream.
 
      @param idElemental the identifier of chemical element.
+     @param basisLabel the label of basis set.
      @param fileName the name of basis set library file.
      @param oStream the output stream.
      @return the atom basis object.
      */
     CAtomBasis _readAtomBasis(const int32_t        idElemental,
+                              const std::string&   basisLabel,
                               const std::string&   fileName,
                                     COutputStream& oStream);
 
@@ -104,6 +106,39 @@ class CBasisReader
      @param oStream the output stream.
      */
     void _syntaxBasisSet(COutputStream& oStream);
+    
+    /**
+     Creates molecular basis object by reading basis set data from basis library
+     for selected molecule. Reading errors are printed to output stream.
+
+     @param basisLabel the uppercased label of basis set.
+     @param pathToBasisSets the path to basis set library.
+     @param molecule the molecule.
+     @param oStream the output stream.
+     @return the molecular basis object.
+     */
+    CMolecularBasis _getBasis(const std::string&   basisLabel,
+                              const std::string&   pathToBasisSets,
+                              const CMolecule&     molecule,
+                                    COutputStream& oStream);
+    
+    /**
+     Determines appropiate label for Coulomb fitting basis set. If label can not
+     determined sets basis set reader object state to abnormal. The error
+     message is printed to output stream.
+
+     @param oStream the output stream.
+     @return the label of Coulomb fitting basis set.
+     */
+    std::string _getLabelForRIJBasis(COutputStream& oStream);
+    
+    /**
+     Prints unsupported Coulomb fitting basis set error message to output stream
+     and sets basis reader object state to abnormal.
+
+     @param oStream the output stream.
+     */
+    void _errorRIJBasisSet(COutputStream& oStream);
 
 public:
 
@@ -135,8 +170,8 @@ public:
                      COutputStream& oStream);
 
     /**
-     Creates molecular basis object by reading basis set data from basis library
-     for selected molecule. Reading errors are printed to output stream.
+     Creates molecular AO basis object by reading basis set data from basis
+     library for selected molecule. Reading errors are printed to output stream.
 
      @param pathToBasisSets the path to basis set library.
      @param molecule the molecule.
@@ -146,6 +181,22 @@ public:
     CMolecularBasis getAOBasis(const std::string&   pathToBasisSets,
                                const CMolecule&     molecule,
                                      COutputStream& oStream);
+    
+    
+    /**
+     Creates molecular Coulomb fitting basis object by reading basis set data
+     from basis library for selected molecule. Reading errors are printed to
+     output stream.
+     
+     @param pathToBasisSets the path to basis set library.
+     @param molecule the molecule.
+     @param oStream the output stream.
+     @return the molecular basis object.
+     */
+    CMolecularBasis getRIJBasis(const std::string&   pathToBasisSets,
+                                const CMolecule&     molecule,
+                                      COutputStream& oStream);
+    
 };
 
 #endif /* BasisReader_hpp */

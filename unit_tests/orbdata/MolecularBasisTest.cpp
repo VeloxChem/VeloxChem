@@ -140,6 +140,31 @@ TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctionsWithMolecule)
     ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 2));
 }
 
+TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctionsWithMoleculeAndAtomsList)
+{
+    CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(3, ambas.getNumberOfBasisFunctions(lih, 0, 1, 0));
+    
+    ASSERT_EQ(2, ambas.getNumberOfBasisFunctions(lih, 1, 1, 0));
+    
+    ASSERT_EQ(5, ambas.getNumberOfBasisFunctions(lih, 0, 2, 0));
+    
+    ASSERT_EQ(2, ambas.getNumberOfBasisFunctions(lih, 0, 1, 1));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 1, 1, 1));
+    
+    ASSERT_EQ(3, ambas.getNumberOfBasisFunctions(lih, 0, 2, 1));
+    
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 0, 1, 2));
+    
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 1, 1, 2));
+    
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 0, 2, 2));
+}
+
 TEST_F(CMolecularBasisTest, GetNumberOfPrimitiveBasisFunctionsWithMolecule)
 {
     CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
@@ -151,6 +176,31 @@ TEST_F(CMolecularBasisTest, GetNumberOfPrimitiveBasisFunctionsWithMolecule)
     ASSERT_EQ(4, ambas.getNumberOfPrimitiveBasisFunctions(lih, 1));
 
     ASSERT_EQ(0, ambas.getNumberOfPrimitiveBasisFunctions(lih, 2));
+}
+
+TEST_F(CMolecularBasisTest, GetNumberOfPrimitiveBasisFunctionsWithMoleculeAndAtomsList)
+{
+    CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(7, ambas.getNumberOfPrimitiveBasisFunctions(lih, 0, 1, 0));
+    
+    ASSERT_EQ(4, ambas.getNumberOfPrimitiveBasisFunctions(lih, 1, 1, 0));
+    
+    ASSERT_EQ(11, ambas.getNumberOfPrimitiveBasisFunctions(lih, 0, 2, 0));
+    
+    ASSERT_EQ(3, ambas.getNumberOfPrimitiveBasisFunctions(lih, 0, 1, 1));
+    
+    ASSERT_EQ(1, ambas.getNumberOfPrimitiveBasisFunctions(lih, 1, 1, 1));
+    
+    ASSERT_EQ(4, ambas.getNumberOfPrimitiveBasisFunctions(lih, 0, 2, 1));
+    
+    ASSERT_EQ(0, ambas.getNumberOfPrimitiveBasisFunctions(lih, 0, 1, 2));
+    
+    ASSERT_EQ(0, ambas.getNumberOfPrimitiveBasisFunctions(lih, 1, 1, 2));
+    
+    ASSERT_EQ(0, ambas.getNumberOfPrimitiveBasisFunctions(lih, 0, 2, 2));
 }
 
 TEST_F(CMolecularBasisTest, GetDimensionsOfBasis)

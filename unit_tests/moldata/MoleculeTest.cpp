@@ -97,6 +97,29 @@ TEST_F(CMoleculeTest, GetNumberOfAtomsWithIdElemental)
     ASSERT_EQ(0, mol.getNumberOfAtoms(2));
 }
 
+TEST_F(CMoleculeTest, GetNumberOfAtomsWithIdElementalAndAtomsList)
+{
+    CMolecule mol = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(0, mol.getNumberOfAtoms(0, 1, 1));
+    
+    ASSERT_EQ(1, mol.getNumberOfAtoms(0, 1, 3));
+    
+    ASSERT_EQ(0, mol.getNumberOfAtoms(0, 1, 2));
+    
+    ASSERT_EQ(1, mol.getNumberOfAtoms(1, 1, 1));
+    
+    ASSERT_EQ(0, mol.getNumberOfAtoms(1, 1, 3));
+    
+    ASSERT_EQ(0, mol.getNumberOfAtoms(1, 1, 2));
+    
+    ASSERT_EQ(1, mol.getNumberOfAtoms(0, 2, 1));
+    
+    ASSERT_EQ(1, mol.getNumberOfAtoms(0, 2, 3));
+    
+    ASSERT_EQ(0, mol.getNumberOfAtoms(0, 2, 2));
+}
+
 TEST_F(CMoleculeTest, GetElementalComposition)
 {
     CMolecule mol = vlxmol::getMoleculeLiH();

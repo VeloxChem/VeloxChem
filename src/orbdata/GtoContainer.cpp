@@ -46,6 +46,28 @@ CGtoContainer::CGtoContainer(const CMolecule&       molecule,
     }
 }
 
+CGtoContainer::CGtoContainer(const CMolecule&       molecule,
+                             const CMolecularBasis& basis,
+                             const int32_t          iAtom,
+                             const int32_t          nAtoms)
+
+    : _maxAngularMomentum(-1)
+{
+    auto mang = basis.getMaxAngularMomentum();
+    
+    for (int32_t i = 0; i <= mang; i++)
+    {
+        CGtoBlock gtoblock(molecule, basis, iAtom, nAtoms, i);
+        
+        if (!gtoblock.empty())
+        {
+            _gtoBlocks.push_back(gtoblock);
+            
+            if (_maxAngularMomentum < i) _maxAngularMomentum = i;
+        }
+    }
+}
+
 CGtoContainer::CGtoContainer(const CGtoContainer& source)
 
     : _gtoBlocks(source._gtoBlocks)

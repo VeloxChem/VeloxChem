@@ -64,6 +64,19 @@ public:
      */
     CGtoContainer(const CMolecule&       molecule,
                   const CMolecularBasis& basis);
+    
+    /**
+     Creates a GTOs container object from list of atoms in molecule.
+     
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param iAtom the index of first atom in list of atoms.
+     @param nAtoms the number of atoms in list of atoms.
+     */
+    CGtoContainer(const CMolecule&       molecule,
+                  const CMolecularBasis& basis,
+                  const int32_t          iAtom,
+                  const int32_t          nAtoms);
 
     /**
      Creates a GTOs container object by copying other GTOs container object.

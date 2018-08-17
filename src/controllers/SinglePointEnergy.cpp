@@ -21,6 +21,7 @@
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "NuclearPotentialIntegralsDriver.hpp"
 #include "ElectronicPotentialIntegralsDriver.hpp"
+#include "ThreeCenterElectronRepulsionIntegralsDriver.hpp"
 
 #include "MemBlock2D.hpp"
 
@@ -86,12 +87,24 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
 
          _state = rdraobasis.getState();
 
+        // read AO basis
+        
         if (_state)
         {
              _aoBasis = rdraobasis.getAOBasis(pathToBasisSets, _molecule,
                                               oStream);
         }
 
+        _state = rdraobasis.getState();
+        
+        // read RI-J basis
+        
+        if (_state)
+        {
+            _riBasis = rdraobasis.getRIJBasis(pathToBasisSets, _molecule,
+                                              oStream);
+        }
+        
         _state = rdraobasis.getState();
     }
 
@@ -102,10 +115,19 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
     // broadcast AO basis
 
     _aoBasis.broadcast(_globRank, MPI_COMM_WORLD);
-
+    
+    // broadcast RI basis
+    
+    _riBasis.broadcast(_globRank, MPI_COMM_WORLD);
+    
     // print atomic orbitals i.e. AO basis
 
     if (_globRank == mpi::master()) _aoBasis.printBasis("Atomic Orbitals",
+                                                        _molecule, oStream);
+    
+    // print RI basis i.e. Coulomb fitting
+    
+    if (_globRank == mpi::master()) _riBasis.printBasis("Coulomb Fitting Orbitals",
                                                         _molecule, oStream);
 
 //    if (_globRank == mpi::master())
@@ -132,11 +154,17 @@ CSinglePointEnergy::run(COutputStream& oStream,
 {
     // generate molecular grid
 
-    CGridDriver drvgrid(_globRank, _globNodes, _runMode, comm);
+    //CGridDriver drvgrid(_globRank, _globNodes, _runMode, comm);
 
-    auto molgrid = drvgrid.generate(_molecule, oStream, comm);
+    //auto molgrid = drvgrid.generate(_molecule, oStream, comm);
 
-    molgrid.distribute(_globRank, _globNodes, comm);
+    //molgrid.distribute(_globRank, _globNodes, comm);
+    
+    // generate density grid
+    
+    //CDensityGridDriver drvDenGrid(_globRank, _globNodes, _runMode, comm);
+    
+    //drvDenGrid.generate(_molecule, _aoBasis, molgrid, xcfun::mgga, oStream, comm);
     
     // compute overlap integrals
     
@@ -155,12 +183,12 @@ CSinglePointEnergy::run(COutputStream& oStream,
     CElectronicPotentialIntegralsDriver epotdrv(_globRank, _globNodes, comm);
     
     auto epotmat = epotdrv.compute(_molecule, _aoBasis, comm);
-
-    // generate density grid
-
-    //CDensityGridDriver drvDenGrid(_globRank, _globNodes, _runMode, comm);
-
-    //drvDenGrid.generate(_molecule, _aoBasis, molgrid, xcfun::mgga, oStream, comm);
+    
+    // compute three center electron repulsion integrals
+    
+    CThreeCenterElectronRepulsionIntegralsDriver ridrv(_globRank, _globNodes, comm);
+    
+    ridrv.compute(_molecule, _aoBasis, _riBasis, 1.0e-12, oStream, comm);
 }
 
 void

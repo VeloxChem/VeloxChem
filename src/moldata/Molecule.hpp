@@ -202,6 +202,19 @@ public:
     int32_t getNumberOfAtoms(const int32_t idElemental) const;
     
     /**
+    Gets number of atoms belonging to specific chemical element in list of atoms
+    in molecule.
+    
+    @param iAtom the index of first atom in list of atoms.
+    @param nAtoms the number of atoms in list of atoms.
+    @param idElemental the chemical element number.
+    @return the number of atoms.
+    */
+    int32_t getNumberOfAtoms(const int32_t iAtom,
+                             const int32_t nAtoms,
+                             const int32_t idElemental) const;
+    
+    /**
      Gets set of unique chemical elements in molecule.
 
      @return the set of unique chemical elements.

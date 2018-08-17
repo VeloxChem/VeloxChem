@@ -38,31 +38,51 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
                      const CMolecularBasis& basis,
                      const int32_t          angularMomentum)
 
+    : CGtoBlock(molecule, basis, 0, molecule.getNumberOfAtoms(), angularMomentum)
+{
+   
+}
+
+CGtoBlock::CGtoBlock(const CMolecule&       molecule,
+                     const CMolecularBasis& basis,
+                     const int32_t          iAtom,
+                     const int32_t          nAtoms,
+                     const int32_t          angularMomentum)
+
     : _angularMomentum(angularMomentum)
 {
     // allocate primitives data
-
+    
     auto npfuncs = basis.getNumberOfPrimitiveBasisFunctions(molecule,
+                                                            iAtom, nAtoms,
                                                             _angularMomentum);
     
     if (npfuncs > 0)
     {
         _gtoPrimitives = CMemBlock2D<double>(npfuncs, 5);
-
+        
         // allocate contraction data
-
+        
         auto ncfuncs = basis.getNumberOfBasisFunctions(molecule,
                                                        _angularMomentum);
         
         auto angcomp = angmom::to_SphericalComponents(_angularMomentum);
-
-        _contrPattern = CMemBlock2D<int32_t>(ncfuncs, 2 + angcomp);
+        
+        auto ncdim = basis.getNumberOfBasisFunctions(molecule, iAtom, nAtoms,
+                                                     angularMomentum);
+        
+        _contrPattern = CMemBlock2D<int32_t>(ncdim, 2 + angcomp);
         
         // determine partial dimensions of AO basis
         
         auto npartdim = basis.getPartialDimensionsOfBasis(molecule,
                                                           _angularMomentum);
-
+        
+        // determine offset in contracted GTOs block
+        
+        auto ncoff = basis.getNumberOfBasisFunctions(molecule, 0, iAtom,
+                                                     angularMomentum);
+        
         // set up pointers to molecular data
         
         auto molrx = molecule.getCoordinatesX();
@@ -90,74 +110,74 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         auto coordsy = _gtoPrimitives.data(3);
         
         auto coordsz = _gtoPrimitives.data(4);
-
+        
         // loop over atoms in molecule
-
+        
         int32_t icgto = 0;
-
+        
         int32_t iprim = 0;
-
-        for (int32_t i = 0; i < molecule.getNumberOfAtoms(); i++)
+        
+        for (int32_t i = iAtom; i < (iAtom + nAtoms); i++)
         {
-
+            
             // get atom coordinates
-
+            
             auto rx = molrx[i];
-
+            
             auto ry = molry[i];
-
+            
             auto rz = molrz[i];
-
+            
             // loop over basis functions of i-th atom
             
             auto gtos = basis.getBasisFunctions(idselem[i], _angularMomentum);
-
+            
             for (size_t j = 0; j < gtos.size(); j++)
             {
                 auto nprim = gtos[j].getNumberOfPrimitiveFunctions();
-
+                
                 // set contraction pattern
-
+                
                 spos[icgto] = iprim;
-
+                
                 epos[icgto] = iprim + nprim;
-
+                
                 for (int32_t k = 0; k < angcomp; k++)
                 {
                     auto pgtoidx = _contrPattern.data(2 + k);
                     
-                    pgtoidx[icgto] = npartdim + k * ncfuncs + icgto;
+                    pgtoidx[icgto] = npartdim + k * ncfuncs + ncoff + icgto;
                 }
-
+                
                 // retrieve primitve exponents, norm. factors
-
+                
                 auto pexp  = gtos[j].getExponents();
-
+                
                 auto pnorm = gtos[j].getNormalizationFactors();
-
+                
                 // set up primitives data
-
+                
                 for (int32_t k = 0; k < nprim; k++)
                 {
                     // assign exponent, norm. factor
-
+                    
                     gtoexps[iprim + k] = pexp[k];
-
+                    
                     gtonorms[iprim + k] = pnorm[k];
-
+                    
                     // assign atom coordinates
-
+                    
                     coordsx[iprim + k] = rx;
-
+                    
                     coordsy[iprim + k] = ry;
-
+                    
                     coordsz[iprim + k] = rz;
                 }
-
+                
                 // update indexes
-
+                
                 iprim += nprim;
-
+                
                 icgto++;
             }
         }

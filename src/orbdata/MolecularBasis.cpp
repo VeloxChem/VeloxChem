@@ -168,15 +168,25 @@ int32_t
 CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
                                            const int32_t    angularMomentum) const
 {
-    int32_t nbfucs = 0;
+    return getNumberOfBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(),
+                                     angularMomentum);
+}
 
+int32_t
+CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
+                                           const int32_t    iAtom,
+                                           const int32_t    nAtoms,
+                                           const int32_t    angularMomentum) const
+{
+    int32_t nbfucs = 0;
+    
     for (size_t i = 0; i < _atomicBasisSets.size(); i++)
     {
-        nbfucs += molecule.getNumberOfAtoms(_atomicBasisSets[i].getIdElemental())
-
+        nbfucs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
+        
                 * _atomicBasisSets[i].getNumberOfBasisFunctions(angularMomentum);
     }
-
+    
     return nbfucs;
 }
 
@@ -184,15 +194,25 @@ int32_t
 CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
                                                     const int32_t    angularMomentum) const
 {
+    return getNumberOfPrimitiveBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(),
+                                              angularMomentum); 
+}
+
+int32_t
+CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
+                                                    const int32_t    iAtom,
+                                                    const int32_t    nAtoms,
+                                                    const int32_t    angularMomentum) const
+{
     int32_t npfuncs = 0;
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    
+    for (int32_t i = iAtom; i < _atomicBasisSets.size(); i++)
     {
-        npfuncs += molecule.getNumberOfAtoms(_atomicBasisSets[i].getIdElemental())
-
+        npfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
+        
                  * _atomicBasisSets[i].getNumberOfPrimitiveFunctions(angularMomentum);
     }
-
+    
     return npfuncs;
 }
 

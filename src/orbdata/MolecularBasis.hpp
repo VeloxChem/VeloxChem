@@ -170,6 +170,21 @@ public:
      */
     int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
                                       const int32_t    angularMomentum) const;
+    
+    /**
+     Determines number of basis functions with specific angular momentum
+     in molecular basis of list of atoms in selected molecule.
+     
+     @param molecule the molecule.
+     @param iAtom the index of first atom in list of atoms.
+     @param nAtoms the number of atoms in list of atoms.
+     @param angularMomentum the angular momentum.
+     @return the number of basis functions.
+     */
+    int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
+                                      const int32_t    iAtom,
+                                      const int32_t    nAtoms,
+                                      const int32_t    angularMomentum) const;
 
     /**
      Determines number of primitive Gaussian functions with specific angular
@@ -180,6 +195,22 @@ public:
      @return the number of Gaussian functions.
      */
     int32_t getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
+                                               const int32_t    angularMomentum) const;
+    
+    
+    /**
+     Determines number of primitive Gaussian functions with specific angular
+     momentum in molecular basis of list of atoms in selected molecule.
+     
+     @param molecule the molecule.
+     @param iAtom the index of first atom in list of atoms.
+     @param nAtoms the number of atoms in list of atoms.
+     @param angularMomentum the angular momentum.
+     @return the number of Gaussian functions.
+     */
+    int32_t getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
+                                               const int32_t    iAtom,
+                                               const int32_t    nAtoms,
                                                const int32_t    angularMomentum) const;
 
     /**

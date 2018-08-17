@@ -89,35 +89,24 @@ CBasisReader::getAOBasis(const std::string&   pathToBasisSets,
                          const CMolecule&     molecule,
                                COutputStream& oStream)
 {
-    CMolecularBasis molbasis;
+    return _getBasis(_label, pathToBasisSets, molecule, oStream);
+}
 
-    auto fname = pathToBasisSets;
-
-    fname.append(_label);
-
-    auto elmlist = molecule.getElementalComposition();
-
-    for (auto i = elmlist.cbegin(); i != elmlist.cend(); ++i)
-    {
-        CAtomBasis atmbasis = _readAtomBasis(*i, fname, oStream);
-
-        if (_state)
-        {
-            molbasis.addAtomBasis(atmbasis);
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    molbasis.setLabel(_label);
-
-    return molbasis;
+CMolecularBasis
+CBasisReader::getRIJBasis(const std::string&   pathToBasisSets,
+                          const CMolecule&     molecule,
+                                COutputStream& oStream)
+{
+    auto rilbl = _getLabelForRIJBasis(oStream);
+    
+    if (!_state) return CMolecularBasis();
+    
+    return _getBasis(rilbl, pathToBasisSets, molecule, oStream);
 }
 
 CAtomBasis
 CBasisReader::_readAtomBasis(const int32_t        idElemental,
+                             const std::string&   basisLabel,
                              const std::string&   fileName,
                                    COutputStream& oStream)
 {
@@ -151,7 +140,7 @@ CBasisReader::_readAtomBasis(const int32_t        idElemental,
 
             if (iline.isControlKeyword("basis_set"))
             {
-                if (iline.isKeyword(1, _label))
+                if (iline.isKeyword(1, basisLabel))
                 {
                     continue;
                 }
@@ -354,3 +343,71 @@ CBasisReader::_syntaxBasisSet(COutputStream& oStream)
 
     oStream << "...." << fmt::end << fmt::blank;
 }
+
+CMolecularBasis
+CBasisReader::_getBasis(const std::string&   basisLabel,
+                        const std::string&   pathToBasisSets,
+                        const CMolecule&     molecule,
+                              COutputStream& oStream)
+{
+    CMolecularBasis molbasis;
+    
+    auto fname = pathToBasisSets;
+    
+    fname.append(basisLabel);
+    
+    auto elmlist = molecule.getElementalComposition();
+    
+    for (auto i = elmlist.cbegin(); i != elmlist.cend(); ++i)
+    {
+        CAtomBasis atmbasis = _readAtomBasis(*i, basisLabel, fname, oStream);
+        
+        if (_state)
+        {
+            molbasis.addAtomBasis(atmbasis);
+        }
+        else
+        {
+            break;
+        }
+    }
+    
+    molbasis.setLabel(basisLabel);
+    
+    return molbasis;
+}
+
+std::string
+CBasisReader::_getLabelForRIJBasis(COutputStream& oStream)
+{
+    // DEF2 basis sets family
+    
+    std::vector<std::string> d2lbls({"DEF2-SV(P)", "DEF2-SVP", "DEF2-TZVP",
+                                     "DEF2-TZVPP", "DEF2-QZVP", "DEF2-QZVPP"});
+    
+    for (size_t i = 0; i < d2lbls.size(); i++)
+    {
+        if (d2lbls[i] == _label) return std::string("DEF2-RI-J");
+    }
+    
+    // ADD handling of other basis sets here...
+    
+    _errorRIJBasisSet(oStream);
+    
+    return std::string();
+}
+
+void
+CBasisReader::_errorRIJBasisSet(COutputStream& oStream)
+{
+    _state = false;
+    
+    oStream << fmt::cerror << "Coulomb fitting basis is not supported for  ";
+    
+    oStream << _label << " basis set!" << fmt::end;
+    
+    oStream << "Please consult manual for list of supported basis sets and ";
+    
+    oStream << "adjust @basis input group!" << fmt::end << fmt::blank;
+}
+

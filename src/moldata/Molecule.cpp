@@ -222,9 +222,17 @@ CMolecule::getNumberOfAtoms() const
 int32_t
 CMolecule::getNumberOfAtoms(const int32_t idElemental) const
 {
+    return getNumberOfAtoms(0, _idsElemental.size(), idElemental);
+}
+
+int32_t
+CMolecule::getNumberOfAtoms(const int32_t iAtom,
+                            const int32_t nAtoms,
+                            const int32_t idElemental) const
+{
     int32_t natoms = 0;
     
-    for (int32_t i = 0; i < _idsElemental.size(); i++)
+    for (int32_t i = iAtom; i < (iAtom + nAtoms); i++)
     {
         if (_idsElemental.at(i) == idElemental) natoms++;
     }

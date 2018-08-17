@@ -87,6 +87,78 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeForP)
     ASSERT_EQ(porb, pdat);
 }
 
+TEST_F(CGtoBlockTest, ConstructorWithMoleculeAndAtomlistForP)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock aporb(lih, bas, 0, 1, 1);
+    
+    CMemBlock2D<int32_t> apidx({ 0,  2,
+                                 2,  3,
+                                 5,  6,
+                                 8,  9,
+                                11, 12},
+                               2, 5);
+    
+    CMemBlock2D<double> apprim({1.450000000000e+00, 3.000000000000e-01, 8.200000000000e-02,
+                                2.586000000000e-01, 1.000000000000e+00, 1.000000000000e+00,
+                                0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                                0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                                0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00},
+                               3, 5);
+    
+    CGtoBlock apdat(apprim, apidx, 1);
+    
+    ASSERT_EQ(aporb, apdat);
+    
+    CGtoBlock bporb(lih, bas, 1, 1, 1);
+    
+    CMemBlock2D<int32_t> bpidx({ 0,
+                                 1,
+                                 7,
+                                10,
+                                13},
+                               1, 5);
+    
+    CMemBlock2D<double> bpprim({8.000000000000e-01,
+                                1.000000000000e+00,
+                                0.000000000000e+00,
+                                0.000000000000e+00,
+                                1.200000000000e+00},
+                               1, 5);
+    
+    CGtoBlock bpdat(bpprim, bpidx, 1);
+    
+    ASSERT_EQ(bporb, bpdat);
+    
+    CGtoBlock cporb(lih, bas, 0, 2, 1);
+    
+    CMemBlock2D<int32_t> cpidx({ 0,  2,  3,
+                                 2,  3,  4,
+                                 5,  6,  7,
+                                 8,  9, 10,
+                                11, 12, 13},
+                                3, 5);
+    
+    CMemBlock2D<double> cpprim({1.450000000000e+00, 3.000000000000e-01, 8.200000000000e-02,
+                                8.000000000000e-01,
+                                2.586000000000e-01, 1.000000000000e+00, 1.000000000000e+00,
+                                1.000000000000e+00,
+                                0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                                0.000000000000e+00,
+                                0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                                0.000000000000e+00,
+                                0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
+                                1.200000000000e+00},
+                              4, 5);
+    
+    CGtoBlock cpdat(cpprim, cpidx, 1);
+    
+    ASSERT_EQ(cporb, cpdat);
+}
+
 TEST_F(CGtoBlockTest, ConstructorWithMoleculeForD)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

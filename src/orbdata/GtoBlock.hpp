@@ -72,6 +72,21 @@ public:
     CGtoBlock(const CMolecule&       molecule,
               const CMolecularBasis& basis,
               const int32_t          angularMomentum);
+    
+    /**
+     Creates a GTOs block object from list of atoms in molecule.
+     
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param iAtom the index of first atom in list of atoms.
+     @param nAtoms the number of atoms in list of atoms.
+     @param angularMomentum the angular momentum of contracted basis functions.
+     */
+    CGtoBlock(const CMolecule&       molecule,
+              const CMolecularBasis& basis,
+              const int32_t          iAtom,
+              const int32_t          nAtoms,
+              const int32_t          angularMomentum);
 
     /**
      Creates a GTOs block object by copying other GTOs block object.
