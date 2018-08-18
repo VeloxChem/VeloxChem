@@ -16,6 +16,8 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "OutputStream.hpp"
+#include "MemBlock2D.hpp"
+#include "GtoPairsContainer.hpp"
 
 /**
  Class CThreeCenterElectronicRepulsionIntegralsDriver computes electronic potential
@@ -56,7 +58,21 @@ class CThreeCenterElectronRepulsionIntegralsDriver
      
      @param oStream the output stream.
      */
-    void _startHeader(COutputStream& oStream) const; 
+    void _startHeader(COutputStream& oStream) const;
+    
+    /**
+     Creates atoms list splitting pattern for generation of GTO blocks on each
+     MPI process. The splitting pattern enables effective task based computation
+     of integrals on systems with variable number of CPU cores.
+
+     @param molecule the molecule.
+     @param riBasis the molecular RI basis.
+     @param gtoPairs the GTOs pairs container.
+     @return the splitting pattern for atoms list.
+     */
+    CMemBlock2D<int32_t> _getBatchesOfGtoBlocks(const CMolecule&          molecule,
+                                                const CMolecularBasis&    riBasis,
+                                                const CGtoPairsContainer& gtoPairs) const;
     
 public:
     

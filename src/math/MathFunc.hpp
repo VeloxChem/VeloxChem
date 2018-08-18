@@ -113,6 +113,19 @@ namespace mathfunc { // mathfunc namespace
     void indexes(      int32_t* aVector,
                  const int32_t* bVector,
                  const int32_t  nElements);
+    
+    /**
+     Sets indexes vector using size vector and offset.
+     
+     @param aVector the indexes vector.
+     @param bVector the sizes vector.
+     @param offset the offset of first index.
+     @param nElements the number of elements in vectors.
+     */
+    void indexes(      int32_t* aVector,
+                 const int32_t* bVector,
+                 const int32_t  offset,
+                 const int32_t  nElements);
 
     /**
      Computes distance between two 3D vectors.

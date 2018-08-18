@@ -105,6 +105,18 @@ CGtoPairsContainer::operator!=(const CGtoPairsContainer& other) const
     return !(*this == other);
 }
 
+int32_t
+CGtoPairsContainer::getNumberOfGtoPairsBlocks() const
+{
+    return static_cast<int32_t>(_gtoPairsBlocks.size());
+}
+
+CGtoPairsBlock
+CGtoPairsContainer::getGtoPairsBlock(const int32_t iBlock) const
+{
+    return _gtoPairsBlocks[iBlock]; 
+}
+
 std::ostream&
 operator<<(      std::ostream&       output,
            const CGtoPairsContainer& source)

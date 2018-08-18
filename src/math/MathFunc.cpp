@@ -128,6 +128,22 @@ namespace mathfunc { // mathfunc namespace
     }
     
     void
+    indexes(      int32_t* aVector,
+            const int32_t* bVector,
+            const int32_t  offset,
+            const int32_t  nElements)
+    {
+        int32_t index = offset;
+        
+        for (int32_t i = 0; i < nElements; i++)
+        {
+            aVector[i] = index;
+            
+            index += bVector[i];
+        }
+    }
+    
+    void
     distances(      double* abDistancesX,
                     double* abDistancesY,
                     double* abDistancesZ,

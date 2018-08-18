@@ -141,6 +141,25 @@ TEST_F(CMathFuncTest, Indexes)
     vlxtest::compare(vecb, vecc, 5); 
 }
 
+TEST_F(CMathFuncTest, IndexesWithOffset)
+{
+    int32_t veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5, 8, 4, 3, 4};
+    
+    int32_t vecb[5] __attribute__ ((aligned(VLX_ALIGN)));
+    
+    int32_t vecc[5] __attribute__ ((aligned(VLX_ALIGN))) = {0, 5, 13, 17, 20};
+    
+    int32_t vecd[5] __attribute__ ((aligned(VLX_ALIGN))) = {2, 7, 15, 19, 22};
+    
+    mathfunc::indexes(vecb, veca, 0, 5);
+    
+    vlxtest::compare(vecb, vecc, 5);
+   
+    mathfunc::indexes(vecb, veca, 2, 5);
+    
+    vlxtest::compare(vecb, vecd, 5);
+}
+
 TEST_F(CMathFuncTest, QuadChebyshevOfKindTwo)
 {
     double coords[5] __attribute__ ((aligned(VLX_ALIGN)));

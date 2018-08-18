@@ -106,6 +106,21 @@ public:
     bool operator!=(const CGtoPairsContainer& other) const;
     
     /**
+     Gets numnber of GTOs pairs block objects in GTOs pairs container.
+
+     @return the number of GTOs pairs block objects.
+     */
+    int32_t getNumberOfGtoPairsBlocks() const;
+    
+    /**
+     Gets specific GTOs pairs block object from GTOs pairs container.
+
+     @param iBlock the index of requested GTOs pairs block object.
+     @return the GTOs pairs block object.
+     */
+    CGtoPairsBlock getGtoPairsBlock(const int32_t iBlock) const;
+    
+    /**
      Converts GTOs pairs container object to text output and insert it into
      output text stream.
      

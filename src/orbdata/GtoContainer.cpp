@@ -68,6 +68,34 @@ CGtoContainer::CGtoContainer(const CMolecule&       molecule,
     }
 }
 
+CGtoContainer::CGtoContainer(const CMolecule&            molecule,
+                             const CMolecularBasis&      basis,
+                             const CMemBlock2D<int32_t>& batches)
+
+: _maxAngularMomentum(-1)
+{
+    auto bpos = batches.data(0);
+    
+    auto bdim = batches.data(1);
+    
+    auto mang = basis.getMaxAngularMomentum();
+    
+    for (int32_t i = 0; i < batches.size(0); i++)
+    {
+        for (int32_t j = 0; j <= mang; j++)
+        {
+            CGtoBlock gtoblock(molecule, basis, bpos[i], bdim[i], j);
+        
+            if (!gtoblock.empty())
+            {
+                _gtoBlocks.push_back(gtoblock);
+            
+                if (_maxAngularMomentum < j) _maxAngularMomentum = j;
+            }
+        }
+    }
+}
+
 CGtoContainer::CGtoContainer(const CGtoContainer& source)
 
     : _gtoBlocks(source._gtoBlocks)

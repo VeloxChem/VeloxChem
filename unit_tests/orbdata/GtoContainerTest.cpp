@@ -70,6 +70,29 @@ TEST_F(CGtoContainerTest, ConstructorWithMoleculeAndAtomsList)
     ASSERT_EQ(ccont, dcont);
 }
 
+TEST_F(CGtoContainerTest, ConstructorWithMoleculeAndBatches)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock asorb(lih, bas, 0, 1, 0);
+    
+    CGtoBlock aporb(lih, bas, 0, 1, 1);
+    
+    CGtoBlock bsorb(lih, bas, 1, 1, 0);
+    
+    CGtoBlock bporb(lih, bas, 1, 1, 1);
+    
+    CGtoContainer acont({asorb, aporb, bsorb, bporb});
+    
+    CMemBlock2D<int32_t> bdim({0, 1, 1, 1}, 2, 2);
+    
+    CGtoContainer bcont(lih, bas, bdim);
+    
+    ASSERT_EQ(acont, bcont);
+}
+
 TEST_F(CGtoContainerTest, CopyConstructor)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

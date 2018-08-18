@@ -77,6 +77,18 @@ public:
                   const CMolecularBasis& basis,
                   const int32_t          iAtom,
                   const int32_t          nAtoms);
+    
+    /**
+     Creates a GTOs container object according to given pattern of atomic batches
+     in molecule.
+     
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param batches the distribution pattern for atomic batches.
+     */
+    CGtoContainer(const CMolecule&            molecule,
+                  const CMolecularBasis&      basis,
+                  const CMemBlock2D<int32_t>& batches);
 
     /**
      Creates a GTOs container object by copying other GTOs container object.
