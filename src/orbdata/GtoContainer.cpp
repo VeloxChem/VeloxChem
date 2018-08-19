@@ -72,7 +72,7 @@ CGtoContainer::CGtoContainer(const CMolecule&            molecule,
                              const CMolecularBasis&      basis,
                              const CMemBlock2D<int32_t>& batches)
 
-: _maxAngularMomentum(-1)
+    : _maxAngularMomentum(-1)
 {
     auto bpos = batches.data(0);
     

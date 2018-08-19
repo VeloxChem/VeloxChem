@@ -18,6 +18,7 @@
 #include "OutputStream.hpp"
 #include "MemBlock2D.hpp"
 #include "GtoPairsContainer.hpp"
+#include "GtoContainer.hpp"
 
 /**
  Class CThreeCenterElectronicRepulsionIntegralsDriver computes electronic potential
@@ -56,9 +57,11 @@ class CThreeCenterElectronRepulsionIntegralsDriver
      Prints start header for computation of three-center electron repulsion
      integrals.
      
+     @param gtoPairs the GTOs pairs container on ket side.
      @param oStream the output stream.
      */
-    void _startHeader(COutputStream& oStream) const;
+    void _startHeader(const CGtoPairsContainer& gtoPairs,
+                            COutputStream&      oStream) const;
     
     /**
      Creates atoms list splitting pattern for generation of GTO blocks on each

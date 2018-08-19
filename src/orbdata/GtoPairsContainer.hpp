@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "GtoPairsBlock.hpp"
+#include "OutputStream.hpp"
 
 /**
  Class CGtoPairsContainer stores vector of GTOs pairs block objects and provides
@@ -119,6 +120,13 @@ public:
      @return the GTOs pairs block object.
      */
     CGtoPairsBlock getGtoPairsBlock(const int32_t iBlock) const;
+    
+    /**
+     Prints GTO pairs screening information to output stream.
+
+     @param oStream the output stream.
+     */
+    void printScreeningInfo(COutputStream& oStream) const;
     
     /**
      Converts GTOs pairs container object to text output and insert it into

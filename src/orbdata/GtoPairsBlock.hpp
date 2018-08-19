@@ -338,6 +338,27 @@ public:
     int32_t getNumberOfScreenedContrPairs() const;
     
     /**
+     Gets pair type string for GTOs pairs object.
+
+     @return the pair type string.
+     */
+    std::string getPairType() const;
+    
+    /**
+     Gets raw size string for GTOs pairs object.
+     
+     @return the raw size string.
+     */
+    std::string getRawSizeString() const;
+    
+    /**
+     Gets screened size string for GTOs pairs object.
+     
+     @return the raw size string.
+     */
+    std::string getScreenedSizeString() const;
+    
+    /**
      Converts GTOs pairs block object to text output and insert it into output
      text stream.
      

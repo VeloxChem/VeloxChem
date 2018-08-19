@@ -8,6 +8,8 @@
 
 #include "ThreeCenterElectronRepulsionIntegralsDriver.hpp"
 
+#include <string>
+
 #ifdef MAC_OS_OMP
 #include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
 #else
@@ -19,6 +21,7 @@
 #include "GtoPairsContainer.hpp"
 #include "GtoContainer.hpp"
 #include "MathFunc.hpp"
+#include "StringFormat.hpp"
 
 CThreeCenterElectronRepulsionIntegralsDriver::CThreeCenterElectronRepulsionIntegralsDriver(const int32_t  globRank,
                                                                                            const int32_t  globNodes,
@@ -62,21 +65,29 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     // generate RI gtos for on each MPI node
     
-    // CGtoContainer bgtos(molecule, riBasis, nodoff, nodatm);
+    CGtoContainer bgtos(molecule, riBasis, gtopat);
+    
+    printf("node: %i ngtos: %i\n", _locRank, bgtos.getNumberOfAtomicOrbitals());
     
     // print start header
     
-    if (_globRank == mpi::master()) _startHeader(oStream);
+    if (_globRank == mpi::master()) _startHeader(kgtopairs, oStream);
 }
 
 void
-CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(COutputStream& oStream) const
+CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContainer& gtoPairs,
+                                                                 COutputStream&      oStream) const
 {
     oStream << fmt::header << "Three-Center Electron Repulsion Integrals" << fmt::end;
     
     oStream << std::string(43, '=') << fmt::end << fmt::blank;
+    
+    // GTO pairs screening information
+    
+    gtoPairs.printScreeningInfo(oStream);
+    
+    // memory storage information
 }
-
 
 CMemBlock2D<int32_t>
 CThreeCenterElectronRepulsionIntegralsDriver::_getBatchesOfGtoBlocks(const CMolecule&          molecule,

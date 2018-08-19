@@ -12,6 +12,7 @@
 
 #include "MathConst.hpp"
 #include "AngularMomentum.hpp"
+#include "StringFormat.hpp"
 
 CGtoPairsBlock::CGtoPairsBlock()
 
@@ -626,6 +627,50 @@ int32_t
 CGtoPairsBlock::getNumberOfScreenedContrPairs() const
 {
     return _nScreenedContrPairs; 
+}
+
+std::string
+CGtoPairsBlock::getPairType() const
+{
+    std::string str("(");
+    
+    str.append(fstr::to_AngularMomentum(_braAngularMomentum));
+    
+    str.append(",");
+    
+    str.append(fstr::to_AngularMomentum(_ketAngularMomentum));
+    
+    str.append(")");
+    
+    return str; 
+}
+
+std::string
+CGtoPairsBlock::getRawSizeString() const
+{
+    std::string str("Contr.: ");
+                    
+    str.append(fstr::to_string(_nOriginalContrPairs, 8, fmt::left));
+    
+    str.append(" Prim.: ");
+    
+    str.append(std::to_string(_nOriginalPrimPairs));
+    
+    return fstr::format(str, 32, fmt::left);
+}
+
+std::string
+CGtoPairsBlock::getScreenedSizeString() const
+{
+    std::string str("Contr.: ");
+    
+    str.append(fstr::to_string(_nScreenedContrPairs, 8, fmt::left));
+    
+    str.append(" Prim.: ");
+    
+    str.append(std::to_string(_nScreenedPrimPairs));
+    
+    return fstr::format(str, 32, fmt::left);
 }
 
 std::ostream&

@@ -56,7 +56,6 @@ TEST_F(CGtoPairsBlockTest, MoveConstructor)
     
     CGtoBlock bgto(lih, bas, 1);
     
-    
     CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
     
     CGtoPairsBlock bpairs(CGtoPairsBlock(agto, bgto, 1.0e-13));
@@ -476,4 +475,30 @@ TEST_F(CGtoPairsBlockTest, GetNumberOfScreenedContrPairs)
     ASSERT_EQ(3, bpairs.getNumberOfScreenedContrPairs());
 }
 
+TEST_F(CGtoPairsBlockTest, GetPairType)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(std::string("(S,P)"), apairs.getPairType());
+    
+    CGtoPairsBlock bpairs(bgto, agto, 1.0e-13);
+    
+    ASSERT_EQ(std::string("(P,S)"), bpairs.getPairType());
+    
+    CGtoPairsBlock cpairs(agto, 1.0e-13);
+    
+    ASSERT_EQ(std::string("(S,S)"), cpairs.getPairType());
+    
+    CGtoPairsBlock dpairs(bgto, 1.0e-13);
+    
+    ASSERT_EQ(std::string("(P,P)"), dpairs.getPairType());
+}
 
