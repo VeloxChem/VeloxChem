@@ -170,7 +170,7 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     COverlapIntegralsDriver ovldrv(_globRank, _globNodes, comm);
     
-    auto ovlmat = ovldrv.compute(_molecule, _aoBasis, comm);
+    auto ovlmat = ovldrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute kinetic energy integrals
     

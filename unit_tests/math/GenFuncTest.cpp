@@ -13,6 +13,7 @@
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "SparseMatrix.hpp"
+#include "DenseMatrix.hpp"
 #include "MemBlock.hpp"
 #include "GtoContainer.hpp"
 
@@ -461,6 +462,179 @@ TEST_F(CGenFuncTest, Distribute)
                         14, 14, 1.0e-13);
     
     ASSERT_EQ(spmat, tmat); 
+}
+
+TEST_F(CGenFuncTest, DistributeWithNaturalPattern)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock bgtos(lih, bas, 1);
+    
+    CGtoBlock kgtos(lih, bas, 1);
+    
+    CDenseMatrix spmat(9, 9);
+    
+    CMemBlock2D<double> adat({ 1.0,  2.0,  0.0,
+                              -3.0,  4.0,  2.0,
+                               6.0,  7.0,  8.0,
+                               1.0,  5.7, -1.0,
+                               0.0,  0.0,  2.0,
+                               0.0,  0.0,  0.0,
+                               1.0,  2.0,  3.0,
+                               0.0, -1.0,  2.0,
+                               0.1, -1.2,  0.0},
+                              3, 9);
+    
+    genfunc::distribute(spmat.values(), adat, 1, 1, 3, 3, 0);
+    
+    genfunc::distribute(spmat.values(), adat, 1, 1, 3, 3, 2);
+    
+    CMemBlock2D<double> bdat({ 1.0,  2.0,  0.0,
+                               0.0,  4.0,  0.0,
+                               0.0,  7.0,  8.0,
+                               0.0,  0.0, -1.0,
+                               0.0,  0.0,  2.0,
+                               0.0,  0.0,  0.0,
+                               2.0,  2.0,  3.0,
+                               0.0, -1.0,  2.0,
+                               0.1, -1.2,  0.0},
+                             3, 9);
+    
+    
+    genfunc::distribute(spmat.values(), bdat, 1, 1, 3, 3, 1);
+    
+    CDenseMatrix bmat({1.0,  2.0,  0.0, -3.0,  4.0,  2.0, 6.0,  7.0,  8.0,
+                       1.0,  2.0,  0.0,  0.0,  4.0,  0.0, 0.0,  7.0,  8.0,
+                       1.0,  2.0,  0.0, -3.0,  4.0,  2.0, 6.0,  7.0,  8.0,
+                       1.0,  5.7, -1.0,  0.0,  0.0,  2.0, 0.0,  0.0,  0.0,
+                       0.0,  0.0, -1.0,  0.0,  0.0,  2.0, 0.0,  0.0,  0.0,
+                       1.0,  5.7, -1.0,  0.0,  0.0,  2.0, 0.0,  0.0,  0.0,
+                       1.0,  2.0,  3.0,  0.0, -1.0,  2.0, 0.1, -1.2,  0.0,
+                       2.0,  2.0,  3.0,  0.0, -1.0,  2.0, 0.1, -1.2,  0.0,
+                       1.0,  2.0,  3.0,  0.0, -1.0,  2.0, 0.1, -1.2,  0.0},
+                      9, 9);
+    
+    ASSERT_EQ(spmat, bmat);
+}
+
+TEST_F(CGenFuncTest, DistributeWithFullMatrix)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock bgtos(lih, bas, 0);
+    
+    CGtoBlock kgtos(lih, bas, 0);
+    
+    CDenseMatrix spmat(14, 14);
+    
+    CMemBlock2D<double> s0dat({1.1, 1.2, 1.3, 1.4, 1.5}, 5, 1);
+    
+    genfunc::distribute(spmat.values(), s0dat, bgtos, kgtos, true, 14, 0);
+    
+    CMemBlock2D<double> s1dat({2.1, 2.2, 2.3, 2.4, 2.5}, 5, 1);
+    
+    genfunc::distribute(spmat.values(), s1dat, bgtos, kgtos, true, 14, 1);
+    
+    CMemBlock2D<double> s2dat({3.1, 3.2, 3.3, 3.4, 3.5}, 5, 1);
+    
+    genfunc::distribute(spmat.values(), s2dat, bgtos, kgtos, true, 14, 2);
+    
+    CMemBlock2D<double> s3dat({4.1, 4.2, 4.3, 4.4, 4.5}, 5, 1);
+    
+    genfunc::distribute(spmat.values(), s3dat, bgtos, kgtos, true, 14, 3);
+    
+    CMemBlock2D<double> s4dat({5.1, 5.2, 5.3, 5.4, 5.5}, 5, 1);
+    
+    genfunc::distribute(spmat.values(), s4dat, bgtos, kgtos, true, 14, 4);
+    
+    kgtos = CGtoBlock(lih, bas, 1);
+    
+    CMemBlock2D<double> sp0dat({2.2, 2.4, 2.6,
+                                2.3, 2.6, 2.9,
+                                2.0, 2.5, 3.0},
+                                3, 3);
+    
+    genfunc::distribute(spmat.values(), sp0dat, bgtos, kgtos, false, 14,  0);
+    
+    CMemBlock2D<double> sp1dat({3.2, 3.4, 3.6,
+                                3.3, 3.6, 3.9,
+                                3.0, 3.5, 4.0},
+                                3, 3);
+    
+    genfunc::distribute(spmat.values(), sp1dat, bgtos, kgtos, false, 14, 1);
+    
+    CMemBlock2D<double> sp2dat({4.2, 4.4, 4.6,
+                                4.3, 4.6, 4.9,
+                                4.0, 4.5, 5.0},
+                                3, 3);
+    
+    genfunc::distribute(spmat.values(), sp2dat, bgtos, kgtos, false, 14,  2);
+    
+    CMemBlock2D<double> sp3dat({5.2, 5.4, 5.6,
+                                5.3, 5.6, 5.9,
+                                5.0, 5.5, 6.0},
+                                3, 3);
+    
+    genfunc::distribute(spmat.values(), sp3dat, bgtos, kgtos, false, 14, 3);
+    
+    CMemBlock2D<double> sp4dat({6.2, 6.4, 6.6,
+                                6.3, 6.6, 6.9,
+                                6.0, 6.5, 7.0},
+                                3, 3);
+    
+    genfunc::distribute(spmat.values(), sp4dat, bgtos, kgtos, false, 14, 4);
+    
+    bgtos = CGtoBlock(lih, bas, 1);
+    
+    CMemBlock2D<double> pp0dat({ 1.0,  2.0,  0.0,
+                                -3.0,  4.0,  2.0,
+                                 6.0,  7.0,  8.0,
+                                 1.0,  5.7, -1.0,
+                                 0.0,  0.0,  2.0,
+                                 0.0,  0.0,  0.0,
+                                 1.0,  2.0,  3.0,
+                                 0.0, -1.0,  2.0,
+                                 0.1, -1.2,  0.0},
+                                3, 9);
+    
+    genfunc::distribute(spmat.values(), pp0dat, bgtos, kgtos, true, 14,  0);
+    
+    genfunc::distribute(spmat.values(), pp0dat, bgtos, kgtos, true, 14, 2);
+    
+    CMemBlock2D<double> pp1dat({ 1.0,  2.0,  0.0,
+                                 0.0,  4.0,  0.0,
+                                 0.0,  7.0,  8.0,
+                                 0.0,  0.0, -1.0,
+                                 0.0,  0.0,  2.0,
+                                 0.0,  0.0,  0.0,
+                                 2.0,  2.0,  3.0,
+                                 0.0, -1.0,  2.0,
+                                 0.1, -1.2,  0.0},
+                                3, 9);
+    
+    genfunc::distribute(spmat.values(), pp1dat, bgtos, kgtos, true, 14,  1);
+   
+    CDenseMatrix bmat({1.1, 1.2, 1.3, 1.4, 1.5, 2.2, 2.4,  2.6,  2.3,  2.6, 2.9, 2.0,  2.5, 3.0,
+                       2.1, 2.2, 2.3, 2.4, 2.5, 3.2, 3.4,  3.6,  3.3,  3.6, 3.9, 3.0,  3.5, 4.0,
+                       3.1, 3.2, 3.3, 3.4, 3.5, 4.2, 4.4,  4.6,  4.3,  4.6, 4.9, 4.0,  4.5, 5.0,
+                       4.1, 4.2, 4.3, 4.4, 4.5, 5.2, 5.4,  5.6,  5.3,  5.6, 5.9, 5.0,  5.5, 6.0,
+                       5.1, 5.2, 5.3, 5.4, 5.5, 6.2, 6.4,  6.6,  6.3,  6.6, 6.9, 6.0,  6.5, 7.0,
+                       2.2, 3.2, 4.2, 5.2, 6.2, 1.0, 2.0,  0.0, -3.0,  4.0, 2.0, 6.0,  7.0, 8.0,
+                       2.4, 3.4, 4.4, 5.4, 6.4, 1.0, 2.0,  0.0,  0.0,  4.0, 0.0, 0.0,  7.0, 8.0,
+                       2.6, 3.6, 4.6, 5.6, 6.6, 1.0, 2.0,  0.0, -3.0,  4.0, 2.0, 6.0,  7.0, 8.0,
+                       2.3, 3.3, 4.3, 5.3, 6.3, 1.0, 5.7, -1.0,  0.0,  0.0, 2.0, 0.0,  0.0, 0.0,
+                       2.6, 3.6, 4.6, 5.6, 6.6, 0.0, 0.0, -1.0,  0.0,  0.0, 2.0, 0.0,  0.0, 0.0,
+                       2.9, 3.9, 4.9, 5.9, 6.9, 1.0, 5.7, -1.0,  0.0,  0.0, 2.0, 0.0,  0.0, 0.0,
+                       2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 2.0,  3.0,  0.0, -1.0, 2.0, 0.1, -1.2, 0.0,
+                       2.5, 3.5, 4.5, 5.5, 6.5, 2.0, 2.0,  3.0,  0.0, -1.0, 2.0, 0.1, -1.2, 0.0,
+                       3.0, 4.0, 5.0, 6.0, 7.0, 1.0, 2.0,  3.0,  0.0, -1.0, 2.0, 0.1, -1.2, 0.0},
+                      14, 14);
+    
+    ASSERT_EQ(spmat, bmat);
 }
 
 TEST_F(CGenFuncTest, IsInVectorForTwoIndexes)

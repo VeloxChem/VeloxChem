@@ -126,6 +126,46 @@ namespace genfunc { // genfunc namespace
                              const CGtoContainer* ketGtoContainer);
     
     /**
+     Distributes batch of integrals (contracted GTO on bra side x all contracted
+     GTOs on ket side) in integrals matrix.
+
+     @param values the integrals matrix.
+     @param spherData the batch of integrals.
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     @param nBraContrGtos the number of contracted GTOs on bra side.
+     @param nKetContrGtos the number of contracted GTOs on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void distribute(      double*              values,
+                    const CMemBlock2D<double>& spherData,
+                    const int32_t              braAngularMomentum,
+                    const int32_t              ketAngularMomentum,
+                    const int32_t              nBraContrGtos,
+                    const int32_t              nKetContrGtos,
+                    const int32_t              iContrGto);
+    
+    /**
+     Distributes batch of integrals (contracted GTO on bra side x all contracted
+     GTOs on ket side) in integrals matrix.
+
+     @param values the integrals matrix.
+     @param spherData the batch of integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param isBraEqualKet the flag indicating equality of bra and ket sides.
+     @param nColumns the number of columns in integrals matrix.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void distribute(      double*              values,
+                    const CMemBlock2D<double>& spherData,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoBlock&           ketGtoBlock,
+                    const bool                 isBraEqualKet,
+                    const int32_t              nColumns,
+                    const int32_t              iContrGto);
+    
+    /**
      Checks if two indexes object is inside vector of two indexes objects.
 
      @param vector the vector of two indexes objects.

@@ -13,6 +13,7 @@
 #include "OverlapRecFunc.hpp"
 #include "GenFunc.hpp"
 #include "MemBlock.hpp"
+#include "SystemClock.hpp"
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
                                                  const int32_t  globNodes,
@@ -38,8 +39,11 @@ COverlapIntegralsDriver::~COverlapIntegralsDriver()
 COverlapMatrix
 COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const 
 {
+    COverlapMatrix ovlmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs container
@@ -48,18 +52,21 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
         
         // compute overlap integrals
         
-        return _compOverlapIntegrals(&bracontr, &bracontr);
+        ovlmat = _compOverlapIntegrals(&bracontr, &bracontr);
     }
     
-    return COverlapMatrix();
+    return ovlmat;
 }
 
 COverlapMatrix
 COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const
 {
+    COverlapMatrix ovlmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs containers
@@ -70,18 +77,21 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
         
         // compute overlap integrals
         
-        return _compOverlapIntegrals(&bracontr, &ketcontr);
+        ovlmat = _compOverlapIntegrals(&bracontr, &ketcontr);
     }
     
-    return COverlapMatrix();
+    return ovlmat;
 }
 
 COverlapMatrix
 COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& basis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const
 {
+    COverlapMatrix ovlmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs containers
@@ -92,10 +102,10 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         // compute overlap integrals
         
-        return _compOverlapIntegrals(&bracontr, &ketcontr);
+        ovlmat = _compOverlapIntegrals(&bracontr, &ketcontr);
     }
     
-    return COverlapMatrix();
+    return ovlmat;
 }
 
 COverlapMatrix
@@ -103,8 +113,11 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const
 {
+    COverlapMatrix ovlmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs containers
@@ -115,75 +128,24 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         // compute overlap integrals
         
-        return _compOverlapIntegrals(&bracontr, &ketcontr);
+        ovlmat = _compOverlapIntegrals(&bracontr, &ketcontr);
     }
     
-    return COverlapMatrix();
-}
-
-COverlapMatrix
-COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContainer,
-                                               const CGtoContainer* ketGtoContainer) const
-{
-    // allocate buffer of sparse matrices
-    
-    auto matbuff = _createSparseBuffer(braGtoContainer, ketGtoContainer);
-    
-    // compute overlap integral blocks
-    
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, matbuff)
-    {
-        #pragma omp single nowait
-        {
-            // determine number of GTOs blocks in bra/ket sides
-            
-            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
-            
-            auto nket = ketGtoContainer->getNumberOfGtoBlocks();
-            
-            // loop over pairs of GTOs blocks
-            
-            for (int32_t i = 0; i < nbra; i++)
-            {
-                for (int32_t j = 0; j < nket; j++)
-                {
-                    #pragma omp task firstprivate(i, j)
-                    {
-                        _compOverlapForGtoBlocks(matbuff, braGtoContainer, i,
-                                                 ketGtoContainer, j);
-                    }
-                }
-            }
-        }
-    }
-    
-    // distribute submatrices into single sparse matrix 
-    
-    auto spmat = genfunc::distribute(matbuff, braGtoContainer, ketGtoContainer);
-    
-    // optimize memory usage in sparsse matrix
-    
-    spmat.optimize_storage(); 
-    
-    // deallocate buffer of sparse matrices
-    
-    delete [] matbuff;
-    
-    return COverlapMatrix(spmat);
+    return ovlmat;
 }
 
 void
-COverlapIntegralsDriver::_compOverlapForGtoBlocks(      CSparseMatrix* sparseBuffer,
-                                                  const CGtoContainer* braGtoContainer,
-                                                  const int32_t        iBraGtoBlock,
-                                                  const CGtoContainer* ketGtoContainer,
-                                                  const int32_t        iKetGtoBlock) const
+COverlapIntegralsDriver::_compOverlapForGtoBlocks(      double*    intsValues,
+                                                  const CGtoBlock& braGtoBlock,
+                                                  const CGtoBlock& ketGtoBlock,
+                                                  const int32_t    nRows,
+                                                  const int32_t    nColumns) const
 {
     // copy GTOs blocks for bra and ket sides
     
-    auto bragtos = braGtoContainer->getGtoBlock(iBraGtoBlock);
+    auto bragtos = braGtoBlock;
     
-    auto ketgtos = ketGtoContainer->getGtoBlock(iKetGtoBlock);
+    auto ketgtos = ketGtoBlock;
     
     // set up spherical angular momentum for bra and ket sides
     
@@ -227,35 +189,31 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      CSparseMatrix* sparseBuf
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
     
-    // allocate contracted Cartesian integrals buffer
+    // set up contracted GTOs dimensions
     
-    auto cdim = ketgtos.getNumberOfContrGtos();
+    auto bdim = bragtos.getNumberOfContrGtos();
+    
+    auto kdim = ketgtos.getNumberOfContrGtos();
+    
+    // allocate contracted Cartesian integrals buffer
     
     auto ncart = angmom::to_CartesianComponents(bang, kang);
     
-    CMemBlock2D<double> cartbuffer(cdim, ncart);
+    CMemBlock2D<double> cartbuffer(kdim, ncart);
     
     // allocate contracted spherical integrals buffer
     
     auto nspher = angmom::to_SphericalComponents(bang, kang);
     
-    CMemBlock2D<double> spherbuffer(cdim, nspher);
+    CMemBlock2D<double> spherbuffer(kdim, nspher);
     
-    // allocate sparse matrix row data
+    // determine integrals storage scheme
     
-    CMemBlock<double> rowvals(cdim * angmom::to_SphericalComponents(kang));
+    bool diagblk = (bragtos == ketgtos);
     
-    CMemBlock<int32_t> colidx(cdim * angmom::to_SphericalComponents(kang));
+    bool origord = ((nRows == 0) && (nColumns == 0));
     
-    // initialize sparce matrix
-    
-    auto nrow = bragtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(bang);
-    
-    auto ncol = ketgtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(kang);
-    
-    CSparseMatrix spmat(nrow, ncol, 1.0e-13);
-    
-    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    for (int32_t i = 0; i < bdim; i++)
     {
         // compute distances: R(AB) = A - B
         
@@ -284,36 +242,81 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      CSparseMatrix* sparseBuf
         
         // transform Cartesian to spherical integrals
         
-        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, cdim);
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, kdim);
         
-        // add batch of integrals to sparse matrix
+        // add batch of integrals to integrals matrix
         
-        genfunc::compress(spmat, rowvals, colidx, spherbuffer, bragtos, ketgtos,
-                          i); 
+        if (origord)
+        {
+            genfunc::distribute(intsValues, spherbuffer, bang, kang, bdim, kdim, i);
+        }
+        else
+        {
+            genfunc::distribute(intsValues, spherbuffer, bragtos, ketgtos,
+                                diagblk, nColumns, i); 
+        }
     }
-    
-    // copy sparse matrix to buffer of sparce matrices
-    
-    auto kblk = ketGtoContainer->getNumberOfGtoBlocks();
-    
-    sparseBuffer[iBraGtoBlock * kblk + iKetGtoBlock] = spmat;
 }
 
-CSparseMatrix*
-COverlapIntegralsDriver::_createSparseBuffer(const CGtoContainer* braGtoContainer,
-                                             const CGtoContainer* ketGtoContainer) const
+COverlapMatrix
+COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                               const CGtoContainer* ketGtoContainer) const
 {
-    // setup size of sparse matrices buffer
+    // check if GTOs containers are same on bra and ket sides
     
-    auto bcomp = braGtoContainer->getNumberOfGtoBlocks();
+    auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
     
-    auto kcomp = ketGtoContainer->getNumberOfGtoBlocks();
+    // determine dimensions of overlap matrix
     
-    // allocate sparse matrices
+    auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
     
-    CSparseMatrix* matbuff = new CSparseMatrix[bcomp * kcomp];
+    auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
     
-    return matbuff;
+    // allocate dense matrix for overlap integrals
+    
+    CDenseMatrix ovlmat(nrow, ncol); 
+    
+    auto ovlvals = ovlmat.values();
+    
+    // compute overlap integral blocks
+    
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, ovlvals,\
+                                nrow, ncol, symbk)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs blocks in bra/ket sides
+            
+            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+            
+            auto nket = ketGtoContainer->getNumberOfGtoBlocks();
+            
+            // loop over pairs of GTOs blocks
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+                
+                auto joff = (symbk) ? i : 0;
+                
+                for (int32_t j = joff; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(i, j)
+                    {
+                        auto kgtos = ketGtoContainer->getGtoBlock(j);
+                        
+                        printf("Matrix Block: (%i,%i)\n", bgtos.getAngularMomentum(), kgtos.getAngularMomentum());
+                        
+                        _compOverlapForGtoBlocks(ovlvals, bgtos, kgtos, nrow, ncol);
+                    }
+                }
+            }
+        }
+    }
+
+    printf("Overlap matrix: (%i,%i) sym: %i\n", ovlmat.getNumberOfRows(), ovlmat.getNumberOfColumns(), symbk);
+    
+    return COverlapMatrix();
 }
 
 void

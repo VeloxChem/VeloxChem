@@ -14,8 +14,31 @@
 
 #include "MemBlock2D.hpp"
 #include "GtoBlock.hpp"
+#include "GtoContainer.hpp"
+#include "DenseMatrix.hpp"
 
 namespace intsfunc { // intsfunc namespace
+    
+    /**
+     Creates buffer of dense matrices for all allowed combinations of GTOs
+     blocks from GTOs containers on bra and ket sides.
+     
+     @param braGtoContainer the GTOs container for bra side.
+     @param ketGtoContainer the GTOs container for ket side.
+     @param isBraEqualKet the boolean flag indicating equality of GTOs containers
+            on bra and ket sides.
+     @return the vector of dense matrices.
+     */
+    CDenseMatrix* createMatrixBuffer(const CGtoContainer* braGtoContainer,
+                                     const CGtoContainer* ketGtoContainer,
+                                     const bool           isBraEqualKet);
+    
+    /**
+     Destroys buffer of dense matrices.
+
+     @param matrixBuffer the vector of dense matrices.
+     */
+    void destroyMatrixBuffer(CDenseMatrix* matrixBuffer);
     
     /**
      Computes distances between specific contracted GTO on bra side with all

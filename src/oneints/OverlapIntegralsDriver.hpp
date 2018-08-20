@@ -22,6 +22,7 @@
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
 #include "SparseMatrix.hpp"
+#include "OutputStream.hpp"
 
 /**
  Class COverlapIntegralsDriver computes one-electron overlap integrals.
@@ -66,21 +67,23 @@ class COverlapIntegralsDriver
                                          const CGtoContainer* ketGtoContainer) const;
     
     /**
-     Computes overlap integrals for specific pair of GTOs blocks.
-
-     @param sparseBuffer the buffer of sparce matrices.
-     @param braGtoContainer the GTOs container for bra side.
-     @param iBraGtoBlock the index of GTOs block object in GTOs container for
-            bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @param iKetGtoBlock the index of GTOs block object in GTOs container for
-            ket side.
+     Computes overlap integrals for specific pair of GTOs blocks and stores
+     integrals in matrix of predefined size.
+     NOTE: If size of integrals matrix, nRows and nColumns, is set to zero, then
+     size of integrals matrix is defined by GTOs block objects on bra and ket
+     sides.
+     
+     @param intsValues the matrix of overlap integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param nRows the number of rows in overlap integrals matrix.
+     @param nColumns the number of columns in overlap integrals matrix.
      */
-    void _compOverlapForGtoBlocks(      CSparseMatrix* sparseBuffer,
-                                  const CGtoContainer* braGtoContainer,
-                                  const int32_t        iBraGtoBlock,
-                                  const CGtoContainer* ketGtoContainer,
-                                  const int32_t        iKetGtoBlock) const;
+    void _compOverlapForGtoBlocks(      double*    intsValues,
+                                  const CGtoBlock& braGtoBlock,
+                                  const CGtoBlock& ketGtoBlock,
+                                  const int32_t    nRows,
+                                  const int32_t    nColumns) const;
     
     /**
      Computes batch of primitive overlap integrals using Obara-Saika recursion
@@ -138,16 +141,7 @@ class COverlapIntegralsDriver
                                            const CVecTwoIndexes&       recPattern,
                                            const int32_t               maxPrimGtos) const;
     
-    /**
-     Creates buffer of sparse matrices for all allowed combinations of GTOs
-     blocks from GTOs containers on bra and ket sides.
-
-     @param braGtoContainer the GTOs container for bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @return the vector of sparse matrices.
-     */
-    CSparseMatrix* _createSparseBuffer(const CGtoContainer* braGtoContainer,
-                                       const CGtoContainer* ketGtoContainer) const;
+    
 
 public:
     
@@ -173,11 +167,13 @@ public:
 
      @param molecule the molecule.
      @param basis the molecular basis.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the overlap matrix object.
      */
     COverlapMatrix compute(const CMolecule&       molecule,
                            const CMolecularBasis& basis,
+                                 COutputStream&   oStream,
                                  MPI_Comm         comm) const;
     
     /**
@@ -187,12 +183,14 @@ public:
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of overlap matrix.
      @param ketBasis the molecular basis for ket side of overlap matrix.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the overlap matrix object.
      */
     COverlapMatrix compute(const CMolecule&       molecule,
                            const CMolecularBasis& braBasis,
                            const CMolecularBasis& ketBasis,
+                                 COutputStream&   oStream,
                                  MPI_Comm         comm) const;
     
     /**
@@ -202,12 +200,14 @@ public:
      @param braMolecule the molecule for bra side of overlap matrix.
      @param ketMolecule the molecule for ket side of overlap matrix.
      @param basis the molecular basis.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the overlap matrix object.
      */
     COverlapMatrix compute(const CMolecule&       braMolecule,
                            const CMolecule&       ketMolecule,
                            const CMolecularBasis& basis,
+                                 COutputStream&   oStream,
                                  MPI_Comm         comm) const;
     
     /**
@@ -218,6 +218,7 @@ public:
      @param ketMolecule the molecule for ket side of overlap matrix.
      @param braBasis the molecular basis for bra side of overlap matrix.
      @param ketBasis the molecular basis for ket side of overlap matrix.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the overlap matrix object.
      */
@@ -225,7 +226,19 @@ public:
                            const CMolecule&       ketMolecule,
                            const CMolecularBasis& braBasis,
                            const CMolecularBasis& ketBasis,
+                                 COutputStream&   oStream,
                                  MPI_Comm         comm) const;
+    
+    /**
+     Computes overlap integrals blocks for pair of GTOs blocks.
+ 
+     @param intsValues the matrix of overlap integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     */
+    void compute(      double*    intsValues,
+                 const CGtoBlock& braGtoBlock,
+                 const CGtoBlock& ketGtoBlock) const;
 };
 
 #endif /* OverlapIntegralsDriver_hpp */
