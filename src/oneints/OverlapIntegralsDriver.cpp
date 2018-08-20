@@ -135,6 +135,71 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
 }
 
 void
+COverlapIntegralsDriver::compute(      double*    intsValues,
+                                 const CGtoBlock& braGtoBlock,
+                                 const CGtoBlock& ketGtoBlock) const
+{
+    _compOverlapForGtoBlocks(intsValues, braGtoBlock, ketGtoBlock, 0, 0); 
+}
+
+COverlapMatrix
+COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                               const CGtoContainer* ketGtoContainer) const
+{
+    // check if GTOs containers are same on bra and ket sides
+    
+    auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
+    
+    // determine dimensions of overlap matrix
+    
+    auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
+    
+    auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
+    
+    // allocate dense matrix for overlap integrals
+    
+    CDenseMatrix ovlmat(nrow, ncol);
+    
+    auto ovlvals = ovlmat.values();
+    
+    // compute overlap integral blocks
+    
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, ovlvals,\
+                                nrow, ncol, symbk)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs blocks in bra/ket sides
+            
+            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+            
+            auto nket = ketGtoContainer->getNumberOfGtoBlocks();
+            
+            // loop over pairs of GTOs blocks
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+                
+                auto joff = (symbk) ? i : 0;
+                
+                for (int32_t j = joff; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(i, j)
+                    {
+                        auto kgtos = ketGtoContainer->getGtoBlock(j);
+                        
+                        _compOverlapForGtoBlocks(ovlvals, bgtos, kgtos, nrow, ncol);
+                    }
+                }
+            }
+        }
+    }
+    
+    return COverlapMatrix(ovlmat);
+}
+
+void
 COverlapIntegralsDriver::_compOverlapForGtoBlocks(      double*    intsValues,
                                                   const CGtoBlock& braGtoBlock,
                                                   const CGtoBlock& ketGtoBlock,
@@ -256,67 +321,6 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      double*    intsValues,
                                 diagblk, nColumns, i); 
         }
     }
-}
-
-COverlapMatrix
-COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContainer,
-                                               const CGtoContainer* ketGtoContainer) const
-{
-    // check if GTOs containers are same on bra and ket sides
-    
-    auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
-    
-    // determine dimensions of overlap matrix
-    
-    auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
-    
-    auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
-    
-    // allocate dense matrix for overlap integrals
-    
-    CDenseMatrix ovlmat(nrow, ncol); 
-    
-    auto ovlvals = ovlmat.values();
-    
-    // compute overlap integral blocks
-    
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, ovlvals,\
-                                nrow, ncol, symbk)
-    {
-        #pragma omp single nowait
-        {
-            // determine number of GTOs blocks in bra/ket sides
-            
-            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
-            
-            auto nket = ketGtoContainer->getNumberOfGtoBlocks();
-            
-            // loop over pairs of GTOs blocks
-            
-            for (int32_t i = 0; i < nbra; i++)
-            {
-                auto bgtos = braGtoContainer->getGtoBlock(i);
-                
-                auto joff = (symbk) ? i : 0;
-                
-                for (int32_t j = joff; j < nket; j++)
-                {
-                    #pragma omp task firstprivate(i, j)
-                    {
-                        auto kgtos = ketGtoContainer->getGtoBlock(j);
-                        
-                        printf("Matrix Block: (%i,%i)\n", bgtos.getAngularMomentum(), kgtos.getAngularMomentum());
-                        
-                        _compOverlapForGtoBlocks(ovlvals, bgtos, kgtos, nrow, ncol);
-                    }
-                }
-            }
-        }
-    }
-
-    printf("Overlap matrix: (%i,%i) sym: %i\n", ovlmat.getNumberOfRows(), ovlmat.getNumberOfColumns(), symbk);
-    
-    return COverlapMatrix();
 }
 
 void

@@ -9,7 +9,7 @@
 #ifndef OverlapMatrix_hpp
 #define OverlapMatrix_hpp
 
-#include "SparseMatrix.hpp"
+#include "DenseMatrix.hpp"
 
 /**
  Class COverlapMatrix stores general one electron overlap matrix and provides
@@ -20,9 +20,9 @@
 class COverlapMatrix
 {
     /**
-     The generic sparse overlap matrix (rectangular or square).
+     The generic dense overlap matrix (rectangular or square).
      */
-    CSparseMatrix _matrix;
+    CDenseMatrix _matrix;
     
 public:
     
@@ -34,9 +34,9 @@ public:
     /**
      Creates a overlap matrix object.
      
-     @param matrix the sparse matrix with overlap integrals.
+     @param matrix the dense matrix with overlap integrals.
      */
-    COverlapMatrix(const CSparseMatrix& matrix);
+    COverlapMatrix(const CDenseMatrix& matrix);
     
     /**
      Creates a overlap matrix object by copying other overlap matrix object.

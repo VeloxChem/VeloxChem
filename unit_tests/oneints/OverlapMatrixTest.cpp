@@ -14,16 +14,14 @@ TEST_F(COverlapMatrixTest, DefaultConstructor)
 {
     COverlapMatrix smata;
     
-    COverlapMatrix smatb(CSparseMatrix(0, 0, 1.0e-13));
+    COverlapMatrix smatb(CDenseMatrix(0, 0));
     
     ASSERT_EQ(smata, smatb);
 }
 
 TEST_F(COverlapMatrixTest, CopyConstructor)
 {
-    CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0, 7.0,
-                      8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4},
-                     {0, 1, 2, 0, 1, 2, 3, 4, 9, 2, 3, 1, 4}, 5, 5, 1.0e-13);
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
     COverlapMatrix smata(ma);
     
@@ -34,9 +32,7 @@ TEST_F(COverlapMatrixTest, CopyConstructor)
 
 TEST_F(COverlapMatrixTest, MoveConstructor)
 {
-    CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0, 7.0,
-                      8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4},
-                     {0, 1, 2, 0, 1, 2, 3, 4, 9, 2, 3, 1, 4}, 5, 5, 1.0e-13);
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
     COverlapMatrix smata(ma);
     
@@ -47,9 +43,7 @@ TEST_F(COverlapMatrixTest, MoveConstructor)
 
 TEST_F(COverlapMatrixTest, CopyAssignment)
 {
-    CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0, 7.0,
-                      8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4},
-                     {0, 1, 2, 0, 1, 2, 3, 4, 9, 2, 3, 1, 4}, 5, 5, 1.0e-13);
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
     COverlapMatrix smata(ma);
     
@@ -60,9 +54,7 @@ TEST_F(COverlapMatrixTest, CopyAssignment)
 
 TEST_F(COverlapMatrixTest, MoveAssignment)
 {
-    CSparseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0, 2.0, 7.0,
-                      8.0, -5.0}, {0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4},
-                     {0, 1, 2, 0, 1, 2, 3, 4, 9, 2, 3, 1, 4}, 5, 5, 1.0e-13);
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
     COverlapMatrix smata(ma);
     

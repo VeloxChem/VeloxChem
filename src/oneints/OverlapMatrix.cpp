@@ -13,7 +13,7 @@ COverlapMatrix::COverlapMatrix()
     
 }
 
-COverlapMatrix::COverlapMatrix(const CSparseMatrix& matrix)
+COverlapMatrix::COverlapMatrix(const CDenseMatrix& matrix)
 
     : _matrix(matrix)
 {
