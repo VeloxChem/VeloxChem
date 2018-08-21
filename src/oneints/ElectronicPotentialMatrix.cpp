@@ -13,7 +13,7 @@ CElectronicPotentialMatrix::CElectronicPotentialMatrix()
     
 }
 
-CElectronicPotentialMatrix::CElectronicPotentialMatrix(const CSparseMatrix& matrix)
+CElectronicPotentialMatrix::CElectronicPotentialMatrix(const CDenseMatrix& matrix)
 
     : _matrix(matrix)
 {

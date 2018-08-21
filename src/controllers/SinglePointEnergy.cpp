@@ -178,11 +178,17 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     auto kinmat = kindrv.compute(_molecule, _aoBasis, oStream, comm);
     
+    // compute nuclear potential integrals
+    
+    CNuclearPotentialIntegralsDriver npotdrv(_globRank, _globNodes, comm);
+    
+    auto npotmat = npotdrv.compute(_molecule, _aoBasis, oStream, comm);
+    
     // compute electronic potential integrals
     
     CElectronicPotentialIntegralsDriver epotdrv(_globRank, _globNodes, comm);
     
-    auto epotmat = epotdrv.compute(_molecule, _aoBasis, comm);
+    auto epotmat = epotdrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute three center electron repulsion integrals
     

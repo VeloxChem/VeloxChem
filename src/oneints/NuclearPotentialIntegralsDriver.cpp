@@ -13,6 +13,7 @@
 #include "OneIntsFunc.hpp"
 #include "BoysFunction.hpp"
 #include "NuclearPotentialRecFunc.hpp"
+#include "StringFormat.hpp"
 
 CNuclearPotentialIntegralsDriver::CNuclearPotentialIntegralsDriver(const int32_t  globRank,
                                                                    const int32_t  globNodes,
@@ -38,8 +39,13 @@ CNuclearPotentialIntegralsDriver::~CNuclearPotentialIntegralsDriver()
 CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecularBasis& basis,
+                                                COutputStream&   oStream,
                                                 MPI_Comm         comm) const
 {
+    CSystemClock timer;
+    
+    CNuclearPotentialMatrix npotmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs container
@@ -52,13 +58,26 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
         
         auto pcoords  = molecule.getCoordinates();
         
-        // compute kinetic energy integrals
+        // compute nuclear potential integrals
         
-        return _compNuclearPotentialIntegrals(&pcharges, &pcoords, &bracontr,
+        npotmat = _compNuclearPotentialIntegrals(&pcharges, &pcoords, &bracontr,
                                               &bracontr);
     }
     
-    return CNuclearPotentialMatrix();
+    _printComputationTime(timer, oStream);
+    
+    return npotmat;
+}
+
+void
+CNuclearPotentialIntegralsDriver::compute(      double*              intsValues,
+                                          const CMemBlock<double>*   charges,
+                                          const CMemBlock2D<double>* coordinates,
+                                          const CGtoBlock&           braGtoBlock,
+                                          const CGtoBlock&           ketGtoBlock) const
+{
+    _compNuclearPotentialForGtoBlocks(intsValues, charges, coordinates, braGtoBlock,
+                                      ketGtoBlock, 0, 0);
 }
 
 CNuclearPotentialMatrix
@@ -67,15 +86,28 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
                                                                  const CGtoContainer*       braGtoContainer,
                                                                  const CGtoContainer*       ketGtoContainer) const
 {
-    // allocate buffer of sparse matrices
+    // check if GTOs containers are same on bra and ket sides
     
-    auto matbuff = _createSparseBuffer(braGtoContainer, ketGtoContainer);
+    auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
     
-    // compute kinetic energy integral blocks
+    // determine dimensions of nuclear potential matrix
     
-    //#pragma omp parallel shared(braGtoContainer, ketGtoContainer, matbuff)
+    auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
+    
+    auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
+    
+    // allocate dense matrix for nuclear potential integrals
+    
+    CDenseMatrix npotmat(nrow, ncol);
+    
+    auto npotvals = npotmat.values();
+    
+    // compute nuclear potential integral blocks
+    
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, npotvals,\
+                                nrow, ncol, symbk)
     {
-        //#pragma omp single nowait
+        #pragma omp single nowait
         {
             // determine number of GTOs blocks in bra/ket sides
             
@@ -87,48 +119,41 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
             
             for (int32_t i = 0; i < nbra; i++)
             {
-                for (int32_t j = 0; j < nket; j++)
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+                
+                auto joff = (symbk) ? i : 0;
+                
+                for (int32_t j = joff; j < nket; j++)
                 {
-                   // #pragma omp task firstprivate(i, j)
+                    #pragma omp task firstprivate(j)
                     {
-                        _compNuclearPotentialForGtoBlocks(matbuff, charges, coordinates,
-                                                          braGtoContainer, i,
-                                                          ketGtoContainer, j);
+                        auto kgtos = ketGtoContainer->getGtoBlock(j);
+                        
+                        _compNuclearPotentialForGtoBlocks(npotvals, charges, coordinates,
+                                                          bgtos, kgtos, nrow, ncol);
                     }
                 }
             }
         }
     }
     
-    // distribute submatrices into single sparse matrix
-    
-    auto spmat = genfunc::distribute(matbuff, braGtoContainer, ketGtoContainer);
-    
-    // optimize memory usage in sparsse matrix
-    
-    spmat.optimize_storage();
-    
-    // deallocate buffer of sparse matrices
-    
-    delete [] matbuff;
-    
-    return CNuclearPotentialMatrix(spmat);
+    return CNuclearPotentialMatrix(npotmat);
 }
 
 void
-CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSparseMatrix*       sparseBuffer,
+CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      double*              intsValues,
                                                                     const CMemBlock<double>*   charges,
                                                                     const CMemBlock2D<double>* coordinates,
-                                                                    const CGtoContainer*       braGtoContainer,
-                                                                    const int32_t              iBraGtoBlock,
-                                                                    const CGtoContainer*       ketGtoContainer,
-                                                                    const int32_t              iKetGtoBlock) const
+                                                                    const CGtoBlock&           braGtoBlock,
+                                                                    const CGtoBlock&           ketGtoBlock,
+                                                                    const int32_t              nRows,
+                                                                    const int32_t              nColumns) const
 {
     // copy GTOs blocks for bra and ket sides
     
-    auto bragtos = braGtoContainer->getGtoBlock(iBraGtoBlock);
+    auto bragtos = braGtoBlock;
     
-    auto ketgtos = ketGtoContainer->getGtoBlock(iKetGtoBlock);
+    auto ketgtos = ketGtoBlock;
     
     // copy charges and their coordinates
     
@@ -188,31 +213,21 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
     
     CMemBlock2D<double> accbuffer(pdim, ncart * pmax);
     
+    // set up contracted GTOs dimensions
+    
+    auto bdim = bragtos.getNumberOfContrGtos();
+    
+    auto kdim = ketgtos.getNumberOfContrGtos();
+    
     // allocate contracted Cartesian integrals buffer
     
-    auto cdim = ketgtos.getNumberOfContrGtos();
-    
-    CMemBlock2D<double> cartbuffer(cdim, ncart);
+    CMemBlock2D<double> cartbuffer(kdim, ncart);
     
     // allocate contracted spherical integrals buffer
     
     auto nspher = angmom::to_SphericalComponents(bang, kang);
     
-    CMemBlock2D<double> spherbuffer(cdim, nspher);
-    
-    // allocate sparse matrix row data
-    
-    CMemBlock<double> rowvals(cdim * angmom::to_SphericalComponents(kang));
-    
-    CMemBlock<int32_t> colidx(cdim * angmom::to_SphericalComponents(kang));
-    
-    // initialize sparce matrix
-    
-    auto nrow = bragtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(bang);
-    
-    auto ncol = ketgtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(kang);
-    
-    CSparseMatrix spmat(nrow, ncol, 1.0e-13);
+    CMemBlock2D<double> spherbuffer(kdim, nspher);
     
     // initialize Boys function evaluator
     
@@ -223,6 +238,12 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
     CMemBlock<double> bargs(pdim);
     
     CMemBlock2D<double> bvals(pdim, bord + 1);
+    
+    // determine integrals storage scheme
+    
+    bool diagblk = (bragtos == ketgtos);
+    
+    bool origord = ((nRows == 0) && (nColumns == 0));
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -276,19 +297,20 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      CSpars
         
         // transform Cartesian to spherical integrals
         
-        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, cdim);
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, kdim);
         
-        // add batch of integrals to sparse matrix
+        // add batch of integrals to integrals matrix
         
-        genfunc::compress(spmat, rowvals, colidx, spherbuffer, bragtos, ketgtos,
-                          i);
+        if (origord)
+        {
+            genfunc::distribute(intsValues, spherbuffer, bang, kang, bdim, kdim, i);
+        }
+        else
+        {
+            genfunc::distribute(intsValues, spherbuffer, bragtos, ketgtos,
+                                diagblk, nColumns, i);
+        }
     }
-    
-    // copy sparse matrix to buffer of sparce matrices
-    
-    auto kblk = ketGtoContainer->getNumberOfGtoBlocks();
-    
-    sparseBuffer[iBraGtoBlock * kblk + iKetGtoBlock] = spmat;
 }
 
 void
@@ -461,24 +483,6 @@ CNuclearPotentialIntegralsDriver::_compPrimNuclearPotentialInts(      CMemBlock2
                                            braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: add l > 4 recursion here
-}
-
-
-CSparseMatrix*
-CNuclearPotentialIntegralsDriver::_createSparseBuffer(const CGtoContainer* braGtoContainer,
-                                                      const CGtoContainer* ketGtoContainer) const
-{
-    // setup size of sparse matrices buffer
-    
-    auto bcomp = braGtoContainer->getNumberOfGtoBlocks();
-    
-    auto kcomp = ketGtoContainer->getNumberOfGtoBlocks();
-    
-    // allocate sparse matrices
-    
-    CSparseMatrix* matbuff = new CSparseMatrix[bcomp * kcomp];
-    
-    return matbuff;
 }
 
 CVecThreeIndexes
@@ -701,5 +705,27 @@ CNuclearPotentialIntegralsDriver::_addPointChargeContribution(      CMemBlock2D<
                 abuf[k] += fact * pbuf[k];
             }
         }
+    }
+}
+
+void
+CNuclearPotentialIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
+                                                              COutputStream& oStream) const
+{
+    auto tsec = timer.getElapsedTimeInSeconds();
+    
+    if (_isLocalMode)
+    {
+        // FIX ME: we need tags for each driver to be implemented to manage
+        //         MPI send/receive cycle.
+    }
+    
+    if (_globRank == mpi::master())
+    {
+        oStream << fmt::info << "Nuclear potential matrix computed in ";
+        
+        oStream << fstr::to_string(tsec, 2) << " sec.";
+        
+        oStream << fmt::end << fmt::blank;
     }
 }

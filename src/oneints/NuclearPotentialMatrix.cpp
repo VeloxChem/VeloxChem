@@ -13,7 +13,7 @@ CNuclearPotentialMatrix::CNuclearPotentialMatrix()
     
 }
 
-CNuclearPotentialMatrix::CNuclearPotentialMatrix(const CSparseMatrix& matrix)
+CNuclearPotentialMatrix::CNuclearPotentialMatrix(const CDenseMatrix& matrix)
 
     : _matrix(matrix)
 {

@@ -19,6 +19,8 @@
 #include "ThreeIndexes.hpp"
 #include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
+#include "OutputStream.hpp"
+#include "SystemClock.hpp"
 
 /**
  Class CNuclearPotentialIntegralsDriver computes one-electron nuclear potential
@@ -70,23 +72,21 @@ class CNuclearPotentialIntegralsDriver
     /**
      Computes nuclear potential integrals for specific pair of GTOs blocks.
      
-     @param sparseBuffer the buffer of sparce matrices.
+     @param intsValues the matrix of kinetic energy integrals.
      @param charges the vector of point charges.
      @param coordinates the vector of point charges coordines.
-     @param braGtoContainer the GTOs container for bra side.
-     @param iBraGtoBlock the index of GTOs block object in GTOs container for
-     bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @param iKetGtoBlock the index of GTOs block object in GTOs container for
-     ket side.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param nRows the number of rows in nuclear potential integrals matrix.
+     @param nColumns the number of columns in nuclear potential integrals matrix.
      */
-    void _compNuclearPotentialForGtoBlocks(      CSparseMatrix*       sparseBuffer,
+    void _compNuclearPotentialForGtoBlocks(      double*              intsValues,
                                            const CMemBlock<double>*   charges,
                                            const CMemBlock2D<double>* coordinates,
-                                           const CGtoContainer*       braGtoContainer,
-                                           const int32_t              iBraGtoBlock,
-                                           const CGtoContainer*       ketGtoContainer,
-                                           const int32_t              iKetGtoBlock) const;
+                                           const CGtoBlock&           braGtoBlock,
+                                           const CGtoBlock&           ketGtoBlock,
+                                           const int32_t              nRows,
+                                           const int32_t              nColumns) const;
     
     /**
      Gets Obara-Saika recursion pattern for specific combination of GTOs blocks
@@ -113,18 +113,7 @@ class CNuclearPotentialIntegralsDriver
     int32_t _getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
                                            const CVecThreeIndexes&     recPattern,
                                            const int32_t               maxPrimGtos) const;
-    
-    /**
-     Creates buffer of sparse matrices for all allowed combinations of GTOs
-     blocks from GTOs containers on bra and ket sides.
-     
-     @param braGtoContainer the GTOs container for bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @return the vector of sparse matrices.
-     */
-    CSparseMatrix* _createSparseBuffer(const CGtoContainer* braGtoContainer,
-                                       const CGtoContainer* ketGtoContainer) const;
-    
+        
     /**
      Adds single point charge contribution from primitives recursion buffer to
      primitives accumulation buffer, which contains primitive nuclear potential
@@ -189,6 +178,15 @@ class CNuclearPotentialIntegralsDriver
                                        const CGtoBlock&            ketGtoBlock,
                                        const int32_t               iContrGto) const;
     
+    /**
+     Prints nuclear potential integrals computation time to output stream.
+     
+     @param timer the system clock timer.
+     @param oStream the output stream.
+     */
+    void _printComputationTime(const CSystemClock&  timer,
+                                     COutputStream& oStream) const;
+    
 public:
     
     /**
@@ -213,12 +211,29 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       molecule,
                                     const CMolecularBasis& basis,
+                                          COutputStream&   oStream, 
                                           MPI_Comm         comm) const;
+    
+    /**
+     Computes nuclear potential integrals blocks for pair of GTOs blocks.
+     
+     @param intsValues the matrix of nuclear potential integrals.
+     @param charges the vector of point charges.
+     @param coordinates the vector of point charges coordines.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     */
+    void compute(      double*              intsValues,
+                 const CMemBlock<double>*   charges,
+                 const CMemBlock2D<double>* coordinates,
+                 const CGtoBlock&           braGtoBlock,
+                 const CGtoBlock&           ketGtoBlock) const;
 };
 
 #endif /* NuclearPotentialIntegralsDriver_hpp */

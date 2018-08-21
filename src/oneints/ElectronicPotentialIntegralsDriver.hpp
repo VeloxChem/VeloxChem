@@ -23,6 +23,8 @@
 #include "VecIndexes.hpp"
 #include "SparseMatrix.hpp"
 #include "BoysFunction.hpp"
+#include "OutputStream.hpp"
+#include "SystemClock.hpp"
 
 /**
  Class CElectronicPotentialIntegralsDriver computes electronic potential
@@ -68,21 +70,23 @@ class CElectronicPotentialIntegralsDriver
                                                                  const CGtoContainer* ketGtoContainer) const;
     
     /**
-     Computes electronic potential integrals for specific pair of GTOs blocks.
+     Computes electronic potential integrals for specific pair of GTOs blocks and
+     stores integrals in matrix of predefined size.
+     NOTE: If size of integrals matrix, nRows and nColumns, is set to zero, then
+     size of integrals matrix is defined by GTOs block objects on bra and ket
+     sides.
      
-     @param sparseBuffer the buffer of sparce matrices.
-     @param braGtoContainer the GTOs container for bra side.
-     @param iBraGtoBlock the index of GTOs block object in GTOs container for
-     bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @param iKetGtoBlock the index of GTOs block object in GTOs container for
-     ket side.
+     @param intsValues the matrix of electronic potential integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param nRows the number of rows in kinetic energy integrals matrix.
+     @param nColumns the number of columns in kinetic energy integrals matrix.
      */
-    void _compElectronicPotentialForGtoBlocks(      CSparseMatrix* sparseBuffer,
-                                              const CGtoContainer* braGtoContainer,
-                                              const int32_t        iBraGtoBlock,
-                                              const CGtoContainer* ketGtoContainer,
-                                              const int32_t        iKetGtoBlock) const;
+    void _compElectronicPotentialForGtoBlocks(      double*    intsValues,
+                                              const CGtoBlock& braGtoBlock,
+                                              const CGtoBlock& ketGtoBlock,
+                                              const int32_t    nRows,
+                                              const int32_t    nColumns) const;
     
     /**
      Computes batch of primitive electronic potential integrals using Obara-Saika
@@ -149,15 +153,13 @@ class CElectronicPotentialIntegralsDriver
                                            const int32_t               maxPrimGtos) const;
     
     /**
-     Creates buffer of sparse matrices for all allowed combinations of GTOs
-     blocks from GTOs containers on bra and ket sides.
+     Prints electronic potential integrals computation time to output stream.
      
-     @param braGtoContainer the GTOs container for bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @return the vector of sparse matrices.
+     @param timer the system clock timer.
+     @param oStream the output stream.
      */
-    CSparseMatrix* _createSparseBuffer(const CGtoContainer* braGtoContainer,
-                                       const CGtoContainer* ketGtoContainer) const;
+    void _printComputationTime(const CSystemClock&  timer,
+                                     COutputStream& oStream) const;
     
 public:
     
@@ -183,12 +185,25 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the electronic potential matrix object.
      */
     CElectronicPotentialMatrix compute(const CMolecule&       molecule,
                                        const CMolecularBasis& basis,
+                                             COutputStream&   oStream, 
                                              MPI_Comm         comm) const;
+    
+    /**
+     Computes electronic potential integrals blocks for pair of GTOs blocks.
+     
+     @param intsValues the matrix of electronic potential integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     */
+    void compute(      double*    intsValues,
+                 const CGtoBlock& braGtoBlock,
+                 const CGtoBlock& ketGtoBlock) const;
 };
 
 

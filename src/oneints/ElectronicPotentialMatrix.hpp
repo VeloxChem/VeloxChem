@@ -9,7 +9,7 @@
 #ifndef ElectronicPotentialMatrix_hpp
 #define ElectronicPotentialMatrix_hpp
 
-#include "SparseMatrix.hpp"
+#include "DenseMatrix.hpp"
 
 /**
  Class CElectronicPotenialMatrix stores general electronic potential matrix and
@@ -20,9 +20,9 @@
 class CElectronicPotentialMatrix
 {
     /**
-     The generic sparse electronic potential matrix (rectangular or square).
+     The generic dense electronic potential matrix (rectangular or square).
      */
-    CSparseMatrix _matrix;
+    CDenseMatrix _matrix;
     
 public:
     
@@ -34,9 +34,9 @@ public:
     /**
      Creates a electronic potential matrix object.
      
-     @param matrix the sparse matrix with electronic potential integrals.
+     @param matrix the dense matrix with electronic potential integrals.
      */
-    CElectronicPotentialMatrix(const CSparseMatrix& matrix);
+    CElectronicPotentialMatrix(const CDenseMatrix& matrix);
     
     /**
      Creates a electronic potential matrix object by copying other electronic potential

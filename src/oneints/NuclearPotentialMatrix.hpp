@@ -9,7 +9,7 @@
 #ifndef NuclearPotentialMatrix_hpp
 #define NuclearPotentialMatrix_hpp
 
-#include "SparseMatrix.hpp"
+#include "DenseMatrix.hpp"
 
 /**
  Class CNuclearPotentialMatrix stores general nuclear potential matrix and
@@ -20,9 +20,9 @@
 class CNuclearPotentialMatrix
 {
     /**
-     The generic sparse nuclear potential matrix (rectangular or square).
+     The generic dense nuclear potential matrix (rectangular or square).
      */
-    CSparseMatrix _matrix;
+    CDenseMatrix _matrix;
     
 public:
     
@@ -34,9 +34,9 @@ public:
     /**
      Creates a nuclear potential matrix object.
      
-     @param matrix the sparse matrix with nuclear potential integrals.
+     @param matrix the dense matrix with nuclear potential integrals.
      */
-    CNuclearPotentialMatrix(const CSparseMatrix& matrix);
+    CNuclearPotentialMatrix(const CDenseMatrix& matrix);
     
     /**
      Creates a nuclear potential matrix object by copying other nuclear potential

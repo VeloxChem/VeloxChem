@@ -241,7 +241,7 @@ public:
     /**
      Computes kinetic energy integrals blocks for pair of GTOs blocks.
      
-     @param intsValues the matrix of overlap integrals.
+     @param intsValues the matrix of kinetic energy integrals.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
