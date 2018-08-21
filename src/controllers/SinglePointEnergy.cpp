@@ -176,7 +176,7 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     CKineticEnergyIntegralsDriver kindrv(_globRank, _globNodes, comm);
     
-    auto kinmat = kindrv.compute(_molecule, _aoBasis, comm);
+    auto kinmat = kindrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute electronic potential integrals
     

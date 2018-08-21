@@ -37,16 +37,15 @@ getMolecularBasisForLiH()
 }
 
 CMolecularBasis
-getTestBasisForLiH(const int32_t angularMomentumA,
-                   const int32_t angularMomentumB)
+getTestBasisForLiH()
 {
     CMolecularBasis mbas;
     
     mbas.setLabel({"Test-Basis"});
     
-    mbas.addAtomBasis(getTestBasisForLi(angularMomentumA));
+    mbas.addAtomBasis(getTestBasisForLi());
     
-    mbas.addAtomBasis(getTestBasisForH(angularMomentumB));
+    mbas.addAtomBasis(getTestBasisForH());
     
     return mbas;
 }

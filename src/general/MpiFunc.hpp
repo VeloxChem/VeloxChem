@@ -151,20 +151,28 @@ void bcast(std::vector<std::string>& vector,
            MPI_Comm                  comm);
     
 /**
- Sends a real number from source MPI process to destination MPI process.
+ Sends a real number to destination MPI process.
  
  @param value the real number.
- @param rank the rank of MPI process.
- @param dst_rank the rank of destination MPI process.
- @param src_rank the rank of source MPI process.
+ @param rank the rank of destination MPI process.
  @param comm the MPI communicator.
 */
 void
 send(      double&  value,
      const int32_t  rank,
-     const int32_t  dst_rank,
-     const int32_t  src_rank,
            MPI_Comm comm);
+    
+/**
+ Receives a real number to source MPI process.
+     
+ @param value the real number.
+ @param rank the rank of source MPI process.
+ @param comm the MPI communicator.
+*/
+void
+receive(      double&  value,
+        const int32_t  rank,
+              MPI_Comm comm);
    
 /**
  Determines batch size associated with MPI process for data vector within domain

@@ -12,6 +12,7 @@
 #include "AngularMomentum.hpp"
 #include "OneIntsFunc.hpp"
 #include "KineticEnergyRecFunc.hpp"
+#include "StringFormat.hpp"
 
 CKineticEnergyIntegralsDriver::CKineticEnergyIntegralsDriver(const int32_t  globRank,
                                                              const int32_t  globNodes,
@@ -37,8 +38,13 @@ CKineticEnergyIntegralsDriver::~CKineticEnergyIntegralsDriver()
 CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& basis,
+                                             COutputStream&   oStream, 
                                              MPI_Comm         comm) const
 {
+    CSystemClock timer;
+    
+    CKineticEnergyMatrix kinmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs container
@@ -47,10 +53,12 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
         
         // compute kinetic energy integrals
         
-        return _compKineticEnergyIntegrals(&bracontr, &bracontr);
+        kinmat = _compKineticEnergyIntegrals(&bracontr, &bracontr);
     }
     
-    return CKineticEnergyMatrix();
+    _printComputationTime(timer, oStream);
+    
+    return kinmat;
 }
 
 CKineticEnergyMatrix
@@ -668,4 +676,26 @@ CKineticEnergyIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<
     }
     
     return nblk;
+}
+
+void
+CKineticEnergyIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
+                                                           COutputStream& oStream) const
+{
+    auto tsec = timer.getElapsedTimeInSeconds();
+    
+    if (_isLocalMode)
+    {
+        // FIX ME: we need tags for each driver to be implemented to manage
+        //         MPI send/receive cycle.
+    }
+    
+    if (_globRank == mpi::master())
+    {
+        oStream << fmt::info << "Kinetic energy matrix was computed in ";
+        
+        oStream << fstr::to_string(tsec, 2) << " sec.";
+        
+        oStream << fmt::end << fmt::blank;
+    }
 }

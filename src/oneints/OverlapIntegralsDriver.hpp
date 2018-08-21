@@ -21,7 +21,7 @@
 #include "OverlapMatrix.hpp"
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
-#include "SparseMatrix.hpp"
+#include "SystemClock.hpp"
 #include "OutputStream.hpp"
 
 /**
@@ -141,7 +141,14 @@ class COverlapIntegralsDriver
                                            const CVecTwoIndexes&       recPattern,
                                            const int32_t               maxPrimGtos) const;
     
-    
+    /**
+     Prints overlap integrals computation time to output stream.
+
+     @param timer the system clock timer.
+     @param oStream the output stream.
+     */
+    void _printComputationTime(const CSystemClock&  timer,
+                                     COutputStream& oStream) const;
 
 public:
     

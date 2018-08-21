@@ -94,6 +94,21 @@ to_string(const double source,
 
     return fstr::format(str, width, aligment);
 }
+    
+std::string
+to_string(const double source,
+          const size_t presicion)
+{
+    std::stringstream sStream;
+    
+    sStream.setf(std::ios::fixed);
+        
+    sStream.precision(presicion);
+        
+    sStream << source;
+        
+    return std::string(sStream.str());
+}
 
 std::string
 to_string(const int32_t source,

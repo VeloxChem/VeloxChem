@@ -71,6 +71,16 @@ namespace fstr { // fstr namespace
                           const size_t presicion,
                           const size_t width,
                           const fmt    aligment);
+   
+    /**
+     Creates string with requested precision from real number.
+     
+     @param source the real number.
+     @param presicion the conversion precision in decimal places.
+     @return the formatted string.
+     */
+    std::string to_string(const double source,
+                          const size_t presicion);
 
     /**
      Creates formatted string with requested width from integer number.

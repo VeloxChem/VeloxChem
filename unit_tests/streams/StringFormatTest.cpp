@@ -116,6 +116,27 @@ TEST_F(CStringFormatTest, To_StringForDouble)
     ASSERT_EQ(mstr, std::string("    -0.52918"));
 }
 
+TEST_F(CStringFormatTest, To_StringForDoubleWithPrecision)
+{
+    double f = 0.52917721067;
+    
+    auto mstr = fstr::to_string(f, 3);
+    
+    ASSERT_EQ(mstr, std::string("0.529"));
+    
+    mstr = fstr::to_string(-f, 3);
+    
+    ASSERT_EQ(mstr, std::string("-0.529"));
+    
+    mstr = fstr::to_string(f, 2);
+    
+    ASSERT_EQ(mstr, std::string("0.53"));
+    
+    mstr = fstr::to_string(-f, 2);
+    
+    ASSERT_EQ(mstr, std::string("-0.53"));
+}
+
 TEST_F(CStringFormatTest, To_StringForInt32)
 {
     int32_t f = 124;

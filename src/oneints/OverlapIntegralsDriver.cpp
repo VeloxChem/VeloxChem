@@ -14,6 +14,7 @@
 #include "GenFunc.hpp"
 #include "MemBlock.hpp"
 #include "SystemClock.hpp"
+#include "StringFormat.hpp"
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
                                                  const int32_t  globNodes,
@@ -34,6 +35,7 @@ COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
 
 COverlapIntegralsDriver::~COverlapIntegralsDriver()
 {
+    
 }
 
 COverlapMatrix
@@ -42,6 +44,8 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                        COutputStream&   oStream,
                                        MPI_Comm         comm) const 
 {
+    CSystemClock timer;
+    
     COverlapMatrix ovlmat;
     
     if (_locRank == mpi::master())
@@ -54,6 +58,8 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
         
         ovlmat = _compOverlapIntegrals(&bracontr, &bracontr);
     }
+    
+    _printComputationTime(timer, oStream);
     
     return ovlmat;
 }
@@ -606,4 +612,24 @@ COverlapIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_
     return nblk;
 }
 
-
+void
+COverlapIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
+                                                     COutputStream& oStream) const
+{
+    auto tsec = timer.getElapsedTimeInSeconds();
+    
+    if (_isLocalMode)
+    {
+        // FIX ME: we need tags for each driver to be implemented to manage
+        //         MPI send/receive cycle.
+    }
+    
+    if (_globRank == mpi::master())
+    {
+        oStream << fmt::info << "Overlap matrix was computed in ";
+        
+        oStream << fstr::to_string(tsec, 2) << " sec.";
+        
+        oStream << fmt::end << fmt::blank;
+    }
+}

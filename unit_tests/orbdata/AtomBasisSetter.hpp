@@ -21,9 +21,9 @@ CAtomBasis getAtomBasisForH();
 
 CAtomBasis getAtomBasisForLi();
     
-CAtomBasis getTestBasisForH(const int32_t angularMomentum);
+CAtomBasis getTestBasisForH();
     
-CAtomBasis getTestBasisForLi(const int32_t angularMomentum);
+CAtomBasis getTestBasisForLi();
 
 } // vlxbas namespace
 

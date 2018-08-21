@@ -73,7 +73,7 @@ TEST_F(COneIntsFuncTest, compFactorsForOverlap)
 
 TEST_F(COneIntsFuncTest, compFactorsForKineticEnergy)
 {
-    CMolecularBasis bas = vlxbas::getTestBasisForLiH(2, 2);
+    CMolecularBasis bas = vlxbas::getTestBasisForLiH();
     
     auto lih = vlxmol::getMoleculeLiH();
     
@@ -138,7 +138,7 @@ TEST_F(COneIntsFuncTest, CompFactorsForNuclearPotential)
 
 TEST_F(COneIntsFuncTest, compFactorsForElectronicPotential)
 {
-    CMolecularBasis bas = vlxbas::getTestBasisForLiH(2, 2);
+    CMolecularBasis bas = vlxbas::getTestBasisForLiH();
     
     auto lih = vlxmol::getMoleculeLiH();
     

@@ -22,6 +22,8 @@
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
 #include "SparseMatrix.hpp"
+#include "OutputStream.hpp"
+#include "SystemClock.hpp"
 
 /**
  Class CKineticEnergyIntegralsDriver computes one-electron kinetic energy
@@ -150,6 +152,15 @@ class CKineticEnergyIntegralsDriver
     CSparseMatrix* _createSparseBuffer(const CGtoContainer* braGtoContainer,
                                        const CGtoContainer* ketGtoContainer) const;
     
+    /**
+     Prints kinetic energy integrals computation time to output stream.
+     
+     @param timer the system clock timer.
+     @param oStream the output stream.
+     */
+    void _printComputationTime(const CSystemClock&  timer,
+                                     COutputStream& oStream) const;
+    
 public:
     
     /**
@@ -174,11 +185,13 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
     
     /**

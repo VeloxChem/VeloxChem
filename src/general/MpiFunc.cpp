@@ -279,30 +279,28 @@ bcast(std::vector<std::string>& vector,
 void
 send(      double&  value,
      const int32_t  rank,
-     const int32_t  dst_rank,
-     const int32_t  src_rank,
            MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
-        if (rank == src_rank)
-        {
-            auto merror = MPI_Send(&value, 1, MPI_DOUBLE, dst_rank, 0, comm);
+        auto merror = MPI_Send(&value, 1, MPI_DOUBLE, rank, 0, comm);
             
-            if (merror != MPI_SUCCESS) mpi::abort(merror, "send(double)");
-        }
-        else
-        {
-            if (rank == dst_rank)
-            {
-                MPI_Status mstat;
-                
-                auto merror = MPI_Recv(&value, 1, MPI_DOUBLE, src_rank, 0,
-                                       comm, &mstat);
-                
-                if (merror != MPI_SUCCESS) mpi::abort(merror, "send(double)");
-            }
-        }
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "send(double)");
+    }
+}
+  
+void
+receive(      double&  value,
+        const int32_t  rank,
+              MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        MPI_Status mstat;
+        
+        auto merror = MPI_Recv(&value, 1, MPI_DOUBLE, rank, 0, comm, &mstat);
+        
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "receive(double)");
     }
 }
     

@@ -75,45 +75,51 @@ getAtomBasisForLi()
 }
   
 CAtomBasis
-getTestBasisForH(const int32_t angularMomentum)
+getTestBasisForH()
 {
     CAtomBasis bas;
     
     bas.setIdElemental(1);
     
-    CBasisFunction bfone({3.0, 2.0}, {0.5, 0.5}, angularMomentum);
+    for (int32_t i = 0; i < 5; i++)
+    {
+        CBasisFunction bfone({3.0, 2.0}, {0.5, 0.5}, i);
     
-    bfone.normalize();
+        bfone.normalize();
     
-    CBasisFunction bftwo({0.8}, {1.0}, angularMomentum);
+        CBasisFunction bftwo({0.8}, {1.0}, i);
     
-    bftwo.normalize();
+        bftwo.normalize();
     
-    bas.addBasisFunction(bfone);
+        bas.addBasisFunction(bfone);
     
-    bas.addBasisFunction(bftwo);
+        bas.addBasisFunction(bftwo);
+    }
     
     return bas; 
 }
     
 CAtomBasis
-getTestBasisForLi(const int32_t angularMomentum)
+getTestBasisForLi()
 {
     CAtomBasis bas;
     
     bas.setIdElemental(3);
+    
+    for (int32_t i = 0; i < 5; i++)
+    {
+        CBasisFunction bfone({2.8, 1.5}, {0.5, 0.5}, i);
         
-    CBasisFunction bfone({2.8, 1.5}, {0.5, 0.5}, angularMomentum);
+        bfone.normalize();
         
-    bfone.normalize();
+        CBasisFunction bftwo({1.2}, {1.0}, i);
         
-    CBasisFunction bftwo({1.2}, {1.0}, angularMomentum);
+        bftwo.normalize();
         
-    bftwo.normalize();
+        bas.addBasisFunction(bfone);
         
-    bas.addBasisFunction(bfone);
-        
-    bas.addBasisFunction(bftwo);
+        bas.addBasisFunction(bftwo);
+    }
         
     return bas;
 }

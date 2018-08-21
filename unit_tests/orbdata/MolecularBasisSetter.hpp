@@ -17,8 +17,7 @@ CMolecularBasis getMolecularBasisEmpty();
 
 CMolecularBasis getMolecularBasisForLiH();
     
-CMolecularBasis getTestBasisForLiH(const int32_t angularMomentumA,
-                                   const int32_t angularMomentumB);
+CMolecularBasis getTestBasisForLiH();
     
 } // vlxbas namespace
 
