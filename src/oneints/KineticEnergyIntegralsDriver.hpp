@@ -69,21 +69,23 @@ class CKineticEnergyIntegralsDriver
                                                      const CGtoContainer* ketGtoContainer) const;
     
     /**
-     Computes kinetic energy integrals for specific pair of GTOs blocks.
+     Computes kinetic energy integrals for specific pair of GTOs blocks and
+     stores integrals in matrix of predefined size.
+     NOTE: If size of integrals matrix, nRows and nColumns, is set to zero, then
+     size of integrals matrix is defined by GTOs block objects on bra and ket
+     sides.
      
-     @param sparseBuffer the buffer of sparce matrices.
-     @param braGtoContainer the GTOs container for bra side.
-     @param iBraGtoBlock the index of GTOs block object in GTOs container for
-     bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @param iKetGtoBlock the index of GTOs block object in GTOs container for
-     ket side.
+     @param intsValues the matrix of kinetic energy integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param nRows the number of rows in kinetic energy integrals matrix.
+     @param nColumns the number of columns in kinetic energy integrals matrix.
      */
-    void _compKineticEnergyForGtoBlocks(      CSparseMatrix* sparseBuffer,
-                                        const CGtoContainer* braGtoContainer,
-                                        const int32_t        iBraGtoBlock,
-                                        const CGtoContainer* ketGtoContainer,
-                                        const int32_t        iKetGtoBlock) const;
+    void _compKineticEnergyForGtoBlocks(      double*    intsValues,
+                                        const CGtoBlock& braGtoBlock,
+                                        const CGtoBlock& ketGtoBlock,
+                                        const int32_t    nRows,
+                                        const int32_t    nColumns) const;
     
     /**
      Computes batch of primitive kinetic energy integrals using Obara-Saika
@@ -142,17 +144,6 @@ class CKineticEnergyIntegralsDriver
                                            const int32_t               maxPrimGtos) const;
     
     /**
-     Creates buffer of sparse matrices for all allowed combinations of GTOs
-     blocks from GTOs containers on bra and ket sides.
-     
-     @param braGtoContainer the GTOs container for bra side.
-     @param ketGtoContainer the GTOs container for ket side.
-     @return the vector of sparse matrices.
-     */
-    CSparseMatrix* _createSparseBuffer(const CGtoContainer* braGtoContainer,
-                                       const CGtoContainer* ketGtoContainer) const;
-    
-    /**
      Prints kinetic energy integrals computation time to output stream.
      
      @param timer the system clock timer.
@@ -201,12 +192,14 @@ public:
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of kinetic energy matrix.
      @param ketBasis the molecular basis for ket side of kinetic energy matrix.
+     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       molecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
     
     /**
@@ -216,12 +209,14 @@ public:
      @param braMolecule the molecule for bra side of kinetic energy matrix.
      @param ketMolecule the molecule for ket side of kinetic energy matrix.
      @param basis the molecular basis.
+     @param oStream the output stream.
      @param comm the MPI communicator.
-     @return the overlap matrix object.
+     @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& basis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
     
     /**
@@ -232,14 +227,27 @@ public:
      @param ketMolecule the molecule for ket side of kinetic energy matrix.
      @param braBasis the molecular basis for bra side of kinetic energy matrix.
      @param ketBasis the molecular basis for ket side of kinetic energy matrix.
+     @param oStream the output stream.
      @param comm the MPI communicator.
-     @return the overlap matrix object.
+     @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
+                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
+    
+    /**
+     Computes kinetic energy integrals blocks for pair of GTOs blocks.
+     
+     @param intsValues the matrix of overlap integrals.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     */
+    void compute(      double*    intsValues,
+                 const CGtoBlock& braGtoBlock,
+                 const CGtoBlock& ketGtoBlock) const;
 };
 
 #endif /* KineticEnergyIntegralsDriver_hpp */

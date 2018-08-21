@@ -9,7 +9,7 @@
 #ifndef KineticEnergyMatrix_hpp
 #define KineticEnergyMatrix_hpp
 
-#include "SparseMatrix.hpp"
+#include "DenseMatrix.hpp"
 
 /**
  Class CKineticEnergyMatrix stores general kinetic energy matrix and provides
@@ -20,9 +20,9 @@
 class CKineticEnergyMatrix
 {
     /**
-     The generic sparse kinetic energy matrix (rectangular or square).
+     The generic dense kinetic energy matrix (rectangular or square).
      */
-    CSparseMatrix _matrix;
+    CDenseMatrix _matrix;
     
 public:
     
@@ -34,9 +34,9 @@ public:
     /**
      Creates a kinetic energy matrix object.
      
-     @param matrix the sparse matrix with kinetic energy integrals.
+     @param matrix the dense matrix with kinetic energy integrals.
      */
-    CKineticEnergyMatrix(const CSparseMatrix& matrix);
+    CKineticEnergyMatrix(const CDenseMatrix& matrix);
     
     /**
      Creates a kinetic energy matrix object by copying other kinetic energy

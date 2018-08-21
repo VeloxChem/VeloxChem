@@ -13,7 +13,7 @@ CKineticEnergyMatrix::CKineticEnergyMatrix()
     
 }
 
-CKineticEnergyMatrix::CKineticEnergyMatrix(const CSparseMatrix& matrix)
+CKineticEnergyMatrix::CKineticEnergyMatrix(const CDenseMatrix& matrix)
 
     : _matrix(matrix)
 {

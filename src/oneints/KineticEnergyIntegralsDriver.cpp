@@ -65,8 +65,13 @@ CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& braBasis,
                                        const CMolecularBasis& ketBasis,
+                                             COutputStream&   oStream,
                                              MPI_Comm         comm) const
 {
+    CSystemClock timer;
+    
+    CKineticEnergyMatrix kinmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs containers
@@ -77,18 +82,25 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
         
         // compute kinetic energy integrals
         
-        return _compKineticEnergyIntegrals(&bracontr, &ketcontr);
+        kinmat = _compKineticEnergyIntegrals(&bracontr, &ketcontr);
     }
     
-    return CKineticEnergyMatrix();
+    _printComputationTime(timer, oStream);
+    
+    return kinmat;
 }
 
 CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecule&       ketMolecule,
                                        const CMolecularBasis& basis,
+                                             COutputStream&   oStream,
                                              MPI_Comm         comm) const
 {
+    CSystemClock timer;
+    
+    CKineticEnergyMatrix kinmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs containers
@@ -99,10 +111,12 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         // compute kinetic energy integrals
         
-        return _compKineticEnergyIntegrals(&bracontr, &ketcontr);
+        kinmat = _compKineticEnergyIntegrals(&bracontr, &ketcontr);
     }
     
-    return CKineticEnergyMatrix();
+    _printComputationTime(timer, oStream);
+    
+    return kinmat;
 }
 
 CKineticEnergyMatrix
@@ -110,8 +124,13 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecule&       ketMolecule,
                                        const CMolecularBasis& braBasis,
                                        const CMolecularBasis& ketBasis,
+                                             COutputStream&   oStream,
                                              MPI_Comm         comm) const
 {
+    CSystemClock timer;
+    
+    CKineticEnergyMatrix kinmat;
+    
     if (_locRank == mpi::master())
     {
         // set up GTOs containers
@@ -122,23 +141,46 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         // compute kinetic energy integrals
         
-        return _compKineticEnergyIntegrals(&bracontr, &ketcontr);
+        kinmat = _compKineticEnergyIntegrals(&bracontr, &ketcontr);
     }
     
-    return CKineticEnergyMatrix();
+    _printComputationTime(timer, oStream);
+    
+    return kinmat;
+}
+
+void
+CKineticEnergyIntegralsDriver::compute(      double*    intsValues,
+                                       const CGtoBlock& braGtoBlock,
+                                       const CGtoBlock& ketGtoBlock) const
+{
+    _compKineticEnergyForGtoBlocks(intsValues, braGtoBlock, ketGtoBlock, 0, 0); 
 }
 
 CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver::_compKineticEnergyIntegrals(const CGtoContainer* braGtoContainer,
                                                            const CGtoContainer* ketGtoContainer) const
 {
-    // allocate buffer of sparse matrices
+    // check if GTOs containers are same on bra and ket sides
     
-    auto matbuff = _createSparseBuffer(braGtoContainer, ketGtoContainer);
+    auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
+    
+    // determine dimensions of kinetic energy matrix
+    
+    auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
+    
+    auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
+    
+    // allocate dense matrix for kinetic energy integrals
+    
+    CDenseMatrix kinmat(nrow, ncol);
+    
+    auto kinvals = kinmat.values();
     
     // compute kinetic energy integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, matbuff)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, kinvals,\
+                                nrow, ncol, symbk)
     {
         #pragma omp single nowait
         {
@@ -152,45 +194,38 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyIntegrals(const CGtoContainer* 
             
             for (int32_t i = 0; i < nbra; i++)
             {
-                for (int32_t j = 0; j < nket; j++)
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+                
+                auto joff = (symbk) ? i : 0;
+                
+                for (int32_t j = joff; j < nket; j++)
                 {
-                    #pragma omp task firstprivate(i, j)
+                    #pragma omp task firstprivate(j)
                     {
-                        _compKineticEnergyForGtoBlocks(matbuff, braGtoContainer,
-                                                       i, ketGtoContainer, j);
+                        auto kgtos = ketGtoContainer->getGtoBlock(j);
+                        
+                        _compKineticEnergyForGtoBlocks(kinvals, bgtos, kgtos, nrow, ncol);
                     }
                 }
             }
         }
     }
     
-    // distribute submatrices into single sparse matrix
-    
-    auto spmat = genfunc::distribute(matbuff, braGtoContainer, ketGtoContainer);
-    
-    // optimize memory usage in sparsse matrix
-    
-    spmat.optimize_storage();
-    
-    // deallocate buffer of sparse matrices
-    
-    delete [] matbuff;
-    
-    return CKineticEnergyMatrix(spmat);
+    return CKineticEnergyMatrix(kinmat);
 }
 
 void
-CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      CSparseMatrix* sparseBuffer,
-                                                              const CGtoContainer* braGtoContainer,
-                                                              const int32_t        iBraGtoBlock,
-                                                              const CGtoContainer* ketGtoContainer,
-                                                              const int32_t        iKetGtoBlock) const
+CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      double*    intsValues,
+                                                              const CGtoBlock& braGtoBlock,
+                                                              const CGtoBlock& ketGtoBlock,
+                                                              const int32_t    nRows,
+                                                              const int32_t    nColumns) const
 {
     // copy GTOs blocks for bra and ket sides
     
-    auto bragtos = braGtoContainer->getGtoBlock(iBraGtoBlock);
+    auto bragtos = braGtoBlock;
     
-    auto ketgtos = ketGtoContainer->getGtoBlock(iKetGtoBlock);
+    auto ketgtos = ketGtoBlock;
     
     // set up spherical angular momentum for bra and ket sides
     
@@ -234,33 +269,29 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      CSparseMatri
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
     
-    // allocate contracted Cartesian integrals buffer
+    // set up contracted GTOs dimensions
     
-    auto cdim = ketgtos.getNumberOfContrGtos();
+    auto bdim = bragtos.getNumberOfContrGtos();
+    
+    auto kdim = ketgtos.getNumberOfContrGtos();
+    
+    // allocate contracted Cartesian integrals buffer
     
     auto ncart = angmom::to_CartesianComponents(bang, kang);
     
-    CMemBlock2D<double> cartbuffer(cdim, ncart);
+    CMemBlock2D<double> cartbuffer(kdim, ncart);
     
     // allocate contracted spherical integrals buffer
     
     auto nspher = angmom::to_SphericalComponents(bang, kang);
     
-    CMemBlock2D<double> spherbuffer(cdim, nspher);
+    CMemBlock2D<double> spherbuffer(kdim, nspher);
     
-    // allocate sparse matrix row data
+    // determine integrals storage scheme
     
-    CMemBlock<double> rowvals(cdim * angmom::to_SphericalComponents(kang));
+    bool diagblk = (bragtos == ketgtos);
     
-    CMemBlock<int32_t> colidx(cdim * angmom::to_SphericalComponents(kang));
-    
-    // initialize sparce matrix
-    
-    auto nrow = bragtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(bang);
-    
-    auto ncol = ketgtos.getNumberOfContrGtos() * angmom::to_SphericalComponents(kang);
-    
-    CSparseMatrix spmat(nrow, ncol, 1.0e-13);
+    bool origord = ((nRows == 0) && (nColumns == 0));
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -291,19 +322,20 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      CSparseMatri
         
         // transform Cartesian to spherical integrals
         
-        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, cdim);
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, kdim);
         
-        // add batch of integrals to sparse matrix
+        // add batch of integrals to integrals matrix
         
-        genfunc::compress(spmat, rowvals, colidx, spherbuffer, bragtos, ketgtos,
-                          i);
+        if (origord)
+        {
+            genfunc::distribute(intsValues, spherbuffer, bang, kang, bdim, kdim, i);
+        }
+        else
+        {
+            genfunc::distribute(intsValues, spherbuffer, bragtos, ketgtos,
+                                diagblk, nColumns, i);
+        }
     }
-    
-    // copy sparse matrix to buffer of sparce matrices
-    
-    auto kblk = ketGtoContainer->getNumberOfGtoBlocks();
-    
-    sparseBuffer[iBraGtoBlock * kblk + iKetGtoBlock] = spmat;
 }
 
 void
@@ -469,23 +501,6 @@ CKineticEnergyIntegralsDriver::_compPrimKineticEnergyInts(      CMemBlock2D<doub
                                        ketGtoBlock, iContrGto);
     
     // NOTE: add l > 4 recursion here
-}
-
-CSparseMatrix*
-CKineticEnergyIntegralsDriver::_createSparseBuffer(const CGtoContainer* braGtoContainer,
-                                                   const CGtoContainer* ketGtoContainer) const
-{
-    // setup size of sparse matrices buffer
-    
-    auto bcomp = braGtoContainer->getNumberOfGtoBlocks();
-    
-    auto kcomp = ketGtoContainer->getNumberOfGtoBlocks();
-    
-    // allocate sparse matrices
-    
-    CSparseMatrix* matbuff = new CSparseMatrix[bcomp * kcomp];
-    
-    return matbuff;
 }
 
 CVecThreeIndexes
@@ -692,7 +707,7 @@ CKineticEnergyIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
     
     if (_globRank == mpi::master())
     {
-        oStream << fmt::info << "Kinetic energy matrix was computed in ";
+        oStream << fmt::info << "Kinetic energy matrix computed in ";
         
         oStream << fstr::to_string(tsec, 2) << " sec.";
         

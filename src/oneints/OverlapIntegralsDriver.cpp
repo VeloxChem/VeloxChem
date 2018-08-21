@@ -191,7 +191,7 @@ COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContai
                 
                 for (int32_t j = joff; j < nket; j++)
                 {
-                    #pragma omp task firstprivate(i, j)
+                    #pragma omp task firstprivate(j)
                     {
                         auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
@@ -626,7 +626,7 @@ COverlapIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
     
     if (_globRank == mpi::master())
     {
-        oStream << fmt::info << "Overlap matrix was computed in ";
+        oStream << fmt::info << "Overlap matrix computed in ";
         
         oStream << fstr::to_string(tsec, 2) << " sec.";
         
