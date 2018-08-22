@@ -497,7 +497,7 @@ namespace intsfunc { // intsfunc namespace
             
             auto fx = osFactors.data(nFactors * idx);
             
-            // set up pmitive GTO data on bra side
+            // set up primitive GTO data on bra side
             
             auto fax = bexp[i] * brx[i];
             

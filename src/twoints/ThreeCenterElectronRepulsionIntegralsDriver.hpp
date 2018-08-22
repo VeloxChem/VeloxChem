@@ -54,6 +54,26 @@ class CThreeCenterElectronRepulsionIntegralsDriver
     bool _isLocalMode;
     
     /**
+     Comutes electronic repulsion integrals for pair of GTOs and GTOs
+     pairs containers.
+     
+     @param braGtoContainer the GTOs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     */
+    void _compElectronRepulsionIntegrals(const CGtoContainer*      braGtoContainer,
+                                         const CGtoPairsContainer* ketGtoPairsContainer) const;
+    
+    /**
+     Computes electronic repulsion integrals for specific pair of GTOs and
+     GTOs pairs blocks and stores integrals in packed format.
+
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     */
+    void _compElectronRepulsionForGtoBlocks(const CGtoBlock&      braGtoBlock,
+                                            const CGtoPairsBlock& ketGtoPairsBlock) const;
+    
+    /**
      Prints start header for computation of three-center electron repulsion
      integrals.
      
@@ -70,13 +90,13 @@ class CThreeCenterElectronRepulsionIntegralsDriver
 
      @param molecule the molecule.
      @param riBasis the molecular RI basis.
-     @param gtoPairs the GTOs pairs container.
+     @param gtoPairsContainer the GTOs pairs container.
      @return the splitting pattern for atoms list.
      */
     CMemBlock2D<int32_t> _getBatchesOfGtoBlocks(const CMolecule&          molecule,
                                                 const CMolecularBasis&    riBasis,
-                                                const CGtoPairsContainer& gtoPairs) const;
-    
+                                                const CGtoPairsContainer& gtoPairsContainer) const;
+
 public:
     
     /**

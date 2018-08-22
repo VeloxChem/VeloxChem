@@ -194,7 +194,7 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     CThreeCenterElectronRepulsionIntegralsDriver ridrv(_globRank, _globNodes, comm);
     
-    ridrv.compute(_molecule, _aoBasis, _riBasis, 1.0e-12, oStream, comm);
+    ridrv.compute(_molecule, _aoBasis, _riBasis, 1.0e-13, oStream, comm);
 }
 
 void

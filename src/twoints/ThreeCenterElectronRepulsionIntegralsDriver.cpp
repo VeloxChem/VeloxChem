@@ -22,6 +22,7 @@
 #include "GtoContainer.hpp"
 #include "MathFunc.hpp"
 #include "StringFormat.hpp"
+#include "TwoIntsFunc.hpp"
 
 CThreeCenterElectronRepulsionIntegralsDriver::CThreeCenterElectronRepulsionIntegralsDriver(const int32_t  globRank,
                                                                                            const int32_t  globNodes,
@@ -67,11 +68,124 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     CGtoContainer bgtos(molecule, riBasis, gtopat);
     
-    printf("node: %i ngtos: %i\n", _locRank, bgtos.getNumberOfAtomicOrbitals());
-    
     // print start header
     
     if (_globRank == mpi::master()) _startHeader(kgtopairs, oStream);
+    
+    // compute electron repulsion integrals on node
+    
+    _compElectronRepulsionIntegrals(&bgtos, &kgtopairs);
+    
+    printf("node: %i ngtos: %i time: %lf sec.\n", _locRank, bgtos.getNumberOfAtomicOrbitals(), eritim.getElapsedTimeInSeconds());
+}
+
+void
+CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoContainer*      braGtoContainer,
+                                                                              const CGtoPairsContainer* ketGtoPairsContainer) const
+{
+    #pragma omp parallel shared(braGtoContainer, ketGtoPairsContainer)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs and GTOs pairs blocks in bra/ket sides
+            
+            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+            
+            auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
+            
+            // loop over pairs of GTOs blocks
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+                
+                for (int32_t j = 0; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(j)
+                    {
+                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
+                        
+                        _compElectronRepulsionForGtoBlocks(bgtos, kpairs);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void
+CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks(const CGtoBlock&      braGtoBlock,
+                                                                                 const CGtoPairsBlock& ketGtoPairsBlock) const
+{
+    // copy GTOs and GTOs pairs blocks for bra and ket sides
+    
+    auto bragtos = braGtoBlock;
+    
+    auto ketpairs = ketGtoPairsBlock;
+ 
+    // testing print out
+    
+    printf("*** INTEGRALS (%i|%i,%i):\n", bragtos.getAngularMomentum(),
+           ketpairs.getBraAngularMomentum(), ketpairs.getKetAngularMomentum());
+    
+    // set up spherical angular momentum for bra and ket sides
+    
+    CSphericalMomentum amom(bragtos.getAngularMomentum());
+    
+    CSphericalMomentum cmom(ketpairs.getBraAngularMomentum());
+    
+    CSphericalMomentum dmom(ketpairs.getKetAngularMomentum());
+    
+    // allocate prefactors used in Obara-Saika recursion
+    
+    auto pdim = ketpairs.getNumberOfScreenedPrimPairs();
+    
+    CMemBlock2D<double> raq(pdim, 3);
+    
+    auto pmax = bragtos.getMaxContractionDepth();
+    
+    CMemBlock2D<double> rfacts(pdim, 5 * pmax);
+    
+    CMemBlock2D<double> rw(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rwa(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rwd(pdim, 3 * pmax);
+    
+    // loop over contracted GTOs ob bra side
+    
+    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    {
+        // compute distances: R(AQ) = A - Q
+        
+        twointsfunc::compDistancesAQ(raq, bragtos, ketpairs, i); 
+        
+        // compute Obara-Saika recursion factors
+        
+        twointsfunc::compFactorsForThreeCenterElectronRepulsion(rfacts, bragtos, ketpairs, i);
+        
+        // compute coordinates of center W
+        
+        twointsfunc::compCoordinatesForW(rw, rfacts, 5, bragtos, ketpairs, i);
+        
+        // compute distances: R(WA) = W - A
+        
+        twointsfunc::compDistancesWA(rwa, rw, bragtos, ketpairs, i); 
+        
+        // compute distances: R(WD) = W - D;
+        
+        // compute primitive electron repulsion integrals
+        
+        // contract primitive electron repulsion integrals
+        
+        // transform bra side to spherical form
+        
+        // apply horizontal recursion
+        
+        // transform ket side to spherical form
+        
+        // store computed integrals
+    }
 }
 
 void
@@ -92,7 +206,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContai
 CMemBlock2D<int32_t>
 CThreeCenterElectronRepulsionIntegralsDriver::_getBatchesOfGtoBlocks(const CMolecule&          molecule,
                                                                      const CMolecularBasis&    riBasis,
-                                                                     const CGtoPairsContainer& gtoPairs) const
+                                                                     const CGtoPairsContainer& gtoPairsContainer) const
 {
     // determine dimensions of atoms batch for each MPI node
     
@@ -106,7 +220,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::_getBatchesOfGtoBlocks(const CMole
     
     auto mtasks = (riBasis.getMaxAngularMomentum() + 1)
     
-                * gtoPairs.getNumberOfGtoPairsBlocks();
+                * gtoPairsContainer.getNumberOfGtoPairsBlocks();
     
     // determine max. number of threads
     

@@ -50,6 +50,19 @@ getTestBasisForLiH()
     return mbas;
 }
     
+CMolecularBasis
+getReducedTestBasisForLiH()
+{
+    CMolecularBasis mbas;
+    
+    mbas.setLabel({"Reduced-Basis"});
+    
+    mbas.addAtomBasis(getAtomBasisForLi());
+    
+    mbas.addAtomBasis(getTestBasisForH());
+    
+    return mbas;
+}
     
 } // vlxbas namespace
 

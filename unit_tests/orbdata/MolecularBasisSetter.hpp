@@ -19,6 +19,8 @@ CMolecularBasis getMolecularBasisForLiH();
     
 CMolecularBasis getTestBasisForLiH();
     
+CMolecularBasis getReducedTestBasisForLiH();
+    
 } // vlxbas namespace
 
 #endif /* MolecularBasisSetter_hpp */

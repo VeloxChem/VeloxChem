@@ -316,7 +316,7 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      double*    i
         _compPrimKineticEnergyInts(pbuffer, recvec, recidx, rfacts, rab, rpa,
                                    rpb, bragtos, ketgtos, i);
         
-        // contract primitive overlap integrals
+        // contract primitive kinetic energy integrals
         
         genfunc::contract(cartbuffer, pbuffer, pidx, bragtos, ketgtos, i);
         
