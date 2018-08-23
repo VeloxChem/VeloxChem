@@ -23,6 +23,7 @@
 #include "MathFunc.hpp"
 #include "StringFormat.hpp"
 #include "TwoIntsFunc.hpp"
+#include "GenFunc.hpp"
 
 CThreeCenterElectronRepulsionIntegralsDriver::CThreeCenterElectronRepulsionIntegralsDriver(const int32_t  globRank,
                                                                                            const int32_t  globNodes,
@@ -152,6 +153,18 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     CMemBlock2D<double> rwd(pdim, 3 * pmax);
     
+    // generate horizontal recursion pattern
+    
+    auto hrrvec = _getHorizontalRecursionPattern(bragtos, ketpairs);
+    
+    // testing codde
+    
+    for (int32_t i = 0; i < hrrvec.size(); i++)
+    {
+        printf("HRR: (%i,%i,%i)\n", hrrvec[i].first(), hrrvec[i].second(),
+               hrrvec[i].third());
+    }
+    
     // loop over contracted GTOs ob bra side
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
@@ -173,6 +186,8 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
         twointsfunc::compDistancesWA(rwa, rw, bragtos, ketpairs, i); 
         
         // compute distances: R(WD) = W - D;
+        
+        twointsfunc::compDistancesWD(rwd, rw, bragtos, ketpairs, i); 
         
         // compute primitive electron repulsion integrals
         
@@ -244,4 +259,75 @@ CThreeCenterElectronRepulsionIntegralsDriver::_getBatchesOfGtoBlocks(const CMole
     mathfunc::indexes(bpos, bdim, nodoff, nblocks);
     
     return batches;
+}
+
+CVecThreeIndexes
+CThreeCenterElectronRepulsionIntegralsDriver::_getHorizontalRecursionPattern(const CGtoBlock&      braGtoBlock,
+                                                                             const CGtoPairsBlock& ketGtoPairsBlock) const
+{
+    // set up angular momentum
+    
+    auto anga = braGtoBlock.getAngularMomentum();
+    
+    auto angc = ketGtoPairsBlock.getBraAngularMomentum();
+    
+    auto angd = ketGtoPairsBlock.getKetAngularMomentum();
+    
+    // set up recursion buffer
+    
+    CVecThreeIndexes recvec;
+    
+    recvec.reserve((angc + 1) * (angd + 1));
+    
+    // set up indexing counters
+    
+    int32_t spos = 0;
+    
+    int32_t epos = 1;
+    
+    // set up initial state of recursion buffer
+    
+    recvec.push_back(CThreeIndexes(anga, angc, angd));
+    
+    while (true)
+    {
+        // internal new recursion terms counter
+        
+        int32_t nterms = 0;
+        
+        // generate bra and ket Obara-Saika recursion terms
+        
+        for (int32_t i = spos; i < epos; i++)
+        {
+            CThreeIndexes cidx(recvec[i]);
+            
+            // (a |g(r,r')| (c - 1) d) term
+            
+            CThreeIndexes t0idx(cidx.first(),  cidx.second() - 1,
+                                
+                                cidx.third());
+            
+            if (genfunc::addValidAndUniqueTriple(recvec, t0idx)) nterms++;
+            
+            // (a |g(r,r')| (c - 1) (d + 1)) term
+            
+            CThreeIndexes t1idx(cidx.first(),  cidx.second() - 1,
+                                
+                                cidx.third() + 1);
+            
+            if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
+        }
+        
+        // break loop, all recursion terms are generrated
+        
+        if (nterms == 0) break;
+        
+        // update counters
+        
+        spos  = epos;
+        
+        epos += nterms;
+    }
+    
+    return recvec;
 }

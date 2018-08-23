@@ -65,7 +65,7 @@ namespace twointsfunc { // twointsfunc namespace
      Computes vector of distances between center W of combined primitive GTOs
      and center A of primitive GTO on bra side.
      
-     @param waDistances the vector of Cartesian R(WA) = P - W distances.
+     @param waDistances the vector of Cartesian R(WA) = W - A distances.
      @param wCoordinates the vector of coordinates for combined Gaussian
             functions.
      @param braGtoBlock the GTOs block on bra side.
@@ -73,6 +73,23 @@ namespace twointsfunc { // twointsfunc namespace
      @param iContrGto the index of contracted GTO on bra side.
      */
     void compDistancesWA(      CMemBlock2D<double>& waDistances,
+                         const CMemBlock2D<double>& wCoordinates,
+                         const CGtoBlock&           braGtoBlock,
+                         const CGtoPairsBlock&      ketGtoPairsBlock,
+                         const int32_t              iContrGto);
+    
+    /**
+     Computes vector of distances between center W of combined primitive GTOs
+     and center D of primitive GTOs pair on ket side.
+     
+     @param wdDistances the vector of Cartesian R(WD) = W - D distances.
+     @param wCoordinates the vector of coordinates for combined Gaussian
+            functions.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compDistancesWD(      CMemBlock2D<double>& wdDistances,
                          const CMemBlock2D<double>& wCoordinates,
                          const CGtoBlock&           braGtoBlock,
                          const CGtoPairsBlock&      ketGtoPairsBlock,

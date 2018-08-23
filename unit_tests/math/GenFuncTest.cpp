@@ -773,3 +773,16 @@ TEST_F(CGenFuncTest, MaxOrderOfPair)
     
     ASSERT_EQ( 3, genfunc::maxOrderOfPair(vec, 2, 4));
 }
+
+TEST_F(CGenFuncTest, GetPairsFromTripleIndexes)
+{
+    CVecThreeIndexes vec{{0, 0, 1}, {2, 4, 3}, {7, 0, 2}, {8, -2, 4}};
+    
+    auto xyvec = genfunc::getPairsFromTripleIndexes(vec);
+    
+    ASSERT_EQ(2, xyvec.size());
+    
+    ASSERT_EQ(xyvec[0], CThreeIndexes(0, 1, 0));
+    
+    ASSERT_EQ(xyvec[1], CThreeIndexes(7, 2, 0));
+}

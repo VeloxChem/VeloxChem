@@ -251,6 +251,16 @@ namespace genfunc { // genfunc namespace
     int32_t maxOrderOfPair(const CVecThreeIndexes& vector,
                            const int32_t           firstIndex,
                            const int32_t           secondIndex);
+    
+    /**
+     Creates vector of three indexes objects of (x,y,0) type coresponding to
+     all three index objects of (x,0,y) type found in vector of three indexes
+     objects.
+     
+     @param vector the vector of three indexes objects.
+     @return the vector of three indexes objects of (x,y,0) type.
+     */
+    CVecThreeIndexes getPairsFromTripleIndexes(const CVecThreeIndexes& vector);
 
 } // genfunc namespace
 

@@ -523,7 +523,7 @@ CNuclearPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBl
         {
             CThreeIndexes cidx(recvec[i]);
             
-            // nuclear potentil recursion
+            // nuclear potential recursion
                 
             if (cidx.first() != 0)
             {

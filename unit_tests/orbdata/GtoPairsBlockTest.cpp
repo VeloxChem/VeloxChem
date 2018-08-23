@@ -289,7 +289,7 @@ TEST_F(CGtoPairsBlockTest, GetDistancesPAY)
     vlxtest::compare(std::vector<double>(11, 0.0), apairs.getDistancesPAY());
 }
 
-TEST_F(CGtoPairsBlockTest, GetCoordinatesPAZ)
+TEST_F(CGtoPairsBlockTest, GetDistancesPAZ)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
     
@@ -331,7 +331,7 @@ TEST_F(CGtoPairsBlockTest, GetDistancesPBY)
     vlxtest::compare(std::vector<double>(11, 0.0), apairs.getDistancesPBY());
 }
 
-TEST_F(CGtoPairsBlockTest, GetCoordinatesPBZ)
+TEST_F(CGtoPairsBlockTest, GetDistancesPBZ)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
     
@@ -345,6 +345,126 @@ TEST_F(CGtoPairsBlockTest, GetCoordinatesPBZ)
                       0.000 / 1.532,  0.0000 / 0.382, -1.740 / 2.250, -0.360 / 1.100,
                       0.000 / 0.164, -0.0984 / 0.882,  0.000 / 1.600},
                      apairs.getDistancesPBZ());
+}
+
+TEST_F(CGtoPairsBlockTest, GetCoordinatesAX)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(11, 0.0), apairs.getCoordinatesAX());
+}
+
+TEST_F(CGtoPairsBlockTest, GetCoordinatesAY)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(11, 0.0), apairs.getCoordinatesAY());
+}
+
+TEST_F(CGtoPairsBlockTest, GetCoordinatesAZ)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare({0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2},
+                     apairs.getCoordinatesAZ());
+}
+
+TEST_F(CGtoPairsBlockTest, GetCoordinatesBX)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(11, 0.0), apairs.getCoordinatesBX());
+}
+
+TEST_F(CGtoPairsBlockTest, GetCoordinatesBY)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(11, 0.0), apairs.getCoordinatesBY());
+}
+
+TEST_F(CGtoPairsBlockTest, GetCoordinatesBZ)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare({0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2, 1.2, 0.0, 1.2, 1.2},
+                     apairs.getCoordinatesBZ());
+}
+
+TEST_F(CGtoPairsBlockTest, GetDistancesABX)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(11, 0.0), apairs.getDistancesABX());
+}
+
+TEST_F(CGtoPairsBlockTest, GetDistancesABY)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(11, 0.0), apairs.getDistancesABY());
+}
+
+TEST_F(CGtoPairsBlockTest, GetDistancesABZ)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare({0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.2, -1.2, 0.0, -1.2, 0.0},
+                     apairs.getDistancesABZ());
 }
 
 TEST_F(CGtoPairsBlockTest, GetStartPositions)

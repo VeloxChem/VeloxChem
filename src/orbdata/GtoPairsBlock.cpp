@@ -125,7 +125,7 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     // initialize temporary storage for primitive pairs data
     
-    CMemBlock2D<double> ppfacts(bpgto * kpgto, 13);
+    CMemBlock2D<double> ppfacts(bpgto * kpgto, 22);
     
     // set up pointers to Obara-Saika prefactors
     
@@ -160,6 +160,30 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     auto pprpby = ppfacts.data(11);
     
     auto pprpbz = ppfacts.data(12);
+    
+    // set up pointers to A centers
+    
+    auto pprax = ppfacts.data(13);
+    
+    auto ppray = ppfacts.data(14);
+    
+    auto ppraz = ppfacts.data(15);
+    
+    // set up pointers to B centers
+    
+    auto pprbx = ppfacts.data(16);
+    
+    auto pprby = ppfacts.data(17);
+    
+    auto pprbz = ppfacts.data(18);
+    
+    // set up pointers to R(AB) distances
+    
+    auto pprabx = ppfacts.data(19);
+    
+    auto ppraby = ppfacts.data(20);
+    
+    auto pprabz = ppfacts.data(21);
     
     // initialize temporary storage for contracted pairs data
     
@@ -276,7 +300,31 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
                         pprpby[idxpgto + nprim] = pprpy[idxpgto + nprim] - kry[l];
                         
                         pprpbz[idxpgto + nprim] = pprpz[idxpgto + nprim] - krz[l];
-
+                        
+                        // A Center
+                        
+                        pprax[idxpgto + nprim] = rax;
+                        
+                        ppray[idxpgto + nprim] = ray;
+                        
+                        ppraz[idxpgto + nprim] = raz;
+                        
+                        // B Center
+                        
+                        pprbx[idxpgto + nprim] = krx[l];
+                        
+                        pprby[idxpgto + nprim] = kry[l];
+                        
+                        pprbz[idxpgto + nprim] = krz[l];
+                        
+                        // R(AB) distances
+                        
+                        pprabx[idxpgto + nprim] = abx;
+                        
+                        ppraby[idxpgto + nprim] = aby;
+                        
+                        pprabz[idxpgto + nprim] = abz;
+                
                         // update local primitives counter 
                         
                         nprim++;
@@ -577,6 +625,60 @@ const double*
 CGtoPairsBlock::getDistancesPBZ() const
 {
     return _pairFactors.data(12);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesAX() const
+{
+    return _pairFactors.data(13);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesAY() const
+{
+    return _pairFactors.data(14);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesAZ() const
+{
+    return _pairFactors.data(15);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesBX() const
+{
+    return _pairFactors.data(16);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesBY() const
+{
+    return _pairFactors.data(17);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesBZ() const
+{
+    return _pairFactors.data(18);
+}
+
+const double*
+CGtoPairsBlock::getDistancesABX() const
+{
+    return _pairFactors.data(19);
+}
+
+const double*
+CGtoPairsBlock::getDistancesABY() const
+{
+    return _pairFactors.data(20);
+}
+
+const double*
+CGtoPairsBlock::getDistancesABZ() const
+{
+    return _pairFactors.data(21);
 }
 
 const int32_t*

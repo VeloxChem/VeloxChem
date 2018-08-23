@@ -470,7 +470,7 @@ CElectronicPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGt
         {
             CThreeIndexes cidx(recvec[i]);
             
-            // nuclear potentil recursion
+            // electronic potential recursion
             
             if (cidx.first() != 0)
             {

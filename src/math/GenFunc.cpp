@@ -614,4 +614,20 @@ maxOrderOfPair(const CVecThreeIndexes& vector,
     return iord;
 }
     
+CVecThreeIndexes
+getPairsFromTripleIndexes(const CVecThreeIndexes& vector)
+{
+    CVecThreeIndexes xyvec;
+    
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (vector[i].second() == 0)
+        {
+            xyvec.push_back(CThreeIndexes(vector[i].first(), vector[i].third(), 0));
+        }
+    }
+    
+    return xyvec;
+}
+    
 } // genfunc namespace

@@ -155,3 +155,44 @@ TEST_F(CTwoIntsFuncTest, CompDistancesWA)
     
     ASSERT_EQ(rwa, refrwa);
 }
+
+TEST_F(CTwoIntsFuncTest, CompDistancesForWD)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> facts(11, 10);
+    
+    twointsfunc::compFactorsForThreeCenterElectronRepulsion(facts, pbra, ppairs, 0);
+    
+    CMemBlock2D<double> rw(11, 6);
+    
+    twointsfunc::compCoordinatesForW(rw, facts, 5, pbra, ppairs, 0);
+    
+    CMemBlock2D<double> rwd(11, 6);
+    
+    twointsfunc::compDistancesWD(rwd, rw, pbra, ppairs, 0);
+    
+    CMemBlock2D<double> refrwd({0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+                                0.0000, 0.0000, 0.0000, 0.0000,
+                                0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+                                0.0000, 0.0000, 0.0000, 0.0000,
+                                0.000 / 4.350,  0.0000 / 3.200,  0.000 / 3.200,  0.000 / 2.050,
+                                0.000 / 2.982,  0.0000 / 1.832, -3.480 / 3.700, -2.100 / 2.550,
+                                0.000 / 1.614, -1.8384 / 2.332, -1.740 / 3.050,
+                                0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+                                0.0000, 0.0000, 0.0000, 0.0000,
+                                0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+                                0.0000, 0.0000, 0.0000, 0.0000,
+                                0.000 / 3.200,  0.000  / 2.050,  0.000 / 2.050,  0.000 / 0.900,
+                                0.000 / 1.832,  0.000  / 0.682, -2.100 / 2.550, -0.720 / 1.400,
+                                0.000 / 0.464, -0.4584 / 1.182, -0.360 / 1.900}, 11, 6);
+    
+    ASSERT_EQ(rwd, refrwd);
+}
+

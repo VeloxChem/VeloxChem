@@ -276,6 +276,69 @@ public:
     const double* getDistancesPBZ() const;
     
     /**
+     Gets constant vector of Cartesian X coordinates of center A.
+     
+     @return the vector of Cartesian X coordinates.
+     */
+    const double* getCoordinatesAX() const;
+    
+    /**
+     Gets constant vector of Cartesian Y coordinates of center A.
+     
+     @return the vector of Cartesian Y coordinates.
+     */
+    const double* getCoordinatesAY() const;
+    
+    /**
+     Gets constant vector of Cartesian Z coordinates of center A.
+     
+     @return the vector of Cartesian Z coordinates.
+     */
+    const double* getCoordinatesAZ() const;
+    
+    /**
+     Gets constant vector of Cartesian X coordinates of center B.
+     
+     @return the vector of Cartesian X coordinates.
+     */
+    const double* getCoordinatesBX() const;
+    
+    /**
+     Gets constant vector of Cartesian Y coordinates of center B.
+     
+     @return the vector of Cartesian Y coordinates.
+     */
+    const double* getCoordinatesBY() const;
+    
+    /**
+     Gets constant vector of Cartesian Z coordinates of center B.
+     
+     @return the vector of Cartesian Z coordinates.
+     */
+    const double* getCoordinatesBZ() const;
+    
+    /**
+     Gets constant vector of Cartesian X component of R(AB) = A - B distances.
+     
+     @return the vector of Cartesian R(AB)_Z distances.
+     */
+    const double* getDistancesABX() const;
+    
+    /**
+     Gets vector of Cartesian Y component of R(AB) = A - B distances.
+     
+     @return the vector of Cartesian R(AB)_Y distances.
+     */
+    const double* getDistancesABY() const;
+    
+    /**
+     Gets constant vector of Cartesian Z component of R(AB) = A - B distances.
+     
+     @return the vector of Cartesian R(AB)_Z distances.
+     */
+    const double* getDistancesABZ() const;
+    
+    /**
      Gets constant pointer to contracted pair start positions in primitive
      pairs vector.
      

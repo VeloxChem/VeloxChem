@@ -272,4 +272,72 @@ namespace twointsfunc { // twointsfunc namespace
         }
     }
     
+    void
+    compDistancesWD(      CMemBlock2D<double>& wdDistances,
+                    const CMemBlock2D<double>& wCoordinates,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const int32_t              iContrGto)
+    {
+        // skip computation for zero angular momentum on ket side
+        
+        if ((ketGtoPairsBlock.getBraAngularMomentum() == 0) &&
+            (ketGtoPairsBlock.getKetAngularMomentum() == 0)) return;
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto rdx = ketGtoPairsBlock.getCoordinatesBX();
+        
+        auto rdy = ketGtoPairsBlock.getCoordinatesBY();
+        
+        auto rdz = ketGtoPairsBlock.getCoordinatesBZ();
+        
+        auto nprim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of W
+            
+            auto wx = wCoordinates.data(3 * idx);
+            
+            auto wy = wCoordinates.data(3 * idx + 1);
+            
+            auto wz = wCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(WD)
+            
+            auto wdx = wdDistances.data(3 * idx);
+            
+            auto wdy = wdDistances.data(3 * idx + 1);
+            
+            auto wdz = wdDistances.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(wx, wy, wz, wdx, wdy, wdz, rdx, rdy,\
+                                     rdz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                wdx[j] = wx[j] - rdx[j];
+                
+                wdy[j] = wy[j] - rdy[j];
+                
+                wdz[j] = wz[j] - rdz[j];
+            }
+            
+            idx++;
+        }
+        
+        
+    }
+    
+    
 } // twointsfunc namespace

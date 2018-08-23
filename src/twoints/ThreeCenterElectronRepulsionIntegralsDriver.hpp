@@ -19,6 +19,7 @@
 #include "MemBlock2D.hpp"
 #include "GtoPairsContainer.hpp"
 #include "GtoContainer.hpp"
+#include "VecIndexes.hpp"
 
 /**
  Class CThreeCenterElectronicRepulsionIntegralsDriver computes electronic potential
@@ -96,6 +97,17 @@ class CThreeCenterElectronRepulsionIntegralsDriver
     CMemBlock2D<int32_t> _getBatchesOfGtoBlocks(const CMolecule&          molecule,
                                                 const CMolecularBasis&    riBasis,
                                                 const CGtoPairsContainer& gtoPairsContainer) const;
+    
+    /**
+     Gets Obara-Saika horizontal recursion pattern for specific combination of
+     GTOs blocks on bra and ket sides.
+     
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @return the vector of three indexes object with recursion pattern.
+     */
+    CVecThreeIndexes _getHorizontalRecursionPattern(const CGtoBlock&      braGtoBlock,
+                                                    const CGtoPairsBlock& ketGtoPairsBlock) const;
 
 public:
     
