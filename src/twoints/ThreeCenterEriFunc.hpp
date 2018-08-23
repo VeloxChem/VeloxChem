@@ -48,6 +48,46 @@ namespace t3erifunc { // t3erifunc namespace
                                        const CGtoPairsBlock&       ketGtoPairsBlock,
                                        const int32_t               iContrGto);
     
+    /**
+     Computes batch of primitive (S|g(r,r')|SP)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param wdDistances the vector of distances R(WD) = W - D.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronicPotentialForSSP(      CMemBlock2D<double>&  primBuffer,
+                                       const CVecThreeIndexes&     recPattern,
+                                       const std::vector<int32_t>& recIndexes,
+                                       const CMemBlock2D<double>&  wdDistances,
+                                       const CGtoBlock&            braGtoBlock,
+                                       const CGtoPairsBlock&       ketGtoPairsBlock,
+                                       const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (P|g(r,r')|SS)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronicPotentialForPSS(      CMemBlock2D<double>&  primBuffer,
+                                       const CVecThreeIndexes&     recPattern,
+                                       const std::vector<int32_t>& recIndexes,
+                                       const CMemBlock2D<double>&  waDistances,
+                                       const CGtoBlock&            braGtoBlock,
+                                       const CGtoPairsBlock&       ketGtoPairsBlock,
+                                       const int32_t               iContrGto);
+    
 }  // t3erifunc namespace
 
 #endif /* ThreeCenterEriFunc_hpp */

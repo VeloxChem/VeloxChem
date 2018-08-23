@@ -99,7 +99,7 @@ namespace epotrecfunc { // epotrecfunc namespace
                 fargs[j] = fb * knorm[j] * fpi * std::sqrt(fx[j]) * fia[j] * fib[j];
             }
             
-            // distribute (s|g(r,r')|s) integrals
+            // distribute (S|g(r,r')|S) integrals
             
             for (int32_t j = 0; j <= bfOrder; j++)
             {
@@ -151,7 +151,6 @@ namespace epotrecfunc { // epotrecfunc namespace
         
         // compute primitive integrals up to required order
         
-        
         for (int32_t i = 0; i <= bord; i++)
         {
             // get position of integrals in primitves buffer
@@ -182,11 +181,11 @@ namespace epotrecfunc { // epotrecfunc namespace
                 
                 auto pbz = pbDistances.data(3 * idx + 2);
                 
-                // set up pointers to (S|A(0)|S)^(m+1) integrals
+                // set up pointers to (S|g(r,r')|S)^(m+1) integrals
                 
                 auto g_0_0 = primBuffer.data(g1off + idx);
                 
-                // set up pointers to (S|A(0)|P)^(m) integrals
+                // set up pointers to (S|g(r,r')|P)^(m) integrals
                 
                 auto g_0_x = primBuffer.data(goff + 3 * idx);
                 
@@ -269,11 +268,11 @@ namespace epotrecfunc { // epotrecfunc namespace
                 
                 auto paz = paDistances.data(3 * idx + 2);
                 
-                // set up pointers to (S|A(0)|S)^(m+1) integrals
+                // set up pointers to (S|g(r,r')|S)^(m+1) integrals
                 
                 auto g_0_0 = primBuffer.data(g1off + idx);
                 
-                // set up pointers to (P|A(0)|S)^(m) integrals
+                // set up pointers to (P|g(r,r')|S)^(m) integrals
                 
                 auto g_x_0 = primBuffer.data(goff + 3 * idx);
                 

@@ -277,7 +277,20 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(   
     t3erifunc::compElectronicPotentialForSSS(primBuffer, recPattern, recIndexes,
                                              bfTable, bfArguments, bfValues, bfOrder,
                                              osFactors, aqDistances, braGtoBlock,
-                                             ketGtoPairsBlock, iContrGto); 
+                                             ketGtoPairsBlock, iContrGto);
+    
+    // compute (s|g(r,r')|sp) integrals
+    
+    t3erifunc::compElectronicPotentialForSSP(primBuffer, recPattern, recIndexes,
+                                             wdDistances, braGtoBlock, ketGtoPairsBlock,
+                                             iContrGto);
+    
+    // compute (p|g(r,r')|ss) integrals
+    
+    t3erifunc::compElectronicPotentialForPSS(primBuffer, recPattern, recIndexes,
+                                             waDistances, braGtoBlock, ketGtoPairsBlock,
+                                             iContrGto);
+    
 }
 
 void
