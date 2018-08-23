@@ -20,6 +20,7 @@
 #include "GtoPairsContainer.hpp"
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
+#include "BoysFunction.hpp"
 
 /**
  Class CThreeCenterElectronicRepulsionIntegralsDriver computes electronic potential
@@ -74,6 +75,44 @@ class CThreeCenterElectronRepulsionIntegralsDriver
     void _compElectronRepulsionForGtoBlocks(const CGtoBlock&      braGtoBlock,
                                             const CGtoPairsBlock& ketGtoPairsBlock) const;
     
+   /**
+    Computes batch of primitive electron repulsion integrals using Obara-Saika
+    recursion and stores results in primitives buffer.
+    Reference: S. Obara, A. Saika, J. Chem. Phys. 84, 3963 (1986).
+    
+    Batch size: (one contracted GTO on bra side) x (all contracted GTOs pairs on
+                                                    ket side).
+    
+    @param primBuffer the primitives buffer.
+    @param recPattern the recursion pattern.
+    @param recIndexes the indexes of data blocks in recursion pattern.
+    @param bfTable the Boys function evaluator.
+    @param bfArguments the vector of Boys function arguments.
+    @param bfValues the vector of Boys function values.
+    @param bfOrder the order of Boys function.
+    @param osFactors the Obara-Saika recursion factors.
+    @param aqDistances the vector of distances R(AQ) = A - Q.
+    @param waDistances the vector of distances R(WA) = W - A.
+    @param wdDistances the vector of distances R(WD) = W - D.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoPairsBlock the GTOs pairs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void _compPrimElectronRepulsionInts(      CMemBlock2D<double>&  primBuffer,
+                                        const CVecThreeIndexes&     recPattern,
+                                        const std::vector<int32_t>& recIndexes,
+                                        const CBoysFunction&        bfTable,
+                                              CMemBlock<double>&    bfArguments,
+                                              CMemBlock2D<double>&  bfValues,
+                                        const int32_t               bfOrder,
+                                        const CMemBlock2D<double>&  osFactors,
+                                        const CMemBlock2D<double>&  aqDistances,
+                                        const CMemBlock2D<double>&  waDistances,
+                                        const CMemBlock2D<double>&  wdDistances,
+                                        const CGtoBlock&            braGtoBlock,
+                                        const CGtoPairsBlock&       ketGtoPairsBlock,
+                                        const int32_t               iContrGto) const;
+    
     /**
      Prints start header for computation of three-center electron repulsion
      integrals.
@@ -108,6 +147,34 @@ class CThreeCenterElectronRepulsionIntegralsDriver
      */
     CVecThreeIndexes _getHorizontalRecursionPattern(const CGtoBlock&      braGtoBlock,
                                                     const CGtoPairsBlock& ketGtoPairsBlock) const;
+    
+    
+    /**
+     Gets Obara-Saika vertical recursion pattern for given set of leading terms.
+     
+     @param leadTerms the vector of leading terms in recursion pattern.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @return the vector of three indexes object with recursion pattern.
+     */
+    CVecThreeIndexes _getVerticalRecursionPattern(const CVecThreeIndexes& leadTerms,
+                                                  const CGtoBlock&        braGtoBlock,
+                                                  const CGtoPairsBlock&   ketGtoPairsBlock) const;
+    
+    /**
+     Gets vector of unified indexes of primitive GTOs buffer for vertical
+     Obara-Saika recursion pattern.
+     
+     @param recIndexes the vector of starting indexes of data blocks in recursion
+            pattern.
+     @param recPattern the recursion pattern.
+     @param maxPrimGtos the maximum number of primitive GTOs in contracted
+     GTO on bra side.
+     @return the total number of blocks in recursion pattern.
+     */
+    int32_t _getIndexesForVerticalRecursionPattern(      std::vector<int32_t>& recIndexes,
+                                                   const CVecThreeIndexes&     recPattern,
+                                                   const int32_t               maxPrimGtos) const;
 
 public:
     
