@@ -482,6 +482,66 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(   
     t3erifunc::compElectronRepulsionForGSI(primBuffer, recPattern, recIndexes,
                                            osFactors, waDistances, braGtoBlock,
                                            ketGtoPairsBlock, iContrGto);
+    
+    // compute (s|g(r,r')|sk) integrals
+    
+    t3erifunc::compElectronRepulsionForSSK(primBuffer, recPattern, recIndexes,
+                                           osFactors, wqDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (p|g(r,r')|sk) integrals
+    
+    t3erifunc::compElectronRepulsionForPSK(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (d|g(r,r')|sk) integrals
+    
+    t3erifunc::compElectronRepulsionForDSK(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (f|g(r,r')|sk) integrals
+    
+    t3erifunc::compElectronRepulsionForFSK(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (g|g(r,r')|sk) integrals
+    
+    t3erifunc::compElectronRepulsionForGSK(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (s|g(r,r')|sl) integrals
+    
+    t3erifunc::compElectronRepulsionForSSL(primBuffer, recPattern, recIndexes,
+                                           osFactors, wqDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (p|g(r,r')|sl) integrals
+    
+    t3erifunc::compElectronRepulsionForPSL(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (d|g(r,r')|sl) integrals
+    
+    t3erifunc::compElectronRepulsionForDSL(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (f|g(r,r')|sl) integrals
+    
+    t3erifunc::compElectronRepulsionForFSL(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
+    
+    // compute (g|g(r,r')|sl) integrals
+    
+    t3erifunc::compElectronRepulsionForGSL(primBuffer, recPattern, recIndexes,
+                                           osFactors, waDistances, braGtoBlock,
+                                           ketGtoPairsBlock, iContrGto);
 }
 
 void

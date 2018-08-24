@@ -771,7 +771,7 @@ namespace t3erifunc { // t3erifunc namespace
                                      const int32_t               iContrGto);
     
     /**
-     Computes batch of primitive (G|g(r,r')|SH)^(m) electron repulsion integrals
+     Computes batch of primitive (G|g(r,r')|SI)^(m) electron repulsion integrals
      and stores results in primitives buffer.
      
      @param primBuffer the primitives buffer.
@@ -784,6 +784,226 @@ namespace t3erifunc { // t3erifunc namespace
      @param iContrGto the index of contracted GTO on bra side.
      */
     void compElectronRepulsionForGSI(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (S|g(r,r')|SK)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param wqDistances the vector of distances R(WQ) = W - Q.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForSSK(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  wqDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (P|g(r,r')|SK)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForPSK(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (D|g(r,r')|SK)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForDSK(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (F|g(r,r')|SK)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForFSK(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (G|g(r,r')|SK)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForGSK(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (S|g(r,r')|SL)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param wqDistances the vector of distances R(WQ) = W - Q.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForSSL(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  wqDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (P|g(r,r')|SL)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForPSL(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (D|g(r,r')|SL)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForDSL(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (F|g(r,r')|SL)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForFSL(      CMemBlock2D<double>&  primBuffer,
+                                     const CVecThreeIndexes&     recPattern,
+                                     const std::vector<int32_t>& recIndexes,
+                                     const CMemBlock2D<double>&  osFactors,
+                                     const CMemBlock2D<double>&  waDistances,
+                                     const CGtoBlock&            braGtoBlock,
+                                     const CGtoPairsBlock&       ketGtoPairsBlock,
+                                     const int32_t               iContrGto);
+    
+    /**
+     Computes batch of primitive (G|g(r,r')|SL)^(m) electron repulsion integrals
+     and stores results in primitives buffer.
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param osFactors the Obara-Saika recursion factors.
+     @param waDistances the vector of distances R(WA) = W - A.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compElectronRepulsionForGSL(      CMemBlock2D<double>&  primBuffer,
                                      const CVecThreeIndexes&     recPattern,
                                      const std::vector<int32_t>& recIndexes,
                                      const CMemBlock2D<double>&  osFactors,
