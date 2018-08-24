@@ -95,6 +95,23 @@ namespace twointsfunc { // twointsfunc namespace
                          const CGtoPairsBlock&      ketGtoPairsBlock,
                          const int32_t              iContrGto);
     
+    /**
+     Computes vector of distances between center W of combined primitive GTOs
+     and combined center Q of primitive GTOs pair on ket side.
+     
+     @param wqDistances the vector of Cartesian R(WQ) = W - Q distances.
+     @param wCoordinates the vector of coordinates for combined Gaussian
+     functions.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compDistancesWQ(      CMemBlock2D<double>& wqDistances,
+                         const CMemBlock2D<double>& wCoordinates,
+                         const CGtoBlock&           braGtoBlock,
+                         const CGtoPairsBlock&      ketGtoPairsBlock,
+                         const int32_t              iContrGto);
+    
 } // intsfunc namespace
 
 #endif /* TwoIntsFunc_hpp */

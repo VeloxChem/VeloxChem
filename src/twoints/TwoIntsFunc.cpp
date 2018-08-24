@@ -335,8 +335,74 @@ namespace twointsfunc { // twointsfunc namespace
             
             idx++;
         }
+    }
+    
+    void
+    compDistancesWQ(      CMemBlock2D<double>& wqDistances,
+                    const CMemBlock2D<double>& wCoordinates,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const int32_t              iContrGto)
+    {
+        // skip computation for zero angular momentum on ket side or non-zero
+        // angular momentum on bra side
         
+        if (braGtoBlock.getAngularMomentum() > 0) return;
         
+        if ((ketGtoPairsBlock.getBraAngularMomentum() == 0) &&
+            (ketGtoPairsBlock.getKetAngularMomentum() == 0)) return;
+    
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto rpx = ketGtoPairsBlock.getCoordinatesPX();
+        
+        auto rpy = ketGtoPairsBlock.getCoordinatesPY();
+        
+        auto rpz = ketGtoPairsBlock.getCoordinatesPZ();
+        
+        auto nprim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of W
+            
+            auto wx = wCoordinates.data(3 * idx);
+            
+            auto wy = wCoordinates.data(3 * idx + 1);
+            
+            auto wz = wCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(WQ)
+            
+            auto wqx = wqDistances.data(3 * idx);
+            
+            auto wqy = wqDistances.data(3 * idx + 1);
+            
+            auto wqz = wqDistances.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(wx, wy, wz, wqx, wqy, wqz, rpx, rpy,\
+                                     rpz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                wqx[j] = wx[j] - rpx[j];
+                
+                wqy[j] = wy[j] - rpy[j];
+                
+                wqz[j] = wz[j] - rpz[j];
+            }
+            
+            idx++;
+        }
     }
     
     

@@ -93,7 +93,7 @@ class CThreeCenterElectronRepulsionIntegralsDriver
     @param osFactors the Obara-Saika recursion factors.
     @param aqDistances the vector of distances R(AQ) = A - Q.
     @param waDistances the vector of distances R(WA) = W - A.
-    @param wdDistances the vector of distances R(WD) = W - D.
+    @param wqDistances the vector of distances R(WQ) = W - Q.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoPairsBlock the GTOs pairs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -108,7 +108,7 @@ class CThreeCenterElectronRepulsionIntegralsDriver
                                         const CMemBlock2D<double>&  osFactors,
                                         const CMemBlock2D<double>&  aqDistances,
                                         const CMemBlock2D<double>&  waDistances,
-                                        const CMemBlock2D<double>&  wdDistances,
+                                        const CMemBlock2D<double>&  wqDistances,
                                         const CGtoBlock&            braGtoBlock,
                                         const CGtoPairsBlock&       ketGtoPairsBlock,
                                         const int32_t               iContrGto) const;
