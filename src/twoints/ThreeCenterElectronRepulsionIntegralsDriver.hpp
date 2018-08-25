@@ -185,6 +185,17 @@ class CThreeCenterElectronRepulsionIntegralsDriver
      */
     int32_t _getIndexesForContractedIntegrals(      std::vector<int32_t>& contrIndexes,
                                               const CVecThreeIndexes&     contrListing) const;
+    
+    /**
+     Gets vector of unified indexes of half transformed integrals buffer.
+     
+     @param intsIndexes the vector of starting indexes in half transformed
+            integrals buffer.
+     @param intsListing the half transformed integrals listing.
+     @return the total number of blocks in half transformed integrals listing.
+     */
+    int32_t _getIndexesForHalfTransformedIntegrals(      std::vector<int32_t>& intsIndexes,
+                                                   const CVecThreeIndexes&     intsListing) const;
 
 public:
     

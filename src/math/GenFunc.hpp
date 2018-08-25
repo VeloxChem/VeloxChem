@@ -10,6 +10,7 @@
 #define GenFunc_hpp
 
 #include <cstdint>
+#include <vector>
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
@@ -95,14 +96,18 @@ namespace genfunc { // genfunc namespace
      @param spherData the spherical data vectors.
      @param cartData the Cartesian data vectors.
      @param spherMomentum the spherical momentum object.
+     @param spherIndex the position of spherical data vectors.
+     @param cartIndex the position of Cartesian data vectors.
      @param nElements the number elements in individual data vector.
      @param nBlocks the number of data vectors per spherical momentum component.
      */
-    void transform(     CMemBlock2D<double>& spherData,
-                  const CMemBlock2D<double>& cartData,
-                  const CSphericalMomentum&  spherMomentum,
-                  const int32_t              nElements,
-                  const int32_t              nBlocks);
+    void transform(      CMemBlock2D<double>& spherData,
+                   const CMemBlock2D<double>& cartData,
+                   const CSphericalMomentum&  spherMomentum,
+                   const int32_t              spherIndex,
+                   const int32_t              cartIndex,
+                   const int32_t              nElements,
+                   const int32_t              nBlocks);
     
     /**
      Transforms Cartesian integrals to spherical integrals.
@@ -118,6 +123,28 @@ namespace genfunc { // genfunc namespace
                    const CSphericalMomentum&  braMomentum,
                    const CSphericalMomentum&  ketMomentum,
                    const int32_t              nElements);
+    
+    /**
+     Transforms set Cartesian data vectors to set spherical data vectors by
+     applying bra side transformation: <cart|f(x)|cart> to <spher|f(x)|cart>.
+
+     @param spherData the spherical data vectors.
+     @param cartData the Cartesian data
+     @param spherMomentum the spherical momentum object for bra side.
+     @param spherPattern the distribution pattern of spherical data vectors.
+     @param spherIndexes the indexing vector of spherical data vectors.
+     @param cartPattern the distribution pattern of Cartesian data vectors.
+     @param cartIndexes the indexing vector of Cartesian data vectors.
+     @param nElements the number of elements in data vectors.
+     */
+    void transform(      CMemBlock2D<double>&  spherData,
+                   const CMemBlock2D<double>&  cartData,
+                   const CSphericalMomentum&   spherMomentum,
+                   const CVecThreeIndexes&     spherPattern,
+                   const std::vector<int32_t>& spherIndexes,
+                   const CVecThreeIndexes&     cartPattern,
+                   const std::vector<int32_t>& cartIndexes,
+                   const int32_t               nElements);
     
     /**
      Reshapes batch of integrals batch (1 contracted GTO on bra side x all

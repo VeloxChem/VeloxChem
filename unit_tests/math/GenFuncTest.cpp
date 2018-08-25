@@ -138,7 +138,7 @@ TEST_F(CGenFuncTest, TransformForS)
     
     CMemBlock2D<double> spherdat(6, 3);
     
-    genfunc::transform(spherdat, cartdat, CSphericalMomentum(0), 6, 3);
+    genfunc::transform(spherdat, cartdat, CSphericalMomentum(0), 0, 0, 6, 3);
     
     ASSERT_EQ(spherdat, cartdat);
 }
@@ -152,7 +152,7 @@ TEST_F(CGenFuncTest, TransformForP)
     
     CMemBlock2D<double> spherdat(6, 3);
     
-    genfunc::transform(spherdat, cartdat, CSphericalMomentum(1), 6, 1);
+    genfunc::transform(spherdat, cartdat, CSphericalMomentum(1), 0, 0, 6, 1);
     
     CMemBlock2D<double> tdat({2.0, 3.0,  6.0, 7.0,  8.0, 1.0,
                               2.4, 5.7, -1.0, 8.0,  9.0, 0.0,
@@ -174,7 +174,7 @@ TEST_F(CGenFuncTest, TransformForD)
     
     CMemBlock2D<double> spherdat(2, 10);
     
-    genfunc::transform(spherdat, cartdat, CSphericalMomentum(2), 2, 2);
+    genfunc::transform(spherdat, cartdat, CSphericalMomentum(2), 0, 0, 2, 2);
     
     CMemBlock2D<double> tdat({ 3.46410161513775, 10.392304845413260,
                               10.39230484541326, 17.320508075688770,
@@ -280,6 +280,37 @@ TEST_F(CGenFuncTest, TransformForDD)
                               12.0, 12.0, 0.0, 12.0, 0.0,
                                0.0,  0.0, 0.0,  0.0, 0.0},
                              1, 25);
+    
+    ASSERT_EQ(spherdat, tdat);
+}
+
+TEST_F(CGenFuncTest, TransformHalfIntegrals)
+{
+    CMemBlock2D<double> cartdat({1.0, 2.0, 3.0, 6.0, -3.0, 4.0,
+                                 2.0, 3.0,  6.0, 7.0,  8.0, 1.0,
+                                 2.4, 5.7, -1.0, 8.0,  9.0, 0.0},
+                                 2, 9);
+    
+    CMemBlock2D<double> spherdat(2, 12);
+    
+    spherdat.zero();
+    
+    CVecThreeIndexes sphervec({{1, 0, 1}, {0, 2, 2}});
+    
+    std::vector<int32_t> spheridx({3, 0});
+    
+    CVecThreeIndexes cartvec({{1, 1, 0}});
+    
+    std::vector<int32_t> cartidx({0});
+    
+    genfunc::transform(spherdat, cartdat, CSphericalMomentum(1), sphervec,
+                       spheridx, cartvec, cartidx, 2);
+    
+    CMemBlock2D<double> tdat({0.0, 0.0,  0.0, 0.0,  0.0, 0.0,
+                              2.0, 3.0,  6.0, 7.0,  8.0, 1.0,
+                              2.4, 5.7, -1.0, 8.0,  9.0, 0.0,
+                              1.0, 2.0,  3.0, 6.0, -3.0, 4.0},
+                             2, 12);
     
     ASSERT_EQ(spherdat, tdat);
 }

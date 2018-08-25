@@ -194,6 +194,8 @@ void
 transform(      CMemBlock2D<double>& spherData,
           const CMemBlock2D<double>& cartData,
           const CSphericalMomentum&  spherMomentum,
+          const int32_t              spherIndex,
+          const int32_t              cartIndex,
           const int32_t              nElements,
           const int32_t              nBlocks)
 {
@@ -213,11 +215,11 @@ transform(      CMemBlock2D<double>& spherData,
         {
             // set up spherical data vector
             
-            auto sphervec = spherData.data(i * nBlocks + j);
+            auto sphervec = spherData.data(spherIndex + i * nBlocks + j);
             
             // first term: assignment
             
-            auto cartvec = cartData.data(tidx[0] * nBlocks + j);
+            auto cartvec = cartData.data(cartIndex + tidx[0] * nBlocks + j);
             
             auto cfact = tfact[0];
             
@@ -316,6 +318,33 @@ transform(      CMemBlock2D<double>& spherData,
                 }
             }
         }
+    }
+}
+    
+void transform(      CMemBlock2D<double>&  spherData,
+               const CMemBlock2D<double>&  cartData,
+               const CSphericalMomentum&   spherMomentum,
+               const CVecThreeIndexes&     spherPattern,
+               const std::vector<int32_t>& spherIndexes,
+               const CVecThreeIndexes&     cartPattern,
+               const std::vector<int32_t>& cartIndexes,
+               const int32_t               nElements)
+{
+    for (size_t i = 0; i < cartPattern.size(); i++)
+    {
+        // determine positions of Cartesian and spherical data vectors
+        
+        auto tidx = cartPattern[i];
+        
+        auto cidx = genfunc::findTripleIndex(cartIndexes, cartPattern, tidx);
+        
+        auto sidx = genfunc::findTripleIndex(spherIndexes, spherPattern,
+                                             {tidx.first(), 0, tidx.second()});
+        
+        // transform data vectors
+        
+       genfunc::transform(spherData, cartData, spherMomentum, sidx, cidx, nElements,
+                          angmom::to_CartesianComponents(tidx.second()));
     }
 }
     

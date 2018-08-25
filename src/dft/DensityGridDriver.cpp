@@ -580,5 +580,5 @@ CDensityGridDriver::_transContrGtoValues(      CMemBlock2D<double>&  spherGtoVal
     
     // transform GTOs
     
-    genfunc::transform(spherGtoValues, cartGtoValues, spherMomentum, ngto, nvcomp);
+    genfunc::transform(spherGtoValues, cartGtoValues, spherMomentum, 0, 0, ngto, nvcomp);
 }

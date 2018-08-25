@@ -189,7 +189,13 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     CMemBlock2D<double> cbuffer(cdim, nblk);
     
-    // FIX ME: add other buffers
+    // set up half-transformed integrals buffer indexes
+    
+    std::vector<int32_t> hrridx;
+    
+    nblk = _getIndexesForHalfTransformedIntegrals(hrridx, hrrvec);
+    
+    CMemBlock2D<double> hrrbuffer(cdim, nblk);
     
     // initialize Boys function evaluator
     
@@ -205,8 +211,8 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     for (int32_t i = 0; i < hrrvec.size(); i++)
     {
-        printf("HRR: (%i,%i,%i)\n", hrrvec[i].first(), hrrvec[i].second(),
-               hrrvec[i].third());
+        printf("HRR: (%i,%i,%i): %i\n", hrrvec[i].first(), hrrvec[i].second(),
+               hrrvec[i].third(), hrridx[i]);
     }
     
     printf("Intermidiates: ");
@@ -262,6 +268,9 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
                           bragtos, ketpairs, i); 
         
         // transform bra side to spherical form
+        
+        genfunc::transform(hrrbuffer, cbuffer, amom, hrrvec, hrridx, t0vec,
+                           t0idx, cdim); 
         
         // apply horizontal recursion
         
@@ -847,6 +856,33 @@ CThreeCenterElectronRepulsionIntegralsDriver::_getIndexesForContractedIntegrals(
         
         nblk += angmom::to_CartesianComponents(contrListing[i].first(),
                                                contrListing[i].second());
+    }
+    
+    return nblk;
+}
+
+int32_t
+CThreeCenterElectronRepulsionIntegralsDriver::_getIndexesForHalfTransformedIntegrals(std::vector<int32_t>&   intsIndexes,
+                                                                                     const CVecThreeIndexes& intsListing) const
+{
+    // clear vector and reserve memory
+    
+    intsIndexes.clear();
+    
+    intsIndexes.reserve(intsListing.size() + 1);
+    
+    // loop over integrals listing
+    
+    int32_t nblk = 0;
+    
+    for (size_t i = 0; i < intsListing.size(); i++)
+    {
+        intsIndexes.push_back(nblk);
+        
+        nblk += angmom::to_SphericalComponents(intsListing[i].first())
+        
+              *  angmom::to_CartesianComponents(intsListing[i].second(),
+                                                intsListing[i].third());
     }
     
     return nblk;
