@@ -175,6 +175,16 @@ class CThreeCenterElectronRepulsionIntegralsDriver
     int32_t _getIndexesForVerticalRecursionPattern(      std::vector<int32_t>& recIndexes,
                                                    const CVecThreeIndexes&     recPattern,
                                                    const int32_t               maxPrimGtos) const;
+    
+    /**
+     Gets vector of unified indexes of contracted GTOs buffer.
+
+     @param contrIndexes the vector of starting indexes in contracted GTOs buffer.
+     @param contrListing the contracted integrals listing.
+     @return the total number of blocks in contracted integrals listing.
+     */
+    int32_t _getIndexesForContractedIntegrals(      std::vector<int32_t>& contrIndexes,
+                                              const CVecThreeIndexes&     contrListing) const;
 
 public:
     

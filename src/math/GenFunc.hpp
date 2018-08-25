@@ -18,6 +18,8 @@
 #include "GtoBlock.hpp"
 #include "GtoContainer.hpp"
 #include "SparseMatrix.hpp"
+#include "GtoPairsBlock.hpp"
+
 
 namespace genfunc { // genfunc namespace
     
@@ -26,6 +28,7 @@ namespace genfunc { // genfunc namespace
 
      @param contrData the contracted data vectors.
      @param primData the primitive data vectors.
+     @param contrIndex the index of first contracted data vector.
      @param primIndex the index of first primitive data vector.
      @param startPositions the vector of start positions in contraction pattern.
      @param endPositions the vector of end positions in contractrion pattern.
@@ -35,6 +38,7 @@ namespace genfunc { // genfunc namespace
      */
     void contract(      CMemBlock2D<double>& contrData,
                   const CMemBlock2D<double>& primData,
+                  const int32_t              contrIndex,
                   const int32_t              primIndex,
                   const int32_t*             startPositions,
                   const int32_t*             endPositions,
@@ -59,6 +63,31 @@ namespace genfunc { // genfunc namespace
                   const CGtoBlock&           braGtoBlock,
                   const CGtoBlock&           ketGtoBlock,
                   const int32_t              iContrGto);
+    
+    /**
+     Contracts set of primitive data vectoes to contracted data vectors using
+     two step procedure. NOTE: Primitive data is destroyed during contraction
+     process.
+
+     @param contrData the contracted data vectors.
+     @param primData the primitive data vectors.
+     @param contrPattern the contracted data vectors distribution pattern.
+     @param contrIndexes the contracted data vectors indexing pattern.
+     @param primPattern the primitive data vectors distribution pattern.
+     @param primIndexes the primitive data vectors indexing pattern,
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void contract(      CMemBlock2D<double>&  contrData,
+                        CMemBlock2D<double>&  primData,
+                  const CVecThreeIndexes&     contrPattern,
+                  const std::vector<int32_t>& contrIndexes,
+                  const CVecThreeIndexes&     primPattern,
+                  const std::vector<int32_t>& primIndexes,
+                  const CGtoBlock&            braGtoBlock,
+                  const CGtoPairsBlock&       ketGtoPairsBlock,
+                  const int32_t               iContrGto);
     
     /**
      Transforms Cartesian data vectors to spherical data vectors.

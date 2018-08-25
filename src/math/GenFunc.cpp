@@ -15,6 +15,7 @@ namespace genfunc { // genfunc namespace
 void
 contract(      CMemBlock2D<double>& contrData,
          const CMemBlock2D<double>& primData,
+         const int32_t              contrIndex,
          const int32_t              primIndex,
          const int32_t*             startPositions,
          const int32_t*             endPositions,
@@ -27,7 +28,7 @@ contract(      CMemBlock2D<double>& contrData,
         
         auto pdat = primData.data(primIndex + i);
         
-        auto cdat = contrData.data(i);
+        auto cdat = contrData.data(contrIndex + i);
         
         for (int32_t j = 0; j < nElements; j++)
         {
@@ -59,9 +60,7 @@ contract(      CMemBlock2D<double>& contrData,
     
     auto kang = ketGtoBlock.getAngularMomentum();
     
-    auto ncomp = angmom::to_CartesianComponents(bang)
-    
-               * angmom::to_CartesianComponents(kang);
+    auto ncomp = angmom::to_CartesianComponents(bang, kang);
     
     // set up pointers to primitives data on bra side
     
@@ -111,7 +110,84 @@ contract(      CMemBlock2D<double>& contrData,
     
     // second step: direct contraction over ket side
     
-    genfunc::contract(contrData, primData, primIndex, spos, epos, kdim, ncomp);
+    genfunc::contract(contrData, primData, 0, primIndex, spos, epos, kdim, ncomp);
+}
+
+void
+contract(      CMemBlock2D<double>&  contrData,
+               CMemBlock2D<double>&  primData,
+         const CVecThreeIndexes&     contrPattern,
+         const std::vector<int32_t>& contrIndexes,
+         const CVecThreeIndexes&     primPattern,
+         const std::vector<int32_t>& primIndexes,
+         const CGtoBlock&            braGtoBlock,
+         const CGtoPairsBlock&       ketGtoPairsBlock,
+         const int32_t               iContrGto)
+{
+    // set up pointers to primitives data on bra side
+    
+    auto spos = braGtoBlock.getStartPositions();
+    
+    auto epos = braGtoBlock.getEndPositions();
+    
+    auto bdim = epos[iContrGto] - spos[iContrGto];
+    
+    // set up pointers to primitives data on ket side
+    
+    auto kspos = ketGtoPairsBlock.getStartPositions();
+    
+    auto kepos = ketGtoPairsBlock.getEndPositions();
+    
+    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    auto nprim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+
+    // loop over set of data vectors
+
+    for (size_t i = 0; i < contrPattern.size(); i++)
+    {
+        // determine positions of contracted and primitive vectors
+        
+        auto tidx = contrPattern[i];
+        
+        auto cidx = genfunc::findTripleIndex(contrIndexes, contrPattern, tidx);
+        
+        auto pidx = genfunc::findTripleIndex(primIndexes, primPattern, tidx);
+        
+        // set up number angular components
+        
+        auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.second());
+        
+        // first step: vertical summation over bra GTO
+        
+        for (int32_t j = 1; j < bdim; j++)
+        {
+            // accumulate summation over primitives on bra side
+            
+            for (int32_t k = 0; k < ncomp; k++)
+            {
+                // summation buffer
+                
+                auto sumbuf = primData.data(pidx + k);
+                
+                // source buffer
+                
+                auto srcbuf = primData.data(pidx + j * ncomp + k);
+                
+                // loop over primitive GTOs on ket side
+                
+                #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
+                for (int32_t l = 0; l < nprim; l++)
+                {
+                    sumbuf[l] += srcbuf[l];
+                }
+            }
+        }
+        
+        // second step: direct contraction over ket side
+        
+        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, kdim, ncomp);
+    }
 }
     
 void

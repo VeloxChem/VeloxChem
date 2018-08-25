@@ -177,6 +177,18 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
     
+    // set up contracted integrals buffer indexes
+    
+    std::vector<int32_t> t0idx;
+    
+    nblk = _getIndexesForContractedIntegrals(t0idx, t0vec);
+    
+    // allocate contracted integrals buffer
+    
+    auto cdim = ketpairs.getNumberOfScreenedContrPairs();
+    
+    CMemBlock2D<double> cbuffer(cdim, nblk);
+    
     // FIX ME: add other buffers
     
     // initialize Boys function evaluator
@@ -201,8 +213,8 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     for (int32_t i = 0; i < t0vec.size(); i++)
     {
-        printf("(%i,%i)^(%i) ", t0vec[i].first(), t0vec[i].second(),
-               t0vec[i].third());
+        printf("(%i,%i)^(%i): %i ", t0vec[i].first(), t0vec[i].second(),
+               t0vec[i].third(), t0idx[i]);
     }
     
     printf("\n");
@@ -245,6 +257,9 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
                                        bragtos, ketpairs, i);
         
         // contract primitive electron repulsion integrals
+        
+        genfunc::contract(cbuffer, pbuffer, t0vec, t0idx, vrrvec, vrridx,
+                          bragtos, ketpairs, i); 
         
         // transform bra side to spherical form
         
@@ -807,6 +822,31 @@ CThreeCenterElectronRepulsionIntegralsDriver::_getIndexesForVerticalRecursionPat
         
         nblk += maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
                                                              recPattern[i].second());
+    }
+    
+    return nblk;
+}
+
+int32_t
+CThreeCenterElectronRepulsionIntegralsDriver::_getIndexesForContractedIntegrals(      std::vector<int32_t>& contrIndexes,
+                                                                                const CVecThreeIndexes&     contrListing) const
+{
+    // clear vector and reserve memory
+    
+    contrIndexes.clear();
+    
+    contrIndexes.reserve(contrListing.size() + 1);
+    
+    // loop over integrals listing
+    
+    int32_t nblk = 0;
+    
+    for (size_t i = 0; i < contrListing.size(); i++)
+    {
+        contrIndexes.push_back(nblk);
+        
+        nblk += angmom::to_CartesianComponents(contrListing[i].first(),
+                                               contrListing[i].second());
     }
     
     return nblk;

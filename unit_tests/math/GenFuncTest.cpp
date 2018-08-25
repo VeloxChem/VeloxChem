@@ -28,11 +28,13 @@ TEST_F(CGenFuncTest, Contract)
                               2.4, 5.7, -1.0, 8.0,  9.0, 0.0},
                              6, 3);
     
-    CMemBlock2D<double> cdat(3, 2);
+    CMemBlock2D<double> cdat(3, 3);
     
-    genfunc::contract(cdat, pdat, 1, sposvec, eposvec, 3, 2);
+    cdat.zero();
     
-    CMemBlock2D<double> tdat({5.0, 6.0, 16.0, 8.1, -1.0, 17.0}, 3, 2);
+    genfunc::contract(cdat, pdat, 1,  1, sposvec, eposvec, 3, 2);
+    
+    CMemBlock2D<double> tdat({0.0, 0.0, 0.0, 5.0, 6.0, 16.0, 8.1, -1.0, 17.0}, 3, 3);
     
     ASSERT_EQ(cdat, tdat);
 }
@@ -82,6 +84,47 @@ TEST_F(CGenFuncTest, ContractWithGtoBlocks)
                                3.0,  7.0, 3.0,
                                1.3,  2.0, 5.2},
                              3, 9);
+    
+    ASSERT_EQ(cdat, tdat);
+}
+
+TEST_F(CGenFuncTest, ContractWithGtoBlockAndGtoPairsBlock)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> pdat({1.0, 0.2, 3.0, 2.3, 0.0, 1.0, 0.7, 0.2, 3.1, 1.2, 0.8,
+                              0.3, 0.5, 2.1, 0.5, 0.9, 2.1, 1.7, 3.4, 3.9, 2.7, 1.2,
+                              3.1, 0.8, 0.4, 2.1, 2.7, 0.6, 2.0, 2.7, 1.7, 0.6, 0.3,
+                              1.2, 2.6, 0.8, 1.3, 2.9, 2.5, 1.7, 2.2, 2.1, 2.0, 1.5,
+                              0.9, 3.2, 2.1, 2.6, 2.7, 0.3, 2.2, 0.9, 1.1, 2.7, 0.2,
+                              0.8, 1.5, 0.8, 1.5, 1.4, 1.9, 2.7, 4.2, 0.5, 2.3, 2.8,
+                              0.1, 1.8, 2.2, 0.5, 0.8, 2.2, 3.7, 1.2, 2.9, 1.7, 1.3,
+                              4.1, 3.6, 0.7, 1.5, 3.2, 4.0, 1.7, 3.2, 0.7, 1.6, 2.1},
+                              11, 8);
+    
+    CVecThreeIndexes cvec({{0, 0, 0}, {0, 1, 0}});
+    
+    std::vector<int32_t> cidx({3, 0});
+    
+    CVecThreeIndexes pvec({{0, 2, 3}, {0, 0, 0}, {0, 0, 1},  {0, 1, 0}});
+    
+    std::vector<int32_t> pidx({7, 0, 8, 2});
+    
+    CMemBlock2D<double> cdat(6, 4);
+    
+    genfunc::contract(cdat, pdat, cvec, cidx, pvec, pidx, pbra, ppairs, 0);
+    
+    CMemBlock2D<double> tdat({11.0,  6.6, 11.6, 2.2, 2.9, 3.1,
+                              10.5,  8.4,  8.8, 5.0, 3.7, 2.8,
+                              18.7, 10.2,  8.0, 1.8, 4.3, 2.3,
+                               9.9,  4.0,  6.0, 7.0, 3.9, 2.0},
+                              6, 4);
     
     ASSERT_EQ(cdat, tdat);
 }
