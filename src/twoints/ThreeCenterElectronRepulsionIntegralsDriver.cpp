@@ -26,6 +26,7 @@
 #include "GenFunc.hpp"
 #include "AngularMomentum.hpp"
 #include "ThreeCenterEriFunc.hpp"
+#include "ThreeCenterHrrFunc.hpp"
 
 CThreeCenterElectronRepulsionIntegralsDriver::CThreeCenterElectronRepulsionIntegralsDriver(const int32_t  globRank,
                                                                                            const int32_t  globNodes,
@@ -197,6 +198,10 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     CMemBlock2D<double> hrrbuffer(cdim, nblk);
     
+    // initialize R(CD) = C - D distance for horizontal recursion
+    
+    auto rcd = ketpairs.getDistancesAB();
+    
     // initialize Boys function evaluator
     
     auto bord = genfunc::maxOrderOfPair(vrrvec, 0, 0);
@@ -273,6 +278,9 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
                            t0idx, cdim); 
         
         // apply horizontal recursion
+        
+        _compContrElectronRepulsionInts(hrrbuffer, hrrvec, hrridx, rcd, bragtos,
+                                        ketpairs);
         
         // transform ket side to spherical form
         
@@ -566,6 +574,28 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(   
     t3erifunc::compElectronRepulsionForGSL(primBuffer, recPattern, recIndexes,
                                            osFactors, waDistances, braGtoBlock,
                                            ketGtoPairsBlock, iContrGto);
+}
+
+void
+CThreeCenterElectronRepulsionIntegralsDriver::_compContrElectronRepulsionInts(      CMemBlock2D<double>&  contrBuffer,
+                                                                              const CVecThreeIndexes&     recPattern,
+                                                                              const std::vector<int32_t>& recIndexes,
+                                                                              const CMemBlock2D<double>&  cdDistances,
+                                                                              const CGtoBlock&            braGtoBlock,
+                                                                              const CGtoPairsBlock&       ketGtoPairsBlock) const
+{
+    // set up angular momentum on bra side
+    
+    auto bang = braGtoBlock.getAngularMomentum();
+    
+    // compute (x|g(r,r')|pp) integrals
+    
+    for (int32_t i = 0; i <= bang; i++)
+    {
+        t3hrrfunc::compElectronRepulsionForXPP(contrBuffer, recPattern, recIndexes,
+                                               cdDistances, i, ketGtoPairsBlock);
+    }
+    
 }
 
 void

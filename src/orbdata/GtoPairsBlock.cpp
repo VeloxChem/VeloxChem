@@ -707,6 +707,45 @@ CGtoPairsBlock::getKetIdentifiers(const int32_t iComponent) const
     return _contrPattern.data(2 + bang  + iComponent);
 }
 
+CMemBlock2D<double>
+CGtoPairsBlock::getDistancesAB() const
+{
+    CMemBlock2D<double> rab(_nScreenedContrPairs, 3);
+    
+    // set up pointers to R(AB) distances in primitives data
+    
+    auto abx = getDistancesABX();
+    
+    auto aby = getDistancesABY();
+    
+    auto abz = getDistancesABZ();
+    
+    // set up pointers to R(AB) distances
+    
+    auto rabx = rab.data(0);
+    
+    auto raby = rab.data(1);
+    
+    auto rabz = rab.data(2);
+    
+    // set up pointer to starting positions
+    
+    auto spos = getStartPositions();
+    
+    for (int32_t i = 0; i < _nScreenedContrPairs; i++)
+    {
+        auto ppidx = spos[i];
+        
+        rabx[i] = abx[ppidx];
+        
+        raby[i] = aby[ppidx];
+        
+        rabz[i] = abz[ppidx];
+    }
+    
+    return rab;
+}
+
 int32_t
 CGtoPairsBlock::getNumberOfOriginalPrimPairs() const
 {

@@ -373,6 +373,14 @@ public:
     const int32_t* getKetIdentifiers(const int32_t iComponent) const;
     
     /**
+     Gets vector with Cartesian R(AB) = A - B distances for contracted GTOs
+     pairs.
+
+     @return vector of R(AB) distances.
+     */
+    CMemBlock2D<double> getDistancesAB() const;
+    
+    /**
      Gets number of initial primitive pairs generated from input data.
 
      @return the number of primitive pairs.

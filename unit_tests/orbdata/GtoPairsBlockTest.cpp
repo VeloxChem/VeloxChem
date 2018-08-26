@@ -527,6 +527,24 @@ TEST_F(CGtoPairsBlockTest, GetKetIdentifiers)
     vlxtest::compare({11, 12, 13, 12, 13, 13}, apairs.getKetIdentifiers(2));
 }
 
+TEST_F(CGtoPairsBlockTest, GetDistancesAB)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    CMemBlock2D<double> rab({0.0, 0.0,  0.0, 0.0,  0.0, 0.0,
+                             0.0, 0.0,  0.0, 0.0,  0.0, 0.0,
+                             0.0, 0.0, -1.2, 0.0, -1.2, 0.0},
+                             6, 3);
+    
+    ASSERT_EQ(apairs.getDistancesAB(), rab); 
+}
+
 TEST_F(CGtoPairsBlockTest, GetNumberOfOriginalPrimPairs)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

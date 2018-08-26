@@ -114,6 +114,25 @@ class CThreeCenterElectronRepulsionIntegralsDriver
                                         const int32_t               iContrGto) const;
     
     /**
+     Computes batch of contracted, half-transformed electron repulsion integrals
+     using horizontal recursion and stores results in half-transformed integrals
+     buffer.
+
+     @param contrBuffer the contracted, half-transformed integrals buffer.
+     @param recPattern the horizontal recursion pattern.
+     @param recIndexes the indexes of data blocks in horizontal recursion pattern.
+     @param cdDistances the vector of distances R(CD) = C - D.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     */
+    void _compContrElectronRepulsionInts(      CMemBlock2D<double>&  contrBuffer,
+                                         const CVecThreeIndexes&     recPattern,
+                                         const std::vector<int32_t>& recIndexes,
+                                         const CMemBlock2D<double>&  cdDistances,
+                                         const CGtoBlock&            braGtoBlock,
+                                         const CGtoPairsBlock&       ketGtoPairsBlock) const;
+    
+    /**
      Prints start header for computation of three-center electron repulsion
      integrals.
      
