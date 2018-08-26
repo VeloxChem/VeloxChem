@@ -589,13 +589,84 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compContrElectronRepulsionInts(  
     auto bang = braGtoBlock.getAngularMomentum();
     
     // compute (x|g(r,r')|pp) integrals
+
+    t3hrrfunc::compElectronRepulsionForXPP(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
     
-    for (int32_t i = 0; i <= bang; i++)
-    {
-        t3hrrfunc::compElectronRepulsionForXPP(contrBuffer, recPattern, recIndexes,
-                                               cdDistances, i, ketGtoPairsBlock);
-    }
+    // compute (x|g(r,r')|pd) integrals
     
+    t3hrrfunc::compElectronRepulsionForXPD(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|pf) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXPF(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|pg) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXPG(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|ph) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXPH(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|pi) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXPI(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|pk) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXPK(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|dd) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXDD(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|df) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXDF(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|dg) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXDG(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|dh) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXDH(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|di) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXDI(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|ff) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXFF(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|fg) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXFG(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|fh) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXFH(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
+    
+    // compute (x|g(r,r')|gg) integrals
+    
+    t3hrrfunc::compElectronRepulsionForXGG(contrBuffer, recPattern, recIndexes,
+                                           cdDistances, bang, ketGtoPairsBlock);
 }
 
 void
@@ -609,8 +680,6 @@ CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContai
     // GTO pairs screening information
     
     gtoPairs.printScreeningInfo(oStream);
-    
-    // memory storage information
 }
 
 CMemBlock2D<int32_t>
