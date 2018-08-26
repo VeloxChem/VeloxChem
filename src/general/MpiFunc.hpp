@@ -224,6 +224,20 @@ void gather(int32_t* vector,
             int32_t  value,
             int32_t  rank,
             MPI_Comm comm);
+    
+/**
+ Gathers vector of real numbers on master MPI process by taking single real
+ number from all MPI processes within domain of MPI communicator.
+
+ @param vector the vector of real numbers.
+ @param value the real number.
+ @param rank the rank of MPI process.
+ @param comm the MPI communicator.
+ */
+void gather(double*  vector,
+            double   value,
+            int32_t  rank,
+            MPI_Comm comm);
 
 /**
  Terminates all MPI processes and prints error message to standard error stream.

@@ -363,6 +363,25 @@ gather(int32_t* vector,
     }
 }
     
+void
+gather(double*  vector,
+       double   value,
+       int32_t  rank,
+       MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        auto merror = MPI_Gather(&value, 1, MPI_DOUBLE, vector, 1, MPI_DOUBLE,
+                                 mpi::master(), comm);
+        
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "gather(double)");
+    }
+    else
+    {
+        vector[0] = value;
+    }
+}
+    
 // TODO: Add other MPI functions for generic types
     
 void

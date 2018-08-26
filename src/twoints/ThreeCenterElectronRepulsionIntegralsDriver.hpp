@@ -21,6 +21,7 @@
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
+#include "SystemClock.hpp"
 
 /**
  Class CThreeCenterElectronicRepulsionIntegralsDriver computes electronic potential
@@ -141,6 +142,17 @@ class CThreeCenterElectronRepulsionIntegralsDriver
      */
     void _startHeader(const CGtoPairsContainer& gtoPairs,
                             COutputStream&      oStream) const;
+    
+    /**
+     Prints timing statistics for evaluation of electron repulsion integrals.
+
+     @param molecule the molecule.
+     @param timer the timer.
+     @param oStream the output stream.
+     */
+    void _printTiming(const CMolecule&     molecule,
+                      const CSystemClock&  timer,
+                            COutputStream& oStream) const;
     
     /**
      Creates atoms list splitting pattern for generation of GTO blocks on each

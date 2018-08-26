@@ -17,7 +17,6 @@
 #endif
 
 #include "MpiFunc.hpp"
-#include "SystemClock.hpp"
 #include "GtoPairsContainer.hpp"
 #include "GtoContainer.hpp"
 #include "MathFunc.hpp"
@@ -80,7 +79,9 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     _compElectronRepulsionIntegrals(&bgtos, &kgtopairs);
     
-    printf("node: %i ngtos: %i time: %lf sec.\n", _locRank, bgtos.getNumberOfAtomicOrbitals(), eritim.getElapsedTimeInSeconds());
+    // print evaluation timing statistics
+    
+    _printTiming(molecule, eritim, oStream);
 }
 
 void
@@ -673,6 +674,74 @@ CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContai
     // GTO pairs screening information
     
     gtoPairs.printScreeningInfo(oStream);
+    
+    oStream << fmt::blank;
+}
+
+void
+CThreeCenterElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
+                                                           const CSystemClock&  timer,
+                                                                 COutputStream& oStream) const
+{
+    // NOTE: Silent for local execution mode
+    
+    if (_isLocalMode) return;
+    
+    // collect timing data from MPI nodes
+    
+    auto tsec = timer.getElapsedTimeInSeconds();
+    
+    CMemBlock<double> tvec;
+    
+    if (_globRank == mpi::master()) tvec = CMemBlock<double>(_globNodes);
+    
+    mpi::gather(tvec.data(), tsec, _globRank, MPI_COMM_WORLD);
+    
+    // print timing data
+    
+    if (_globRank == mpi::master())
+    {
+        auto natoms = molecule.getNumberOfAtoms();
+        
+        std::string str("Three-Center Integrals Evaluation Timings: ");
+        
+        oStream << fstr::format(str, 80, fmt::left) << fmt::end << fmt::blank;
+        
+        for (int32_t i = 0; i < _globNodes; i++)
+        {
+            // node information
+            
+            str.assign("MPI Node: ");
+            
+            str.append(fstr::to_string(i, 3, fmt::left));
+            
+            // atom batches information
+            
+            auto nodatm = mpi::batch_size(natoms, i, _globNodes);
+            
+            auto nodoff = mpi::batch_offset(natoms, i, _globNodes);
+            
+            str.append(" Atoms in batch: ");
+            
+            std::string bstr(std::to_string(nodoff));
+            
+            bstr.append("-");
+            
+            bstr.append(std::to_string(nodoff + nodatm));
+            
+            str.append(fstr::format(bstr, 8, fmt::left));
+            
+            // evaluation time info
+            
+            str.append(" Time: ");
+            
+            str.append(fstr::to_string(tvec.at(i), 2));
+            
+            str.append(" sec.");
+            
+            oStream << fstr::format(str, 80, fmt::left) << fmt::end;
+        }
+    }
 }
 
 CMemBlock2D<int32_t>
