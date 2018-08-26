@@ -98,6 +98,10 @@ namespace t3hrrfunc { // t3hrrfunc namespace
             
             auto g_z_z = contrBuffer.data(goff + 9 * i + 8);
             
+            #pragma omp simd aligned(rcdx, rcdy, rcdz, g_0_x, g_0_y, g_0_z,\
+                                     g_0_xx, g_0_xy, g_0_xz, g_0_yy, g_0_yz,\
+                                     g_0_zz, g_x_x, g_x_y, g_x_z, g_y_x, g_y_y,\
+                                     g_y_z, g_z_x, g_z_y, g_z_z: VLX_ALIGN)
             for (int32_t j = 0; j < kdim; j++)
             {
                 // leading x component
