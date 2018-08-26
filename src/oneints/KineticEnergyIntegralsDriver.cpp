@@ -322,7 +322,7 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      double*    i
         
         // transform Cartesian to spherical integrals
         
-        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, kdim);
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0, kdim);
         
         // add batch of integrals to integrals matrix
         

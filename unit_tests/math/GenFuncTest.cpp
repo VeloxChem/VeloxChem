@@ -204,7 +204,7 @@ TEST_F(CGenFuncTest, TransformForSPAndPS)
     
     CSphericalMomentum kmom(1);
     
-    genfunc::transform(spherdat, cartdat, bmom, kmom,  6);
+    genfunc::transform(spherdat, cartdat, bmom, kmom, 0, 0, 6);
     
     CMemBlock2D<double> tdat({2.0, 3.0,  6.0, 7.0,  8.0, 1.0,
                               2.4, 5.7, -1.0, 8.0,  9.0, 0.0,
@@ -213,7 +213,7 @@ TEST_F(CGenFuncTest, TransformForSPAndPS)
     
     ASSERT_EQ(spherdat, tdat);
     
-    genfunc::transform(spherdat, cartdat, kmom, bmom,  6);
+    genfunc::transform(spherdat, cartdat, kmom, bmom, 0, 0, 6);
     
     ASSERT_EQ(spherdat, tdat);
 }
@@ -234,7 +234,7 @@ TEST_F(CGenFuncTest, TransformForSDAndDS)
     
     CSphericalMomentum kmom(2);
     
-    genfunc::transform(spherdat, cartdat, bmom, kmom, 4);
+    genfunc::transform(spherdat, cartdat, bmom, kmom, 0, 0, 4);
     
     CMemBlock2D<double> tdat({ 3.46410161513775, 10.392304845413260,
                               10.39230484541326, 17.320508075688770,
@@ -250,7 +250,7 @@ TEST_F(CGenFuncTest, TransformForSDAndDS)
     
     ASSERT_EQ(spherdat, tdat);
     
-    genfunc::transform(spherdat, cartdat, kmom, bmom, 4);
+    genfunc::transform(spherdat, cartdat, kmom, bmom, 0, 0, 4);
     
     ASSERT_EQ(spherdat, tdat);
 }
@@ -272,7 +272,7 @@ TEST_F(CGenFuncTest, TransformForDD)
     
     CSphericalMomentum kmom(2);
     
-    genfunc::transform(spherdat, cartdat, bmom, kmom, 1);
+    genfunc::transform(spherdat, cartdat, bmom, kmom, 0, 0, 1);
     
     CMemBlock2D<double> tdat({12.0, 12.0, 0.0, 12.0, 0.0,
                               12.0, 12.0, 0.0, 12.0, 0.0,
@@ -311,6 +311,47 @@ TEST_F(CGenFuncTest, TransformHalfIntegrals)
                               2.4, 5.7, -1.0, 8.0,  9.0, 0.0,
                               1.0, 2.0,  3.0, 6.0, -3.0, 4.0},
                              2, 12);
+    
+    ASSERT_EQ(spherdat, tdat);
+}
+
+TEST_F(CGenFuncTest, TransformFullIntegralsForDD)
+{
+    CMemBlock2D<double> cartdat(1, 72);
+    
+    for (int32_t i = 0; i < 36; i++)
+    {
+        auto vec = cartdat.data(i);
+        
+        vec[0] = 1.0;
+    }
+    
+    for (int32_t i = 36; i < 72; i++)
+    {
+        auto vec = cartdat.data(i);
+        
+        vec[0] = 2.0;
+    }
+    
+    CMemBlock2D<double> spherdat(1, 50);
+    
+    CSphericalMomentum bmom(2);
+    
+    CSphericalMomentum kmom(2);
+    
+    genfunc::transform(spherdat, cartdat, bmom, kmom, 0, 0, 1, 2);
+    
+    CMemBlock2D<double> tdat({12.0, 12.0, 0.0, 12.0, 0.0,
+                              12.0, 12.0, 0.0, 12.0, 0.0,
+                               0.0,  0.0, 0.0,  0.0, 0.0,
+                              12.0, 12.0, 0.0, 12.0, 0.0,
+                               0.0,  0.0, 0.0,  0.0, 0.0,
+                              24.0, 24.0, 0.0, 24.0, 0.0,
+                              24.0, 24.0, 0.0, 24.0, 0.0,
+                               0.0,  0.0, 0.0,  0.0, 0.0,
+                              24.0, 24.0, 0.0, 24.0, 0.0,
+                               0.0,  0.0, 0.0,  0.0, 0.0},
+                             1, 50);
     
     ASSERT_EQ(spherdat, tdat);
 }

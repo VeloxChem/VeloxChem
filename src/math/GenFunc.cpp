@@ -252,6 +252,8 @@ transform(      CMemBlock2D<double>& spherData,
           const CMemBlock2D<double>& cartData,
           const CSphericalMomentum&  braMomentum,
           const CSphericalMomentum&  ketMomentum,
+          const int32_t              spherIndex,
+          const int32_t              cartIndex,
           const int32_t              nElements)
 {
     // set up angular momentum data
@@ -263,10 +265,6 @@ transform(      CMemBlock2D<double>& spherData,
     // set up number of Cartisian components on ket side
     
     auto kcart = angmom::to_CartesianComponents(ketMomentum.getAngularMomentum());
-    
-    // zero spherical integrals
-    
-    spherData.zero();
     
     // loop over spherical components on bra side
     
@@ -294,7 +292,11 @@ transform(      CMemBlock2D<double>& spherData,
             
             // set up spherical integrals vector
             
-            auto sphervec = spherData.data(i * kcomp + j);
+            auto sphervec = spherData.data(spherIndex + i * kcomp + j);
+            
+            // zero spherical integrals vector
+            
+            mathfunc::zero(sphervec, nElements); 
             
             // apply Cartesian to spherical transformation
             
@@ -304,7 +306,7 @@ transform(      CMemBlock2D<double>& spherData,
                 {
                     // set up pointer to Cartesian component
                     
-                    auto cartvec = cartData.data(btidx[k] * kcart + ktidx[l]);
+                    auto cartvec = cartData.data(cartIndex + btidx[k] * kcart + ktidx[l]);
                     
                     auto cfact = btfact[k] * ktfact[l];
                     
@@ -345,6 +347,41 @@ void transform(      CMemBlock2D<double>&  spherData,
         
        genfunc::transform(spherData, cartData, spherMomentum, sidx, cidx, nElements,
                           angmom::to_CartesianComponents(tidx.second()));
+    }
+}
+
+void
+transform(      CMemBlock2D<double>& spherData,
+          const CMemBlock2D<double>& cartData,
+          const CSphericalMomentum&  ketMomentumC,
+          const CSphericalMomentum&  ketMomentumD,
+          const int32_t              spherIndex,
+          const int32_t              cartIndex,
+          const int32_t              nElements,
+          const int32_t              nBlocks)
+{
+    // set up angular momentum for ket side
+    
+    auto cang = ketMomentumC.getAngularMomentum();
+    
+    auto dang = ketMomentumD.getAngularMomentum();
+    
+    // set up number of components
+    
+    auto ncart = angmom::to_CartesianComponents(cang, dang);
+    
+    auto nspher = angmom::to_SphericalComponents(cang, dang);
+    
+    // loop over components on bra side
+    
+    for (int32_t i = 0; i < nBlocks; i++)
+    {
+        auto sidx = spherIndex + i * nspher;
+        
+        auto cidx = cartIndex + i * ncart;
+        
+        genfunc::transform(spherData, cartData, ketMomentumC, ketMomentumD,
+                           sidx, cidx, nElements);
     }
 }
     

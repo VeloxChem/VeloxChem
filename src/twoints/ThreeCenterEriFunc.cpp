@@ -29,8 +29,6 @@ namespace t3erifunc { // t3erifunc namespace
                                 const CGtoPairsBlock&       ketGtoPairsBlock,
                                 const int32_t               iContrGto)
     {
-        if (iContrGto == 0) printf("-> computing VRR(0|00)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto bnorm = braGtoBlock.getNormFactors();
@@ -137,8 +135,6 @@ namespace t3erifunc { // t3erifunc namespace
         
         if (bord < 0) return;
         
-        if (iContrGto == 0) printf("-> computing VRR(0|01)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -243,8 +239,6 @@ namespace t3erifunc { // t3erifunc namespace
         
         if (bord < 0) return;
         
-        if (iContrGto == 0) printf("-> computing VRR(1|00)\n");
-        
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -332,8 +326,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|01)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -474,8 +466,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(0|02)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -638,8 +628,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(2|00)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -774,8 +762,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|02)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -965,8 +951,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|01)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -1196,8 +1180,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|02)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -1551,8 +1533,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(0|03)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -1757,8 +1737,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(3|00)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -1928,8 +1906,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|03)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -2186,8 +2162,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|01)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -2521,8 +2495,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|03)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -3044,8 +3016,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|02)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -3617,8 +3587,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|03)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -4510,8 +4478,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(0|04)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -4768,8 +4734,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(4|00)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -4983,8 +4947,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|04)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -5326,8 +5288,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|01)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -5804,8 +5764,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|04)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -6539,8 +6497,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|02)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -7402,8 +7358,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|04)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -8703,8 +8657,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|03)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -10095,8 +10047,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|04)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -12182,8 +12132,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(0|05)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -12505,8 +12453,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|05)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -12951,8 +12897,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|05)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -13949,8 +13893,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|05)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -15766,8 +15708,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|05)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -18676,8 +18616,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(0|06)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -19082,8 +19020,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|06)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -19647,8 +19583,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|06)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -20960,8 +20894,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|06)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -23367,8 +23299,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|06)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -27231,8 +27161,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(0|07)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -27737,8 +27665,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|07)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -28450,8 +28376,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|07)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -30118,8 +30042,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|07)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -33194,8 +33116,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|07)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -38152,8 +38072,6 @@ namespace t3erifunc { // t3erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrGto == 0) printf("-> computing VRR(0|08)\n");
-
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -38767,8 +38685,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(1|08)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -39637,8 +39553,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(2|08)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -41700,8 +41614,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(3|08)\n");
 
         // set up pointers to primitives data on bra side
 
@@ -45530,8 +45442,6 @@ namespace t3erifunc { // t3erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrGto == 0) printf("-> computing VRR(4|08)\n");
 
         // set up pointers to primitives data on bra side
 

@@ -116,12 +116,16 @@ namespace genfunc { // genfunc namespace
      @param cartData the Cartesian data vectors.
      @param braMomentum the spherical momentum object for bra side.
      @param ketMomentum the spherical momentum object for ket side.
+     @param spherIndex the position of spherical data vectors.
+     @param cartIndex the position of Cartesian data vectors.
      @param nElements the number elements in individual data vector.
      */
     void transform(      CMemBlock2D<double>& spherData,
                    const CMemBlock2D<double>& cartData,
                    const CSphericalMomentum&  braMomentum,
                    const CSphericalMomentum&  ketMomentum,
+                   const int32_t              spherIndex,
+                   const int32_t              cartIndex,
                    const int32_t              nElements);
     
     /**
@@ -147,6 +151,28 @@ namespace genfunc { // genfunc namespace
                    const int32_t               nElements);
     
     /**
+     Transforms Cartesian half-transformed integrals to spherical integrals by
+     applying ket side transformation: <cart|f(x)|spher> to <spher|f(x)|spher>.
+     
+     @param spherData the spherical data vectors.
+     @param cartData the Cartesian data vectors.
+     @param ketMomentumC the spherical momentum object for C center on ket side.
+     @param ketMomentumD the spherical momentum object for D center on ket side.
+     @param spherIndex the position of spherical data vectors.
+     @param cartIndex the position of Cartesian data vectors.
+     @param nElements the number elements in individual data vector.
+     @param nBlocks the number of data vectors on bra side.
+     */
+    void transform(      CMemBlock2D<double>& spherData,
+                   const CMemBlock2D<double>& cartData,
+                   const CSphericalMomentum&  ketMomentumC,
+                   const CSphericalMomentum&  ketMomentumD,
+                   const int32_t              spherIndex,
+                   const int32_t              cartIndex,
+                   const int32_t              nElements,
+                   const int32_t              nBlocks);
+    
+    /**
      Reshapes batch of integrals batch (1 contracted GTO on bra side x all
      contracted GTOs on ket side) into compressed data and stores it in sparse
      matrix.
@@ -166,7 +192,6 @@ namespace genfunc { // genfunc namespace
                   const CGtoBlock&           braGtoBlock,
                   const CGtoBlock&           ketGtoBlock,
                   const int32_t              iContrGto);
-    
     
     /**
      Creates sparse matrix by distributing list of sparse matrices according to

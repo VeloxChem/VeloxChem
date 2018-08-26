@@ -126,11 +126,6 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     auto bragtos = braGtoBlock;
     
     auto ketpairs = ketGtoPairsBlock;
- 
-    // testing print out
-    
-    printf("*** INTEGRALS (%i|%i,%i):\n", bragtos.getAngularMomentum(),
-           ketpairs.getBraAngularMomentum(), ketpairs.getKetAngularMomentum());
     
     // set up spherical angular momentum for bra and ket sides
     
@@ -198,6 +193,26 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     CMemBlock2D<double> hrrbuffer(cdim, nblk);
     
+    // set up angular momentum for bra and ket sides
+    
+    auto baang = bragtos.getAngularMomentum();
+    
+    auto kcang = ketpairs.getBraAngularMomentum();
+
+    auto kdang = ketpairs.getKetAngularMomentum();
+    
+    // allocate spherical integrals buffer
+    
+    auto bcomp = angmom::to_SphericalComponents(bragtos.getAngularMomentum());
+    
+    nblk = bcomp * angmom::to_SphericalComponents(kcang, kdang);
+    
+    CMemBlock2D<double> spherbuffer(cdim, nblk);
+    
+    // set up half transformed integrals position
+    
+    auto cidx = genfunc::findTripleIndex(hrridx, hrrvec, {baang, kcang, kdang});
+    
     // initialize R(CD) = C - D distance for horizontal recursion
     
     auto rcd = ketpairs.getDistancesAB();
@@ -211,30 +226,6 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     CMemBlock<double> bargs(pdim);
     
     CMemBlock2D<double> bvals(pdim, bord + 1);
-    
-    // testing codde
-    
-    for (int32_t i = 0; i < hrrvec.size(); i++)
-    {
-        printf("HRR: (%i,%i,%i): %i\n", hrrvec[i].first(), hrrvec[i].second(),
-               hrrvec[i].third(), hrridx[i]);
-    }
-    
-    printf("Intermidiates: ");
-    
-    for (int32_t i = 0; i < t0vec.size(); i++)
-    {
-        printf("(%i,%i)^(%i): %i ", t0vec[i].first(), t0vec[i].second(),
-               t0vec[i].third(), t0idx[i]);
-    }
-    
-    printf("\n");
-    
-    for (int32_t i = 0; i < vrrvec.size(); i++)
-    {
-        printf("VRR: (%i,%i)^(%i) Index: %i\n", vrrvec[i].first(), vrrvec[i].second(),
-               vrrvec[i].third(), vrridx[i]);
-    }
     
     // loop over contracted GTOs ob bra side
     
@@ -284,7 +275,9 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
         
         // transform ket side to spherical form
         
-        // store computed integrals
+        genfunc::transform(spherbuffer, hrrbuffer, cmom, dmom, 0, cidx, cdim, bcomp);
+        
+        // FIX ME:  distribute or store integrals
     }
 }
 
