@@ -24,7 +24,7 @@
 #include "SystemClock.hpp"
 
 /**
- Class CThreeCenterElectronicRepulsionIntegralsDriver computes electronic potential
+ Class CThreeCenterElectronicRepulsionIntegralsDriver computes electron repulsion
  <f(r)| 1/|r-r'||g(r') h(r')> integrals.
  
  @author Z. Rinkevicius
