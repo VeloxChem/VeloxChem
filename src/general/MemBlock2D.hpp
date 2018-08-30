@@ -210,7 +210,7 @@ public:
      @return the 2D memory block object.
      */
     CMemBlock2D<T> slice(const int32_t iPosition,
-                         const int32_t nElements);
+                         const int32_t nElements) const;
     
     /**
      Sets all elements of contiguous memory block to zero.
@@ -519,7 +519,7 @@ CMemBlock2D<T>::operator!=(const CMemBlock2D<T>& other) const
 template <class T>
 CMemBlock2D<T>
 CMemBlock2D<T>::slice(const int32_t iPosition,
-                      const int32_t nElements)
+                      const int32_t nElements) const
 {
     CMemBlock2D<T> mblock(nElements, blocks());
         

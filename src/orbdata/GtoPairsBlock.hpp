@@ -9,6 +9,7 @@
 #define GtoPairsBlock_hpp
 
 #include <cstdint>
+#include <vector>
 
 #include "MemBlock2D.hpp"
 #include "GtoBlock.hpp"
@@ -162,6 +163,15 @@ public:
      @return true if GTOs pairs block objects are not equal, false otherwise.
      */
     bool operator!=(const CGtoPairsBlock& other) const;
+    
+    
+    /**
+     Creates vector of GTOs pairs objects by splitting GTOs pairs object.
+
+     @param batchSize the size of contracted GTOs pairs batch.
+     @return the vector of GTOs pairs objects.
+     */
+    std::vector<CGtoPairsBlock> split(const int32_t batchSize) const;
     
     /**
      Gets angular momentum of bra side in GTOs pairs block object.

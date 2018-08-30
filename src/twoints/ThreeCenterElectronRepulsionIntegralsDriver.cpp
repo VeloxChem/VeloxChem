@@ -63,9 +63,13 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     CGtoPairsContainer kgtopairs(molecule, aoBasis, 1.0e-13);
     
+    // split GTOs pairs into batches
+    
+    auto kbpairs = kgtopairs.split(10000);
+    
     // set up GTOs splitting pattern for RI basis
     
-    auto gtopat = _getBatchesOfGtoBlocks(molecule, riBasis, kgtopairs);
+    auto gtopat = _getBatchesOfGtoBlocks(molecule, riBasis, kbpairs);
     
     // generate RI gtos for on each MPI node
     
@@ -77,7 +81,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     // compute electron repulsion integrals on node
     
-    _compElectronRepulsionIntegrals(&bgtos, &kgtopairs);
+    _compElectronRepulsionIntegrals(&bgtos, &kbpairs);
     
     // print evaluation timing statistics
     

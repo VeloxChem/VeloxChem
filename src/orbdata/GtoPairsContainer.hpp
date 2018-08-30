@@ -106,6 +106,16 @@ public:
      */
     bool operator!=(const CGtoPairsContainer& other) const;
     
+    
+    /**
+     Creates a GTOs pairs container object by splitting the GTOs pairs container
+     object.
+
+     @param batchSize the size of batch.
+     @return the GTOs pairs container object.
+     */
+    CGtoPairsContainer split(const int32_t batchSize) const;
+    
     /**
      Gets numnber of GTOs pairs block objects in GTOs pairs container.
 

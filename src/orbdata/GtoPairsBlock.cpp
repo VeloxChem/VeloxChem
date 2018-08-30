@@ -525,6 +525,77 @@ CGtoPairsBlock::operator==(const CGtoPairsBlock& other) const
     return true;
 }
 
+std::vector<CGtoPairsBlock>
+CGtoPairsBlock::split(const int32_t batchSize) const
+{
+    // determine number of batches
+    
+    auto nbtch = _nScreenedContrPairs / batchSize;
+    
+    if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
+    
+    // set up batches distribution pattern
+    
+    CMemBlock2D<int32_t> bblk(nbtch, 2);
+    
+    mpi::batches_pattern(bblk.data(0), _nScreenedContrPairs, nbtch);
+    
+    mathfunc::indexes(bblk.data(1), bblk.data(0), nbtch);
+    
+    // set up pointers to distribution pattern
+    
+    auto boff = bblk.data(1);
+    
+    auto bdim = bblk.data(0);
+    
+    // primitive space start and end positions
+    
+    auto spos = getStartPositions();
+    
+    auto epos = getEndPositions();
+    
+    // split GTOs pairs block
+    
+    std::vector<CGtoPairsBlock> ppvec;
+    
+    for (int32_t i = 0; i < nbtch; i++)
+    {
+        // slice contracted GTOs pairs
+        
+        auto cidx = boff[i];
+        
+        auto cdim = bdim[i];
+        
+        auto cdat = _contrPattern.slice(cidx, cdim);
+        
+        // slice primitive GTOs pairs
+        
+        auto pidx = spos[cidx];
+        
+        auto pdim = epos[cidx + cdim - 1] - pidx;
+        
+        auto pdat = _pairFactors.slice(pidx, pdim);
+        
+        // adjust primitive GTOs pairs indexing
+        
+        auto scurpos = cdat.data(0);
+        
+        auto ecurpos = cdat.data(1);
+        
+        for (int32_t j = 0; j < cdim; j++)
+        {
+            scurpos[j] = spos[cidx + j] - pidx;
+            
+            ecurpos[j] = epos[cidx + j] - pidx;
+        }
+        
+        ppvec.push_back(CGtoPairsBlock(cdat, pdat, _braAngularMomentum,
+                                       _ketAngularMomentum, _threshold));
+    }
+    
+    return ppvec;
+}
+
 int32_t
 CGtoPairsBlock::getBraAngularMomentum() const
 {

@@ -106,6 +106,24 @@ CGtoPairsContainer::operator!=(const CGtoPairsContainer& other) const
     return !(*this == other);
 }
 
+CGtoPairsContainer
+CGtoPairsContainer::split(const int32_t batchSize) const
+{
+    std::vector<CGtoPairsBlock> ppvec;
+    
+    for (size_t i = 0; i < _gtoPairsBlocks.size(); i++)
+    {
+        auto cvec = _gtoPairsBlocks[i].split(batchSize);
+        
+        for (size_t j = 0; j < cvec.size(); j++)
+        {
+            ppvec.push_back(cvec[j]);
+        }
+    }
+    
+   return CGtoPairsContainer(ppvec);
+}
+
 int32_t
 CGtoPairsContainer::getNumberOfGtoPairsBlocks() const
 {
