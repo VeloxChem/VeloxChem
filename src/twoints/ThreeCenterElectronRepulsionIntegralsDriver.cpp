@@ -65,7 +65,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     // split GTOs pairs into batches
     
-    auto kbpairs = kgtopairs.split(10000);
+    auto kbpairs = kgtopairs.split(5000);
     
     // set up GTOs splitting pattern for RI basis
     
@@ -89,42 +89,8 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
 }
 
 void
-CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoContainer*      braGtoContainer,
-                                                                              const CGtoPairsContainer* ketGtoPairsContainer) const
-{
-    #pragma omp parallel shared(braGtoContainer, ketGtoPairsContainer)
-    {
-        #pragma omp single nowait
-        {
-            // determine number of GTOs and GTOs pairs blocks in bra/ket sides
-            
-            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
-            
-            auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
-            
-            // loop over pairs of GTOs blocks
-            
-            for (int32_t i = 0; i < nbra; i++)
-            {
-                auto bgtos = braGtoContainer->getGtoBlock(i);
-                
-                for (int32_t j = 0; j < nket; j++)
-                {
-                    #pragma omp task firstprivate(j)
-                    {
-                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
-                        
-                        _compElectronRepulsionForGtoBlocks(bgtos, kpairs);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void
-CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks(const CGtoBlock&      braGtoBlock,
-                                                                                 const CGtoPairsBlock& ketGtoPairsBlock) const
+CThreeCenterElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoBlocks(const CGtoBlock&      braGtoBlock,
+                                                                                const CGtoPairsBlock& ketGtoPairsBlock) const
 {
     // copy GTOs and GTOs pairs blocks for bra and ket sides
     
@@ -166,7 +132,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     
     // generate vertical recursion pattern
     
-    auto vrrvec = _getVerticalRecursionPattern(t0vec, bragtos, ketpairs);
+    auto vrrvec = _getVerticalRecursionPattern(t0vec);
     
     // set up primitives buffer indexes
     
@@ -203,7 +169,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     auto baang = bragtos.getAngularMomentum();
     
     auto kcang = ketpairs.getBraAngularMomentum();
-
+    
     auto kdang = ketpairs.getKetAngularMomentum();
     
     // allocate spherical integrals buffer
@@ -238,7 +204,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
     {
         // compute distances: R(AQ) = A - Q
         
-        twointsfunc::compDistancesAQ(raq, bragtos, ketpairs, i); 
+        twointsfunc::compDistancesAQ(raq, bragtos, ketpairs, i);
         
         // compute Obara-Saika recursion factors
         
@@ -251,7 +217,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
         
         // compute distances: R(WA) = W - A
         
-        twointsfunc::compDistancesWA(rwa, rw, bragtos, ketpairs, i); 
+        twointsfunc::compDistancesWA(rwa, rw, bragtos, ketpairs, i);
         
         // compute distances: R(WQ) = W - Q;
         
@@ -266,12 +232,12 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
         // contract primitive electron repulsion integrals
         
         genfunc::contract(cbuffer, pbuffer, t0vec, t0idx, vrrvec, vrridx,
-                          bragtos, ketpairs, i); 
+                          bragtos, ketpairs, i);
         
         // transform bra side to spherical form
         
         genfunc::transform(hrrbuffer, cbuffer, amom, hrrvec, hrridx, t0vec,
-                           t0idx, cdim); 
+                           t0idx, cdim);
         
         // apply horizontal recursion
         
@@ -285,6 +251,41 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoBlocks
         // FIX ME:  distribute or store integrals
     }
 }
+
+void
+CThreeCenterElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoContainer*      braGtoContainer,
+                                                                              const CGtoPairsContainer* ketGtoPairsContainer) const
+{
+    #pragma omp parallel shared(braGtoContainer, ketGtoPairsContainer)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs and GTOs pairs blocks in bra/ket sides
+            
+            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+            
+            auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
+            
+            // loop over pairs of GTOs blocks
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+                
+                for (int32_t j = 0; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(j)
+                    {
+                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
+                        
+                        compElectronRepulsionForGtoBlocks(bgtos, kpairs);
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 void
 CThreeCenterElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBlock2D<double>&  primBuffer,
@@ -863,9 +864,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::_getHorizontalRecursionPattern(con
 }
 
 CVecThreeIndexes
-CThreeCenterElectronRepulsionIntegralsDriver::_getVerticalRecursionPattern(const CVecThreeIndexes&  leadTerms,
-                                                                           const CGtoBlock&         braGtoBlock,
-                                                                           const CGtoPairsBlock&    ketGtoPairsBlock) const
+CThreeCenterElectronRepulsionIntegralsDriver::_getVerticalRecursionPattern(const CVecThreeIndexes& leadTerms) const
 {
     // set up recursion buffer
     
@@ -973,7 +972,6 @@ CThreeCenterElectronRepulsionIntegralsDriver::_getVerticalRecursionPattern(const
     
     return recvec;
 }
-
 
 int32_t
 CThreeCenterElectronRepulsionIntegralsDriver::_getIndexesForVerticalRecursionPattern(      std::vector<int32_t>& recIndexes,

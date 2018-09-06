@@ -66,16 +66,6 @@ class CThreeCenterElectronRepulsionIntegralsDriver
     void _compElectronRepulsionIntegrals(const CGtoContainer*      braGtoContainer,
                                          const CGtoPairsContainer* ketGtoPairsContainer) const;
     
-    /**
-     Computes electronic repulsion integrals for specific pair of GTOs and
-     GTOs pairs blocks and stores integrals in packed format.
-
-     @param braGtoBlock the GTOs block on bra side.
-     @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     */
-    void _compElectronRepulsionForGtoBlocks(const CGtoBlock&      braGtoBlock,
-                                            const CGtoPairsBlock& ketGtoPairsBlock) const;
-    
    /**
     Computes batch of primitive electron repulsion integrals using Obara-Saika
     recursion and stores results in primitives buffer.
@@ -184,13 +174,9 @@ class CThreeCenterElectronRepulsionIntegralsDriver
      Gets Obara-Saika vertical recursion pattern for given set of leading terms.
      
      @param leadTerms the vector of leading terms in recursion pattern.
-     @param braGtoBlock the GTOs block on bra side.
-     @param ketGtoPairsBlock the GTOs pairs block on ket side.
      @return the vector of three indexes object with recursion pattern.
      */
-    CVecThreeIndexes _getVerticalRecursionPattern(const CVecThreeIndexes& leadTerms,
-                                                  const CGtoBlock&        braGtoBlock,
-                                                  const CGtoPairsBlock&   ketGtoPairsBlock) const;
+    CVecThreeIndexes _getVerticalRecursionPattern(const CVecThreeIndexes& leadTerms) const;
     
     /**
      Gets vector of unified indexes of primitive GTOs buffer for vertical
@@ -265,6 +251,16 @@ public:
                   const double           threshold,
                         COutputStream&   oStream,
                         MPI_Comm         comm) const;
+    
+    /**
+     Computes electronic repulsion integrals for specific pair of GTOs and
+     GTOs pairs blocks.
+     
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     */
+    void compElectronRepulsionForGtoBlocks(const CGtoBlock&      braGtoBlock,
+                                           const CGtoPairsBlock& ketGtoPairsBlock) const;
 };
 
 #endif /* ThreeCenterElectronRepulsionIntegralsDriver_hpp */

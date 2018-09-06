@@ -112,6 +112,101 @@ namespace twointsfunc { // twointsfunc namespace
                          const CGtoPairsBlock&      ketGtoPairsBlock,
                          const int32_t              iContrGto);
     
+    /**
+     Computes distances between combined centers of contracted GTOs pair on bra
+     side with all combined centers of contracted GTOs pairs on ket side.
+     
+     @param pqDistances the vector of Cartesian R(PQ) = P - Q distances.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void compDistancesPQ(      CMemBlock2D<double>& pqDistances,
+                         const CGtoPairsBlock&      braGtoPairsBlock,
+                         const CGtoPairsBlock&      ketGtoPairsBlock,
+                         const bool                 isBraEqualKet,
+                         const int32_t              iContrPair);
+    
+    /**
+     Computes Obara-Saika factors for electron repulsion integrals.
+     
+     @param osFactors the vector of Obara-Saika factors.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void compFactorsForElectronRepulsion(      CMemBlock2D<double>& osFactors,
+                                         const CGtoPairsBlock&      braGtoPairsBlock,
+                                         const CGtoPairsBlock&      ketGtoPairsBlock,
+                                         const bool                 isBraEqualKet,
+                                         const int32_t              iContrPair);
+    
+    /**
+     Computes coordinates of combined Gaussian functions, which is obtained by
+     applying Gaussian product rule to thee Gaussian functions.
+     
+     @param wCoordinates the vector of coordinates for combined Gaussian
+            functions.
+     @param osFactors the vector of Obara-Saika factors.
+     @param nFactors the fundamental dimension of Obara-Saika factors vectors.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+             blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void compCoordinatesForW(      CMemBlock2D<double>& wCoordinates,
+                             const CMemBlock2D<double>& osFactors,
+                             const int32_t              nFactors,
+                             const CGtoPairsBlock&      braGtoPairsBlock,
+                             const CGtoPairsBlock&      ketGtoPairsBlock,
+                             const bool                 isBraEqualKet,
+                             const int32_t              iContrPair);
+    
+   /**
+    Computes vector of distances between center W of combined primitive GTOs
+    and combined center P of primitive GTOs pair on bra side.
+    
+    @param wpDistances the vector of Cartesian R(WP) = W - P distances.
+    @param wCoordinates the vector of coordinates for combined Gaussian
+           functions.
+    @param braGtoPairsBlock the GTOs pairs block on bra side.
+    @param ketGtoPairsBlock the GTOs pairs block on ket side.
+    @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+           blocks.
+    @param iContrPair the index of contracted GTO pair on bra side.
+    */
+    void compDistancesWP(      CMemBlock2D<double>& wpDistances,
+                         const CMemBlock2D<double>& wCoordinates,
+                         const CGtoPairsBlock&      braGtoPairsBlock,
+                         const CGtoPairsBlock&      ketGtoPairsBlock,
+                         const bool                 isBraEqualKet,
+                         const int32_t              iContrPair);
+    
+    /**
+     Computes vector of distances between center W of combined primitive GTOs
+     and combined center Q of primitive GTOs pair on kwt side.
+     
+     @param wqDistances the vector of Cartesian R(WQ) = W - Q distances.
+     @param wCoordinates the vector of coordinates for combined Gaussian
+            functions.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void compDistancesWQ(      CMemBlock2D<double>& wqDistances,
+                         const CMemBlock2D<double>& wCoordinates,
+                         const CGtoPairsBlock&      braGtoPairsBlock,
+                         const CGtoPairsBlock&      ketGtoPairsBlock,
+                         const bool                 isBraEqualKet,
+                         const int32_t              iContrPair);
+    
 } // intsfunc namespace
 
 #endif /* TwoIntsFunc_hpp */

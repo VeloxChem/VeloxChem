@@ -196,3 +196,305 @@ TEST_F(CTwoIntsFuncTest, CompDistancesForWD)
     ASSERT_EQ(rwd, refrwd);
 }
 
+TEST_F(CTwoIntsFuncTest, CompDistancesForPQ)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> t0rpq(4, 12);
+    
+    twointsfunc::compDistancesPQ(t0rpq, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> ref0rpq(4, 12);
+    
+    ref0rpq.zero();
+    
+    ASSERT_EQ(t0rpq, ref0rpq);
+    
+    CMemBlock2D<double> t2rpq(8, 6);
+    
+    twointsfunc::compDistancesPQ(t2rpq, ppairs, ppairs, true, 2);
+    
+    CMemBlock2D<double> ref2rpq({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000,
+                                 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000,
+                                 0.960 / 2.250, 0.960 / 2.250, 0.960 / 2.250,
+                                 0.960 / 2.250, 0.960 / 2.250, 0.960 / 2.250,
+                                 0.000, -1.104 / 2.475,
+                                 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000,
+                                 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000,
+                                 0.960 / 1.100, 0.960 / 1.100, 0.960 / 1.100,
+                                 0.960 / 1.100, 0.960 / 1.100, 0.960 / 1.100,
+                                 1.104 / 2.475, 0.000},
+                                8, 6);
+    
+    ASSERT_EQ(t2rpq, ref2rpq); 
+    
+    CMemBlock2D<double> t4rpq(11, 3);
+    
+    twointsfunc::compDistancesPQ(t4rpq, ppairs, ppairs, false, 4);
+    
+    CMemBlock2D<double> ref4rpq({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000, 0.000,
+                                 0.960 / 0.882, 0.960 / 0.882, 0.960 / 0.882,
+                                 0.960 / 0.882, 0.960 / 0.882, 0.960 / 0.882,
+                                 1.31328 / 1.9845, 0.20928 / 0.9702,
+                                 0.960 / 0.882, 0.000, -0.15744 / 1.4112},
+                                11, 3);
+    
+    ASSERT_EQ(t4rpq, ref4rpq);
+}
+
+TEST_F(CTwoIntsFuncTest, CompFactorsForElectronRepulsion)
+{
+    CMolecularBasis bas = vlxbas::getReducedTestBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 2);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> r0facts(4, 16);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> ref0facts({ 1.0 / 12.0,  1.0 / 11.0,  1.0 / 11.0,  1.0 / 10.0,
+                                   36.0 / 12.0, 30.0 / 11.0, 30.0 / 11.0, 24.0 / 10.0,
+                                    6.0 / 12.0,  5.0 / 11.0,  5.0 / 11.0,  4.0 / 10.0,
+                                    6.0 / 12.0,  6.0 / 11.0,  6.0 / 11.0,  6.0 / 10.0,
+                                    1.0 / 11.0,  1.0 / 10.0,  1.0 / 10.0,  1.0 /  9.0,
+                                   30.0 / 11.0, 25.0 / 10.0, 25.0 / 10.0, 20.0 /  9.0,
+                                    6.0 / 11.0,  5.0 / 10.0,  5.0 / 10.0,  4.0 /  9.0,
+                                    5.0 / 11.0,  5.0 / 10.0,  5.0 / 10.0,  5.0 /  9.0,
+                                    1.0 / 11.0,  1.0 / 10.0,  1.0 / 10.0,  1.0 /  9.0,
+                                   30.0 / 11.0, 25.0 / 10.0, 25.0 / 10.0, 20.0 /  9.0,
+                                    6.0 / 11.0,  5.0 / 10.0,  5.0 / 10.0,  4.0 /  9.0,
+                                    5.0 / 11.0,  5.0 / 10.0,  5.0 / 10.0,  5.0 /  9.0,
+                                    1.0 / 10.0,  1.0 /  9.0,  1.0 /  9.0,  1.0 /  8.0,
+                                   24.0 / 10.0, 20.0 /  9.0, 20.0 /  9.0, 16.0 /  8.0,
+                                    6.0 / 10.0,  5.0 /  9.0,  5.0 /  9.0,  4.0 /  8.0,
+                                    4.0 / 10.0,  4.0 /  9.0,  4.0 /  9.0,  4.0 /  8.0},
+                                  4, 16);
+    
+    ASSERT_EQ(r0facts, ref0facts);
+    
+    CMemBlock2D<double> r2facts(7, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r2facts, ppairs, ppairs, true, 2);
+    
+    CMemBlock2D<double> ref2facts({ 1.00 / 7.60, 1.00 / 6.60, 1.00 / 6.60, 1.00 / 5.60,
+                                    1.00 / 5.40, 1.00 / 4.40, 1.00 / 3.20,
+                                    9.60 / 7.60, 8.00 / 6.60, 8.00 / 6.60, 6.40 / 5.60,
+                                    6.08 / 5.40, 4.48 / 4.40, 2.56 / 3.20,
+                                    6.00 / 7.60, 5.00 / 6.60, 5.00 / 6.60, 4.00 / 5.60,
+                                    3.80 / 5.40, 2.80 / 4.40, 1.60 / 3.20,
+                                    1.60 / 7.60, 1.60 / 6.60, 1.60 / 6.60, 1.60 / 5.60,
+                                    1.60 / 5.40, 1.60 / 4.40, 1.60 / 3.20},
+                                  7, 4);
+    
+    ASSERT_EQ(r2facts, ref2facts);
+    
+    CMemBlock2D<double> r3facts(7, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r3facts, ppairs, ppairs,false, 2);
+    
+    ASSERT_EQ(r3facts, ref2facts);
+}
+
+TEST_F(CTwoIntsFuncTest, CompCoordinatesForWUsingPairs)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> r0facts(4, 16);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> r0w(4, 12);
+    
+    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> refr0w(4, 12);
+    
+    refr0w.zero();
+    
+    ASSERT_EQ(r0w, refr0w);
+    
+    CMemBlock2D<double> r5facts(11, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, true, 5);
+    
+    CMemBlock2D<double> r5w(11, 3);
+    
+    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, true, 5);
+    
+    
+    CMemBlock2D<double> refr5w({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                0.000, 0.000, 0.000,
+                                0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                0.000, 0.000, 0.000,
+                                1.920 / 4.500, 1.920 / 3.350, 1.920 / 3.350, 1.920 / 2.200,
+                                1.920 / 3.132, 1.920 / 1.982, 2.880 / 3.850, 2.880 / 2.700,
+                                1.920 / 1.764, 2.880 / 2.482, 3.840 / 3.200},
+                               11, 3);
+    
+    ASSERT_EQ(r5w, refr5w);
+    
+    CMemBlock2D<double> r6facts(11, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, false, 5);
+    
+    CMemBlock2D<double> r6w(11, 3);
+    
+    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, false, 5);
+    
+    ASSERT_EQ(r6w, refr5w);
+}
+
+TEST_F(CTwoIntsFuncTest, CompCoordinatesForWP)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> r0facts(4, 16);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> r0w(4, 12);
+    
+    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> r0wp(4, 12);
+    
+    twointsfunc::compDistancesWP(r0wp, r0w, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> refr0wp(4, 12);
+    
+    refr0wp.zero();
+    
+    ASSERT_EQ(r0wp, refr0wp);
+    
+    CMemBlock2D<double> r5facts(11, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, true, 5);
+    
+    CMemBlock2D<double> r5w(11, 3);
+    
+    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, true, 5);
+    
+    CMemBlock2D<double> r5wp(11, 3);
+    
+    twointsfunc::compDistancesWP(r5wp, r5w, ppairs, ppairs, true, 5);
+    
+    CMemBlock2D<double> refr5wp({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000,
+                                -3.4800 / 4.500, -2.1000 / 3.350, -2.100 / 3.350, -0.720 / 2.200,
+                                -1.8384 / 3.132, -0.4584 / 1.982, -1.740 / 3.850, -0.360 / 2.700,
+                                -0.1968 / 1.764, -0.0984 / 2.482, 0.000},
+                               11, 3);
+    
+    ASSERT_EQ(r5wp, refr5wp);
+    
+    CMemBlock2D<double> r6facts(11, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, false, 5);
+    
+    CMemBlock2D<double> r6w(11, 3);
+    
+    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, false, 5);
+    
+    CMemBlock2D<double> r6wp(11, 3);
+    
+    twointsfunc::compDistancesWP(r6wp, r6w, ppairs, ppairs, false, 5);
+    
+    ASSERT_EQ(r6wp, refr5wp);
+}
+
+TEST_F(CTwoIntsFuncTest, CompCoordinatesForWQUsingPairs)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> r0facts(4, 16);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> r0w(4, 12);
+    
+    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> r0wq(4, 12);
+    
+    twointsfunc::compDistancesWQ(r0wq, r0w, ppairs, ppairs, true, 0);
+    
+    CMemBlock2D<double> refr0wq(4, 12);
+    
+    refr0wq.zero();
+    
+    ASSERT_EQ(r0wq, refr0wq);
+    
+    CMemBlock2D<double> r5facts(11, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, true, 5);
+    
+    CMemBlock2D<double> r5w(11, 3);
+    
+    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, true, 5);
+    
+    CMemBlock2D<double> r5wq(11, 3);
+    
+    twointsfunc::compDistancesWQ(r5wq, r5w, ppairs, ppairs, true, 5);
+    
+    CMemBlock2D<double> refr5wq({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+                                 0.000, 0.000, 0.000,
+                                 1.920 / 4.500, 1.92000 / 3.350000, 1.9200 / 3.3500, 1.920 / 2.200,
+                                 1.920 / 3.132, 1.92000 / 1.982000, 2.7840 / 8.6625, 0.576 / 2.970,
+                                 1.920 / 1.764, 0.15744 / 2.189124, 0.000},
+                                11, 3);
+        
+    ASSERT_EQ(r5wq, refr5wq);
+    
+    CMemBlock2D<double> r6facts(11, 4);
+    
+    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, false, 5);
+    
+    CMemBlock2D<double> r6w(11, 3);
+    
+    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, false, 5);
+    
+    CMemBlock2D<double> r6wq(11, 3);
+    
+    twointsfunc::compDistancesWQ(r6wq, r6w, ppairs, ppairs, false, 5);
+    
+    ASSERT_EQ(r6wq, refr5wq);
+}

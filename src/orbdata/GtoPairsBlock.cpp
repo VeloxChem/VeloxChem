@@ -830,6 +830,37 @@ CGtoPairsBlock::getNumberOfScreenedPrimPairs() const
 }
 
 int32_t
+CGtoPairsBlock::getMaxContractionDepth() const
+{
+    // set up pointers to positions data
+    
+    auto spos = getStartPositions();
+    
+    auto epos = getEndPositions();
+    
+    // loop over contracted GTOs pairs
+    
+    int32_t mpdim = 0;
+    
+    for (int32_t i = 0; i < _contrPattern.size(0); i++)
+    {
+        auto cpdim = epos[i] - spos[i];
+        
+        if (cpdim > mpdim) mpdim = cpdim;
+    }
+    
+    return mpdim;
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfPrimPairs(const int32_t iContrPair) const
+{
+    auto epos = getEndPositions();
+    
+    return epos[iContrPair]; 
+}
+
+int32_t
 CGtoPairsBlock::getNumberOfOriginalContrPairs() const
 {
     return _nOriginalContrPairs;

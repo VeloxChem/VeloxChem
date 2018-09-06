@@ -674,6 +674,42 @@ TEST_F(CGtoPairsBlockTest, GetNumberOfScreenedPrimPairs)
     ASSERT_EQ(3, bpairs.getNumberOfScreenedPrimPairs());
 }
 
+TEST_F(CGtoPairsBlockTest, GetMaxContractionDepth)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    ASSERT_EQ(4, apairs.getMaxContractionDepth());
+}
+
+TEST_F(CGtoPairsBlockTest, GetNumberOfPrimPairs)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    ASSERT_EQ(4, apairs.getNumberOfPrimPairs(0));
+    
+    ASSERT_EQ(6, apairs.getNumberOfPrimPairs(1));
+    
+    ASSERT_EQ(8, apairs.getNumberOfPrimPairs(2));
+    
+    ASSERT_EQ(9, apairs.getNumberOfPrimPairs(3));
+    
+    ASSERT_EQ(10, apairs.getNumberOfPrimPairs(4));
+    
+    ASSERT_EQ(11, apairs.getNumberOfPrimPairs(5));
+}
+
 TEST_F(CGtoPairsBlockTest, GetNumberOfOriginalContrPairs)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

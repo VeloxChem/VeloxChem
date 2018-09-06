@@ -269,9 +269,20 @@ namespace genfunc { // genfunc namespace
                     const CThreeIndexes&    triple);
     
     /**
+     Checks if four indexes object is inside vector of four indexes objects.
+     
+     @param vector the vector of four indexes objects.
+     @param quadruple the four indexes object.
+     @return true if four indexes object is found in vector of four indexes
+     objects, false - otherwise.
+     */
+    bool isInVector(const CVecFourIndexes& vector,
+                    const CFourIndexes&    quadruple);
+    
+    /**
      Conditionally adds two indexes object to vector of two indexes objects.
      Addition is skipped if two indexes object is not valid indexing pair or
-     is already resides in vector of two indexes objects.
+     already resides in vector of two indexes objects.
 
      @param vector the vector of two indexes objects.
      @param pair the two indexes object.
@@ -284,7 +295,7 @@ namespace genfunc { // genfunc namespace
     /**
     Conditionally adds three indexes object to vector of three indexes objects.
     Addition is skipped if three indexes object is not valid indexing triple or
-    is already resides in vector of three indexes objects.
+    already resides in vector of three indexes objects.
         
     @param vector the vector of three indexes objects.
     @param triple the three indexes object.
@@ -293,6 +304,19 @@ namespace genfunc { // genfunc namespace
     */
     bool addValidAndUniqueTriple(      CVecThreeIndexes& vector,
                                  const CThreeIndexes&    triple);
+    
+    /**
+     Conditionally adds four indexes object to vector of four indexes objects.
+     Addition is skipped if four indexes object is not valid indexing quadruple
+     or already resides in vector of four indexes objects.
+     
+     @param vector the vector of three indexes objects.
+     @param quadruple the four indexes object.
+     @return true if four indexes object is added to vector of four indexes
+     objects, false otherwise.
+     */
+    bool addValidAndUniqueQuadruple(      CVecFourIndexes& vector,
+                                    const CFourIndexes&    quadruple);
     
     /**
      Finds index from vector of indexes associated with two indexes object in
@@ -342,6 +366,16 @@ namespace genfunc { // genfunc namespace
      @return the vector of three indexes objects of (x,y,0) type.
      */
     CVecThreeIndexes getPairsFromTripleIndexes(const CVecThreeIndexes& vector);
+    
+    /**
+     Creates vector of three indexes objects of (x,y,z) type coresponding to
+     all four index objects of (0,x,y,z) type found in vector of four indexes
+     objects.
+     
+     @param vector the vector of four indexes objects.
+     @return the vector of three indexes objects of (x,y,z) type.
+     */
+    CVecThreeIndexes getTriplesFromQuadrupleIndexes(const CVecFourIndexes& vector);
 
 } // genfunc namespace
 

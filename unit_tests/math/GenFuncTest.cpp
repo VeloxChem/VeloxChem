@@ -794,6 +794,27 @@ TEST_F(CGenFuncTest, IsInVectorForThreeIndexes)
     ASSERT_FALSE(genfunc::isInVector(vec, {7, 1, 2}));
 }
 
+TEST_F(CGenFuncTest, IsInVectorForFourIndexes)
+{
+    CVecFourIndexes vec{{0, 1, 3, 4}, {2, 4, 2, 1}, {7, -1, 3, 4}, {8, 2, 4, 5}};
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {0, 1, 3, 4}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {2, 4, 2, 1}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {7, -1, 3, 4}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {8,  2, 4, 5}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {0, 0, 0, 0}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 0, 1, 1}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 1, 2, 1}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {7, 1, 2, 3}));
+}
+
 TEST_F(CGenFuncTest, AddValidAndUniquePair)
 {
     CVecTwoIndexes vec{{0, 1}, {2, 4}};
@@ -836,6 +857,35 @@ TEST_F(CGenFuncTest, AddValidAndUniqueTriple)
     ASSERT_EQ(vec[1], CThreeIndexes(2, 4, 0));
     
     ASSERT_EQ(vec[2], CThreeIndexes(2, 1, 1));
+}
+
+TEST_F(CGenFuncTest, AddValidAndUniqueQuadruple)
+{
+    CVecFourIndexes vec{{0, 1, 1, 2}, {2, 4, 0, 7}};
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {7, -1, 1, 2});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, 1, 3});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 4, 0, 7});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, -1, 1});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, 1, 2});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {-2, 1, 1, 2});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, 1, -1});
+    
+    ASSERT_EQ(vec.size(), 4);
+    
+    ASSERT_EQ(vec[0], CFourIndexes(0, 1, 1, 2));
+    
+    ASSERT_EQ(vec[1], CFourIndexes(2, 4, 0, 7));
+    
+    ASSERT_EQ(vec[2], CFourIndexes(2, 1, 1, 3));
+    
+    ASSERT_EQ(vec[3], CFourIndexes(2, 1, 1, 2));
 }
 
 TEST_F(CGenFuncTest, FindPairIndex)
@@ -900,4 +950,17 @@ TEST_F(CGenFuncTest, GetPairsFromTripleIndexes)
     ASSERT_EQ(xyvec[0], CThreeIndexes(0, 1, 0));
     
     ASSERT_EQ(xyvec[1], CThreeIndexes(7, 2, 0));
+}
+
+TEST_F(CGenFuncTest, GetTriplesFromQuadrupleIndexes)
+{
+    CVecFourIndexes vec{{0, 0, 1, 2}, {2, 4, 3, 2}, {1, 7, 0, 2}, {0, 8, -2, 4}};
+    
+    auto xyzvec = genfunc::getTriplesFromQuadrupleIndexes(vec);
+    
+    ASSERT_EQ(2, xyzvec.size());
+    
+    ASSERT_EQ(xyzvec[0], CThreeIndexes(0, 1, 2));
+    
+    ASSERT_EQ(xyzvec[1], CThreeIndexes(8, -2, 4));
 }

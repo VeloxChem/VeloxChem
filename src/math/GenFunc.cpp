@@ -686,6 +686,18 @@ isInVector(const CVecThreeIndexes& vector,
 }
 
 bool
+isInVector(const CVecFourIndexes& vector,
+           const CFourIndexes&    quadruple)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (quadruple == vector[i]) return true;
+    }
+    
+    return false;
+}
+    
+bool
 addValidAndUniquePair(      CVecTwoIndexes& vector,
                       const CTwoIndexes&    pair)
 {
@@ -708,6 +720,19 @@ addValidAndUniqueTriple(      CVecThreeIndexes& vector,
         
     vector.push_back(triple);
         
+    return true;
+}
+    
+bool
+addValidAndUniqueQuadruple(      CVecFourIndexes& vector,
+                           const CFourIndexes&    quadruple)
+{
+    if (!quadruple.isValidQuadruple()) return false;
+    
+    if (genfunc::isInVector(vector, quadruple)) return false;
+    
+    vector.push_back(quadruple);
+    
     return true;
 }
 
@@ -771,5 +796,23 @@ getPairsFromTripleIndexes(const CVecThreeIndexes& vector)
     
     return xyvec;
 }
+
+CVecThreeIndexes
+getTriplesFromQuadrupleIndexes(const CVecFourIndexes& vector)
+{
+    CVecThreeIndexes xyzvec;
+        
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (vector[i].first() == 0)
+        {
+            xyzvec.push_back(CThreeIndexes(vector[i].second(), vector[i].third(),
+                                           vector[i].fourth()));
+        }
+    }
+        
+    return xyzvec;
+}
+    
     
 } // genfunc namespace

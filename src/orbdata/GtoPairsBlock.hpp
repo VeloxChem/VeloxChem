@@ -405,6 +405,21 @@ public:
     int32_t getNumberOfScreenedPrimPairs() const;
     
     /**
+     Gets maximum contraction depth of GTOs pair in GTOs pairs object.
+     
+     @return the maximum contraction depth.
+     */
+    int32_t getMaxContractionDepth() const;
+    
+    /**
+     Gets number of primitive pairs in set of contracted pairs ([0..iContrPair]).
+
+     @param iContrPair the index of lasr contracted pair.
+     @return the number of primitive pairs.
+     */
+    int32_t getNumberOfPrimPairs(const int32_t iContrPair) const;
+    
+    /**
      Gets number of initial contracted pairs generated from input data.
      
      @return the number of contractes pairs.

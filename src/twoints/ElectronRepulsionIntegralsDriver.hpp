@@ -16,6 +16,8 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "OutputStream.hpp"
+#include "GtoPairsBlock.hpp"
+#include "VecIndexes.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -50,6 +52,32 @@ class CElectronRepulsionIntegralsDriver
      */
     bool _isLocalMode;
     
+    /**
+     Gets Obara-Saika bra side horizontal recursion pattern for specific
+     combination of GTOs pairs blocks on bra and ket sides.
+     
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @return the vector of three indexes object with recursion pattern.
+     */
+    CVecFourIndexes _getBraHorizontalRecursionPattern(const CGtoPairsBlock& braGtoPairsBlock,
+                                                      const CGtoPairsBlock& ketGtoPairsBlock) const;
+    
+    /**
+     Gets Obara-Saika ket side horizontal recursion pattern for given set of leading terms.
+     
+     @param leadTerms the vector of leading terms in recursion pattern.
+     @return the vector of three indexes object with recursion pattern.
+     */
+    CVecThreeIndexes _getKetHorizontalRecursionPattern(const CVecThreeIndexes& leadTerms) const;
+    
+    /**
+     Gets Obara-Saika vertical recursion pattern for given set of leading terms.
+     
+     @param leadTerms the vector of leading terms in recursion pattern.
+     @return the vector of three indexes object with recursion pattern.
+     */
+    CVecThreeIndexes _getVerticalRecursionPattern(const CVecThreeIndexes& leadTerms) const;
     
 public:
     
@@ -84,6 +112,16 @@ public:
                   const double           threshold,
                         COutputStream&   oStream,
                         MPI_Comm         comm) const;
+    
+    /**
+     Computes electronic repulsion integrals for combination of GTOs pairs
+     blocks.
+     
+     @param braGtoPairsBlock the GTOs pairsblock on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     */
+    void compElectronRepulsionForGtoPairsBlocks(const CGtoPairsBlock& braGtoPairsBlock,
+                                                const CGtoPairsBlock& ketGtoPairsBlock) const;
 };
 
 
