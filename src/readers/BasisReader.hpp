@@ -197,6 +197,19 @@ public:
                                 const CMolecule&     molecule,
                                       COutputStream& oStream);
     
+    /**
+     Creates minimal AO basis object by reading basis set data from basis 
+     library for selected molecule. Reading errors are printed to output stream.
+     
+     @param pathToBasisSets the path to basis set library.
+     @param molecule the molecule.
+     @param oStream the output stream.
+     @return the molecular basis object.
+     */
+    CMolecularBasis getMinBasis(const std::string&   pathToBasisSets,
+                                const CMolecule&     molecule,
+                                      COutputStream& oStream);
+    
 };
 
 #endif /* BasisReader_hpp */

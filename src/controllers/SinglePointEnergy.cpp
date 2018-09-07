@@ -92,8 +92,8 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
         
         if (_state)
         {
-             _aoBasis = rdraobasis.getAOBasis(pathToBasisSets, _molecule,
-                                              oStream);
+            _aoBasis = rdraobasis.getAOBasis(pathToBasisSets, _molecule,
+                                             oStream);
         }
 
         _state = rdraobasis.getState();
@@ -105,8 +105,18 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
         //    _riBasis = rdraobasis.getRIJBasis(pathToBasisSets, _molecule,
         //                                      oStream);
         // }
-        
+
         //_state = rdraobasis.getState();
+        
+        // read minimal AO basis
+        
+        if (_state)
+        {
+            _minBasis = rdraobasis.getMinBasis(pathToBasisSets, _molecule,
+                                               oStream);
+        }
+        
+        _state = rdraobasis.getState();
     }
 
     mpi::bcast(_state, _globRank, MPI_COMM_WORLD);

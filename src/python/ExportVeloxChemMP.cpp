@@ -22,7 +22,10 @@
 #include "InputStream.hpp"
 #include "OutputStream.hpp"
 #include "MolXYZReader.hpp"
+#include "EnvironmentReader.hpp"
+#include "BasisReader.hpp"
 #include "Molecule.hpp"
+#include "MolecularBasis.hpp"
 
 namespace bp = boost::python;
 
@@ -200,4 +203,36 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
         .def("get_state", &CMolXYZReader::getState)
     ;
 
+    // CEnvironmentReader class
+
+    bp::class_< CEnvironmentReader >
+        (
+            "CEnvironmentReader", bp::init<>()
+        )
+        .def("parse", &CEnvironmentReader::parse)
+        .def("get_state", &CEnvironmentReader::getState)
+        .def("get_path_to_basis_sets", &CEnvironmentReader::getPathToBasisSets)
+    ;
+
+    // CBasisReader class
+
+    bp::class_< CBasisReader >
+        (
+            "CBasisReader", bp::init<>()
+        )
+        .def("parse", &CBasisReader::parse)
+        .def("get_state", &CBasisReader::getState)
+        .def("get_ao_basis", &CBasisReader::getAOBasis)
+        .def("get_rij_basis", &CBasisReader::getRIJBasis)
+        .def("get_min_basis", &CBasisReader::getMinBasis)
+    ;
+
+    // CMolecularBasis class
+
+    bp::class_< CMolecularBasis >
+        (
+            "CMolecularBasis", bp::init<>()
+        )
+        .def("get_label", &CMolecularBasis::getLabel)
+    ;
 }

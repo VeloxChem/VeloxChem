@@ -1,16 +1,39 @@
 from VeloxChemMP import *
+import __future__
 
-inpdata   = CInputData()
-xyzreader = CMolXYZReader()
-mol       = CMolecule()
+# objects from default constructors
 
-cout = COutputStream("test.out")
-cin  = CInputStream("test.inp", cout)
+input_data   = CInputData()
+xyz_reader   = CMolXYZReader()
+env_reader   = CEnvironmentReader()
+basis_reader = CBasisReader()
+molecule     = CMolecule()
 
-cin.read(inpdata, cout)
-xyzreader.parse(mol, inpdata, cout)
+# objects from constructors with arguments
 
-mol.print_geometry(cout)
-cout.flush()
+output_stream = COutputStream("test.out")
+input_stream  = CInputStream("test.inp", output_stream)
 
-assert xyzreader.get_state() == True
+# call methods of objects
+
+input_stream.read(input_data, output_stream)
+xyz_reader.parse(molecule, input_data, output_stream)
+env_reader.parse(input_data, output_stream)
+basis_reader.parse(input_data, output_stream)
+
+path_to_basis_sets = env_reader.get_path_to_basis_sets()
+
+molecule.print_geometry(output_stream)
+output_stream.flush()
+
+ao_basis = basis_reader.get_ao_basis(path_to_basis_sets, molecule, output_stream)
+print("AO basis set:", ao_basis.get_label())
+
+min_basis = basis_reader.get_min_basis(path_to_basis_sets, molecule, output_stream)
+print("Mininal basis set:", min_basis.get_label())
+
+# check state
+
+assert xyz_reader.get_state() == True
+assert env_reader.get_state() == True
+assert basis_reader.get_state() == True
