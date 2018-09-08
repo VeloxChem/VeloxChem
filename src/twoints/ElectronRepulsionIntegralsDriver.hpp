@@ -18,10 +18,11 @@
 #include "OutputStream.hpp"
 #include "GtoPairsBlock.hpp"
 #include "VecIndexes.hpp"
+#include "BoysFunction.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
- <f(r)g(r')| 1/|r-r'||h(r') i(r')> integrals.
+ <f(r)g(r)| 1/|r-r'||h(r') i(r')> integrals.
  
  @author Z. Rinkevicius
  */
@@ -78,6 +79,73 @@ class CElectronRepulsionIntegralsDriver
      @return the vector of three indexes object with recursion pattern.
      */
     CVecThreeIndexes _getVerticalRecursionPattern(const CVecThreeIndexes& leadTerms) const;
+    
+    
+    /**
+     Gets vector of unified indexes of primitive GTOs pairs buffer for vertical
+     Obara-Saika recursion pattern.
+     
+     @param recIndexes the vector of starting indexes of data blocks in recursion
+            pattern.
+     @param recPattern the recursion pattern.
+     @param maxPrimPairs the maximum number of primitive GTOs pairs in contracted
+            GTOs pair on bra side.
+     @return the total number of blocks in recursion pattern.
+     */
+    int32_t _getIndexesForVerticalRecursionPattern(      std::vector<int32_t>& recIndexes,
+                                                   const CVecThreeIndexes&     recPattern,
+                                                   const int32_t               maxPrimPairs) const;
+    
+    /**
+     Gets vector of unified indexes of contracted GTOs pairs buffer.
+     
+     @param contrIndexes the vector of starting indexes in contracted GTOs buffer.
+     @param contrListing the contracted integrals listing.
+     @return the total number of blocks in contracted integrals listing.
+     */
+    int32_t _getIndexesForContractedIntegrals(      std::vector<int32_t>& contrIndexes,
+                                              const CVecThreeIndexes&     contrListing) const;
+    
+    /**
+     Computes batch of primitive electron repulsion integrals using Obara-Saika
+     recursion and stores results in primitives buffer.
+     Reference: S. Obara, A. Saika, J. Chem. Phys. 84, 3963 (1986).
+     
+     Batch size: (one contracted GTOs pair on bra side) x (all contracted GTOs
+                  pairs on ket side).
+     
+     @param primBuffer the primitives buffer.
+     @param recPattern the recursion pattern.
+     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param bfTable the Boys function evaluator.
+     @param bfArguments the vector of Boys function arguments.
+     @param bfValues the vector of Boys function values.
+     @param bfOrder the order of Boys function.
+     @param osFactors the Obara-Saika recursion factors.
+     @param pqDistances the vector of distances R(PQ) = P - Q.
+     @param wpDistances the vector of distances R(WP) = W - P.
+     @param wqDistances the vector of distances R(WQ) = W - Q.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void _compPrimElectronRepulsionInts(      CMemBlock2D<double>&  primBuffer,
+                                        const CVecThreeIndexes&     recPattern,
+                                        const std::vector<int32_t>& recIndexes,
+                                        const CBoysFunction&        bfTable,
+                                              CMemBlock<double>&    bfArguments,
+                                              CMemBlock2D<double>&  bfValues,
+                                        const int32_t               bfOrder,
+                                        const CMemBlock2D<double>&  osFactors,
+                                        const CMemBlock2D<double>&  pqDistances,
+                                        const CMemBlock2D<double>&  wpDistances,
+                                        const CMemBlock2D<double>&  wqDistances,
+                                        const CGtoPairsBlock&       braGtoPairsBlock,
+                                        const CGtoPairsBlock&       ketGtoPairsBlock,
+                                        const bool                  isBraEqualKet,
+                                        const int32_t               iContrPair) const;
     
 public:
     

@@ -18,8 +18,8 @@ CXX := mpiCXX
 
 # Compiler flags for generic intel CPUs
 
-CXX_REL_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall
-CXX_DEB_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall -g
+CXX_REL_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall -qoverride-limits
+CXX_DEB_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall -qoverride-limits -g
 CXX_DEB_FLG += -qopt-report=5 -qopt-report-phase=vec
 
 # Generic preprocessor flags

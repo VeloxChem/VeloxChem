@@ -91,6 +91,34 @@ namespace genfunc { // genfunc namespace
                   const int32_t               iContrGto);
     
     /**
+     Contracts set of primitive data vectoes to contracted data vectors using
+     two step procedure. NOTE: Primitive data is destroyed during contraction
+     process.
+     
+     @param contrData the contracted data vectors.
+     @param primData the primitive data vectors.
+     @param contrPattern the contracted data vectors distribution pattern.
+     @param contrIndexes the contracted data vectors indexing pattern.
+     @param primPattern the primitive data vectors distribution pattern.
+     @param primIndexes the primitive data vectors indexing pattern,
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTOs pair on bra side.
+     */
+    void contract(      CMemBlock2D<double>&  contrData,
+                        CMemBlock2D<double>&  primData,
+                  const CVecThreeIndexes&     contrPattern,
+                  const std::vector<int32_t>& contrIndexes,
+                  const CVecThreeIndexes&     primPattern,
+                  const std::vector<int32_t>& primIndexes,
+                  const CGtoPairsBlock&       braGtoPairsBlock,
+                  const CGtoPairsBlock&       ketGtoPairsBlock,
+                  const bool                  isBraEqualKet,
+                  const int32_t               iContrPair);
+    
+    /**
      Transforms Cartesian data vectors to spherical data vectors.
 
      @param spherData the spherical data vectors.

@@ -201,9 +201,15 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     CElectronRepulsionIntegralsDriver eridrv(_globRank, _globNodes, comm);
     
-    CGtoBlock bgtos(_molecule, _aoBasis, 1);
+    //CGtoBlock sgtos(_molecule, _aoBasis, 0);
+    
+    //CGtoBlock pgtos(_molecule, _aoBasis, 1);
+    
+    CGtoBlock bgtos(_molecule, _aoBasis, 4);
     
     CGtoPairsBlock bpairs(bgtos, 1.0e-13);
+    
+    //CGtoPairsBlock kpairs(sgtos, pgtos, 1.0e-13);
 
     eridrv.compElectronRepulsionForGtoPairsBlocks(bpairs, bpairs);
 }
