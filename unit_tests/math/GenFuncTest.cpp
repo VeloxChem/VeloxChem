@@ -149,9 +149,9 @@ TEST_F(CGenFuncTest, ContractWithGtoPairsBlocks)
                               4.1, 3.6, 0.7, 1.5, 3.2, 4.0, 1.7, 3.2, 0.7, 1.6, 2.1},
                              11, 8);
     
-    CVecThreeIndexes cvec({{0, 0, 0}, {0, 1, 0}});
+    CVecThreeIndexes cvec({{0, 0, 0}, {0, 3, 1}, {0, 0, 1}});
     
-    std::vector<int32_t> cidx({3, 0});
+    std::vector<int32_t> cidx({3, 2, 0});
     
     CVecThreeIndexes pvec({{0, 2, 3}, {0, 0, 0}, {0, 0, 1},  {0, 1, 0}});
     

@@ -89,7 +89,7 @@ namespace erifunc { // erifunc namespace
             
             // evaluate Boys function values
             
-            bfTable.compute(bfValues, bfArguments, bfOrder);
+            bfTable.compute(bfValues, bfArguments, ndim, bfOrder);
             
             // set up pointers to Obara-Saika factors
             

@@ -97,14 +97,15 @@ class CElectronRepulsionIntegralsDriver
                                                    const int32_t               maxPrimPairs) const;
     
     /**
-     Gets vector of unified indexes of contracted GTOs pairs buffer.
+     Gets vector of unified indexes of horizontal recursion buffer on ket side.
      
-     @param contrIndexes the vector of starting indexes in contracted GTOs buffer.
-     @param contrListing the contracted integrals listing.
-     @return the total number of blocks in contracted integrals listing.
+     @param intsIndexes the vector of starting indexes in horizontal recursion
+            buffer.
+     @param intsListing the ket horizontal recursion listing.
+     @return the total number of blocks in horizontal recursion buffer listing.
      */
-    int32_t _getIndexesForContractedIntegrals(      std::vector<int32_t>& contrIndexes,
-                                              const CVecThreeIndexes&     contrListing) const;
+    int32_t _getIndexesForKetHRRIntegrals(      std::vector<int32_t>& intsIndexes,
+                                          const CVecThreeIndexes&     intsListing) const;
     
     /**
      Computes batch of primitive electron repulsion integrals using Obara-Saika
@@ -146,6 +147,27 @@ class CElectronRepulsionIntegralsDriver
                                         const CGtoPairsBlock&       ketGtoPairsBlock,
                                         const bool                  isBraEqualKet,
                                         const int32_t               iContrPair) const;
+    
+    /**
+     Applies horizontal recursion on ket side of contracted integrals buffer.
+     
+     @param ketBuffer the horizontal recursion buffer.
+     @param recPattern the horizontal recursion pattern on ket side.
+     @param recIndexes the indexes of data blocks in horizontal recursion
+            pattern on ket side.
+     @param cdDistances the vector of distances R(CD) = C - D.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void _applyHRRonKet(      CMemBlock2D<double>&  ketBuffer,
+                        const CVecThreeIndexes&     recPattern,
+                        const std::vector<int32_t>& recIndexes,
+                        const CMemBlock2D<double>&  cdDistances,
+                        const CGtoPairsBlock&       ketGtoPairsBlock,
+                        const bool                  isBraEqualKet,
+                        const int32_t               iContrPair) const;
     
 public:
     

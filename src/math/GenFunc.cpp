@@ -235,13 +235,18 @@ contract(      CMemBlock2D<double>&  contrData,
         
         auto tidx = contrPattern[i];
         
+        // skip undesirable terms
+        
+        if (tidx.second() != 0) continue; 
+        
         auto cidx = genfunc::findTripleIndex(contrIndexes, contrPattern, tidx);
         
-        auto pidx = genfunc::findTripleIndex(primIndexes, primPattern, tidx);
+        auto pidx = genfunc::findTripleIndex(primIndexes, primPattern,
+                                             {tidx.first(), tidx.third(), 0});
         
         // set up number angular components
         
-        auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.second());
+        auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.third());
         
         // first step: vertical summation over bra GTO
         
