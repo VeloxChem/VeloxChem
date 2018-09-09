@@ -201,6 +201,35 @@ namespace genfunc { // genfunc namespace
                    const int32_t              nBlocks);
     
     /**
+     Transforms Cartesian integrals to half-transformed  integrals by
+     applying ket side transformation: <cart|g(x,y)|cart> to <vart|g(x,y)|spher>.
+     
+     @param spherData the spherical data vectors.
+     @param cartData the Cartesian data vectors.
+     @param ketMomentumC the spherical momentum object for C center on ket side.
+     @param ketMomentumD the spherical momentum object for D center on ket side.
+     @param spherPattern the half-transformed data vectors distribution pattern.
+     @param spherIndexes the half-transformend data vectors indexing pattern.
+     @param cartPattern the Cartesian data vectors distribution pattern.
+     @param cartIndexes the Cartesian data vectors indexing pattern,
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+     blocks.
+     @param iContrPair the index of contracted GTOs pair on bra side.
+     */
+    void transform_ket(      CMemBlock2D<double>&  spherData,
+                       const CMemBlock2D<double>&  cartData,
+                       const CSphericalMomentum&   ketMomentumC,
+                       const CSphericalMomentum&   ketMomentumD,
+                       const CVecFourIndexes&      spherPattern,
+                       const std::vector<int32_t>& spherIndexes,
+                       const CVecThreeIndexes&     cartPattern,
+                       const std::vector<int32_t>& cartIndexes,
+                       const CGtoPairsBlock&       ketGtoPairsBlock,
+                       const bool                  isBraEqualKet,
+                       const int32_t               iContrPair);
+    
+    /**
      Reshapes batch of integrals batch (1 contracted GTO on bra side x all
      contracted GTOs on ket side) into compressed data and stores it in sparse
      matrix.
@@ -371,6 +400,19 @@ namespace genfunc { // genfunc namespace
     int32_t findTripleIndex(const std::vector<int32_t>& indexes,
                             const CVecThreeIndexes&     vector,
                             const CThreeIndexes&        triple);
+    
+    /**
+     Finds index from vector of indexes associated with four indexes object in
+     vector of four indexes objects.
+     
+     @param indexes the vector of indexes.
+     @param vector the vector of four indexes objects.
+     @param quadruple the four indexes object.
+     @return the index assocated with quadruple indexes object.
+     */
+    int32_t findQuadrupleIndex(const std::vector<int32_t>& indexes,
+                               const CVecFourIndexes&      vector,
+                               const CFourIndexes&         quadruple);
     
     /**
      Gets maximum order of indexes pair in vector of triple indexes objects,

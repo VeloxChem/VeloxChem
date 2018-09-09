@@ -474,7 +474,54 @@ transform(      CMemBlock2D<double>& spherData,
                            sidx, cidx, nElements);
     }
 }
+
+void
+transform_ket(      CMemBlock2D<double>&  spherData,
+              const CMemBlock2D<double>&  cartData,
+              const CSphericalMomentum&   ketMomentumC,
+              const CSphericalMomentum&   ketMomentumD,
+              const CVecFourIndexes&      spherPattern,
+              const std::vector<int32_t>& spherIndexes,
+              const CVecThreeIndexes&     cartPattern,
+              const std::vector<int32_t>& cartIndexes,
+              const CGtoPairsBlock&       ketGtoPairsBlock,
+              const bool                  isBraEqualKet,
+              const int32_t               iContrPair)
+{
+    // set up dimensions on ket side
     
+    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    if (isBraEqualKet) kdim  = iContrPair + 1;
+    
+    // loop over set of data vectors
+    
+    for (size_t i = 0; i < spherPattern.size(); i++)
+    {
+        // skip terms not presented in Cartesian integrals buffer
+        
+        if (spherPattern[i].first() != 0) continue;
+        
+        // set up spherical and Cartesian data indexes
+        
+        auto sidx = spherIndexes[i];
+        
+        auto cidx = findTripleIndex(cartIndexes, cartPattern,
+                                    CThreeIndexes(spherPattern[i].second(),
+                                                  spherPattern[i].third(),
+                                                  spherPattern[i].fourth()));
+        
+        // set up number of bra components
+        
+        auto bcomp = angmom::to_CartesianComponents(spherPattern[i].second());
+        
+        // transform ket side of integrals from Cartesian to spherical form
+        
+        transform(spherData, cartData, ketMomentumC, ketMomentumD, sidx, cidx,
+                  kdim, bcomp);
+    }
+}
+
 void
 compress(      CSparseMatrix&       sparseMatrix,
                CMemBlock<double>&   rowValues,
@@ -849,6 +896,19 @@ findTripleIndex(const std::vector<int32_t>& indexes,
         if (triple == vector[i]) return indexes[i];
     }
         
+    return -1;
+}
+    
+int32_t
+findQuadrupleIndex(const std::vector<int32_t>& indexes,
+                   const CVecFourIndexes&      vector,
+                   const CFourIndexes&         quadruple)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (quadruple == vector[i]) return indexes[i];
+    }
+    
     return -1;
 }
     

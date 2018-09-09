@@ -20,6 +20,7 @@
 #include "EriFuncForK.hpp"
 #include "EriFuncForL.hpp"
 #include "KetHrrFunc.hpp"
+#include "BraHrrFunc.hpp"
 
 CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(const int32_t  globRank,
                                                                      const int32_t  globNodes,
@@ -147,6 +148,18 @@ CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const 
     
     auto rcd = ketpairs.getDistancesAB();
     
+    // set up horizontal recursion buffer for bra side
+    
+    std::vector<int32_t> bhrridx;
+    
+    nblk = _getIndexesForBraHRRIntegrals(bhrridx, bhrrvec);
+    
+    CMemBlock2D<double> bhrrbuffer(cdim, nblk);
+    
+    // initialize R(AB) = A - B distance for horizontal recursion
+    
+    auto rab = brapairs.getDistancesAB();
+    
     // initialize Boys function evaluator
     
     auto bord = genfunc::maxOrderOfPair(vrrvec, 0, 0);
@@ -167,15 +180,15 @@ CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const 
     
     for (size_t i = 0; i < bhrrvec.size(); i++)
     {
-        printf("-> BHRR(%i,%i|%i,%i):\n", bhrrvec[i].first(), bhrrvec[i].second(),
-               bhrrvec[i].third(), bhrrvec[i].fourth()); 
+        printf("-> BHRR(%i,%i|%i,%i): %i\n", bhrrvec[i].first(), bhrrvec[i].second(),
+               bhrrvec[i].third(), bhrrvec[i].fourth(), bhrridx[i]); 
     }
     
     printf("Contr. Intermidiates:\n");
     
     for (size_t i = 0; i < tcvec.size(); i++)
     {
-        printf("(0,%i|%i,%i):  ", tcvec[i].first(), tcvec[i].second(), tcvec[i].third());
+        printf("(0,%i|%i,%i) ", tcvec[i].first(), tcvec[i].second(), tcvec[i].third());
     }
     
     printf("\n");
@@ -248,6 +261,15 @@ CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const 
         // apply horizontal recursion on ket side
         
         _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, ketpairs, symbk, i);
+        
+        // transform ket side to spherical form
+        
+        genfunc::transform_ket(bhrrbuffer, khrrbuffer, cmom, dmom, bhrrvec, bhrridx,
+                               khrrvec, khrridx, ketpairs, symbk, i);
+        
+        // apply horizontal recursion on bra side
+        
+        _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, ketpairs, symbk, i);
     }
 }
 
@@ -545,6 +567,34 @@ CElectronRepulsionIntegralsDriver::_getIndexesForKetHRRIntegrals(      std::vect
         
               * angmom::to_CartesianComponents(intsListing[i].second(),
                                                intsListing[i].third());
+    }
+    
+    return nblk;
+}
+
+int32_t
+CElectronRepulsionIntegralsDriver::_getIndexesForBraHRRIntegrals(      std::vector<int32_t>& intsIndexes,
+                                                                 const CVecFourIndexes&      intsListing) const
+{
+    // clear vector and reserve memory
+    
+    intsIndexes.clear();
+    
+    intsIndexes.reserve(intsListing.size() + 1);
+    
+    // loop over integrals listing
+    
+    int32_t nblk = 0;
+    
+    for (size_t i = 0; i < intsListing.size(); i++)
+    {
+        intsIndexes.push_back(nblk);
+        
+        nblk += angmom::to_CartesianComponents(intsListing[i].first(),
+                                               intsListing[i].second())
+        
+              *  angmom::to_SphericalComponents(intsListing[i].third(),
+                                                intsListing[i].fourth());
     }
     
     return nblk;
@@ -1241,5 +1291,111 @@ CElectronRepulsionIntegralsDriver::_applyHRRonKet(      CMemBlock2D<double>&  ke
     
     kethrrfunc::compElectronRepulsionForSXGG(ketBuffer, recPattern, recIndexes,
                                              cdDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+}
+
+void
+CElectronRepulsionIntegralsDriver::_applyHRRonBra(      CMemBlock2D<double>&  braBuffer,
+                                                  const CVecFourIndexes&      recPattern,
+                                                  const std::vector<int32_t>& recIndexes,
+                                                  const CMemBlock2D<double>&  abDistances,
+                                                  const CGtoPairsBlock&       ketGtoPairsBlock,
+                                                  const bool                  isBraEqualKet,
+                                                  const int32_t               iContrPair) const
+{
+    // compute (pp|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForPPXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (pd|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForPDXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (pf|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForPFXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (pg|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForPGXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (ph|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForPHXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (pi|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForPIXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (pk|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForPKXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (dd|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForDDXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (df|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForDFXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (dg|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForDGXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (dh|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForDHXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (di|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForDIXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (ff|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForFFXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (fg|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForFGXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (fh|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForFHXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
+                                             isBraEqualKet, iContrPair);
+    
+    // compute (gg|g(r,r')|xx) integrals
+    
+    brahrrfunc::compElectronRepulsionForGGXX(braBuffer, recPattern, recIndexes,
+                                             abDistances, ketGtoPairsBlock,
                                              isBraEqualKet, iContrPair);
 }

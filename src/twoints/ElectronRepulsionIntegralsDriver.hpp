@@ -108,6 +108,17 @@ class CElectronRepulsionIntegralsDriver
                                           const CVecThreeIndexes&     intsListing) const;
     
     /**
+     Gets vector of unified indexes of horizontal recursion buffer on bra side.
+     
+     @param intsIndexes the vector of starting indexes in horizontal recursion
+            buffer.
+     @param intsListing the ket horizontal recursion listing.
+     @return the total number of blocks in horizontal recursion buffer listing.
+     */
+    int32_t _getIndexesForBraHRRIntegrals(      std::vector<int32_t>& intsIndexes,
+                                          const CVecFourIndexes&      intsListing) const;
+    
+    /**
      Computes batch of primitive electron repulsion integrals using Obara-Saika
      recursion and stores results in primitives buffer.
      Reference: S. Obara, A. Saika, J. Chem. Phys. 84, 3963 (1986).
@@ -165,6 +176,27 @@ class CElectronRepulsionIntegralsDriver
                         const CVecThreeIndexes&     recPattern,
                         const std::vector<int32_t>& recIndexes,
                         const CMemBlock2D<double>&  cdDistances,
+                        const CGtoPairsBlock&       ketGtoPairsBlock,
+                        const bool                  isBraEqualKet,
+                        const int32_t               iContrPair) const;
+    
+    /**
+     Applies horizontal recursion on bra side of contracted integrals buffer.
+     
+     @param braBuffer the horizontal recursion buffer.
+     @param recPattern the horizontal recursion pattern on bra side.
+     @param recIndexes the indexes of data blocks in horizontal recursion
+            pattern on bra side.
+     @param abDistances the vector of distances R(AB) = A - B.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void _applyHRRonBra(      CMemBlock2D<double>&  braBuffer,
+                        const CVecFourIndexes&      recPattern,
+                        const std::vector<int32_t>& recIndexes,
+                        const CMemBlock2D<double>&  abDistances,
                         const CGtoPairsBlock&       ketGtoPairsBlock,
                         const bool                  isBraEqualKet,
                         const int32_t               iContrPair) const;

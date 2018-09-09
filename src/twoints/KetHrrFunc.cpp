@@ -149,7 +149,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXPD(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXPD(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -200,79 +200,79 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|SD)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SD) integrals
 
-                    auto g2_0_xx = contrBuffer.data(g2off + 6 * j);
+                    auto g2_0_xx = ketBuffer.data(g2off + 6 * j);
 
-                    auto g2_0_xy = contrBuffer.data(g2off + 6 * j + 1);
+                    auto g2_0_xy = ketBuffer.data(g2off + 6 * j + 1);
 
-                    auto g2_0_xz = contrBuffer.data(g2off + 6 * j + 2);
+                    auto g2_0_xz = ketBuffer.data(g2off + 6 * j + 2);
 
-                    auto g2_0_yy = contrBuffer.data(g2off + 6 * j + 3);
+                    auto g2_0_yy = ketBuffer.data(g2off + 6 * j + 3);
 
-                    auto g2_0_yz = contrBuffer.data(g2off + 6 * j + 4);
+                    auto g2_0_yz = ketBuffer.data(g2off + 6 * j + 4);
 
-                    auto g2_0_zz = contrBuffer.data(g2off + 6 * j + 5);
+                    auto g2_0_zz = ketBuffer.data(g2off + 6 * j + 5);
 
-                    // set up pointers to (SX|g(r,r')|SF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SF) integrals
 
-                    auto g1_0_xxx = contrBuffer.data(g1off + 10 * j);
+                    auto g1_0_xxx = ketBuffer.data(g1off + 10 * j);
 
-                    auto g1_0_xxy = contrBuffer.data(g1off + 10 * j + 1);
+                    auto g1_0_xxy = ketBuffer.data(g1off + 10 * j + 1);
 
-                    auto g1_0_xxz = contrBuffer.data(g1off + 10 * j + 2);
+                    auto g1_0_xxz = ketBuffer.data(g1off + 10 * j + 2);
 
-                    auto g1_0_xyy = contrBuffer.data(g1off + 10 * j + 3);
+                    auto g1_0_xyy = ketBuffer.data(g1off + 10 * j + 3);
 
-                    auto g1_0_xyz = contrBuffer.data(g1off + 10 * j + 4);
+                    auto g1_0_xyz = ketBuffer.data(g1off + 10 * j + 4);
 
-                    auto g1_0_xzz = contrBuffer.data(g1off + 10 * j + 5);
+                    auto g1_0_xzz = ketBuffer.data(g1off + 10 * j + 5);
 
-                    auto g1_0_yyy = contrBuffer.data(g1off + 10 * j + 6);
+                    auto g1_0_yyy = ketBuffer.data(g1off + 10 * j + 6);
 
-                    auto g1_0_yyz = contrBuffer.data(g1off + 10 * j + 7);
+                    auto g1_0_yyz = ketBuffer.data(g1off + 10 * j + 7);
 
-                    auto g1_0_yzz = contrBuffer.data(g1off + 10 * j + 8);
+                    auto g1_0_yzz = ketBuffer.data(g1off + 10 * j + 8);
 
-                    auto g1_0_zzz = contrBuffer.data(g1off + 10 * j + 9);
+                    auto g1_0_zzz = ketBuffer.data(g1off + 10 * j + 9);
 
-                    // set up pointers to (SX|g(r,r')|PD)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PD) integrals
 
-                    auto g_x_xx = contrBuffer.data(goff + 18 * j);
+                    auto g_x_xx = ketBuffer.data(goff + 18 * j);
 
-                    auto g_x_xy = contrBuffer.data(goff + 18 * j + 1);
+                    auto g_x_xy = ketBuffer.data(goff + 18 * j + 1);
 
-                    auto g_x_xz = contrBuffer.data(goff + 18 * j + 2);
+                    auto g_x_xz = ketBuffer.data(goff + 18 * j + 2);
 
-                    auto g_x_yy = contrBuffer.data(goff + 18 * j + 3);
+                    auto g_x_yy = ketBuffer.data(goff + 18 * j + 3);
 
-                    auto g_x_yz = contrBuffer.data(goff + 18 * j + 4);
+                    auto g_x_yz = ketBuffer.data(goff + 18 * j + 4);
 
-                    auto g_x_zz = contrBuffer.data(goff + 18 * j + 5);
+                    auto g_x_zz = ketBuffer.data(goff + 18 * j + 5);
 
-                    auto g_y_xx = contrBuffer.data(goff + 18 * j + 6);
+                    auto g_y_xx = ketBuffer.data(goff + 18 * j + 6);
 
-                    auto g_y_xy = contrBuffer.data(goff + 18 * j + 7);
+                    auto g_y_xy = ketBuffer.data(goff + 18 * j + 7);
 
-                    auto g_y_xz = contrBuffer.data(goff + 18 * j + 8);
+                    auto g_y_xz = ketBuffer.data(goff + 18 * j + 8);
 
-                    auto g_y_yy = contrBuffer.data(goff + 18 * j + 9);
+                    auto g_y_yy = ketBuffer.data(goff + 18 * j + 9);
 
-                    auto g_y_yz = contrBuffer.data(goff + 18 * j + 10);
+                    auto g_y_yz = ketBuffer.data(goff + 18 * j + 10);
 
-                    auto g_y_zz = contrBuffer.data(goff + 18 * j + 11);
+                    auto g_y_zz = ketBuffer.data(goff + 18 * j + 11);
 
-                    auto g_z_xx = contrBuffer.data(goff + 18 * j + 12);
+                    auto g_z_xx = ketBuffer.data(goff + 18 * j + 12);
 
-                    auto g_z_xy = contrBuffer.data(goff + 18 * j + 13);
+                    auto g_z_xy = ketBuffer.data(goff + 18 * j + 13);
 
-                    auto g_z_xz = contrBuffer.data(goff + 18 * j + 14);
+                    auto g_z_xz = ketBuffer.data(goff + 18 * j + 14);
 
-                    auto g_z_yy = contrBuffer.data(goff + 18 * j + 15);
+                    auto g_z_yy = ketBuffer.data(goff + 18 * j + 15);
 
-                    auto g_z_yz = contrBuffer.data(goff + 18 * j + 16);
+                    auto g_z_yz = ketBuffer.data(goff + 18 * j + 16);
 
-                    auto g_z_zz = contrBuffer.data(goff + 18 * j + 17);
+                    auto g_z_zz = ketBuffer.data(goff + 18 * j + 17);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_0_xx, g2_0_xy,\
                                              g2_0_xz, g2_0_yy, g2_0_yz, g2_0_zz,\
@@ -340,7 +340,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
 
     void
-    compElectronRepulsionForSXPF(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXPF(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -391,121 +391,121 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|SF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SF) integrals
 
-                    auto g2_0_xxx = contrBuffer.data(g2off + 10 * j);
+                    auto g2_0_xxx = ketBuffer.data(g2off + 10 * j);
 
-                    auto g2_0_xxy = contrBuffer.data(g2off + 10 * j + 1);
+                    auto g2_0_xxy = ketBuffer.data(g2off + 10 * j + 1);
 
-                    auto g2_0_xxz = contrBuffer.data(g2off + 10 * j + 2);
+                    auto g2_0_xxz = ketBuffer.data(g2off + 10 * j + 2);
 
-                    auto g2_0_xyy = contrBuffer.data(g2off + 10 * j + 3);
+                    auto g2_0_xyy = ketBuffer.data(g2off + 10 * j + 3);
 
-                    auto g2_0_xyz = contrBuffer.data(g2off + 10 * j + 4);
+                    auto g2_0_xyz = ketBuffer.data(g2off + 10 * j + 4);
 
-                    auto g2_0_xzz = contrBuffer.data(g2off + 10 * j + 5);
+                    auto g2_0_xzz = ketBuffer.data(g2off + 10 * j + 5);
 
-                    auto g2_0_yyy = contrBuffer.data(g2off + 10 * j + 6);
+                    auto g2_0_yyy = ketBuffer.data(g2off + 10 * j + 6);
 
-                    auto g2_0_yyz = contrBuffer.data(g2off + 10 * j + 7);
+                    auto g2_0_yyz = ketBuffer.data(g2off + 10 * j + 7);
 
-                    auto g2_0_yzz = contrBuffer.data(g2off + 10 * j + 8);
+                    auto g2_0_yzz = ketBuffer.data(g2off + 10 * j + 8);
 
-                    auto g2_0_zzz = contrBuffer.data(g2off + 10 * j + 9);
+                    auto g2_0_zzz = ketBuffer.data(g2off + 10 * j + 9);
 
-                    // set up pointers to (SX|g(r,r')|SG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SG) integrals
 
-                    auto g1_0_xxxx = contrBuffer.data(g1off + 15 * j);
+                    auto g1_0_xxxx = ketBuffer.data(g1off + 15 * j);
 
-                    auto g1_0_xxxy = contrBuffer.data(g1off + 15 * j + 1);
+                    auto g1_0_xxxy = ketBuffer.data(g1off + 15 * j + 1);
 
-                    auto g1_0_xxxz = contrBuffer.data(g1off + 15 * j + 2);
+                    auto g1_0_xxxz = ketBuffer.data(g1off + 15 * j + 2);
 
-                    auto g1_0_xxyy = contrBuffer.data(g1off + 15 * j + 3);
+                    auto g1_0_xxyy = ketBuffer.data(g1off + 15 * j + 3);
 
-                    auto g1_0_xxyz = contrBuffer.data(g1off + 15 * j + 4);
+                    auto g1_0_xxyz = ketBuffer.data(g1off + 15 * j + 4);
 
-                    auto g1_0_xxzz = contrBuffer.data(g1off + 15 * j + 5);
+                    auto g1_0_xxzz = ketBuffer.data(g1off + 15 * j + 5);
 
-                    auto g1_0_xyyy = contrBuffer.data(g1off + 15 * j + 6);
+                    auto g1_0_xyyy = ketBuffer.data(g1off + 15 * j + 6);
 
-                    auto g1_0_xyyz = contrBuffer.data(g1off + 15 * j + 7);
+                    auto g1_0_xyyz = ketBuffer.data(g1off + 15 * j + 7);
 
-                    auto g1_0_xyzz = contrBuffer.data(g1off + 15 * j + 8);
+                    auto g1_0_xyzz = ketBuffer.data(g1off + 15 * j + 8);
 
-                    auto g1_0_xzzz = contrBuffer.data(g1off + 15 * j + 9);
+                    auto g1_0_xzzz = ketBuffer.data(g1off + 15 * j + 9);
 
-                    auto g1_0_yyyy = contrBuffer.data(g1off + 15 * j + 10);
+                    auto g1_0_yyyy = ketBuffer.data(g1off + 15 * j + 10);
 
-                    auto g1_0_yyyz = contrBuffer.data(g1off + 15 * j + 11);
+                    auto g1_0_yyyz = ketBuffer.data(g1off + 15 * j + 11);
 
-                    auto g1_0_yyzz = contrBuffer.data(g1off + 15 * j + 12);
+                    auto g1_0_yyzz = ketBuffer.data(g1off + 15 * j + 12);
 
-                    auto g1_0_yzzz = contrBuffer.data(g1off + 15 * j + 13);
+                    auto g1_0_yzzz = ketBuffer.data(g1off + 15 * j + 13);
 
-                    auto g1_0_zzzz = contrBuffer.data(g1off + 15 * j + 14);
+                    auto g1_0_zzzz = ketBuffer.data(g1off + 15 * j + 14);
 
-                    // set up pointers to (SX|g(r,r')|PF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PF) integrals
 
-                    auto g_x_xxx = contrBuffer.data(goff + 30 * j);
+                    auto g_x_xxx = ketBuffer.data(goff + 30 * j);
 
-                    auto g_x_xxy = contrBuffer.data(goff + 30 * j + 1);
+                    auto g_x_xxy = ketBuffer.data(goff + 30 * j + 1);
 
-                    auto g_x_xxz = contrBuffer.data(goff + 30 * j + 2);
+                    auto g_x_xxz = ketBuffer.data(goff + 30 * j + 2);
 
-                    auto g_x_xyy = contrBuffer.data(goff + 30 * j + 3);
+                    auto g_x_xyy = ketBuffer.data(goff + 30 * j + 3);
 
-                    auto g_x_xyz = contrBuffer.data(goff + 30 * j + 4);
+                    auto g_x_xyz = ketBuffer.data(goff + 30 * j + 4);
 
-                    auto g_x_xzz = contrBuffer.data(goff + 30 * j + 5);
+                    auto g_x_xzz = ketBuffer.data(goff + 30 * j + 5);
 
-                    auto g_x_yyy = contrBuffer.data(goff + 30 * j + 6);
+                    auto g_x_yyy = ketBuffer.data(goff + 30 * j + 6);
 
-                    auto g_x_yyz = contrBuffer.data(goff + 30 * j + 7);
+                    auto g_x_yyz = ketBuffer.data(goff + 30 * j + 7);
 
-                    auto g_x_yzz = contrBuffer.data(goff + 30 * j + 8);
+                    auto g_x_yzz = ketBuffer.data(goff + 30 * j + 8);
 
-                    auto g_x_zzz = contrBuffer.data(goff + 30 * j + 9);
+                    auto g_x_zzz = ketBuffer.data(goff + 30 * j + 9);
 
-                    auto g_y_xxx = contrBuffer.data(goff + 30 * j + 10);
+                    auto g_y_xxx = ketBuffer.data(goff + 30 * j + 10);
 
-                    auto g_y_xxy = contrBuffer.data(goff + 30 * j + 11);
+                    auto g_y_xxy = ketBuffer.data(goff + 30 * j + 11);
 
-                    auto g_y_xxz = contrBuffer.data(goff + 30 * j + 12);
+                    auto g_y_xxz = ketBuffer.data(goff + 30 * j + 12);
 
-                    auto g_y_xyy = contrBuffer.data(goff + 30 * j + 13);
+                    auto g_y_xyy = ketBuffer.data(goff + 30 * j + 13);
 
-                    auto g_y_xyz = contrBuffer.data(goff + 30 * j + 14);
+                    auto g_y_xyz = ketBuffer.data(goff + 30 * j + 14);
 
-                    auto g_y_xzz = contrBuffer.data(goff + 30 * j + 15);
+                    auto g_y_xzz = ketBuffer.data(goff + 30 * j + 15);
 
-                    auto g_y_yyy = contrBuffer.data(goff + 30 * j + 16);
+                    auto g_y_yyy = ketBuffer.data(goff + 30 * j + 16);
 
-                    auto g_y_yyz = contrBuffer.data(goff + 30 * j + 17);
+                    auto g_y_yyz = ketBuffer.data(goff + 30 * j + 17);
 
-                    auto g_y_yzz = contrBuffer.data(goff + 30 * j + 18);
+                    auto g_y_yzz = ketBuffer.data(goff + 30 * j + 18);
 
-                    auto g_y_zzz = contrBuffer.data(goff + 30 * j + 19);
+                    auto g_y_zzz = ketBuffer.data(goff + 30 * j + 19);
 
-                    auto g_z_xxx = contrBuffer.data(goff + 30 * j + 20);
+                    auto g_z_xxx = ketBuffer.data(goff + 30 * j + 20);
 
-                    auto g_z_xxy = contrBuffer.data(goff + 30 * j + 21);
+                    auto g_z_xxy = ketBuffer.data(goff + 30 * j + 21);
 
-                    auto g_z_xxz = contrBuffer.data(goff + 30 * j + 22);
+                    auto g_z_xxz = ketBuffer.data(goff + 30 * j + 22);
 
-                    auto g_z_xyy = contrBuffer.data(goff + 30 * j + 23);
+                    auto g_z_xyy = ketBuffer.data(goff + 30 * j + 23);
 
-                    auto g_z_xyz = contrBuffer.data(goff + 30 * j + 24);
+                    auto g_z_xyz = ketBuffer.data(goff + 30 * j + 24);
 
-                    auto g_z_xzz = contrBuffer.data(goff + 30 * j + 25);
+                    auto g_z_xzz = ketBuffer.data(goff + 30 * j + 25);
 
-                    auto g_z_yyy = contrBuffer.data(goff + 30 * j + 26);
+                    auto g_z_yyy = ketBuffer.data(goff + 30 * j + 26);
 
-                    auto g_z_yyz = contrBuffer.data(goff + 30 * j + 27);
+                    auto g_z_yyz = ketBuffer.data(goff + 30 * j + 27);
 
-                    auto g_z_yzz = contrBuffer.data(goff + 30 * j + 28);
+                    auto g_z_yzz = ketBuffer.data(goff + 30 * j + 28);
 
-                    auto g_z_zzz = contrBuffer.data(goff + 30 * j + 29);
+                    auto g_z_zzz = ketBuffer.data(goff + 30 * j + 29);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_0_xxx, g2_0_xxy,\
                                              g2_0_xxz, g2_0_xyy, g2_0_xyz, g2_0_xzz,\
@@ -602,7 +602,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXPG(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXPG(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -653,173 +653,173 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|SG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SG) integrals
 
-                    auto g2_0_xxxx = contrBuffer.data(g2off + 15 * j);
+                    auto g2_0_xxxx = ketBuffer.data(g2off + 15 * j);
 
-                    auto g2_0_xxxy = contrBuffer.data(g2off + 15 * j + 1);
+                    auto g2_0_xxxy = ketBuffer.data(g2off + 15 * j + 1);
 
-                    auto g2_0_xxxz = contrBuffer.data(g2off + 15 * j + 2);
+                    auto g2_0_xxxz = ketBuffer.data(g2off + 15 * j + 2);
 
-                    auto g2_0_xxyy = contrBuffer.data(g2off + 15 * j + 3);
+                    auto g2_0_xxyy = ketBuffer.data(g2off + 15 * j + 3);
 
-                    auto g2_0_xxyz = contrBuffer.data(g2off + 15 * j + 4);
+                    auto g2_0_xxyz = ketBuffer.data(g2off + 15 * j + 4);
 
-                    auto g2_0_xxzz = contrBuffer.data(g2off + 15 * j + 5);
+                    auto g2_0_xxzz = ketBuffer.data(g2off + 15 * j + 5);
 
-                    auto g2_0_xyyy = contrBuffer.data(g2off + 15 * j + 6);
+                    auto g2_0_xyyy = ketBuffer.data(g2off + 15 * j + 6);
 
-                    auto g2_0_xyyz = contrBuffer.data(g2off + 15 * j + 7);
+                    auto g2_0_xyyz = ketBuffer.data(g2off + 15 * j + 7);
 
-                    auto g2_0_xyzz = contrBuffer.data(g2off + 15 * j + 8);
+                    auto g2_0_xyzz = ketBuffer.data(g2off + 15 * j + 8);
 
-                    auto g2_0_xzzz = contrBuffer.data(g2off + 15 * j + 9);
+                    auto g2_0_xzzz = ketBuffer.data(g2off + 15 * j + 9);
 
-                    auto g2_0_yyyy = contrBuffer.data(g2off + 15 * j + 10);
+                    auto g2_0_yyyy = ketBuffer.data(g2off + 15 * j + 10);
 
-                    auto g2_0_yyyz = contrBuffer.data(g2off + 15 * j + 11);
+                    auto g2_0_yyyz = ketBuffer.data(g2off + 15 * j + 11);
 
-                    auto g2_0_yyzz = contrBuffer.data(g2off + 15 * j + 12);
+                    auto g2_0_yyzz = ketBuffer.data(g2off + 15 * j + 12);
 
-                    auto g2_0_yzzz = contrBuffer.data(g2off + 15 * j + 13);
+                    auto g2_0_yzzz = ketBuffer.data(g2off + 15 * j + 13);
 
-                    auto g2_0_zzzz = contrBuffer.data(g2off + 15 * j + 14);
+                    auto g2_0_zzzz = ketBuffer.data(g2off + 15 * j + 14);
 
-                    // set up pointers to (SX|g(r,r')|SH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SH) integrals
 
-                    auto g1_0_xxxxx = contrBuffer.data(g1off + 21 * j);
+                    auto g1_0_xxxxx = ketBuffer.data(g1off + 21 * j);
 
-                    auto g1_0_xxxxy = contrBuffer.data(g1off + 21 * j + 1);
+                    auto g1_0_xxxxy = ketBuffer.data(g1off + 21 * j + 1);
 
-                    auto g1_0_xxxxz = contrBuffer.data(g1off + 21 * j + 2);
+                    auto g1_0_xxxxz = ketBuffer.data(g1off + 21 * j + 2);
 
-                    auto g1_0_xxxyy = contrBuffer.data(g1off + 21 * j + 3);
+                    auto g1_0_xxxyy = ketBuffer.data(g1off + 21 * j + 3);
 
-                    auto g1_0_xxxyz = contrBuffer.data(g1off + 21 * j + 4);
+                    auto g1_0_xxxyz = ketBuffer.data(g1off + 21 * j + 4);
 
-                    auto g1_0_xxxzz = contrBuffer.data(g1off + 21 * j + 5);
+                    auto g1_0_xxxzz = ketBuffer.data(g1off + 21 * j + 5);
 
-                    auto g1_0_xxyyy = contrBuffer.data(g1off + 21 * j + 6);
+                    auto g1_0_xxyyy = ketBuffer.data(g1off + 21 * j + 6);
 
-                    auto g1_0_xxyyz = contrBuffer.data(g1off + 21 * j + 7);
+                    auto g1_0_xxyyz = ketBuffer.data(g1off + 21 * j + 7);
 
-                    auto g1_0_xxyzz = contrBuffer.data(g1off + 21 * j + 8);
+                    auto g1_0_xxyzz = ketBuffer.data(g1off + 21 * j + 8);
 
-                    auto g1_0_xxzzz = contrBuffer.data(g1off + 21 * j + 9);
+                    auto g1_0_xxzzz = ketBuffer.data(g1off + 21 * j + 9);
 
-                    auto g1_0_xyyyy = contrBuffer.data(g1off + 21 * j + 10);
+                    auto g1_0_xyyyy = ketBuffer.data(g1off + 21 * j + 10);
 
-                    auto g1_0_xyyyz = contrBuffer.data(g1off + 21 * j + 11);
+                    auto g1_0_xyyyz = ketBuffer.data(g1off + 21 * j + 11);
 
-                    auto g1_0_xyyzz = contrBuffer.data(g1off + 21 * j + 12);
+                    auto g1_0_xyyzz = ketBuffer.data(g1off + 21 * j + 12);
 
-                    auto g1_0_xyzzz = contrBuffer.data(g1off + 21 * j + 13);
+                    auto g1_0_xyzzz = ketBuffer.data(g1off + 21 * j + 13);
 
-                    auto g1_0_xzzzz = contrBuffer.data(g1off + 21 * j + 14);
+                    auto g1_0_xzzzz = ketBuffer.data(g1off + 21 * j + 14);
 
-                    auto g1_0_yyyyy = contrBuffer.data(g1off + 21 * j + 15);
+                    auto g1_0_yyyyy = ketBuffer.data(g1off + 21 * j + 15);
 
-                    auto g1_0_yyyyz = contrBuffer.data(g1off + 21 * j + 16);
+                    auto g1_0_yyyyz = ketBuffer.data(g1off + 21 * j + 16);
 
-                    auto g1_0_yyyzz = contrBuffer.data(g1off + 21 * j + 17);
+                    auto g1_0_yyyzz = ketBuffer.data(g1off + 21 * j + 17);
 
-                    auto g1_0_yyzzz = contrBuffer.data(g1off + 21 * j + 18);
+                    auto g1_0_yyzzz = ketBuffer.data(g1off + 21 * j + 18);
 
-                    auto g1_0_yzzzz = contrBuffer.data(g1off + 21 * j + 19);
+                    auto g1_0_yzzzz = ketBuffer.data(g1off + 21 * j + 19);
 
-                    auto g1_0_zzzzz = contrBuffer.data(g1off + 21 * j + 20);
+                    auto g1_0_zzzzz = ketBuffer.data(g1off + 21 * j + 20);
 
-                    // set up pointers to (SX|g(r,r')|PG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PG) integrals
 
-                    auto g_x_xxxx = contrBuffer.data(goff + 45 * j);
+                    auto g_x_xxxx = ketBuffer.data(goff + 45 * j);
 
-                    auto g_x_xxxy = contrBuffer.data(goff + 45 * j + 1);
+                    auto g_x_xxxy = ketBuffer.data(goff + 45 * j + 1);
 
-                    auto g_x_xxxz = contrBuffer.data(goff + 45 * j + 2);
+                    auto g_x_xxxz = ketBuffer.data(goff + 45 * j + 2);
 
-                    auto g_x_xxyy = contrBuffer.data(goff + 45 * j + 3);
+                    auto g_x_xxyy = ketBuffer.data(goff + 45 * j + 3);
 
-                    auto g_x_xxyz = contrBuffer.data(goff + 45 * j + 4);
+                    auto g_x_xxyz = ketBuffer.data(goff + 45 * j + 4);
 
-                    auto g_x_xxzz = contrBuffer.data(goff + 45 * j + 5);
+                    auto g_x_xxzz = ketBuffer.data(goff + 45 * j + 5);
 
-                    auto g_x_xyyy = contrBuffer.data(goff + 45 * j + 6);
+                    auto g_x_xyyy = ketBuffer.data(goff + 45 * j + 6);
 
-                    auto g_x_xyyz = contrBuffer.data(goff + 45 * j + 7);
+                    auto g_x_xyyz = ketBuffer.data(goff + 45 * j + 7);
 
-                    auto g_x_xyzz = contrBuffer.data(goff + 45 * j + 8);
+                    auto g_x_xyzz = ketBuffer.data(goff + 45 * j + 8);
 
-                    auto g_x_xzzz = contrBuffer.data(goff + 45 * j + 9);
+                    auto g_x_xzzz = ketBuffer.data(goff + 45 * j + 9);
 
-                    auto g_x_yyyy = contrBuffer.data(goff + 45 * j + 10);
+                    auto g_x_yyyy = ketBuffer.data(goff + 45 * j + 10);
 
-                    auto g_x_yyyz = contrBuffer.data(goff + 45 * j + 11);
+                    auto g_x_yyyz = ketBuffer.data(goff + 45 * j + 11);
 
-                    auto g_x_yyzz = contrBuffer.data(goff + 45 * j + 12);
+                    auto g_x_yyzz = ketBuffer.data(goff + 45 * j + 12);
 
-                    auto g_x_yzzz = contrBuffer.data(goff + 45 * j + 13);
+                    auto g_x_yzzz = ketBuffer.data(goff + 45 * j + 13);
 
-                    auto g_x_zzzz = contrBuffer.data(goff + 45 * j + 14);
+                    auto g_x_zzzz = ketBuffer.data(goff + 45 * j + 14);
 
-                    auto g_y_xxxx = contrBuffer.data(goff + 45 * j + 15);
+                    auto g_y_xxxx = ketBuffer.data(goff + 45 * j + 15);
 
-                    auto g_y_xxxy = contrBuffer.data(goff + 45 * j + 16);
+                    auto g_y_xxxy = ketBuffer.data(goff + 45 * j + 16);
 
-                    auto g_y_xxxz = contrBuffer.data(goff + 45 * j + 17);
+                    auto g_y_xxxz = ketBuffer.data(goff + 45 * j + 17);
 
-                    auto g_y_xxyy = contrBuffer.data(goff + 45 * j + 18);
+                    auto g_y_xxyy = ketBuffer.data(goff + 45 * j + 18);
 
-                    auto g_y_xxyz = contrBuffer.data(goff + 45 * j + 19);
+                    auto g_y_xxyz = ketBuffer.data(goff + 45 * j + 19);
 
-                    auto g_y_xxzz = contrBuffer.data(goff + 45 * j + 20);
+                    auto g_y_xxzz = ketBuffer.data(goff + 45 * j + 20);
 
-                    auto g_y_xyyy = contrBuffer.data(goff + 45 * j + 21);
+                    auto g_y_xyyy = ketBuffer.data(goff + 45 * j + 21);
 
-                    auto g_y_xyyz = contrBuffer.data(goff + 45 * j + 22);
+                    auto g_y_xyyz = ketBuffer.data(goff + 45 * j + 22);
 
-                    auto g_y_xyzz = contrBuffer.data(goff + 45 * j + 23);
+                    auto g_y_xyzz = ketBuffer.data(goff + 45 * j + 23);
 
-                    auto g_y_xzzz = contrBuffer.data(goff + 45 * j + 24);
+                    auto g_y_xzzz = ketBuffer.data(goff + 45 * j + 24);
 
-                    auto g_y_yyyy = contrBuffer.data(goff + 45 * j + 25);
+                    auto g_y_yyyy = ketBuffer.data(goff + 45 * j + 25);
 
-                    auto g_y_yyyz = contrBuffer.data(goff + 45 * j + 26);
+                    auto g_y_yyyz = ketBuffer.data(goff + 45 * j + 26);
 
-                    auto g_y_yyzz = contrBuffer.data(goff + 45 * j + 27);
+                    auto g_y_yyzz = ketBuffer.data(goff + 45 * j + 27);
 
-                    auto g_y_yzzz = contrBuffer.data(goff + 45 * j + 28);
+                    auto g_y_yzzz = ketBuffer.data(goff + 45 * j + 28);
 
-                    auto g_y_zzzz = contrBuffer.data(goff + 45 * j + 29);
+                    auto g_y_zzzz = ketBuffer.data(goff + 45 * j + 29);
 
-                    auto g_z_xxxx = contrBuffer.data(goff + 45 * j + 30);
+                    auto g_z_xxxx = ketBuffer.data(goff + 45 * j + 30);
 
-                    auto g_z_xxxy = contrBuffer.data(goff + 45 * j + 31);
+                    auto g_z_xxxy = ketBuffer.data(goff + 45 * j + 31);
 
-                    auto g_z_xxxz = contrBuffer.data(goff + 45 * j + 32);
+                    auto g_z_xxxz = ketBuffer.data(goff + 45 * j + 32);
 
-                    auto g_z_xxyy = contrBuffer.data(goff + 45 * j + 33);
+                    auto g_z_xxyy = ketBuffer.data(goff + 45 * j + 33);
 
-                    auto g_z_xxyz = contrBuffer.data(goff + 45 * j + 34);
+                    auto g_z_xxyz = ketBuffer.data(goff + 45 * j + 34);
 
-                    auto g_z_xxzz = contrBuffer.data(goff + 45 * j + 35);
+                    auto g_z_xxzz = ketBuffer.data(goff + 45 * j + 35);
 
-                    auto g_z_xyyy = contrBuffer.data(goff + 45 * j + 36);
+                    auto g_z_xyyy = ketBuffer.data(goff + 45 * j + 36);
 
-                    auto g_z_xyyz = contrBuffer.data(goff + 45 * j + 37);
+                    auto g_z_xyyz = ketBuffer.data(goff + 45 * j + 37);
 
-                    auto g_z_xyzz = contrBuffer.data(goff + 45 * j + 38);
+                    auto g_z_xyzz = ketBuffer.data(goff + 45 * j + 38);
 
-                    auto g_z_xzzz = contrBuffer.data(goff + 45 * j + 39);
+                    auto g_z_xzzz = ketBuffer.data(goff + 45 * j + 39);
 
-                    auto g_z_yyyy = contrBuffer.data(goff + 45 * j + 40);
+                    auto g_z_yyyy = ketBuffer.data(goff + 45 * j + 40);
 
-                    auto g_z_yyyz = contrBuffer.data(goff + 45 * j + 41);
+                    auto g_z_yyyz = ketBuffer.data(goff + 45 * j + 41);
 
-                    auto g_z_yyzz = contrBuffer.data(goff + 45 * j + 42);
+                    auto g_z_yyzz = ketBuffer.data(goff + 45 * j + 42);
 
-                    auto g_z_yzzz = contrBuffer.data(goff + 45 * j + 43);
+                    auto g_z_yzzz = ketBuffer.data(goff + 45 * j + 43);
 
-                    auto g_z_zzzz = contrBuffer.data(goff + 45 * j + 44);
+                    auto g_z_zzzz = ketBuffer.data(goff + 45 * j + 44);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_0_xxxx, g2_0_xxxy,\
                                              g2_0_xxxz, g2_0_xxyy, g2_0_xxyz, g2_0_xxzz,\
@@ -954,7 +954,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXPH(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXPH(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -1005,235 +1005,235 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|SH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SH) integrals
 
-                    auto g2_0_xxxxx = contrBuffer.data(g2off + 21 * j);
+                    auto g2_0_xxxxx = ketBuffer.data(g2off + 21 * j);
 
-                    auto g2_0_xxxxy = contrBuffer.data(g2off + 21 * j + 1);
+                    auto g2_0_xxxxy = ketBuffer.data(g2off + 21 * j + 1);
 
-                    auto g2_0_xxxxz = contrBuffer.data(g2off + 21 * j + 2);
+                    auto g2_0_xxxxz = ketBuffer.data(g2off + 21 * j + 2);
 
-                    auto g2_0_xxxyy = contrBuffer.data(g2off + 21 * j + 3);
+                    auto g2_0_xxxyy = ketBuffer.data(g2off + 21 * j + 3);
 
-                    auto g2_0_xxxyz = contrBuffer.data(g2off + 21 * j + 4);
+                    auto g2_0_xxxyz = ketBuffer.data(g2off + 21 * j + 4);
 
-                    auto g2_0_xxxzz = contrBuffer.data(g2off + 21 * j + 5);
+                    auto g2_0_xxxzz = ketBuffer.data(g2off + 21 * j + 5);
 
-                    auto g2_0_xxyyy = contrBuffer.data(g2off + 21 * j + 6);
+                    auto g2_0_xxyyy = ketBuffer.data(g2off + 21 * j + 6);
 
-                    auto g2_0_xxyyz = contrBuffer.data(g2off + 21 * j + 7);
+                    auto g2_0_xxyyz = ketBuffer.data(g2off + 21 * j + 7);
 
-                    auto g2_0_xxyzz = contrBuffer.data(g2off + 21 * j + 8);
+                    auto g2_0_xxyzz = ketBuffer.data(g2off + 21 * j + 8);
 
-                    auto g2_0_xxzzz = contrBuffer.data(g2off + 21 * j + 9);
+                    auto g2_0_xxzzz = ketBuffer.data(g2off + 21 * j + 9);
 
-                    auto g2_0_xyyyy = contrBuffer.data(g2off + 21 * j + 10);
+                    auto g2_0_xyyyy = ketBuffer.data(g2off + 21 * j + 10);
 
-                    auto g2_0_xyyyz = contrBuffer.data(g2off + 21 * j + 11);
+                    auto g2_0_xyyyz = ketBuffer.data(g2off + 21 * j + 11);
 
-                    auto g2_0_xyyzz = contrBuffer.data(g2off + 21 * j + 12);
+                    auto g2_0_xyyzz = ketBuffer.data(g2off + 21 * j + 12);
 
-                    auto g2_0_xyzzz = contrBuffer.data(g2off + 21 * j + 13);
+                    auto g2_0_xyzzz = ketBuffer.data(g2off + 21 * j + 13);
 
-                    auto g2_0_xzzzz = contrBuffer.data(g2off + 21 * j + 14);
+                    auto g2_0_xzzzz = ketBuffer.data(g2off + 21 * j + 14);
 
-                    auto g2_0_yyyyy = contrBuffer.data(g2off + 21 * j + 15);
+                    auto g2_0_yyyyy = ketBuffer.data(g2off + 21 * j + 15);
 
-                    auto g2_0_yyyyz = contrBuffer.data(g2off + 21 * j + 16);
+                    auto g2_0_yyyyz = ketBuffer.data(g2off + 21 * j + 16);
 
-                    auto g2_0_yyyzz = contrBuffer.data(g2off + 21 * j + 17);
+                    auto g2_0_yyyzz = ketBuffer.data(g2off + 21 * j + 17);
 
-                    auto g2_0_yyzzz = contrBuffer.data(g2off + 21 * j + 18);
+                    auto g2_0_yyzzz = ketBuffer.data(g2off + 21 * j + 18);
 
-                    auto g2_0_yzzzz = contrBuffer.data(g2off + 21 * j + 19);
+                    auto g2_0_yzzzz = ketBuffer.data(g2off + 21 * j + 19);
 
-                    auto g2_0_zzzzz = contrBuffer.data(g2off + 21 * j + 20);
+                    auto g2_0_zzzzz = ketBuffer.data(g2off + 21 * j + 20);
 
-                    // set up pointers to (SX|g(r,r')|SI)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SI) integrals
 
-                    auto g1_0_xxxxxx = contrBuffer.data(g1off + 28 * j);
+                    auto g1_0_xxxxxx = ketBuffer.data(g1off + 28 * j);
 
-                    auto g1_0_xxxxxy = contrBuffer.data(g1off + 28 * j + 1);
+                    auto g1_0_xxxxxy = ketBuffer.data(g1off + 28 * j + 1);
 
-                    auto g1_0_xxxxxz = contrBuffer.data(g1off + 28 * j + 2);
+                    auto g1_0_xxxxxz = ketBuffer.data(g1off + 28 * j + 2);
 
-                    auto g1_0_xxxxyy = contrBuffer.data(g1off + 28 * j + 3);
+                    auto g1_0_xxxxyy = ketBuffer.data(g1off + 28 * j + 3);
 
-                    auto g1_0_xxxxyz = contrBuffer.data(g1off + 28 * j + 4);
+                    auto g1_0_xxxxyz = ketBuffer.data(g1off + 28 * j + 4);
 
-                    auto g1_0_xxxxzz = contrBuffer.data(g1off + 28 * j + 5);
+                    auto g1_0_xxxxzz = ketBuffer.data(g1off + 28 * j + 5);
 
-                    auto g1_0_xxxyyy = contrBuffer.data(g1off + 28 * j + 6);
+                    auto g1_0_xxxyyy = ketBuffer.data(g1off + 28 * j + 6);
 
-                    auto g1_0_xxxyyz = contrBuffer.data(g1off + 28 * j + 7);
+                    auto g1_0_xxxyyz = ketBuffer.data(g1off + 28 * j + 7);
 
-                    auto g1_0_xxxyzz = contrBuffer.data(g1off + 28 * j + 8);
+                    auto g1_0_xxxyzz = ketBuffer.data(g1off + 28 * j + 8);
 
-                    auto g1_0_xxxzzz = contrBuffer.data(g1off + 28 * j + 9);
+                    auto g1_0_xxxzzz = ketBuffer.data(g1off + 28 * j + 9);
 
-                    auto g1_0_xxyyyy = contrBuffer.data(g1off + 28 * j + 10);
+                    auto g1_0_xxyyyy = ketBuffer.data(g1off + 28 * j + 10);
 
-                    auto g1_0_xxyyyz = contrBuffer.data(g1off + 28 * j + 11);
+                    auto g1_0_xxyyyz = ketBuffer.data(g1off + 28 * j + 11);
 
-                    auto g1_0_xxyyzz = contrBuffer.data(g1off + 28 * j + 12);
+                    auto g1_0_xxyyzz = ketBuffer.data(g1off + 28 * j + 12);
 
-                    auto g1_0_xxyzzz = contrBuffer.data(g1off + 28 * j + 13);
+                    auto g1_0_xxyzzz = ketBuffer.data(g1off + 28 * j + 13);
 
-                    auto g1_0_xxzzzz = contrBuffer.data(g1off + 28 * j + 14);
+                    auto g1_0_xxzzzz = ketBuffer.data(g1off + 28 * j + 14);
 
-                    auto g1_0_xyyyyy = contrBuffer.data(g1off + 28 * j + 15);
+                    auto g1_0_xyyyyy = ketBuffer.data(g1off + 28 * j + 15);
 
-                    auto g1_0_xyyyyz = contrBuffer.data(g1off + 28 * j + 16);
+                    auto g1_0_xyyyyz = ketBuffer.data(g1off + 28 * j + 16);
 
-                    auto g1_0_xyyyzz = contrBuffer.data(g1off + 28 * j + 17);
+                    auto g1_0_xyyyzz = ketBuffer.data(g1off + 28 * j + 17);
 
-                    auto g1_0_xyyzzz = contrBuffer.data(g1off + 28 * j + 18);
+                    auto g1_0_xyyzzz = ketBuffer.data(g1off + 28 * j + 18);
 
-                    auto g1_0_xyzzzz = contrBuffer.data(g1off + 28 * j + 19);
+                    auto g1_0_xyzzzz = ketBuffer.data(g1off + 28 * j + 19);
 
-                    auto g1_0_xzzzzz = contrBuffer.data(g1off + 28 * j + 20);
+                    auto g1_0_xzzzzz = ketBuffer.data(g1off + 28 * j + 20);
 
-                    auto g1_0_yyyyyy = contrBuffer.data(g1off + 28 * j + 21);
+                    auto g1_0_yyyyyy = ketBuffer.data(g1off + 28 * j + 21);
 
-                    auto g1_0_yyyyyz = contrBuffer.data(g1off + 28 * j + 22);
+                    auto g1_0_yyyyyz = ketBuffer.data(g1off + 28 * j + 22);
 
-                    auto g1_0_yyyyzz = contrBuffer.data(g1off + 28 * j + 23);
+                    auto g1_0_yyyyzz = ketBuffer.data(g1off + 28 * j + 23);
 
-                    auto g1_0_yyyzzz = contrBuffer.data(g1off + 28 * j + 24);
+                    auto g1_0_yyyzzz = ketBuffer.data(g1off + 28 * j + 24);
 
-                    auto g1_0_yyzzzz = contrBuffer.data(g1off + 28 * j + 25);
+                    auto g1_0_yyzzzz = ketBuffer.data(g1off + 28 * j + 25);
 
-                    auto g1_0_yzzzzz = contrBuffer.data(g1off + 28 * j + 26);
+                    auto g1_0_yzzzzz = ketBuffer.data(g1off + 28 * j + 26);
 
-                    auto g1_0_zzzzzz = contrBuffer.data(g1off + 28 * j + 27);
+                    auto g1_0_zzzzzz = ketBuffer.data(g1off + 28 * j + 27);
 
-                    // set up pointers to (SX|g(r,r')|PH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PH) integrals
 
-                    auto g_x_xxxxx = contrBuffer.data(goff + 63 * j);
+                    auto g_x_xxxxx = ketBuffer.data(goff + 63 * j);
 
-                    auto g_x_xxxxy = contrBuffer.data(goff + 63 * j + 1);
+                    auto g_x_xxxxy = ketBuffer.data(goff + 63 * j + 1);
 
-                    auto g_x_xxxxz = contrBuffer.data(goff + 63 * j + 2);
+                    auto g_x_xxxxz = ketBuffer.data(goff + 63 * j + 2);
 
-                    auto g_x_xxxyy = contrBuffer.data(goff + 63 * j + 3);
+                    auto g_x_xxxyy = ketBuffer.data(goff + 63 * j + 3);
 
-                    auto g_x_xxxyz = contrBuffer.data(goff + 63 * j + 4);
+                    auto g_x_xxxyz = ketBuffer.data(goff + 63 * j + 4);
 
-                    auto g_x_xxxzz = contrBuffer.data(goff + 63 * j + 5);
+                    auto g_x_xxxzz = ketBuffer.data(goff + 63 * j + 5);
 
-                    auto g_x_xxyyy = contrBuffer.data(goff + 63 * j + 6);
+                    auto g_x_xxyyy = ketBuffer.data(goff + 63 * j + 6);
 
-                    auto g_x_xxyyz = contrBuffer.data(goff + 63 * j + 7);
+                    auto g_x_xxyyz = ketBuffer.data(goff + 63 * j + 7);
 
-                    auto g_x_xxyzz = contrBuffer.data(goff + 63 * j + 8);
+                    auto g_x_xxyzz = ketBuffer.data(goff + 63 * j + 8);
 
-                    auto g_x_xxzzz = contrBuffer.data(goff + 63 * j + 9);
+                    auto g_x_xxzzz = ketBuffer.data(goff + 63 * j + 9);
 
-                    auto g_x_xyyyy = contrBuffer.data(goff + 63 * j + 10);
+                    auto g_x_xyyyy = ketBuffer.data(goff + 63 * j + 10);
 
-                    auto g_x_xyyyz = contrBuffer.data(goff + 63 * j + 11);
+                    auto g_x_xyyyz = ketBuffer.data(goff + 63 * j + 11);
 
-                    auto g_x_xyyzz = contrBuffer.data(goff + 63 * j + 12);
+                    auto g_x_xyyzz = ketBuffer.data(goff + 63 * j + 12);
 
-                    auto g_x_xyzzz = contrBuffer.data(goff + 63 * j + 13);
+                    auto g_x_xyzzz = ketBuffer.data(goff + 63 * j + 13);
 
-                    auto g_x_xzzzz = contrBuffer.data(goff + 63 * j + 14);
+                    auto g_x_xzzzz = ketBuffer.data(goff + 63 * j + 14);
 
-                    auto g_x_yyyyy = contrBuffer.data(goff + 63 * j + 15);
+                    auto g_x_yyyyy = ketBuffer.data(goff + 63 * j + 15);
 
-                    auto g_x_yyyyz = contrBuffer.data(goff + 63 * j + 16);
+                    auto g_x_yyyyz = ketBuffer.data(goff + 63 * j + 16);
 
-                    auto g_x_yyyzz = contrBuffer.data(goff + 63 * j + 17);
+                    auto g_x_yyyzz = ketBuffer.data(goff + 63 * j + 17);
 
-                    auto g_x_yyzzz = contrBuffer.data(goff + 63 * j + 18);
+                    auto g_x_yyzzz = ketBuffer.data(goff + 63 * j + 18);
 
-                    auto g_x_yzzzz = contrBuffer.data(goff + 63 * j + 19);
+                    auto g_x_yzzzz = ketBuffer.data(goff + 63 * j + 19);
 
-                    auto g_x_zzzzz = contrBuffer.data(goff + 63 * j + 20);
+                    auto g_x_zzzzz = ketBuffer.data(goff + 63 * j + 20);
 
-                    auto g_y_xxxxx = contrBuffer.data(goff + 63 * j + 21);
+                    auto g_y_xxxxx = ketBuffer.data(goff + 63 * j + 21);
 
-                    auto g_y_xxxxy = contrBuffer.data(goff + 63 * j + 22);
+                    auto g_y_xxxxy = ketBuffer.data(goff + 63 * j + 22);
 
-                    auto g_y_xxxxz = contrBuffer.data(goff + 63 * j + 23);
+                    auto g_y_xxxxz = ketBuffer.data(goff + 63 * j + 23);
 
-                    auto g_y_xxxyy = contrBuffer.data(goff + 63 * j + 24);
+                    auto g_y_xxxyy = ketBuffer.data(goff + 63 * j + 24);
 
-                    auto g_y_xxxyz = contrBuffer.data(goff + 63 * j + 25);
+                    auto g_y_xxxyz = ketBuffer.data(goff + 63 * j + 25);
 
-                    auto g_y_xxxzz = contrBuffer.data(goff + 63 * j + 26);
+                    auto g_y_xxxzz = ketBuffer.data(goff + 63 * j + 26);
 
-                    auto g_y_xxyyy = contrBuffer.data(goff + 63 * j + 27);
+                    auto g_y_xxyyy = ketBuffer.data(goff + 63 * j + 27);
 
-                    auto g_y_xxyyz = contrBuffer.data(goff + 63 * j + 28);
+                    auto g_y_xxyyz = ketBuffer.data(goff + 63 * j + 28);
 
-                    auto g_y_xxyzz = contrBuffer.data(goff + 63 * j + 29);
+                    auto g_y_xxyzz = ketBuffer.data(goff + 63 * j + 29);
 
-                    auto g_y_xxzzz = contrBuffer.data(goff + 63 * j + 30);
+                    auto g_y_xxzzz = ketBuffer.data(goff + 63 * j + 30);
 
-                    auto g_y_xyyyy = contrBuffer.data(goff + 63 * j + 31);
+                    auto g_y_xyyyy = ketBuffer.data(goff + 63 * j + 31);
 
-                    auto g_y_xyyyz = contrBuffer.data(goff + 63 * j + 32);
+                    auto g_y_xyyyz = ketBuffer.data(goff + 63 * j + 32);
 
-                    auto g_y_xyyzz = contrBuffer.data(goff + 63 * j + 33);
+                    auto g_y_xyyzz = ketBuffer.data(goff + 63 * j + 33);
 
-                    auto g_y_xyzzz = contrBuffer.data(goff + 63 * j + 34);
+                    auto g_y_xyzzz = ketBuffer.data(goff + 63 * j + 34);
 
-                    auto g_y_xzzzz = contrBuffer.data(goff + 63 * j + 35);
+                    auto g_y_xzzzz = ketBuffer.data(goff + 63 * j + 35);
 
-                    auto g_y_yyyyy = contrBuffer.data(goff + 63 * j + 36);
+                    auto g_y_yyyyy = ketBuffer.data(goff + 63 * j + 36);
 
-                    auto g_y_yyyyz = contrBuffer.data(goff + 63 * j + 37);
+                    auto g_y_yyyyz = ketBuffer.data(goff + 63 * j + 37);
 
-                    auto g_y_yyyzz = contrBuffer.data(goff + 63 * j + 38);
+                    auto g_y_yyyzz = ketBuffer.data(goff + 63 * j + 38);
 
-                    auto g_y_yyzzz = contrBuffer.data(goff + 63 * j + 39);
+                    auto g_y_yyzzz = ketBuffer.data(goff + 63 * j + 39);
 
-                    auto g_y_yzzzz = contrBuffer.data(goff + 63 * j + 40);
+                    auto g_y_yzzzz = ketBuffer.data(goff + 63 * j + 40);
 
-                    auto g_y_zzzzz = contrBuffer.data(goff + 63 * j + 41);
+                    auto g_y_zzzzz = ketBuffer.data(goff + 63 * j + 41);
 
-                    auto g_z_xxxxx = contrBuffer.data(goff + 63 * j + 42);
+                    auto g_z_xxxxx = ketBuffer.data(goff + 63 * j + 42);
 
-                    auto g_z_xxxxy = contrBuffer.data(goff + 63 * j + 43);
+                    auto g_z_xxxxy = ketBuffer.data(goff + 63 * j + 43);
 
-                    auto g_z_xxxxz = contrBuffer.data(goff + 63 * j + 44);
+                    auto g_z_xxxxz = ketBuffer.data(goff + 63 * j + 44);
 
-                    auto g_z_xxxyy = contrBuffer.data(goff + 63 * j + 45);
+                    auto g_z_xxxyy = ketBuffer.data(goff + 63 * j + 45);
 
-                    auto g_z_xxxyz = contrBuffer.data(goff + 63 * j + 46);
+                    auto g_z_xxxyz = ketBuffer.data(goff + 63 * j + 46);
 
-                    auto g_z_xxxzz = contrBuffer.data(goff + 63 * j + 47);
+                    auto g_z_xxxzz = ketBuffer.data(goff + 63 * j + 47);
 
-                    auto g_z_xxyyy = contrBuffer.data(goff + 63 * j + 48);
+                    auto g_z_xxyyy = ketBuffer.data(goff + 63 * j + 48);
 
-                    auto g_z_xxyyz = contrBuffer.data(goff + 63 * j + 49);
+                    auto g_z_xxyyz = ketBuffer.data(goff + 63 * j + 49);
 
-                    auto g_z_xxyzz = contrBuffer.data(goff + 63 * j + 50);
+                    auto g_z_xxyzz = ketBuffer.data(goff + 63 * j + 50);
 
-                    auto g_z_xxzzz = contrBuffer.data(goff + 63 * j + 51);
+                    auto g_z_xxzzz = ketBuffer.data(goff + 63 * j + 51);
 
-                    auto g_z_xyyyy = contrBuffer.data(goff + 63 * j + 52);
+                    auto g_z_xyyyy = ketBuffer.data(goff + 63 * j + 52);
 
-                    auto g_z_xyyyz = contrBuffer.data(goff + 63 * j + 53);
+                    auto g_z_xyyyz = ketBuffer.data(goff + 63 * j + 53);
 
-                    auto g_z_xyyzz = contrBuffer.data(goff + 63 * j + 54);
+                    auto g_z_xyyzz = ketBuffer.data(goff + 63 * j + 54);
 
-                    auto g_z_xyzzz = contrBuffer.data(goff + 63 * j + 55);
+                    auto g_z_xyzzz = ketBuffer.data(goff + 63 * j + 55);
 
-                    auto g_z_xzzzz = contrBuffer.data(goff + 63 * j + 56);
+                    auto g_z_xzzzz = ketBuffer.data(goff + 63 * j + 56);
 
-                    auto g_z_yyyyy = contrBuffer.data(goff + 63 * j + 57);
+                    auto g_z_yyyyy = ketBuffer.data(goff + 63 * j + 57);
 
-                    auto g_z_yyyyz = contrBuffer.data(goff + 63 * j + 58);
+                    auto g_z_yyyyz = ketBuffer.data(goff + 63 * j + 58);
 
-                    auto g_z_yyyzz = contrBuffer.data(goff + 63 * j + 59);
+                    auto g_z_yyyzz = ketBuffer.data(goff + 63 * j + 59);
 
-                    auto g_z_yyzzz = contrBuffer.data(goff + 63 * j + 60);
+                    auto g_z_yyzzz = ketBuffer.data(goff + 63 * j + 60);
 
-                    auto g_z_yzzzz = contrBuffer.data(goff + 63 * j + 61);
+                    auto g_z_yzzzz = ketBuffer.data(goff + 63 * j + 61);
 
-                    auto g_z_zzzzz = contrBuffer.data(goff + 63 * j + 62);
+                    auto g_z_zzzzz = ketBuffer.data(goff + 63 * j + 62);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_0_xxxxx, g2_0_xxxxy,\
                                              g2_0_xxxxz, g2_0_xxxyy, g2_0_xxxyz,\
@@ -1414,7 +1414,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXPI(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXPI(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -1465,307 +1465,307 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|SI)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SI) integrals
 
-                    auto g2_0_xxxxxx = contrBuffer.data(g2off + 28 * j);
+                    auto g2_0_xxxxxx = ketBuffer.data(g2off + 28 * j);
 
-                    auto g2_0_xxxxxy = contrBuffer.data(g2off + 28 * j + 1);
+                    auto g2_0_xxxxxy = ketBuffer.data(g2off + 28 * j + 1);
 
-                    auto g2_0_xxxxxz = contrBuffer.data(g2off + 28 * j + 2);
+                    auto g2_0_xxxxxz = ketBuffer.data(g2off + 28 * j + 2);
 
-                    auto g2_0_xxxxyy = contrBuffer.data(g2off + 28 * j + 3);
+                    auto g2_0_xxxxyy = ketBuffer.data(g2off + 28 * j + 3);
 
-                    auto g2_0_xxxxyz = contrBuffer.data(g2off + 28 * j + 4);
+                    auto g2_0_xxxxyz = ketBuffer.data(g2off + 28 * j + 4);
 
-                    auto g2_0_xxxxzz = contrBuffer.data(g2off + 28 * j + 5);
+                    auto g2_0_xxxxzz = ketBuffer.data(g2off + 28 * j + 5);
 
-                    auto g2_0_xxxyyy = contrBuffer.data(g2off + 28 * j + 6);
+                    auto g2_0_xxxyyy = ketBuffer.data(g2off + 28 * j + 6);
 
-                    auto g2_0_xxxyyz = contrBuffer.data(g2off + 28 * j + 7);
+                    auto g2_0_xxxyyz = ketBuffer.data(g2off + 28 * j + 7);
 
-                    auto g2_0_xxxyzz = contrBuffer.data(g2off + 28 * j + 8);
+                    auto g2_0_xxxyzz = ketBuffer.data(g2off + 28 * j + 8);
 
-                    auto g2_0_xxxzzz = contrBuffer.data(g2off + 28 * j + 9);
+                    auto g2_0_xxxzzz = ketBuffer.data(g2off + 28 * j + 9);
 
-                    auto g2_0_xxyyyy = contrBuffer.data(g2off + 28 * j + 10);
+                    auto g2_0_xxyyyy = ketBuffer.data(g2off + 28 * j + 10);
 
-                    auto g2_0_xxyyyz = contrBuffer.data(g2off + 28 * j + 11);
+                    auto g2_0_xxyyyz = ketBuffer.data(g2off + 28 * j + 11);
 
-                    auto g2_0_xxyyzz = contrBuffer.data(g2off + 28 * j + 12);
+                    auto g2_0_xxyyzz = ketBuffer.data(g2off + 28 * j + 12);
 
-                    auto g2_0_xxyzzz = contrBuffer.data(g2off + 28 * j + 13);
+                    auto g2_0_xxyzzz = ketBuffer.data(g2off + 28 * j + 13);
 
-                    auto g2_0_xxzzzz = contrBuffer.data(g2off + 28 * j + 14);
+                    auto g2_0_xxzzzz = ketBuffer.data(g2off + 28 * j + 14);
 
-                    auto g2_0_xyyyyy = contrBuffer.data(g2off + 28 * j + 15);
+                    auto g2_0_xyyyyy = ketBuffer.data(g2off + 28 * j + 15);
 
-                    auto g2_0_xyyyyz = contrBuffer.data(g2off + 28 * j + 16);
+                    auto g2_0_xyyyyz = ketBuffer.data(g2off + 28 * j + 16);
 
-                    auto g2_0_xyyyzz = contrBuffer.data(g2off + 28 * j + 17);
+                    auto g2_0_xyyyzz = ketBuffer.data(g2off + 28 * j + 17);
 
-                    auto g2_0_xyyzzz = contrBuffer.data(g2off + 28 * j + 18);
+                    auto g2_0_xyyzzz = ketBuffer.data(g2off + 28 * j + 18);
 
-                    auto g2_0_xyzzzz = contrBuffer.data(g2off + 28 * j + 19);
+                    auto g2_0_xyzzzz = ketBuffer.data(g2off + 28 * j + 19);
 
-                    auto g2_0_xzzzzz = contrBuffer.data(g2off + 28 * j + 20);
+                    auto g2_0_xzzzzz = ketBuffer.data(g2off + 28 * j + 20);
 
-                    auto g2_0_yyyyyy = contrBuffer.data(g2off + 28 * j + 21);
+                    auto g2_0_yyyyyy = ketBuffer.data(g2off + 28 * j + 21);
 
-                    auto g2_0_yyyyyz = contrBuffer.data(g2off + 28 * j + 22);
+                    auto g2_0_yyyyyz = ketBuffer.data(g2off + 28 * j + 22);
 
-                    auto g2_0_yyyyzz = contrBuffer.data(g2off + 28 * j + 23);
+                    auto g2_0_yyyyzz = ketBuffer.data(g2off + 28 * j + 23);
 
-                    auto g2_0_yyyzzz = contrBuffer.data(g2off + 28 * j + 24);
+                    auto g2_0_yyyzzz = ketBuffer.data(g2off + 28 * j + 24);
 
-                    auto g2_0_yyzzzz = contrBuffer.data(g2off + 28 * j + 25);
+                    auto g2_0_yyzzzz = ketBuffer.data(g2off + 28 * j + 25);
 
-                    auto g2_0_yzzzzz = contrBuffer.data(g2off + 28 * j + 26);
+                    auto g2_0_yzzzzz = ketBuffer.data(g2off + 28 * j + 26);
 
-                    auto g2_0_zzzzzz = contrBuffer.data(g2off + 28 * j + 27);
+                    auto g2_0_zzzzzz = ketBuffer.data(g2off + 28 * j + 27);
 
-                    // set up pointers to (SX|g(r,r')|SK)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SK) integrals
 
-                    auto g1_0_xxxxxxx = contrBuffer.data(g1off + 36 * j);
+                    auto g1_0_xxxxxxx = ketBuffer.data(g1off + 36 * j);
 
-                    auto g1_0_xxxxxxy = contrBuffer.data(g1off + 36 * j + 1);
+                    auto g1_0_xxxxxxy = ketBuffer.data(g1off + 36 * j + 1);
 
-                    auto g1_0_xxxxxxz = contrBuffer.data(g1off + 36 * j + 2);
+                    auto g1_0_xxxxxxz = ketBuffer.data(g1off + 36 * j + 2);
 
-                    auto g1_0_xxxxxyy = contrBuffer.data(g1off + 36 * j + 3);
+                    auto g1_0_xxxxxyy = ketBuffer.data(g1off + 36 * j + 3);
 
-                    auto g1_0_xxxxxyz = contrBuffer.data(g1off + 36 * j + 4);
+                    auto g1_0_xxxxxyz = ketBuffer.data(g1off + 36 * j + 4);
 
-                    auto g1_0_xxxxxzz = contrBuffer.data(g1off + 36 * j + 5);
+                    auto g1_0_xxxxxzz = ketBuffer.data(g1off + 36 * j + 5);
 
-                    auto g1_0_xxxxyyy = contrBuffer.data(g1off + 36 * j + 6);
+                    auto g1_0_xxxxyyy = ketBuffer.data(g1off + 36 * j + 6);
 
-                    auto g1_0_xxxxyyz = contrBuffer.data(g1off + 36 * j + 7);
+                    auto g1_0_xxxxyyz = ketBuffer.data(g1off + 36 * j + 7);
 
-                    auto g1_0_xxxxyzz = contrBuffer.data(g1off + 36 * j + 8);
+                    auto g1_0_xxxxyzz = ketBuffer.data(g1off + 36 * j + 8);
 
-                    auto g1_0_xxxxzzz = contrBuffer.data(g1off + 36 * j + 9);
+                    auto g1_0_xxxxzzz = ketBuffer.data(g1off + 36 * j + 9);
 
-                    auto g1_0_xxxyyyy = contrBuffer.data(g1off + 36 * j + 10);
+                    auto g1_0_xxxyyyy = ketBuffer.data(g1off + 36 * j + 10);
 
-                    auto g1_0_xxxyyyz = contrBuffer.data(g1off + 36 * j + 11);
+                    auto g1_0_xxxyyyz = ketBuffer.data(g1off + 36 * j + 11);
 
-                    auto g1_0_xxxyyzz = contrBuffer.data(g1off + 36 * j + 12);
+                    auto g1_0_xxxyyzz = ketBuffer.data(g1off + 36 * j + 12);
 
-                    auto g1_0_xxxyzzz = contrBuffer.data(g1off + 36 * j + 13);
+                    auto g1_0_xxxyzzz = ketBuffer.data(g1off + 36 * j + 13);
 
-                    auto g1_0_xxxzzzz = contrBuffer.data(g1off + 36 * j + 14);
+                    auto g1_0_xxxzzzz = ketBuffer.data(g1off + 36 * j + 14);
 
-                    auto g1_0_xxyyyyy = contrBuffer.data(g1off + 36 * j + 15);
+                    auto g1_0_xxyyyyy = ketBuffer.data(g1off + 36 * j + 15);
 
-                    auto g1_0_xxyyyyz = contrBuffer.data(g1off + 36 * j + 16);
+                    auto g1_0_xxyyyyz = ketBuffer.data(g1off + 36 * j + 16);
 
-                    auto g1_0_xxyyyzz = contrBuffer.data(g1off + 36 * j + 17);
+                    auto g1_0_xxyyyzz = ketBuffer.data(g1off + 36 * j + 17);
 
-                    auto g1_0_xxyyzzz = contrBuffer.data(g1off + 36 * j + 18);
+                    auto g1_0_xxyyzzz = ketBuffer.data(g1off + 36 * j + 18);
 
-                    auto g1_0_xxyzzzz = contrBuffer.data(g1off + 36 * j + 19);
+                    auto g1_0_xxyzzzz = ketBuffer.data(g1off + 36 * j + 19);
 
-                    auto g1_0_xxzzzzz = contrBuffer.data(g1off + 36 * j + 20);
+                    auto g1_0_xxzzzzz = ketBuffer.data(g1off + 36 * j + 20);
 
-                    auto g1_0_xyyyyyy = contrBuffer.data(g1off + 36 * j + 21);
+                    auto g1_0_xyyyyyy = ketBuffer.data(g1off + 36 * j + 21);
 
-                    auto g1_0_xyyyyyz = contrBuffer.data(g1off + 36 * j + 22);
+                    auto g1_0_xyyyyyz = ketBuffer.data(g1off + 36 * j + 22);
 
-                    auto g1_0_xyyyyzz = contrBuffer.data(g1off + 36 * j + 23);
+                    auto g1_0_xyyyyzz = ketBuffer.data(g1off + 36 * j + 23);
 
-                    auto g1_0_xyyyzzz = contrBuffer.data(g1off + 36 * j + 24);
+                    auto g1_0_xyyyzzz = ketBuffer.data(g1off + 36 * j + 24);
 
-                    auto g1_0_xyyzzzz = contrBuffer.data(g1off + 36 * j + 25);
+                    auto g1_0_xyyzzzz = ketBuffer.data(g1off + 36 * j + 25);
 
-                    auto g1_0_xyzzzzz = contrBuffer.data(g1off + 36 * j + 26);
+                    auto g1_0_xyzzzzz = ketBuffer.data(g1off + 36 * j + 26);
 
-                    auto g1_0_xzzzzzz = contrBuffer.data(g1off + 36 * j + 27);
+                    auto g1_0_xzzzzzz = ketBuffer.data(g1off + 36 * j + 27);
 
-                    auto g1_0_yyyyyyy = contrBuffer.data(g1off + 36 * j + 28);
+                    auto g1_0_yyyyyyy = ketBuffer.data(g1off + 36 * j + 28);
 
-                    auto g1_0_yyyyyyz = contrBuffer.data(g1off + 36 * j + 29);
+                    auto g1_0_yyyyyyz = ketBuffer.data(g1off + 36 * j + 29);
 
-                    auto g1_0_yyyyyzz = contrBuffer.data(g1off + 36 * j + 30);
+                    auto g1_0_yyyyyzz = ketBuffer.data(g1off + 36 * j + 30);
 
-                    auto g1_0_yyyyzzz = contrBuffer.data(g1off + 36 * j + 31);
+                    auto g1_0_yyyyzzz = ketBuffer.data(g1off + 36 * j + 31);
 
-                    auto g1_0_yyyzzzz = contrBuffer.data(g1off + 36 * j + 32);
+                    auto g1_0_yyyzzzz = ketBuffer.data(g1off + 36 * j + 32);
 
-                    auto g1_0_yyzzzzz = contrBuffer.data(g1off + 36 * j + 33);
+                    auto g1_0_yyzzzzz = ketBuffer.data(g1off + 36 * j + 33);
 
-                    auto g1_0_yzzzzzz = contrBuffer.data(g1off + 36 * j + 34);
+                    auto g1_0_yzzzzzz = ketBuffer.data(g1off + 36 * j + 34);
 
-                    auto g1_0_zzzzzzz = contrBuffer.data(g1off + 36 * j + 35);
+                    auto g1_0_zzzzzzz = ketBuffer.data(g1off + 36 * j + 35);
 
-                    // set up pointers to (SX|g(r,r')|PI)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PI) integrals
 
-                    auto g_x_xxxxxx = contrBuffer.data(goff + 84 * j);
+                    auto g_x_xxxxxx = ketBuffer.data(goff + 84 * j);
 
-                    auto g_x_xxxxxy = contrBuffer.data(goff + 84 * j + 1);
+                    auto g_x_xxxxxy = ketBuffer.data(goff + 84 * j + 1);
 
-                    auto g_x_xxxxxz = contrBuffer.data(goff + 84 * j + 2);
+                    auto g_x_xxxxxz = ketBuffer.data(goff + 84 * j + 2);
 
-                    auto g_x_xxxxyy = contrBuffer.data(goff + 84 * j + 3);
+                    auto g_x_xxxxyy = ketBuffer.data(goff + 84 * j + 3);
 
-                    auto g_x_xxxxyz = contrBuffer.data(goff + 84 * j + 4);
+                    auto g_x_xxxxyz = ketBuffer.data(goff + 84 * j + 4);
 
-                    auto g_x_xxxxzz = contrBuffer.data(goff + 84 * j + 5);
+                    auto g_x_xxxxzz = ketBuffer.data(goff + 84 * j + 5);
 
-                    auto g_x_xxxyyy = contrBuffer.data(goff + 84 * j + 6);
+                    auto g_x_xxxyyy = ketBuffer.data(goff + 84 * j + 6);
 
-                    auto g_x_xxxyyz = contrBuffer.data(goff + 84 * j + 7);
+                    auto g_x_xxxyyz = ketBuffer.data(goff + 84 * j + 7);
 
-                    auto g_x_xxxyzz = contrBuffer.data(goff + 84 * j + 8);
+                    auto g_x_xxxyzz = ketBuffer.data(goff + 84 * j + 8);
 
-                    auto g_x_xxxzzz = contrBuffer.data(goff + 84 * j + 9);
+                    auto g_x_xxxzzz = ketBuffer.data(goff + 84 * j + 9);
 
-                    auto g_x_xxyyyy = contrBuffer.data(goff + 84 * j + 10);
+                    auto g_x_xxyyyy = ketBuffer.data(goff + 84 * j + 10);
 
-                    auto g_x_xxyyyz = contrBuffer.data(goff + 84 * j + 11);
+                    auto g_x_xxyyyz = ketBuffer.data(goff + 84 * j + 11);
 
-                    auto g_x_xxyyzz = contrBuffer.data(goff + 84 * j + 12);
+                    auto g_x_xxyyzz = ketBuffer.data(goff + 84 * j + 12);
 
-                    auto g_x_xxyzzz = contrBuffer.data(goff + 84 * j + 13);
+                    auto g_x_xxyzzz = ketBuffer.data(goff + 84 * j + 13);
 
-                    auto g_x_xxzzzz = contrBuffer.data(goff + 84 * j + 14);
+                    auto g_x_xxzzzz = ketBuffer.data(goff + 84 * j + 14);
 
-                    auto g_x_xyyyyy = contrBuffer.data(goff + 84 * j + 15);
+                    auto g_x_xyyyyy = ketBuffer.data(goff + 84 * j + 15);
 
-                    auto g_x_xyyyyz = contrBuffer.data(goff + 84 * j + 16);
+                    auto g_x_xyyyyz = ketBuffer.data(goff + 84 * j + 16);
 
-                    auto g_x_xyyyzz = contrBuffer.data(goff + 84 * j + 17);
+                    auto g_x_xyyyzz = ketBuffer.data(goff + 84 * j + 17);
 
-                    auto g_x_xyyzzz = contrBuffer.data(goff + 84 * j + 18);
+                    auto g_x_xyyzzz = ketBuffer.data(goff + 84 * j + 18);
 
-                    auto g_x_xyzzzz = contrBuffer.data(goff + 84 * j + 19);
+                    auto g_x_xyzzzz = ketBuffer.data(goff + 84 * j + 19);
 
-                    auto g_x_xzzzzz = contrBuffer.data(goff + 84 * j + 20);
+                    auto g_x_xzzzzz = ketBuffer.data(goff + 84 * j + 20);
 
-                    auto g_x_yyyyyy = contrBuffer.data(goff + 84 * j + 21);
+                    auto g_x_yyyyyy = ketBuffer.data(goff + 84 * j + 21);
 
-                    auto g_x_yyyyyz = contrBuffer.data(goff + 84 * j + 22);
+                    auto g_x_yyyyyz = ketBuffer.data(goff + 84 * j + 22);
 
-                    auto g_x_yyyyzz = contrBuffer.data(goff + 84 * j + 23);
+                    auto g_x_yyyyzz = ketBuffer.data(goff + 84 * j + 23);
 
-                    auto g_x_yyyzzz = contrBuffer.data(goff + 84 * j + 24);
+                    auto g_x_yyyzzz = ketBuffer.data(goff + 84 * j + 24);
 
-                    auto g_x_yyzzzz = contrBuffer.data(goff + 84 * j + 25);
+                    auto g_x_yyzzzz = ketBuffer.data(goff + 84 * j + 25);
 
-                    auto g_x_yzzzzz = contrBuffer.data(goff + 84 * j + 26);
+                    auto g_x_yzzzzz = ketBuffer.data(goff + 84 * j + 26);
 
-                    auto g_x_zzzzzz = contrBuffer.data(goff + 84 * j + 27);
+                    auto g_x_zzzzzz = ketBuffer.data(goff + 84 * j + 27);
 
-                    auto g_y_xxxxxx = contrBuffer.data(goff + 84 * j + 28);
+                    auto g_y_xxxxxx = ketBuffer.data(goff + 84 * j + 28);
 
-                    auto g_y_xxxxxy = contrBuffer.data(goff + 84 * j + 29);
+                    auto g_y_xxxxxy = ketBuffer.data(goff + 84 * j + 29);
 
-                    auto g_y_xxxxxz = contrBuffer.data(goff + 84 * j + 30);
+                    auto g_y_xxxxxz = ketBuffer.data(goff + 84 * j + 30);
 
-                    auto g_y_xxxxyy = contrBuffer.data(goff + 84 * j + 31);
+                    auto g_y_xxxxyy = ketBuffer.data(goff + 84 * j + 31);
 
-                    auto g_y_xxxxyz = contrBuffer.data(goff + 84 * j + 32);
+                    auto g_y_xxxxyz = ketBuffer.data(goff + 84 * j + 32);
 
-                    auto g_y_xxxxzz = contrBuffer.data(goff + 84 * j + 33);
+                    auto g_y_xxxxzz = ketBuffer.data(goff + 84 * j + 33);
 
-                    auto g_y_xxxyyy = contrBuffer.data(goff + 84 * j + 34);
+                    auto g_y_xxxyyy = ketBuffer.data(goff + 84 * j + 34);
 
-                    auto g_y_xxxyyz = contrBuffer.data(goff + 84 * j + 35);
+                    auto g_y_xxxyyz = ketBuffer.data(goff + 84 * j + 35);
 
-                    auto g_y_xxxyzz = contrBuffer.data(goff + 84 * j + 36);
+                    auto g_y_xxxyzz = ketBuffer.data(goff + 84 * j + 36);
 
-                    auto g_y_xxxzzz = contrBuffer.data(goff + 84 * j + 37);
+                    auto g_y_xxxzzz = ketBuffer.data(goff + 84 * j + 37);
 
-                    auto g_y_xxyyyy = contrBuffer.data(goff + 84 * j + 38);
+                    auto g_y_xxyyyy = ketBuffer.data(goff + 84 * j + 38);
 
-                    auto g_y_xxyyyz = contrBuffer.data(goff + 84 * j + 39);
+                    auto g_y_xxyyyz = ketBuffer.data(goff + 84 * j + 39);
 
-                    auto g_y_xxyyzz = contrBuffer.data(goff + 84 * j + 40);
+                    auto g_y_xxyyzz = ketBuffer.data(goff + 84 * j + 40);
 
-                    auto g_y_xxyzzz = contrBuffer.data(goff + 84 * j + 41);
+                    auto g_y_xxyzzz = ketBuffer.data(goff + 84 * j + 41);
 
-                    auto g_y_xxzzzz = contrBuffer.data(goff + 84 * j + 42);
+                    auto g_y_xxzzzz = ketBuffer.data(goff + 84 * j + 42);
 
-                    auto g_y_xyyyyy = contrBuffer.data(goff + 84 * j + 43);
+                    auto g_y_xyyyyy = ketBuffer.data(goff + 84 * j + 43);
 
-                    auto g_y_xyyyyz = contrBuffer.data(goff + 84 * j + 44);
+                    auto g_y_xyyyyz = ketBuffer.data(goff + 84 * j + 44);
 
-                    auto g_y_xyyyzz = contrBuffer.data(goff + 84 * j + 45);
+                    auto g_y_xyyyzz = ketBuffer.data(goff + 84 * j + 45);
 
-                    auto g_y_xyyzzz = contrBuffer.data(goff + 84 * j + 46);
+                    auto g_y_xyyzzz = ketBuffer.data(goff + 84 * j + 46);
 
-                    auto g_y_xyzzzz = contrBuffer.data(goff + 84 * j + 47);
+                    auto g_y_xyzzzz = ketBuffer.data(goff + 84 * j + 47);
 
-                    auto g_y_xzzzzz = contrBuffer.data(goff + 84 * j + 48);
+                    auto g_y_xzzzzz = ketBuffer.data(goff + 84 * j + 48);
 
-                    auto g_y_yyyyyy = contrBuffer.data(goff + 84 * j + 49);
+                    auto g_y_yyyyyy = ketBuffer.data(goff + 84 * j + 49);
 
-                    auto g_y_yyyyyz = contrBuffer.data(goff + 84 * j + 50);
+                    auto g_y_yyyyyz = ketBuffer.data(goff + 84 * j + 50);
 
-                    auto g_y_yyyyzz = contrBuffer.data(goff + 84 * j + 51);
+                    auto g_y_yyyyzz = ketBuffer.data(goff + 84 * j + 51);
 
-                    auto g_y_yyyzzz = contrBuffer.data(goff + 84 * j + 52);
+                    auto g_y_yyyzzz = ketBuffer.data(goff + 84 * j + 52);
 
-                    auto g_y_yyzzzz = contrBuffer.data(goff + 84 * j + 53);
+                    auto g_y_yyzzzz = ketBuffer.data(goff + 84 * j + 53);
 
-                    auto g_y_yzzzzz = contrBuffer.data(goff + 84 * j + 54);
+                    auto g_y_yzzzzz = ketBuffer.data(goff + 84 * j + 54);
 
-                    auto g_y_zzzzzz = contrBuffer.data(goff + 84 * j + 55);
+                    auto g_y_zzzzzz = ketBuffer.data(goff + 84 * j + 55);
 
-                    auto g_z_xxxxxx = contrBuffer.data(goff + 84 * j + 56);
+                    auto g_z_xxxxxx = ketBuffer.data(goff + 84 * j + 56);
 
-                    auto g_z_xxxxxy = contrBuffer.data(goff + 84 * j + 57);
+                    auto g_z_xxxxxy = ketBuffer.data(goff + 84 * j + 57);
 
-                    auto g_z_xxxxxz = contrBuffer.data(goff + 84 * j + 58);
+                    auto g_z_xxxxxz = ketBuffer.data(goff + 84 * j + 58);
 
-                    auto g_z_xxxxyy = contrBuffer.data(goff + 84 * j + 59);
+                    auto g_z_xxxxyy = ketBuffer.data(goff + 84 * j + 59);
 
-                    auto g_z_xxxxyz = contrBuffer.data(goff + 84 * j + 60);
+                    auto g_z_xxxxyz = ketBuffer.data(goff + 84 * j + 60);
 
-                    auto g_z_xxxxzz = contrBuffer.data(goff + 84 * j + 61);
+                    auto g_z_xxxxzz = ketBuffer.data(goff + 84 * j + 61);
 
-                    auto g_z_xxxyyy = contrBuffer.data(goff + 84 * j + 62);
+                    auto g_z_xxxyyy = ketBuffer.data(goff + 84 * j + 62);
 
-                    auto g_z_xxxyyz = contrBuffer.data(goff + 84 * j + 63);
+                    auto g_z_xxxyyz = ketBuffer.data(goff + 84 * j + 63);
 
-                    auto g_z_xxxyzz = contrBuffer.data(goff + 84 * j + 64);
+                    auto g_z_xxxyzz = ketBuffer.data(goff + 84 * j + 64);
 
-                    auto g_z_xxxzzz = contrBuffer.data(goff + 84 * j + 65);
+                    auto g_z_xxxzzz = ketBuffer.data(goff + 84 * j + 65);
 
-                    auto g_z_xxyyyy = contrBuffer.data(goff + 84 * j + 66);
+                    auto g_z_xxyyyy = ketBuffer.data(goff + 84 * j + 66);
 
-                    auto g_z_xxyyyz = contrBuffer.data(goff + 84 * j + 67);
+                    auto g_z_xxyyyz = ketBuffer.data(goff + 84 * j + 67);
 
-                    auto g_z_xxyyzz = contrBuffer.data(goff + 84 * j + 68);
+                    auto g_z_xxyyzz = ketBuffer.data(goff + 84 * j + 68);
 
-                    auto g_z_xxyzzz = contrBuffer.data(goff + 84 * j + 69);
+                    auto g_z_xxyzzz = ketBuffer.data(goff + 84 * j + 69);
 
-                    auto g_z_xxzzzz = contrBuffer.data(goff + 84 * j + 70);
+                    auto g_z_xxzzzz = ketBuffer.data(goff + 84 * j + 70);
 
-                    auto g_z_xyyyyy = contrBuffer.data(goff + 84 * j + 71);
+                    auto g_z_xyyyyy = ketBuffer.data(goff + 84 * j + 71);
 
-                    auto g_z_xyyyyz = contrBuffer.data(goff + 84 * j + 72);
+                    auto g_z_xyyyyz = ketBuffer.data(goff + 84 * j + 72);
 
-                    auto g_z_xyyyzz = contrBuffer.data(goff + 84 * j + 73);
+                    auto g_z_xyyyzz = ketBuffer.data(goff + 84 * j + 73);
 
-                    auto g_z_xyyzzz = contrBuffer.data(goff + 84 * j + 74);
+                    auto g_z_xyyzzz = ketBuffer.data(goff + 84 * j + 74);
 
-                    auto g_z_xyzzzz = contrBuffer.data(goff + 84 * j + 75);
+                    auto g_z_xyzzzz = ketBuffer.data(goff + 84 * j + 75);
 
-                    auto g_z_xzzzzz = contrBuffer.data(goff + 84 * j + 76);
+                    auto g_z_xzzzzz = ketBuffer.data(goff + 84 * j + 76);
 
-                    auto g_z_yyyyyy = contrBuffer.data(goff + 84 * j + 77);
+                    auto g_z_yyyyyy = ketBuffer.data(goff + 84 * j + 77);
 
-                    auto g_z_yyyyyz = contrBuffer.data(goff + 84 * j + 78);
+                    auto g_z_yyyyyz = ketBuffer.data(goff + 84 * j + 78);
 
-                    auto g_z_yyyyzz = contrBuffer.data(goff + 84 * j + 79);
+                    auto g_z_yyyyzz = ketBuffer.data(goff + 84 * j + 79);
 
-                    auto g_z_yyyzzz = contrBuffer.data(goff + 84 * j + 80);
+                    auto g_z_yyyzzz = ketBuffer.data(goff + 84 * j + 80);
 
-                    auto g_z_yyzzzz = contrBuffer.data(goff + 84 * j + 81);
+                    auto g_z_yyzzzz = ketBuffer.data(goff + 84 * j + 81);
 
-                    auto g_z_yzzzzz = contrBuffer.data(goff + 84 * j + 82);
+                    auto g_z_yzzzzz = ketBuffer.data(goff + 84 * j + 82);
 
-                    auto g_z_zzzzzz = contrBuffer.data(goff + 84 * j + 83);
+                    auto g_z_zzzzzz = ketBuffer.data(goff + 84 * j + 83);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_0_xxxxxx, g2_0_xxxxxy,\
                                              g2_0_xxxxxz, g2_0_xxxxyy, g2_0_xxxxyz,\
@@ -2005,7 +2005,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXPK(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXPK(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -2056,389 +2056,389 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|SK)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SK) integrals
 
-                    auto g2_0_xxxxxxx = contrBuffer.data(g2off + 36 * j);
+                    auto g2_0_xxxxxxx = ketBuffer.data(g2off + 36 * j);
 
-                    auto g2_0_xxxxxxy = contrBuffer.data(g2off + 36 * j + 1);
+                    auto g2_0_xxxxxxy = ketBuffer.data(g2off + 36 * j + 1);
 
-                    auto g2_0_xxxxxxz = contrBuffer.data(g2off + 36 * j + 2);
+                    auto g2_0_xxxxxxz = ketBuffer.data(g2off + 36 * j + 2);
 
-                    auto g2_0_xxxxxyy = contrBuffer.data(g2off + 36 * j + 3);
+                    auto g2_0_xxxxxyy = ketBuffer.data(g2off + 36 * j + 3);
 
-                    auto g2_0_xxxxxyz = contrBuffer.data(g2off + 36 * j + 4);
+                    auto g2_0_xxxxxyz = ketBuffer.data(g2off + 36 * j + 4);
 
-                    auto g2_0_xxxxxzz = contrBuffer.data(g2off + 36 * j + 5);
+                    auto g2_0_xxxxxzz = ketBuffer.data(g2off + 36 * j + 5);
 
-                    auto g2_0_xxxxyyy = contrBuffer.data(g2off + 36 * j + 6);
+                    auto g2_0_xxxxyyy = ketBuffer.data(g2off + 36 * j + 6);
 
-                    auto g2_0_xxxxyyz = contrBuffer.data(g2off + 36 * j + 7);
+                    auto g2_0_xxxxyyz = ketBuffer.data(g2off + 36 * j + 7);
 
-                    auto g2_0_xxxxyzz = contrBuffer.data(g2off + 36 * j + 8);
+                    auto g2_0_xxxxyzz = ketBuffer.data(g2off + 36 * j + 8);
 
-                    auto g2_0_xxxxzzz = contrBuffer.data(g2off + 36 * j + 9);
+                    auto g2_0_xxxxzzz = ketBuffer.data(g2off + 36 * j + 9);
 
-                    auto g2_0_xxxyyyy = contrBuffer.data(g2off + 36 * j + 10);
+                    auto g2_0_xxxyyyy = ketBuffer.data(g2off + 36 * j + 10);
 
-                    auto g2_0_xxxyyyz = contrBuffer.data(g2off + 36 * j + 11);
+                    auto g2_0_xxxyyyz = ketBuffer.data(g2off + 36 * j + 11);
 
-                    auto g2_0_xxxyyzz = contrBuffer.data(g2off + 36 * j + 12);
+                    auto g2_0_xxxyyzz = ketBuffer.data(g2off + 36 * j + 12);
 
-                    auto g2_0_xxxyzzz = contrBuffer.data(g2off + 36 * j + 13);
+                    auto g2_0_xxxyzzz = ketBuffer.data(g2off + 36 * j + 13);
 
-                    auto g2_0_xxxzzzz = contrBuffer.data(g2off + 36 * j + 14);
+                    auto g2_0_xxxzzzz = ketBuffer.data(g2off + 36 * j + 14);
 
-                    auto g2_0_xxyyyyy = contrBuffer.data(g2off + 36 * j + 15);
+                    auto g2_0_xxyyyyy = ketBuffer.data(g2off + 36 * j + 15);
 
-                    auto g2_0_xxyyyyz = contrBuffer.data(g2off + 36 * j + 16);
+                    auto g2_0_xxyyyyz = ketBuffer.data(g2off + 36 * j + 16);
 
-                    auto g2_0_xxyyyzz = contrBuffer.data(g2off + 36 * j + 17);
+                    auto g2_0_xxyyyzz = ketBuffer.data(g2off + 36 * j + 17);
 
-                    auto g2_0_xxyyzzz = contrBuffer.data(g2off + 36 * j + 18);
+                    auto g2_0_xxyyzzz = ketBuffer.data(g2off + 36 * j + 18);
 
-                    auto g2_0_xxyzzzz = contrBuffer.data(g2off + 36 * j + 19);
+                    auto g2_0_xxyzzzz = ketBuffer.data(g2off + 36 * j + 19);
 
-                    auto g2_0_xxzzzzz = contrBuffer.data(g2off + 36 * j + 20);
+                    auto g2_0_xxzzzzz = ketBuffer.data(g2off + 36 * j + 20);
 
-                    auto g2_0_xyyyyyy = contrBuffer.data(g2off + 36 * j + 21);
+                    auto g2_0_xyyyyyy = ketBuffer.data(g2off + 36 * j + 21);
 
-                    auto g2_0_xyyyyyz = contrBuffer.data(g2off + 36 * j + 22);
+                    auto g2_0_xyyyyyz = ketBuffer.data(g2off + 36 * j + 22);
 
-                    auto g2_0_xyyyyzz = contrBuffer.data(g2off + 36 * j + 23);
+                    auto g2_0_xyyyyzz = ketBuffer.data(g2off + 36 * j + 23);
 
-                    auto g2_0_xyyyzzz = contrBuffer.data(g2off + 36 * j + 24);
+                    auto g2_0_xyyyzzz = ketBuffer.data(g2off + 36 * j + 24);
 
-                    auto g2_0_xyyzzzz = contrBuffer.data(g2off + 36 * j + 25);
+                    auto g2_0_xyyzzzz = ketBuffer.data(g2off + 36 * j + 25);
 
-                    auto g2_0_xyzzzzz = contrBuffer.data(g2off + 36 * j + 26);
+                    auto g2_0_xyzzzzz = ketBuffer.data(g2off + 36 * j + 26);
 
-                    auto g2_0_xzzzzzz = contrBuffer.data(g2off + 36 * j + 27);
+                    auto g2_0_xzzzzzz = ketBuffer.data(g2off + 36 * j + 27);
 
-                    auto g2_0_yyyyyyy = contrBuffer.data(g2off + 36 * j + 28);
+                    auto g2_0_yyyyyyy = ketBuffer.data(g2off + 36 * j + 28);
 
-                    auto g2_0_yyyyyyz = contrBuffer.data(g2off + 36 * j + 29);
+                    auto g2_0_yyyyyyz = ketBuffer.data(g2off + 36 * j + 29);
 
-                    auto g2_0_yyyyyzz = contrBuffer.data(g2off + 36 * j + 30);
+                    auto g2_0_yyyyyzz = ketBuffer.data(g2off + 36 * j + 30);
 
-                    auto g2_0_yyyyzzz = contrBuffer.data(g2off + 36 * j + 31);
+                    auto g2_0_yyyyzzz = ketBuffer.data(g2off + 36 * j + 31);
 
-                    auto g2_0_yyyzzzz = contrBuffer.data(g2off + 36 * j + 32);
+                    auto g2_0_yyyzzzz = ketBuffer.data(g2off + 36 * j + 32);
 
-                    auto g2_0_yyzzzzz = contrBuffer.data(g2off + 36 * j + 33);
+                    auto g2_0_yyzzzzz = ketBuffer.data(g2off + 36 * j + 33);
 
-                    auto g2_0_yzzzzzz = contrBuffer.data(g2off + 36 * j + 34);
+                    auto g2_0_yzzzzzz = ketBuffer.data(g2off + 36 * j + 34);
 
-                    auto g2_0_zzzzzzz = contrBuffer.data(g2off + 36 * j + 35);
+                    auto g2_0_zzzzzzz = ketBuffer.data(g2off + 36 * j + 35);
 
-                    // set up pointers to (SX|g(r,r')|SL)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|SL) integrals
 
-                    auto g1_0_xxxxxxxx = contrBuffer.data(g1off + 45 * j);
+                    auto g1_0_xxxxxxxx = ketBuffer.data(g1off + 45 * j);
 
-                    auto g1_0_xxxxxxxy = contrBuffer.data(g1off + 45 * j + 1);
+                    auto g1_0_xxxxxxxy = ketBuffer.data(g1off + 45 * j + 1);
 
-                    auto g1_0_xxxxxxxz = contrBuffer.data(g1off + 45 * j + 2);
+                    auto g1_0_xxxxxxxz = ketBuffer.data(g1off + 45 * j + 2);
 
-                    auto g1_0_xxxxxxyy = contrBuffer.data(g1off + 45 * j + 3);
+                    auto g1_0_xxxxxxyy = ketBuffer.data(g1off + 45 * j + 3);
 
-                    auto g1_0_xxxxxxyz = contrBuffer.data(g1off + 45 * j + 4);
+                    auto g1_0_xxxxxxyz = ketBuffer.data(g1off + 45 * j + 4);
 
-                    auto g1_0_xxxxxxzz = contrBuffer.data(g1off + 45 * j + 5);
+                    auto g1_0_xxxxxxzz = ketBuffer.data(g1off + 45 * j + 5);
 
-                    auto g1_0_xxxxxyyy = contrBuffer.data(g1off + 45 * j + 6);
+                    auto g1_0_xxxxxyyy = ketBuffer.data(g1off + 45 * j + 6);
 
-                    auto g1_0_xxxxxyyz = contrBuffer.data(g1off + 45 * j + 7);
+                    auto g1_0_xxxxxyyz = ketBuffer.data(g1off + 45 * j + 7);
 
-                    auto g1_0_xxxxxyzz = contrBuffer.data(g1off + 45 * j + 8);
+                    auto g1_0_xxxxxyzz = ketBuffer.data(g1off + 45 * j + 8);
 
-                    auto g1_0_xxxxxzzz = contrBuffer.data(g1off + 45 * j + 9);
+                    auto g1_0_xxxxxzzz = ketBuffer.data(g1off + 45 * j + 9);
 
-                    auto g1_0_xxxxyyyy = contrBuffer.data(g1off + 45 * j + 10);
+                    auto g1_0_xxxxyyyy = ketBuffer.data(g1off + 45 * j + 10);
 
-                    auto g1_0_xxxxyyyz = contrBuffer.data(g1off + 45 * j + 11);
+                    auto g1_0_xxxxyyyz = ketBuffer.data(g1off + 45 * j + 11);
 
-                    auto g1_0_xxxxyyzz = contrBuffer.data(g1off + 45 * j + 12);
+                    auto g1_0_xxxxyyzz = ketBuffer.data(g1off + 45 * j + 12);
 
-                    auto g1_0_xxxxyzzz = contrBuffer.data(g1off + 45 * j + 13);
+                    auto g1_0_xxxxyzzz = ketBuffer.data(g1off + 45 * j + 13);
 
-                    auto g1_0_xxxxzzzz = contrBuffer.data(g1off + 45 * j + 14);
+                    auto g1_0_xxxxzzzz = ketBuffer.data(g1off + 45 * j + 14);
 
-                    auto g1_0_xxxyyyyy = contrBuffer.data(g1off + 45 * j + 15);
+                    auto g1_0_xxxyyyyy = ketBuffer.data(g1off + 45 * j + 15);
 
-                    auto g1_0_xxxyyyyz = contrBuffer.data(g1off + 45 * j + 16);
+                    auto g1_0_xxxyyyyz = ketBuffer.data(g1off + 45 * j + 16);
 
-                    auto g1_0_xxxyyyzz = contrBuffer.data(g1off + 45 * j + 17);
+                    auto g1_0_xxxyyyzz = ketBuffer.data(g1off + 45 * j + 17);
 
-                    auto g1_0_xxxyyzzz = contrBuffer.data(g1off + 45 * j + 18);
+                    auto g1_0_xxxyyzzz = ketBuffer.data(g1off + 45 * j + 18);
 
-                    auto g1_0_xxxyzzzz = contrBuffer.data(g1off + 45 * j + 19);
+                    auto g1_0_xxxyzzzz = ketBuffer.data(g1off + 45 * j + 19);
 
-                    auto g1_0_xxxzzzzz = contrBuffer.data(g1off + 45 * j + 20);
+                    auto g1_0_xxxzzzzz = ketBuffer.data(g1off + 45 * j + 20);
 
-                    auto g1_0_xxyyyyyy = contrBuffer.data(g1off + 45 * j + 21);
+                    auto g1_0_xxyyyyyy = ketBuffer.data(g1off + 45 * j + 21);
 
-                    auto g1_0_xxyyyyyz = contrBuffer.data(g1off + 45 * j + 22);
+                    auto g1_0_xxyyyyyz = ketBuffer.data(g1off + 45 * j + 22);
 
-                    auto g1_0_xxyyyyzz = contrBuffer.data(g1off + 45 * j + 23);
+                    auto g1_0_xxyyyyzz = ketBuffer.data(g1off + 45 * j + 23);
 
-                    auto g1_0_xxyyyzzz = contrBuffer.data(g1off + 45 * j + 24);
+                    auto g1_0_xxyyyzzz = ketBuffer.data(g1off + 45 * j + 24);
 
-                    auto g1_0_xxyyzzzz = contrBuffer.data(g1off + 45 * j + 25);
+                    auto g1_0_xxyyzzzz = ketBuffer.data(g1off + 45 * j + 25);
 
-                    auto g1_0_xxyzzzzz = contrBuffer.data(g1off + 45 * j + 26);
+                    auto g1_0_xxyzzzzz = ketBuffer.data(g1off + 45 * j + 26);
 
-                    auto g1_0_xxzzzzzz = contrBuffer.data(g1off + 45 * j + 27);
+                    auto g1_0_xxzzzzzz = ketBuffer.data(g1off + 45 * j + 27);
 
-                    auto g1_0_xyyyyyyy = contrBuffer.data(g1off + 45 * j + 28);
+                    auto g1_0_xyyyyyyy = ketBuffer.data(g1off + 45 * j + 28);
 
-                    auto g1_0_xyyyyyyz = contrBuffer.data(g1off + 45 * j + 29);
+                    auto g1_0_xyyyyyyz = ketBuffer.data(g1off + 45 * j + 29);
 
-                    auto g1_0_xyyyyyzz = contrBuffer.data(g1off + 45 * j + 30);
+                    auto g1_0_xyyyyyzz = ketBuffer.data(g1off + 45 * j + 30);
 
-                    auto g1_0_xyyyyzzz = contrBuffer.data(g1off + 45 * j + 31);
+                    auto g1_0_xyyyyzzz = ketBuffer.data(g1off + 45 * j + 31);
 
-                    auto g1_0_xyyyzzzz = contrBuffer.data(g1off + 45 * j + 32);
+                    auto g1_0_xyyyzzzz = ketBuffer.data(g1off + 45 * j + 32);
 
-                    auto g1_0_xyyzzzzz = contrBuffer.data(g1off + 45 * j + 33);
+                    auto g1_0_xyyzzzzz = ketBuffer.data(g1off + 45 * j + 33);
 
-                    auto g1_0_xyzzzzzz = contrBuffer.data(g1off + 45 * j + 34);
+                    auto g1_0_xyzzzzzz = ketBuffer.data(g1off + 45 * j + 34);
 
-                    auto g1_0_xzzzzzzz = contrBuffer.data(g1off + 45 * j + 35);
+                    auto g1_0_xzzzzzzz = ketBuffer.data(g1off + 45 * j + 35);
 
-                    auto g1_0_yyyyyyyy = contrBuffer.data(g1off + 45 * j + 36);
+                    auto g1_0_yyyyyyyy = ketBuffer.data(g1off + 45 * j + 36);
 
-                    auto g1_0_yyyyyyyz = contrBuffer.data(g1off + 45 * j + 37);
+                    auto g1_0_yyyyyyyz = ketBuffer.data(g1off + 45 * j + 37);
 
-                    auto g1_0_yyyyyyzz = contrBuffer.data(g1off + 45 * j + 38);
+                    auto g1_0_yyyyyyzz = ketBuffer.data(g1off + 45 * j + 38);
 
-                    auto g1_0_yyyyyzzz = contrBuffer.data(g1off + 45 * j + 39);
+                    auto g1_0_yyyyyzzz = ketBuffer.data(g1off + 45 * j + 39);
 
-                    auto g1_0_yyyyzzzz = contrBuffer.data(g1off + 45 * j + 40);
+                    auto g1_0_yyyyzzzz = ketBuffer.data(g1off + 45 * j + 40);
 
-                    auto g1_0_yyyzzzzz = contrBuffer.data(g1off + 45 * j + 41);
+                    auto g1_0_yyyzzzzz = ketBuffer.data(g1off + 45 * j + 41);
 
-                    auto g1_0_yyzzzzzz = contrBuffer.data(g1off + 45 * j + 42);
+                    auto g1_0_yyzzzzzz = ketBuffer.data(g1off + 45 * j + 42);
 
-                    auto g1_0_yzzzzzzz = contrBuffer.data(g1off + 45 * j + 43);
+                    auto g1_0_yzzzzzzz = ketBuffer.data(g1off + 45 * j + 43);
 
-                    auto g1_0_zzzzzzzz = contrBuffer.data(g1off + 45 * j + 44);
+                    auto g1_0_zzzzzzzz = ketBuffer.data(g1off + 45 * j + 44);
 
-                    // set up pointers to (SX|g(r,r')|PK)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PK) integrals
 
-                    auto g_x_xxxxxxx = contrBuffer.data(goff + 108 * j);
+                    auto g_x_xxxxxxx = ketBuffer.data(goff + 108 * j);
 
-                    auto g_x_xxxxxxy = contrBuffer.data(goff + 108 * j + 1);
+                    auto g_x_xxxxxxy = ketBuffer.data(goff + 108 * j + 1);
 
-                    auto g_x_xxxxxxz = contrBuffer.data(goff + 108 * j + 2);
+                    auto g_x_xxxxxxz = ketBuffer.data(goff + 108 * j + 2);
 
-                    auto g_x_xxxxxyy = contrBuffer.data(goff + 108 * j + 3);
+                    auto g_x_xxxxxyy = ketBuffer.data(goff + 108 * j + 3);
 
-                    auto g_x_xxxxxyz = contrBuffer.data(goff + 108 * j + 4);
+                    auto g_x_xxxxxyz = ketBuffer.data(goff + 108 * j + 4);
 
-                    auto g_x_xxxxxzz = contrBuffer.data(goff + 108 * j + 5);
+                    auto g_x_xxxxxzz = ketBuffer.data(goff + 108 * j + 5);
 
-                    auto g_x_xxxxyyy = contrBuffer.data(goff + 108 * j + 6);
+                    auto g_x_xxxxyyy = ketBuffer.data(goff + 108 * j + 6);
 
-                    auto g_x_xxxxyyz = contrBuffer.data(goff + 108 * j + 7);
+                    auto g_x_xxxxyyz = ketBuffer.data(goff + 108 * j + 7);
 
-                    auto g_x_xxxxyzz = contrBuffer.data(goff + 108 * j + 8);
+                    auto g_x_xxxxyzz = ketBuffer.data(goff + 108 * j + 8);
 
-                    auto g_x_xxxxzzz = contrBuffer.data(goff + 108 * j + 9);
+                    auto g_x_xxxxzzz = ketBuffer.data(goff + 108 * j + 9);
 
-                    auto g_x_xxxyyyy = contrBuffer.data(goff + 108 * j + 10);
+                    auto g_x_xxxyyyy = ketBuffer.data(goff + 108 * j + 10);
 
-                    auto g_x_xxxyyyz = contrBuffer.data(goff + 108 * j + 11);
+                    auto g_x_xxxyyyz = ketBuffer.data(goff + 108 * j + 11);
 
-                    auto g_x_xxxyyzz = contrBuffer.data(goff + 108 * j + 12);
+                    auto g_x_xxxyyzz = ketBuffer.data(goff + 108 * j + 12);
 
-                    auto g_x_xxxyzzz = contrBuffer.data(goff + 108 * j + 13);
+                    auto g_x_xxxyzzz = ketBuffer.data(goff + 108 * j + 13);
 
-                    auto g_x_xxxzzzz = contrBuffer.data(goff + 108 * j + 14);
+                    auto g_x_xxxzzzz = ketBuffer.data(goff + 108 * j + 14);
 
-                    auto g_x_xxyyyyy = contrBuffer.data(goff + 108 * j + 15);
+                    auto g_x_xxyyyyy = ketBuffer.data(goff + 108 * j + 15);
 
-                    auto g_x_xxyyyyz = contrBuffer.data(goff + 108 * j + 16);
+                    auto g_x_xxyyyyz = ketBuffer.data(goff + 108 * j + 16);
 
-                    auto g_x_xxyyyzz = contrBuffer.data(goff + 108 * j + 17);
+                    auto g_x_xxyyyzz = ketBuffer.data(goff + 108 * j + 17);
 
-                    auto g_x_xxyyzzz = contrBuffer.data(goff + 108 * j + 18);
+                    auto g_x_xxyyzzz = ketBuffer.data(goff + 108 * j + 18);
 
-                    auto g_x_xxyzzzz = contrBuffer.data(goff + 108 * j + 19);
+                    auto g_x_xxyzzzz = ketBuffer.data(goff + 108 * j + 19);
 
-                    auto g_x_xxzzzzz = contrBuffer.data(goff + 108 * j + 20);
+                    auto g_x_xxzzzzz = ketBuffer.data(goff + 108 * j + 20);
 
-                    auto g_x_xyyyyyy = contrBuffer.data(goff + 108 * j + 21);
+                    auto g_x_xyyyyyy = ketBuffer.data(goff + 108 * j + 21);
 
-                    auto g_x_xyyyyyz = contrBuffer.data(goff + 108 * j + 22);
+                    auto g_x_xyyyyyz = ketBuffer.data(goff + 108 * j + 22);
 
-                    auto g_x_xyyyyzz = contrBuffer.data(goff + 108 * j + 23);
+                    auto g_x_xyyyyzz = ketBuffer.data(goff + 108 * j + 23);
 
-                    auto g_x_xyyyzzz = contrBuffer.data(goff + 108 * j + 24);
+                    auto g_x_xyyyzzz = ketBuffer.data(goff + 108 * j + 24);
 
-                    auto g_x_xyyzzzz = contrBuffer.data(goff + 108 * j + 25);
+                    auto g_x_xyyzzzz = ketBuffer.data(goff + 108 * j + 25);
 
-                    auto g_x_xyzzzzz = contrBuffer.data(goff + 108 * j + 26);
+                    auto g_x_xyzzzzz = ketBuffer.data(goff + 108 * j + 26);
 
-                    auto g_x_xzzzzzz = contrBuffer.data(goff + 108 * j + 27);
+                    auto g_x_xzzzzzz = ketBuffer.data(goff + 108 * j + 27);
 
-                    auto g_x_yyyyyyy = contrBuffer.data(goff + 108 * j + 28);
+                    auto g_x_yyyyyyy = ketBuffer.data(goff + 108 * j + 28);
 
-                    auto g_x_yyyyyyz = contrBuffer.data(goff + 108 * j + 29);
+                    auto g_x_yyyyyyz = ketBuffer.data(goff + 108 * j + 29);
 
-                    auto g_x_yyyyyzz = contrBuffer.data(goff + 108 * j + 30);
+                    auto g_x_yyyyyzz = ketBuffer.data(goff + 108 * j + 30);
 
-                    auto g_x_yyyyzzz = contrBuffer.data(goff + 108 * j + 31);
+                    auto g_x_yyyyzzz = ketBuffer.data(goff + 108 * j + 31);
 
-                    auto g_x_yyyzzzz = contrBuffer.data(goff + 108 * j + 32);
+                    auto g_x_yyyzzzz = ketBuffer.data(goff + 108 * j + 32);
 
-                    auto g_x_yyzzzzz = contrBuffer.data(goff + 108 * j + 33);
+                    auto g_x_yyzzzzz = ketBuffer.data(goff + 108 * j + 33);
 
-                    auto g_x_yzzzzzz = contrBuffer.data(goff + 108 * j + 34);
+                    auto g_x_yzzzzzz = ketBuffer.data(goff + 108 * j + 34);
 
-                    auto g_x_zzzzzzz = contrBuffer.data(goff + 108 * j + 35);
+                    auto g_x_zzzzzzz = ketBuffer.data(goff + 108 * j + 35);
 
-                    auto g_y_xxxxxxx = contrBuffer.data(goff + 108 * j + 36);
+                    auto g_y_xxxxxxx = ketBuffer.data(goff + 108 * j + 36);
 
-                    auto g_y_xxxxxxy = contrBuffer.data(goff + 108 * j + 37);
+                    auto g_y_xxxxxxy = ketBuffer.data(goff + 108 * j + 37);
 
-                    auto g_y_xxxxxxz = contrBuffer.data(goff + 108 * j + 38);
+                    auto g_y_xxxxxxz = ketBuffer.data(goff + 108 * j + 38);
 
-                    auto g_y_xxxxxyy = contrBuffer.data(goff + 108 * j + 39);
+                    auto g_y_xxxxxyy = ketBuffer.data(goff + 108 * j + 39);
 
-                    auto g_y_xxxxxyz = contrBuffer.data(goff + 108 * j + 40);
+                    auto g_y_xxxxxyz = ketBuffer.data(goff + 108 * j + 40);
 
-                    auto g_y_xxxxxzz = contrBuffer.data(goff + 108 * j + 41);
+                    auto g_y_xxxxxzz = ketBuffer.data(goff + 108 * j + 41);
 
-                    auto g_y_xxxxyyy = contrBuffer.data(goff + 108 * j + 42);
+                    auto g_y_xxxxyyy = ketBuffer.data(goff + 108 * j + 42);
 
-                    auto g_y_xxxxyyz = contrBuffer.data(goff + 108 * j + 43);
+                    auto g_y_xxxxyyz = ketBuffer.data(goff + 108 * j + 43);
 
-                    auto g_y_xxxxyzz = contrBuffer.data(goff + 108 * j + 44);
+                    auto g_y_xxxxyzz = ketBuffer.data(goff + 108 * j + 44);
 
-                    auto g_y_xxxxzzz = contrBuffer.data(goff + 108 * j + 45);
+                    auto g_y_xxxxzzz = ketBuffer.data(goff + 108 * j + 45);
 
-                    auto g_y_xxxyyyy = contrBuffer.data(goff + 108 * j + 46);
+                    auto g_y_xxxyyyy = ketBuffer.data(goff + 108 * j + 46);
 
-                    auto g_y_xxxyyyz = contrBuffer.data(goff + 108 * j + 47);
+                    auto g_y_xxxyyyz = ketBuffer.data(goff + 108 * j + 47);
 
-                    auto g_y_xxxyyzz = contrBuffer.data(goff + 108 * j + 48);
+                    auto g_y_xxxyyzz = ketBuffer.data(goff + 108 * j + 48);
 
-                    auto g_y_xxxyzzz = contrBuffer.data(goff + 108 * j + 49);
+                    auto g_y_xxxyzzz = ketBuffer.data(goff + 108 * j + 49);
 
-                    auto g_y_xxxzzzz = contrBuffer.data(goff + 108 * j + 50);
+                    auto g_y_xxxzzzz = ketBuffer.data(goff + 108 * j + 50);
 
-                    auto g_y_xxyyyyy = contrBuffer.data(goff + 108 * j + 51);
+                    auto g_y_xxyyyyy = ketBuffer.data(goff + 108 * j + 51);
 
-                    auto g_y_xxyyyyz = contrBuffer.data(goff + 108 * j + 52);
+                    auto g_y_xxyyyyz = ketBuffer.data(goff + 108 * j + 52);
 
-                    auto g_y_xxyyyzz = contrBuffer.data(goff + 108 * j + 53);
+                    auto g_y_xxyyyzz = ketBuffer.data(goff + 108 * j + 53);
 
-                    auto g_y_xxyyzzz = contrBuffer.data(goff + 108 * j + 54);
+                    auto g_y_xxyyzzz = ketBuffer.data(goff + 108 * j + 54);
 
-                    auto g_y_xxyzzzz = contrBuffer.data(goff + 108 * j + 55);
+                    auto g_y_xxyzzzz = ketBuffer.data(goff + 108 * j + 55);
 
-                    auto g_y_xxzzzzz = contrBuffer.data(goff + 108 * j + 56);
+                    auto g_y_xxzzzzz = ketBuffer.data(goff + 108 * j + 56);
 
-                    auto g_y_xyyyyyy = contrBuffer.data(goff + 108 * j + 57);
+                    auto g_y_xyyyyyy = ketBuffer.data(goff + 108 * j + 57);
 
-                    auto g_y_xyyyyyz = contrBuffer.data(goff + 108 * j + 58);
+                    auto g_y_xyyyyyz = ketBuffer.data(goff + 108 * j + 58);
 
-                    auto g_y_xyyyyzz = contrBuffer.data(goff + 108 * j + 59);
+                    auto g_y_xyyyyzz = ketBuffer.data(goff + 108 * j + 59);
 
-                    auto g_y_xyyyzzz = contrBuffer.data(goff + 108 * j + 60);
+                    auto g_y_xyyyzzz = ketBuffer.data(goff + 108 * j + 60);
 
-                    auto g_y_xyyzzzz = contrBuffer.data(goff + 108 * j + 61);
+                    auto g_y_xyyzzzz = ketBuffer.data(goff + 108 * j + 61);
 
-                    auto g_y_xyzzzzz = contrBuffer.data(goff + 108 * j + 62);
+                    auto g_y_xyzzzzz = ketBuffer.data(goff + 108 * j + 62);
 
-                    auto g_y_xzzzzzz = contrBuffer.data(goff + 108 * j + 63);
+                    auto g_y_xzzzzzz = ketBuffer.data(goff + 108 * j + 63);
 
-                    auto g_y_yyyyyyy = contrBuffer.data(goff + 108 * j + 64);
+                    auto g_y_yyyyyyy = ketBuffer.data(goff + 108 * j + 64);
 
-                    auto g_y_yyyyyyz = contrBuffer.data(goff + 108 * j + 65);
+                    auto g_y_yyyyyyz = ketBuffer.data(goff + 108 * j + 65);
 
-                    auto g_y_yyyyyzz = contrBuffer.data(goff + 108 * j + 66);
+                    auto g_y_yyyyyzz = ketBuffer.data(goff + 108 * j + 66);
 
-                    auto g_y_yyyyzzz = contrBuffer.data(goff + 108 * j + 67);
+                    auto g_y_yyyyzzz = ketBuffer.data(goff + 108 * j + 67);
 
-                    auto g_y_yyyzzzz = contrBuffer.data(goff + 108 * j + 68);
+                    auto g_y_yyyzzzz = ketBuffer.data(goff + 108 * j + 68);
 
-                    auto g_y_yyzzzzz = contrBuffer.data(goff + 108 * j + 69);
+                    auto g_y_yyzzzzz = ketBuffer.data(goff + 108 * j + 69);
 
-                    auto g_y_yzzzzzz = contrBuffer.data(goff + 108 * j + 70);
+                    auto g_y_yzzzzzz = ketBuffer.data(goff + 108 * j + 70);
 
-                    auto g_y_zzzzzzz = contrBuffer.data(goff + 108 * j + 71);
+                    auto g_y_zzzzzzz = ketBuffer.data(goff + 108 * j + 71);
 
-                    auto g_z_xxxxxxx = contrBuffer.data(goff + 108 * j + 72);
+                    auto g_z_xxxxxxx = ketBuffer.data(goff + 108 * j + 72);
 
-                    auto g_z_xxxxxxy = contrBuffer.data(goff + 108 * j + 73);
+                    auto g_z_xxxxxxy = ketBuffer.data(goff + 108 * j + 73);
 
-                    auto g_z_xxxxxxz = contrBuffer.data(goff + 108 * j + 74);
+                    auto g_z_xxxxxxz = ketBuffer.data(goff + 108 * j + 74);
 
-                    auto g_z_xxxxxyy = contrBuffer.data(goff + 108 * j + 75);
+                    auto g_z_xxxxxyy = ketBuffer.data(goff + 108 * j + 75);
 
-                    auto g_z_xxxxxyz = contrBuffer.data(goff + 108 * j + 76);
+                    auto g_z_xxxxxyz = ketBuffer.data(goff + 108 * j + 76);
 
-                    auto g_z_xxxxxzz = contrBuffer.data(goff + 108 * j + 77);
+                    auto g_z_xxxxxzz = ketBuffer.data(goff + 108 * j + 77);
 
-                    auto g_z_xxxxyyy = contrBuffer.data(goff + 108 * j + 78);
+                    auto g_z_xxxxyyy = ketBuffer.data(goff + 108 * j + 78);
 
-                    auto g_z_xxxxyyz = contrBuffer.data(goff + 108 * j + 79);
+                    auto g_z_xxxxyyz = ketBuffer.data(goff + 108 * j + 79);
 
-                    auto g_z_xxxxyzz = contrBuffer.data(goff + 108 * j + 80);
+                    auto g_z_xxxxyzz = ketBuffer.data(goff + 108 * j + 80);
 
-                    auto g_z_xxxxzzz = contrBuffer.data(goff + 108 * j + 81);
+                    auto g_z_xxxxzzz = ketBuffer.data(goff + 108 * j + 81);
 
-                    auto g_z_xxxyyyy = contrBuffer.data(goff + 108 * j + 82);
+                    auto g_z_xxxyyyy = ketBuffer.data(goff + 108 * j + 82);
 
-                    auto g_z_xxxyyyz = contrBuffer.data(goff + 108 * j + 83);
+                    auto g_z_xxxyyyz = ketBuffer.data(goff + 108 * j + 83);
 
-                    auto g_z_xxxyyzz = contrBuffer.data(goff + 108 * j + 84);
+                    auto g_z_xxxyyzz = ketBuffer.data(goff + 108 * j + 84);
 
-                    auto g_z_xxxyzzz = contrBuffer.data(goff + 108 * j + 85);
+                    auto g_z_xxxyzzz = ketBuffer.data(goff + 108 * j + 85);
 
-                    auto g_z_xxxzzzz = contrBuffer.data(goff + 108 * j + 86);
+                    auto g_z_xxxzzzz = ketBuffer.data(goff + 108 * j + 86);
 
-                    auto g_z_xxyyyyy = contrBuffer.data(goff + 108 * j + 87);
+                    auto g_z_xxyyyyy = ketBuffer.data(goff + 108 * j + 87);
 
-                    auto g_z_xxyyyyz = contrBuffer.data(goff + 108 * j + 88);
+                    auto g_z_xxyyyyz = ketBuffer.data(goff + 108 * j + 88);
 
-                    auto g_z_xxyyyzz = contrBuffer.data(goff + 108 * j + 89);
+                    auto g_z_xxyyyzz = ketBuffer.data(goff + 108 * j + 89);
 
-                    auto g_z_xxyyzzz = contrBuffer.data(goff + 108 * j + 90);
+                    auto g_z_xxyyzzz = ketBuffer.data(goff + 108 * j + 90);
 
-                    auto g_z_xxyzzzz = contrBuffer.data(goff + 108 * j + 91);
+                    auto g_z_xxyzzzz = ketBuffer.data(goff + 108 * j + 91);
 
-                    auto g_z_xxzzzzz = contrBuffer.data(goff + 108 * j + 92);
+                    auto g_z_xxzzzzz = ketBuffer.data(goff + 108 * j + 92);
 
-                    auto g_z_xyyyyyy = contrBuffer.data(goff + 108 * j + 93);
+                    auto g_z_xyyyyyy = ketBuffer.data(goff + 108 * j + 93);
 
-                    auto g_z_xyyyyyz = contrBuffer.data(goff + 108 * j + 94);
+                    auto g_z_xyyyyyz = ketBuffer.data(goff + 108 * j + 94);
 
-                    auto g_z_xyyyyzz = contrBuffer.data(goff + 108 * j + 95);
+                    auto g_z_xyyyyzz = ketBuffer.data(goff + 108 * j + 95);
 
-                    auto g_z_xyyyzzz = contrBuffer.data(goff + 108 * j + 96);
+                    auto g_z_xyyyzzz = ketBuffer.data(goff + 108 * j + 96);
 
-                    auto g_z_xyyzzzz = contrBuffer.data(goff + 108 * j + 97);
+                    auto g_z_xyyzzzz = ketBuffer.data(goff + 108 * j + 97);
 
-                    auto g_z_xyzzzzz = contrBuffer.data(goff + 108 * j + 98);
+                    auto g_z_xyzzzzz = ketBuffer.data(goff + 108 * j + 98);
 
-                    auto g_z_xzzzzzz = contrBuffer.data(goff + 108 * j + 99);
+                    auto g_z_xzzzzzz = ketBuffer.data(goff + 108 * j + 99);
 
-                    auto g_z_yyyyyyy = contrBuffer.data(goff + 108 * j + 100);
+                    auto g_z_yyyyyyy = ketBuffer.data(goff + 108 * j + 100);
 
-                    auto g_z_yyyyyyz = contrBuffer.data(goff + 108 * j + 101);
+                    auto g_z_yyyyyyz = ketBuffer.data(goff + 108 * j + 101);
 
-                    auto g_z_yyyyyzz = contrBuffer.data(goff + 108 * j + 102);
+                    auto g_z_yyyyyzz = ketBuffer.data(goff + 108 * j + 102);
 
-                    auto g_z_yyyyzzz = contrBuffer.data(goff + 108 * j + 103);
+                    auto g_z_yyyyzzz = ketBuffer.data(goff + 108 * j + 103);
 
-                    auto g_z_yyyzzzz = contrBuffer.data(goff + 108 * j + 104);
+                    auto g_z_yyyzzzz = ketBuffer.data(goff + 108 * j + 104);
 
-                    auto g_z_yyzzzzz = contrBuffer.data(goff + 108 * j + 105);
+                    auto g_z_yyzzzzz = ketBuffer.data(goff + 108 * j + 105);
 
-                    auto g_z_yzzzzzz = contrBuffer.data(goff + 108 * j + 106);
+                    auto g_z_yzzzzzz = ketBuffer.data(goff + 108 * j + 106);
 
-                    auto g_z_zzzzzzz = contrBuffer.data(goff + 108 * j + 107);
+                    auto g_z_zzzzzzz = ketBuffer.data(goff + 108 * j + 107);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_0_xxxxxxx, g2_0_xxxxxxy,\
                                              g2_0_xxxxxxz, g2_0_xxxxxyy, g2_0_xxxxxyz,\
@@ -2740,7 +2740,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXDD(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXDD(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -2791,169 +2791,169 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|PD)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PD) integrals
 
-                    auto g2_x_xx = contrBuffer.data(g2off + 18 * j);
+                    auto g2_x_xx = ketBuffer.data(g2off + 18 * j);
 
-                    auto g2_x_xy = contrBuffer.data(g2off + 18 * j + 1);
+                    auto g2_x_xy = ketBuffer.data(g2off + 18 * j + 1);
 
-                    auto g2_x_xz = contrBuffer.data(g2off + 18 * j + 2);
+                    auto g2_x_xz = ketBuffer.data(g2off + 18 * j + 2);
 
-                    auto g2_x_yy = contrBuffer.data(g2off + 18 * j + 3);
+                    auto g2_x_yy = ketBuffer.data(g2off + 18 * j + 3);
 
-                    auto g2_x_yz = contrBuffer.data(g2off + 18 * j + 4);
+                    auto g2_x_yz = ketBuffer.data(g2off + 18 * j + 4);
 
-                    auto g2_x_zz = contrBuffer.data(g2off + 18 * j + 5);
+                    auto g2_x_zz = ketBuffer.data(g2off + 18 * j + 5);
 
-                    auto g2_y_xx = contrBuffer.data(g2off + 18 * j + 6);
+                    auto g2_y_xx = ketBuffer.data(g2off + 18 * j + 6);
 
-                    auto g2_y_xy = contrBuffer.data(g2off + 18 * j + 7);
+                    auto g2_y_xy = ketBuffer.data(g2off + 18 * j + 7);
 
-                    auto g2_y_xz = contrBuffer.data(g2off + 18 * j + 8);
+                    auto g2_y_xz = ketBuffer.data(g2off + 18 * j + 8);
 
-                    auto g2_y_yy = contrBuffer.data(g2off + 18 * j + 9);
+                    auto g2_y_yy = ketBuffer.data(g2off + 18 * j + 9);
 
-                    auto g2_y_yz = contrBuffer.data(g2off + 18 * j + 10);
+                    auto g2_y_yz = ketBuffer.data(g2off + 18 * j + 10);
 
-                    auto g2_y_zz = contrBuffer.data(g2off + 18 * j + 11);
+                    auto g2_y_zz = ketBuffer.data(g2off + 18 * j + 11);
 
-                    auto g2_z_xx = contrBuffer.data(g2off + 18 * j + 12);
+                    auto g2_z_xx = ketBuffer.data(g2off + 18 * j + 12);
 
-                    auto g2_z_xy = contrBuffer.data(g2off + 18 * j + 13);
+                    auto g2_z_xy = ketBuffer.data(g2off + 18 * j + 13);
 
-                    auto g2_z_xz = contrBuffer.data(g2off + 18 * j + 14);
+                    auto g2_z_xz = ketBuffer.data(g2off + 18 * j + 14);
 
-                    auto g2_z_yy = contrBuffer.data(g2off + 18 * j + 15);
+                    auto g2_z_yy = ketBuffer.data(g2off + 18 * j + 15);
 
-                    auto g2_z_yz = contrBuffer.data(g2off + 18 * j + 16);
+                    auto g2_z_yz = ketBuffer.data(g2off + 18 * j + 16);
 
-                    auto g2_z_zz = contrBuffer.data(g2off + 18 * j + 17);
+                    auto g2_z_zz = ketBuffer.data(g2off + 18 * j + 17);
 
-                    // set up pointers to (SX|g(r,r')|PF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PF) integrals
 
-                    auto g1_x_xxx = contrBuffer.data(g1off + 30 * j);
+                    auto g1_x_xxx = ketBuffer.data(g1off + 30 * j);
 
-                    auto g1_x_xxy = contrBuffer.data(g1off + 30 * j + 1);
+                    auto g1_x_xxy = ketBuffer.data(g1off + 30 * j + 1);
 
-                    auto g1_x_xxz = contrBuffer.data(g1off + 30 * j + 2);
+                    auto g1_x_xxz = ketBuffer.data(g1off + 30 * j + 2);
 
-                    auto g1_x_xyy = contrBuffer.data(g1off + 30 * j + 3);
+                    auto g1_x_xyy = ketBuffer.data(g1off + 30 * j + 3);
 
-                    auto g1_x_xyz = contrBuffer.data(g1off + 30 * j + 4);
+                    auto g1_x_xyz = ketBuffer.data(g1off + 30 * j + 4);
 
-                    auto g1_x_xzz = contrBuffer.data(g1off + 30 * j + 5);
+                    auto g1_x_xzz = ketBuffer.data(g1off + 30 * j + 5);
 
-                    auto g1_y_xxx = contrBuffer.data(g1off + 30 * j + 10);
+                    auto g1_y_xxx = ketBuffer.data(g1off + 30 * j + 10);
 
-                    auto g1_y_xxy = contrBuffer.data(g1off + 30 * j + 11);
+                    auto g1_y_xxy = ketBuffer.data(g1off + 30 * j + 11);
 
-                    auto g1_y_xxz = contrBuffer.data(g1off + 30 * j + 12);
+                    auto g1_y_xxz = ketBuffer.data(g1off + 30 * j + 12);
 
-                    auto g1_y_xyy = contrBuffer.data(g1off + 30 * j + 13);
+                    auto g1_y_xyy = ketBuffer.data(g1off + 30 * j + 13);
 
-                    auto g1_y_xyz = contrBuffer.data(g1off + 30 * j + 14);
+                    auto g1_y_xyz = ketBuffer.data(g1off + 30 * j + 14);
 
-                    auto g1_y_xzz = contrBuffer.data(g1off + 30 * j + 15);
+                    auto g1_y_xzz = ketBuffer.data(g1off + 30 * j + 15);
 
-                    auto g1_y_yyy = contrBuffer.data(g1off + 30 * j + 16);
+                    auto g1_y_yyy = ketBuffer.data(g1off + 30 * j + 16);
 
-                    auto g1_y_yyz = contrBuffer.data(g1off + 30 * j + 17);
+                    auto g1_y_yyz = ketBuffer.data(g1off + 30 * j + 17);
 
-                    auto g1_y_yzz = contrBuffer.data(g1off + 30 * j + 18);
+                    auto g1_y_yzz = ketBuffer.data(g1off + 30 * j + 18);
 
-                    auto g1_z_xxx = contrBuffer.data(g1off + 30 * j + 20);
+                    auto g1_z_xxx = ketBuffer.data(g1off + 30 * j + 20);
 
-                    auto g1_z_xxy = contrBuffer.data(g1off + 30 * j + 21);
+                    auto g1_z_xxy = ketBuffer.data(g1off + 30 * j + 21);
 
-                    auto g1_z_xxz = contrBuffer.data(g1off + 30 * j + 22);
+                    auto g1_z_xxz = ketBuffer.data(g1off + 30 * j + 22);
 
-                    auto g1_z_xyy = contrBuffer.data(g1off + 30 * j + 23);
+                    auto g1_z_xyy = ketBuffer.data(g1off + 30 * j + 23);
 
-                    auto g1_z_xyz = contrBuffer.data(g1off + 30 * j + 24);
+                    auto g1_z_xyz = ketBuffer.data(g1off + 30 * j + 24);
 
-                    auto g1_z_xzz = contrBuffer.data(g1off + 30 * j + 25);
+                    auto g1_z_xzz = ketBuffer.data(g1off + 30 * j + 25);
 
-                    auto g1_z_yyy = contrBuffer.data(g1off + 30 * j + 26);
+                    auto g1_z_yyy = ketBuffer.data(g1off + 30 * j + 26);
 
-                    auto g1_z_yyz = contrBuffer.data(g1off + 30 * j + 27);
+                    auto g1_z_yyz = ketBuffer.data(g1off + 30 * j + 27);
 
-                    auto g1_z_yzz = contrBuffer.data(g1off + 30 * j + 28);
+                    auto g1_z_yzz = ketBuffer.data(g1off + 30 * j + 28);
 
-                    auto g1_z_zzz = contrBuffer.data(g1off + 30 * j + 29);
+                    auto g1_z_zzz = ketBuffer.data(g1off + 30 * j + 29);
 
-                    // set up pointers to (SX|g(r,r')|DD)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DD) integrals
 
-                    auto g_xx_xx = contrBuffer.data(goff + 36 * j);
+                    auto g_xx_xx = ketBuffer.data(goff + 36 * j);
 
-                    auto g_xx_xy = contrBuffer.data(goff + 36 * j + 1);
+                    auto g_xx_xy = ketBuffer.data(goff + 36 * j + 1);
 
-                    auto g_xx_xz = contrBuffer.data(goff + 36 * j + 2);
+                    auto g_xx_xz = ketBuffer.data(goff + 36 * j + 2);
 
-                    auto g_xx_yy = contrBuffer.data(goff + 36 * j + 3);
+                    auto g_xx_yy = ketBuffer.data(goff + 36 * j + 3);
 
-                    auto g_xx_yz = contrBuffer.data(goff + 36 * j + 4);
+                    auto g_xx_yz = ketBuffer.data(goff + 36 * j + 4);
 
-                    auto g_xx_zz = contrBuffer.data(goff + 36 * j + 5);
+                    auto g_xx_zz = ketBuffer.data(goff + 36 * j + 5);
 
-                    auto g_xy_xx = contrBuffer.data(goff + 36 * j + 6);
+                    auto g_xy_xx = ketBuffer.data(goff + 36 * j + 6);
 
-                    auto g_xy_xy = contrBuffer.data(goff + 36 * j + 7);
+                    auto g_xy_xy = ketBuffer.data(goff + 36 * j + 7);
 
-                    auto g_xy_xz = contrBuffer.data(goff + 36 * j + 8);
+                    auto g_xy_xz = ketBuffer.data(goff + 36 * j + 8);
 
-                    auto g_xy_yy = contrBuffer.data(goff + 36 * j + 9);
+                    auto g_xy_yy = ketBuffer.data(goff + 36 * j + 9);
 
-                    auto g_xy_yz = contrBuffer.data(goff + 36 * j + 10);
+                    auto g_xy_yz = ketBuffer.data(goff + 36 * j + 10);
 
-                    auto g_xy_zz = contrBuffer.data(goff + 36 * j + 11);
+                    auto g_xy_zz = ketBuffer.data(goff + 36 * j + 11);
 
-                    auto g_xz_xx = contrBuffer.data(goff + 36 * j + 12);
+                    auto g_xz_xx = ketBuffer.data(goff + 36 * j + 12);
 
-                    auto g_xz_xy = contrBuffer.data(goff + 36 * j + 13);
+                    auto g_xz_xy = ketBuffer.data(goff + 36 * j + 13);
 
-                    auto g_xz_xz = contrBuffer.data(goff + 36 * j + 14);
+                    auto g_xz_xz = ketBuffer.data(goff + 36 * j + 14);
 
-                    auto g_xz_yy = contrBuffer.data(goff + 36 * j + 15);
+                    auto g_xz_yy = ketBuffer.data(goff + 36 * j + 15);
 
-                    auto g_xz_yz = contrBuffer.data(goff + 36 * j + 16);
+                    auto g_xz_yz = ketBuffer.data(goff + 36 * j + 16);
 
-                    auto g_xz_zz = contrBuffer.data(goff + 36 * j + 17);
+                    auto g_xz_zz = ketBuffer.data(goff + 36 * j + 17);
 
-                    auto g_yy_xx = contrBuffer.data(goff + 36 * j + 18);
+                    auto g_yy_xx = ketBuffer.data(goff + 36 * j + 18);
 
-                    auto g_yy_xy = contrBuffer.data(goff + 36 * j + 19);
+                    auto g_yy_xy = ketBuffer.data(goff + 36 * j + 19);
 
-                    auto g_yy_xz = contrBuffer.data(goff + 36 * j + 20);
+                    auto g_yy_xz = ketBuffer.data(goff + 36 * j + 20);
 
-                    auto g_yy_yy = contrBuffer.data(goff + 36 * j + 21);
+                    auto g_yy_yy = ketBuffer.data(goff + 36 * j + 21);
 
-                    auto g_yy_yz = contrBuffer.data(goff + 36 * j + 22);
+                    auto g_yy_yz = ketBuffer.data(goff + 36 * j + 22);
 
-                    auto g_yy_zz = contrBuffer.data(goff + 36 * j + 23);
+                    auto g_yy_zz = ketBuffer.data(goff + 36 * j + 23);
 
-                    auto g_yz_xx = contrBuffer.data(goff + 36 * j + 24);
+                    auto g_yz_xx = ketBuffer.data(goff + 36 * j + 24);
 
-                    auto g_yz_xy = contrBuffer.data(goff + 36 * j + 25);
+                    auto g_yz_xy = ketBuffer.data(goff + 36 * j + 25);
 
-                    auto g_yz_xz = contrBuffer.data(goff + 36 * j + 26);
+                    auto g_yz_xz = ketBuffer.data(goff + 36 * j + 26);
 
-                    auto g_yz_yy = contrBuffer.data(goff + 36 * j + 27);
+                    auto g_yz_yy = ketBuffer.data(goff + 36 * j + 27);
 
-                    auto g_yz_yz = contrBuffer.data(goff + 36 * j + 28);
+                    auto g_yz_yz = ketBuffer.data(goff + 36 * j + 28);
 
-                    auto g_yz_zz = contrBuffer.data(goff + 36 * j + 29);
+                    auto g_yz_zz = ketBuffer.data(goff + 36 * j + 29);
 
-                    auto g_zz_xx = contrBuffer.data(goff + 36 * j + 30);
+                    auto g_zz_xx = ketBuffer.data(goff + 36 * j + 30);
 
-                    auto g_zz_xy = contrBuffer.data(goff + 36 * j + 31);
+                    auto g_zz_xy = ketBuffer.data(goff + 36 * j + 31);
 
-                    auto g_zz_xz = contrBuffer.data(goff + 36 * j + 32);
+                    auto g_zz_xz = ketBuffer.data(goff + 36 * j + 32);
 
-                    auto g_zz_yy = contrBuffer.data(goff + 36 * j + 33);
+                    auto g_zz_yy = ketBuffer.data(goff + 36 * j + 33);
 
-                    auto g_zz_yz = contrBuffer.data(goff + 36 * j + 34);
+                    auto g_zz_yz = ketBuffer.data(goff + 36 * j + 34);
 
-                    auto g_zz_zz = contrBuffer.data(goff + 36 * j + 35);
+                    auto g_zz_zz = ketBuffer.data(goff + 36 * j + 35);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_x_xx, g2_x_xy,\
                                              g2_x_xz, g2_x_yy, g2_x_yz, g2_x_zz,\
@@ -3068,7 +3068,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXDF(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXDF(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -3119,269 +3119,269 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|PF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PF) integrals
 
-                    auto g2_x_xxx = contrBuffer.data(g2off + 30 * j);
+                    auto g2_x_xxx = ketBuffer.data(g2off + 30 * j);
 
-                    auto g2_x_xxy = contrBuffer.data(g2off + 30 * j + 1);
+                    auto g2_x_xxy = ketBuffer.data(g2off + 30 * j + 1);
 
-                    auto g2_x_xxz = contrBuffer.data(g2off + 30 * j + 2);
+                    auto g2_x_xxz = ketBuffer.data(g2off + 30 * j + 2);
 
-                    auto g2_x_xyy = contrBuffer.data(g2off + 30 * j + 3);
+                    auto g2_x_xyy = ketBuffer.data(g2off + 30 * j + 3);
 
-                    auto g2_x_xyz = contrBuffer.data(g2off + 30 * j + 4);
+                    auto g2_x_xyz = ketBuffer.data(g2off + 30 * j + 4);
 
-                    auto g2_x_xzz = contrBuffer.data(g2off + 30 * j + 5);
+                    auto g2_x_xzz = ketBuffer.data(g2off + 30 * j + 5);
 
-                    auto g2_x_yyy = contrBuffer.data(g2off + 30 * j + 6);
+                    auto g2_x_yyy = ketBuffer.data(g2off + 30 * j + 6);
 
-                    auto g2_x_yyz = contrBuffer.data(g2off + 30 * j + 7);
+                    auto g2_x_yyz = ketBuffer.data(g2off + 30 * j + 7);
 
-                    auto g2_x_yzz = contrBuffer.data(g2off + 30 * j + 8);
+                    auto g2_x_yzz = ketBuffer.data(g2off + 30 * j + 8);
 
-                    auto g2_x_zzz = contrBuffer.data(g2off + 30 * j + 9);
+                    auto g2_x_zzz = ketBuffer.data(g2off + 30 * j + 9);
 
-                    auto g2_y_xxx = contrBuffer.data(g2off + 30 * j + 10);
+                    auto g2_y_xxx = ketBuffer.data(g2off + 30 * j + 10);
 
-                    auto g2_y_xxy = contrBuffer.data(g2off + 30 * j + 11);
+                    auto g2_y_xxy = ketBuffer.data(g2off + 30 * j + 11);
 
-                    auto g2_y_xxz = contrBuffer.data(g2off + 30 * j + 12);
+                    auto g2_y_xxz = ketBuffer.data(g2off + 30 * j + 12);
 
-                    auto g2_y_xyy = contrBuffer.data(g2off + 30 * j + 13);
+                    auto g2_y_xyy = ketBuffer.data(g2off + 30 * j + 13);
 
-                    auto g2_y_xyz = contrBuffer.data(g2off + 30 * j + 14);
+                    auto g2_y_xyz = ketBuffer.data(g2off + 30 * j + 14);
 
-                    auto g2_y_xzz = contrBuffer.data(g2off + 30 * j + 15);
+                    auto g2_y_xzz = ketBuffer.data(g2off + 30 * j + 15);
 
-                    auto g2_y_yyy = contrBuffer.data(g2off + 30 * j + 16);
+                    auto g2_y_yyy = ketBuffer.data(g2off + 30 * j + 16);
 
-                    auto g2_y_yyz = contrBuffer.data(g2off + 30 * j + 17);
+                    auto g2_y_yyz = ketBuffer.data(g2off + 30 * j + 17);
 
-                    auto g2_y_yzz = contrBuffer.data(g2off + 30 * j + 18);
+                    auto g2_y_yzz = ketBuffer.data(g2off + 30 * j + 18);
 
-                    auto g2_y_zzz = contrBuffer.data(g2off + 30 * j + 19);
+                    auto g2_y_zzz = ketBuffer.data(g2off + 30 * j + 19);
 
-                    auto g2_z_xxx = contrBuffer.data(g2off + 30 * j + 20);
+                    auto g2_z_xxx = ketBuffer.data(g2off + 30 * j + 20);
 
-                    auto g2_z_xxy = contrBuffer.data(g2off + 30 * j + 21);
+                    auto g2_z_xxy = ketBuffer.data(g2off + 30 * j + 21);
 
-                    auto g2_z_xxz = contrBuffer.data(g2off + 30 * j + 22);
+                    auto g2_z_xxz = ketBuffer.data(g2off + 30 * j + 22);
 
-                    auto g2_z_xyy = contrBuffer.data(g2off + 30 * j + 23);
+                    auto g2_z_xyy = ketBuffer.data(g2off + 30 * j + 23);
 
-                    auto g2_z_xyz = contrBuffer.data(g2off + 30 * j + 24);
+                    auto g2_z_xyz = ketBuffer.data(g2off + 30 * j + 24);
 
-                    auto g2_z_xzz = contrBuffer.data(g2off + 30 * j + 25);
+                    auto g2_z_xzz = ketBuffer.data(g2off + 30 * j + 25);
 
-                    auto g2_z_yyy = contrBuffer.data(g2off + 30 * j + 26);
+                    auto g2_z_yyy = ketBuffer.data(g2off + 30 * j + 26);
 
-                    auto g2_z_yyz = contrBuffer.data(g2off + 30 * j + 27);
+                    auto g2_z_yyz = ketBuffer.data(g2off + 30 * j + 27);
 
-                    auto g2_z_yzz = contrBuffer.data(g2off + 30 * j + 28);
+                    auto g2_z_yzz = ketBuffer.data(g2off + 30 * j + 28);
 
-                    auto g2_z_zzz = contrBuffer.data(g2off + 30 * j + 29);
+                    auto g2_z_zzz = ketBuffer.data(g2off + 30 * j + 29);
 
-                    // set up pointers to (SX|g(r,r')|PG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PG) integrals
 
-                    auto g1_x_xxxx = contrBuffer.data(g1off + 45 * j);
+                    auto g1_x_xxxx = ketBuffer.data(g1off + 45 * j);
 
-                    auto g1_x_xxxy = contrBuffer.data(g1off + 45 * j + 1);
+                    auto g1_x_xxxy = ketBuffer.data(g1off + 45 * j + 1);
 
-                    auto g1_x_xxxz = contrBuffer.data(g1off + 45 * j + 2);
+                    auto g1_x_xxxz = ketBuffer.data(g1off + 45 * j + 2);
 
-                    auto g1_x_xxyy = contrBuffer.data(g1off + 45 * j + 3);
+                    auto g1_x_xxyy = ketBuffer.data(g1off + 45 * j + 3);
 
-                    auto g1_x_xxyz = contrBuffer.data(g1off + 45 * j + 4);
+                    auto g1_x_xxyz = ketBuffer.data(g1off + 45 * j + 4);
 
-                    auto g1_x_xxzz = contrBuffer.data(g1off + 45 * j + 5);
+                    auto g1_x_xxzz = ketBuffer.data(g1off + 45 * j + 5);
 
-                    auto g1_x_xyyy = contrBuffer.data(g1off + 45 * j + 6);
+                    auto g1_x_xyyy = ketBuffer.data(g1off + 45 * j + 6);
 
-                    auto g1_x_xyyz = contrBuffer.data(g1off + 45 * j + 7);
+                    auto g1_x_xyyz = ketBuffer.data(g1off + 45 * j + 7);
 
-                    auto g1_x_xyzz = contrBuffer.data(g1off + 45 * j + 8);
+                    auto g1_x_xyzz = ketBuffer.data(g1off + 45 * j + 8);
 
-                    auto g1_x_xzzz = contrBuffer.data(g1off + 45 * j + 9);
+                    auto g1_x_xzzz = ketBuffer.data(g1off + 45 * j + 9);
 
-                    auto g1_y_xxxx = contrBuffer.data(g1off + 45 * j + 15);
+                    auto g1_y_xxxx = ketBuffer.data(g1off + 45 * j + 15);
 
-                    auto g1_y_xxxy = contrBuffer.data(g1off + 45 * j + 16);
+                    auto g1_y_xxxy = ketBuffer.data(g1off + 45 * j + 16);
 
-                    auto g1_y_xxxz = contrBuffer.data(g1off + 45 * j + 17);
+                    auto g1_y_xxxz = ketBuffer.data(g1off + 45 * j + 17);
 
-                    auto g1_y_xxyy = contrBuffer.data(g1off + 45 * j + 18);
+                    auto g1_y_xxyy = ketBuffer.data(g1off + 45 * j + 18);
 
-                    auto g1_y_xxyz = contrBuffer.data(g1off + 45 * j + 19);
+                    auto g1_y_xxyz = ketBuffer.data(g1off + 45 * j + 19);
 
-                    auto g1_y_xxzz = contrBuffer.data(g1off + 45 * j + 20);
+                    auto g1_y_xxzz = ketBuffer.data(g1off + 45 * j + 20);
 
-                    auto g1_y_xyyy = contrBuffer.data(g1off + 45 * j + 21);
+                    auto g1_y_xyyy = ketBuffer.data(g1off + 45 * j + 21);
 
-                    auto g1_y_xyyz = contrBuffer.data(g1off + 45 * j + 22);
+                    auto g1_y_xyyz = ketBuffer.data(g1off + 45 * j + 22);
 
-                    auto g1_y_xyzz = contrBuffer.data(g1off + 45 * j + 23);
+                    auto g1_y_xyzz = ketBuffer.data(g1off + 45 * j + 23);
 
-                    auto g1_y_xzzz = contrBuffer.data(g1off + 45 * j + 24);
+                    auto g1_y_xzzz = ketBuffer.data(g1off + 45 * j + 24);
 
-                    auto g1_y_yyyy = contrBuffer.data(g1off + 45 * j + 25);
+                    auto g1_y_yyyy = ketBuffer.data(g1off + 45 * j + 25);
 
-                    auto g1_y_yyyz = contrBuffer.data(g1off + 45 * j + 26);
+                    auto g1_y_yyyz = ketBuffer.data(g1off + 45 * j + 26);
 
-                    auto g1_y_yyzz = contrBuffer.data(g1off + 45 * j + 27);
+                    auto g1_y_yyzz = ketBuffer.data(g1off + 45 * j + 27);
 
-                    auto g1_y_yzzz = contrBuffer.data(g1off + 45 * j + 28);
+                    auto g1_y_yzzz = ketBuffer.data(g1off + 45 * j + 28);
 
-                    auto g1_z_xxxx = contrBuffer.data(g1off + 45 * j + 30);
+                    auto g1_z_xxxx = ketBuffer.data(g1off + 45 * j + 30);
 
-                    auto g1_z_xxxy = contrBuffer.data(g1off + 45 * j + 31);
+                    auto g1_z_xxxy = ketBuffer.data(g1off + 45 * j + 31);
 
-                    auto g1_z_xxxz = contrBuffer.data(g1off + 45 * j + 32);
+                    auto g1_z_xxxz = ketBuffer.data(g1off + 45 * j + 32);
 
-                    auto g1_z_xxyy = contrBuffer.data(g1off + 45 * j + 33);
+                    auto g1_z_xxyy = ketBuffer.data(g1off + 45 * j + 33);
 
-                    auto g1_z_xxyz = contrBuffer.data(g1off + 45 * j + 34);
+                    auto g1_z_xxyz = ketBuffer.data(g1off + 45 * j + 34);
 
-                    auto g1_z_xxzz = contrBuffer.data(g1off + 45 * j + 35);
+                    auto g1_z_xxzz = ketBuffer.data(g1off + 45 * j + 35);
 
-                    auto g1_z_xyyy = contrBuffer.data(g1off + 45 * j + 36);
+                    auto g1_z_xyyy = ketBuffer.data(g1off + 45 * j + 36);
 
-                    auto g1_z_xyyz = contrBuffer.data(g1off + 45 * j + 37);
+                    auto g1_z_xyyz = ketBuffer.data(g1off + 45 * j + 37);
 
-                    auto g1_z_xyzz = contrBuffer.data(g1off + 45 * j + 38);
+                    auto g1_z_xyzz = ketBuffer.data(g1off + 45 * j + 38);
 
-                    auto g1_z_xzzz = contrBuffer.data(g1off + 45 * j + 39);
+                    auto g1_z_xzzz = ketBuffer.data(g1off + 45 * j + 39);
 
-                    auto g1_z_yyyy = contrBuffer.data(g1off + 45 * j + 40);
+                    auto g1_z_yyyy = ketBuffer.data(g1off + 45 * j + 40);
 
-                    auto g1_z_yyyz = contrBuffer.data(g1off + 45 * j + 41);
+                    auto g1_z_yyyz = ketBuffer.data(g1off + 45 * j + 41);
 
-                    auto g1_z_yyzz = contrBuffer.data(g1off + 45 * j + 42);
+                    auto g1_z_yyzz = ketBuffer.data(g1off + 45 * j + 42);
 
-                    auto g1_z_yzzz = contrBuffer.data(g1off + 45 * j + 43);
+                    auto g1_z_yzzz = ketBuffer.data(g1off + 45 * j + 43);
 
-                    auto g1_z_zzzz = contrBuffer.data(g1off + 45 * j + 44);
+                    auto g1_z_zzzz = ketBuffer.data(g1off + 45 * j + 44);
 
-                    // set up pointers to (SX|g(r,r')|DF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DF) integrals
 
-                    auto g_xx_xxx = contrBuffer.data(goff + 60 * j);
+                    auto g_xx_xxx = ketBuffer.data(goff + 60 * j);
 
-                    auto g_xx_xxy = contrBuffer.data(goff + 60 * j + 1);
+                    auto g_xx_xxy = ketBuffer.data(goff + 60 * j + 1);
 
-                    auto g_xx_xxz = contrBuffer.data(goff + 60 * j + 2);
+                    auto g_xx_xxz = ketBuffer.data(goff + 60 * j + 2);
 
-                    auto g_xx_xyy = contrBuffer.data(goff + 60 * j + 3);
+                    auto g_xx_xyy = ketBuffer.data(goff + 60 * j + 3);
 
-                    auto g_xx_xyz = contrBuffer.data(goff + 60 * j + 4);
+                    auto g_xx_xyz = ketBuffer.data(goff + 60 * j + 4);
 
-                    auto g_xx_xzz = contrBuffer.data(goff + 60 * j + 5);
+                    auto g_xx_xzz = ketBuffer.data(goff + 60 * j + 5);
 
-                    auto g_xx_yyy = contrBuffer.data(goff + 60 * j + 6);
+                    auto g_xx_yyy = ketBuffer.data(goff + 60 * j + 6);
 
-                    auto g_xx_yyz = contrBuffer.data(goff + 60 * j + 7);
+                    auto g_xx_yyz = ketBuffer.data(goff + 60 * j + 7);
 
-                    auto g_xx_yzz = contrBuffer.data(goff + 60 * j + 8);
+                    auto g_xx_yzz = ketBuffer.data(goff + 60 * j + 8);
 
-                    auto g_xx_zzz = contrBuffer.data(goff + 60 * j + 9);
+                    auto g_xx_zzz = ketBuffer.data(goff + 60 * j + 9);
 
-                    auto g_xy_xxx = contrBuffer.data(goff + 60 * j + 10);
+                    auto g_xy_xxx = ketBuffer.data(goff + 60 * j + 10);
 
-                    auto g_xy_xxy = contrBuffer.data(goff + 60 * j + 11);
+                    auto g_xy_xxy = ketBuffer.data(goff + 60 * j + 11);
 
-                    auto g_xy_xxz = contrBuffer.data(goff + 60 * j + 12);
+                    auto g_xy_xxz = ketBuffer.data(goff + 60 * j + 12);
 
-                    auto g_xy_xyy = contrBuffer.data(goff + 60 * j + 13);
+                    auto g_xy_xyy = ketBuffer.data(goff + 60 * j + 13);
 
-                    auto g_xy_xyz = contrBuffer.data(goff + 60 * j + 14);
+                    auto g_xy_xyz = ketBuffer.data(goff + 60 * j + 14);
 
-                    auto g_xy_xzz = contrBuffer.data(goff + 60 * j + 15);
+                    auto g_xy_xzz = ketBuffer.data(goff + 60 * j + 15);
 
-                    auto g_xy_yyy = contrBuffer.data(goff + 60 * j + 16);
+                    auto g_xy_yyy = ketBuffer.data(goff + 60 * j + 16);
 
-                    auto g_xy_yyz = contrBuffer.data(goff + 60 * j + 17);
+                    auto g_xy_yyz = ketBuffer.data(goff + 60 * j + 17);
 
-                    auto g_xy_yzz = contrBuffer.data(goff + 60 * j + 18);
+                    auto g_xy_yzz = ketBuffer.data(goff + 60 * j + 18);
 
-                    auto g_xy_zzz = contrBuffer.data(goff + 60 * j + 19);
+                    auto g_xy_zzz = ketBuffer.data(goff + 60 * j + 19);
 
-                    auto g_xz_xxx = contrBuffer.data(goff + 60 * j + 20);
+                    auto g_xz_xxx = ketBuffer.data(goff + 60 * j + 20);
 
-                    auto g_xz_xxy = contrBuffer.data(goff + 60 * j + 21);
+                    auto g_xz_xxy = ketBuffer.data(goff + 60 * j + 21);
 
-                    auto g_xz_xxz = contrBuffer.data(goff + 60 * j + 22);
+                    auto g_xz_xxz = ketBuffer.data(goff + 60 * j + 22);
 
-                    auto g_xz_xyy = contrBuffer.data(goff + 60 * j + 23);
+                    auto g_xz_xyy = ketBuffer.data(goff + 60 * j + 23);
 
-                    auto g_xz_xyz = contrBuffer.data(goff + 60 * j + 24);
+                    auto g_xz_xyz = ketBuffer.data(goff + 60 * j + 24);
 
-                    auto g_xz_xzz = contrBuffer.data(goff + 60 * j + 25);
+                    auto g_xz_xzz = ketBuffer.data(goff + 60 * j + 25);
 
-                    auto g_xz_yyy = contrBuffer.data(goff + 60 * j + 26);
+                    auto g_xz_yyy = ketBuffer.data(goff + 60 * j + 26);
 
-                    auto g_xz_yyz = contrBuffer.data(goff + 60 * j + 27);
+                    auto g_xz_yyz = ketBuffer.data(goff + 60 * j + 27);
 
-                    auto g_xz_yzz = contrBuffer.data(goff + 60 * j + 28);
+                    auto g_xz_yzz = ketBuffer.data(goff + 60 * j + 28);
 
-                    auto g_xz_zzz = contrBuffer.data(goff + 60 * j + 29);
+                    auto g_xz_zzz = ketBuffer.data(goff + 60 * j + 29);
 
-                    auto g_yy_xxx = contrBuffer.data(goff + 60 * j + 30);
+                    auto g_yy_xxx = ketBuffer.data(goff + 60 * j + 30);
 
-                    auto g_yy_xxy = contrBuffer.data(goff + 60 * j + 31);
+                    auto g_yy_xxy = ketBuffer.data(goff + 60 * j + 31);
 
-                    auto g_yy_xxz = contrBuffer.data(goff + 60 * j + 32);
+                    auto g_yy_xxz = ketBuffer.data(goff + 60 * j + 32);
 
-                    auto g_yy_xyy = contrBuffer.data(goff + 60 * j + 33);
+                    auto g_yy_xyy = ketBuffer.data(goff + 60 * j + 33);
 
-                    auto g_yy_xyz = contrBuffer.data(goff + 60 * j + 34);
+                    auto g_yy_xyz = ketBuffer.data(goff + 60 * j + 34);
 
-                    auto g_yy_xzz = contrBuffer.data(goff + 60 * j + 35);
+                    auto g_yy_xzz = ketBuffer.data(goff + 60 * j + 35);
 
-                    auto g_yy_yyy = contrBuffer.data(goff + 60 * j + 36);
+                    auto g_yy_yyy = ketBuffer.data(goff + 60 * j + 36);
 
-                    auto g_yy_yyz = contrBuffer.data(goff + 60 * j + 37);
+                    auto g_yy_yyz = ketBuffer.data(goff + 60 * j + 37);
 
-                    auto g_yy_yzz = contrBuffer.data(goff + 60 * j + 38);
+                    auto g_yy_yzz = ketBuffer.data(goff + 60 * j + 38);
 
-                    auto g_yy_zzz = contrBuffer.data(goff + 60 * j + 39);
+                    auto g_yy_zzz = ketBuffer.data(goff + 60 * j + 39);
 
-                    auto g_yz_xxx = contrBuffer.data(goff + 60 * j + 40);
+                    auto g_yz_xxx = ketBuffer.data(goff + 60 * j + 40);
 
-                    auto g_yz_xxy = contrBuffer.data(goff + 60 * j + 41);
+                    auto g_yz_xxy = ketBuffer.data(goff + 60 * j + 41);
 
-                    auto g_yz_xxz = contrBuffer.data(goff + 60 * j + 42);
+                    auto g_yz_xxz = ketBuffer.data(goff + 60 * j + 42);
 
-                    auto g_yz_xyy = contrBuffer.data(goff + 60 * j + 43);
+                    auto g_yz_xyy = ketBuffer.data(goff + 60 * j + 43);
 
-                    auto g_yz_xyz = contrBuffer.data(goff + 60 * j + 44);
+                    auto g_yz_xyz = ketBuffer.data(goff + 60 * j + 44);
 
-                    auto g_yz_xzz = contrBuffer.data(goff + 60 * j + 45);
+                    auto g_yz_xzz = ketBuffer.data(goff + 60 * j + 45);
 
-                    auto g_yz_yyy = contrBuffer.data(goff + 60 * j + 46);
+                    auto g_yz_yyy = ketBuffer.data(goff + 60 * j + 46);
 
-                    auto g_yz_yyz = contrBuffer.data(goff + 60 * j + 47);
+                    auto g_yz_yyz = ketBuffer.data(goff + 60 * j + 47);
 
-                    auto g_yz_yzz = contrBuffer.data(goff + 60 * j + 48);
+                    auto g_yz_yzz = ketBuffer.data(goff + 60 * j + 48);
 
-                    auto g_yz_zzz = contrBuffer.data(goff + 60 * j + 49);
+                    auto g_yz_zzz = ketBuffer.data(goff + 60 * j + 49);
 
-                    auto g_zz_xxx = contrBuffer.data(goff + 60 * j + 50);
+                    auto g_zz_xxx = ketBuffer.data(goff + 60 * j + 50);
 
-                    auto g_zz_xxy = contrBuffer.data(goff + 60 * j + 51);
+                    auto g_zz_xxy = ketBuffer.data(goff + 60 * j + 51);
 
-                    auto g_zz_xxz = contrBuffer.data(goff + 60 * j + 52);
+                    auto g_zz_xxz = ketBuffer.data(goff + 60 * j + 52);
 
-                    auto g_zz_xyy = contrBuffer.data(goff + 60 * j + 53);
+                    auto g_zz_xyy = ketBuffer.data(goff + 60 * j + 53);
 
-                    auto g_zz_xyz = contrBuffer.data(goff + 60 * j + 54);
+                    auto g_zz_xyz = ketBuffer.data(goff + 60 * j + 54);
 
-                    auto g_zz_xzz = contrBuffer.data(goff + 60 * j + 55);
+                    auto g_zz_xzz = ketBuffer.data(goff + 60 * j + 55);
 
-                    auto g_zz_yyy = contrBuffer.data(goff + 60 * j + 56);
+                    auto g_zz_yyy = ketBuffer.data(goff + 60 * j + 56);
 
-                    auto g_zz_yyz = contrBuffer.data(goff + 60 * j + 57);
+                    auto g_zz_yyz = ketBuffer.data(goff + 60 * j + 57);
 
-                    auto g_zz_yzz = contrBuffer.data(goff + 60 * j + 58);
+                    auto g_zz_yzz = ketBuffer.data(goff + 60 * j + 58);
 
-                    auto g_zz_zzz = contrBuffer.data(goff + 60 * j + 59);
+                    auto g_zz_zzz = ketBuffer.data(goff + 60 * j + 59);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_x_xxx, g2_x_xxy,\
                                              g2_x_xxz, g2_x_xyy, g2_x_xyz, g2_x_xzz,\
@@ -3557,7 +3557,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXDG(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXDG(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -3608,393 +3608,393 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|PG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PG) integrals
 
-                    auto g2_x_xxxx = contrBuffer.data(g2off + 45 * j);
+                    auto g2_x_xxxx = ketBuffer.data(g2off + 45 * j);
 
-                    auto g2_x_xxxy = contrBuffer.data(g2off + 45 * j + 1);
+                    auto g2_x_xxxy = ketBuffer.data(g2off + 45 * j + 1);
 
-                    auto g2_x_xxxz = contrBuffer.data(g2off + 45 * j + 2);
+                    auto g2_x_xxxz = ketBuffer.data(g2off + 45 * j + 2);
 
-                    auto g2_x_xxyy = contrBuffer.data(g2off + 45 * j + 3);
+                    auto g2_x_xxyy = ketBuffer.data(g2off + 45 * j + 3);
 
-                    auto g2_x_xxyz = contrBuffer.data(g2off + 45 * j + 4);
+                    auto g2_x_xxyz = ketBuffer.data(g2off + 45 * j + 4);
 
-                    auto g2_x_xxzz = contrBuffer.data(g2off + 45 * j + 5);
+                    auto g2_x_xxzz = ketBuffer.data(g2off + 45 * j + 5);
 
-                    auto g2_x_xyyy = contrBuffer.data(g2off + 45 * j + 6);
+                    auto g2_x_xyyy = ketBuffer.data(g2off + 45 * j + 6);
 
-                    auto g2_x_xyyz = contrBuffer.data(g2off + 45 * j + 7);
+                    auto g2_x_xyyz = ketBuffer.data(g2off + 45 * j + 7);
 
-                    auto g2_x_xyzz = contrBuffer.data(g2off + 45 * j + 8);
+                    auto g2_x_xyzz = ketBuffer.data(g2off + 45 * j + 8);
 
-                    auto g2_x_xzzz = contrBuffer.data(g2off + 45 * j + 9);
+                    auto g2_x_xzzz = ketBuffer.data(g2off + 45 * j + 9);
 
-                    auto g2_x_yyyy = contrBuffer.data(g2off + 45 * j + 10);
+                    auto g2_x_yyyy = ketBuffer.data(g2off + 45 * j + 10);
 
-                    auto g2_x_yyyz = contrBuffer.data(g2off + 45 * j + 11);
+                    auto g2_x_yyyz = ketBuffer.data(g2off + 45 * j + 11);
 
-                    auto g2_x_yyzz = contrBuffer.data(g2off + 45 * j + 12);
+                    auto g2_x_yyzz = ketBuffer.data(g2off + 45 * j + 12);
 
-                    auto g2_x_yzzz = contrBuffer.data(g2off + 45 * j + 13);
+                    auto g2_x_yzzz = ketBuffer.data(g2off + 45 * j + 13);
 
-                    auto g2_x_zzzz = contrBuffer.data(g2off + 45 * j + 14);
+                    auto g2_x_zzzz = ketBuffer.data(g2off + 45 * j + 14);
 
-                    auto g2_y_xxxx = contrBuffer.data(g2off + 45 * j + 15);
+                    auto g2_y_xxxx = ketBuffer.data(g2off + 45 * j + 15);
 
-                    auto g2_y_xxxy = contrBuffer.data(g2off + 45 * j + 16);
+                    auto g2_y_xxxy = ketBuffer.data(g2off + 45 * j + 16);
 
-                    auto g2_y_xxxz = contrBuffer.data(g2off + 45 * j + 17);
+                    auto g2_y_xxxz = ketBuffer.data(g2off + 45 * j + 17);
 
-                    auto g2_y_xxyy = contrBuffer.data(g2off + 45 * j + 18);
+                    auto g2_y_xxyy = ketBuffer.data(g2off + 45 * j + 18);
 
-                    auto g2_y_xxyz = contrBuffer.data(g2off + 45 * j + 19);
+                    auto g2_y_xxyz = ketBuffer.data(g2off + 45 * j + 19);
 
-                    auto g2_y_xxzz = contrBuffer.data(g2off + 45 * j + 20);
+                    auto g2_y_xxzz = ketBuffer.data(g2off + 45 * j + 20);
 
-                    auto g2_y_xyyy = contrBuffer.data(g2off + 45 * j + 21);
+                    auto g2_y_xyyy = ketBuffer.data(g2off + 45 * j + 21);
 
-                    auto g2_y_xyyz = contrBuffer.data(g2off + 45 * j + 22);
+                    auto g2_y_xyyz = ketBuffer.data(g2off + 45 * j + 22);
 
-                    auto g2_y_xyzz = contrBuffer.data(g2off + 45 * j + 23);
+                    auto g2_y_xyzz = ketBuffer.data(g2off + 45 * j + 23);
 
-                    auto g2_y_xzzz = contrBuffer.data(g2off + 45 * j + 24);
+                    auto g2_y_xzzz = ketBuffer.data(g2off + 45 * j + 24);
 
-                    auto g2_y_yyyy = contrBuffer.data(g2off + 45 * j + 25);
+                    auto g2_y_yyyy = ketBuffer.data(g2off + 45 * j + 25);
 
-                    auto g2_y_yyyz = contrBuffer.data(g2off + 45 * j + 26);
+                    auto g2_y_yyyz = ketBuffer.data(g2off + 45 * j + 26);
 
-                    auto g2_y_yyzz = contrBuffer.data(g2off + 45 * j + 27);
+                    auto g2_y_yyzz = ketBuffer.data(g2off + 45 * j + 27);
 
-                    auto g2_y_yzzz = contrBuffer.data(g2off + 45 * j + 28);
+                    auto g2_y_yzzz = ketBuffer.data(g2off + 45 * j + 28);
 
-                    auto g2_y_zzzz = contrBuffer.data(g2off + 45 * j + 29);
+                    auto g2_y_zzzz = ketBuffer.data(g2off + 45 * j + 29);
 
-                    auto g2_z_xxxx = contrBuffer.data(g2off + 45 * j + 30);
+                    auto g2_z_xxxx = ketBuffer.data(g2off + 45 * j + 30);
 
-                    auto g2_z_xxxy = contrBuffer.data(g2off + 45 * j + 31);
+                    auto g2_z_xxxy = ketBuffer.data(g2off + 45 * j + 31);
 
-                    auto g2_z_xxxz = contrBuffer.data(g2off + 45 * j + 32);
+                    auto g2_z_xxxz = ketBuffer.data(g2off + 45 * j + 32);
 
-                    auto g2_z_xxyy = contrBuffer.data(g2off + 45 * j + 33);
+                    auto g2_z_xxyy = ketBuffer.data(g2off + 45 * j + 33);
 
-                    auto g2_z_xxyz = contrBuffer.data(g2off + 45 * j + 34);
+                    auto g2_z_xxyz = ketBuffer.data(g2off + 45 * j + 34);
 
-                    auto g2_z_xxzz = contrBuffer.data(g2off + 45 * j + 35);
+                    auto g2_z_xxzz = ketBuffer.data(g2off + 45 * j + 35);
 
-                    auto g2_z_xyyy = contrBuffer.data(g2off + 45 * j + 36);
+                    auto g2_z_xyyy = ketBuffer.data(g2off + 45 * j + 36);
 
-                    auto g2_z_xyyz = contrBuffer.data(g2off + 45 * j + 37);
+                    auto g2_z_xyyz = ketBuffer.data(g2off + 45 * j + 37);
 
-                    auto g2_z_xyzz = contrBuffer.data(g2off + 45 * j + 38);
+                    auto g2_z_xyzz = ketBuffer.data(g2off + 45 * j + 38);
 
-                    auto g2_z_xzzz = contrBuffer.data(g2off + 45 * j + 39);
+                    auto g2_z_xzzz = ketBuffer.data(g2off + 45 * j + 39);
 
-                    auto g2_z_yyyy = contrBuffer.data(g2off + 45 * j + 40);
+                    auto g2_z_yyyy = ketBuffer.data(g2off + 45 * j + 40);
 
-                    auto g2_z_yyyz = contrBuffer.data(g2off + 45 * j + 41);
+                    auto g2_z_yyyz = ketBuffer.data(g2off + 45 * j + 41);
 
-                    auto g2_z_yyzz = contrBuffer.data(g2off + 45 * j + 42);
+                    auto g2_z_yyzz = ketBuffer.data(g2off + 45 * j + 42);
 
-                    auto g2_z_yzzz = contrBuffer.data(g2off + 45 * j + 43);
+                    auto g2_z_yzzz = ketBuffer.data(g2off + 45 * j + 43);
 
-                    auto g2_z_zzzz = contrBuffer.data(g2off + 45 * j + 44);
+                    auto g2_z_zzzz = ketBuffer.data(g2off + 45 * j + 44);
 
-                    // set up pointers to (SX|g(r,r')|PH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PH) integrals
 
-                    auto g1_x_xxxxx = contrBuffer.data(g1off + 63 * j);
+                    auto g1_x_xxxxx = ketBuffer.data(g1off + 63 * j);
 
-                    auto g1_x_xxxxy = contrBuffer.data(g1off + 63 * j + 1);
+                    auto g1_x_xxxxy = ketBuffer.data(g1off + 63 * j + 1);
 
-                    auto g1_x_xxxxz = contrBuffer.data(g1off + 63 * j + 2);
+                    auto g1_x_xxxxz = ketBuffer.data(g1off + 63 * j + 2);
 
-                    auto g1_x_xxxyy = contrBuffer.data(g1off + 63 * j + 3);
+                    auto g1_x_xxxyy = ketBuffer.data(g1off + 63 * j + 3);
 
-                    auto g1_x_xxxyz = contrBuffer.data(g1off + 63 * j + 4);
+                    auto g1_x_xxxyz = ketBuffer.data(g1off + 63 * j + 4);
 
-                    auto g1_x_xxxzz = contrBuffer.data(g1off + 63 * j + 5);
+                    auto g1_x_xxxzz = ketBuffer.data(g1off + 63 * j + 5);
 
-                    auto g1_x_xxyyy = contrBuffer.data(g1off + 63 * j + 6);
+                    auto g1_x_xxyyy = ketBuffer.data(g1off + 63 * j + 6);
 
-                    auto g1_x_xxyyz = contrBuffer.data(g1off + 63 * j + 7);
+                    auto g1_x_xxyyz = ketBuffer.data(g1off + 63 * j + 7);
 
-                    auto g1_x_xxyzz = contrBuffer.data(g1off + 63 * j + 8);
+                    auto g1_x_xxyzz = ketBuffer.data(g1off + 63 * j + 8);
 
-                    auto g1_x_xxzzz = contrBuffer.data(g1off + 63 * j + 9);
+                    auto g1_x_xxzzz = ketBuffer.data(g1off + 63 * j + 9);
 
-                    auto g1_x_xyyyy = contrBuffer.data(g1off + 63 * j + 10);
+                    auto g1_x_xyyyy = ketBuffer.data(g1off + 63 * j + 10);
 
-                    auto g1_x_xyyyz = contrBuffer.data(g1off + 63 * j + 11);
+                    auto g1_x_xyyyz = ketBuffer.data(g1off + 63 * j + 11);
 
-                    auto g1_x_xyyzz = contrBuffer.data(g1off + 63 * j + 12);
+                    auto g1_x_xyyzz = ketBuffer.data(g1off + 63 * j + 12);
 
-                    auto g1_x_xyzzz = contrBuffer.data(g1off + 63 * j + 13);
+                    auto g1_x_xyzzz = ketBuffer.data(g1off + 63 * j + 13);
 
-                    auto g1_x_xzzzz = contrBuffer.data(g1off + 63 * j + 14);
+                    auto g1_x_xzzzz = ketBuffer.data(g1off + 63 * j + 14);
 
-                    auto g1_y_xxxxx = contrBuffer.data(g1off + 63 * j + 21);
+                    auto g1_y_xxxxx = ketBuffer.data(g1off + 63 * j + 21);
 
-                    auto g1_y_xxxxy = contrBuffer.data(g1off + 63 * j + 22);
+                    auto g1_y_xxxxy = ketBuffer.data(g1off + 63 * j + 22);
 
-                    auto g1_y_xxxxz = contrBuffer.data(g1off + 63 * j + 23);
+                    auto g1_y_xxxxz = ketBuffer.data(g1off + 63 * j + 23);
 
-                    auto g1_y_xxxyy = contrBuffer.data(g1off + 63 * j + 24);
+                    auto g1_y_xxxyy = ketBuffer.data(g1off + 63 * j + 24);
 
-                    auto g1_y_xxxyz = contrBuffer.data(g1off + 63 * j + 25);
+                    auto g1_y_xxxyz = ketBuffer.data(g1off + 63 * j + 25);
 
-                    auto g1_y_xxxzz = contrBuffer.data(g1off + 63 * j + 26);
+                    auto g1_y_xxxzz = ketBuffer.data(g1off + 63 * j + 26);
 
-                    auto g1_y_xxyyy = contrBuffer.data(g1off + 63 * j + 27);
+                    auto g1_y_xxyyy = ketBuffer.data(g1off + 63 * j + 27);
 
-                    auto g1_y_xxyyz = contrBuffer.data(g1off + 63 * j + 28);
+                    auto g1_y_xxyyz = ketBuffer.data(g1off + 63 * j + 28);
 
-                    auto g1_y_xxyzz = contrBuffer.data(g1off + 63 * j + 29);
+                    auto g1_y_xxyzz = ketBuffer.data(g1off + 63 * j + 29);
 
-                    auto g1_y_xxzzz = contrBuffer.data(g1off + 63 * j + 30);
+                    auto g1_y_xxzzz = ketBuffer.data(g1off + 63 * j + 30);
 
-                    auto g1_y_xyyyy = contrBuffer.data(g1off + 63 * j + 31);
+                    auto g1_y_xyyyy = ketBuffer.data(g1off + 63 * j + 31);
 
-                    auto g1_y_xyyyz = contrBuffer.data(g1off + 63 * j + 32);
+                    auto g1_y_xyyyz = ketBuffer.data(g1off + 63 * j + 32);
 
-                    auto g1_y_xyyzz = contrBuffer.data(g1off + 63 * j + 33);
+                    auto g1_y_xyyzz = ketBuffer.data(g1off + 63 * j + 33);
 
-                    auto g1_y_xyzzz = contrBuffer.data(g1off + 63 * j + 34);
+                    auto g1_y_xyzzz = ketBuffer.data(g1off + 63 * j + 34);
 
-                    auto g1_y_xzzzz = contrBuffer.data(g1off + 63 * j + 35);
+                    auto g1_y_xzzzz = ketBuffer.data(g1off + 63 * j + 35);
 
-                    auto g1_y_yyyyy = contrBuffer.data(g1off + 63 * j + 36);
+                    auto g1_y_yyyyy = ketBuffer.data(g1off + 63 * j + 36);
 
-                    auto g1_y_yyyyz = contrBuffer.data(g1off + 63 * j + 37);
+                    auto g1_y_yyyyz = ketBuffer.data(g1off + 63 * j + 37);
 
-                    auto g1_y_yyyzz = contrBuffer.data(g1off + 63 * j + 38);
+                    auto g1_y_yyyzz = ketBuffer.data(g1off + 63 * j + 38);
 
-                    auto g1_y_yyzzz = contrBuffer.data(g1off + 63 * j + 39);
+                    auto g1_y_yyzzz = ketBuffer.data(g1off + 63 * j + 39);
 
-                    auto g1_y_yzzzz = contrBuffer.data(g1off + 63 * j + 40);
+                    auto g1_y_yzzzz = ketBuffer.data(g1off + 63 * j + 40);
 
-                    auto g1_z_xxxxx = contrBuffer.data(g1off + 63 * j + 42);
+                    auto g1_z_xxxxx = ketBuffer.data(g1off + 63 * j + 42);
 
-                    auto g1_z_xxxxy = contrBuffer.data(g1off + 63 * j + 43);
+                    auto g1_z_xxxxy = ketBuffer.data(g1off + 63 * j + 43);
 
-                    auto g1_z_xxxxz = contrBuffer.data(g1off + 63 * j + 44);
+                    auto g1_z_xxxxz = ketBuffer.data(g1off + 63 * j + 44);
 
-                    auto g1_z_xxxyy = contrBuffer.data(g1off + 63 * j + 45);
+                    auto g1_z_xxxyy = ketBuffer.data(g1off + 63 * j + 45);
 
-                    auto g1_z_xxxyz = contrBuffer.data(g1off + 63 * j + 46);
+                    auto g1_z_xxxyz = ketBuffer.data(g1off + 63 * j + 46);
 
-                    auto g1_z_xxxzz = contrBuffer.data(g1off + 63 * j + 47);
+                    auto g1_z_xxxzz = ketBuffer.data(g1off + 63 * j + 47);
 
-                    auto g1_z_xxyyy = contrBuffer.data(g1off + 63 * j + 48);
+                    auto g1_z_xxyyy = ketBuffer.data(g1off + 63 * j + 48);
 
-                    auto g1_z_xxyyz = contrBuffer.data(g1off + 63 * j + 49);
+                    auto g1_z_xxyyz = ketBuffer.data(g1off + 63 * j + 49);
 
-                    auto g1_z_xxyzz = contrBuffer.data(g1off + 63 * j + 50);
+                    auto g1_z_xxyzz = ketBuffer.data(g1off + 63 * j + 50);
 
-                    auto g1_z_xxzzz = contrBuffer.data(g1off + 63 * j + 51);
+                    auto g1_z_xxzzz = ketBuffer.data(g1off + 63 * j + 51);
 
-                    auto g1_z_xyyyy = contrBuffer.data(g1off + 63 * j + 52);
+                    auto g1_z_xyyyy = ketBuffer.data(g1off + 63 * j + 52);
 
-                    auto g1_z_xyyyz = contrBuffer.data(g1off + 63 * j + 53);
+                    auto g1_z_xyyyz = ketBuffer.data(g1off + 63 * j + 53);
 
-                    auto g1_z_xyyzz = contrBuffer.data(g1off + 63 * j + 54);
+                    auto g1_z_xyyzz = ketBuffer.data(g1off + 63 * j + 54);
 
-                    auto g1_z_xyzzz = contrBuffer.data(g1off + 63 * j + 55);
+                    auto g1_z_xyzzz = ketBuffer.data(g1off + 63 * j + 55);
 
-                    auto g1_z_xzzzz = contrBuffer.data(g1off + 63 * j + 56);
+                    auto g1_z_xzzzz = ketBuffer.data(g1off + 63 * j + 56);
 
-                    auto g1_z_yyyyy = contrBuffer.data(g1off + 63 * j + 57);
+                    auto g1_z_yyyyy = ketBuffer.data(g1off + 63 * j + 57);
 
-                    auto g1_z_yyyyz = contrBuffer.data(g1off + 63 * j + 58);
+                    auto g1_z_yyyyz = ketBuffer.data(g1off + 63 * j + 58);
 
-                    auto g1_z_yyyzz = contrBuffer.data(g1off + 63 * j + 59);
+                    auto g1_z_yyyzz = ketBuffer.data(g1off + 63 * j + 59);
 
-                    auto g1_z_yyzzz = contrBuffer.data(g1off + 63 * j + 60);
+                    auto g1_z_yyzzz = ketBuffer.data(g1off + 63 * j + 60);
 
-                    auto g1_z_yzzzz = contrBuffer.data(g1off + 63 * j + 61);
+                    auto g1_z_yzzzz = ketBuffer.data(g1off + 63 * j + 61);
 
-                    auto g1_z_zzzzz = contrBuffer.data(g1off + 63 * j + 62);
+                    auto g1_z_zzzzz = ketBuffer.data(g1off + 63 * j + 62);
 
-                    // set up pointers to (SX|g(r,r')|DG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DG) integrals
 
-                    auto g_xx_xxxx = contrBuffer.data(goff + 90 * j);
+                    auto g_xx_xxxx = ketBuffer.data(goff + 90 * j);
 
-                    auto g_xx_xxxy = contrBuffer.data(goff + 90 * j + 1);
+                    auto g_xx_xxxy = ketBuffer.data(goff + 90 * j + 1);
 
-                    auto g_xx_xxxz = contrBuffer.data(goff + 90 * j + 2);
+                    auto g_xx_xxxz = ketBuffer.data(goff + 90 * j + 2);
 
-                    auto g_xx_xxyy = contrBuffer.data(goff + 90 * j + 3);
+                    auto g_xx_xxyy = ketBuffer.data(goff + 90 * j + 3);
 
-                    auto g_xx_xxyz = contrBuffer.data(goff + 90 * j + 4);
+                    auto g_xx_xxyz = ketBuffer.data(goff + 90 * j + 4);
 
-                    auto g_xx_xxzz = contrBuffer.data(goff + 90 * j + 5);
+                    auto g_xx_xxzz = ketBuffer.data(goff + 90 * j + 5);
 
-                    auto g_xx_xyyy = contrBuffer.data(goff + 90 * j + 6);
+                    auto g_xx_xyyy = ketBuffer.data(goff + 90 * j + 6);
 
-                    auto g_xx_xyyz = contrBuffer.data(goff + 90 * j + 7);
+                    auto g_xx_xyyz = ketBuffer.data(goff + 90 * j + 7);
 
-                    auto g_xx_xyzz = contrBuffer.data(goff + 90 * j + 8);
+                    auto g_xx_xyzz = ketBuffer.data(goff + 90 * j + 8);
 
-                    auto g_xx_xzzz = contrBuffer.data(goff + 90 * j + 9);
+                    auto g_xx_xzzz = ketBuffer.data(goff + 90 * j + 9);
 
-                    auto g_xx_yyyy = contrBuffer.data(goff + 90 * j + 10);
+                    auto g_xx_yyyy = ketBuffer.data(goff + 90 * j + 10);
 
-                    auto g_xx_yyyz = contrBuffer.data(goff + 90 * j + 11);
+                    auto g_xx_yyyz = ketBuffer.data(goff + 90 * j + 11);
 
-                    auto g_xx_yyzz = contrBuffer.data(goff + 90 * j + 12);
+                    auto g_xx_yyzz = ketBuffer.data(goff + 90 * j + 12);
 
-                    auto g_xx_yzzz = contrBuffer.data(goff + 90 * j + 13);
+                    auto g_xx_yzzz = ketBuffer.data(goff + 90 * j + 13);
 
-                    auto g_xx_zzzz = contrBuffer.data(goff + 90 * j + 14);
+                    auto g_xx_zzzz = ketBuffer.data(goff + 90 * j + 14);
 
-                    auto g_xy_xxxx = contrBuffer.data(goff + 90 * j + 15);
+                    auto g_xy_xxxx = ketBuffer.data(goff + 90 * j + 15);
 
-                    auto g_xy_xxxy = contrBuffer.data(goff + 90 * j + 16);
+                    auto g_xy_xxxy = ketBuffer.data(goff + 90 * j + 16);
 
-                    auto g_xy_xxxz = contrBuffer.data(goff + 90 * j + 17);
+                    auto g_xy_xxxz = ketBuffer.data(goff + 90 * j + 17);
 
-                    auto g_xy_xxyy = contrBuffer.data(goff + 90 * j + 18);
+                    auto g_xy_xxyy = ketBuffer.data(goff + 90 * j + 18);
 
-                    auto g_xy_xxyz = contrBuffer.data(goff + 90 * j + 19);
+                    auto g_xy_xxyz = ketBuffer.data(goff + 90 * j + 19);
 
-                    auto g_xy_xxzz = contrBuffer.data(goff + 90 * j + 20);
+                    auto g_xy_xxzz = ketBuffer.data(goff + 90 * j + 20);
 
-                    auto g_xy_xyyy = contrBuffer.data(goff + 90 * j + 21);
+                    auto g_xy_xyyy = ketBuffer.data(goff + 90 * j + 21);
 
-                    auto g_xy_xyyz = contrBuffer.data(goff + 90 * j + 22);
+                    auto g_xy_xyyz = ketBuffer.data(goff + 90 * j + 22);
 
-                    auto g_xy_xyzz = contrBuffer.data(goff + 90 * j + 23);
+                    auto g_xy_xyzz = ketBuffer.data(goff + 90 * j + 23);
 
-                    auto g_xy_xzzz = contrBuffer.data(goff + 90 * j + 24);
+                    auto g_xy_xzzz = ketBuffer.data(goff + 90 * j + 24);
 
-                    auto g_xy_yyyy = contrBuffer.data(goff + 90 * j + 25);
+                    auto g_xy_yyyy = ketBuffer.data(goff + 90 * j + 25);
 
-                    auto g_xy_yyyz = contrBuffer.data(goff + 90 * j + 26);
+                    auto g_xy_yyyz = ketBuffer.data(goff + 90 * j + 26);
 
-                    auto g_xy_yyzz = contrBuffer.data(goff + 90 * j + 27);
+                    auto g_xy_yyzz = ketBuffer.data(goff + 90 * j + 27);
 
-                    auto g_xy_yzzz = contrBuffer.data(goff + 90 * j + 28);
+                    auto g_xy_yzzz = ketBuffer.data(goff + 90 * j + 28);
 
-                    auto g_xy_zzzz = contrBuffer.data(goff + 90 * j + 29);
+                    auto g_xy_zzzz = ketBuffer.data(goff + 90 * j + 29);
 
-                    auto g_xz_xxxx = contrBuffer.data(goff + 90 * j + 30);
+                    auto g_xz_xxxx = ketBuffer.data(goff + 90 * j + 30);
 
-                    auto g_xz_xxxy = contrBuffer.data(goff + 90 * j + 31);
+                    auto g_xz_xxxy = ketBuffer.data(goff + 90 * j + 31);
 
-                    auto g_xz_xxxz = contrBuffer.data(goff + 90 * j + 32);
+                    auto g_xz_xxxz = ketBuffer.data(goff + 90 * j + 32);
 
-                    auto g_xz_xxyy = contrBuffer.data(goff + 90 * j + 33);
+                    auto g_xz_xxyy = ketBuffer.data(goff + 90 * j + 33);
 
-                    auto g_xz_xxyz = contrBuffer.data(goff + 90 * j + 34);
+                    auto g_xz_xxyz = ketBuffer.data(goff + 90 * j + 34);
 
-                    auto g_xz_xxzz = contrBuffer.data(goff + 90 * j + 35);
+                    auto g_xz_xxzz = ketBuffer.data(goff + 90 * j + 35);
 
-                    auto g_xz_xyyy = contrBuffer.data(goff + 90 * j + 36);
+                    auto g_xz_xyyy = ketBuffer.data(goff + 90 * j + 36);
 
-                    auto g_xz_xyyz = contrBuffer.data(goff + 90 * j + 37);
+                    auto g_xz_xyyz = ketBuffer.data(goff + 90 * j + 37);
 
-                    auto g_xz_xyzz = contrBuffer.data(goff + 90 * j + 38);
+                    auto g_xz_xyzz = ketBuffer.data(goff + 90 * j + 38);
 
-                    auto g_xz_xzzz = contrBuffer.data(goff + 90 * j + 39);
+                    auto g_xz_xzzz = ketBuffer.data(goff + 90 * j + 39);
 
-                    auto g_xz_yyyy = contrBuffer.data(goff + 90 * j + 40);
+                    auto g_xz_yyyy = ketBuffer.data(goff + 90 * j + 40);
 
-                    auto g_xz_yyyz = contrBuffer.data(goff + 90 * j + 41);
+                    auto g_xz_yyyz = ketBuffer.data(goff + 90 * j + 41);
 
-                    auto g_xz_yyzz = contrBuffer.data(goff + 90 * j + 42);
+                    auto g_xz_yyzz = ketBuffer.data(goff + 90 * j + 42);
 
-                    auto g_xz_yzzz = contrBuffer.data(goff + 90 * j + 43);
+                    auto g_xz_yzzz = ketBuffer.data(goff + 90 * j + 43);
 
-                    auto g_xz_zzzz = contrBuffer.data(goff + 90 * j + 44);
+                    auto g_xz_zzzz = ketBuffer.data(goff + 90 * j + 44);
 
-                    auto g_yy_xxxx = contrBuffer.data(goff + 90 * j + 45);
+                    auto g_yy_xxxx = ketBuffer.data(goff + 90 * j + 45);
 
-                    auto g_yy_xxxy = contrBuffer.data(goff + 90 * j + 46);
+                    auto g_yy_xxxy = ketBuffer.data(goff + 90 * j + 46);
 
-                    auto g_yy_xxxz = contrBuffer.data(goff + 90 * j + 47);
+                    auto g_yy_xxxz = ketBuffer.data(goff + 90 * j + 47);
 
-                    auto g_yy_xxyy = contrBuffer.data(goff + 90 * j + 48);
+                    auto g_yy_xxyy = ketBuffer.data(goff + 90 * j + 48);
 
-                    auto g_yy_xxyz = contrBuffer.data(goff + 90 * j + 49);
+                    auto g_yy_xxyz = ketBuffer.data(goff + 90 * j + 49);
 
-                    auto g_yy_xxzz = contrBuffer.data(goff + 90 * j + 50);
+                    auto g_yy_xxzz = ketBuffer.data(goff + 90 * j + 50);
 
-                    auto g_yy_xyyy = contrBuffer.data(goff + 90 * j + 51);
+                    auto g_yy_xyyy = ketBuffer.data(goff + 90 * j + 51);
 
-                    auto g_yy_xyyz = contrBuffer.data(goff + 90 * j + 52);
+                    auto g_yy_xyyz = ketBuffer.data(goff + 90 * j + 52);
 
-                    auto g_yy_xyzz = contrBuffer.data(goff + 90 * j + 53);
+                    auto g_yy_xyzz = ketBuffer.data(goff + 90 * j + 53);
 
-                    auto g_yy_xzzz = contrBuffer.data(goff + 90 * j + 54);
+                    auto g_yy_xzzz = ketBuffer.data(goff + 90 * j + 54);
 
-                    auto g_yy_yyyy = contrBuffer.data(goff + 90 * j + 55);
+                    auto g_yy_yyyy = ketBuffer.data(goff + 90 * j + 55);
 
-                    auto g_yy_yyyz = contrBuffer.data(goff + 90 * j + 56);
+                    auto g_yy_yyyz = ketBuffer.data(goff + 90 * j + 56);
 
-                    auto g_yy_yyzz = contrBuffer.data(goff + 90 * j + 57);
+                    auto g_yy_yyzz = ketBuffer.data(goff + 90 * j + 57);
 
-                    auto g_yy_yzzz = contrBuffer.data(goff + 90 * j + 58);
+                    auto g_yy_yzzz = ketBuffer.data(goff + 90 * j + 58);
 
-                    auto g_yy_zzzz = contrBuffer.data(goff + 90 * j + 59);
+                    auto g_yy_zzzz = ketBuffer.data(goff + 90 * j + 59);
 
-                    auto g_yz_xxxx = contrBuffer.data(goff + 90 * j + 60);
+                    auto g_yz_xxxx = ketBuffer.data(goff + 90 * j + 60);
 
-                    auto g_yz_xxxy = contrBuffer.data(goff + 90 * j + 61);
+                    auto g_yz_xxxy = ketBuffer.data(goff + 90 * j + 61);
 
-                    auto g_yz_xxxz = contrBuffer.data(goff + 90 * j + 62);
+                    auto g_yz_xxxz = ketBuffer.data(goff + 90 * j + 62);
 
-                    auto g_yz_xxyy = contrBuffer.data(goff + 90 * j + 63);
+                    auto g_yz_xxyy = ketBuffer.data(goff + 90 * j + 63);
 
-                    auto g_yz_xxyz = contrBuffer.data(goff + 90 * j + 64);
+                    auto g_yz_xxyz = ketBuffer.data(goff + 90 * j + 64);
 
-                    auto g_yz_xxzz = contrBuffer.data(goff + 90 * j + 65);
+                    auto g_yz_xxzz = ketBuffer.data(goff + 90 * j + 65);
 
-                    auto g_yz_xyyy = contrBuffer.data(goff + 90 * j + 66);
+                    auto g_yz_xyyy = ketBuffer.data(goff + 90 * j + 66);
 
-                    auto g_yz_xyyz = contrBuffer.data(goff + 90 * j + 67);
+                    auto g_yz_xyyz = ketBuffer.data(goff + 90 * j + 67);
 
-                    auto g_yz_xyzz = contrBuffer.data(goff + 90 * j + 68);
+                    auto g_yz_xyzz = ketBuffer.data(goff + 90 * j + 68);
 
-                    auto g_yz_xzzz = contrBuffer.data(goff + 90 * j + 69);
+                    auto g_yz_xzzz = ketBuffer.data(goff + 90 * j + 69);
 
-                    auto g_yz_yyyy = contrBuffer.data(goff + 90 * j + 70);
+                    auto g_yz_yyyy = ketBuffer.data(goff + 90 * j + 70);
 
-                    auto g_yz_yyyz = contrBuffer.data(goff + 90 * j + 71);
+                    auto g_yz_yyyz = ketBuffer.data(goff + 90 * j + 71);
 
-                    auto g_yz_yyzz = contrBuffer.data(goff + 90 * j + 72);
+                    auto g_yz_yyzz = ketBuffer.data(goff + 90 * j + 72);
 
-                    auto g_yz_yzzz = contrBuffer.data(goff + 90 * j + 73);
+                    auto g_yz_yzzz = ketBuffer.data(goff + 90 * j + 73);
 
-                    auto g_yz_zzzz = contrBuffer.data(goff + 90 * j + 74);
+                    auto g_yz_zzzz = ketBuffer.data(goff + 90 * j + 74);
 
-                    auto g_zz_xxxx = contrBuffer.data(goff + 90 * j + 75);
+                    auto g_zz_xxxx = ketBuffer.data(goff + 90 * j + 75);
 
-                    auto g_zz_xxxy = contrBuffer.data(goff + 90 * j + 76);
+                    auto g_zz_xxxy = ketBuffer.data(goff + 90 * j + 76);
 
-                    auto g_zz_xxxz = contrBuffer.data(goff + 90 * j + 77);
+                    auto g_zz_xxxz = ketBuffer.data(goff + 90 * j + 77);
 
-                    auto g_zz_xxyy = contrBuffer.data(goff + 90 * j + 78);
+                    auto g_zz_xxyy = ketBuffer.data(goff + 90 * j + 78);
 
-                    auto g_zz_xxyz = contrBuffer.data(goff + 90 * j + 79);
+                    auto g_zz_xxyz = ketBuffer.data(goff + 90 * j + 79);
 
-                    auto g_zz_xxzz = contrBuffer.data(goff + 90 * j + 80);
+                    auto g_zz_xxzz = ketBuffer.data(goff + 90 * j + 80);
 
-                    auto g_zz_xyyy = contrBuffer.data(goff + 90 * j + 81);
+                    auto g_zz_xyyy = ketBuffer.data(goff + 90 * j + 81);
 
-                    auto g_zz_xyyz = contrBuffer.data(goff + 90 * j + 82);
+                    auto g_zz_xyyz = ketBuffer.data(goff + 90 * j + 82);
 
-                    auto g_zz_xyzz = contrBuffer.data(goff + 90 * j + 83);
+                    auto g_zz_xyzz = ketBuffer.data(goff + 90 * j + 83);
 
-                    auto g_zz_xzzz = contrBuffer.data(goff + 90 * j + 84);
+                    auto g_zz_xzzz = ketBuffer.data(goff + 90 * j + 84);
 
-                    auto g_zz_yyyy = contrBuffer.data(goff + 90 * j + 85);
+                    auto g_zz_yyyy = ketBuffer.data(goff + 90 * j + 85);
 
-                    auto g_zz_yyyz = contrBuffer.data(goff + 90 * j + 86);
+                    auto g_zz_yyyz = ketBuffer.data(goff + 90 * j + 86);
 
-                    auto g_zz_yyzz = contrBuffer.data(goff + 90 * j + 87);
+                    auto g_zz_yyzz = ketBuffer.data(goff + 90 * j + 87);
 
-                    auto g_zz_yzzz = contrBuffer.data(goff + 90 * j + 88);
+                    auto g_zz_yzzz = ketBuffer.data(goff + 90 * j + 88);
 
-                    auto g_zz_zzzz = contrBuffer.data(goff + 90 * j + 89);
+                    auto g_zz_zzzz = ketBuffer.data(goff + 90 * j + 89);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_x_xxxx, g2_x_xxxy,\
                                              g2_x_xxxz, g2_x_xxyy, g2_x_xxyz, g2_x_xxzz,\
@@ -4250,7 +4250,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXDH(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXDH(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -4301,541 +4301,541 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|PH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PH) integrals
 
-                    auto g2_x_xxxxx = contrBuffer.data(g2off + 63 * j);
+                    auto g2_x_xxxxx = ketBuffer.data(g2off + 63 * j);
 
-                    auto g2_x_xxxxy = contrBuffer.data(g2off + 63 * j + 1);
+                    auto g2_x_xxxxy = ketBuffer.data(g2off + 63 * j + 1);
 
-                    auto g2_x_xxxxz = contrBuffer.data(g2off + 63 * j + 2);
+                    auto g2_x_xxxxz = ketBuffer.data(g2off + 63 * j + 2);
 
-                    auto g2_x_xxxyy = contrBuffer.data(g2off + 63 * j + 3);
+                    auto g2_x_xxxyy = ketBuffer.data(g2off + 63 * j + 3);
 
-                    auto g2_x_xxxyz = contrBuffer.data(g2off + 63 * j + 4);
+                    auto g2_x_xxxyz = ketBuffer.data(g2off + 63 * j + 4);
 
-                    auto g2_x_xxxzz = contrBuffer.data(g2off + 63 * j + 5);
+                    auto g2_x_xxxzz = ketBuffer.data(g2off + 63 * j + 5);
 
-                    auto g2_x_xxyyy = contrBuffer.data(g2off + 63 * j + 6);
+                    auto g2_x_xxyyy = ketBuffer.data(g2off + 63 * j + 6);
 
-                    auto g2_x_xxyyz = contrBuffer.data(g2off + 63 * j + 7);
+                    auto g2_x_xxyyz = ketBuffer.data(g2off + 63 * j + 7);
 
-                    auto g2_x_xxyzz = contrBuffer.data(g2off + 63 * j + 8);
+                    auto g2_x_xxyzz = ketBuffer.data(g2off + 63 * j + 8);
 
-                    auto g2_x_xxzzz = contrBuffer.data(g2off + 63 * j + 9);
+                    auto g2_x_xxzzz = ketBuffer.data(g2off + 63 * j + 9);
 
-                    auto g2_x_xyyyy = contrBuffer.data(g2off + 63 * j + 10);
+                    auto g2_x_xyyyy = ketBuffer.data(g2off + 63 * j + 10);
 
-                    auto g2_x_xyyyz = contrBuffer.data(g2off + 63 * j + 11);
+                    auto g2_x_xyyyz = ketBuffer.data(g2off + 63 * j + 11);
 
-                    auto g2_x_xyyzz = contrBuffer.data(g2off + 63 * j + 12);
+                    auto g2_x_xyyzz = ketBuffer.data(g2off + 63 * j + 12);
 
-                    auto g2_x_xyzzz = contrBuffer.data(g2off + 63 * j + 13);
+                    auto g2_x_xyzzz = ketBuffer.data(g2off + 63 * j + 13);
 
-                    auto g2_x_xzzzz = contrBuffer.data(g2off + 63 * j + 14);
+                    auto g2_x_xzzzz = ketBuffer.data(g2off + 63 * j + 14);
 
-                    auto g2_x_yyyyy = contrBuffer.data(g2off + 63 * j + 15);
+                    auto g2_x_yyyyy = ketBuffer.data(g2off + 63 * j + 15);
 
-                    auto g2_x_yyyyz = contrBuffer.data(g2off + 63 * j + 16);
+                    auto g2_x_yyyyz = ketBuffer.data(g2off + 63 * j + 16);
 
-                    auto g2_x_yyyzz = contrBuffer.data(g2off + 63 * j + 17);
+                    auto g2_x_yyyzz = ketBuffer.data(g2off + 63 * j + 17);
 
-                    auto g2_x_yyzzz = contrBuffer.data(g2off + 63 * j + 18);
+                    auto g2_x_yyzzz = ketBuffer.data(g2off + 63 * j + 18);
 
-                    auto g2_x_yzzzz = contrBuffer.data(g2off + 63 * j + 19);
+                    auto g2_x_yzzzz = ketBuffer.data(g2off + 63 * j + 19);
 
-                    auto g2_x_zzzzz = contrBuffer.data(g2off + 63 * j + 20);
+                    auto g2_x_zzzzz = ketBuffer.data(g2off + 63 * j + 20);
 
-                    auto g2_y_xxxxx = contrBuffer.data(g2off + 63 * j + 21);
+                    auto g2_y_xxxxx = ketBuffer.data(g2off + 63 * j + 21);
 
-                    auto g2_y_xxxxy = contrBuffer.data(g2off + 63 * j + 22);
+                    auto g2_y_xxxxy = ketBuffer.data(g2off + 63 * j + 22);
 
-                    auto g2_y_xxxxz = contrBuffer.data(g2off + 63 * j + 23);
+                    auto g2_y_xxxxz = ketBuffer.data(g2off + 63 * j + 23);
 
-                    auto g2_y_xxxyy = contrBuffer.data(g2off + 63 * j + 24);
+                    auto g2_y_xxxyy = ketBuffer.data(g2off + 63 * j + 24);
 
-                    auto g2_y_xxxyz = contrBuffer.data(g2off + 63 * j + 25);
+                    auto g2_y_xxxyz = ketBuffer.data(g2off + 63 * j + 25);
 
-                    auto g2_y_xxxzz = contrBuffer.data(g2off + 63 * j + 26);
+                    auto g2_y_xxxzz = ketBuffer.data(g2off + 63 * j + 26);
 
-                    auto g2_y_xxyyy = contrBuffer.data(g2off + 63 * j + 27);
+                    auto g2_y_xxyyy = ketBuffer.data(g2off + 63 * j + 27);
 
-                    auto g2_y_xxyyz = contrBuffer.data(g2off + 63 * j + 28);
+                    auto g2_y_xxyyz = ketBuffer.data(g2off + 63 * j + 28);
 
-                    auto g2_y_xxyzz = contrBuffer.data(g2off + 63 * j + 29);
+                    auto g2_y_xxyzz = ketBuffer.data(g2off + 63 * j + 29);
 
-                    auto g2_y_xxzzz = contrBuffer.data(g2off + 63 * j + 30);
+                    auto g2_y_xxzzz = ketBuffer.data(g2off + 63 * j + 30);
 
-                    auto g2_y_xyyyy = contrBuffer.data(g2off + 63 * j + 31);
+                    auto g2_y_xyyyy = ketBuffer.data(g2off + 63 * j + 31);
 
-                    auto g2_y_xyyyz = contrBuffer.data(g2off + 63 * j + 32);
+                    auto g2_y_xyyyz = ketBuffer.data(g2off + 63 * j + 32);
 
-                    auto g2_y_xyyzz = contrBuffer.data(g2off + 63 * j + 33);
+                    auto g2_y_xyyzz = ketBuffer.data(g2off + 63 * j + 33);
 
-                    auto g2_y_xyzzz = contrBuffer.data(g2off + 63 * j + 34);
+                    auto g2_y_xyzzz = ketBuffer.data(g2off + 63 * j + 34);
 
-                    auto g2_y_xzzzz = contrBuffer.data(g2off + 63 * j + 35);
+                    auto g2_y_xzzzz = ketBuffer.data(g2off + 63 * j + 35);
 
-                    auto g2_y_yyyyy = contrBuffer.data(g2off + 63 * j + 36);
+                    auto g2_y_yyyyy = ketBuffer.data(g2off + 63 * j + 36);
 
-                    auto g2_y_yyyyz = contrBuffer.data(g2off + 63 * j + 37);
+                    auto g2_y_yyyyz = ketBuffer.data(g2off + 63 * j + 37);
 
-                    auto g2_y_yyyzz = contrBuffer.data(g2off + 63 * j + 38);
+                    auto g2_y_yyyzz = ketBuffer.data(g2off + 63 * j + 38);
 
-                    auto g2_y_yyzzz = contrBuffer.data(g2off + 63 * j + 39);
+                    auto g2_y_yyzzz = ketBuffer.data(g2off + 63 * j + 39);
 
-                    auto g2_y_yzzzz = contrBuffer.data(g2off + 63 * j + 40);
+                    auto g2_y_yzzzz = ketBuffer.data(g2off + 63 * j + 40);
 
-                    auto g2_y_zzzzz = contrBuffer.data(g2off + 63 * j + 41);
+                    auto g2_y_zzzzz = ketBuffer.data(g2off + 63 * j + 41);
 
-                    auto g2_z_xxxxx = contrBuffer.data(g2off + 63 * j + 42);
+                    auto g2_z_xxxxx = ketBuffer.data(g2off + 63 * j + 42);
 
-                    auto g2_z_xxxxy = contrBuffer.data(g2off + 63 * j + 43);
+                    auto g2_z_xxxxy = ketBuffer.data(g2off + 63 * j + 43);
 
-                    auto g2_z_xxxxz = contrBuffer.data(g2off + 63 * j + 44);
+                    auto g2_z_xxxxz = ketBuffer.data(g2off + 63 * j + 44);
 
-                    auto g2_z_xxxyy = contrBuffer.data(g2off + 63 * j + 45);
+                    auto g2_z_xxxyy = ketBuffer.data(g2off + 63 * j + 45);
 
-                    auto g2_z_xxxyz = contrBuffer.data(g2off + 63 * j + 46);
+                    auto g2_z_xxxyz = ketBuffer.data(g2off + 63 * j + 46);
 
-                    auto g2_z_xxxzz = contrBuffer.data(g2off + 63 * j + 47);
+                    auto g2_z_xxxzz = ketBuffer.data(g2off + 63 * j + 47);
 
-                    auto g2_z_xxyyy = contrBuffer.data(g2off + 63 * j + 48);
+                    auto g2_z_xxyyy = ketBuffer.data(g2off + 63 * j + 48);
 
-                    auto g2_z_xxyyz = contrBuffer.data(g2off + 63 * j + 49);
+                    auto g2_z_xxyyz = ketBuffer.data(g2off + 63 * j + 49);
 
-                    auto g2_z_xxyzz = contrBuffer.data(g2off + 63 * j + 50);
+                    auto g2_z_xxyzz = ketBuffer.data(g2off + 63 * j + 50);
 
-                    auto g2_z_xxzzz = contrBuffer.data(g2off + 63 * j + 51);
+                    auto g2_z_xxzzz = ketBuffer.data(g2off + 63 * j + 51);
 
-                    auto g2_z_xyyyy = contrBuffer.data(g2off + 63 * j + 52);
+                    auto g2_z_xyyyy = ketBuffer.data(g2off + 63 * j + 52);
 
-                    auto g2_z_xyyyz = contrBuffer.data(g2off + 63 * j + 53);
+                    auto g2_z_xyyyz = ketBuffer.data(g2off + 63 * j + 53);
 
-                    auto g2_z_xyyzz = contrBuffer.data(g2off + 63 * j + 54);
+                    auto g2_z_xyyzz = ketBuffer.data(g2off + 63 * j + 54);
 
-                    auto g2_z_xyzzz = contrBuffer.data(g2off + 63 * j + 55);
+                    auto g2_z_xyzzz = ketBuffer.data(g2off + 63 * j + 55);
 
-                    auto g2_z_xzzzz = contrBuffer.data(g2off + 63 * j + 56);
+                    auto g2_z_xzzzz = ketBuffer.data(g2off + 63 * j + 56);
 
-                    auto g2_z_yyyyy = contrBuffer.data(g2off + 63 * j + 57);
+                    auto g2_z_yyyyy = ketBuffer.data(g2off + 63 * j + 57);
 
-                    auto g2_z_yyyyz = contrBuffer.data(g2off + 63 * j + 58);
+                    auto g2_z_yyyyz = ketBuffer.data(g2off + 63 * j + 58);
 
-                    auto g2_z_yyyzz = contrBuffer.data(g2off + 63 * j + 59);
+                    auto g2_z_yyyzz = ketBuffer.data(g2off + 63 * j + 59);
 
-                    auto g2_z_yyzzz = contrBuffer.data(g2off + 63 * j + 60);
+                    auto g2_z_yyzzz = ketBuffer.data(g2off + 63 * j + 60);
 
-                    auto g2_z_yzzzz = contrBuffer.data(g2off + 63 * j + 61);
+                    auto g2_z_yzzzz = ketBuffer.data(g2off + 63 * j + 61);
 
-                    auto g2_z_zzzzz = contrBuffer.data(g2off + 63 * j + 62);
+                    auto g2_z_zzzzz = ketBuffer.data(g2off + 63 * j + 62);
 
-                    // set up pointers to (SX|g(r,r')|PI)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PI) integrals
 
-                    auto g1_x_xxxxxx = contrBuffer.data(g1off + 84 * j);
+                    auto g1_x_xxxxxx = ketBuffer.data(g1off + 84 * j);
 
-                    auto g1_x_xxxxxy = contrBuffer.data(g1off + 84 * j + 1);
+                    auto g1_x_xxxxxy = ketBuffer.data(g1off + 84 * j + 1);
 
-                    auto g1_x_xxxxxz = contrBuffer.data(g1off + 84 * j + 2);
+                    auto g1_x_xxxxxz = ketBuffer.data(g1off + 84 * j + 2);
 
-                    auto g1_x_xxxxyy = contrBuffer.data(g1off + 84 * j + 3);
+                    auto g1_x_xxxxyy = ketBuffer.data(g1off + 84 * j + 3);
 
-                    auto g1_x_xxxxyz = contrBuffer.data(g1off + 84 * j + 4);
+                    auto g1_x_xxxxyz = ketBuffer.data(g1off + 84 * j + 4);
 
-                    auto g1_x_xxxxzz = contrBuffer.data(g1off + 84 * j + 5);
+                    auto g1_x_xxxxzz = ketBuffer.data(g1off + 84 * j + 5);
 
-                    auto g1_x_xxxyyy = contrBuffer.data(g1off + 84 * j + 6);
+                    auto g1_x_xxxyyy = ketBuffer.data(g1off + 84 * j + 6);
 
-                    auto g1_x_xxxyyz = contrBuffer.data(g1off + 84 * j + 7);
+                    auto g1_x_xxxyyz = ketBuffer.data(g1off + 84 * j + 7);
 
-                    auto g1_x_xxxyzz = contrBuffer.data(g1off + 84 * j + 8);
+                    auto g1_x_xxxyzz = ketBuffer.data(g1off + 84 * j + 8);
 
-                    auto g1_x_xxxzzz = contrBuffer.data(g1off + 84 * j + 9);
+                    auto g1_x_xxxzzz = ketBuffer.data(g1off + 84 * j + 9);
 
-                    auto g1_x_xxyyyy = contrBuffer.data(g1off + 84 * j + 10);
+                    auto g1_x_xxyyyy = ketBuffer.data(g1off + 84 * j + 10);
 
-                    auto g1_x_xxyyyz = contrBuffer.data(g1off + 84 * j + 11);
+                    auto g1_x_xxyyyz = ketBuffer.data(g1off + 84 * j + 11);
 
-                    auto g1_x_xxyyzz = contrBuffer.data(g1off + 84 * j + 12);
+                    auto g1_x_xxyyzz = ketBuffer.data(g1off + 84 * j + 12);
 
-                    auto g1_x_xxyzzz = contrBuffer.data(g1off + 84 * j + 13);
+                    auto g1_x_xxyzzz = ketBuffer.data(g1off + 84 * j + 13);
 
-                    auto g1_x_xxzzzz = contrBuffer.data(g1off + 84 * j + 14);
+                    auto g1_x_xxzzzz = ketBuffer.data(g1off + 84 * j + 14);
 
-                    auto g1_x_xyyyyy = contrBuffer.data(g1off + 84 * j + 15);
+                    auto g1_x_xyyyyy = ketBuffer.data(g1off + 84 * j + 15);
 
-                    auto g1_x_xyyyyz = contrBuffer.data(g1off + 84 * j + 16);
+                    auto g1_x_xyyyyz = ketBuffer.data(g1off + 84 * j + 16);
 
-                    auto g1_x_xyyyzz = contrBuffer.data(g1off + 84 * j + 17);
+                    auto g1_x_xyyyzz = ketBuffer.data(g1off + 84 * j + 17);
 
-                    auto g1_x_xyyzzz = contrBuffer.data(g1off + 84 * j + 18);
+                    auto g1_x_xyyzzz = ketBuffer.data(g1off + 84 * j + 18);
 
-                    auto g1_x_xyzzzz = contrBuffer.data(g1off + 84 * j + 19);
+                    auto g1_x_xyzzzz = ketBuffer.data(g1off + 84 * j + 19);
 
-                    auto g1_x_xzzzzz = contrBuffer.data(g1off + 84 * j + 20);
+                    auto g1_x_xzzzzz = ketBuffer.data(g1off + 84 * j + 20);
 
-                    auto g1_y_xxxxxx = contrBuffer.data(g1off + 84 * j + 28);
+                    auto g1_y_xxxxxx = ketBuffer.data(g1off + 84 * j + 28);
 
-                    auto g1_y_xxxxxy = contrBuffer.data(g1off + 84 * j + 29);
+                    auto g1_y_xxxxxy = ketBuffer.data(g1off + 84 * j + 29);
 
-                    auto g1_y_xxxxxz = contrBuffer.data(g1off + 84 * j + 30);
+                    auto g1_y_xxxxxz = ketBuffer.data(g1off + 84 * j + 30);
 
-                    auto g1_y_xxxxyy = contrBuffer.data(g1off + 84 * j + 31);
+                    auto g1_y_xxxxyy = ketBuffer.data(g1off + 84 * j + 31);
 
-                    auto g1_y_xxxxyz = contrBuffer.data(g1off + 84 * j + 32);
+                    auto g1_y_xxxxyz = ketBuffer.data(g1off + 84 * j + 32);
 
-                    auto g1_y_xxxxzz = contrBuffer.data(g1off + 84 * j + 33);
+                    auto g1_y_xxxxzz = ketBuffer.data(g1off + 84 * j + 33);
 
-                    auto g1_y_xxxyyy = contrBuffer.data(g1off + 84 * j + 34);
+                    auto g1_y_xxxyyy = ketBuffer.data(g1off + 84 * j + 34);
 
-                    auto g1_y_xxxyyz = contrBuffer.data(g1off + 84 * j + 35);
+                    auto g1_y_xxxyyz = ketBuffer.data(g1off + 84 * j + 35);
 
-                    auto g1_y_xxxyzz = contrBuffer.data(g1off + 84 * j + 36);
+                    auto g1_y_xxxyzz = ketBuffer.data(g1off + 84 * j + 36);
 
-                    auto g1_y_xxxzzz = contrBuffer.data(g1off + 84 * j + 37);
+                    auto g1_y_xxxzzz = ketBuffer.data(g1off + 84 * j + 37);
 
-                    auto g1_y_xxyyyy = contrBuffer.data(g1off + 84 * j + 38);
+                    auto g1_y_xxyyyy = ketBuffer.data(g1off + 84 * j + 38);
 
-                    auto g1_y_xxyyyz = contrBuffer.data(g1off + 84 * j + 39);
+                    auto g1_y_xxyyyz = ketBuffer.data(g1off + 84 * j + 39);
 
-                    auto g1_y_xxyyzz = contrBuffer.data(g1off + 84 * j + 40);
+                    auto g1_y_xxyyzz = ketBuffer.data(g1off + 84 * j + 40);
 
-                    auto g1_y_xxyzzz = contrBuffer.data(g1off + 84 * j + 41);
+                    auto g1_y_xxyzzz = ketBuffer.data(g1off + 84 * j + 41);
 
-                    auto g1_y_xxzzzz = contrBuffer.data(g1off + 84 * j + 42);
+                    auto g1_y_xxzzzz = ketBuffer.data(g1off + 84 * j + 42);
 
-                    auto g1_y_xyyyyy = contrBuffer.data(g1off + 84 * j + 43);
+                    auto g1_y_xyyyyy = ketBuffer.data(g1off + 84 * j + 43);
 
-                    auto g1_y_xyyyyz = contrBuffer.data(g1off + 84 * j + 44);
+                    auto g1_y_xyyyyz = ketBuffer.data(g1off + 84 * j + 44);
 
-                    auto g1_y_xyyyzz = contrBuffer.data(g1off + 84 * j + 45);
+                    auto g1_y_xyyyzz = ketBuffer.data(g1off + 84 * j + 45);
 
-                    auto g1_y_xyyzzz = contrBuffer.data(g1off + 84 * j + 46);
+                    auto g1_y_xyyzzz = ketBuffer.data(g1off + 84 * j + 46);
 
-                    auto g1_y_xyzzzz = contrBuffer.data(g1off + 84 * j + 47);
+                    auto g1_y_xyzzzz = ketBuffer.data(g1off + 84 * j + 47);
 
-                    auto g1_y_xzzzzz = contrBuffer.data(g1off + 84 * j + 48);
+                    auto g1_y_xzzzzz = ketBuffer.data(g1off + 84 * j + 48);
 
-                    auto g1_y_yyyyyy = contrBuffer.data(g1off + 84 * j + 49);
+                    auto g1_y_yyyyyy = ketBuffer.data(g1off + 84 * j + 49);
 
-                    auto g1_y_yyyyyz = contrBuffer.data(g1off + 84 * j + 50);
+                    auto g1_y_yyyyyz = ketBuffer.data(g1off + 84 * j + 50);
 
-                    auto g1_y_yyyyzz = contrBuffer.data(g1off + 84 * j + 51);
+                    auto g1_y_yyyyzz = ketBuffer.data(g1off + 84 * j + 51);
 
-                    auto g1_y_yyyzzz = contrBuffer.data(g1off + 84 * j + 52);
+                    auto g1_y_yyyzzz = ketBuffer.data(g1off + 84 * j + 52);
 
-                    auto g1_y_yyzzzz = contrBuffer.data(g1off + 84 * j + 53);
+                    auto g1_y_yyzzzz = ketBuffer.data(g1off + 84 * j + 53);
 
-                    auto g1_y_yzzzzz = contrBuffer.data(g1off + 84 * j + 54);
+                    auto g1_y_yzzzzz = ketBuffer.data(g1off + 84 * j + 54);
 
-                    auto g1_z_xxxxxx = contrBuffer.data(g1off + 84 * j + 56);
+                    auto g1_z_xxxxxx = ketBuffer.data(g1off + 84 * j + 56);
 
-                    auto g1_z_xxxxxy = contrBuffer.data(g1off + 84 * j + 57);
+                    auto g1_z_xxxxxy = ketBuffer.data(g1off + 84 * j + 57);
 
-                    auto g1_z_xxxxxz = contrBuffer.data(g1off + 84 * j + 58);
+                    auto g1_z_xxxxxz = ketBuffer.data(g1off + 84 * j + 58);
 
-                    auto g1_z_xxxxyy = contrBuffer.data(g1off + 84 * j + 59);
+                    auto g1_z_xxxxyy = ketBuffer.data(g1off + 84 * j + 59);
 
-                    auto g1_z_xxxxyz = contrBuffer.data(g1off + 84 * j + 60);
+                    auto g1_z_xxxxyz = ketBuffer.data(g1off + 84 * j + 60);
 
-                    auto g1_z_xxxxzz = contrBuffer.data(g1off + 84 * j + 61);
+                    auto g1_z_xxxxzz = ketBuffer.data(g1off + 84 * j + 61);
 
-                    auto g1_z_xxxyyy = contrBuffer.data(g1off + 84 * j + 62);
+                    auto g1_z_xxxyyy = ketBuffer.data(g1off + 84 * j + 62);
 
-                    auto g1_z_xxxyyz = contrBuffer.data(g1off + 84 * j + 63);
+                    auto g1_z_xxxyyz = ketBuffer.data(g1off + 84 * j + 63);
 
-                    auto g1_z_xxxyzz = contrBuffer.data(g1off + 84 * j + 64);
+                    auto g1_z_xxxyzz = ketBuffer.data(g1off + 84 * j + 64);
 
-                    auto g1_z_xxxzzz = contrBuffer.data(g1off + 84 * j + 65);
+                    auto g1_z_xxxzzz = ketBuffer.data(g1off + 84 * j + 65);
 
-                    auto g1_z_xxyyyy = contrBuffer.data(g1off + 84 * j + 66);
+                    auto g1_z_xxyyyy = ketBuffer.data(g1off + 84 * j + 66);
 
-                    auto g1_z_xxyyyz = contrBuffer.data(g1off + 84 * j + 67);
+                    auto g1_z_xxyyyz = ketBuffer.data(g1off + 84 * j + 67);
 
-                    auto g1_z_xxyyzz = contrBuffer.data(g1off + 84 * j + 68);
+                    auto g1_z_xxyyzz = ketBuffer.data(g1off + 84 * j + 68);
 
-                    auto g1_z_xxyzzz = contrBuffer.data(g1off + 84 * j + 69);
+                    auto g1_z_xxyzzz = ketBuffer.data(g1off + 84 * j + 69);
 
-                    auto g1_z_xxzzzz = contrBuffer.data(g1off + 84 * j + 70);
+                    auto g1_z_xxzzzz = ketBuffer.data(g1off + 84 * j + 70);
 
-                    auto g1_z_xyyyyy = contrBuffer.data(g1off + 84 * j + 71);
+                    auto g1_z_xyyyyy = ketBuffer.data(g1off + 84 * j + 71);
 
-                    auto g1_z_xyyyyz = contrBuffer.data(g1off + 84 * j + 72);
+                    auto g1_z_xyyyyz = ketBuffer.data(g1off + 84 * j + 72);
 
-                    auto g1_z_xyyyzz = contrBuffer.data(g1off + 84 * j + 73);
+                    auto g1_z_xyyyzz = ketBuffer.data(g1off + 84 * j + 73);
 
-                    auto g1_z_xyyzzz = contrBuffer.data(g1off + 84 * j + 74);
+                    auto g1_z_xyyzzz = ketBuffer.data(g1off + 84 * j + 74);
 
-                    auto g1_z_xyzzzz = contrBuffer.data(g1off + 84 * j + 75);
+                    auto g1_z_xyzzzz = ketBuffer.data(g1off + 84 * j + 75);
 
-                    auto g1_z_xzzzzz = contrBuffer.data(g1off + 84 * j + 76);
+                    auto g1_z_xzzzzz = ketBuffer.data(g1off + 84 * j + 76);
 
-                    auto g1_z_yyyyyy = contrBuffer.data(g1off + 84 * j + 77);
+                    auto g1_z_yyyyyy = ketBuffer.data(g1off + 84 * j + 77);
 
-                    auto g1_z_yyyyyz = contrBuffer.data(g1off + 84 * j + 78);
+                    auto g1_z_yyyyyz = ketBuffer.data(g1off + 84 * j + 78);
 
-                    auto g1_z_yyyyzz = contrBuffer.data(g1off + 84 * j + 79);
+                    auto g1_z_yyyyzz = ketBuffer.data(g1off + 84 * j + 79);
 
-                    auto g1_z_yyyzzz = contrBuffer.data(g1off + 84 * j + 80);
+                    auto g1_z_yyyzzz = ketBuffer.data(g1off + 84 * j + 80);
 
-                    auto g1_z_yyzzzz = contrBuffer.data(g1off + 84 * j + 81);
+                    auto g1_z_yyzzzz = ketBuffer.data(g1off + 84 * j + 81);
 
-                    auto g1_z_yzzzzz = contrBuffer.data(g1off + 84 * j + 82);
+                    auto g1_z_yzzzzz = ketBuffer.data(g1off + 84 * j + 82);
 
-                    auto g1_z_zzzzzz = contrBuffer.data(g1off + 84 * j + 83);
+                    auto g1_z_zzzzzz = ketBuffer.data(g1off + 84 * j + 83);
 
-                    // set up pointers to (SX|g(r,r')|DH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DH) integrals
 
-                    auto g_xx_xxxxx = contrBuffer.data(goff + 126 * j);
+                    auto g_xx_xxxxx = ketBuffer.data(goff + 126 * j);
 
-                    auto g_xx_xxxxy = contrBuffer.data(goff + 126 * j + 1);
+                    auto g_xx_xxxxy = ketBuffer.data(goff + 126 * j + 1);
 
-                    auto g_xx_xxxxz = contrBuffer.data(goff + 126 * j + 2);
+                    auto g_xx_xxxxz = ketBuffer.data(goff + 126 * j + 2);
 
-                    auto g_xx_xxxyy = contrBuffer.data(goff + 126 * j + 3);
+                    auto g_xx_xxxyy = ketBuffer.data(goff + 126 * j + 3);
 
-                    auto g_xx_xxxyz = contrBuffer.data(goff + 126 * j + 4);
+                    auto g_xx_xxxyz = ketBuffer.data(goff + 126 * j + 4);
 
-                    auto g_xx_xxxzz = contrBuffer.data(goff + 126 * j + 5);
+                    auto g_xx_xxxzz = ketBuffer.data(goff + 126 * j + 5);
 
-                    auto g_xx_xxyyy = contrBuffer.data(goff + 126 * j + 6);
+                    auto g_xx_xxyyy = ketBuffer.data(goff + 126 * j + 6);
 
-                    auto g_xx_xxyyz = contrBuffer.data(goff + 126 * j + 7);
+                    auto g_xx_xxyyz = ketBuffer.data(goff + 126 * j + 7);
 
-                    auto g_xx_xxyzz = contrBuffer.data(goff + 126 * j + 8);
+                    auto g_xx_xxyzz = ketBuffer.data(goff + 126 * j + 8);
 
-                    auto g_xx_xxzzz = contrBuffer.data(goff + 126 * j + 9);
+                    auto g_xx_xxzzz = ketBuffer.data(goff + 126 * j + 9);
 
-                    auto g_xx_xyyyy = contrBuffer.data(goff + 126 * j + 10);
+                    auto g_xx_xyyyy = ketBuffer.data(goff + 126 * j + 10);
 
-                    auto g_xx_xyyyz = contrBuffer.data(goff + 126 * j + 11);
+                    auto g_xx_xyyyz = ketBuffer.data(goff + 126 * j + 11);
 
-                    auto g_xx_xyyzz = contrBuffer.data(goff + 126 * j + 12);
+                    auto g_xx_xyyzz = ketBuffer.data(goff + 126 * j + 12);
 
-                    auto g_xx_xyzzz = contrBuffer.data(goff + 126 * j + 13);
+                    auto g_xx_xyzzz = ketBuffer.data(goff + 126 * j + 13);
 
-                    auto g_xx_xzzzz = contrBuffer.data(goff + 126 * j + 14);
+                    auto g_xx_xzzzz = ketBuffer.data(goff + 126 * j + 14);
 
-                    auto g_xx_yyyyy = contrBuffer.data(goff + 126 * j + 15);
+                    auto g_xx_yyyyy = ketBuffer.data(goff + 126 * j + 15);
 
-                    auto g_xx_yyyyz = contrBuffer.data(goff + 126 * j + 16);
+                    auto g_xx_yyyyz = ketBuffer.data(goff + 126 * j + 16);
 
-                    auto g_xx_yyyzz = contrBuffer.data(goff + 126 * j + 17);
+                    auto g_xx_yyyzz = ketBuffer.data(goff + 126 * j + 17);
 
-                    auto g_xx_yyzzz = contrBuffer.data(goff + 126 * j + 18);
+                    auto g_xx_yyzzz = ketBuffer.data(goff + 126 * j + 18);
 
-                    auto g_xx_yzzzz = contrBuffer.data(goff + 126 * j + 19);
+                    auto g_xx_yzzzz = ketBuffer.data(goff + 126 * j + 19);
 
-                    auto g_xx_zzzzz = contrBuffer.data(goff + 126 * j + 20);
+                    auto g_xx_zzzzz = ketBuffer.data(goff + 126 * j + 20);
 
-                    auto g_xy_xxxxx = contrBuffer.data(goff + 126 * j + 21);
+                    auto g_xy_xxxxx = ketBuffer.data(goff + 126 * j + 21);
 
-                    auto g_xy_xxxxy = contrBuffer.data(goff + 126 * j + 22);
+                    auto g_xy_xxxxy = ketBuffer.data(goff + 126 * j + 22);
 
-                    auto g_xy_xxxxz = contrBuffer.data(goff + 126 * j + 23);
+                    auto g_xy_xxxxz = ketBuffer.data(goff + 126 * j + 23);
 
-                    auto g_xy_xxxyy = contrBuffer.data(goff + 126 * j + 24);
+                    auto g_xy_xxxyy = ketBuffer.data(goff + 126 * j + 24);
 
-                    auto g_xy_xxxyz = contrBuffer.data(goff + 126 * j + 25);
+                    auto g_xy_xxxyz = ketBuffer.data(goff + 126 * j + 25);
 
-                    auto g_xy_xxxzz = contrBuffer.data(goff + 126 * j + 26);
+                    auto g_xy_xxxzz = ketBuffer.data(goff + 126 * j + 26);
 
-                    auto g_xy_xxyyy = contrBuffer.data(goff + 126 * j + 27);
+                    auto g_xy_xxyyy = ketBuffer.data(goff + 126 * j + 27);
 
-                    auto g_xy_xxyyz = contrBuffer.data(goff + 126 * j + 28);
+                    auto g_xy_xxyyz = ketBuffer.data(goff + 126 * j + 28);
 
-                    auto g_xy_xxyzz = contrBuffer.data(goff + 126 * j + 29);
+                    auto g_xy_xxyzz = ketBuffer.data(goff + 126 * j + 29);
 
-                    auto g_xy_xxzzz = contrBuffer.data(goff + 126 * j + 30);
+                    auto g_xy_xxzzz = ketBuffer.data(goff + 126 * j + 30);
 
-                    auto g_xy_xyyyy = contrBuffer.data(goff + 126 * j + 31);
+                    auto g_xy_xyyyy = ketBuffer.data(goff + 126 * j + 31);
 
-                    auto g_xy_xyyyz = contrBuffer.data(goff + 126 * j + 32);
+                    auto g_xy_xyyyz = ketBuffer.data(goff + 126 * j + 32);
 
-                    auto g_xy_xyyzz = contrBuffer.data(goff + 126 * j + 33);
+                    auto g_xy_xyyzz = ketBuffer.data(goff + 126 * j + 33);
 
-                    auto g_xy_xyzzz = contrBuffer.data(goff + 126 * j + 34);
+                    auto g_xy_xyzzz = ketBuffer.data(goff + 126 * j + 34);
 
-                    auto g_xy_xzzzz = contrBuffer.data(goff + 126 * j + 35);
+                    auto g_xy_xzzzz = ketBuffer.data(goff + 126 * j + 35);
 
-                    auto g_xy_yyyyy = contrBuffer.data(goff + 126 * j + 36);
+                    auto g_xy_yyyyy = ketBuffer.data(goff + 126 * j + 36);
 
-                    auto g_xy_yyyyz = contrBuffer.data(goff + 126 * j + 37);
+                    auto g_xy_yyyyz = ketBuffer.data(goff + 126 * j + 37);
 
-                    auto g_xy_yyyzz = contrBuffer.data(goff + 126 * j + 38);
+                    auto g_xy_yyyzz = ketBuffer.data(goff + 126 * j + 38);
 
-                    auto g_xy_yyzzz = contrBuffer.data(goff + 126 * j + 39);
+                    auto g_xy_yyzzz = ketBuffer.data(goff + 126 * j + 39);
 
-                    auto g_xy_yzzzz = contrBuffer.data(goff + 126 * j + 40);
+                    auto g_xy_yzzzz = ketBuffer.data(goff + 126 * j + 40);
 
-                    auto g_xy_zzzzz = contrBuffer.data(goff + 126 * j + 41);
+                    auto g_xy_zzzzz = ketBuffer.data(goff + 126 * j + 41);
 
-                    auto g_xz_xxxxx = contrBuffer.data(goff + 126 * j + 42);
+                    auto g_xz_xxxxx = ketBuffer.data(goff + 126 * j + 42);
 
-                    auto g_xz_xxxxy = contrBuffer.data(goff + 126 * j + 43);
+                    auto g_xz_xxxxy = ketBuffer.data(goff + 126 * j + 43);
 
-                    auto g_xz_xxxxz = contrBuffer.data(goff + 126 * j + 44);
+                    auto g_xz_xxxxz = ketBuffer.data(goff + 126 * j + 44);
 
-                    auto g_xz_xxxyy = contrBuffer.data(goff + 126 * j + 45);
+                    auto g_xz_xxxyy = ketBuffer.data(goff + 126 * j + 45);
 
-                    auto g_xz_xxxyz = contrBuffer.data(goff + 126 * j + 46);
+                    auto g_xz_xxxyz = ketBuffer.data(goff + 126 * j + 46);
 
-                    auto g_xz_xxxzz = contrBuffer.data(goff + 126 * j + 47);
+                    auto g_xz_xxxzz = ketBuffer.data(goff + 126 * j + 47);
 
-                    auto g_xz_xxyyy = contrBuffer.data(goff + 126 * j + 48);
+                    auto g_xz_xxyyy = ketBuffer.data(goff + 126 * j + 48);
 
-                    auto g_xz_xxyyz = contrBuffer.data(goff + 126 * j + 49);
+                    auto g_xz_xxyyz = ketBuffer.data(goff + 126 * j + 49);
 
-                    auto g_xz_xxyzz = contrBuffer.data(goff + 126 * j + 50);
+                    auto g_xz_xxyzz = ketBuffer.data(goff + 126 * j + 50);
 
-                    auto g_xz_xxzzz = contrBuffer.data(goff + 126 * j + 51);
+                    auto g_xz_xxzzz = ketBuffer.data(goff + 126 * j + 51);
 
-                    auto g_xz_xyyyy = contrBuffer.data(goff + 126 * j + 52);
+                    auto g_xz_xyyyy = ketBuffer.data(goff + 126 * j + 52);
 
-                    auto g_xz_xyyyz = contrBuffer.data(goff + 126 * j + 53);
+                    auto g_xz_xyyyz = ketBuffer.data(goff + 126 * j + 53);
 
-                    auto g_xz_xyyzz = contrBuffer.data(goff + 126 * j + 54);
+                    auto g_xz_xyyzz = ketBuffer.data(goff + 126 * j + 54);
 
-                    auto g_xz_xyzzz = contrBuffer.data(goff + 126 * j + 55);
+                    auto g_xz_xyzzz = ketBuffer.data(goff + 126 * j + 55);
 
-                    auto g_xz_xzzzz = contrBuffer.data(goff + 126 * j + 56);
+                    auto g_xz_xzzzz = ketBuffer.data(goff + 126 * j + 56);
 
-                    auto g_xz_yyyyy = contrBuffer.data(goff + 126 * j + 57);
+                    auto g_xz_yyyyy = ketBuffer.data(goff + 126 * j + 57);
 
-                    auto g_xz_yyyyz = contrBuffer.data(goff + 126 * j + 58);
+                    auto g_xz_yyyyz = ketBuffer.data(goff + 126 * j + 58);
 
-                    auto g_xz_yyyzz = contrBuffer.data(goff + 126 * j + 59);
+                    auto g_xz_yyyzz = ketBuffer.data(goff + 126 * j + 59);
 
-                    auto g_xz_yyzzz = contrBuffer.data(goff + 126 * j + 60);
+                    auto g_xz_yyzzz = ketBuffer.data(goff + 126 * j + 60);
 
-                    auto g_xz_yzzzz = contrBuffer.data(goff + 126 * j + 61);
+                    auto g_xz_yzzzz = ketBuffer.data(goff + 126 * j + 61);
 
-                    auto g_xz_zzzzz = contrBuffer.data(goff + 126 * j + 62);
+                    auto g_xz_zzzzz = ketBuffer.data(goff + 126 * j + 62);
 
-                    auto g_yy_xxxxx = contrBuffer.data(goff + 126 * j + 63);
+                    auto g_yy_xxxxx = ketBuffer.data(goff + 126 * j + 63);
 
-                    auto g_yy_xxxxy = contrBuffer.data(goff + 126 * j + 64);
+                    auto g_yy_xxxxy = ketBuffer.data(goff + 126 * j + 64);
 
-                    auto g_yy_xxxxz = contrBuffer.data(goff + 126 * j + 65);
+                    auto g_yy_xxxxz = ketBuffer.data(goff + 126 * j + 65);
 
-                    auto g_yy_xxxyy = contrBuffer.data(goff + 126 * j + 66);
+                    auto g_yy_xxxyy = ketBuffer.data(goff + 126 * j + 66);
 
-                    auto g_yy_xxxyz = contrBuffer.data(goff + 126 * j + 67);
+                    auto g_yy_xxxyz = ketBuffer.data(goff + 126 * j + 67);
 
-                    auto g_yy_xxxzz = contrBuffer.data(goff + 126 * j + 68);
+                    auto g_yy_xxxzz = ketBuffer.data(goff + 126 * j + 68);
 
-                    auto g_yy_xxyyy = contrBuffer.data(goff + 126 * j + 69);
+                    auto g_yy_xxyyy = ketBuffer.data(goff + 126 * j + 69);
 
-                    auto g_yy_xxyyz = contrBuffer.data(goff + 126 * j + 70);
+                    auto g_yy_xxyyz = ketBuffer.data(goff + 126 * j + 70);
 
-                    auto g_yy_xxyzz = contrBuffer.data(goff + 126 * j + 71);
+                    auto g_yy_xxyzz = ketBuffer.data(goff + 126 * j + 71);
 
-                    auto g_yy_xxzzz = contrBuffer.data(goff + 126 * j + 72);
+                    auto g_yy_xxzzz = ketBuffer.data(goff + 126 * j + 72);
 
-                    auto g_yy_xyyyy = contrBuffer.data(goff + 126 * j + 73);
+                    auto g_yy_xyyyy = ketBuffer.data(goff + 126 * j + 73);
 
-                    auto g_yy_xyyyz = contrBuffer.data(goff + 126 * j + 74);
+                    auto g_yy_xyyyz = ketBuffer.data(goff + 126 * j + 74);
 
-                    auto g_yy_xyyzz = contrBuffer.data(goff + 126 * j + 75);
+                    auto g_yy_xyyzz = ketBuffer.data(goff + 126 * j + 75);
 
-                    auto g_yy_xyzzz = contrBuffer.data(goff + 126 * j + 76);
+                    auto g_yy_xyzzz = ketBuffer.data(goff + 126 * j + 76);
 
-                    auto g_yy_xzzzz = contrBuffer.data(goff + 126 * j + 77);
+                    auto g_yy_xzzzz = ketBuffer.data(goff + 126 * j + 77);
 
-                    auto g_yy_yyyyy = contrBuffer.data(goff + 126 * j + 78);
+                    auto g_yy_yyyyy = ketBuffer.data(goff + 126 * j + 78);
 
-                    auto g_yy_yyyyz = contrBuffer.data(goff + 126 * j + 79);
+                    auto g_yy_yyyyz = ketBuffer.data(goff + 126 * j + 79);
 
-                    auto g_yy_yyyzz = contrBuffer.data(goff + 126 * j + 80);
+                    auto g_yy_yyyzz = ketBuffer.data(goff + 126 * j + 80);
 
-                    auto g_yy_yyzzz = contrBuffer.data(goff + 126 * j + 81);
+                    auto g_yy_yyzzz = ketBuffer.data(goff + 126 * j + 81);
 
-                    auto g_yy_yzzzz = contrBuffer.data(goff + 126 * j + 82);
+                    auto g_yy_yzzzz = ketBuffer.data(goff + 126 * j + 82);
 
-                    auto g_yy_zzzzz = contrBuffer.data(goff + 126 * j + 83);
+                    auto g_yy_zzzzz = ketBuffer.data(goff + 126 * j + 83);
 
-                    auto g_yz_xxxxx = contrBuffer.data(goff + 126 * j + 84);
+                    auto g_yz_xxxxx = ketBuffer.data(goff + 126 * j + 84);
 
-                    auto g_yz_xxxxy = contrBuffer.data(goff + 126 * j + 85);
+                    auto g_yz_xxxxy = ketBuffer.data(goff + 126 * j + 85);
 
-                    auto g_yz_xxxxz = contrBuffer.data(goff + 126 * j + 86);
+                    auto g_yz_xxxxz = ketBuffer.data(goff + 126 * j + 86);
 
-                    auto g_yz_xxxyy = contrBuffer.data(goff + 126 * j + 87);
+                    auto g_yz_xxxyy = ketBuffer.data(goff + 126 * j + 87);
 
-                    auto g_yz_xxxyz = contrBuffer.data(goff + 126 * j + 88);
+                    auto g_yz_xxxyz = ketBuffer.data(goff + 126 * j + 88);
 
-                    auto g_yz_xxxzz = contrBuffer.data(goff + 126 * j + 89);
+                    auto g_yz_xxxzz = ketBuffer.data(goff + 126 * j + 89);
 
-                    auto g_yz_xxyyy = contrBuffer.data(goff + 126 * j + 90);
+                    auto g_yz_xxyyy = ketBuffer.data(goff + 126 * j + 90);
 
-                    auto g_yz_xxyyz = contrBuffer.data(goff + 126 * j + 91);
+                    auto g_yz_xxyyz = ketBuffer.data(goff + 126 * j + 91);
 
-                    auto g_yz_xxyzz = contrBuffer.data(goff + 126 * j + 92);
+                    auto g_yz_xxyzz = ketBuffer.data(goff + 126 * j + 92);
 
-                    auto g_yz_xxzzz = contrBuffer.data(goff + 126 * j + 93);
+                    auto g_yz_xxzzz = ketBuffer.data(goff + 126 * j + 93);
 
-                    auto g_yz_xyyyy = contrBuffer.data(goff + 126 * j + 94);
+                    auto g_yz_xyyyy = ketBuffer.data(goff + 126 * j + 94);
 
-                    auto g_yz_xyyyz = contrBuffer.data(goff + 126 * j + 95);
+                    auto g_yz_xyyyz = ketBuffer.data(goff + 126 * j + 95);
 
-                    auto g_yz_xyyzz = contrBuffer.data(goff + 126 * j + 96);
+                    auto g_yz_xyyzz = ketBuffer.data(goff + 126 * j + 96);
 
-                    auto g_yz_xyzzz = contrBuffer.data(goff + 126 * j + 97);
+                    auto g_yz_xyzzz = ketBuffer.data(goff + 126 * j + 97);
 
-                    auto g_yz_xzzzz = contrBuffer.data(goff + 126 * j + 98);
+                    auto g_yz_xzzzz = ketBuffer.data(goff + 126 * j + 98);
 
-                    auto g_yz_yyyyy = contrBuffer.data(goff + 126 * j + 99);
+                    auto g_yz_yyyyy = ketBuffer.data(goff + 126 * j + 99);
 
-                    auto g_yz_yyyyz = contrBuffer.data(goff + 126 * j + 100);
+                    auto g_yz_yyyyz = ketBuffer.data(goff + 126 * j + 100);
 
-                    auto g_yz_yyyzz = contrBuffer.data(goff + 126 * j + 101);
+                    auto g_yz_yyyzz = ketBuffer.data(goff + 126 * j + 101);
 
-                    auto g_yz_yyzzz = contrBuffer.data(goff + 126 * j + 102);
+                    auto g_yz_yyzzz = ketBuffer.data(goff + 126 * j + 102);
 
-                    auto g_yz_yzzzz = contrBuffer.data(goff + 126 * j + 103);
+                    auto g_yz_yzzzz = ketBuffer.data(goff + 126 * j + 103);
 
-                    auto g_yz_zzzzz = contrBuffer.data(goff + 126 * j + 104);
+                    auto g_yz_zzzzz = ketBuffer.data(goff + 126 * j + 104);
 
-                    auto g_zz_xxxxx = contrBuffer.data(goff + 126 * j + 105);
+                    auto g_zz_xxxxx = ketBuffer.data(goff + 126 * j + 105);
 
-                    auto g_zz_xxxxy = contrBuffer.data(goff + 126 * j + 106);
+                    auto g_zz_xxxxy = ketBuffer.data(goff + 126 * j + 106);
 
-                    auto g_zz_xxxxz = contrBuffer.data(goff + 126 * j + 107);
+                    auto g_zz_xxxxz = ketBuffer.data(goff + 126 * j + 107);
 
-                    auto g_zz_xxxyy = contrBuffer.data(goff + 126 * j + 108);
+                    auto g_zz_xxxyy = ketBuffer.data(goff + 126 * j + 108);
 
-                    auto g_zz_xxxyz = contrBuffer.data(goff + 126 * j + 109);
+                    auto g_zz_xxxyz = ketBuffer.data(goff + 126 * j + 109);
 
-                    auto g_zz_xxxzz = contrBuffer.data(goff + 126 * j + 110);
+                    auto g_zz_xxxzz = ketBuffer.data(goff + 126 * j + 110);
 
-                    auto g_zz_xxyyy = contrBuffer.data(goff + 126 * j + 111);
+                    auto g_zz_xxyyy = ketBuffer.data(goff + 126 * j + 111);
 
-                    auto g_zz_xxyyz = contrBuffer.data(goff + 126 * j + 112);
+                    auto g_zz_xxyyz = ketBuffer.data(goff + 126 * j + 112);
 
-                    auto g_zz_xxyzz = contrBuffer.data(goff + 126 * j + 113);
+                    auto g_zz_xxyzz = ketBuffer.data(goff + 126 * j + 113);
 
-                    auto g_zz_xxzzz = contrBuffer.data(goff + 126 * j + 114);
+                    auto g_zz_xxzzz = ketBuffer.data(goff + 126 * j + 114);
 
-                    auto g_zz_xyyyy = contrBuffer.data(goff + 126 * j + 115);
+                    auto g_zz_xyyyy = ketBuffer.data(goff + 126 * j + 115);
 
-                    auto g_zz_xyyyz = contrBuffer.data(goff + 126 * j + 116);
+                    auto g_zz_xyyyz = ketBuffer.data(goff + 126 * j + 116);
 
-                    auto g_zz_xyyzz = contrBuffer.data(goff + 126 * j + 117);
+                    auto g_zz_xyyzz = ketBuffer.data(goff + 126 * j + 117);
 
-                    auto g_zz_xyzzz = contrBuffer.data(goff + 126 * j + 118);
+                    auto g_zz_xyzzz = ketBuffer.data(goff + 126 * j + 118);
 
-                    auto g_zz_xzzzz = contrBuffer.data(goff + 126 * j + 119);
+                    auto g_zz_xzzzz = ketBuffer.data(goff + 126 * j + 119);
 
-                    auto g_zz_yyyyy = contrBuffer.data(goff + 126 * j + 120);
+                    auto g_zz_yyyyy = ketBuffer.data(goff + 126 * j + 120);
 
-                    auto g_zz_yyyyz = contrBuffer.data(goff + 126 * j + 121);
+                    auto g_zz_yyyyz = ketBuffer.data(goff + 126 * j + 121);
 
-                    auto g_zz_yyyzz = contrBuffer.data(goff + 126 * j + 122);
+                    auto g_zz_yyyzz = ketBuffer.data(goff + 126 * j + 122);
 
-                    auto g_zz_yyzzz = contrBuffer.data(goff + 126 * j + 123);
+                    auto g_zz_yyzzz = ketBuffer.data(goff + 126 * j + 123);
 
-                    auto g_zz_yzzzz = contrBuffer.data(goff + 126 * j + 124);
+                    auto g_zz_yzzzz = ketBuffer.data(goff + 126 * j + 124);
 
-                    auto g_zz_zzzzz = contrBuffer.data(goff + 126 * j + 125);
+                    auto g_zz_zzzzz = ketBuffer.data(goff + 126 * j + 125);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_x_xxxxx, g2_x_xxxxy,\
                                              g2_x_xxxxz, g2_x_xxxyy, g2_x_xxxyz,\
@@ -5199,7 +5199,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXDI(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXDI(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -5250,713 +5250,713 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|PI)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PI) integrals
 
-                    auto g2_x_xxxxxx = contrBuffer.data(g2off + 84 * j);
+                    auto g2_x_xxxxxx = ketBuffer.data(g2off + 84 * j);
 
-                    auto g2_x_xxxxxy = contrBuffer.data(g2off + 84 * j + 1);
+                    auto g2_x_xxxxxy = ketBuffer.data(g2off + 84 * j + 1);
 
-                    auto g2_x_xxxxxz = contrBuffer.data(g2off + 84 * j + 2);
+                    auto g2_x_xxxxxz = ketBuffer.data(g2off + 84 * j + 2);
 
-                    auto g2_x_xxxxyy = contrBuffer.data(g2off + 84 * j + 3);
+                    auto g2_x_xxxxyy = ketBuffer.data(g2off + 84 * j + 3);
 
-                    auto g2_x_xxxxyz = contrBuffer.data(g2off + 84 * j + 4);
+                    auto g2_x_xxxxyz = ketBuffer.data(g2off + 84 * j + 4);
 
-                    auto g2_x_xxxxzz = contrBuffer.data(g2off + 84 * j + 5);
+                    auto g2_x_xxxxzz = ketBuffer.data(g2off + 84 * j + 5);
 
-                    auto g2_x_xxxyyy = contrBuffer.data(g2off + 84 * j + 6);
+                    auto g2_x_xxxyyy = ketBuffer.data(g2off + 84 * j + 6);
 
-                    auto g2_x_xxxyyz = contrBuffer.data(g2off + 84 * j + 7);
+                    auto g2_x_xxxyyz = ketBuffer.data(g2off + 84 * j + 7);
 
-                    auto g2_x_xxxyzz = contrBuffer.data(g2off + 84 * j + 8);
+                    auto g2_x_xxxyzz = ketBuffer.data(g2off + 84 * j + 8);
 
-                    auto g2_x_xxxzzz = contrBuffer.data(g2off + 84 * j + 9);
+                    auto g2_x_xxxzzz = ketBuffer.data(g2off + 84 * j + 9);
 
-                    auto g2_x_xxyyyy = contrBuffer.data(g2off + 84 * j + 10);
+                    auto g2_x_xxyyyy = ketBuffer.data(g2off + 84 * j + 10);
 
-                    auto g2_x_xxyyyz = contrBuffer.data(g2off + 84 * j + 11);
+                    auto g2_x_xxyyyz = ketBuffer.data(g2off + 84 * j + 11);
 
-                    auto g2_x_xxyyzz = contrBuffer.data(g2off + 84 * j + 12);
+                    auto g2_x_xxyyzz = ketBuffer.data(g2off + 84 * j + 12);
 
-                    auto g2_x_xxyzzz = contrBuffer.data(g2off + 84 * j + 13);
+                    auto g2_x_xxyzzz = ketBuffer.data(g2off + 84 * j + 13);
 
-                    auto g2_x_xxzzzz = contrBuffer.data(g2off + 84 * j + 14);
+                    auto g2_x_xxzzzz = ketBuffer.data(g2off + 84 * j + 14);
 
-                    auto g2_x_xyyyyy = contrBuffer.data(g2off + 84 * j + 15);
+                    auto g2_x_xyyyyy = ketBuffer.data(g2off + 84 * j + 15);
 
-                    auto g2_x_xyyyyz = contrBuffer.data(g2off + 84 * j + 16);
+                    auto g2_x_xyyyyz = ketBuffer.data(g2off + 84 * j + 16);
 
-                    auto g2_x_xyyyzz = contrBuffer.data(g2off + 84 * j + 17);
+                    auto g2_x_xyyyzz = ketBuffer.data(g2off + 84 * j + 17);
 
-                    auto g2_x_xyyzzz = contrBuffer.data(g2off + 84 * j + 18);
+                    auto g2_x_xyyzzz = ketBuffer.data(g2off + 84 * j + 18);
 
-                    auto g2_x_xyzzzz = contrBuffer.data(g2off + 84 * j + 19);
+                    auto g2_x_xyzzzz = ketBuffer.data(g2off + 84 * j + 19);
 
-                    auto g2_x_xzzzzz = contrBuffer.data(g2off + 84 * j + 20);
+                    auto g2_x_xzzzzz = ketBuffer.data(g2off + 84 * j + 20);
 
-                    auto g2_x_yyyyyy = contrBuffer.data(g2off + 84 * j + 21);
+                    auto g2_x_yyyyyy = ketBuffer.data(g2off + 84 * j + 21);
 
-                    auto g2_x_yyyyyz = contrBuffer.data(g2off + 84 * j + 22);
+                    auto g2_x_yyyyyz = ketBuffer.data(g2off + 84 * j + 22);
 
-                    auto g2_x_yyyyzz = contrBuffer.data(g2off + 84 * j + 23);
+                    auto g2_x_yyyyzz = ketBuffer.data(g2off + 84 * j + 23);
 
-                    auto g2_x_yyyzzz = contrBuffer.data(g2off + 84 * j + 24);
+                    auto g2_x_yyyzzz = ketBuffer.data(g2off + 84 * j + 24);
 
-                    auto g2_x_yyzzzz = contrBuffer.data(g2off + 84 * j + 25);
+                    auto g2_x_yyzzzz = ketBuffer.data(g2off + 84 * j + 25);
 
-                    auto g2_x_yzzzzz = contrBuffer.data(g2off + 84 * j + 26);
+                    auto g2_x_yzzzzz = ketBuffer.data(g2off + 84 * j + 26);
 
-                    auto g2_x_zzzzzz = contrBuffer.data(g2off + 84 * j + 27);
+                    auto g2_x_zzzzzz = ketBuffer.data(g2off + 84 * j + 27);
 
-                    auto g2_y_xxxxxx = contrBuffer.data(g2off + 84 * j + 28);
+                    auto g2_y_xxxxxx = ketBuffer.data(g2off + 84 * j + 28);
 
-                    auto g2_y_xxxxxy = contrBuffer.data(g2off + 84 * j + 29);
+                    auto g2_y_xxxxxy = ketBuffer.data(g2off + 84 * j + 29);
 
-                    auto g2_y_xxxxxz = contrBuffer.data(g2off + 84 * j + 30);
+                    auto g2_y_xxxxxz = ketBuffer.data(g2off + 84 * j + 30);
 
-                    auto g2_y_xxxxyy = contrBuffer.data(g2off + 84 * j + 31);
+                    auto g2_y_xxxxyy = ketBuffer.data(g2off + 84 * j + 31);
 
-                    auto g2_y_xxxxyz = contrBuffer.data(g2off + 84 * j + 32);
+                    auto g2_y_xxxxyz = ketBuffer.data(g2off + 84 * j + 32);
 
-                    auto g2_y_xxxxzz = contrBuffer.data(g2off + 84 * j + 33);
+                    auto g2_y_xxxxzz = ketBuffer.data(g2off + 84 * j + 33);
 
-                    auto g2_y_xxxyyy = contrBuffer.data(g2off + 84 * j + 34);
+                    auto g2_y_xxxyyy = ketBuffer.data(g2off + 84 * j + 34);
 
-                    auto g2_y_xxxyyz = contrBuffer.data(g2off + 84 * j + 35);
+                    auto g2_y_xxxyyz = ketBuffer.data(g2off + 84 * j + 35);
 
-                    auto g2_y_xxxyzz = contrBuffer.data(g2off + 84 * j + 36);
+                    auto g2_y_xxxyzz = ketBuffer.data(g2off + 84 * j + 36);
 
-                    auto g2_y_xxxzzz = contrBuffer.data(g2off + 84 * j + 37);
+                    auto g2_y_xxxzzz = ketBuffer.data(g2off + 84 * j + 37);
 
-                    auto g2_y_xxyyyy = contrBuffer.data(g2off + 84 * j + 38);
+                    auto g2_y_xxyyyy = ketBuffer.data(g2off + 84 * j + 38);
 
-                    auto g2_y_xxyyyz = contrBuffer.data(g2off + 84 * j + 39);
+                    auto g2_y_xxyyyz = ketBuffer.data(g2off + 84 * j + 39);
 
-                    auto g2_y_xxyyzz = contrBuffer.data(g2off + 84 * j + 40);
+                    auto g2_y_xxyyzz = ketBuffer.data(g2off + 84 * j + 40);
 
-                    auto g2_y_xxyzzz = contrBuffer.data(g2off + 84 * j + 41);
+                    auto g2_y_xxyzzz = ketBuffer.data(g2off + 84 * j + 41);
 
-                    auto g2_y_xxzzzz = contrBuffer.data(g2off + 84 * j + 42);
+                    auto g2_y_xxzzzz = ketBuffer.data(g2off + 84 * j + 42);
 
-                    auto g2_y_xyyyyy = contrBuffer.data(g2off + 84 * j + 43);
+                    auto g2_y_xyyyyy = ketBuffer.data(g2off + 84 * j + 43);
 
-                    auto g2_y_xyyyyz = contrBuffer.data(g2off + 84 * j + 44);
+                    auto g2_y_xyyyyz = ketBuffer.data(g2off + 84 * j + 44);
 
-                    auto g2_y_xyyyzz = contrBuffer.data(g2off + 84 * j + 45);
+                    auto g2_y_xyyyzz = ketBuffer.data(g2off + 84 * j + 45);
 
-                    auto g2_y_xyyzzz = contrBuffer.data(g2off + 84 * j + 46);
+                    auto g2_y_xyyzzz = ketBuffer.data(g2off + 84 * j + 46);
 
-                    auto g2_y_xyzzzz = contrBuffer.data(g2off + 84 * j + 47);
+                    auto g2_y_xyzzzz = ketBuffer.data(g2off + 84 * j + 47);
 
-                    auto g2_y_xzzzzz = contrBuffer.data(g2off + 84 * j + 48);
+                    auto g2_y_xzzzzz = ketBuffer.data(g2off + 84 * j + 48);
 
-                    auto g2_y_yyyyyy = contrBuffer.data(g2off + 84 * j + 49);
+                    auto g2_y_yyyyyy = ketBuffer.data(g2off + 84 * j + 49);
 
-                    auto g2_y_yyyyyz = contrBuffer.data(g2off + 84 * j + 50);
+                    auto g2_y_yyyyyz = ketBuffer.data(g2off + 84 * j + 50);
 
-                    auto g2_y_yyyyzz = contrBuffer.data(g2off + 84 * j + 51);
+                    auto g2_y_yyyyzz = ketBuffer.data(g2off + 84 * j + 51);
 
-                    auto g2_y_yyyzzz = contrBuffer.data(g2off + 84 * j + 52);
+                    auto g2_y_yyyzzz = ketBuffer.data(g2off + 84 * j + 52);
 
-                    auto g2_y_yyzzzz = contrBuffer.data(g2off + 84 * j + 53);
+                    auto g2_y_yyzzzz = ketBuffer.data(g2off + 84 * j + 53);
 
-                    auto g2_y_yzzzzz = contrBuffer.data(g2off + 84 * j + 54);
+                    auto g2_y_yzzzzz = ketBuffer.data(g2off + 84 * j + 54);
 
-                    auto g2_y_zzzzzz = contrBuffer.data(g2off + 84 * j + 55);
+                    auto g2_y_zzzzzz = ketBuffer.data(g2off + 84 * j + 55);
 
-                    auto g2_z_xxxxxx = contrBuffer.data(g2off + 84 * j + 56);
+                    auto g2_z_xxxxxx = ketBuffer.data(g2off + 84 * j + 56);
 
-                    auto g2_z_xxxxxy = contrBuffer.data(g2off + 84 * j + 57);
+                    auto g2_z_xxxxxy = ketBuffer.data(g2off + 84 * j + 57);
 
-                    auto g2_z_xxxxxz = contrBuffer.data(g2off + 84 * j + 58);
+                    auto g2_z_xxxxxz = ketBuffer.data(g2off + 84 * j + 58);
 
-                    auto g2_z_xxxxyy = contrBuffer.data(g2off + 84 * j + 59);
+                    auto g2_z_xxxxyy = ketBuffer.data(g2off + 84 * j + 59);
 
-                    auto g2_z_xxxxyz = contrBuffer.data(g2off + 84 * j + 60);
+                    auto g2_z_xxxxyz = ketBuffer.data(g2off + 84 * j + 60);
 
-                    auto g2_z_xxxxzz = contrBuffer.data(g2off + 84 * j + 61);
+                    auto g2_z_xxxxzz = ketBuffer.data(g2off + 84 * j + 61);
 
-                    auto g2_z_xxxyyy = contrBuffer.data(g2off + 84 * j + 62);
+                    auto g2_z_xxxyyy = ketBuffer.data(g2off + 84 * j + 62);
 
-                    auto g2_z_xxxyyz = contrBuffer.data(g2off + 84 * j + 63);
+                    auto g2_z_xxxyyz = ketBuffer.data(g2off + 84 * j + 63);
 
-                    auto g2_z_xxxyzz = contrBuffer.data(g2off + 84 * j + 64);
+                    auto g2_z_xxxyzz = ketBuffer.data(g2off + 84 * j + 64);
 
-                    auto g2_z_xxxzzz = contrBuffer.data(g2off + 84 * j + 65);
+                    auto g2_z_xxxzzz = ketBuffer.data(g2off + 84 * j + 65);
 
-                    auto g2_z_xxyyyy = contrBuffer.data(g2off + 84 * j + 66);
+                    auto g2_z_xxyyyy = ketBuffer.data(g2off + 84 * j + 66);
 
-                    auto g2_z_xxyyyz = contrBuffer.data(g2off + 84 * j + 67);
+                    auto g2_z_xxyyyz = ketBuffer.data(g2off + 84 * j + 67);
 
-                    auto g2_z_xxyyzz = contrBuffer.data(g2off + 84 * j + 68);
+                    auto g2_z_xxyyzz = ketBuffer.data(g2off + 84 * j + 68);
 
-                    auto g2_z_xxyzzz = contrBuffer.data(g2off + 84 * j + 69);
+                    auto g2_z_xxyzzz = ketBuffer.data(g2off + 84 * j + 69);
 
-                    auto g2_z_xxzzzz = contrBuffer.data(g2off + 84 * j + 70);
+                    auto g2_z_xxzzzz = ketBuffer.data(g2off + 84 * j + 70);
 
-                    auto g2_z_xyyyyy = contrBuffer.data(g2off + 84 * j + 71);
+                    auto g2_z_xyyyyy = ketBuffer.data(g2off + 84 * j + 71);
 
-                    auto g2_z_xyyyyz = contrBuffer.data(g2off + 84 * j + 72);
+                    auto g2_z_xyyyyz = ketBuffer.data(g2off + 84 * j + 72);
 
-                    auto g2_z_xyyyzz = contrBuffer.data(g2off + 84 * j + 73);
+                    auto g2_z_xyyyzz = ketBuffer.data(g2off + 84 * j + 73);
 
-                    auto g2_z_xyyzzz = contrBuffer.data(g2off + 84 * j + 74);
+                    auto g2_z_xyyzzz = ketBuffer.data(g2off + 84 * j + 74);
 
-                    auto g2_z_xyzzzz = contrBuffer.data(g2off + 84 * j + 75);
+                    auto g2_z_xyzzzz = ketBuffer.data(g2off + 84 * j + 75);
 
-                    auto g2_z_xzzzzz = contrBuffer.data(g2off + 84 * j + 76);
+                    auto g2_z_xzzzzz = ketBuffer.data(g2off + 84 * j + 76);
 
-                    auto g2_z_yyyyyy = contrBuffer.data(g2off + 84 * j + 77);
+                    auto g2_z_yyyyyy = ketBuffer.data(g2off + 84 * j + 77);
 
-                    auto g2_z_yyyyyz = contrBuffer.data(g2off + 84 * j + 78);
+                    auto g2_z_yyyyyz = ketBuffer.data(g2off + 84 * j + 78);
 
-                    auto g2_z_yyyyzz = contrBuffer.data(g2off + 84 * j + 79);
+                    auto g2_z_yyyyzz = ketBuffer.data(g2off + 84 * j + 79);
 
-                    auto g2_z_yyyzzz = contrBuffer.data(g2off + 84 * j + 80);
+                    auto g2_z_yyyzzz = ketBuffer.data(g2off + 84 * j + 80);
 
-                    auto g2_z_yyzzzz = contrBuffer.data(g2off + 84 * j + 81);
+                    auto g2_z_yyzzzz = ketBuffer.data(g2off + 84 * j + 81);
 
-                    auto g2_z_yzzzzz = contrBuffer.data(g2off + 84 * j + 82);
+                    auto g2_z_yzzzzz = ketBuffer.data(g2off + 84 * j + 82);
 
-                    auto g2_z_zzzzzz = contrBuffer.data(g2off + 84 * j + 83);
+                    auto g2_z_zzzzzz = ketBuffer.data(g2off + 84 * j + 83);
 
-                    // set up pointers to (SX|g(r,r')|PK)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|PK) integrals
 
-                    auto g1_x_xxxxxxx = contrBuffer.data(g1off + 108 * j);
+                    auto g1_x_xxxxxxx = ketBuffer.data(g1off + 108 * j);
 
-                    auto g1_x_xxxxxxy = contrBuffer.data(g1off + 108 * j + 1);
+                    auto g1_x_xxxxxxy = ketBuffer.data(g1off + 108 * j + 1);
 
-                    auto g1_x_xxxxxxz = contrBuffer.data(g1off + 108 * j + 2);
+                    auto g1_x_xxxxxxz = ketBuffer.data(g1off + 108 * j + 2);
 
-                    auto g1_x_xxxxxyy = contrBuffer.data(g1off + 108 * j + 3);
+                    auto g1_x_xxxxxyy = ketBuffer.data(g1off + 108 * j + 3);
 
-                    auto g1_x_xxxxxyz = contrBuffer.data(g1off + 108 * j + 4);
+                    auto g1_x_xxxxxyz = ketBuffer.data(g1off + 108 * j + 4);
 
-                    auto g1_x_xxxxxzz = contrBuffer.data(g1off + 108 * j + 5);
+                    auto g1_x_xxxxxzz = ketBuffer.data(g1off + 108 * j + 5);
 
-                    auto g1_x_xxxxyyy = contrBuffer.data(g1off + 108 * j + 6);
+                    auto g1_x_xxxxyyy = ketBuffer.data(g1off + 108 * j + 6);
 
-                    auto g1_x_xxxxyyz = contrBuffer.data(g1off + 108 * j + 7);
+                    auto g1_x_xxxxyyz = ketBuffer.data(g1off + 108 * j + 7);
 
-                    auto g1_x_xxxxyzz = contrBuffer.data(g1off + 108 * j + 8);
+                    auto g1_x_xxxxyzz = ketBuffer.data(g1off + 108 * j + 8);
 
-                    auto g1_x_xxxxzzz = contrBuffer.data(g1off + 108 * j + 9);
+                    auto g1_x_xxxxzzz = ketBuffer.data(g1off + 108 * j + 9);
 
-                    auto g1_x_xxxyyyy = contrBuffer.data(g1off + 108 * j + 10);
+                    auto g1_x_xxxyyyy = ketBuffer.data(g1off + 108 * j + 10);
 
-                    auto g1_x_xxxyyyz = contrBuffer.data(g1off + 108 * j + 11);
+                    auto g1_x_xxxyyyz = ketBuffer.data(g1off + 108 * j + 11);
 
-                    auto g1_x_xxxyyzz = contrBuffer.data(g1off + 108 * j + 12);
+                    auto g1_x_xxxyyzz = ketBuffer.data(g1off + 108 * j + 12);
 
-                    auto g1_x_xxxyzzz = contrBuffer.data(g1off + 108 * j + 13);
+                    auto g1_x_xxxyzzz = ketBuffer.data(g1off + 108 * j + 13);
 
-                    auto g1_x_xxxzzzz = contrBuffer.data(g1off + 108 * j + 14);
+                    auto g1_x_xxxzzzz = ketBuffer.data(g1off + 108 * j + 14);
 
-                    auto g1_x_xxyyyyy = contrBuffer.data(g1off + 108 * j + 15);
+                    auto g1_x_xxyyyyy = ketBuffer.data(g1off + 108 * j + 15);
 
-                    auto g1_x_xxyyyyz = contrBuffer.data(g1off + 108 * j + 16);
+                    auto g1_x_xxyyyyz = ketBuffer.data(g1off + 108 * j + 16);
 
-                    auto g1_x_xxyyyzz = contrBuffer.data(g1off + 108 * j + 17);
+                    auto g1_x_xxyyyzz = ketBuffer.data(g1off + 108 * j + 17);
 
-                    auto g1_x_xxyyzzz = contrBuffer.data(g1off + 108 * j + 18);
+                    auto g1_x_xxyyzzz = ketBuffer.data(g1off + 108 * j + 18);
 
-                    auto g1_x_xxyzzzz = contrBuffer.data(g1off + 108 * j + 19);
+                    auto g1_x_xxyzzzz = ketBuffer.data(g1off + 108 * j + 19);
 
-                    auto g1_x_xxzzzzz = contrBuffer.data(g1off + 108 * j + 20);
+                    auto g1_x_xxzzzzz = ketBuffer.data(g1off + 108 * j + 20);
 
-                    auto g1_x_xyyyyyy = contrBuffer.data(g1off + 108 * j + 21);
+                    auto g1_x_xyyyyyy = ketBuffer.data(g1off + 108 * j + 21);
 
-                    auto g1_x_xyyyyyz = contrBuffer.data(g1off + 108 * j + 22);
+                    auto g1_x_xyyyyyz = ketBuffer.data(g1off + 108 * j + 22);
 
-                    auto g1_x_xyyyyzz = contrBuffer.data(g1off + 108 * j + 23);
+                    auto g1_x_xyyyyzz = ketBuffer.data(g1off + 108 * j + 23);
 
-                    auto g1_x_xyyyzzz = contrBuffer.data(g1off + 108 * j + 24);
+                    auto g1_x_xyyyzzz = ketBuffer.data(g1off + 108 * j + 24);
 
-                    auto g1_x_xyyzzzz = contrBuffer.data(g1off + 108 * j + 25);
+                    auto g1_x_xyyzzzz = ketBuffer.data(g1off + 108 * j + 25);
 
-                    auto g1_x_xyzzzzz = contrBuffer.data(g1off + 108 * j + 26);
+                    auto g1_x_xyzzzzz = ketBuffer.data(g1off + 108 * j + 26);
 
-                    auto g1_x_xzzzzzz = contrBuffer.data(g1off + 108 * j + 27);
+                    auto g1_x_xzzzzzz = ketBuffer.data(g1off + 108 * j + 27);
 
-                    auto g1_y_xxxxxxx = contrBuffer.data(g1off + 108 * j + 36);
+                    auto g1_y_xxxxxxx = ketBuffer.data(g1off + 108 * j + 36);
 
-                    auto g1_y_xxxxxxy = contrBuffer.data(g1off + 108 * j + 37);
+                    auto g1_y_xxxxxxy = ketBuffer.data(g1off + 108 * j + 37);
 
-                    auto g1_y_xxxxxxz = contrBuffer.data(g1off + 108 * j + 38);
+                    auto g1_y_xxxxxxz = ketBuffer.data(g1off + 108 * j + 38);
 
-                    auto g1_y_xxxxxyy = contrBuffer.data(g1off + 108 * j + 39);
+                    auto g1_y_xxxxxyy = ketBuffer.data(g1off + 108 * j + 39);
 
-                    auto g1_y_xxxxxyz = contrBuffer.data(g1off + 108 * j + 40);
+                    auto g1_y_xxxxxyz = ketBuffer.data(g1off + 108 * j + 40);
 
-                    auto g1_y_xxxxxzz = contrBuffer.data(g1off + 108 * j + 41);
+                    auto g1_y_xxxxxzz = ketBuffer.data(g1off + 108 * j + 41);
 
-                    auto g1_y_xxxxyyy = contrBuffer.data(g1off + 108 * j + 42);
+                    auto g1_y_xxxxyyy = ketBuffer.data(g1off + 108 * j + 42);
 
-                    auto g1_y_xxxxyyz = contrBuffer.data(g1off + 108 * j + 43);
+                    auto g1_y_xxxxyyz = ketBuffer.data(g1off + 108 * j + 43);
 
-                    auto g1_y_xxxxyzz = contrBuffer.data(g1off + 108 * j + 44);
+                    auto g1_y_xxxxyzz = ketBuffer.data(g1off + 108 * j + 44);
 
-                    auto g1_y_xxxxzzz = contrBuffer.data(g1off + 108 * j + 45);
+                    auto g1_y_xxxxzzz = ketBuffer.data(g1off + 108 * j + 45);
 
-                    auto g1_y_xxxyyyy = contrBuffer.data(g1off + 108 * j + 46);
+                    auto g1_y_xxxyyyy = ketBuffer.data(g1off + 108 * j + 46);
 
-                    auto g1_y_xxxyyyz = contrBuffer.data(g1off + 108 * j + 47);
+                    auto g1_y_xxxyyyz = ketBuffer.data(g1off + 108 * j + 47);
 
-                    auto g1_y_xxxyyzz = contrBuffer.data(g1off + 108 * j + 48);
+                    auto g1_y_xxxyyzz = ketBuffer.data(g1off + 108 * j + 48);
 
-                    auto g1_y_xxxyzzz = contrBuffer.data(g1off + 108 * j + 49);
+                    auto g1_y_xxxyzzz = ketBuffer.data(g1off + 108 * j + 49);
 
-                    auto g1_y_xxxzzzz = contrBuffer.data(g1off + 108 * j + 50);
+                    auto g1_y_xxxzzzz = ketBuffer.data(g1off + 108 * j + 50);
 
-                    auto g1_y_xxyyyyy = contrBuffer.data(g1off + 108 * j + 51);
+                    auto g1_y_xxyyyyy = ketBuffer.data(g1off + 108 * j + 51);
 
-                    auto g1_y_xxyyyyz = contrBuffer.data(g1off + 108 * j + 52);
+                    auto g1_y_xxyyyyz = ketBuffer.data(g1off + 108 * j + 52);
 
-                    auto g1_y_xxyyyzz = contrBuffer.data(g1off + 108 * j + 53);
+                    auto g1_y_xxyyyzz = ketBuffer.data(g1off + 108 * j + 53);
 
-                    auto g1_y_xxyyzzz = contrBuffer.data(g1off + 108 * j + 54);
+                    auto g1_y_xxyyzzz = ketBuffer.data(g1off + 108 * j + 54);
 
-                    auto g1_y_xxyzzzz = contrBuffer.data(g1off + 108 * j + 55);
+                    auto g1_y_xxyzzzz = ketBuffer.data(g1off + 108 * j + 55);
 
-                    auto g1_y_xxzzzzz = contrBuffer.data(g1off + 108 * j + 56);
+                    auto g1_y_xxzzzzz = ketBuffer.data(g1off + 108 * j + 56);
 
-                    auto g1_y_xyyyyyy = contrBuffer.data(g1off + 108 * j + 57);
+                    auto g1_y_xyyyyyy = ketBuffer.data(g1off + 108 * j + 57);
 
-                    auto g1_y_xyyyyyz = contrBuffer.data(g1off + 108 * j + 58);
+                    auto g1_y_xyyyyyz = ketBuffer.data(g1off + 108 * j + 58);
 
-                    auto g1_y_xyyyyzz = contrBuffer.data(g1off + 108 * j + 59);
+                    auto g1_y_xyyyyzz = ketBuffer.data(g1off + 108 * j + 59);
 
-                    auto g1_y_xyyyzzz = contrBuffer.data(g1off + 108 * j + 60);
+                    auto g1_y_xyyyzzz = ketBuffer.data(g1off + 108 * j + 60);
 
-                    auto g1_y_xyyzzzz = contrBuffer.data(g1off + 108 * j + 61);
+                    auto g1_y_xyyzzzz = ketBuffer.data(g1off + 108 * j + 61);
 
-                    auto g1_y_xyzzzzz = contrBuffer.data(g1off + 108 * j + 62);
+                    auto g1_y_xyzzzzz = ketBuffer.data(g1off + 108 * j + 62);
 
-                    auto g1_y_xzzzzzz = contrBuffer.data(g1off + 108 * j + 63);
+                    auto g1_y_xzzzzzz = ketBuffer.data(g1off + 108 * j + 63);
 
-                    auto g1_y_yyyyyyy = contrBuffer.data(g1off + 108 * j + 64);
+                    auto g1_y_yyyyyyy = ketBuffer.data(g1off + 108 * j + 64);
 
-                    auto g1_y_yyyyyyz = contrBuffer.data(g1off + 108 * j + 65);
+                    auto g1_y_yyyyyyz = ketBuffer.data(g1off + 108 * j + 65);
 
-                    auto g1_y_yyyyyzz = contrBuffer.data(g1off + 108 * j + 66);
+                    auto g1_y_yyyyyzz = ketBuffer.data(g1off + 108 * j + 66);
 
-                    auto g1_y_yyyyzzz = contrBuffer.data(g1off + 108 * j + 67);
+                    auto g1_y_yyyyzzz = ketBuffer.data(g1off + 108 * j + 67);
 
-                    auto g1_y_yyyzzzz = contrBuffer.data(g1off + 108 * j + 68);
+                    auto g1_y_yyyzzzz = ketBuffer.data(g1off + 108 * j + 68);
 
-                    auto g1_y_yyzzzzz = contrBuffer.data(g1off + 108 * j + 69);
+                    auto g1_y_yyzzzzz = ketBuffer.data(g1off + 108 * j + 69);
 
-                    auto g1_y_yzzzzzz = contrBuffer.data(g1off + 108 * j + 70);
+                    auto g1_y_yzzzzzz = ketBuffer.data(g1off + 108 * j + 70);
 
-                    auto g1_z_xxxxxxx = contrBuffer.data(g1off + 108 * j + 72);
+                    auto g1_z_xxxxxxx = ketBuffer.data(g1off + 108 * j + 72);
 
-                    auto g1_z_xxxxxxy = contrBuffer.data(g1off + 108 * j + 73);
+                    auto g1_z_xxxxxxy = ketBuffer.data(g1off + 108 * j + 73);
 
-                    auto g1_z_xxxxxxz = contrBuffer.data(g1off + 108 * j + 74);
+                    auto g1_z_xxxxxxz = ketBuffer.data(g1off + 108 * j + 74);
 
-                    auto g1_z_xxxxxyy = contrBuffer.data(g1off + 108 * j + 75);
+                    auto g1_z_xxxxxyy = ketBuffer.data(g1off + 108 * j + 75);
 
-                    auto g1_z_xxxxxyz = contrBuffer.data(g1off + 108 * j + 76);
+                    auto g1_z_xxxxxyz = ketBuffer.data(g1off + 108 * j + 76);
 
-                    auto g1_z_xxxxxzz = contrBuffer.data(g1off + 108 * j + 77);
+                    auto g1_z_xxxxxzz = ketBuffer.data(g1off + 108 * j + 77);
 
-                    auto g1_z_xxxxyyy = contrBuffer.data(g1off + 108 * j + 78);
+                    auto g1_z_xxxxyyy = ketBuffer.data(g1off + 108 * j + 78);
 
-                    auto g1_z_xxxxyyz = contrBuffer.data(g1off + 108 * j + 79);
+                    auto g1_z_xxxxyyz = ketBuffer.data(g1off + 108 * j + 79);
 
-                    auto g1_z_xxxxyzz = contrBuffer.data(g1off + 108 * j + 80);
+                    auto g1_z_xxxxyzz = ketBuffer.data(g1off + 108 * j + 80);
 
-                    auto g1_z_xxxxzzz = contrBuffer.data(g1off + 108 * j + 81);
+                    auto g1_z_xxxxzzz = ketBuffer.data(g1off + 108 * j + 81);
 
-                    auto g1_z_xxxyyyy = contrBuffer.data(g1off + 108 * j + 82);
+                    auto g1_z_xxxyyyy = ketBuffer.data(g1off + 108 * j + 82);
 
-                    auto g1_z_xxxyyyz = contrBuffer.data(g1off + 108 * j + 83);
+                    auto g1_z_xxxyyyz = ketBuffer.data(g1off + 108 * j + 83);
 
-                    auto g1_z_xxxyyzz = contrBuffer.data(g1off + 108 * j + 84);
+                    auto g1_z_xxxyyzz = ketBuffer.data(g1off + 108 * j + 84);
 
-                    auto g1_z_xxxyzzz = contrBuffer.data(g1off + 108 * j + 85);
+                    auto g1_z_xxxyzzz = ketBuffer.data(g1off + 108 * j + 85);
 
-                    auto g1_z_xxxzzzz = contrBuffer.data(g1off + 108 * j + 86);
+                    auto g1_z_xxxzzzz = ketBuffer.data(g1off + 108 * j + 86);
 
-                    auto g1_z_xxyyyyy = contrBuffer.data(g1off + 108 * j + 87);
+                    auto g1_z_xxyyyyy = ketBuffer.data(g1off + 108 * j + 87);
 
-                    auto g1_z_xxyyyyz = contrBuffer.data(g1off + 108 * j + 88);
+                    auto g1_z_xxyyyyz = ketBuffer.data(g1off + 108 * j + 88);
 
-                    auto g1_z_xxyyyzz = contrBuffer.data(g1off + 108 * j + 89);
+                    auto g1_z_xxyyyzz = ketBuffer.data(g1off + 108 * j + 89);
 
-                    auto g1_z_xxyyzzz = contrBuffer.data(g1off + 108 * j + 90);
+                    auto g1_z_xxyyzzz = ketBuffer.data(g1off + 108 * j + 90);
 
-                    auto g1_z_xxyzzzz = contrBuffer.data(g1off + 108 * j + 91);
+                    auto g1_z_xxyzzzz = ketBuffer.data(g1off + 108 * j + 91);
 
-                    auto g1_z_xxzzzzz = contrBuffer.data(g1off + 108 * j + 92);
+                    auto g1_z_xxzzzzz = ketBuffer.data(g1off + 108 * j + 92);
 
-                    auto g1_z_xyyyyyy = contrBuffer.data(g1off + 108 * j + 93);
+                    auto g1_z_xyyyyyy = ketBuffer.data(g1off + 108 * j + 93);
 
-                    auto g1_z_xyyyyyz = contrBuffer.data(g1off + 108 * j + 94);
+                    auto g1_z_xyyyyyz = ketBuffer.data(g1off + 108 * j + 94);
 
-                    auto g1_z_xyyyyzz = contrBuffer.data(g1off + 108 * j + 95);
+                    auto g1_z_xyyyyzz = ketBuffer.data(g1off + 108 * j + 95);
 
-                    auto g1_z_xyyyzzz = contrBuffer.data(g1off + 108 * j + 96);
+                    auto g1_z_xyyyzzz = ketBuffer.data(g1off + 108 * j + 96);
 
-                    auto g1_z_xyyzzzz = contrBuffer.data(g1off + 108 * j + 97);
+                    auto g1_z_xyyzzzz = ketBuffer.data(g1off + 108 * j + 97);
 
-                    auto g1_z_xyzzzzz = contrBuffer.data(g1off + 108 * j + 98);
+                    auto g1_z_xyzzzzz = ketBuffer.data(g1off + 108 * j + 98);
 
-                    auto g1_z_xzzzzzz = contrBuffer.data(g1off + 108 * j + 99);
+                    auto g1_z_xzzzzzz = ketBuffer.data(g1off + 108 * j + 99);
 
-                    auto g1_z_yyyyyyy = contrBuffer.data(g1off + 108 * j + 100);
+                    auto g1_z_yyyyyyy = ketBuffer.data(g1off + 108 * j + 100);
 
-                    auto g1_z_yyyyyyz = contrBuffer.data(g1off + 108 * j + 101);
+                    auto g1_z_yyyyyyz = ketBuffer.data(g1off + 108 * j + 101);
 
-                    auto g1_z_yyyyyzz = contrBuffer.data(g1off + 108 * j + 102);
+                    auto g1_z_yyyyyzz = ketBuffer.data(g1off + 108 * j + 102);
 
-                    auto g1_z_yyyyzzz = contrBuffer.data(g1off + 108 * j + 103);
+                    auto g1_z_yyyyzzz = ketBuffer.data(g1off + 108 * j + 103);
 
-                    auto g1_z_yyyzzzz = contrBuffer.data(g1off + 108 * j + 104);
+                    auto g1_z_yyyzzzz = ketBuffer.data(g1off + 108 * j + 104);
 
-                    auto g1_z_yyzzzzz = contrBuffer.data(g1off + 108 * j + 105);
+                    auto g1_z_yyzzzzz = ketBuffer.data(g1off + 108 * j + 105);
 
-                    auto g1_z_yzzzzzz = contrBuffer.data(g1off + 108 * j + 106);
+                    auto g1_z_yzzzzzz = ketBuffer.data(g1off + 108 * j + 106);
 
-                    auto g1_z_zzzzzzz = contrBuffer.data(g1off + 108 * j + 107);
+                    auto g1_z_zzzzzzz = ketBuffer.data(g1off + 108 * j + 107);
 
-                    // set up pointers to (SX|g(r,r')|DI)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DI) integrals
 
-                    auto g_xx_xxxxxx = contrBuffer.data(goff + 168 * j);
+                    auto g_xx_xxxxxx = ketBuffer.data(goff + 168 * j);
 
-                    auto g_xx_xxxxxy = contrBuffer.data(goff + 168 * j + 1);
+                    auto g_xx_xxxxxy = ketBuffer.data(goff + 168 * j + 1);
 
-                    auto g_xx_xxxxxz = contrBuffer.data(goff + 168 * j + 2);
+                    auto g_xx_xxxxxz = ketBuffer.data(goff + 168 * j + 2);
 
-                    auto g_xx_xxxxyy = contrBuffer.data(goff + 168 * j + 3);
+                    auto g_xx_xxxxyy = ketBuffer.data(goff + 168 * j + 3);
 
-                    auto g_xx_xxxxyz = contrBuffer.data(goff + 168 * j + 4);
+                    auto g_xx_xxxxyz = ketBuffer.data(goff + 168 * j + 4);
 
-                    auto g_xx_xxxxzz = contrBuffer.data(goff + 168 * j + 5);
+                    auto g_xx_xxxxzz = ketBuffer.data(goff + 168 * j + 5);
 
-                    auto g_xx_xxxyyy = contrBuffer.data(goff + 168 * j + 6);
+                    auto g_xx_xxxyyy = ketBuffer.data(goff + 168 * j + 6);
 
-                    auto g_xx_xxxyyz = contrBuffer.data(goff + 168 * j + 7);
+                    auto g_xx_xxxyyz = ketBuffer.data(goff + 168 * j + 7);
 
-                    auto g_xx_xxxyzz = contrBuffer.data(goff + 168 * j + 8);
+                    auto g_xx_xxxyzz = ketBuffer.data(goff + 168 * j + 8);
 
-                    auto g_xx_xxxzzz = contrBuffer.data(goff + 168 * j + 9);
+                    auto g_xx_xxxzzz = ketBuffer.data(goff + 168 * j + 9);
 
-                    auto g_xx_xxyyyy = contrBuffer.data(goff + 168 * j + 10);
+                    auto g_xx_xxyyyy = ketBuffer.data(goff + 168 * j + 10);
 
-                    auto g_xx_xxyyyz = contrBuffer.data(goff + 168 * j + 11);
+                    auto g_xx_xxyyyz = ketBuffer.data(goff + 168 * j + 11);
 
-                    auto g_xx_xxyyzz = contrBuffer.data(goff + 168 * j + 12);
+                    auto g_xx_xxyyzz = ketBuffer.data(goff + 168 * j + 12);
 
-                    auto g_xx_xxyzzz = contrBuffer.data(goff + 168 * j + 13);
+                    auto g_xx_xxyzzz = ketBuffer.data(goff + 168 * j + 13);
 
-                    auto g_xx_xxzzzz = contrBuffer.data(goff + 168 * j + 14);
+                    auto g_xx_xxzzzz = ketBuffer.data(goff + 168 * j + 14);
 
-                    auto g_xx_xyyyyy = contrBuffer.data(goff + 168 * j + 15);
+                    auto g_xx_xyyyyy = ketBuffer.data(goff + 168 * j + 15);
 
-                    auto g_xx_xyyyyz = contrBuffer.data(goff + 168 * j + 16);
+                    auto g_xx_xyyyyz = ketBuffer.data(goff + 168 * j + 16);
 
-                    auto g_xx_xyyyzz = contrBuffer.data(goff + 168 * j + 17);
+                    auto g_xx_xyyyzz = ketBuffer.data(goff + 168 * j + 17);
 
-                    auto g_xx_xyyzzz = contrBuffer.data(goff + 168 * j + 18);
+                    auto g_xx_xyyzzz = ketBuffer.data(goff + 168 * j + 18);
 
-                    auto g_xx_xyzzzz = contrBuffer.data(goff + 168 * j + 19);
+                    auto g_xx_xyzzzz = ketBuffer.data(goff + 168 * j + 19);
 
-                    auto g_xx_xzzzzz = contrBuffer.data(goff + 168 * j + 20);
+                    auto g_xx_xzzzzz = ketBuffer.data(goff + 168 * j + 20);
 
-                    auto g_xx_yyyyyy = contrBuffer.data(goff + 168 * j + 21);
+                    auto g_xx_yyyyyy = ketBuffer.data(goff + 168 * j + 21);
 
-                    auto g_xx_yyyyyz = contrBuffer.data(goff + 168 * j + 22);
+                    auto g_xx_yyyyyz = ketBuffer.data(goff + 168 * j + 22);
 
-                    auto g_xx_yyyyzz = contrBuffer.data(goff + 168 * j + 23);
+                    auto g_xx_yyyyzz = ketBuffer.data(goff + 168 * j + 23);
 
-                    auto g_xx_yyyzzz = contrBuffer.data(goff + 168 * j + 24);
+                    auto g_xx_yyyzzz = ketBuffer.data(goff + 168 * j + 24);
 
-                    auto g_xx_yyzzzz = contrBuffer.data(goff + 168 * j + 25);
+                    auto g_xx_yyzzzz = ketBuffer.data(goff + 168 * j + 25);
 
-                    auto g_xx_yzzzzz = contrBuffer.data(goff + 168 * j + 26);
+                    auto g_xx_yzzzzz = ketBuffer.data(goff + 168 * j + 26);
 
-                    auto g_xx_zzzzzz = contrBuffer.data(goff + 168 * j + 27);
+                    auto g_xx_zzzzzz = ketBuffer.data(goff + 168 * j + 27);
 
-                    auto g_xy_xxxxxx = contrBuffer.data(goff + 168 * j + 28);
+                    auto g_xy_xxxxxx = ketBuffer.data(goff + 168 * j + 28);
 
-                    auto g_xy_xxxxxy = contrBuffer.data(goff + 168 * j + 29);
+                    auto g_xy_xxxxxy = ketBuffer.data(goff + 168 * j + 29);
 
-                    auto g_xy_xxxxxz = contrBuffer.data(goff + 168 * j + 30);
+                    auto g_xy_xxxxxz = ketBuffer.data(goff + 168 * j + 30);
 
-                    auto g_xy_xxxxyy = contrBuffer.data(goff + 168 * j + 31);
+                    auto g_xy_xxxxyy = ketBuffer.data(goff + 168 * j + 31);
 
-                    auto g_xy_xxxxyz = contrBuffer.data(goff + 168 * j + 32);
+                    auto g_xy_xxxxyz = ketBuffer.data(goff + 168 * j + 32);
 
-                    auto g_xy_xxxxzz = contrBuffer.data(goff + 168 * j + 33);
+                    auto g_xy_xxxxzz = ketBuffer.data(goff + 168 * j + 33);
 
-                    auto g_xy_xxxyyy = contrBuffer.data(goff + 168 * j + 34);
+                    auto g_xy_xxxyyy = ketBuffer.data(goff + 168 * j + 34);
 
-                    auto g_xy_xxxyyz = contrBuffer.data(goff + 168 * j + 35);
+                    auto g_xy_xxxyyz = ketBuffer.data(goff + 168 * j + 35);
 
-                    auto g_xy_xxxyzz = contrBuffer.data(goff + 168 * j + 36);
+                    auto g_xy_xxxyzz = ketBuffer.data(goff + 168 * j + 36);
 
-                    auto g_xy_xxxzzz = contrBuffer.data(goff + 168 * j + 37);
+                    auto g_xy_xxxzzz = ketBuffer.data(goff + 168 * j + 37);
 
-                    auto g_xy_xxyyyy = contrBuffer.data(goff + 168 * j + 38);
+                    auto g_xy_xxyyyy = ketBuffer.data(goff + 168 * j + 38);
 
-                    auto g_xy_xxyyyz = contrBuffer.data(goff + 168 * j + 39);
+                    auto g_xy_xxyyyz = ketBuffer.data(goff + 168 * j + 39);
 
-                    auto g_xy_xxyyzz = contrBuffer.data(goff + 168 * j + 40);
+                    auto g_xy_xxyyzz = ketBuffer.data(goff + 168 * j + 40);
 
-                    auto g_xy_xxyzzz = contrBuffer.data(goff + 168 * j + 41);
+                    auto g_xy_xxyzzz = ketBuffer.data(goff + 168 * j + 41);
 
-                    auto g_xy_xxzzzz = contrBuffer.data(goff + 168 * j + 42);
+                    auto g_xy_xxzzzz = ketBuffer.data(goff + 168 * j + 42);
 
-                    auto g_xy_xyyyyy = contrBuffer.data(goff + 168 * j + 43);
+                    auto g_xy_xyyyyy = ketBuffer.data(goff + 168 * j + 43);
 
-                    auto g_xy_xyyyyz = contrBuffer.data(goff + 168 * j + 44);
+                    auto g_xy_xyyyyz = ketBuffer.data(goff + 168 * j + 44);
 
-                    auto g_xy_xyyyzz = contrBuffer.data(goff + 168 * j + 45);
+                    auto g_xy_xyyyzz = ketBuffer.data(goff + 168 * j + 45);
 
-                    auto g_xy_xyyzzz = contrBuffer.data(goff + 168 * j + 46);
+                    auto g_xy_xyyzzz = ketBuffer.data(goff + 168 * j + 46);
 
-                    auto g_xy_xyzzzz = contrBuffer.data(goff + 168 * j + 47);
+                    auto g_xy_xyzzzz = ketBuffer.data(goff + 168 * j + 47);
 
-                    auto g_xy_xzzzzz = contrBuffer.data(goff + 168 * j + 48);
+                    auto g_xy_xzzzzz = ketBuffer.data(goff + 168 * j + 48);
 
-                    auto g_xy_yyyyyy = contrBuffer.data(goff + 168 * j + 49);
+                    auto g_xy_yyyyyy = ketBuffer.data(goff + 168 * j + 49);
 
-                    auto g_xy_yyyyyz = contrBuffer.data(goff + 168 * j + 50);
+                    auto g_xy_yyyyyz = ketBuffer.data(goff + 168 * j + 50);
 
-                    auto g_xy_yyyyzz = contrBuffer.data(goff + 168 * j + 51);
+                    auto g_xy_yyyyzz = ketBuffer.data(goff + 168 * j + 51);
 
-                    auto g_xy_yyyzzz = contrBuffer.data(goff + 168 * j + 52);
+                    auto g_xy_yyyzzz = ketBuffer.data(goff + 168 * j + 52);
 
-                    auto g_xy_yyzzzz = contrBuffer.data(goff + 168 * j + 53);
+                    auto g_xy_yyzzzz = ketBuffer.data(goff + 168 * j + 53);
 
-                    auto g_xy_yzzzzz = contrBuffer.data(goff + 168 * j + 54);
+                    auto g_xy_yzzzzz = ketBuffer.data(goff + 168 * j + 54);
 
-                    auto g_xy_zzzzzz = contrBuffer.data(goff + 168 * j + 55);
+                    auto g_xy_zzzzzz = ketBuffer.data(goff + 168 * j + 55);
 
-                    auto g_xz_xxxxxx = contrBuffer.data(goff + 168 * j + 56);
+                    auto g_xz_xxxxxx = ketBuffer.data(goff + 168 * j + 56);
 
-                    auto g_xz_xxxxxy = contrBuffer.data(goff + 168 * j + 57);
+                    auto g_xz_xxxxxy = ketBuffer.data(goff + 168 * j + 57);
 
-                    auto g_xz_xxxxxz = contrBuffer.data(goff + 168 * j + 58);
+                    auto g_xz_xxxxxz = ketBuffer.data(goff + 168 * j + 58);
 
-                    auto g_xz_xxxxyy = contrBuffer.data(goff + 168 * j + 59);
+                    auto g_xz_xxxxyy = ketBuffer.data(goff + 168 * j + 59);
 
-                    auto g_xz_xxxxyz = contrBuffer.data(goff + 168 * j + 60);
+                    auto g_xz_xxxxyz = ketBuffer.data(goff + 168 * j + 60);
 
-                    auto g_xz_xxxxzz = contrBuffer.data(goff + 168 * j + 61);
+                    auto g_xz_xxxxzz = ketBuffer.data(goff + 168 * j + 61);
 
-                    auto g_xz_xxxyyy = contrBuffer.data(goff + 168 * j + 62);
+                    auto g_xz_xxxyyy = ketBuffer.data(goff + 168 * j + 62);
 
-                    auto g_xz_xxxyyz = contrBuffer.data(goff + 168 * j + 63);
+                    auto g_xz_xxxyyz = ketBuffer.data(goff + 168 * j + 63);
 
-                    auto g_xz_xxxyzz = contrBuffer.data(goff + 168 * j + 64);
+                    auto g_xz_xxxyzz = ketBuffer.data(goff + 168 * j + 64);
 
-                    auto g_xz_xxxzzz = contrBuffer.data(goff + 168 * j + 65);
+                    auto g_xz_xxxzzz = ketBuffer.data(goff + 168 * j + 65);
 
-                    auto g_xz_xxyyyy = contrBuffer.data(goff + 168 * j + 66);
+                    auto g_xz_xxyyyy = ketBuffer.data(goff + 168 * j + 66);
 
-                    auto g_xz_xxyyyz = contrBuffer.data(goff + 168 * j + 67);
+                    auto g_xz_xxyyyz = ketBuffer.data(goff + 168 * j + 67);
 
-                    auto g_xz_xxyyzz = contrBuffer.data(goff + 168 * j + 68);
+                    auto g_xz_xxyyzz = ketBuffer.data(goff + 168 * j + 68);
 
-                    auto g_xz_xxyzzz = contrBuffer.data(goff + 168 * j + 69);
+                    auto g_xz_xxyzzz = ketBuffer.data(goff + 168 * j + 69);
 
-                    auto g_xz_xxzzzz = contrBuffer.data(goff + 168 * j + 70);
+                    auto g_xz_xxzzzz = ketBuffer.data(goff + 168 * j + 70);
 
-                    auto g_xz_xyyyyy = contrBuffer.data(goff + 168 * j + 71);
+                    auto g_xz_xyyyyy = ketBuffer.data(goff + 168 * j + 71);
 
-                    auto g_xz_xyyyyz = contrBuffer.data(goff + 168 * j + 72);
+                    auto g_xz_xyyyyz = ketBuffer.data(goff + 168 * j + 72);
 
-                    auto g_xz_xyyyzz = contrBuffer.data(goff + 168 * j + 73);
+                    auto g_xz_xyyyzz = ketBuffer.data(goff + 168 * j + 73);
 
-                    auto g_xz_xyyzzz = contrBuffer.data(goff + 168 * j + 74);
+                    auto g_xz_xyyzzz = ketBuffer.data(goff + 168 * j + 74);
 
-                    auto g_xz_xyzzzz = contrBuffer.data(goff + 168 * j + 75);
+                    auto g_xz_xyzzzz = ketBuffer.data(goff + 168 * j + 75);
 
-                    auto g_xz_xzzzzz = contrBuffer.data(goff + 168 * j + 76);
+                    auto g_xz_xzzzzz = ketBuffer.data(goff + 168 * j + 76);
 
-                    auto g_xz_yyyyyy = contrBuffer.data(goff + 168 * j + 77);
+                    auto g_xz_yyyyyy = ketBuffer.data(goff + 168 * j + 77);
 
-                    auto g_xz_yyyyyz = contrBuffer.data(goff + 168 * j + 78);
+                    auto g_xz_yyyyyz = ketBuffer.data(goff + 168 * j + 78);
 
-                    auto g_xz_yyyyzz = contrBuffer.data(goff + 168 * j + 79);
+                    auto g_xz_yyyyzz = ketBuffer.data(goff + 168 * j + 79);
 
-                    auto g_xz_yyyzzz = contrBuffer.data(goff + 168 * j + 80);
+                    auto g_xz_yyyzzz = ketBuffer.data(goff + 168 * j + 80);
 
-                    auto g_xz_yyzzzz = contrBuffer.data(goff + 168 * j + 81);
+                    auto g_xz_yyzzzz = ketBuffer.data(goff + 168 * j + 81);
 
-                    auto g_xz_yzzzzz = contrBuffer.data(goff + 168 * j + 82);
+                    auto g_xz_yzzzzz = ketBuffer.data(goff + 168 * j + 82);
 
-                    auto g_xz_zzzzzz = contrBuffer.data(goff + 168 * j + 83);
+                    auto g_xz_zzzzzz = ketBuffer.data(goff + 168 * j + 83);
 
-                    auto g_yy_xxxxxx = contrBuffer.data(goff + 168 * j + 84);
+                    auto g_yy_xxxxxx = ketBuffer.data(goff + 168 * j + 84);
 
-                    auto g_yy_xxxxxy = contrBuffer.data(goff + 168 * j + 85);
+                    auto g_yy_xxxxxy = ketBuffer.data(goff + 168 * j + 85);
 
-                    auto g_yy_xxxxxz = contrBuffer.data(goff + 168 * j + 86);
+                    auto g_yy_xxxxxz = ketBuffer.data(goff + 168 * j + 86);
 
-                    auto g_yy_xxxxyy = contrBuffer.data(goff + 168 * j + 87);
+                    auto g_yy_xxxxyy = ketBuffer.data(goff + 168 * j + 87);
 
-                    auto g_yy_xxxxyz = contrBuffer.data(goff + 168 * j + 88);
+                    auto g_yy_xxxxyz = ketBuffer.data(goff + 168 * j + 88);
 
-                    auto g_yy_xxxxzz = contrBuffer.data(goff + 168 * j + 89);
+                    auto g_yy_xxxxzz = ketBuffer.data(goff + 168 * j + 89);
 
-                    auto g_yy_xxxyyy = contrBuffer.data(goff + 168 * j + 90);
+                    auto g_yy_xxxyyy = ketBuffer.data(goff + 168 * j + 90);
 
-                    auto g_yy_xxxyyz = contrBuffer.data(goff + 168 * j + 91);
+                    auto g_yy_xxxyyz = ketBuffer.data(goff + 168 * j + 91);
 
-                    auto g_yy_xxxyzz = contrBuffer.data(goff + 168 * j + 92);
+                    auto g_yy_xxxyzz = ketBuffer.data(goff + 168 * j + 92);
 
-                    auto g_yy_xxxzzz = contrBuffer.data(goff + 168 * j + 93);
+                    auto g_yy_xxxzzz = ketBuffer.data(goff + 168 * j + 93);
 
-                    auto g_yy_xxyyyy = contrBuffer.data(goff + 168 * j + 94);
+                    auto g_yy_xxyyyy = ketBuffer.data(goff + 168 * j + 94);
 
-                    auto g_yy_xxyyyz = contrBuffer.data(goff + 168 * j + 95);
+                    auto g_yy_xxyyyz = ketBuffer.data(goff + 168 * j + 95);
 
-                    auto g_yy_xxyyzz = contrBuffer.data(goff + 168 * j + 96);
+                    auto g_yy_xxyyzz = ketBuffer.data(goff + 168 * j + 96);
 
-                    auto g_yy_xxyzzz = contrBuffer.data(goff + 168 * j + 97);
+                    auto g_yy_xxyzzz = ketBuffer.data(goff + 168 * j + 97);
 
-                    auto g_yy_xxzzzz = contrBuffer.data(goff + 168 * j + 98);
+                    auto g_yy_xxzzzz = ketBuffer.data(goff + 168 * j + 98);
 
-                    auto g_yy_xyyyyy = contrBuffer.data(goff + 168 * j + 99);
+                    auto g_yy_xyyyyy = ketBuffer.data(goff + 168 * j + 99);
 
-                    auto g_yy_xyyyyz = contrBuffer.data(goff + 168 * j + 100);
+                    auto g_yy_xyyyyz = ketBuffer.data(goff + 168 * j + 100);
 
-                    auto g_yy_xyyyzz = contrBuffer.data(goff + 168 * j + 101);
+                    auto g_yy_xyyyzz = ketBuffer.data(goff + 168 * j + 101);
 
-                    auto g_yy_xyyzzz = contrBuffer.data(goff + 168 * j + 102);
+                    auto g_yy_xyyzzz = ketBuffer.data(goff + 168 * j + 102);
 
-                    auto g_yy_xyzzzz = contrBuffer.data(goff + 168 * j + 103);
+                    auto g_yy_xyzzzz = ketBuffer.data(goff + 168 * j + 103);
 
-                    auto g_yy_xzzzzz = contrBuffer.data(goff + 168 * j + 104);
+                    auto g_yy_xzzzzz = ketBuffer.data(goff + 168 * j + 104);
 
-                    auto g_yy_yyyyyy = contrBuffer.data(goff + 168 * j + 105);
+                    auto g_yy_yyyyyy = ketBuffer.data(goff + 168 * j + 105);
 
-                    auto g_yy_yyyyyz = contrBuffer.data(goff + 168 * j + 106);
+                    auto g_yy_yyyyyz = ketBuffer.data(goff + 168 * j + 106);
 
-                    auto g_yy_yyyyzz = contrBuffer.data(goff + 168 * j + 107);
+                    auto g_yy_yyyyzz = ketBuffer.data(goff + 168 * j + 107);
 
-                    auto g_yy_yyyzzz = contrBuffer.data(goff + 168 * j + 108);
+                    auto g_yy_yyyzzz = ketBuffer.data(goff + 168 * j + 108);
 
-                    auto g_yy_yyzzzz = contrBuffer.data(goff + 168 * j + 109);
+                    auto g_yy_yyzzzz = ketBuffer.data(goff + 168 * j + 109);
 
-                    auto g_yy_yzzzzz = contrBuffer.data(goff + 168 * j + 110);
+                    auto g_yy_yzzzzz = ketBuffer.data(goff + 168 * j + 110);
 
-                    auto g_yy_zzzzzz = contrBuffer.data(goff + 168 * j + 111);
+                    auto g_yy_zzzzzz = ketBuffer.data(goff + 168 * j + 111);
 
-                    auto g_yz_xxxxxx = contrBuffer.data(goff + 168 * j + 112);
+                    auto g_yz_xxxxxx = ketBuffer.data(goff + 168 * j + 112);
 
-                    auto g_yz_xxxxxy = contrBuffer.data(goff + 168 * j + 113);
+                    auto g_yz_xxxxxy = ketBuffer.data(goff + 168 * j + 113);
 
-                    auto g_yz_xxxxxz = contrBuffer.data(goff + 168 * j + 114);
+                    auto g_yz_xxxxxz = ketBuffer.data(goff + 168 * j + 114);
 
-                    auto g_yz_xxxxyy = contrBuffer.data(goff + 168 * j + 115);
+                    auto g_yz_xxxxyy = ketBuffer.data(goff + 168 * j + 115);
 
-                    auto g_yz_xxxxyz = contrBuffer.data(goff + 168 * j + 116);
+                    auto g_yz_xxxxyz = ketBuffer.data(goff + 168 * j + 116);
 
-                    auto g_yz_xxxxzz = contrBuffer.data(goff + 168 * j + 117);
+                    auto g_yz_xxxxzz = ketBuffer.data(goff + 168 * j + 117);
 
-                    auto g_yz_xxxyyy = contrBuffer.data(goff + 168 * j + 118);
+                    auto g_yz_xxxyyy = ketBuffer.data(goff + 168 * j + 118);
 
-                    auto g_yz_xxxyyz = contrBuffer.data(goff + 168 * j + 119);
+                    auto g_yz_xxxyyz = ketBuffer.data(goff + 168 * j + 119);
 
-                    auto g_yz_xxxyzz = contrBuffer.data(goff + 168 * j + 120);
+                    auto g_yz_xxxyzz = ketBuffer.data(goff + 168 * j + 120);
 
-                    auto g_yz_xxxzzz = contrBuffer.data(goff + 168 * j + 121);
+                    auto g_yz_xxxzzz = ketBuffer.data(goff + 168 * j + 121);
 
-                    auto g_yz_xxyyyy = contrBuffer.data(goff + 168 * j + 122);
+                    auto g_yz_xxyyyy = ketBuffer.data(goff + 168 * j + 122);
 
-                    auto g_yz_xxyyyz = contrBuffer.data(goff + 168 * j + 123);
+                    auto g_yz_xxyyyz = ketBuffer.data(goff + 168 * j + 123);
 
-                    auto g_yz_xxyyzz = contrBuffer.data(goff + 168 * j + 124);
+                    auto g_yz_xxyyzz = ketBuffer.data(goff + 168 * j + 124);
 
-                    auto g_yz_xxyzzz = contrBuffer.data(goff + 168 * j + 125);
+                    auto g_yz_xxyzzz = ketBuffer.data(goff + 168 * j + 125);
 
-                    auto g_yz_xxzzzz = contrBuffer.data(goff + 168 * j + 126);
+                    auto g_yz_xxzzzz = ketBuffer.data(goff + 168 * j + 126);
 
-                    auto g_yz_xyyyyy = contrBuffer.data(goff + 168 * j + 127);
+                    auto g_yz_xyyyyy = ketBuffer.data(goff + 168 * j + 127);
 
-                    auto g_yz_xyyyyz = contrBuffer.data(goff + 168 * j + 128);
+                    auto g_yz_xyyyyz = ketBuffer.data(goff + 168 * j + 128);
 
-                    auto g_yz_xyyyzz = contrBuffer.data(goff + 168 * j + 129);
+                    auto g_yz_xyyyzz = ketBuffer.data(goff + 168 * j + 129);
 
-                    auto g_yz_xyyzzz = contrBuffer.data(goff + 168 * j + 130);
+                    auto g_yz_xyyzzz = ketBuffer.data(goff + 168 * j + 130);
 
-                    auto g_yz_xyzzzz = contrBuffer.data(goff + 168 * j + 131);
+                    auto g_yz_xyzzzz = ketBuffer.data(goff + 168 * j + 131);
 
-                    auto g_yz_xzzzzz = contrBuffer.data(goff + 168 * j + 132);
+                    auto g_yz_xzzzzz = ketBuffer.data(goff + 168 * j + 132);
 
-                    auto g_yz_yyyyyy = contrBuffer.data(goff + 168 * j + 133);
+                    auto g_yz_yyyyyy = ketBuffer.data(goff + 168 * j + 133);
 
-                    auto g_yz_yyyyyz = contrBuffer.data(goff + 168 * j + 134);
+                    auto g_yz_yyyyyz = ketBuffer.data(goff + 168 * j + 134);
 
-                    auto g_yz_yyyyzz = contrBuffer.data(goff + 168 * j + 135);
+                    auto g_yz_yyyyzz = ketBuffer.data(goff + 168 * j + 135);
 
-                    auto g_yz_yyyzzz = contrBuffer.data(goff + 168 * j + 136);
+                    auto g_yz_yyyzzz = ketBuffer.data(goff + 168 * j + 136);
 
-                    auto g_yz_yyzzzz = contrBuffer.data(goff + 168 * j + 137);
+                    auto g_yz_yyzzzz = ketBuffer.data(goff + 168 * j + 137);
 
-                    auto g_yz_yzzzzz = contrBuffer.data(goff + 168 * j + 138);
+                    auto g_yz_yzzzzz = ketBuffer.data(goff + 168 * j + 138);
 
-                    auto g_yz_zzzzzz = contrBuffer.data(goff + 168 * j + 139);
+                    auto g_yz_zzzzzz = ketBuffer.data(goff + 168 * j + 139);
 
-                    auto g_zz_xxxxxx = contrBuffer.data(goff + 168 * j + 140);
+                    auto g_zz_xxxxxx = ketBuffer.data(goff + 168 * j + 140);
 
-                    auto g_zz_xxxxxy = contrBuffer.data(goff + 168 * j + 141);
+                    auto g_zz_xxxxxy = ketBuffer.data(goff + 168 * j + 141);
 
-                    auto g_zz_xxxxxz = contrBuffer.data(goff + 168 * j + 142);
+                    auto g_zz_xxxxxz = ketBuffer.data(goff + 168 * j + 142);
 
-                    auto g_zz_xxxxyy = contrBuffer.data(goff + 168 * j + 143);
+                    auto g_zz_xxxxyy = ketBuffer.data(goff + 168 * j + 143);
 
-                    auto g_zz_xxxxyz = contrBuffer.data(goff + 168 * j + 144);
+                    auto g_zz_xxxxyz = ketBuffer.data(goff + 168 * j + 144);
 
-                    auto g_zz_xxxxzz = contrBuffer.data(goff + 168 * j + 145);
+                    auto g_zz_xxxxzz = ketBuffer.data(goff + 168 * j + 145);
 
-                    auto g_zz_xxxyyy = contrBuffer.data(goff + 168 * j + 146);
+                    auto g_zz_xxxyyy = ketBuffer.data(goff + 168 * j + 146);
 
-                    auto g_zz_xxxyyz = contrBuffer.data(goff + 168 * j + 147);
+                    auto g_zz_xxxyyz = ketBuffer.data(goff + 168 * j + 147);
 
-                    auto g_zz_xxxyzz = contrBuffer.data(goff + 168 * j + 148);
+                    auto g_zz_xxxyzz = ketBuffer.data(goff + 168 * j + 148);
 
-                    auto g_zz_xxxzzz = contrBuffer.data(goff + 168 * j + 149);
+                    auto g_zz_xxxzzz = ketBuffer.data(goff + 168 * j + 149);
 
-                    auto g_zz_xxyyyy = contrBuffer.data(goff + 168 * j + 150);
+                    auto g_zz_xxyyyy = ketBuffer.data(goff + 168 * j + 150);
 
-                    auto g_zz_xxyyyz = contrBuffer.data(goff + 168 * j + 151);
+                    auto g_zz_xxyyyz = ketBuffer.data(goff + 168 * j + 151);
 
-                    auto g_zz_xxyyzz = contrBuffer.data(goff + 168 * j + 152);
+                    auto g_zz_xxyyzz = ketBuffer.data(goff + 168 * j + 152);
 
-                    auto g_zz_xxyzzz = contrBuffer.data(goff + 168 * j + 153);
+                    auto g_zz_xxyzzz = ketBuffer.data(goff + 168 * j + 153);
 
-                    auto g_zz_xxzzzz = contrBuffer.data(goff + 168 * j + 154);
+                    auto g_zz_xxzzzz = ketBuffer.data(goff + 168 * j + 154);
 
-                    auto g_zz_xyyyyy = contrBuffer.data(goff + 168 * j + 155);
+                    auto g_zz_xyyyyy = ketBuffer.data(goff + 168 * j + 155);
 
-                    auto g_zz_xyyyyz = contrBuffer.data(goff + 168 * j + 156);
+                    auto g_zz_xyyyyz = ketBuffer.data(goff + 168 * j + 156);
 
-                    auto g_zz_xyyyzz = contrBuffer.data(goff + 168 * j + 157);
+                    auto g_zz_xyyyzz = ketBuffer.data(goff + 168 * j + 157);
 
-                    auto g_zz_xyyzzz = contrBuffer.data(goff + 168 * j + 158);
+                    auto g_zz_xyyzzz = ketBuffer.data(goff + 168 * j + 158);
 
-                    auto g_zz_xyzzzz = contrBuffer.data(goff + 168 * j + 159);
+                    auto g_zz_xyzzzz = ketBuffer.data(goff + 168 * j + 159);
 
-                    auto g_zz_xzzzzz = contrBuffer.data(goff + 168 * j + 160);
+                    auto g_zz_xzzzzz = ketBuffer.data(goff + 168 * j + 160);
 
-                    auto g_zz_yyyyyy = contrBuffer.data(goff + 168 * j + 161);
+                    auto g_zz_yyyyyy = ketBuffer.data(goff + 168 * j + 161);
 
-                    auto g_zz_yyyyyz = contrBuffer.data(goff + 168 * j + 162);
+                    auto g_zz_yyyyyz = ketBuffer.data(goff + 168 * j + 162);
 
-                    auto g_zz_yyyyzz = contrBuffer.data(goff + 168 * j + 163);
+                    auto g_zz_yyyyzz = ketBuffer.data(goff + 168 * j + 163);
 
-                    auto g_zz_yyyzzz = contrBuffer.data(goff + 168 * j + 164);
+                    auto g_zz_yyyzzz = ketBuffer.data(goff + 168 * j + 164);
 
-                    auto g_zz_yyzzzz = contrBuffer.data(goff + 168 * j + 165);
+                    auto g_zz_yyzzzz = ketBuffer.data(goff + 168 * j + 165);
 
-                    auto g_zz_yzzzzz = contrBuffer.data(goff + 168 * j + 166);
+                    auto g_zz_yzzzzz = ketBuffer.data(goff + 168 * j + 166);
 
-                    auto g_zz_zzzzzz = contrBuffer.data(goff + 168 * j + 167);
+                    auto g_zz_zzzzzz = ketBuffer.data(goff + 168 * j + 167);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_x_xxxxxx, g2_x_xxxxxy,\
                                              g2_x_xxxxxz, g2_x_xxxxyy, g2_x_xxxxyz,\
@@ -6433,7 +6433,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXFF(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXFF(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -6484,477 +6484,477 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|DF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DF) integrals
 
-                    auto g2_xx_xxx = contrBuffer.data(g2off + 60 * j);
+                    auto g2_xx_xxx = ketBuffer.data(g2off + 60 * j);
 
-                    auto g2_xx_xxy = contrBuffer.data(g2off + 60 * j + 1);
+                    auto g2_xx_xxy = ketBuffer.data(g2off + 60 * j + 1);
 
-                    auto g2_xx_xxz = contrBuffer.data(g2off + 60 * j + 2);
+                    auto g2_xx_xxz = ketBuffer.data(g2off + 60 * j + 2);
 
-                    auto g2_xx_xyy = contrBuffer.data(g2off + 60 * j + 3);
+                    auto g2_xx_xyy = ketBuffer.data(g2off + 60 * j + 3);
 
-                    auto g2_xx_xyz = contrBuffer.data(g2off + 60 * j + 4);
+                    auto g2_xx_xyz = ketBuffer.data(g2off + 60 * j + 4);
 
-                    auto g2_xx_xzz = contrBuffer.data(g2off + 60 * j + 5);
+                    auto g2_xx_xzz = ketBuffer.data(g2off + 60 * j + 5);
 
-                    auto g2_xx_yyy = contrBuffer.data(g2off + 60 * j + 6);
+                    auto g2_xx_yyy = ketBuffer.data(g2off + 60 * j + 6);
 
-                    auto g2_xx_yyz = contrBuffer.data(g2off + 60 * j + 7);
+                    auto g2_xx_yyz = ketBuffer.data(g2off + 60 * j + 7);
 
-                    auto g2_xx_yzz = contrBuffer.data(g2off + 60 * j + 8);
+                    auto g2_xx_yzz = ketBuffer.data(g2off + 60 * j + 8);
 
-                    auto g2_xx_zzz = contrBuffer.data(g2off + 60 * j + 9);
+                    auto g2_xx_zzz = ketBuffer.data(g2off + 60 * j + 9);
 
-                    auto g2_xy_xxx = contrBuffer.data(g2off + 60 * j + 10);
+                    auto g2_xy_xxx = ketBuffer.data(g2off + 60 * j + 10);
 
-                    auto g2_xy_xxy = contrBuffer.data(g2off + 60 * j + 11);
+                    auto g2_xy_xxy = ketBuffer.data(g2off + 60 * j + 11);
 
-                    auto g2_xy_xxz = contrBuffer.data(g2off + 60 * j + 12);
+                    auto g2_xy_xxz = ketBuffer.data(g2off + 60 * j + 12);
 
-                    auto g2_xy_xyy = contrBuffer.data(g2off + 60 * j + 13);
+                    auto g2_xy_xyy = ketBuffer.data(g2off + 60 * j + 13);
 
-                    auto g2_xy_xyz = contrBuffer.data(g2off + 60 * j + 14);
+                    auto g2_xy_xyz = ketBuffer.data(g2off + 60 * j + 14);
 
-                    auto g2_xy_xzz = contrBuffer.data(g2off + 60 * j + 15);
+                    auto g2_xy_xzz = ketBuffer.data(g2off + 60 * j + 15);
 
-                    auto g2_xy_yyy = contrBuffer.data(g2off + 60 * j + 16);
+                    auto g2_xy_yyy = ketBuffer.data(g2off + 60 * j + 16);
 
-                    auto g2_xy_yyz = contrBuffer.data(g2off + 60 * j + 17);
+                    auto g2_xy_yyz = ketBuffer.data(g2off + 60 * j + 17);
 
-                    auto g2_xy_yzz = contrBuffer.data(g2off + 60 * j + 18);
+                    auto g2_xy_yzz = ketBuffer.data(g2off + 60 * j + 18);
 
-                    auto g2_xy_zzz = contrBuffer.data(g2off + 60 * j + 19);
+                    auto g2_xy_zzz = ketBuffer.data(g2off + 60 * j + 19);
 
-                    auto g2_xz_xxx = contrBuffer.data(g2off + 60 * j + 20);
+                    auto g2_xz_xxx = ketBuffer.data(g2off + 60 * j + 20);
 
-                    auto g2_xz_xxy = contrBuffer.data(g2off + 60 * j + 21);
+                    auto g2_xz_xxy = ketBuffer.data(g2off + 60 * j + 21);
 
-                    auto g2_xz_xxz = contrBuffer.data(g2off + 60 * j + 22);
+                    auto g2_xz_xxz = ketBuffer.data(g2off + 60 * j + 22);
 
-                    auto g2_xz_xyy = contrBuffer.data(g2off + 60 * j + 23);
+                    auto g2_xz_xyy = ketBuffer.data(g2off + 60 * j + 23);
 
-                    auto g2_xz_xyz = contrBuffer.data(g2off + 60 * j + 24);
+                    auto g2_xz_xyz = ketBuffer.data(g2off + 60 * j + 24);
 
-                    auto g2_xz_xzz = contrBuffer.data(g2off + 60 * j + 25);
+                    auto g2_xz_xzz = ketBuffer.data(g2off + 60 * j + 25);
 
-                    auto g2_xz_yyy = contrBuffer.data(g2off + 60 * j + 26);
+                    auto g2_xz_yyy = ketBuffer.data(g2off + 60 * j + 26);
 
-                    auto g2_xz_yyz = contrBuffer.data(g2off + 60 * j + 27);
+                    auto g2_xz_yyz = ketBuffer.data(g2off + 60 * j + 27);
 
-                    auto g2_xz_yzz = contrBuffer.data(g2off + 60 * j + 28);
+                    auto g2_xz_yzz = ketBuffer.data(g2off + 60 * j + 28);
 
-                    auto g2_xz_zzz = contrBuffer.data(g2off + 60 * j + 29);
+                    auto g2_xz_zzz = ketBuffer.data(g2off + 60 * j + 29);
 
-                    auto g2_yy_xxx = contrBuffer.data(g2off + 60 * j + 30);
+                    auto g2_yy_xxx = ketBuffer.data(g2off + 60 * j + 30);
 
-                    auto g2_yy_xxy = contrBuffer.data(g2off + 60 * j + 31);
+                    auto g2_yy_xxy = ketBuffer.data(g2off + 60 * j + 31);
 
-                    auto g2_yy_xxz = contrBuffer.data(g2off + 60 * j + 32);
+                    auto g2_yy_xxz = ketBuffer.data(g2off + 60 * j + 32);
 
-                    auto g2_yy_xyy = contrBuffer.data(g2off + 60 * j + 33);
+                    auto g2_yy_xyy = ketBuffer.data(g2off + 60 * j + 33);
 
-                    auto g2_yy_xyz = contrBuffer.data(g2off + 60 * j + 34);
+                    auto g2_yy_xyz = ketBuffer.data(g2off + 60 * j + 34);
 
-                    auto g2_yy_xzz = contrBuffer.data(g2off + 60 * j + 35);
+                    auto g2_yy_xzz = ketBuffer.data(g2off + 60 * j + 35);
 
-                    auto g2_yy_yyy = contrBuffer.data(g2off + 60 * j + 36);
+                    auto g2_yy_yyy = ketBuffer.data(g2off + 60 * j + 36);
 
-                    auto g2_yy_yyz = contrBuffer.data(g2off + 60 * j + 37);
+                    auto g2_yy_yyz = ketBuffer.data(g2off + 60 * j + 37);
 
-                    auto g2_yy_yzz = contrBuffer.data(g2off + 60 * j + 38);
+                    auto g2_yy_yzz = ketBuffer.data(g2off + 60 * j + 38);
 
-                    auto g2_yy_zzz = contrBuffer.data(g2off + 60 * j + 39);
+                    auto g2_yy_zzz = ketBuffer.data(g2off + 60 * j + 39);
 
-                    auto g2_yz_xxx = contrBuffer.data(g2off + 60 * j + 40);
+                    auto g2_yz_xxx = ketBuffer.data(g2off + 60 * j + 40);
 
-                    auto g2_yz_xxy = contrBuffer.data(g2off + 60 * j + 41);
+                    auto g2_yz_xxy = ketBuffer.data(g2off + 60 * j + 41);
 
-                    auto g2_yz_xxz = contrBuffer.data(g2off + 60 * j + 42);
+                    auto g2_yz_xxz = ketBuffer.data(g2off + 60 * j + 42);
 
-                    auto g2_yz_xyy = contrBuffer.data(g2off + 60 * j + 43);
+                    auto g2_yz_xyy = ketBuffer.data(g2off + 60 * j + 43);
 
-                    auto g2_yz_xyz = contrBuffer.data(g2off + 60 * j + 44);
+                    auto g2_yz_xyz = ketBuffer.data(g2off + 60 * j + 44);
 
-                    auto g2_yz_xzz = contrBuffer.data(g2off + 60 * j + 45);
+                    auto g2_yz_xzz = ketBuffer.data(g2off + 60 * j + 45);
 
-                    auto g2_yz_yyy = contrBuffer.data(g2off + 60 * j + 46);
+                    auto g2_yz_yyy = ketBuffer.data(g2off + 60 * j + 46);
 
-                    auto g2_yz_yyz = contrBuffer.data(g2off + 60 * j + 47);
+                    auto g2_yz_yyz = ketBuffer.data(g2off + 60 * j + 47);
 
-                    auto g2_yz_yzz = contrBuffer.data(g2off + 60 * j + 48);
+                    auto g2_yz_yzz = ketBuffer.data(g2off + 60 * j + 48);
 
-                    auto g2_yz_zzz = contrBuffer.data(g2off + 60 * j + 49);
+                    auto g2_yz_zzz = ketBuffer.data(g2off + 60 * j + 49);
 
-                    auto g2_zz_xxx = contrBuffer.data(g2off + 60 * j + 50);
+                    auto g2_zz_xxx = ketBuffer.data(g2off + 60 * j + 50);
 
-                    auto g2_zz_xxy = contrBuffer.data(g2off + 60 * j + 51);
+                    auto g2_zz_xxy = ketBuffer.data(g2off + 60 * j + 51);
 
-                    auto g2_zz_xxz = contrBuffer.data(g2off + 60 * j + 52);
+                    auto g2_zz_xxz = ketBuffer.data(g2off + 60 * j + 52);
 
-                    auto g2_zz_xyy = contrBuffer.data(g2off + 60 * j + 53);
+                    auto g2_zz_xyy = ketBuffer.data(g2off + 60 * j + 53);
 
-                    auto g2_zz_xyz = contrBuffer.data(g2off + 60 * j + 54);
+                    auto g2_zz_xyz = ketBuffer.data(g2off + 60 * j + 54);
 
-                    auto g2_zz_xzz = contrBuffer.data(g2off + 60 * j + 55);
+                    auto g2_zz_xzz = ketBuffer.data(g2off + 60 * j + 55);
 
-                    auto g2_zz_yyy = contrBuffer.data(g2off + 60 * j + 56);
+                    auto g2_zz_yyy = ketBuffer.data(g2off + 60 * j + 56);
 
-                    auto g2_zz_yyz = contrBuffer.data(g2off + 60 * j + 57);
+                    auto g2_zz_yyz = ketBuffer.data(g2off + 60 * j + 57);
 
-                    auto g2_zz_yzz = contrBuffer.data(g2off + 60 * j + 58);
+                    auto g2_zz_yzz = ketBuffer.data(g2off + 60 * j + 58);
 
-                    auto g2_zz_zzz = contrBuffer.data(g2off + 60 * j + 59);
+                    auto g2_zz_zzz = ketBuffer.data(g2off + 60 * j + 59);
 
-                    // set up pointers to (SX|g(r,r')|DG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DG) integrals
 
-                    auto g1_xx_xxxx = contrBuffer.data(g1off + 90 * j);
+                    auto g1_xx_xxxx = ketBuffer.data(g1off + 90 * j);
 
-                    auto g1_xx_xxxy = contrBuffer.data(g1off + 90 * j + 1);
+                    auto g1_xx_xxxy = ketBuffer.data(g1off + 90 * j + 1);
 
-                    auto g1_xx_xxxz = contrBuffer.data(g1off + 90 * j + 2);
+                    auto g1_xx_xxxz = ketBuffer.data(g1off + 90 * j + 2);
 
-                    auto g1_xx_xxyy = contrBuffer.data(g1off + 90 * j + 3);
+                    auto g1_xx_xxyy = ketBuffer.data(g1off + 90 * j + 3);
 
-                    auto g1_xx_xxyz = contrBuffer.data(g1off + 90 * j + 4);
+                    auto g1_xx_xxyz = ketBuffer.data(g1off + 90 * j + 4);
 
-                    auto g1_xx_xxzz = contrBuffer.data(g1off + 90 * j + 5);
+                    auto g1_xx_xxzz = ketBuffer.data(g1off + 90 * j + 5);
 
-                    auto g1_xx_xyyy = contrBuffer.data(g1off + 90 * j + 6);
+                    auto g1_xx_xyyy = ketBuffer.data(g1off + 90 * j + 6);
 
-                    auto g1_xx_xyyz = contrBuffer.data(g1off + 90 * j + 7);
+                    auto g1_xx_xyyz = ketBuffer.data(g1off + 90 * j + 7);
 
-                    auto g1_xx_xyzz = contrBuffer.data(g1off + 90 * j + 8);
+                    auto g1_xx_xyzz = ketBuffer.data(g1off + 90 * j + 8);
 
-                    auto g1_xx_xzzz = contrBuffer.data(g1off + 90 * j + 9);
+                    auto g1_xx_xzzz = ketBuffer.data(g1off + 90 * j + 9);
 
-                    auto g1_xy_xxxx = contrBuffer.data(g1off + 90 * j + 15);
+                    auto g1_xy_xxxx = ketBuffer.data(g1off + 90 * j + 15);
 
-                    auto g1_xy_xxxy = contrBuffer.data(g1off + 90 * j + 16);
+                    auto g1_xy_xxxy = ketBuffer.data(g1off + 90 * j + 16);
 
-                    auto g1_xy_xxxz = contrBuffer.data(g1off + 90 * j + 17);
+                    auto g1_xy_xxxz = ketBuffer.data(g1off + 90 * j + 17);
 
-                    auto g1_xy_xxyy = contrBuffer.data(g1off + 90 * j + 18);
+                    auto g1_xy_xxyy = ketBuffer.data(g1off + 90 * j + 18);
 
-                    auto g1_xy_xxyz = contrBuffer.data(g1off + 90 * j + 19);
+                    auto g1_xy_xxyz = ketBuffer.data(g1off + 90 * j + 19);
 
-                    auto g1_xy_xxzz = contrBuffer.data(g1off + 90 * j + 20);
+                    auto g1_xy_xxzz = ketBuffer.data(g1off + 90 * j + 20);
 
-                    auto g1_xy_xyyy = contrBuffer.data(g1off + 90 * j + 21);
+                    auto g1_xy_xyyy = ketBuffer.data(g1off + 90 * j + 21);
 
-                    auto g1_xy_xyyz = contrBuffer.data(g1off + 90 * j + 22);
+                    auto g1_xy_xyyz = ketBuffer.data(g1off + 90 * j + 22);
 
-                    auto g1_xy_xyzz = contrBuffer.data(g1off + 90 * j + 23);
+                    auto g1_xy_xyzz = ketBuffer.data(g1off + 90 * j + 23);
 
-                    auto g1_xy_xzzz = contrBuffer.data(g1off + 90 * j + 24);
+                    auto g1_xy_xzzz = ketBuffer.data(g1off + 90 * j + 24);
 
-                    auto g1_xz_xxxx = contrBuffer.data(g1off + 90 * j + 30);
+                    auto g1_xz_xxxx = ketBuffer.data(g1off + 90 * j + 30);
 
-                    auto g1_xz_xxxy = contrBuffer.data(g1off + 90 * j + 31);
+                    auto g1_xz_xxxy = ketBuffer.data(g1off + 90 * j + 31);
 
-                    auto g1_xz_xxxz = contrBuffer.data(g1off + 90 * j + 32);
+                    auto g1_xz_xxxz = ketBuffer.data(g1off + 90 * j + 32);
 
-                    auto g1_xz_xxyy = contrBuffer.data(g1off + 90 * j + 33);
+                    auto g1_xz_xxyy = ketBuffer.data(g1off + 90 * j + 33);
 
-                    auto g1_xz_xxyz = contrBuffer.data(g1off + 90 * j + 34);
+                    auto g1_xz_xxyz = ketBuffer.data(g1off + 90 * j + 34);
 
-                    auto g1_xz_xxzz = contrBuffer.data(g1off + 90 * j + 35);
+                    auto g1_xz_xxzz = ketBuffer.data(g1off + 90 * j + 35);
 
-                    auto g1_xz_xyyy = contrBuffer.data(g1off + 90 * j + 36);
+                    auto g1_xz_xyyy = ketBuffer.data(g1off + 90 * j + 36);
 
-                    auto g1_xz_xyyz = contrBuffer.data(g1off + 90 * j + 37);
+                    auto g1_xz_xyyz = ketBuffer.data(g1off + 90 * j + 37);
 
-                    auto g1_xz_xyzz = contrBuffer.data(g1off + 90 * j + 38);
+                    auto g1_xz_xyzz = ketBuffer.data(g1off + 90 * j + 38);
 
-                    auto g1_xz_xzzz = contrBuffer.data(g1off + 90 * j + 39);
+                    auto g1_xz_xzzz = ketBuffer.data(g1off + 90 * j + 39);
 
-                    auto g1_yy_xxxx = contrBuffer.data(g1off + 90 * j + 45);
+                    auto g1_yy_xxxx = ketBuffer.data(g1off + 90 * j + 45);
 
-                    auto g1_yy_xxxy = contrBuffer.data(g1off + 90 * j + 46);
+                    auto g1_yy_xxxy = ketBuffer.data(g1off + 90 * j + 46);
 
-                    auto g1_yy_xxxz = contrBuffer.data(g1off + 90 * j + 47);
+                    auto g1_yy_xxxz = ketBuffer.data(g1off + 90 * j + 47);
 
-                    auto g1_yy_xxyy = contrBuffer.data(g1off + 90 * j + 48);
+                    auto g1_yy_xxyy = ketBuffer.data(g1off + 90 * j + 48);
 
-                    auto g1_yy_xxyz = contrBuffer.data(g1off + 90 * j + 49);
+                    auto g1_yy_xxyz = ketBuffer.data(g1off + 90 * j + 49);
 
-                    auto g1_yy_xxzz = contrBuffer.data(g1off + 90 * j + 50);
+                    auto g1_yy_xxzz = ketBuffer.data(g1off + 90 * j + 50);
 
-                    auto g1_yy_xyyy = contrBuffer.data(g1off + 90 * j + 51);
+                    auto g1_yy_xyyy = ketBuffer.data(g1off + 90 * j + 51);
 
-                    auto g1_yy_xyyz = contrBuffer.data(g1off + 90 * j + 52);
+                    auto g1_yy_xyyz = ketBuffer.data(g1off + 90 * j + 52);
 
-                    auto g1_yy_xyzz = contrBuffer.data(g1off + 90 * j + 53);
+                    auto g1_yy_xyzz = ketBuffer.data(g1off + 90 * j + 53);
 
-                    auto g1_yy_xzzz = contrBuffer.data(g1off + 90 * j + 54);
+                    auto g1_yy_xzzz = ketBuffer.data(g1off + 90 * j + 54);
 
-                    auto g1_yy_yyyy = contrBuffer.data(g1off + 90 * j + 55);
+                    auto g1_yy_yyyy = ketBuffer.data(g1off + 90 * j + 55);
 
-                    auto g1_yy_yyyz = contrBuffer.data(g1off + 90 * j + 56);
+                    auto g1_yy_yyyz = ketBuffer.data(g1off + 90 * j + 56);
 
-                    auto g1_yy_yyzz = contrBuffer.data(g1off + 90 * j + 57);
+                    auto g1_yy_yyzz = ketBuffer.data(g1off + 90 * j + 57);
 
-                    auto g1_yy_yzzz = contrBuffer.data(g1off + 90 * j + 58);
+                    auto g1_yy_yzzz = ketBuffer.data(g1off + 90 * j + 58);
 
-                    auto g1_yz_xxxx = contrBuffer.data(g1off + 90 * j + 60);
+                    auto g1_yz_xxxx = ketBuffer.data(g1off + 90 * j + 60);
 
-                    auto g1_yz_xxxy = contrBuffer.data(g1off + 90 * j + 61);
+                    auto g1_yz_xxxy = ketBuffer.data(g1off + 90 * j + 61);
 
-                    auto g1_yz_xxxz = contrBuffer.data(g1off + 90 * j + 62);
+                    auto g1_yz_xxxz = ketBuffer.data(g1off + 90 * j + 62);
 
-                    auto g1_yz_xxyy = contrBuffer.data(g1off + 90 * j + 63);
+                    auto g1_yz_xxyy = ketBuffer.data(g1off + 90 * j + 63);
 
-                    auto g1_yz_xxyz = contrBuffer.data(g1off + 90 * j + 64);
+                    auto g1_yz_xxyz = ketBuffer.data(g1off + 90 * j + 64);
 
-                    auto g1_yz_xxzz = contrBuffer.data(g1off + 90 * j + 65);
+                    auto g1_yz_xxzz = ketBuffer.data(g1off + 90 * j + 65);
 
-                    auto g1_yz_xyyy = contrBuffer.data(g1off + 90 * j + 66);
+                    auto g1_yz_xyyy = ketBuffer.data(g1off + 90 * j + 66);
 
-                    auto g1_yz_xyyz = contrBuffer.data(g1off + 90 * j + 67);
+                    auto g1_yz_xyyz = ketBuffer.data(g1off + 90 * j + 67);
 
-                    auto g1_yz_xyzz = contrBuffer.data(g1off + 90 * j + 68);
+                    auto g1_yz_xyzz = ketBuffer.data(g1off + 90 * j + 68);
 
-                    auto g1_yz_xzzz = contrBuffer.data(g1off + 90 * j + 69);
+                    auto g1_yz_xzzz = ketBuffer.data(g1off + 90 * j + 69);
 
-                    auto g1_yz_yyyy = contrBuffer.data(g1off + 90 * j + 70);
+                    auto g1_yz_yyyy = ketBuffer.data(g1off + 90 * j + 70);
 
-                    auto g1_yz_yyyz = contrBuffer.data(g1off + 90 * j + 71);
+                    auto g1_yz_yyyz = ketBuffer.data(g1off + 90 * j + 71);
 
-                    auto g1_yz_yyzz = contrBuffer.data(g1off + 90 * j + 72);
+                    auto g1_yz_yyzz = ketBuffer.data(g1off + 90 * j + 72);
 
-                    auto g1_yz_yzzz = contrBuffer.data(g1off + 90 * j + 73);
+                    auto g1_yz_yzzz = ketBuffer.data(g1off + 90 * j + 73);
 
-                    auto g1_zz_xxxx = contrBuffer.data(g1off + 90 * j + 75);
+                    auto g1_zz_xxxx = ketBuffer.data(g1off + 90 * j + 75);
 
-                    auto g1_zz_xxxy = contrBuffer.data(g1off + 90 * j + 76);
+                    auto g1_zz_xxxy = ketBuffer.data(g1off + 90 * j + 76);
 
-                    auto g1_zz_xxxz = contrBuffer.data(g1off + 90 * j + 77);
+                    auto g1_zz_xxxz = ketBuffer.data(g1off + 90 * j + 77);
 
-                    auto g1_zz_xxyy = contrBuffer.data(g1off + 90 * j + 78);
+                    auto g1_zz_xxyy = ketBuffer.data(g1off + 90 * j + 78);
 
-                    auto g1_zz_xxyz = contrBuffer.data(g1off + 90 * j + 79);
+                    auto g1_zz_xxyz = ketBuffer.data(g1off + 90 * j + 79);
 
-                    auto g1_zz_xxzz = contrBuffer.data(g1off + 90 * j + 80);
+                    auto g1_zz_xxzz = ketBuffer.data(g1off + 90 * j + 80);
 
-                    auto g1_zz_xyyy = contrBuffer.data(g1off + 90 * j + 81);
+                    auto g1_zz_xyyy = ketBuffer.data(g1off + 90 * j + 81);
 
-                    auto g1_zz_xyyz = contrBuffer.data(g1off + 90 * j + 82);
+                    auto g1_zz_xyyz = ketBuffer.data(g1off + 90 * j + 82);
 
-                    auto g1_zz_xyzz = contrBuffer.data(g1off + 90 * j + 83);
+                    auto g1_zz_xyzz = ketBuffer.data(g1off + 90 * j + 83);
 
-                    auto g1_zz_xzzz = contrBuffer.data(g1off + 90 * j + 84);
+                    auto g1_zz_xzzz = ketBuffer.data(g1off + 90 * j + 84);
 
-                    auto g1_zz_yyyy = contrBuffer.data(g1off + 90 * j + 85);
+                    auto g1_zz_yyyy = ketBuffer.data(g1off + 90 * j + 85);
 
-                    auto g1_zz_yyyz = contrBuffer.data(g1off + 90 * j + 86);
+                    auto g1_zz_yyyz = ketBuffer.data(g1off + 90 * j + 86);
 
-                    auto g1_zz_yyzz = contrBuffer.data(g1off + 90 * j + 87);
+                    auto g1_zz_yyzz = ketBuffer.data(g1off + 90 * j + 87);
 
-                    auto g1_zz_yzzz = contrBuffer.data(g1off + 90 * j + 88);
+                    auto g1_zz_yzzz = ketBuffer.data(g1off + 90 * j + 88);
 
-                    auto g1_zz_zzzz = contrBuffer.data(g1off + 90 * j + 89);
+                    auto g1_zz_zzzz = ketBuffer.data(g1off + 90 * j + 89);
 
-                    // set up pointers to (SX|g(r,r')|FF)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|FF) integrals
 
-                    auto g_xxx_xxx = contrBuffer.data(goff + 100 * j);
+                    auto g_xxx_xxx = ketBuffer.data(goff + 100 * j);
 
-                    auto g_xxx_xxy = contrBuffer.data(goff + 100 * j + 1);
+                    auto g_xxx_xxy = ketBuffer.data(goff + 100 * j + 1);
 
-                    auto g_xxx_xxz = contrBuffer.data(goff + 100 * j + 2);
+                    auto g_xxx_xxz = ketBuffer.data(goff + 100 * j + 2);
 
-                    auto g_xxx_xyy = contrBuffer.data(goff + 100 * j + 3);
+                    auto g_xxx_xyy = ketBuffer.data(goff + 100 * j + 3);
 
-                    auto g_xxx_xyz = contrBuffer.data(goff + 100 * j + 4);
+                    auto g_xxx_xyz = ketBuffer.data(goff + 100 * j + 4);
 
-                    auto g_xxx_xzz = contrBuffer.data(goff + 100 * j + 5);
+                    auto g_xxx_xzz = ketBuffer.data(goff + 100 * j + 5);
 
-                    auto g_xxx_yyy = contrBuffer.data(goff + 100 * j + 6);
+                    auto g_xxx_yyy = ketBuffer.data(goff + 100 * j + 6);
 
-                    auto g_xxx_yyz = contrBuffer.data(goff + 100 * j + 7);
+                    auto g_xxx_yyz = ketBuffer.data(goff + 100 * j + 7);
 
-                    auto g_xxx_yzz = contrBuffer.data(goff + 100 * j + 8);
+                    auto g_xxx_yzz = ketBuffer.data(goff + 100 * j + 8);
 
-                    auto g_xxx_zzz = contrBuffer.data(goff + 100 * j + 9);
+                    auto g_xxx_zzz = ketBuffer.data(goff + 100 * j + 9);
 
-                    auto g_xxy_xxx = contrBuffer.data(goff + 100 * j + 10);
+                    auto g_xxy_xxx = ketBuffer.data(goff + 100 * j + 10);
 
-                    auto g_xxy_xxy = contrBuffer.data(goff + 100 * j + 11);
+                    auto g_xxy_xxy = ketBuffer.data(goff + 100 * j + 11);
 
-                    auto g_xxy_xxz = contrBuffer.data(goff + 100 * j + 12);
+                    auto g_xxy_xxz = ketBuffer.data(goff + 100 * j + 12);
 
-                    auto g_xxy_xyy = contrBuffer.data(goff + 100 * j + 13);
+                    auto g_xxy_xyy = ketBuffer.data(goff + 100 * j + 13);
 
-                    auto g_xxy_xyz = contrBuffer.data(goff + 100 * j + 14);
+                    auto g_xxy_xyz = ketBuffer.data(goff + 100 * j + 14);
 
-                    auto g_xxy_xzz = contrBuffer.data(goff + 100 * j + 15);
+                    auto g_xxy_xzz = ketBuffer.data(goff + 100 * j + 15);
 
-                    auto g_xxy_yyy = contrBuffer.data(goff + 100 * j + 16);
+                    auto g_xxy_yyy = ketBuffer.data(goff + 100 * j + 16);
 
-                    auto g_xxy_yyz = contrBuffer.data(goff + 100 * j + 17);
+                    auto g_xxy_yyz = ketBuffer.data(goff + 100 * j + 17);
 
-                    auto g_xxy_yzz = contrBuffer.data(goff + 100 * j + 18);
+                    auto g_xxy_yzz = ketBuffer.data(goff + 100 * j + 18);
 
-                    auto g_xxy_zzz = contrBuffer.data(goff + 100 * j + 19);
+                    auto g_xxy_zzz = ketBuffer.data(goff + 100 * j + 19);
 
-                    auto g_xxz_xxx = contrBuffer.data(goff + 100 * j + 20);
+                    auto g_xxz_xxx = ketBuffer.data(goff + 100 * j + 20);
 
-                    auto g_xxz_xxy = contrBuffer.data(goff + 100 * j + 21);
+                    auto g_xxz_xxy = ketBuffer.data(goff + 100 * j + 21);
 
-                    auto g_xxz_xxz = contrBuffer.data(goff + 100 * j + 22);
+                    auto g_xxz_xxz = ketBuffer.data(goff + 100 * j + 22);
 
-                    auto g_xxz_xyy = contrBuffer.data(goff + 100 * j + 23);
+                    auto g_xxz_xyy = ketBuffer.data(goff + 100 * j + 23);
 
-                    auto g_xxz_xyz = contrBuffer.data(goff + 100 * j + 24);
+                    auto g_xxz_xyz = ketBuffer.data(goff + 100 * j + 24);
 
-                    auto g_xxz_xzz = contrBuffer.data(goff + 100 * j + 25);
+                    auto g_xxz_xzz = ketBuffer.data(goff + 100 * j + 25);
 
-                    auto g_xxz_yyy = contrBuffer.data(goff + 100 * j + 26);
+                    auto g_xxz_yyy = ketBuffer.data(goff + 100 * j + 26);
 
-                    auto g_xxz_yyz = contrBuffer.data(goff + 100 * j + 27);
+                    auto g_xxz_yyz = ketBuffer.data(goff + 100 * j + 27);
 
-                    auto g_xxz_yzz = contrBuffer.data(goff + 100 * j + 28);
+                    auto g_xxz_yzz = ketBuffer.data(goff + 100 * j + 28);
 
-                    auto g_xxz_zzz = contrBuffer.data(goff + 100 * j + 29);
+                    auto g_xxz_zzz = ketBuffer.data(goff + 100 * j + 29);
 
-                    auto g_xyy_xxx = contrBuffer.data(goff + 100 * j + 30);
+                    auto g_xyy_xxx = ketBuffer.data(goff + 100 * j + 30);
 
-                    auto g_xyy_xxy = contrBuffer.data(goff + 100 * j + 31);
+                    auto g_xyy_xxy = ketBuffer.data(goff + 100 * j + 31);
 
-                    auto g_xyy_xxz = contrBuffer.data(goff + 100 * j + 32);
+                    auto g_xyy_xxz = ketBuffer.data(goff + 100 * j + 32);
 
-                    auto g_xyy_xyy = contrBuffer.data(goff + 100 * j + 33);
+                    auto g_xyy_xyy = ketBuffer.data(goff + 100 * j + 33);
 
-                    auto g_xyy_xyz = contrBuffer.data(goff + 100 * j + 34);
+                    auto g_xyy_xyz = ketBuffer.data(goff + 100 * j + 34);
 
-                    auto g_xyy_xzz = contrBuffer.data(goff + 100 * j + 35);
+                    auto g_xyy_xzz = ketBuffer.data(goff + 100 * j + 35);
 
-                    auto g_xyy_yyy = contrBuffer.data(goff + 100 * j + 36);
+                    auto g_xyy_yyy = ketBuffer.data(goff + 100 * j + 36);
 
-                    auto g_xyy_yyz = contrBuffer.data(goff + 100 * j + 37);
+                    auto g_xyy_yyz = ketBuffer.data(goff + 100 * j + 37);
 
-                    auto g_xyy_yzz = contrBuffer.data(goff + 100 * j + 38);
+                    auto g_xyy_yzz = ketBuffer.data(goff + 100 * j + 38);
 
-                    auto g_xyy_zzz = contrBuffer.data(goff + 100 * j + 39);
+                    auto g_xyy_zzz = ketBuffer.data(goff + 100 * j + 39);
 
-                    auto g_xyz_xxx = contrBuffer.data(goff + 100 * j + 40);
+                    auto g_xyz_xxx = ketBuffer.data(goff + 100 * j + 40);
 
-                    auto g_xyz_xxy = contrBuffer.data(goff + 100 * j + 41);
+                    auto g_xyz_xxy = ketBuffer.data(goff + 100 * j + 41);
 
-                    auto g_xyz_xxz = contrBuffer.data(goff + 100 * j + 42);
+                    auto g_xyz_xxz = ketBuffer.data(goff + 100 * j + 42);
 
-                    auto g_xyz_xyy = contrBuffer.data(goff + 100 * j + 43);
+                    auto g_xyz_xyy = ketBuffer.data(goff + 100 * j + 43);
 
-                    auto g_xyz_xyz = contrBuffer.data(goff + 100 * j + 44);
+                    auto g_xyz_xyz = ketBuffer.data(goff + 100 * j + 44);
 
-                    auto g_xyz_xzz = contrBuffer.data(goff + 100 * j + 45);
+                    auto g_xyz_xzz = ketBuffer.data(goff + 100 * j + 45);
 
-                    auto g_xyz_yyy = contrBuffer.data(goff + 100 * j + 46);
+                    auto g_xyz_yyy = ketBuffer.data(goff + 100 * j + 46);
 
-                    auto g_xyz_yyz = contrBuffer.data(goff + 100 * j + 47);
+                    auto g_xyz_yyz = ketBuffer.data(goff + 100 * j + 47);
 
-                    auto g_xyz_yzz = contrBuffer.data(goff + 100 * j + 48);
+                    auto g_xyz_yzz = ketBuffer.data(goff + 100 * j + 48);
 
-                    auto g_xyz_zzz = contrBuffer.data(goff + 100 * j + 49);
+                    auto g_xyz_zzz = ketBuffer.data(goff + 100 * j + 49);
 
-                    auto g_xzz_xxx = contrBuffer.data(goff + 100 * j + 50);
+                    auto g_xzz_xxx = ketBuffer.data(goff + 100 * j + 50);
 
-                    auto g_xzz_xxy = contrBuffer.data(goff + 100 * j + 51);
+                    auto g_xzz_xxy = ketBuffer.data(goff + 100 * j + 51);
 
-                    auto g_xzz_xxz = contrBuffer.data(goff + 100 * j + 52);
+                    auto g_xzz_xxz = ketBuffer.data(goff + 100 * j + 52);
 
-                    auto g_xzz_xyy = contrBuffer.data(goff + 100 * j + 53);
+                    auto g_xzz_xyy = ketBuffer.data(goff + 100 * j + 53);
 
-                    auto g_xzz_xyz = contrBuffer.data(goff + 100 * j + 54);
+                    auto g_xzz_xyz = ketBuffer.data(goff + 100 * j + 54);
 
-                    auto g_xzz_xzz = contrBuffer.data(goff + 100 * j + 55);
+                    auto g_xzz_xzz = ketBuffer.data(goff + 100 * j + 55);
 
-                    auto g_xzz_yyy = contrBuffer.data(goff + 100 * j + 56);
+                    auto g_xzz_yyy = ketBuffer.data(goff + 100 * j + 56);
 
-                    auto g_xzz_yyz = contrBuffer.data(goff + 100 * j + 57);
+                    auto g_xzz_yyz = ketBuffer.data(goff + 100 * j + 57);
 
-                    auto g_xzz_yzz = contrBuffer.data(goff + 100 * j + 58);
+                    auto g_xzz_yzz = ketBuffer.data(goff + 100 * j + 58);
 
-                    auto g_xzz_zzz = contrBuffer.data(goff + 100 * j + 59);
+                    auto g_xzz_zzz = ketBuffer.data(goff + 100 * j + 59);
 
-                    auto g_yyy_xxx = contrBuffer.data(goff + 100 * j + 60);
+                    auto g_yyy_xxx = ketBuffer.data(goff + 100 * j + 60);
 
-                    auto g_yyy_xxy = contrBuffer.data(goff + 100 * j + 61);
+                    auto g_yyy_xxy = ketBuffer.data(goff + 100 * j + 61);
 
-                    auto g_yyy_xxz = contrBuffer.data(goff + 100 * j + 62);
+                    auto g_yyy_xxz = ketBuffer.data(goff + 100 * j + 62);
 
-                    auto g_yyy_xyy = contrBuffer.data(goff + 100 * j + 63);
+                    auto g_yyy_xyy = ketBuffer.data(goff + 100 * j + 63);
 
-                    auto g_yyy_xyz = contrBuffer.data(goff + 100 * j + 64);
+                    auto g_yyy_xyz = ketBuffer.data(goff + 100 * j + 64);
 
-                    auto g_yyy_xzz = contrBuffer.data(goff + 100 * j + 65);
+                    auto g_yyy_xzz = ketBuffer.data(goff + 100 * j + 65);
 
-                    auto g_yyy_yyy = contrBuffer.data(goff + 100 * j + 66);
+                    auto g_yyy_yyy = ketBuffer.data(goff + 100 * j + 66);
 
-                    auto g_yyy_yyz = contrBuffer.data(goff + 100 * j + 67);
+                    auto g_yyy_yyz = ketBuffer.data(goff + 100 * j + 67);
 
-                    auto g_yyy_yzz = contrBuffer.data(goff + 100 * j + 68);
+                    auto g_yyy_yzz = ketBuffer.data(goff + 100 * j + 68);
 
-                    auto g_yyy_zzz = contrBuffer.data(goff + 100 * j + 69);
+                    auto g_yyy_zzz = ketBuffer.data(goff + 100 * j + 69);
 
-                    auto g_yyz_xxx = contrBuffer.data(goff + 100 * j + 70);
+                    auto g_yyz_xxx = ketBuffer.data(goff + 100 * j + 70);
 
-                    auto g_yyz_xxy = contrBuffer.data(goff + 100 * j + 71);
+                    auto g_yyz_xxy = ketBuffer.data(goff + 100 * j + 71);
 
-                    auto g_yyz_xxz = contrBuffer.data(goff + 100 * j + 72);
+                    auto g_yyz_xxz = ketBuffer.data(goff + 100 * j + 72);
 
-                    auto g_yyz_xyy = contrBuffer.data(goff + 100 * j + 73);
+                    auto g_yyz_xyy = ketBuffer.data(goff + 100 * j + 73);
 
-                    auto g_yyz_xyz = contrBuffer.data(goff + 100 * j + 74);
+                    auto g_yyz_xyz = ketBuffer.data(goff + 100 * j + 74);
 
-                    auto g_yyz_xzz = contrBuffer.data(goff + 100 * j + 75);
+                    auto g_yyz_xzz = ketBuffer.data(goff + 100 * j + 75);
 
-                    auto g_yyz_yyy = contrBuffer.data(goff + 100 * j + 76);
+                    auto g_yyz_yyy = ketBuffer.data(goff + 100 * j + 76);
 
-                    auto g_yyz_yyz = contrBuffer.data(goff + 100 * j + 77);
+                    auto g_yyz_yyz = ketBuffer.data(goff + 100 * j + 77);
 
-                    auto g_yyz_yzz = contrBuffer.data(goff + 100 * j + 78);
+                    auto g_yyz_yzz = ketBuffer.data(goff + 100 * j + 78);
 
-                    auto g_yyz_zzz = contrBuffer.data(goff + 100 * j + 79);
+                    auto g_yyz_zzz = ketBuffer.data(goff + 100 * j + 79);
 
-                    auto g_yzz_xxx = contrBuffer.data(goff + 100 * j + 80);
+                    auto g_yzz_xxx = ketBuffer.data(goff + 100 * j + 80);
 
-                    auto g_yzz_xxy = contrBuffer.data(goff + 100 * j + 81);
+                    auto g_yzz_xxy = ketBuffer.data(goff + 100 * j + 81);
 
-                    auto g_yzz_xxz = contrBuffer.data(goff + 100 * j + 82);
+                    auto g_yzz_xxz = ketBuffer.data(goff + 100 * j + 82);
 
-                    auto g_yzz_xyy = contrBuffer.data(goff + 100 * j + 83);
+                    auto g_yzz_xyy = ketBuffer.data(goff + 100 * j + 83);
 
-                    auto g_yzz_xyz = contrBuffer.data(goff + 100 * j + 84);
+                    auto g_yzz_xyz = ketBuffer.data(goff + 100 * j + 84);
 
-                    auto g_yzz_xzz = contrBuffer.data(goff + 100 * j + 85);
+                    auto g_yzz_xzz = ketBuffer.data(goff + 100 * j + 85);
 
-                    auto g_yzz_yyy = contrBuffer.data(goff + 100 * j + 86);
+                    auto g_yzz_yyy = ketBuffer.data(goff + 100 * j + 86);
 
-                    auto g_yzz_yyz = contrBuffer.data(goff + 100 * j + 87);
+                    auto g_yzz_yyz = ketBuffer.data(goff + 100 * j + 87);
 
-                    auto g_yzz_yzz = contrBuffer.data(goff + 100 * j + 88);
+                    auto g_yzz_yzz = ketBuffer.data(goff + 100 * j + 88);
 
-                    auto g_yzz_zzz = contrBuffer.data(goff + 100 * j + 89);
+                    auto g_yzz_zzz = ketBuffer.data(goff + 100 * j + 89);
 
-                    auto g_zzz_xxx = contrBuffer.data(goff + 100 * j + 90);
+                    auto g_zzz_xxx = ketBuffer.data(goff + 100 * j + 90);
 
-                    auto g_zzz_xxy = contrBuffer.data(goff + 100 * j + 91);
+                    auto g_zzz_xxy = ketBuffer.data(goff + 100 * j + 91);
 
-                    auto g_zzz_xxz = contrBuffer.data(goff + 100 * j + 92);
+                    auto g_zzz_xxz = ketBuffer.data(goff + 100 * j + 92);
 
-                    auto g_zzz_xyy = contrBuffer.data(goff + 100 * j + 93);
+                    auto g_zzz_xyy = ketBuffer.data(goff + 100 * j + 93);
 
-                    auto g_zzz_xyz = contrBuffer.data(goff + 100 * j + 94);
+                    auto g_zzz_xyz = ketBuffer.data(goff + 100 * j + 94);
 
-                    auto g_zzz_xzz = contrBuffer.data(goff + 100 * j + 95);
+                    auto g_zzz_xzz = ketBuffer.data(goff + 100 * j + 95);
 
-                    auto g_zzz_yyy = contrBuffer.data(goff + 100 * j + 96);
+                    auto g_zzz_yyy = ketBuffer.data(goff + 100 * j + 96);
 
-                    auto g_zzz_yyz = contrBuffer.data(goff + 100 * j + 97);
+                    auto g_zzz_yyz = ketBuffer.data(goff + 100 * j + 97);
 
-                    auto g_zzz_yzz = contrBuffer.data(goff + 100 * j + 98);
+                    auto g_zzz_yzz = ketBuffer.data(goff + 100 * j + 98);
 
-                    auto g_zzz_zzz = contrBuffer.data(goff + 100 * j + 99);
+                    auto g_zzz_zzz = ketBuffer.data(goff + 100 * j + 99);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_xx_xxx, g2_xx_xxy,\
                                              g2_xx_xxz, g2_xx_xyy, g2_xx_xyz, g2_xx_xzz,\
@@ -7244,7 +7244,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXFG(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXFG(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -7295,703 +7295,703 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|DG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DG) integrals
 
-                    auto g2_xx_xxxx = contrBuffer.data(g2off + 90 * j);
+                    auto g2_xx_xxxx = ketBuffer.data(g2off + 90 * j);
 
-                    auto g2_xx_xxxy = contrBuffer.data(g2off + 90 * j + 1);
+                    auto g2_xx_xxxy = ketBuffer.data(g2off + 90 * j + 1);
 
-                    auto g2_xx_xxxz = contrBuffer.data(g2off + 90 * j + 2);
+                    auto g2_xx_xxxz = ketBuffer.data(g2off + 90 * j + 2);
 
-                    auto g2_xx_xxyy = contrBuffer.data(g2off + 90 * j + 3);
+                    auto g2_xx_xxyy = ketBuffer.data(g2off + 90 * j + 3);
 
-                    auto g2_xx_xxyz = contrBuffer.data(g2off + 90 * j + 4);
+                    auto g2_xx_xxyz = ketBuffer.data(g2off + 90 * j + 4);
 
-                    auto g2_xx_xxzz = contrBuffer.data(g2off + 90 * j + 5);
+                    auto g2_xx_xxzz = ketBuffer.data(g2off + 90 * j + 5);
 
-                    auto g2_xx_xyyy = contrBuffer.data(g2off + 90 * j + 6);
+                    auto g2_xx_xyyy = ketBuffer.data(g2off + 90 * j + 6);
 
-                    auto g2_xx_xyyz = contrBuffer.data(g2off + 90 * j + 7);
+                    auto g2_xx_xyyz = ketBuffer.data(g2off + 90 * j + 7);
 
-                    auto g2_xx_xyzz = contrBuffer.data(g2off + 90 * j + 8);
+                    auto g2_xx_xyzz = ketBuffer.data(g2off + 90 * j + 8);
 
-                    auto g2_xx_xzzz = contrBuffer.data(g2off + 90 * j + 9);
+                    auto g2_xx_xzzz = ketBuffer.data(g2off + 90 * j + 9);
 
-                    auto g2_xx_yyyy = contrBuffer.data(g2off + 90 * j + 10);
+                    auto g2_xx_yyyy = ketBuffer.data(g2off + 90 * j + 10);
 
-                    auto g2_xx_yyyz = contrBuffer.data(g2off + 90 * j + 11);
+                    auto g2_xx_yyyz = ketBuffer.data(g2off + 90 * j + 11);
 
-                    auto g2_xx_yyzz = contrBuffer.data(g2off + 90 * j + 12);
+                    auto g2_xx_yyzz = ketBuffer.data(g2off + 90 * j + 12);
 
-                    auto g2_xx_yzzz = contrBuffer.data(g2off + 90 * j + 13);
+                    auto g2_xx_yzzz = ketBuffer.data(g2off + 90 * j + 13);
 
-                    auto g2_xx_zzzz = contrBuffer.data(g2off + 90 * j + 14);
+                    auto g2_xx_zzzz = ketBuffer.data(g2off + 90 * j + 14);
 
-                    auto g2_xy_xxxx = contrBuffer.data(g2off + 90 * j + 15);
+                    auto g2_xy_xxxx = ketBuffer.data(g2off + 90 * j + 15);
 
-                    auto g2_xy_xxxy = contrBuffer.data(g2off + 90 * j + 16);
+                    auto g2_xy_xxxy = ketBuffer.data(g2off + 90 * j + 16);
 
-                    auto g2_xy_xxxz = contrBuffer.data(g2off + 90 * j + 17);
+                    auto g2_xy_xxxz = ketBuffer.data(g2off + 90 * j + 17);
 
-                    auto g2_xy_xxyy = contrBuffer.data(g2off + 90 * j + 18);
+                    auto g2_xy_xxyy = ketBuffer.data(g2off + 90 * j + 18);
 
-                    auto g2_xy_xxyz = contrBuffer.data(g2off + 90 * j + 19);
+                    auto g2_xy_xxyz = ketBuffer.data(g2off + 90 * j + 19);
 
-                    auto g2_xy_xxzz = contrBuffer.data(g2off + 90 * j + 20);
+                    auto g2_xy_xxzz = ketBuffer.data(g2off + 90 * j + 20);
 
-                    auto g2_xy_xyyy = contrBuffer.data(g2off + 90 * j + 21);
+                    auto g2_xy_xyyy = ketBuffer.data(g2off + 90 * j + 21);
 
-                    auto g2_xy_xyyz = contrBuffer.data(g2off + 90 * j + 22);
+                    auto g2_xy_xyyz = ketBuffer.data(g2off + 90 * j + 22);
 
-                    auto g2_xy_xyzz = contrBuffer.data(g2off + 90 * j + 23);
+                    auto g2_xy_xyzz = ketBuffer.data(g2off + 90 * j + 23);
 
-                    auto g2_xy_xzzz = contrBuffer.data(g2off + 90 * j + 24);
+                    auto g2_xy_xzzz = ketBuffer.data(g2off + 90 * j + 24);
 
-                    auto g2_xy_yyyy = contrBuffer.data(g2off + 90 * j + 25);
+                    auto g2_xy_yyyy = ketBuffer.data(g2off + 90 * j + 25);
 
-                    auto g2_xy_yyyz = contrBuffer.data(g2off + 90 * j + 26);
+                    auto g2_xy_yyyz = ketBuffer.data(g2off + 90 * j + 26);
 
-                    auto g2_xy_yyzz = contrBuffer.data(g2off + 90 * j + 27);
+                    auto g2_xy_yyzz = ketBuffer.data(g2off + 90 * j + 27);
 
-                    auto g2_xy_yzzz = contrBuffer.data(g2off + 90 * j + 28);
+                    auto g2_xy_yzzz = ketBuffer.data(g2off + 90 * j + 28);
 
-                    auto g2_xy_zzzz = contrBuffer.data(g2off + 90 * j + 29);
+                    auto g2_xy_zzzz = ketBuffer.data(g2off + 90 * j + 29);
 
-                    auto g2_xz_xxxx = contrBuffer.data(g2off + 90 * j + 30);
+                    auto g2_xz_xxxx = ketBuffer.data(g2off + 90 * j + 30);
 
-                    auto g2_xz_xxxy = contrBuffer.data(g2off + 90 * j + 31);
+                    auto g2_xz_xxxy = ketBuffer.data(g2off + 90 * j + 31);
 
-                    auto g2_xz_xxxz = contrBuffer.data(g2off + 90 * j + 32);
+                    auto g2_xz_xxxz = ketBuffer.data(g2off + 90 * j + 32);
 
-                    auto g2_xz_xxyy = contrBuffer.data(g2off + 90 * j + 33);
+                    auto g2_xz_xxyy = ketBuffer.data(g2off + 90 * j + 33);
 
-                    auto g2_xz_xxyz = contrBuffer.data(g2off + 90 * j + 34);
+                    auto g2_xz_xxyz = ketBuffer.data(g2off + 90 * j + 34);
 
-                    auto g2_xz_xxzz = contrBuffer.data(g2off + 90 * j + 35);
+                    auto g2_xz_xxzz = ketBuffer.data(g2off + 90 * j + 35);
 
-                    auto g2_xz_xyyy = contrBuffer.data(g2off + 90 * j + 36);
+                    auto g2_xz_xyyy = ketBuffer.data(g2off + 90 * j + 36);
 
-                    auto g2_xz_xyyz = contrBuffer.data(g2off + 90 * j + 37);
+                    auto g2_xz_xyyz = ketBuffer.data(g2off + 90 * j + 37);
 
-                    auto g2_xz_xyzz = contrBuffer.data(g2off + 90 * j + 38);
+                    auto g2_xz_xyzz = ketBuffer.data(g2off + 90 * j + 38);
 
-                    auto g2_xz_xzzz = contrBuffer.data(g2off + 90 * j + 39);
+                    auto g2_xz_xzzz = ketBuffer.data(g2off + 90 * j + 39);
 
-                    auto g2_xz_yyyy = contrBuffer.data(g2off + 90 * j + 40);
+                    auto g2_xz_yyyy = ketBuffer.data(g2off + 90 * j + 40);
 
-                    auto g2_xz_yyyz = contrBuffer.data(g2off + 90 * j + 41);
+                    auto g2_xz_yyyz = ketBuffer.data(g2off + 90 * j + 41);
 
-                    auto g2_xz_yyzz = contrBuffer.data(g2off + 90 * j + 42);
+                    auto g2_xz_yyzz = ketBuffer.data(g2off + 90 * j + 42);
 
-                    auto g2_xz_yzzz = contrBuffer.data(g2off + 90 * j + 43);
+                    auto g2_xz_yzzz = ketBuffer.data(g2off + 90 * j + 43);
 
-                    auto g2_xz_zzzz = contrBuffer.data(g2off + 90 * j + 44);
+                    auto g2_xz_zzzz = ketBuffer.data(g2off + 90 * j + 44);
 
-                    auto g2_yy_xxxx = contrBuffer.data(g2off + 90 * j + 45);
+                    auto g2_yy_xxxx = ketBuffer.data(g2off + 90 * j + 45);
 
-                    auto g2_yy_xxxy = contrBuffer.data(g2off + 90 * j + 46);
+                    auto g2_yy_xxxy = ketBuffer.data(g2off + 90 * j + 46);
 
-                    auto g2_yy_xxxz = contrBuffer.data(g2off + 90 * j + 47);
+                    auto g2_yy_xxxz = ketBuffer.data(g2off + 90 * j + 47);
 
-                    auto g2_yy_xxyy = contrBuffer.data(g2off + 90 * j + 48);
+                    auto g2_yy_xxyy = ketBuffer.data(g2off + 90 * j + 48);
 
-                    auto g2_yy_xxyz = contrBuffer.data(g2off + 90 * j + 49);
+                    auto g2_yy_xxyz = ketBuffer.data(g2off + 90 * j + 49);
 
-                    auto g2_yy_xxzz = contrBuffer.data(g2off + 90 * j + 50);
+                    auto g2_yy_xxzz = ketBuffer.data(g2off + 90 * j + 50);
 
-                    auto g2_yy_xyyy = contrBuffer.data(g2off + 90 * j + 51);
+                    auto g2_yy_xyyy = ketBuffer.data(g2off + 90 * j + 51);
 
-                    auto g2_yy_xyyz = contrBuffer.data(g2off + 90 * j + 52);
+                    auto g2_yy_xyyz = ketBuffer.data(g2off + 90 * j + 52);
 
-                    auto g2_yy_xyzz = contrBuffer.data(g2off + 90 * j + 53);
+                    auto g2_yy_xyzz = ketBuffer.data(g2off + 90 * j + 53);
 
-                    auto g2_yy_xzzz = contrBuffer.data(g2off + 90 * j + 54);
+                    auto g2_yy_xzzz = ketBuffer.data(g2off + 90 * j + 54);
 
-                    auto g2_yy_yyyy = contrBuffer.data(g2off + 90 * j + 55);
+                    auto g2_yy_yyyy = ketBuffer.data(g2off + 90 * j + 55);
 
-                    auto g2_yy_yyyz = contrBuffer.data(g2off + 90 * j + 56);
+                    auto g2_yy_yyyz = ketBuffer.data(g2off + 90 * j + 56);
 
-                    auto g2_yy_yyzz = contrBuffer.data(g2off + 90 * j + 57);
+                    auto g2_yy_yyzz = ketBuffer.data(g2off + 90 * j + 57);
 
-                    auto g2_yy_yzzz = contrBuffer.data(g2off + 90 * j + 58);
+                    auto g2_yy_yzzz = ketBuffer.data(g2off + 90 * j + 58);
 
-                    auto g2_yy_zzzz = contrBuffer.data(g2off + 90 * j + 59);
+                    auto g2_yy_zzzz = ketBuffer.data(g2off + 90 * j + 59);
 
-                    auto g2_yz_xxxx = contrBuffer.data(g2off + 90 * j + 60);
+                    auto g2_yz_xxxx = ketBuffer.data(g2off + 90 * j + 60);
 
-                    auto g2_yz_xxxy = contrBuffer.data(g2off + 90 * j + 61);
+                    auto g2_yz_xxxy = ketBuffer.data(g2off + 90 * j + 61);
 
-                    auto g2_yz_xxxz = contrBuffer.data(g2off + 90 * j + 62);
+                    auto g2_yz_xxxz = ketBuffer.data(g2off + 90 * j + 62);
 
-                    auto g2_yz_xxyy = contrBuffer.data(g2off + 90 * j + 63);
+                    auto g2_yz_xxyy = ketBuffer.data(g2off + 90 * j + 63);
 
-                    auto g2_yz_xxyz = contrBuffer.data(g2off + 90 * j + 64);
+                    auto g2_yz_xxyz = ketBuffer.data(g2off + 90 * j + 64);
 
-                    auto g2_yz_xxzz = contrBuffer.data(g2off + 90 * j + 65);
+                    auto g2_yz_xxzz = ketBuffer.data(g2off + 90 * j + 65);
 
-                    auto g2_yz_xyyy = contrBuffer.data(g2off + 90 * j + 66);
+                    auto g2_yz_xyyy = ketBuffer.data(g2off + 90 * j + 66);
 
-                    auto g2_yz_xyyz = contrBuffer.data(g2off + 90 * j + 67);
+                    auto g2_yz_xyyz = ketBuffer.data(g2off + 90 * j + 67);
 
-                    auto g2_yz_xyzz = contrBuffer.data(g2off + 90 * j + 68);
+                    auto g2_yz_xyzz = ketBuffer.data(g2off + 90 * j + 68);
 
-                    auto g2_yz_xzzz = contrBuffer.data(g2off + 90 * j + 69);
+                    auto g2_yz_xzzz = ketBuffer.data(g2off + 90 * j + 69);
 
-                    auto g2_yz_yyyy = contrBuffer.data(g2off + 90 * j + 70);
+                    auto g2_yz_yyyy = ketBuffer.data(g2off + 90 * j + 70);
 
-                    auto g2_yz_yyyz = contrBuffer.data(g2off + 90 * j + 71);
+                    auto g2_yz_yyyz = ketBuffer.data(g2off + 90 * j + 71);
 
-                    auto g2_yz_yyzz = contrBuffer.data(g2off + 90 * j + 72);
+                    auto g2_yz_yyzz = ketBuffer.data(g2off + 90 * j + 72);
 
-                    auto g2_yz_yzzz = contrBuffer.data(g2off + 90 * j + 73);
+                    auto g2_yz_yzzz = ketBuffer.data(g2off + 90 * j + 73);
 
-                    auto g2_yz_zzzz = contrBuffer.data(g2off + 90 * j + 74);
+                    auto g2_yz_zzzz = ketBuffer.data(g2off + 90 * j + 74);
 
-                    auto g2_zz_xxxx = contrBuffer.data(g2off + 90 * j + 75);
+                    auto g2_zz_xxxx = ketBuffer.data(g2off + 90 * j + 75);
 
-                    auto g2_zz_xxxy = contrBuffer.data(g2off + 90 * j + 76);
+                    auto g2_zz_xxxy = ketBuffer.data(g2off + 90 * j + 76);
 
-                    auto g2_zz_xxxz = contrBuffer.data(g2off + 90 * j + 77);
+                    auto g2_zz_xxxz = ketBuffer.data(g2off + 90 * j + 77);
 
-                    auto g2_zz_xxyy = contrBuffer.data(g2off + 90 * j + 78);
+                    auto g2_zz_xxyy = ketBuffer.data(g2off + 90 * j + 78);
 
-                    auto g2_zz_xxyz = contrBuffer.data(g2off + 90 * j + 79);
+                    auto g2_zz_xxyz = ketBuffer.data(g2off + 90 * j + 79);
 
-                    auto g2_zz_xxzz = contrBuffer.data(g2off + 90 * j + 80);
+                    auto g2_zz_xxzz = ketBuffer.data(g2off + 90 * j + 80);
 
-                    auto g2_zz_xyyy = contrBuffer.data(g2off + 90 * j + 81);
+                    auto g2_zz_xyyy = ketBuffer.data(g2off + 90 * j + 81);
 
-                    auto g2_zz_xyyz = contrBuffer.data(g2off + 90 * j + 82);
+                    auto g2_zz_xyyz = ketBuffer.data(g2off + 90 * j + 82);
 
-                    auto g2_zz_xyzz = contrBuffer.data(g2off + 90 * j + 83);
+                    auto g2_zz_xyzz = ketBuffer.data(g2off + 90 * j + 83);
 
-                    auto g2_zz_xzzz = contrBuffer.data(g2off + 90 * j + 84);
+                    auto g2_zz_xzzz = ketBuffer.data(g2off + 90 * j + 84);
 
-                    auto g2_zz_yyyy = contrBuffer.data(g2off + 90 * j + 85);
+                    auto g2_zz_yyyy = ketBuffer.data(g2off + 90 * j + 85);
 
-                    auto g2_zz_yyyz = contrBuffer.data(g2off + 90 * j + 86);
+                    auto g2_zz_yyyz = ketBuffer.data(g2off + 90 * j + 86);
 
-                    auto g2_zz_yyzz = contrBuffer.data(g2off + 90 * j + 87);
+                    auto g2_zz_yyzz = ketBuffer.data(g2off + 90 * j + 87);
 
-                    auto g2_zz_yzzz = contrBuffer.data(g2off + 90 * j + 88);
+                    auto g2_zz_yzzz = ketBuffer.data(g2off + 90 * j + 88);
 
-                    auto g2_zz_zzzz = contrBuffer.data(g2off + 90 * j + 89);
+                    auto g2_zz_zzzz = ketBuffer.data(g2off + 90 * j + 89);
 
-                    // set up pointers to (SX|g(r,r')|DH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DH) integrals
 
-                    auto g1_xx_xxxxx = contrBuffer.data(g1off + 126 * j);
+                    auto g1_xx_xxxxx = ketBuffer.data(g1off + 126 * j);
 
-                    auto g1_xx_xxxxy = contrBuffer.data(g1off + 126 * j + 1);
+                    auto g1_xx_xxxxy = ketBuffer.data(g1off + 126 * j + 1);
 
-                    auto g1_xx_xxxxz = contrBuffer.data(g1off + 126 * j + 2);
+                    auto g1_xx_xxxxz = ketBuffer.data(g1off + 126 * j + 2);
 
-                    auto g1_xx_xxxyy = contrBuffer.data(g1off + 126 * j + 3);
+                    auto g1_xx_xxxyy = ketBuffer.data(g1off + 126 * j + 3);
 
-                    auto g1_xx_xxxyz = contrBuffer.data(g1off + 126 * j + 4);
+                    auto g1_xx_xxxyz = ketBuffer.data(g1off + 126 * j + 4);
 
-                    auto g1_xx_xxxzz = contrBuffer.data(g1off + 126 * j + 5);
+                    auto g1_xx_xxxzz = ketBuffer.data(g1off + 126 * j + 5);
 
-                    auto g1_xx_xxyyy = contrBuffer.data(g1off + 126 * j + 6);
+                    auto g1_xx_xxyyy = ketBuffer.data(g1off + 126 * j + 6);
 
-                    auto g1_xx_xxyyz = contrBuffer.data(g1off + 126 * j + 7);
+                    auto g1_xx_xxyyz = ketBuffer.data(g1off + 126 * j + 7);
 
-                    auto g1_xx_xxyzz = contrBuffer.data(g1off + 126 * j + 8);
+                    auto g1_xx_xxyzz = ketBuffer.data(g1off + 126 * j + 8);
 
-                    auto g1_xx_xxzzz = contrBuffer.data(g1off + 126 * j + 9);
+                    auto g1_xx_xxzzz = ketBuffer.data(g1off + 126 * j + 9);
 
-                    auto g1_xx_xyyyy = contrBuffer.data(g1off + 126 * j + 10);
+                    auto g1_xx_xyyyy = ketBuffer.data(g1off + 126 * j + 10);
 
-                    auto g1_xx_xyyyz = contrBuffer.data(g1off + 126 * j + 11);
+                    auto g1_xx_xyyyz = ketBuffer.data(g1off + 126 * j + 11);
 
-                    auto g1_xx_xyyzz = contrBuffer.data(g1off + 126 * j + 12);
+                    auto g1_xx_xyyzz = ketBuffer.data(g1off + 126 * j + 12);
 
-                    auto g1_xx_xyzzz = contrBuffer.data(g1off + 126 * j + 13);
+                    auto g1_xx_xyzzz = ketBuffer.data(g1off + 126 * j + 13);
 
-                    auto g1_xx_xzzzz = contrBuffer.data(g1off + 126 * j + 14);
+                    auto g1_xx_xzzzz = ketBuffer.data(g1off + 126 * j + 14);
 
-                    auto g1_xy_xxxxx = contrBuffer.data(g1off + 126 * j + 21);
+                    auto g1_xy_xxxxx = ketBuffer.data(g1off + 126 * j + 21);
 
-                    auto g1_xy_xxxxy = contrBuffer.data(g1off + 126 * j + 22);
+                    auto g1_xy_xxxxy = ketBuffer.data(g1off + 126 * j + 22);
 
-                    auto g1_xy_xxxxz = contrBuffer.data(g1off + 126 * j + 23);
+                    auto g1_xy_xxxxz = ketBuffer.data(g1off + 126 * j + 23);
 
-                    auto g1_xy_xxxyy = contrBuffer.data(g1off + 126 * j + 24);
+                    auto g1_xy_xxxyy = ketBuffer.data(g1off + 126 * j + 24);
 
-                    auto g1_xy_xxxyz = contrBuffer.data(g1off + 126 * j + 25);
+                    auto g1_xy_xxxyz = ketBuffer.data(g1off + 126 * j + 25);
 
-                    auto g1_xy_xxxzz = contrBuffer.data(g1off + 126 * j + 26);
+                    auto g1_xy_xxxzz = ketBuffer.data(g1off + 126 * j + 26);
 
-                    auto g1_xy_xxyyy = contrBuffer.data(g1off + 126 * j + 27);
+                    auto g1_xy_xxyyy = ketBuffer.data(g1off + 126 * j + 27);
 
-                    auto g1_xy_xxyyz = contrBuffer.data(g1off + 126 * j + 28);
+                    auto g1_xy_xxyyz = ketBuffer.data(g1off + 126 * j + 28);
 
-                    auto g1_xy_xxyzz = contrBuffer.data(g1off + 126 * j + 29);
+                    auto g1_xy_xxyzz = ketBuffer.data(g1off + 126 * j + 29);
 
-                    auto g1_xy_xxzzz = contrBuffer.data(g1off + 126 * j + 30);
+                    auto g1_xy_xxzzz = ketBuffer.data(g1off + 126 * j + 30);
 
-                    auto g1_xy_xyyyy = contrBuffer.data(g1off + 126 * j + 31);
+                    auto g1_xy_xyyyy = ketBuffer.data(g1off + 126 * j + 31);
 
-                    auto g1_xy_xyyyz = contrBuffer.data(g1off + 126 * j + 32);
+                    auto g1_xy_xyyyz = ketBuffer.data(g1off + 126 * j + 32);
 
-                    auto g1_xy_xyyzz = contrBuffer.data(g1off + 126 * j + 33);
+                    auto g1_xy_xyyzz = ketBuffer.data(g1off + 126 * j + 33);
 
-                    auto g1_xy_xyzzz = contrBuffer.data(g1off + 126 * j + 34);
+                    auto g1_xy_xyzzz = ketBuffer.data(g1off + 126 * j + 34);
 
-                    auto g1_xy_xzzzz = contrBuffer.data(g1off + 126 * j + 35);
+                    auto g1_xy_xzzzz = ketBuffer.data(g1off + 126 * j + 35);
 
-                    auto g1_xz_xxxxx = contrBuffer.data(g1off + 126 * j + 42);
+                    auto g1_xz_xxxxx = ketBuffer.data(g1off + 126 * j + 42);
 
-                    auto g1_xz_xxxxy = contrBuffer.data(g1off + 126 * j + 43);
+                    auto g1_xz_xxxxy = ketBuffer.data(g1off + 126 * j + 43);
 
-                    auto g1_xz_xxxxz = contrBuffer.data(g1off + 126 * j + 44);
+                    auto g1_xz_xxxxz = ketBuffer.data(g1off + 126 * j + 44);
 
-                    auto g1_xz_xxxyy = contrBuffer.data(g1off + 126 * j + 45);
+                    auto g1_xz_xxxyy = ketBuffer.data(g1off + 126 * j + 45);
 
-                    auto g1_xz_xxxyz = contrBuffer.data(g1off + 126 * j + 46);
+                    auto g1_xz_xxxyz = ketBuffer.data(g1off + 126 * j + 46);
 
-                    auto g1_xz_xxxzz = contrBuffer.data(g1off + 126 * j + 47);
+                    auto g1_xz_xxxzz = ketBuffer.data(g1off + 126 * j + 47);
 
-                    auto g1_xz_xxyyy = contrBuffer.data(g1off + 126 * j + 48);
+                    auto g1_xz_xxyyy = ketBuffer.data(g1off + 126 * j + 48);
 
-                    auto g1_xz_xxyyz = contrBuffer.data(g1off + 126 * j + 49);
+                    auto g1_xz_xxyyz = ketBuffer.data(g1off + 126 * j + 49);
 
-                    auto g1_xz_xxyzz = contrBuffer.data(g1off + 126 * j + 50);
+                    auto g1_xz_xxyzz = ketBuffer.data(g1off + 126 * j + 50);
 
-                    auto g1_xz_xxzzz = contrBuffer.data(g1off + 126 * j + 51);
+                    auto g1_xz_xxzzz = ketBuffer.data(g1off + 126 * j + 51);
 
-                    auto g1_xz_xyyyy = contrBuffer.data(g1off + 126 * j + 52);
+                    auto g1_xz_xyyyy = ketBuffer.data(g1off + 126 * j + 52);
 
-                    auto g1_xz_xyyyz = contrBuffer.data(g1off + 126 * j + 53);
+                    auto g1_xz_xyyyz = ketBuffer.data(g1off + 126 * j + 53);
 
-                    auto g1_xz_xyyzz = contrBuffer.data(g1off + 126 * j + 54);
+                    auto g1_xz_xyyzz = ketBuffer.data(g1off + 126 * j + 54);
 
-                    auto g1_xz_xyzzz = contrBuffer.data(g1off + 126 * j + 55);
+                    auto g1_xz_xyzzz = ketBuffer.data(g1off + 126 * j + 55);
 
-                    auto g1_xz_xzzzz = contrBuffer.data(g1off + 126 * j + 56);
+                    auto g1_xz_xzzzz = ketBuffer.data(g1off + 126 * j + 56);
 
-                    auto g1_yy_xxxxx = contrBuffer.data(g1off + 126 * j + 63);
+                    auto g1_yy_xxxxx = ketBuffer.data(g1off + 126 * j + 63);
 
-                    auto g1_yy_xxxxy = contrBuffer.data(g1off + 126 * j + 64);
+                    auto g1_yy_xxxxy = ketBuffer.data(g1off + 126 * j + 64);
 
-                    auto g1_yy_xxxxz = contrBuffer.data(g1off + 126 * j + 65);
+                    auto g1_yy_xxxxz = ketBuffer.data(g1off + 126 * j + 65);
 
-                    auto g1_yy_xxxyy = contrBuffer.data(g1off + 126 * j + 66);
+                    auto g1_yy_xxxyy = ketBuffer.data(g1off + 126 * j + 66);
 
-                    auto g1_yy_xxxyz = contrBuffer.data(g1off + 126 * j + 67);
+                    auto g1_yy_xxxyz = ketBuffer.data(g1off + 126 * j + 67);
 
-                    auto g1_yy_xxxzz = contrBuffer.data(g1off + 126 * j + 68);
+                    auto g1_yy_xxxzz = ketBuffer.data(g1off + 126 * j + 68);
 
-                    auto g1_yy_xxyyy = contrBuffer.data(g1off + 126 * j + 69);
+                    auto g1_yy_xxyyy = ketBuffer.data(g1off + 126 * j + 69);
 
-                    auto g1_yy_xxyyz = contrBuffer.data(g1off + 126 * j + 70);
+                    auto g1_yy_xxyyz = ketBuffer.data(g1off + 126 * j + 70);
 
-                    auto g1_yy_xxyzz = contrBuffer.data(g1off + 126 * j + 71);
+                    auto g1_yy_xxyzz = ketBuffer.data(g1off + 126 * j + 71);
 
-                    auto g1_yy_xxzzz = contrBuffer.data(g1off + 126 * j + 72);
+                    auto g1_yy_xxzzz = ketBuffer.data(g1off + 126 * j + 72);
 
-                    auto g1_yy_xyyyy = contrBuffer.data(g1off + 126 * j + 73);
+                    auto g1_yy_xyyyy = ketBuffer.data(g1off + 126 * j + 73);
 
-                    auto g1_yy_xyyyz = contrBuffer.data(g1off + 126 * j + 74);
+                    auto g1_yy_xyyyz = ketBuffer.data(g1off + 126 * j + 74);
 
-                    auto g1_yy_xyyzz = contrBuffer.data(g1off + 126 * j + 75);
+                    auto g1_yy_xyyzz = ketBuffer.data(g1off + 126 * j + 75);
 
-                    auto g1_yy_xyzzz = contrBuffer.data(g1off + 126 * j + 76);
+                    auto g1_yy_xyzzz = ketBuffer.data(g1off + 126 * j + 76);
 
-                    auto g1_yy_xzzzz = contrBuffer.data(g1off + 126 * j + 77);
+                    auto g1_yy_xzzzz = ketBuffer.data(g1off + 126 * j + 77);
 
-                    auto g1_yy_yyyyy = contrBuffer.data(g1off + 126 * j + 78);
+                    auto g1_yy_yyyyy = ketBuffer.data(g1off + 126 * j + 78);
 
-                    auto g1_yy_yyyyz = contrBuffer.data(g1off + 126 * j + 79);
+                    auto g1_yy_yyyyz = ketBuffer.data(g1off + 126 * j + 79);
 
-                    auto g1_yy_yyyzz = contrBuffer.data(g1off + 126 * j + 80);
+                    auto g1_yy_yyyzz = ketBuffer.data(g1off + 126 * j + 80);
 
-                    auto g1_yy_yyzzz = contrBuffer.data(g1off + 126 * j + 81);
+                    auto g1_yy_yyzzz = ketBuffer.data(g1off + 126 * j + 81);
 
-                    auto g1_yy_yzzzz = contrBuffer.data(g1off + 126 * j + 82);
+                    auto g1_yy_yzzzz = ketBuffer.data(g1off + 126 * j + 82);
 
-                    auto g1_yz_xxxxx = contrBuffer.data(g1off + 126 * j + 84);
+                    auto g1_yz_xxxxx = ketBuffer.data(g1off + 126 * j + 84);
 
-                    auto g1_yz_xxxxy = contrBuffer.data(g1off + 126 * j + 85);
+                    auto g1_yz_xxxxy = ketBuffer.data(g1off + 126 * j + 85);
 
-                    auto g1_yz_xxxxz = contrBuffer.data(g1off + 126 * j + 86);
+                    auto g1_yz_xxxxz = ketBuffer.data(g1off + 126 * j + 86);
 
-                    auto g1_yz_xxxyy = contrBuffer.data(g1off + 126 * j + 87);
+                    auto g1_yz_xxxyy = ketBuffer.data(g1off + 126 * j + 87);
 
-                    auto g1_yz_xxxyz = contrBuffer.data(g1off + 126 * j + 88);
+                    auto g1_yz_xxxyz = ketBuffer.data(g1off + 126 * j + 88);
 
-                    auto g1_yz_xxxzz = contrBuffer.data(g1off + 126 * j + 89);
+                    auto g1_yz_xxxzz = ketBuffer.data(g1off + 126 * j + 89);
 
-                    auto g1_yz_xxyyy = contrBuffer.data(g1off + 126 * j + 90);
+                    auto g1_yz_xxyyy = ketBuffer.data(g1off + 126 * j + 90);
 
-                    auto g1_yz_xxyyz = contrBuffer.data(g1off + 126 * j + 91);
+                    auto g1_yz_xxyyz = ketBuffer.data(g1off + 126 * j + 91);
 
-                    auto g1_yz_xxyzz = contrBuffer.data(g1off + 126 * j + 92);
+                    auto g1_yz_xxyzz = ketBuffer.data(g1off + 126 * j + 92);
 
-                    auto g1_yz_xxzzz = contrBuffer.data(g1off + 126 * j + 93);
+                    auto g1_yz_xxzzz = ketBuffer.data(g1off + 126 * j + 93);
 
-                    auto g1_yz_xyyyy = contrBuffer.data(g1off + 126 * j + 94);
+                    auto g1_yz_xyyyy = ketBuffer.data(g1off + 126 * j + 94);
 
-                    auto g1_yz_xyyyz = contrBuffer.data(g1off + 126 * j + 95);
+                    auto g1_yz_xyyyz = ketBuffer.data(g1off + 126 * j + 95);
 
-                    auto g1_yz_xyyzz = contrBuffer.data(g1off + 126 * j + 96);
+                    auto g1_yz_xyyzz = ketBuffer.data(g1off + 126 * j + 96);
 
-                    auto g1_yz_xyzzz = contrBuffer.data(g1off + 126 * j + 97);
+                    auto g1_yz_xyzzz = ketBuffer.data(g1off + 126 * j + 97);
 
-                    auto g1_yz_xzzzz = contrBuffer.data(g1off + 126 * j + 98);
+                    auto g1_yz_xzzzz = ketBuffer.data(g1off + 126 * j + 98);
 
-                    auto g1_yz_yyyyy = contrBuffer.data(g1off + 126 * j + 99);
+                    auto g1_yz_yyyyy = ketBuffer.data(g1off + 126 * j + 99);
 
-                    auto g1_yz_yyyyz = contrBuffer.data(g1off + 126 * j + 100);
+                    auto g1_yz_yyyyz = ketBuffer.data(g1off + 126 * j + 100);
 
-                    auto g1_yz_yyyzz = contrBuffer.data(g1off + 126 * j + 101);
+                    auto g1_yz_yyyzz = ketBuffer.data(g1off + 126 * j + 101);
 
-                    auto g1_yz_yyzzz = contrBuffer.data(g1off + 126 * j + 102);
+                    auto g1_yz_yyzzz = ketBuffer.data(g1off + 126 * j + 102);
 
-                    auto g1_yz_yzzzz = contrBuffer.data(g1off + 126 * j + 103);
+                    auto g1_yz_yzzzz = ketBuffer.data(g1off + 126 * j + 103);
 
-                    auto g1_zz_xxxxx = contrBuffer.data(g1off + 126 * j + 105);
+                    auto g1_zz_xxxxx = ketBuffer.data(g1off + 126 * j + 105);
 
-                    auto g1_zz_xxxxy = contrBuffer.data(g1off + 126 * j + 106);
+                    auto g1_zz_xxxxy = ketBuffer.data(g1off + 126 * j + 106);
 
-                    auto g1_zz_xxxxz = contrBuffer.data(g1off + 126 * j + 107);
+                    auto g1_zz_xxxxz = ketBuffer.data(g1off + 126 * j + 107);
 
-                    auto g1_zz_xxxyy = contrBuffer.data(g1off + 126 * j + 108);
+                    auto g1_zz_xxxyy = ketBuffer.data(g1off + 126 * j + 108);
 
-                    auto g1_zz_xxxyz = contrBuffer.data(g1off + 126 * j + 109);
+                    auto g1_zz_xxxyz = ketBuffer.data(g1off + 126 * j + 109);
 
-                    auto g1_zz_xxxzz = contrBuffer.data(g1off + 126 * j + 110);
+                    auto g1_zz_xxxzz = ketBuffer.data(g1off + 126 * j + 110);
 
-                    auto g1_zz_xxyyy = contrBuffer.data(g1off + 126 * j + 111);
+                    auto g1_zz_xxyyy = ketBuffer.data(g1off + 126 * j + 111);
 
-                    auto g1_zz_xxyyz = contrBuffer.data(g1off + 126 * j + 112);
+                    auto g1_zz_xxyyz = ketBuffer.data(g1off + 126 * j + 112);
 
-                    auto g1_zz_xxyzz = contrBuffer.data(g1off + 126 * j + 113);
+                    auto g1_zz_xxyzz = ketBuffer.data(g1off + 126 * j + 113);
 
-                    auto g1_zz_xxzzz = contrBuffer.data(g1off + 126 * j + 114);
+                    auto g1_zz_xxzzz = ketBuffer.data(g1off + 126 * j + 114);
 
-                    auto g1_zz_xyyyy = contrBuffer.data(g1off + 126 * j + 115);
+                    auto g1_zz_xyyyy = ketBuffer.data(g1off + 126 * j + 115);
 
-                    auto g1_zz_xyyyz = contrBuffer.data(g1off + 126 * j + 116);
+                    auto g1_zz_xyyyz = ketBuffer.data(g1off + 126 * j + 116);
 
-                    auto g1_zz_xyyzz = contrBuffer.data(g1off + 126 * j + 117);
+                    auto g1_zz_xyyzz = ketBuffer.data(g1off + 126 * j + 117);
 
-                    auto g1_zz_xyzzz = contrBuffer.data(g1off + 126 * j + 118);
+                    auto g1_zz_xyzzz = ketBuffer.data(g1off + 126 * j + 118);
 
-                    auto g1_zz_xzzzz = contrBuffer.data(g1off + 126 * j + 119);
+                    auto g1_zz_xzzzz = ketBuffer.data(g1off + 126 * j + 119);
 
-                    auto g1_zz_yyyyy = contrBuffer.data(g1off + 126 * j + 120);
+                    auto g1_zz_yyyyy = ketBuffer.data(g1off + 126 * j + 120);
 
-                    auto g1_zz_yyyyz = contrBuffer.data(g1off + 126 * j + 121);
+                    auto g1_zz_yyyyz = ketBuffer.data(g1off + 126 * j + 121);
 
-                    auto g1_zz_yyyzz = contrBuffer.data(g1off + 126 * j + 122);
+                    auto g1_zz_yyyzz = ketBuffer.data(g1off + 126 * j + 122);
 
-                    auto g1_zz_yyzzz = contrBuffer.data(g1off + 126 * j + 123);
+                    auto g1_zz_yyzzz = ketBuffer.data(g1off + 126 * j + 123);
 
-                    auto g1_zz_yzzzz = contrBuffer.data(g1off + 126 * j + 124);
+                    auto g1_zz_yzzzz = ketBuffer.data(g1off + 126 * j + 124);
 
-                    auto g1_zz_zzzzz = contrBuffer.data(g1off + 126 * j + 125);
+                    auto g1_zz_zzzzz = ketBuffer.data(g1off + 126 * j + 125);
 
-                    // set up pointers to (SX|g(r,r')|FG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|FG) integrals
 
-                    auto g_xxx_xxxx = contrBuffer.data(goff + 150 * j);
+                    auto g_xxx_xxxx = ketBuffer.data(goff + 150 * j);
 
-                    auto g_xxx_xxxy = contrBuffer.data(goff + 150 * j + 1);
+                    auto g_xxx_xxxy = ketBuffer.data(goff + 150 * j + 1);
 
-                    auto g_xxx_xxxz = contrBuffer.data(goff + 150 * j + 2);
+                    auto g_xxx_xxxz = ketBuffer.data(goff + 150 * j + 2);
 
-                    auto g_xxx_xxyy = contrBuffer.data(goff + 150 * j + 3);
+                    auto g_xxx_xxyy = ketBuffer.data(goff + 150 * j + 3);
 
-                    auto g_xxx_xxyz = contrBuffer.data(goff + 150 * j + 4);
+                    auto g_xxx_xxyz = ketBuffer.data(goff + 150 * j + 4);
 
-                    auto g_xxx_xxzz = contrBuffer.data(goff + 150 * j + 5);
+                    auto g_xxx_xxzz = ketBuffer.data(goff + 150 * j + 5);
 
-                    auto g_xxx_xyyy = contrBuffer.data(goff + 150 * j + 6);
+                    auto g_xxx_xyyy = ketBuffer.data(goff + 150 * j + 6);
 
-                    auto g_xxx_xyyz = contrBuffer.data(goff + 150 * j + 7);
+                    auto g_xxx_xyyz = ketBuffer.data(goff + 150 * j + 7);
 
-                    auto g_xxx_xyzz = contrBuffer.data(goff + 150 * j + 8);
+                    auto g_xxx_xyzz = ketBuffer.data(goff + 150 * j + 8);
 
-                    auto g_xxx_xzzz = contrBuffer.data(goff + 150 * j + 9);
+                    auto g_xxx_xzzz = ketBuffer.data(goff + 150 * j + 9);
 
-                    auto g_xxx_yyyy = contrBuffer.data(goff + 150 * j + 10);
+                    auto g_xxx_yyyy = ketBuffer.data(goff + 150 * j + 10);
 
-                    auto g_xxx_yyyz = contrBuffer.data(goff + 150 * j + 11);
+                    auto g_xxx_yyyz = ketBuffer.data(goff + 150 * j + 11);
 
-                    auto g_xxx_yyzz = contrBuffer.data(goff + 150 * j + 12);
+                    auto g_xxx_yyzz = ketBuffer.data(goff + 150 * j + 12);
 
-                    auto g_xxx_yzzz = contrBuffer.data(goff + 150 * j + 13);
+                    auto g_xxx_yzzz = ketBuffer.data(goff + 150 * j + 13);
 
-                    auto g_xxx_zzzz = contrBuffer.data(goff + 150 * j + 14);
+                    auto g_xxx_zzzz = ketBuffer.data(goff + 150 * j + 14);
 
-                    auto g_xxy_xxxx = contrBuffer.data(goff + 150 * j + 15);
+                    auto g_xxy_xxxx = ketBuffer.data(goff + 150 * j + 15);
 
-                    auto g_xxy_xxxy = contrBuffer.data(goff + 150 * j + 16);
+                    auto g_xxy_xxxy = ketBuffer.data(goff + 150 * j + 16);
 
-                    auto g_xxy_xxxz = contrBuffer.data(goff + 150 * j + 17);
+                    auto g_xxy_xxxz = ketBuffer.data(goff + 150 * j + 17);
 
-                    auto g_xxy_xxyy = contrBuffer.data(goff + 150 * j + 18);
+                    auto g_xxy_xxyy = ketBuffer.data(goff + 150 * j + 18);
 
-                    auto g_xxy_xxyz = contrBuffer.data(goff + 150 * j + 19);
+                    auto g_xxy_xxyz = ketBuffer.data(goff + 150 * j + 19);
 
-                    auto g_xxy_xxzz = contrBuffer.data(goff + 150 * j + 20);
+                    auto g_xxy_xxzz = ketBuffer.data(goff + 150 * j + 20);
 
-                    auto g_xxy_xyyy = contrBuffer.data(goff + 150 * j + 21);
+                    auto g_xxy_xyyy = ketBuffer.data(goff + 150 * j + 21);
 
-                    auto g_xxy_xyyz = contrBuffer.data(goff + 150 * j + 22);
+                    auto g_xxy_xyyz = ketBuffer.data(goff + 150 * j + 22);
 
-                    auto g_xxy_xyzz = contrBuffer.data(goff + 150 * j + 23);
+                    auto g_xxy_xyzz = ketBuffer.data(goff + 150 * j + 23);
 
-                    auto g_xxy_xzzz = contrBuffer.data(goff + 150 * j + 24);
+                    auto g_xxy_xzzz = ketBuffer.data(goff + 150 * j + 24);
 
-                    auto g_xxy_yyyy = contrBuffer.data(goff + 150 * j + 25);
+                    auto g_xxy_yyyy = ketBuffer.data(goff + 150 * j + 25);
 
-                    auto g_xxy_yyyz = contrBuffer.data(goff + 150 * j + 26);
+                    auto g_xxy_yyyz = ketBuffer.data(goff + 150 * j + 26);
 
-                    auto g_xxy_yyzz = contrBuffer.data(goff + 150 * j + 27);
+                    auto g_xxy_yyzz = ketBuffer.data(goff + 150 * j + 27);
 
-                    auto g_xxy_yzzz = contrBuffer.data(goff + 150 * j + 28);
+                    auto g_xxy_yzzz = ketBuffer.data(goff + 150 * j + 28);
 
-                    auto g_xxy_zzzz = contrBuffer.data(goff + 150 * j + 29);
+                    auto g_xxy_zzzz = ketBuffer.data(goff + 150 * j + 29);
 
-                    auto g_xxz_xxxx = contrBuffer.data(goff + 150 * j + 30);
+                    auto g_xxz_xxxx = ketBuffer.data(goff + 150 * j + 30);
 
-                    auto g_xxz_xxxy = contrBuffer.data(goff + 150 * j + 31);
+                    auto g_xxz_xxxy = ketBuffer.data(goff + 150 * j + 31);
 
-                    auto g_xxz_xxxz = contrBuffer.data(goff + 150 * j + 32);
+                    auto g_xxz_xxxz = ketBuffer.data(goff + 150 * j + 32);
 
-                    auto g_xxz_xxyy = contrBuffer.data(goff + 150 * j + 33);
+                    auto g_xxz_xxyy = ketBuffer.data(goff + 150 * j + 33);
 
-                    auto g_xxz_xxyz = contrBuffer.data(goff + 150 * j + 34);
+                    auto g_xxz_xxyz = ketBuffer.data(goff + 150 * j + 34);
 
-                    auto g_xxz_xxzz = contrBuffer.data(goff + 150 * j + 35);
+                    auto g_xxz_xxzz = ketBuffer.data(goff + 150 * j + 35);
 
-                    auto g_xxz_xyyy = contrBuffer.data(goff + 150 * j + 36);
+                    auto g_xxz_xyyy = ketBuffer.data(goff + 150 * j + 36);
 
-                    auto g_xxz_xyyz = contrBuffer.data(goff + 150 * j + 37);
+                    auto g_xxz_xyyz = ketBuffer.data(goff + 150 * j + 37);
 
-                    auto g_xxz_xyzz = contrBuffer.data(goff + 150 * j + 38);
+                    auto g_xxz_xyzz = ketBuffer.data(goff + 150 * j + 38);
 
-                    auto g_xxz_xzzz = contrBuffer.data(goff + 150 * j + 39);
+                    auto g_xxz_xzzz = ketBuffer.data(goff + 150 * j + 39);
 
-                    auto g_xxz_yyyy = contrBuffer.data(goff + 150 * j + 40);
+                    auto g_xxz_yyyy = ketBuffer.data(goff + 150 * j + 40);
 
-                    auto g_xxz_yyyz = contrBuffer.data(goff + 150 * j + 41);
+                    auto g_xxz_yyyz = ketBuffer.data(goff + 150 * j + 41);
 
-                    auto g_xxz_yyzz = contrBuffer.data(goff + 150 * j + 42);
+                    auto g_xxz_yyzz = ketBuffer.data(goff + 150 * j + 42);
 
-                    auto g_xxz_yzzz = contrBuffer.data(goff + 150 * j + 43);
+                    auto g_xxz_yzzz = ketBuffer.data(goff + 150 * j + 43);
 
-                    auto g_xxz_zzzz = contrBuffer.data(goff + 150 * j + 44);
+                    auto g_xxz_zzzz = ketBuffer.data(goff + 150 * j + 44);
 
-                    auto g_xyy_xxxx = contrBuffer.data(goff + 150 * j + 45);
+                    auto g_xyy_xxxx = ketBuffer.data(goff + 150 * j + 45);
 
-                    auto g_xyy_xxxy = contrBuffer.data(goff + 150 * j + 46);
+                    auto g_xyy_xxxy = ketBuffer.data(goff + 150 * j + 46);
 
-                    auto g_xyy_xxxz = contrBuffer.data(goff + 150 * j + 47);
+                    auto g_xyy_xxxz = ketBuffer.data(goff + 150 * j + 47);
 
-                    auto g_xyy_xxyy = contrBuffer.data(goff + 150 * j + 48);
+                    auto g_xyy_xxyy = ketBuffer.data(goff + 150 * j + 48);
 
-                    auto g_xyy_xxyz = contrBuffer.data(goff + 150 * j + 49);
+                    auto g_xyy_xxyz = ketBuffer.data(goff + 150 * j + 49);
 
-                    auto g_xyy_xxzz = contrBuffer.data(goff + 150 * j + 50);
+                    auto g_xyy_xxzz = ketBuffer.data(goff + 150 * j + 50);
 
-                    auto g_xyy_xyyy = contrBuffer.data(goff + 150 * j + 51);
+                    auto g_xyy_xyyy = ketBuffer.data(goff + 150 * j + 51);
 
-                    auto g_xyy_xyyz = contrBuffer.data(goff + 150 * j + 52);
+                    auto g_xyy_xyyz = ketBuffer.data(goff + 150 * j + 52);
 
-                    auto g_xyy_xyzz = contrBuffer.data(goff + 150 * j + 53);
+                    auto g_xyy_xyzz = ketBuffer.data(goff + 150 * j + 53);
 
-                    auto g_xyy_xzzz = contrBuffer.data(goff + 150 * j + 54);
+                    auto g_xyy_xzzz = ketBuffer.data(goff + 150 * j + 54);
 
-                    auto g_xyy_yyyy = contrBuffer.data(goff + 150 * j + 55);
+                    auto g_xyy_yyyy = ketBuffer.data(goff + 150 * j + 55);
 
-                    auto g_xyy_yyyz = contrBuffer.data(goff + 150 * j + 56);
+                    auto g_xyy_yyyz = ketBuffer.data(goff + 150 * j + 56);
 
-                    auto g_xyy_yyzz = contrBuffer.data(goff + 150 * j + 57);
+                    auto g_xyy_yyzz = ketBuffer.data(goff + 150 * j + 57);
 
-                    auto g_xyy_yzzz = contrBuffer.data(goff + 150 * j + 58);
+                    auto g_xyy_yzzz = ketBuffer.data(goff + 150 * j + 58);
 
-                    auto g_xyy_zzzz = contrBuffer.data(goff + 150 * j + 59);
+                    auto g_xyy_zzzz = ketBuffer.data(goff + 150 * j + 59);
 
-                    auto g_xyz_xxxx = contrBuffer.data(goff + 150 * j + 60);
+                    auto g_xyz_xxxx = ketBuffer.data(goff + 150 * j + 60);
 
-                    auto g_xyz_xxxy = contrBuffer.data(goff + 150 * j + 61);
+                    auto g_xyz_xxxy = ketBuffer.data(goff + 150 * j + 61);
 
-                    auto g_xyz_xxxz = contrBuffer.data(goff + 150 * j + 62);
+                    auto g_xyz_xxxz = ketBuffer.data(goff + 150 * j + 62);
 
-                    auto g_xyz_xxyy = contrBuffer.data(goff + 150 * j + 63);
+                    auto g_xyz_xxyy = ketBuffer.data(goff + 150 * j + 63);
 
-                    auto g_xyz_xxyz = contrBuffer.data(goff + 150 * j + 64);
+                    auto g_xyz_xxyz = ketBuffer.data(goff + 150 * j + 64);
 
-                    auto g_xyz_xxzz = contrBuffer.data(goff + 150 * j + 65);
+                    auto g_xyz_xxzz = ketBuffer.data(goff + 150 * j + 65);
 
-                    auto g_xyz_xyyy = contrBuffer.data(goff + 150 * j + 66);
+                    auto g_xyz_xyyy = ketBuffer.data(goff + 150 * j + 66);
 
-                    auto g_xyz_xyyz = contrBuffer.data(goff + 150 * j + 67);
+                    auto g_xyz_xyyz = ketBuffer.data(goff + 150 * j + 67);
 
-                    auto g_xyz_xyzz = contrBuffer.data(goff + 150 * j + 68);
+                    auto g_xyz_xyzz = ketBuffer.data(goff + 150 * j + 68);
 
-                    auto g_xyz_xzzz = contrBuffer.data(goff + 150 * j + 69);
+                    auto g_xyz_xzzz = ketBuffer.data(goff + 150 * j + 69);
 
-                    auto g_xyz_yyyy = contrBuffer.data(goff + 150 * j + 70);
+                    auto g_xyz_yyyy = ketBuffer.data(goff + 150 * j + 70);
 
-                    auto g_xyz_yyyz = contrBuffer.data(goff + 150 * j + 71);
+                    auto g_xyz_yyyz = ketBuffer.data(goff + 150 * j + 71);
 
-                    auto g_xyz_yyzz = contrBuffer.data(goff + 150 * j + 72);
+                    auto g_xyz_yyzz = ketBuffer.data(goff + 150 * j + 72);
 
-                    auto g_xyz_yzzz = contrBuffer.data(goff + 150 * j + 73);
+                    auto g_xyz_yzzz = ketBuffer.data(goff + 150 * j + 73);
 
-                    auto g_xyz_zzzz = contrBuffer.data(goff + 150 * j + 74);
+                    auto g_xyz_zzzz = ketBuffer.data(goff + 150 * j + 74);
 
-                    auto g_xzz_xxxx = contrBuffer.data(goff + 150 * j + 75);
+                    auto g_xzz_xxxx = ketBuffer.data(goff + 150 * j + 75);
 
-                    auto g_xzz_xxxy = contrBuffer.data(goff + 150 * j + 76);
+                    auto g_xzz_xxxy = ketBuffer.data(goff + 150 * j + 76);
 
-                    auto g_xzz_xxxz = contrBuffer.data(goff + 150 * j + 77);
+                    auto g_xzz_xxxz = ketBuffer.data(goff + 150 * j + 77);
 
-                    auto g_xzz_xxyy = contrBuffer.data(goff + 150 * j + 78);
+                    auto g_xzz_xxyy = ketBuffer.data(goff + 150 * j + 78);
 
-                    auto g_xzz_xxyz = contrBuffer.data(goff + 150 * j + 79);
+                    auto g_xzz_xxyz = ketBuffer.data(goff + 150 * j + 79);
 
-                    auto g_xzz_xxzz = contrBuffer.data(goff + 150 * j + 80);
+                    auto g_xzz_xxzz = ketBuffer.data(goff + 150 * j + 80);
 
-                    auto g_xzz_xyyy = contrBuffer.data(goff + 150 * j + 81);
+                    auto g_xzz_xyyy = ketBuffer.data(goff + 150 * j + 81);
 
-                    auto g_xzz_xyyz = contrBuffer.data(goff + 150 * j + 82);
+                    auto g_xzz_xyyz = ketBuffer.data(goff + 150 * j + 82);
 
-                    auto g_xzz_xyzz = contrBuffer.data(goff + 150 * j + 83);
+                    auto g_xzz_xyzz = ketBuffer.data(goff + 150 * j + 83);
 
-                    auto g_xzz_xzzz = contrBuffer.data(goff + 150 * j + 84);
+                    auto g_xzz_xzzz = ketBuffer.data(goff + 150 * j + 84);
 
-                    auto g_xzz_yyyy = contrBuffer.data(goff + 150 * j + 85);
+                    auto g_xzz_yyyy = ketBuffer.data(goff + 150 * j + 85);
 
-                    auto g_xzz_yyyz = contrBuffer.data(goff + 150 * j + 86);
+                    auto g_xzz_yyyz = ketBuffer.data(goff + 150 * j + 86);
 
-                    auto g_xzz_yyzz = contrBuffer.data(goff + 150 * j + 87);
+                    auto g_xzz_yyzz = ketBuffer.data(goff + 150 * j + 87);
 
-                    auto g_xzz_yzzz = contrBuffer.data(goff + 150 * j + 88);
+                    auto g_xzz_yzzz = ketBuffer.data(goff + 150 * j + 88);
 
-                    auto g_xzz_zzzz = contrBuffer.data(goff + 150 * j + 89);
+                    auto g_xzz_zzzz = ketBuffer.data(goff + 150 * j + 89);
 
-                    auto g_yyy_xxxx = contrBuffer.data(goff + 150 * j + 90);
+                    auto g_yyy_xxxx = ketBuffer.data(goff + 150 * j + 90);
 
-                    auto g_yyy_xxxy = contrBuffer.data(goff + 150 * j + 91);
+                    auto g_yyy_xxxy = ketBuffer.data(goff + 150 * j + 91);
 
-                    auto g_yyy_xxxz = contrBuffer.data(goff + 150 * j + 92);
+                    auto g_yyy_xxxz = ketBuffer.data(goff + 150 * j + 92);
 
-                    auto g_yyy_xxyy = contrBuffer.data(goff + 150 * j + 93);
+                    auto g_yyy_xxyy = ketBuffer.data(goff + 150 * j + 93);
 
-                    auto g_yyy_xxyz = contrBuffer.data(goff + 150 * j + 94);
+                    auto g_yyy_xxyz = ketBuffer.data(goff + 150 * j + 94);
 
-                    auto g_yyy_xxzz = contrBuffer.data(goff + 150 * j + 95);
+                    auto g_yyy_xxzz = ketBuffer.data(goff + 150 * j + 95);
 
-                    auto g_yyy_xyyy = contrBuffer.data(goff + 150 * j + 96);
+                    auto g_yyy_xyyy = ketBuffer.data(goff + 150 * j + 96);
 
-                    auto g_yyy_xyyz = contrBuffer.data(goff + 150 * j + 97);
+                    auto g_yyy_xyyz = ketBuffer.data(goff + 150 * j + 97);
 
-                    auto g_yyy_xyzz = contrBuffer.data(goff + 150 * j + 98);
+                    auto g_yyy_xyzz = ketBuffer.data(goff + 150 * j + 98);
 
-                    auto g_yyy_xzzz = contrBuffer.data(goff + 150 * j + 99);
+                    auto g_yyy_xzzz = ketBuffer.data(goff + 150 * j + 99);
 
-                    auto g_yyy_yyyy = contrBuffer.data(goff + 150 * j + 100);
+                    auto g_yyy_yyyy = ketBuffer.data(goff + 150 * j + 100);
 
-                    auto g_yyy_yyyz = contrBuffer.data(goff + 150 * j + 101);
+                    auto g_yyy_yyyz = ketBuffer.data(goff + 150 * j + 101);
 
-                    auto g_yyy_yyzz = contrBuffer.data(goff + 150 * j + 102);
+                    auto g_yyy_yyzz = ketBuffer.data(goff + 150 * j + 102);
 
-                    auto g_yyy_yzzz = contrBuffer.data(goff + 150 * j + 103);
+                    auto g_yyy_yzzz = ketBuffer.data(goff + 150 * j + 103);
 
-                    auto g_yyy_zzzz = contrBuffer.data(goff + 150 * j + 104);
+                    auto g_yyy_zzzz = ketBuffer.data(goff + 150 * j + 104);
 
-                    auto g_yyz_xxxx = contrBuffer.data(goff + 150 * j + 105);
+                    auto g_yyz_xxxx = ketBuffer.data(goff + 150 * j + 105);
 
-                    auto g_yyz_xxxy = contrBuffer.data(goff + 150 * j + 106);
+                    auto g_yyz_xxxy = ketBuffer.data(goff + 150 * j + 106);
 
-                    auto g_yyz_xxxz = contrBuffer.data(goff + 150 * j + 107);
+                    auto g_yyz_xxxz = ketBuffer.data(goff + 150 * j + 107);
 
-                    auto g_yyz_xxyy = contrBuffer.data(goff + 150 * j + 108);
+                    auto g_yyz_xxyy = ketBuffer.data(goff + 150 * j + 108);
 
-                    auto g_yyz_xxyz = contrBuffer.data(goff + 150 * j + 109);
+                    auto g_yyz_xxyz = ketBuffer.data(goff + 150 * j + 109);
 
-                    auto g_yyz_xxzz = contrBuffer.data(goff + 150 * j + 110);
+                    auto g_yyz_xxzz = ketBuffer.data(goff + 150 * j + 110);
 
-                    auto g_yyz_xyyy = contrBuffer.data(goff + 150 * j + 111);
+                    auto g_yyz_xyyy = ketBuffer.data(goff + 150 * j + 111);
 
-                    auto g_yyz_xyyz = contrBuffer.data(goff + 150 * j + 112);
+                    auto g_yyz_xyyz = ketBuffer.data(goff + 150 * j + 112);
 
-                    auto g_yyz_xyzz = contrBuffer.data(goff + 150 * j + 113);
+                    auto g_yyz_xyzz = ketBuffer.data(goff + 150 * j + 113);
 
-                    auto g_yyz_xzzz = contrBuffer.data(goff + 150 * j + 114);
+                    auto g_yyz_xzzz = ketBuffer.data(goff + 150 * j + 114);
 
-                    auto g_yyz_yyyy = contrBuffer.data(goff + 150 * j + 115);
+                    auto g_yyz_yyyy = ketBuffer.data(goff + 150 * j + 115);
 
-                    auto g_yyz_yyyz = contrBuffer.data(goff + 150 * j + 116);
+                    auto g_yyz_yyyz = ketBuffer.data(goff + 150 * j + 116);
 
-                    auto g_yyz_yyzz = contrBuffer.data(goff + 150 * j + 117);
+                    auto g_yyz_yyzz = ketBuffer.data(goff + 150 * j + 117);
 
-                    auto g_yyz_yzzz = contrBuffer.data(goff + 150 * j + 118);
+                    auto g_yyz_yzzz = ketBuffer.data(goff + 150 * j + 118);
 
-                    auto g_yyz_zzzz = contrBuffer.data(goff + 150 * j + 119);
+                    auto g_yyz_zzzz = ketBuffer.data(goff + 150 * j + 119);
 
-                    auto g_yzz_xxxx = contrBuffer.data(goff + 150 * j + 120);
+                    auto g_yzz_xxxx = ketBuffer.data(goff + 150 * j + 120);
 
-                    auto g_yzz_xxxy = contrBuffer.data(goff + 150 * j + 121);
+                    auto g_yzz_xxxy = ketBuffer.data(goff + 150 * j + 121);
 
-                    auto g_yzz_xxxz = contrBuffer.data(goff + 150 * j + 122);
+                    auto g_yzz_xxxz = ketBuffer.data(goff + 150 * j + 122);
 
-                    auto g_yzz_xxyy = contrBuffer.data(goff + 150 * j + 123);
+                    auto g_yzz_xxyy = ketBuffer.data(goff + 150 * j + 123);
 
-                    auto g_yzz_xxyz = contrBuffer.data(goff + 150 * j + 124);
+                    auto g_yzz_xxyz = ketBuffer.data(goff + 150 * j + 124);
 
-                    auto g_yzz_xxzz = contrBuffer.data(goff + 150 * j + 125);
+                    auto g_yzz_xxzz = ketBuffer.data(goff + 150 * j + 125);
 
-                    auto g_yzz_xyyy = contrBuffer.data(goff + 150 * j + 126);
+                    auto g_yzz_xyyy = ketBuffer.data(goff + 150 * j + 126);
 
-                    auto g_yzz_xyyz = contrBuffer.data(goff + 150 * j + 127);
+                    auto g_yzz_xyyz = ketBuffer.data(goff + 150 * j + 127);
 
-                    auto g_yzz_xyzz = contrBuffer.data(goff + 150 * j + 128);
+                    auto g_yzz_xyzz = ketBuffer.data(goff + 150 * j + 128);
 
-                    auto g_yzz_xzzz = contrBuffer.data(goff + 150 * j + 129);
+                    auto g_yzz_xzzz = ketBuffer.data(goff + 150 * j + 129);
 
-                    auto g_yzz_yyyy = contrBuffer.data(goff + 150 * j + 130);
+                    auto g_yzz_yyyy = ketBuffer.data(goff + 150 * j + 130);
 
-                    auto g_yzz_yyyz = contrBuffer.data(goff + 150 * j + 131);
+                    auto g_yzz_yyyz = ketBuffer.data(goff + 150 * j + 131);
 
-                    auto g_yzz_yyzz = contrBuffer.data(goff + 150 * j + 132);
+                    auto g_yzz_yyzz = ketBuffer.data(goff + 150 * j + 132);
 
-                    auto g_yzz_yzzz = contrBuffer.data(goff + 150 * j + 133);
+                    auto g_yzz_yzzz = ketBuffer.data(goff + 150 * j + 133);
 
-                    auto g_yzz_zzzz = contrBuffer.data(goff + 150 * j + 134);
+                    auto g_yzz_zzzz = ketBuffer.data(goff + 150 * j + 134);
 
-                    auto g_zzz_xxxx = contrBuffer.data(goff + 150 * j + 135);
+                    auto g_zzz_xxxx = ketBuffer.data(goff + 150 * j + 135);
 
-                    auto g_zzz_xxxy = contrBuffer.data(goff + 150 * j + 136);
+                    auto g_zzz_xxxy = ketBuffer.data(goff + 150 * j + 136);
 
-                    auto g_zzz_xxxz = contrBuffer.data(goff + 150 * j + 137);
+                    auto g_zzz_xxxz = ketBuffer.data(goff + 150 * j + 137);
 
-                    auto g_zzz_xxyy = contrBuffer.data(goff + 150 * j + 138);
+                    auto g_zzz_xxyy = ketBuffer.data(goff + 150 * j + 138);
 
-                    auto g_zzz_xxyz = contrBuffer.data(goff + 150 * j + 139);
+                    auto g_zzz_xxyz = ketBuffer.data(goff + 150 * j + 139);
 
-                    auto g_zzz_xxzz = contrBuffer.data(goff + 150 * j + 140);
+                    auto g_zzz_xxzz = ketBuffer.data(goff + 150 * j + 140);
 
-                    auto g_zzz_xyyy = contrBuffer.data(goff + 150 * j + 141);
+                    auto g_zzz_xyyy = ketBuffer.data(goff + 150 * j + 141);
 
-                    auto g_zzz_xyyz = contrBuffer.data(goff + 150 * j + 142);
+                    auto g_zzz_xyyz = ketBuffer.data(goff + 150 * j + 142);
 
-                    auto g_zzz_xyzz = contrBuffer.data(goff + 150 * j + 143);
+                    auto g_zzz_xyzz = ketBuffer.data(goff + 150 * j + 143);
 
-                    auto g_zzz_xzzz = contrBuffer.data(goff + 150 * j + 144);
+                    auto g_zzz_xzzz = ketBuffer.data(goff + 150 * j + 144);
 
-                    auto g_zzz_yyyy = contrBuffer.data(goff + 150 * j + 145);
+                    auto g_zzz_yyyy = ketBuffer.data(goff + 150 * j + 145);
 
-                    auto g_zzz_yyyz = contrBuffer.data(goff + 150 * j + 146);
+                    auto g_zzz_yyyz = ketBuffer.data(goff + 150 * j + 146);
 
-                    auto g_zzz_yyzz = contrBuffer.data(goff + 150 * j + 147);
+                    auto g_zzz_yyzz = ketBuffer.data(goff + 150 * j + 147);
 
-                    auto g_zzz_yzzz = contrBuffer.data(goff + 150 * j + 148);
+                    auto g_zzz_yzzz = ketBuffer.data(goff + 150 * j + 148);
 
-                    auto g_zzz_zzzz = contrBuffer.data(goff + 150 * j + 149);
+                    auto g_zzz_zzzz = ketBuffer.data(goff + 150 * j + 149);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_xx_xxxx, g2_xx_xxxy,\
                                              g2_xx_xxxz, g2_xx_xxyy, g2_xx_xxyz,\
@@ -8430,7 +8430,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXFH(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXFH(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -8481,973 +8481,973 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|DH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DH) integrals
 
-                    auto g2_xx_xxxxx = contrBuffer.data(g2off + 126 * j);
+                    auto g2_xx_xxxxx = ketBuffer.data(g2off + 126 * j);
 
-                    auto g2_xx_xxxxy = contrBuffer.data(g2off + 126 * j + 1);
+                    auto g2_xx_xxxxy = ketBuffer.data(g2off + 126 * j + 1);
 
-                    auto g2_xx_xxxxz = contrBuffer.data(g2off + 126 * j + 2);
+                    auto g2_xx_xxxxz = ketBuffer.data(g2off + 126 * j + 2);
 
-                    auto g2_xx_xxxyy = contrBuffer.data(g2off + 126 * j + 3);
+                    auto g2_xx_xxxyy = ketBuffer.data(g2off + 126 * j + 3);
 
-                    auto g2_xx_xxxyz = contrBuffer.data(g2off + 126 * j + 4);
+                    auto g2_xx_xxxyz = ketBuffer.data(g2off + 126 * j + 4);
 
-                    auto g2_xx_xxxzz = contrBuffer.data(g2off + 126 * j + 5);
+                    auto g2_xx_xxxzz = ketBuffer.data(g2off + 126 * j + 5);
 
-                    auto g2_xx_xxyyy = contrBuffer.data(g2off + 126 * j + 6);
+                    auto g2_xx_xxyyy = ketBuffer.data(g2off + 126 * j + 6);
 
-                    auto g2_xx_xxyyz = contrBuffer.data(g2off + 126 * j + 7);
+                    auto g2_xx_xxyyz = ketBuffer.data(g2off + 126 * j + 7);
 
-                    auto g2_xx_xxyzz = contrBuffer.data(g2off + 126 * j + 8);
+                    auto g2_xx_xxyzz = ketBuffer.data(g2off + 126 * j + 8);
 
-                    auto g2_xx_xxzzz = contrBuffer.data(g2off + 126 * j + 9);
+                    auto g2_xx_xxzzz = ketBuffer.data(g2off + 126 * j + 9);
 
-                    auto g2_xx_xyyyy = contrBuffer.data(g2off + 126 * j + 10);
+                    auto g2_xx_xyyyy = ketBuffer.data(g2off + 126 * j + 10);
 
-                    auto g2_xx_xyyyz = contrBuffer.data(g2off + 126 * j + 11);
+                    auto g2_xx_xyyyz = ketBuffer.data(g2off + 126 * j + 11);
 
-                    auto g2_xx_xyyzz = contrBuffer.data(g2off + 126 * j + 12);
+                    auto g2_xx_xyyzz = ketBuffer.data(g2off + 126 * j + 12);
 
-                    auto g2_xx_xyzzz = contrBuffer.data(g2off + 126 * j + 13);
+                    auto g2_xx_xyzzz = ketBuffer.data(g2off + 126 * j + 13);
 
-                    auto g2_xx_xzzzz = contrBuffer.data(g2off + 126 * j + 14);
+                    auto g2_xx_xzzzz = ketBuffer.data(g2off + 126 * j + 14);
 
-                    auto g2_xx_yyyyy = contrBuffer.data(g2off + 126 * j + 15);
+                    auto g2_xx_yyyyy = ketBuffer.data(g2off + 126 * j + 15);
 
-                    auto g2_xx_yyyyz = contrBuffer.data(g2off + 126 * j + 16);
+                    auto g2_xx_yyyyz = ketBuffer.data(g2off + 126 * j + 16);
 
-                    auto g2_xx_yyyzz = contrBuffer.data(g2off + 126 * j + 17);
+                    auto g2_xx_yyyzz = ketBuffer.data(g2off + 126 * j + 17);
 
-                    auto g2_xx_yyzzz = contrBuffer.data(g2off + 126 * j + 18);
+                    auto g2_xx_yyzzz = ketBuffer.data(g2off + 126 * j + 18);
 
-                    auto g2_xx_yzzzz = contrBuffer.data(g2off + 126 * j + 19);
+                    auto g2_xx_yzzzz = ketBuffer.data(g2off + 126 * j + 19);
 
-                    auto g2_xx_zzzzz = contrBuffer.data(g2off + 126 * j + 20);
+                    auto g2_xx_zzzzz = ketBuffer.data(g2off + 126 * j + 20);
 
-                    auto g2_xy_xxxxx = contrBuffer.data(g2off + 126 * j + 21);
+                    auto g2_xy_xxxxx = ketBuffer.data(g2off + 126 * j + 21);
 
-                    auto g2_xy_xxxxy = contrBuffer.data(g2off + 126 * j + 22);
+                    auto g2_xy_xxxxy = ketBuffer.data(g2off + 126 * j + 22);
 
-                    auto g2_xy_xxxxz = contrBuffer.data(g2off + 126 * j + 23);
+                    auto g2_xy_xxxxz = ketBuffer.data(g2off + 126 * j + 23);
 
-                    auto g2_xy_xxxyy = contrBuffer.data(g2off + 126 * j + 24);
+                    auto g2_xy_xxxyy = ketBuffer.data(g2off + 126 * j + 24);
 
-                    auto g2_xy_xxxyz = contrBuffer.data(g2off + 126 * j + 25);
+                    auto g2_xy_xxxyz = ketBuffer.data(g2off + 126 * j + 25);
 
-                    auto g2_xy_xxxzz = contrBuffer.data(g2off + 126 * j + 26);
+                    auto g2_xy_xxxzz = ketBuffer.data(g2off + 126 * j + 26);
 
-                    auto g2_xy_xxyyy = contrBuffer.data(g2off + 126 * j + 27);
+                    auto g2_xy_xxyyy = ketBuffer.data(g2off + 126 * j + 27);
 
-                    auto g2_xy_xxyyz = contrBuffer.data(g2off + 126 * j + 28);
+                    auto g2_xy_xxyyz = ketBuffer.data(g2off + 126 * j + 28);
 
-                    auto g2_xy_xxyzz = contrBuffer.data(g2off + 126 * j + 29);
+                    auto g2_xy_xxyzz = ketBuffer.data(g2off + 126 * j + 29);
 
-                    auto g2_xy_xxzzz = contrBuffer.data(g2off + 126 * j + 30);
+                    auto g2_xy_xxzzz = ketBuffer.data(g2off + 126 * j + 30);
 
-                    auto g2_xy_xyyyy = contrBuffer.data(g2off + 126 * j + 31);
+                    auto g2_xy_xyyyy = ketBuffer.data(g2off + 126 * j + 31);
 
-                    auto g2_xy_xyyyz = contrBuffer.data(g2off + 126 * j + 32);
+                    auto g2_xy_xyyyz = ketBuffer.data(g2off + 126 * j + 32);
 
-                    auto g2_xy_xyyzz = contrBuffer.data(g2off + 126 * j + 33);
+                    auto g2_xy_xyyzz = ketBuffer.data(g2off + 126 * j + 33);
 
-                    auto g2_xy_xyzzz = contrBuffer.data(g2off + 126 * j + 34);
+                    auto g2_xy_xyzzz = ketBuffer.data(g2off + 126 * j + 34);
 
-                    auto g2_xy_xzzzz = contrBuffer.data(g2off + 126 * j + 35);
+                    auto g2_xy_xzzzz = ketBuffer.data(g2off + 126 * j + 35);
 
-                    auto g2_xy_yyyyy = contrBuffer.data(g2off + 126 * j + 36);
+                    auto g2_xy_yyyyy = ketBuffer.data(g2off + 126 * j + 36);
 
-                    auto g2_xy_yyyyz = contrBuffer.data(g2off + 126 * j + 37);
+                    auto g2_xy_yyyyz = ketBuffer.data(g2off + 126 * j + 37);
 
-                    auto g2_xy_yyyzz = contrBuffer.data(g2off + 126 * j + 38);
+                    auto g2_xy_yyyzz = ketBuffer.data(g2off + 126 * j + 38);
 
-                    auto g2_xy_yyzzz = contrBuffer.data(g2off + 126 * j + 39);
+                    auto g2_xy_yyzzz = ketBuffer.data(g2off + 126 * j + 39);
 
-                    auto g2_xy_yzzzz = contrBuffer.data(g2off + 126 * j + 40);
+                    auto g2_xy_yzzzz = ketBuffer.data(g2off + 126 * j + 40);
 
-                    auto g2_xy_zzzzz = contrBuffer.data(g2off + 126 * j + 41);
+                    auto g2_xy_zzzzz = ketBuffer.data(g2off + 126 * j + 41);
 
-                    auto g2_xz_xxxxx = contrBuffer.data(g2off + 126 * j + 42);
+                    auto g2_xz_xxxxx = ketBuffer.data(g2off + 126 * j + 42);
 
-                    auto g2_xz_xxxxy = contrBuffer.data(g2off + 126 * j + 43);
+                    auto g2_xz_xxxxy = ketBuffer.data(g2off + 126 * j + 43);
 
-                    auto g2_xz_xxxxz = contrBuffer.data(g2off + 126 * j + 44);
+                    auto g2_xz_xxxxz = ketBuffer.data(g2off + 126 * j + 44);
 
-                    auto g2_xz_xxxyy = contrBuffer.data(g2off + 126 * j + 45);
+                    auto g2_xz_xxxyy = ketBuffer.data(g2off + 126 * j + 45);
 
-                    auto g2_xz_xxxyz = contrBuffer.data(g2off + 126 * j + 46);
+                    auto g2_xz_xxxyz = ketBuffer.data(g2off + 126 * j + 46);
 
-                    auto g2_xz_xxxzz = contrBuffer.data(g2off + 126 * j + 47);
+                    auto g2_xz_xxxzz = ketBuffer.data(g2off + 126 * j + 47);
 
-                    auto g2_xz_xxyyy = contrBuffer.data(g2off + 126 * j + 48);
+                    auto g2_xz_xxyyy = ketBuffer.data(g2off + 126 * j + 48);
 
-                    auto g2_xz_xxyyz = contrBuffer.data(g2off + 126 * j + 49);
+                    auto g2_xz_xxyyz = ketBuffer.data(g2off + 126 * j + 49);
 
-                    auto g2_xz_xxyzz = contrBuffer.data(g2off + 126 * j + 50);
+                    auto g2_xz_xxyzz = ketBuffer.data(g2off + 126 * j + 50);
 
-                    auto g2_xz_xxzzz = contrBuffer.data(g2off + 126 * j + 51);
+                    auto g2_xz_xxzzz = ketBuffer.data(g2off + 126 * j + 51);
 
-                    auto g2_xz_xyyyy = contrBuffer.data(g2off + 126 * j + 52);
+                    auto g2_xz_xyyyy = ketBuffer.data(g2off + 126 * j + 52);
 
-                    auto g2_xz_xyyyz = contrBuffer.data(g2off + 126 * j + 53);
+                    auto g2_xz_xyyyz = ketBuffer.data(g2off + 126 * j + 53);
 
-                    auto g2_xz_xyyzz = contrBuffer.data(g2off + 126 * j + 54);
+                    auto g2_xz_xyyzz = ketBuffer.data(g2off + 126 * j + 54);
 
-                    auto g2_xz_xyzzz = contrBuffer.data(g2off + 126 * j + 55);
+                    auto g2_xz_xyzzz = ketBuffer.data(g2off + 126 * j + 55);
 
-                    auto g2_xz_xzzzz = contrBuffer.data(g2off + 126 * j + 56);
+                    auto g2_xz_xzzzz = ketBuffer.data(g2off + 126 * j + 56);
 
-                    auto g2_xz_yyyyy = contrBuffer.data(g2off + 126 * j + 57);
+                    auto g2_xz_yyyyy = ketBuffer.data(g2off + 126 * j + 57);
 
-                    auto g2_xz_yyyyz = contrBuffer.data(g2off + 126 * j + 58);
+                    auto g2_xz_yyyyz = ketBuffer.data(g2off + 126 * j + 58);
 
-                    auto g2_xz_yyyzz = contrBuffer.data(g2off + 126 * j + 59);
+                    auto g2_xz_yyyzz = ketBuffer.data(g2off + 126 * j + 59);
 
-                    auto g2_xz_yyzzz = contrBuffer.data(g2off + 126 * j + 60);
+                    auto g2_xz_yyzzz = ketBuffer.data(g2off + 126 * j + 60);
 
-                    auto g2_xz_yzzzz = contrBuffer.data(g2off + 126 * j + 61);
+                    auto g2_xz_yzzzz = ketBuffer.data(g2off + 126 * j + 61);
 
-                    auto g2_xz_zzzzz = contrBuffer.data(g2off + 126 * j + 62);
+                    auto g2_xz_zzzzz = ketBuffer.data(g2off + 126 * j + 62);
 
-                    auto g2_yy_xxxxx = contrBuffer.data(g2off + 126 * j + 63);
+                    auto g2_yy_xxxxx = ketBuffer.data(g2off + 126 * j + 63);
 
-                    auto g2_yy_xxxxy = contrBuffer.data(g2off + 126 * j + 64);
+                    auto g2_yy_xxxxy = ketBuffer.data(g2off + 126 * j + 64);
 
-                    auto g2_yy_xxxxz = contrBuffer.data(g2off + 126 * j + 65);
+                    auto g2_yy_xxxxz = ketBuffer.data(g2off + 126 * j + 65);
 
-                    auto g2_yy_xxxyy = contrBuffer.data(g2off + 126 * j + 66);
+                    auto g2_yy_xxxyy = ketBuffer.data(g2off + 126 * j + 66);
 
-                    auto g2_yy_xxxyz = contrBuffer.data(g2off + 126 * j + 67);
+                    auto g2_yy_xxxyz = ketBuffer.data(g2off + 126 * j + 67);
 
-                    auto g2_yy_xxxzz = contrBuffer.data(g2off + 126 * j + 68);
+                    auto g2_yy_xxxzz = ketBuffer.data(g2off + 126 * j + 68);
 
-                    auto g2_yy_xxyyy = contrBuffer.data(g2off + 126 * j + 69);
+                    auto g2_yy_xxyyy = ketBuffer.data(g2off + 126 * j + 69);
 
-                    auto g2_yy_xxyyz = contrBuffer.data(g2off + 126 * j + 70);
+                    auto g2_yy_xxyyz = ketBuffer.data(g2off + 126 * j + 70);
 
-                    auto g2_yy_xxyzz = contrBuffer.data(g2off + 126 * j + 71);
+                    auto g2_yy_xxyzz = ketBuffer.data(g2off + 126 * j + 71);
 
-                    auto g2_yy_xxzzz = contrBuffer.data(g2off + 126 * j + 72);
+                    auto g2_yy_xxzzz = ketBuffer.data(g2off + 126 * j + 72);
 
-                    auto g2_yy_xyyyy = contrBuffer.data(g2off + 126 * j + 73);
+                    auto g2_yy_xyyyy = ketBuffer.data(g2off + 126 * j + 73);
 
-                    auto g2_yy_xyyyz = contrBuffer.data(g2off + 126 * j + 74);
+                    auto g2_yy_xyyyz = ketBuffer.data(g2off + 126 * j + 74);
 
-                    auto g2_yy_xyyzz = contrBuffer.data(g2off + 126 * j + 75);
+                    auto g2_yy_xyyzz = ketBuffer.data(g2off + 126 * j + 75);
 
-                    auto g2_yy_xyzzz = contrBuffer.data(g2off + 126 * j + 76);
+                    auto g2_yy_xyzzz = ketBuffer.data(g2off + 126 * j + 76);
 
-                    auto g2_yy_xzzzz = contrBuffer.data(g2off + 126 * j + 77);
+                    auto g2_yy_xzzzz = ketBuffer.data(g2off + 126 * j + 77);
 
-                    auto g2_yy_yyyyy = contrBuffer.data(g2off + 126 * j + 78);
+                    auto g2_yy_yyyyy = ketBuffer.data(g2off + 126 * j + 78);
 
-                    auto g2_yy_yyyyz = contrBuffer.data(g2off + 126 * j + 79);
+                    auto g2_yy_yyyyz = ketBuffer.data(g2off + 126 * j + 79);
 
-                    auto g2_yy_yyyzz = contrBuffer.data(g2off + 126 * j + 80);
+                    auto g2_yy_yyyzz = ketBuffer.data(g2off + 126 * j + 80);
 
-                    auto g2_yy_yyzzz = contrBuffer.data(g2off + 126 * j + 81);
+                    auto g2_yy_yyzzz = ketBuffer.data(g2off + 126 * j + 81);
 
-                    auto g2_yy_yzzzz = contrBuffer.data(g2off + 126 * j + 82);
+                    auto g2_yy_yzzzz = ketBuffer.data(g2off + 126 * j + 82);
 
-                    auto g2_yy_zzzzz = contrBuffer.data(g2off + 126 * j + 83);
+                    auto g2_yy_zzzzz = ketBuffer.data(g2off + 126 * j + 83);
 
-                    auto g2_yz_xxxxx = contrBuffer.data(g2off + 126 * j + 84);
+                    auto g2_yz_xxxxx = ketBuffer.data(g2off + 126 * j + 84);
 
-                    auto g2_yz_xxxxy = contrBuffer.data(g2off + 126 * j + 85);
+                    auto g2_yz_xxxxy = ketBuffer.data(g2off + 126 * j + 85);
 
-                    auto g2_yz_xxxxz = contrBuffer.data(g2off + 126 * j + 86);
+                    auto g2_yz_xxxxz = ketBuffer.data(g2off + 126 * j + 86);
 
-                    auto g2_yz_xxxyy = contrBuffer.data(g2off + 126 * j + 87);
+                    auto g2_yz_xxxyy = ketBuffer.data(g2off + 126 * j + 87);
 
-                    auto g2_yz_xxxyz = contrBuffer.data(g2off + 126 * j + 88);
+                    auto g2_yz_xxxyz = ketBuffer.data(g2off + 126 * j + 88);
 
-                    auto g2_yz_xxxzz = contrBuffer.data(g2off + 126 * j + 89);
+                    auto g2_yz_xxxzz = ketBuffer.data(g2off + 126 * j + 89);
 
-                    auto g2_yz_xxyyy = contrBuffer.data(g2off + 126 * j + 90);
+                    auto g2_yz_xxyyy = ketBuffer.data(g2off + 126 * j + 90);
 
-                    auto g2_yz_xxyyz = contrBuffer.data(g2off + 126 * j + 91);
+                    auto g2_yz_xxyyz = ketBuffer.data(g2off + 126 * j + 91);
 
-                    auto g2_yz_xxyzz = contrBuffer.data(g2off + 126 * j + 92);
+                    auto g2_yz_xxyzz = ketBuffer.data(g2off + 126 * j + 92);
 
-                    auto g2_yz_xxzzz = contrBuffer.data(g2off + 126 * j + 93);
+                    auto g2_yz_xxzzz = ketBuffer.data(g2off + 126 * j + 93);
 
-                    auto g2_yz_xyyyy = contrBuffer.data(g2off + 126 * j + 94);
+                    auto g2_yz_xyyyy = ketBuffer.data(g2off + 126 * j + 94);
 
-                    auto g2_yz_xyyyz = contrBuffer.data(g2off + 126 * j + 95);
+                    auto g2_yz_xyyyz = ketBuffer.data(g2off + 126 * j + 95);
 
-                    auto g2_yz_xyyzz = contrBuffer.data(g2off + 126 * j + 96);
+                    auto g2_yz_xyyzz = ketBuffer.data(g2off + 126 * j + 96);
 
-                    auto g2_yz_xyzzz = contrBuffer.data(g2off + 126 * j + 97);
+                    auto g2_yz_xyzzz = ketBuffer.data(g2off + 126 * j + 97);
 
-                    auto g2_yz_xzzzz = contrBuffer.data(g2off + 126 * j + 98);
+                    auto g2_yz_xzzzz = ketBuffer.data(g2off + 126 * j + 98);
 
-                    auto g2_yz_yyyyy = contrBuffer.data(g2off + 126 * j + 99);
+                    auto g2_yz_yyyyy = ketBuffer.data(g2off + 126 * j + 99);
 
-                    auto g2_yz_yyyyz = contrBuffer.data(g2off + 126 * j + 100);
+                    auto g2_yz_yyyyz = ketBuffer.data(g2off + 126 * j + 100);
 
-                    auto g2_yz_yyyzz = contrBuffer.data(g2off + 126 * j + 101);
+                    auto g2_yz_yyyzz = ketBuffer.data(g2off + 126 * j + 101);
 
-                    auto g2_yz_yyzzz = contrBuffer.data(g2off + 126 * j + 102);
+                    auto g2_yz_yyzzz = ketBuffer.data(g2off + 126 * j + 102);
 
-                    auto g2_yz_yzzzz = contrBuffer.data(g2off + 126 * j + 103);
+                    auto g2_yz_yzzzz = ketBuffer.data(g2off + 126 * j + 103);
 
-                    auto g2_yz_zzzzz = contrBuffer.data(g2off + 126 * j + 104);
+                    auto g2_yz_zzzzz = ketBuffer.data(g2off + 126 * j + 104);
 
-                    auto g2_zz_xxxxx = contrBuffer.data(g2off + 126 * j + 105);
+                    auto g2_zz_xxxxx = ketBuffer.data(g2off + 126 * j + 105);
 
-                    auto g2_zz_xxxxy = contrBuffer.data(g2off + 126 * j + 106);
+                    auto g2_zz_xxxxy = ketBuffer.data(g2off + 126 * j + 106);
 
-                    auto g2_zz_xxxxz = contrBuffer.data(g2off + 126 * j + 107);
+                    auto g2_zz_xxxxz = ketBuffer.data(g2off + 126 * j + 107);
 
-                    auto g2_zz_xxxyy = contrBuffer.data(g2off + 126 * j + 108);
+                    auto g2_zz_xxxyy = ketBuffer.data(g2off + 126 * j + 108);
 
-                    auto g2_zz_xxxyz = contrBuffer.data(g2off + 126 * j + 109);
+                    auto g2_zz_xxxyz = ketBuffer.data(g2off + 126 * j + 109);
 
-                    auto g2_zz_xxxzz = contrBuffer.data(g2off + 126 * j + 110);
+                    auto g2_zz_xxxzz = ketBuffer.data(g2off + 126 * j + 110);
 
-                    auto g2_zz_xxyyy = contrBuffer.data(g2off + 126 * j + 111);
+                    auto g2_zz_xxyyy = ketBuffer.data(g2off + 126 * j + 111);
 
-                    auto g2_zz_xxyyz = contrBuffer.data(g2off + 126 * j + 112);
+                    auto g2_zz_xxyyz = ketBuffer.data(g2off + 126 * j + 112);
 
-                    auto g2_zz_xxyzz = contrBuffer.data(g2off + 126 * j + 113);
+                    auto g2_zz_xxyzz = ketBuffer.data(g2off + 126 * j + 113);
 
-                    auto g2_zz_xxzzz = contrBuffer.data(g2off + 126 * j + 114);
+                    auto g2_zz_xxzzz = ketBuffer.data(g2off + 126 * j + 114);
 
-                    auto g2_zz_xyyyy = contrBuffer.data(g2off + 126 * j + 115);
+                    auto g2_zz_xyyyy = ketBuffer.data(g2off + 126 * j + 115);
 
-                    auto g2_zz_xyyyz = contrBuffer.data(g2off + 126 * j + 116);
+                    auto g2_zz_xyyyz = ketBuffer.data(g2off + 126 * j + 116);
 
-                    auto g2_zz_xyyzz = contrBuffer.data(g2off + 126 * j + 117);
+                    auto g2_zz_xyyzz = ketBuffer.data(g2off + 126 * j + 117);
 
-                    auto g2_zz_xyzzz = contrBuffer.data(g2off + 126 * j + 118);
+                    auto g2_zz_xyzzz = ketBuffer.data(g2off + 126 * j + 118);
 
-                    auto g2_zz_xzzzz = contrBuffer.data(g2off + 126 * j + 119);
+                    auto g2_zz_xzzzz = ketBuffer.data(g2off + 126 * j + 119);
 
-                    auto g2_zz_yyyyy = contrBuffer.data(g2off + 126 * j + 120);
+                    auto g2_zz_yyyyy = ketBuffer.data(g2off + 126 * j + 120);
 
-                    auto g2_zz_yyyyz = contrBuffer.data(g2off + 126 * j + 121);
+                    auto g2_zz_yyyyz = ketBuffer.data(g2off + 126 * j + 121);
 
-                    auto g2_zz_yyyzz = contrBuffer.data(g2off + 126 * j + 122);
+                    auto g2_zz_yyyzz = ketBuffer.data(g2off + 126 * j + 122);
 
-                    auto g2_zz_yyzzz = contrBuffer.data(g2off + 126 * j + 123);
+                    auto g2_zz_yyzzz = ketBuffer.data(g2off + 126 * j + 123);
 
-                    auto g2_zz_yzzzz = contrBuffer.data(g2off + 126 * j + 124);
+                    auto g2_zz_yzzzz = ketBuffer.data(g2off + 126 * j + 124);
 
-                    auto g2_zz_zzzzz = contrBuffer.data(g2off + 126 * j + 125);
+                    auto g2_zz_zzzzz = ketBuffer.data(g2off + 126 * j + 125);
 
-                    // set up pointers to (SX|g(r,r')|DI)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|DI) integrals
 
-                    auto g1_xx_xxxxxx = contrBuffer.data(g1off + 168 * j);
+                    auto g1_xx_xxxxxx = ketBuffer.data(g1off + 168 * j);
 
-                    auto g1_xx_xxxxxy = contrBuffer.data(g1off + 168 * j + 1);
+                    auto g1_xx_xxxxxy = ketBuffer.data(g1off + 168 * j + 1);
 
-                    auto g1_xx_xxxxxz = contrBuffer.data(g1off + 168 * j + 2);
+                    auto g1_xx_xxxxxz = ketBuffer.data(g1off + 168 * j + 2);
 
-                    auto g1_xx_xxxxyy = contrBuffer.data(g1off + 168 * j + 3);
+                    auto g1_xx_xxxxyy = ketBuffer.data(g1off + 168 * j + 3);
 
-                    auto g1_xx_xxxxyz = contrBuffer.data(g1off + 168 * j + 4);
+                    auto g1_xx_xxxxyz = ketBuffer.data(g1off + 168 * j + 4);
 
-                    auto g1_xx_xxxxzz = contrBuffer.data(g1off + 168 * j + 5);
+                    auto g1_xx_xxxxzz = ketBuffer.data(g1off + 168 * j + 5);
 
-                    auto g1_xx_xxxyyy = contrBuffer.data(g1off + 168 * j + 6);
+                    auto g1_xx_xxxyyy = ketBuffer.data(g1off + 168 * j + 6);
 
-                    auto g1_xx_xxxyyz = contrBuffer.data(g1off + 168 * j + 7);
+                    auto g1_xx_xxxyyz = ketBuffer.data(g1off + 168 * j + 7);
 
-                    auto g1_xx_xxxyzz = contrBuffer.data(g1off + 168 * j + 8);
+                    auto g1_xx_xxxyzz = ketBuffer.data(g1off + 168 * j + 8);
 
-                    auto g1_xx_xxxzzz = contrBuffer.data(g1off + 168 * j + 9);
+                    auto g1_xx_xxxzzz = ketBuffer.data(g1off + 168 * j + 9);
 
-                    auto g1_xx_xxyyyy = contrBuffer.data(g1off + 168 * j + 10);
+                    auto g1_xx_xxyyyy = ketBuffer.data(g1off + 168 * j + 10);
 
-                    auto g1_xx_xxyyyz = contrBuffer.data(g1off + 168 * j + 11);
+                    auto g1_xx_xxyyyz = ketBuffer.data(g1off + 168 * j + 11);
 
-                    auto g1_xx_xxyyzz = contrBuffer.data(g1off + 168 * j + 12);
+                    auto g1_xx_xxyyzz = ketBuffer.data(g1off + 168 * j + 12);
 
-                    auto g1_xx_xxyzzz = contrBuffer.data(g1off + 168 * j + 13);
+                    auto g1_xx_xxyzzz = ketBuffer.data(g1off + 168 * j + 13);
 
-                    auto g1_xx_xxzzzz = contrBuffer.data(g1off + 168 * j + 14);
+                    auto g1_xx_xxzzzz = ketBuffer.data(g1off + 168 * j + 14);
 
-                    auto g1_xx_xyyyyy = contrBuffer.data(g1off + 168 * j + 15);
+                    auto g1_xx_xyyyyy = ketBuffer.data(g1off + 168 * j + 15);
 
-                    auto g1_xx_xyyyyz = contrBuffer.data(g1off + 168 * j + 16);
+                    auto g1_xx_xyyyyz = ketBuffer.data(g1off + 168 * j + 16);
 
-                    auto g1_xx_xyyyzz = contrBuffer.data(g1off + 168 * j + 17);
+                    auto g1_xx_xyyyzz = ketBuffer.data(g1off + 168 * j + 17);
 
-                    auto g1_xx_xyyzzz = contrBuffer.data(g1off + 168 * j + 18);
+                    auto g1_xx_xyyzzz = ketBuffer.data(g1off + 168 * j + 18);
 
-                    auto g1_xx_xyzzzz = contrBuffer.data(g1off + 168 * j + 19);
+                    auto g1_xx_xyzzzz = ketBuffer.data(g1off + 168 * j + 19);
 
-                    auto g1_xx_xzzzzz = contrBuffer.data(g1off + 168 * j + 20);
+                    auto g1_xx_xzzzzz = ketBuffer.data(g1off + 168 * j + 20);
 
-                    auto g1_xy_xxxxxx = contrBuffer.data(g1off + 168 * j + 28);
+                    auto g1_xy_xxxxxx = ketBuffer.data(g1off + 168 * j + 28);
 
-                    auto g1_xy_xxxxxy = contrBuffer.data(g1off + 168 * j + 29);
+                    auto g1_xy_xxxxxy = ketBuffer.data(g1off + 168 * j + 29);
 
-                    auto g1_xy_xxxxxz = contrBuffer.data(g1off + 168 * j + 30);
+                    auto g1_xy_xxxxxz = ketBuffer.data(g1off + 168 * j + 30);
 
-                    auto g1_xy_xxxxyy = contrBuffer.data(g1off + 168 * j + 31);
+                    auto g1_xy_xxxxyy = ketBuffer.data(g1off + 168 * j + 31);
 
-                    auto g1_xy_xxxxyz = contrBuffer.data(g1off + 168 * j + 32);
+                    auto g1_xy_xxxxyz = ketBuffer.data(g1off + 168 * j + 32);
 
-                    auto g1_xy_xxxxzz = contrBuffer.data(g1off + 168 * j + 33);
+                    auto g1_xy_xxxxzz = ketBuffer.data(g1off + 168 * j + 33);
 
-                    auto g1_xy_xxxyyy = contrBuffer.data(g1off + 168 * j + 34);
+                    auto g1_xy_xxxyyy = ketBuffer.data(g1off + 168 * j + 34);
 
-                    auto g1_xy_xxxyyz = contrBuffer.data(g1off + 168 * j + 35);
+                    auto g1_xy_xxxyyz = ketBuffer.data(g1off + 168 * j + 35);
 
-                    auto g1_xy_xxxyzz = contrBuffer.data(g1off + 168 * j + 36);
+                    auto g1_xy_xxxyzz = ketBuffer.data(g1off + 168 * j + 36);
 
-                    auto g1_xy_xxxzzz = contrBuffer.data(g1off + 168 * j + 37);
+                    auto g1_xy_xxxzzz = ketBuffer.data(g1off + 168 * j + 37);
 
-                    auto g1_xy_xxyyyy = contrBuffer.data(g1off + 168 * j + 38);
+                    auto g1_xy_xxyyyy = ketBuffer.data(g1off + 168 * j + 38);
 
-                    auto g1_xy_xxyyyz = contrBuffer.data(g1off + 168 * j + 39);
+                    auto g1_xy_xxyyyz = ketBuffer.data(g1off + 168 * j + 39);
 
-                    auto g1_xy_xxyyzz = contrBuffer.data(g1off + 168 * j + 40);
+                    auto g1_xy_xxyyzz = ketBuffer.data(g1off + 168 * j + 40);
 
-                    auto g1_xy_xxyzzz = contrBuffer.data(g1off + 168 * j + 41);
+                    auto g1_xy_xxyzzz = ketBuffer.data(g1off + 168 * j + 41);
 
-                    auto g1_xy_xxzzzz = contrBuffer.data(g1off + 168 * j + 42);
+                    auto g1_xy_xxzzzz = ketBuffer.data(g1off + 168 * j + 42);
 
-                    auto g1_xy_xyyyyy = contrBuffer.data(g1off + 168 * j + 43);
+                    auto g1_xy_xyyyyy = ketBuffer.data(g1off + 168 * j + 43);
 
-                    auto g1_xy_xyyyyz = contrBuffer.data(g1off + 168 * j + 44);
+                    auto g1_xy_xyyyyz = ketBuffer.data(g1off + 168 * j + 44);
 
-                    auto g1_xy_xyyyzz = contrBuffer.data(g1off + 168 * j + 45);
+                    auto g1_xy_xyyyzz = ketBuffer.data(g1off + 168 * j + 45);
 
-                    auto g1_xy_xyyzzz = contrBuffer.data(g1off + 168 * j + 46);
+                    auto g1_xy_xyyzzz = ketBuffer.data(g1off + 168 * j + 46);
 
-                    auto g1_xy_xyzzzz = contrBuffer.data(g1off + 168 * j + 47);
+                    auto g1_xy_xyzzzz = ketBuffer.data(g1off + 168 * j + 47);
 
-                    auto g1_xy_xzzzzz = contrBuffer.data(g1off + 168 * j + 48);
+                    auto g1_xy_xzzzzz = ketBuffer.data(g1off + 168 * j + 48);
 
-                    auto g1_xz_xxxxxx = contrBuffer.data(g1off + 168 * j + 56);
+                    auto g1_xz_xxxxxx = ketBuffer.data(g1off + 168 * j + 56);
 
-                    auto g1_xz_xxxxxy = contrBuffer.data(g1off + 168 * j + 57);
+                    auto g1_xz_xxxxxy = ketBuffer.data(g1off + 168 * j + 57);
 
-                    auto g1_xz_xxxxxz = contrBuffer.data(g1off + 168 * j + 58);
+                    auto g1_xz_xxxxxz = ketBuffer.data(g1off + 168 * j + 58);
 
-                    auto g1_xz_xxxxyy = contrBuffer.data(g1off + 168 * j + 59);
+                    auto g1_xz_xxxxyy = ketBuffer.data(g1off + 168 * j + 59);
 
-                    auto g1_xz_xxxxyz = contrBuffer.data(g1off + 168 * j + 60);
+                    auto g1_xz_xxxxyz = ketBuffer.data(g1off + 168 * j + 60);
 
-                    auto g1_xz_xxxxzz = contrBuffer.data(g1off + 168 * j + 61);
+                    auto g1_xz_xxxxzz = ketBuffer.data(g1off + 168 * j + 61);
 
-                    auto g1_xz_xxxyyy = contrBuffer.data(g1off + 168 * j + 62);
+                    auto g1_xz_xxxyyy = ketBuffer.data(g1off + 168 * j + 62);
 
-                    auto g1_xz_xxxyyz = contrBuffer.data(g1off + 168 * j + 63);
+                    auto g1_xz_xxxyyz = ketBuffer.data(g1off + 168 * j + 63);
 
-                    auto g1_xz_xxxyzz = contrBuffer.data(g1off + 168 * j + 64);
+                    auto g1_xz_xxxyzz = ketBuffer.data(g1off + 168 * j + 64);
 
-                    auto g1_xz_xxxzzz = contrBuffer.data(g1off + 168 * j + 65);
+                    auto g1_xz_xxxzzz = ketBuffer.data(g1off + 168 * j + 65);
 
-                    auto g1_xz_xxyyyy = contrBuffer.data(g1off + 168 * j + 66);
+                    auto g1_xz_xxyyyy = ketBuffer.data(g1off + 168 * j + 66);
 
-                    auto g1_xz_xxyyyz = contrBuffer.data(g1off + 168 * j + 67);
+                    auto g1_xz_xxyyyz = ketBuffer.data(g1off + 168 * j + 67);
 
-                    auto g1_xz_xxyyzz = contrBuffer.data(g1off + 168 * j + 68);
+                    auto g1_xz_xxyyzz = ketBuffer.data(g1off + 168 * j + 68);
 
-                    auto g1_xz_xxyzzz = contrBuffer.data(g1off + 168 * j + 69);
+                    auto g1_xz_xxyzzz = ketBuffer.data(g1off + 168 * j + 69);
 
-                    auto g1_xz_xxzzzz = contrBuffer.data(g1off + 168 * j + 70);
+                    auto g1_xz_xxzzzz = ketBuffer.data(g1off + 168 * j + 70);
 
-                    auto g1_xz_xyyyyy = contrBuffer.data(g1off + 168 * j + 71);
+                    auto g1_xz_xyyyyy = ketBuffer.data(g1off + 168 * j + 71);
 
-                    auto g1_xz_xyyyyz = contrBuffer.data(g1off + 168 * j + 72);
+                    auto g1_xz_xyyyyz = ketBuffer.data(g1off + 168 * j + 72);
 
-                    auto g1_xz_xyyyzz = contrBuffer.data(g1off + 168 * j + 73);
+                    auto g1_xz_xyyyzz = ketBuffer.data(g1off + 168 * j + 73);
 
-                    auto g1_xz_xyyzzz = contrBuffer.data(g1off + 168 * j + 74);
+                    auto g1_xz_xyyzzz = ketBuffer.data(g1off + 168 * j + 74);
 
-                    auto g1_xz_xyzzzz = contrBuffer.data(g1off + 168 * j + 75);
+                    auto g1_xz_xyzzzz = ketBuffer.data(g1off + 168 * j + 75);
 
-                    auto g1_xz_xzzzzz = contrBuffer.data(g1off + 168 * j + 76);
+                    auto g1_xz_xzzzzz = ketBuffer.data(g1off + 168 * j + 76);
 
-                    auto g1_yy_xxxxxx = contrBuffer.data(g1off + 168 * j + 84);
+                    auto g1_yy_xxxxxx = ketBuffer.data(g1off + 168 * j + 84);
 
-                    auto g1_yy_xxxxxy = contrBuffer.data(g1off + 168 * j + 85);
+                    auto g1_yy_xxxxxy = ketBuffer.data(g1off + 168 * j + 85);
 
-                    auto g1_yy_xxxxxz = contrBuffer.data(g1off + 168 * j + 86);
+                    auto g1_yy_xxxxxz = ketBuffer.data(g1off + 168 * j + 86);
 
-                    auto g1_yy_xxxxyy = contrBuffer.data(g1off + 168 * j + 87);
+                    auto g1_yy_xxxxyy = ketBuffer.data(g1off + 168 * j + 87);
 
-                    auto g1_yy_xxxxyz = contrBuffer.data(g1off + 168 * j + 88);
+                    auto g1_yy_xxxxyz = ketBuffer.data(g1off + 168 * j + 88);
 
-                    auto g1_yy_xxxxzz = contrBuffer.data(g1off + 168 * j + 89);
+                    auto g1_yy_xxxxzz = ketBuffer.data(g1off + 168 * j + 89);
 
-                    auto g1_yy_xxxyyy = contrBuffer.data(g1off + 168 * j + 90);
+                    auto g1_yy_xxxyyy = ketBuffer.data(g1off + 168 * j + 90);
 
-                    auto g1_yy_xxxyyz = contrBuffer.data(g1off + 168 * j + 91);
+                    auto g1_yy_xxxyyz = ketBuffer.data(g1off + 168 * j + 91);
 
-                    auto g1_yy_xxxyzz = contrBuffer.data(g1off + 168 * j + 92);
+                    auto g1_yy_xxxyzz = ketBuffer.data(g1off + 168 * j + 92);
 
-                    auto g1_yy_xxxzzz = contrBuffer.data(g1off + 168 * j + 93);
+                    auto g1_yy_xxxzzz = ketBuffer.data(g1off + 168 * j + 93);
 
-                    auto g1_yy_xxyyyy = contrBuffer.data(g1off + 168 * j + 94);
+                    auto g1_yy_xxyyyy = ketBuffer.data(g1off + 168 * j + 94);
 
-                    auto g1_yy_xxyyyz = contrBuffer.data(g1off + 168 * j + 95);
+                    auto g1_yy_xxyyyz = ketBuffer.data(g1off + 168 * j + 95);
 
-                    auto g1_yy_xxyyzz = contrBuffer.data(g1off + 168 * j + 96);
+                    auto g1_yy_xxyyzz = ketBuffer.data(g1off + 168 * j + 96);
 
-                    auto g1_yy_xxyzzz = contrBuffer.data(g1off + 168 * j + 97);
+                    auto g1_yy_xxyzzz = ketBuffer.data(g1off + 168 * j + 97);
 
-                    auto g1_yy_xxzzzz = contrBuffer.data(g1off + 168 * j + 98);
+                    auto g1_yy_xxzzzz = ketBuffer.data(g1off + 168 * j + 98);
 
-                    auto g1_yy_xyyyyy = contrBuffer.data(g1off + 168 * j + 99);
+                    auto g1_yy_xyyyyy = ketBuffer.data(g1off + 168 * j + 99);
 
-                    auto g1_yy_xyyyyz = contrBuffer.data(g1off + 168 * j + 100);
+                    auto g1_yy_xyyyyz = ketBuffer.data(g1off + 168 * j + 100);
 
-                    auto g1_yy_xyyyzz = contrBuffer.data(g1off + 168 * j + 101);
+                    auto g1_yy_xyyyzz = ketBuffer.data(g1off + 168 * j + 101);
 
-                    auto g1_yy_xyyzzz = contrBuffer.data(g1off + 168 * j + 102);
+                    auto g1_yy_xyyzzz = ketBuffer.data(g1off + 168 * j + 102);
 
-                    auto g1_yy_xyzzzz = contrBuffer.data(g1off + 168 * j + 103);
+                    auto g1_yy_xyzzzz = ketBuffer.data(g1off + 168 * j + 103);
 
-                    auto g1_yy_xzzzzz = contrBuffer.data(g1off + 168 * j + 104);
+                    auto g1_yy_xzzzzz = ketBuffer.data(g1off + 168 * j + 104);
 
-                    auto g1_yy_yyyyyy = contrBuffer.data(g1off + 168 * j + 105);
+                    auto g1_yy_yyyyyy = ketBuffer.data(g1off + 168 * j + 105);
 
-                    auto g1_yy_yyyyyz = contrBuffer.data(g1off + 168 * j + 106);
+                    auto g1_yy_yyyyyz = ketBuffer.data(g1off + 168 * j + 106);
 
-                    auto g1_yy_yyyyzz = contrBuffer.data(g1off + 168 * j + 107);
+                    auto g1_yy_yyyyzz = ketBuffer.data(g1off + 168 * j + 107);
 
-                    auto g1_yy_yyyzzz = contrBuffer.data(g1off + 168 * j + 108);
+                    auto g1_yy_yyyzzz = ketBuffer.data(g1off + 168 * j + 108);
 
-                    auto g1_yy_yyzzzz = contrBuffer.data(g1off + 168 * j + 109);
+                    auto g1_yy_yyzzzz = ketBuffer.data(g1off + 168 * j + 109);
 
-                    auto g1_yy_yzzzzz = contrBuffer.data(g1off + 168 * j + 110);
+                    auto g1_yy_yzzzzz = ketBuffer.data(g1off + 168 * j + 110);
 
-                    auto g1_yz_xxxxxx = contrBuffer.data(g1off + 168 * j + 112);
+                    auto g1_yz_xxxxxx = ketBuffer.data(g1off + 168 * j + 112);
 
-                    auto g1_yz_xxxxxy = contrBuffer.data(g1off + 168 * j + 113);
+                    auto g1_yz_xxxxxy = ketBuffer.data(g1off + 168 * j + 113);
 
-                    auto g1_yz_xxxxxz = contrBuffer.data(g1off + 168 * j + 114);
+                    auto g1_yz_xxxxxz = ketBuffer.data(g1off + 168 * j + 114);
 
-                    auto g1_yz_xxxxyy = contrBuffer.data(g1off + 168 * j + 115);
+                    auto g1_yz_xxxxyy = ketBuffer.data(g1off + 168 * j + 115);
 
-                    auto g1_yz_xxxxyz = contrBuffer.data(g1off + 168 * j + 116);
+                    auto g1_yz_xxxxyz = ketBuffer.data(g1off + 168 * j + 116);
 
-                    auto g1_yz_xxxxzz = contrBuffer.data(g1off + 168 * j + 117);
+                    auto g1_yz_xxxxzz = ketBuffer.data(g1off + 168 * j + 117);
 
-                    auto g1_yz_xxxyyy = contrBuffer.data(g1off + 168 * j + 118);
+                    auto g1_yz_xxxyyy = ketBuffer.data(g1off + 168 * j + 118);
 
-                    auto g1_yz_xxxyyz = contrBuffer.data(g1off + 168 * j + 119);
+                    auto g1_yz_xxxyyz = ketBuffer.data(g1off + 168 * j + 119);
 
-                    auto g1_yz_xxxyzz = contrBuffer.data(g1off + 168 * j + 120);
+                    auto g1_yz_xxxyzz = ketBuffer.data(g1off + 168 * j + 120);
 
-                    auto g1_yz_xxxzzz = contrBuffer.data(g1off + 168 * j + 121);
+                    auto g1_yz_xxxzzz = ketBuffer.data(g1off + 168 * j + 121);
 
-                    auto g1_yz_xxyyyy = contrBuffer.data(g1off + 168 * j + 122);
+                    auto g1_yz_xxyyyy = ketBuffer.data(g1off + 168 * j + 122);
 
-                    auto g1_yz_xxyyyz = contrBuffer.data(g1off + 168 * j + 123);
+                    auto g1_yz_xxyyyz = ketBuffer.data(g1off + 168 * j + 123);
 
-                    auto g1_yz_xxyyzz = contrBuffer.data(g1off + 168 * j + 124);
+                    auto g1_yz_xxyyzz = ketBuffer.data(g1off + 168 * j + 124);
 
-                    auto g1_yz_xxyzzz = contrBuffer.data(g1off + 168 * j + 125);
+                    auto g1_yz_xxyzzz = ketBuffer.data(g1off + 168 * j + 125);
 
-                    auto g1_yz_xxzzzz = contrBuffer.data(g1off + 168 * j + 126);
+                    auto g1_yz_xxzzzz = ketBuffer.data(g1off + 168 * j + 126);
 
-                    auto g1_yz_xyyyyy = contrBuffer.data(g1off + 168 * j + 127);
+                    auto g1_yz_xyyyyy = ketBuffer.data(g1off + 168 * j + 127);
 
-                    auto g1_yz_xyyyyz = contrBuffer.data(g1off + 168 * j + 128);
+                    auto g1_yz_xyyyyz = ketBuffer.data(g1off + 168 * j + 128);
 
-                    auto g1_yz_xyyyzz = contrBuffer.data(g1off + 168 * j + 129);
+                    auto g1_yz_xyyyzz = ketBuffer.data(g1off + 168 * j + 129);
 
-                    auto g1_yz_xyyzzz = contrBuffer.data(g1off + 168 * j + 130);
+                    auto g1_yz_xyyzzz = ketBuffer.data(g1off + 168 * j + 130);
 
-                    auto g1_yz_xyzzzz = contrBuffer.data(g1off + 168 * j + 131);
+                    auto g1_yz_xyzzzz = ketBuffer.data(g1off + 168 * j + 131);
 
-                    auto g1_yz_xzzzzz = contrBuffer.data(g1off + 168 * j + 132);
+                    auto g1_yz_xzzzzz = ketBuffer.data(g1off + 168 * j + 132);
 
-                    auto g1_yz_yyyyyy = contrBuffer.data(g1off + 168 * j + 133);
+                    auto g1_yz_yyyyyy = ketBuffer.data(g1off + 168 * j + 133);
 
-                    auto g1_yz_yyyyyz = contrBuffer.data(g1off + 168 * j + 134);
+                    auto g1_yz_yyyyyz = ketBuffer.data(g1off + 168 * j + 134);
 
-                    auto g1_yz_yyyyzz = contrBuffer.data(g1off + 168 * j + 135);
+                    auto g1_yz_yyyyzz = ketBuffer.data(g1off + 168 * j + 135);
 
-                    auto g1_yz_yyyzzz = contrBuffer.data(g1off + 168 * j + 136);
+                    auto g1_yz_yyyzzz = ketBuffer.data(g1off + 168 * j + 136);
 
-                    auto g1_yz_yyzzzz = contrBuffer.data(g1off + 168 * j + 137);
+                    auto g1_yz_yyzzzz = ketBuffer.data(g1off + 168 * j + 137);
 
-                    auto g1_yz_yzzzzz = contrBuffer.data(g1off + 168 * j + 138);
+                    auto g1_yz_yzzzzz = ketBuffer.data(g1off + 168 * j + 138);
 
-                    auto g1_zz_xxxxxx = contrBuffer.data(g1off + 168 * j + 140);
+                    auto g1_zz_xxxxxx = ketBuffer.data(g1off + 168 * j + 140);
 
-                    auto g1_zz_xxxxxy = contrBuffer.data(g1off + 168 * j + 141);
+                    auto g1_zz_xxxxxy = ketBuffer.data(g1off + 168 * j + 141);
 
-                    auto g1_zz_xxxxxz = contrBuffer.data(g1off + 168 * j + 142);
+                    auto g1_zz_xxxxxz = ketBuffer.data(g1off + 168 * j + 142);
 
-                    auto g1_zz_xxxxyy = contrBuffer.data(g1off + 168 * j + 143);
+                    auto g1_zz_xxxxyy = ketBuffer.data(g1off + 168 * j + 143);
 
-                    auto g1_zz_xxxxyz = contrBuffer.data(g1off + 168 * j + 144);
+                    auto g1_zz_xxxxyz = ketBuffer.data(g1off + 168 * j + 144);
 
-                    auto g1_zz_xxxxzz = contrBuffer.data(g1off + 168 * j + 145);
+                    auto g1_zz_xxxxzz = ketBuffer.data(g1off + 168 * j + 145);
 
-                    auto g1_zz_xxxyyy = contrBuffer.data(g1off + 168 * j + 146);
+                    auto g1_zz_xxxyyy = ketBuffer.data(g1off + 168 * j + 146);
 
-                    auto g1_zz_xxxyyz = contrBuffer.data(g1off + 168 * j + 147);
+                    auto g1_zz_xxxyyz = ketBuffer.data(g1off + 168 * j + 147);
 
-                    auto g1_zz_xxxyzz = contrBuffer.data(g1off + 168 * j + 148);
+                    auto g1_zz_xxxyzz = ketBuffer.data(g1off + 168 * j + 148);
 
-                    auto g1_zz_xxxzzz = contrBuffer.data(g1off + 168 * j + 149);
+                    auto g1_zz_xxxzzz = ketBuffer.data(g1off + 168 * j + 149);
 
-                    auto g1_zz_xxyyyy = contrBuffer.data(g1off + 168 * j + 150);
+                    auto g1_zz_xxyyyy = ketBuffer.data(g1off + 168 * j + 150);
 
-                    auto g1_zz_xxyyyz = contrBuffer.data(g1off + 168 * j + 151);
+                    auto g1_zz_xxyyyz = ketBuffer.data(g1off + 168 * j + 151);
 
-                    auto g1_zz_xxyyzz = contrBuffer.data(g1off + 168 * j + 152);
+                    auto g1_zz_xxyyzz = ketBuffer.data(g1off + 168 * j + 152);
 
-                    auto g1_zz_xxyzzz = contrBuffer.data(g1off + 168 * j + 153);
+                    auto g1_zz_xxyzzz = ketBuffer.data(g1off + 168 * j + 153);
 
-                    auto g1_zz_xxzzzz = contrBuffer.data(g1off + 168 * j + 154);
+                    auto g1_zz_xxzzzz = ketBuffer.data(g1off + 168 * j + 154);
 
-                    auto g1_zz_xyyyyy = contrBuffer.data(g1off + 168 * j + 155);
+                    auto g1_zz_xyyyyy = ketBuffer.data(g1off + 168 * j + 155);
 
-                    auto g1_zz_xyyyyz = contrBuffer.data(g1off + 168 * j + 156);
+                    auto g1_zz_xyyyyz = ketBuffer.data(g1off + 168 * j + 156);
 
-                    auto g1_zz_xyyyzz = contrBuffer.data(g1off + 168 * j + 157);
+                    auto g1_zz_xyyyzz = ketBuffer.data(g1off + 168 * j + 157);
 
-                    auto g1_zz_xyyzzz = contrBuffer.data(g1off + 168 * j + 158);
+                    auto g1_zz_xyyzzz = ketBuffer.data(g1off + 168 * j + 158);
 
-                    auto g1_zz_xyzzzz = contrBuffer.data(g1off + 168 * j + 159);
+                    auto g1_zz_xyzzzz = ketBuffer.data(g1off + 168 * j + 159);
 
-                    auto g1_zz_xzzzzz = contrBuffer.data(g1off + 168 * j + 160);
+                    auto g1_zz_xzzzzz = ketBuffer.data(g1off + 168 * j + 160);
 
-                    auto g1_zz_yyyyyy = contrBuffer.data(g1off + 168 * j + 161);
+                    auto g1_zz_yyyyyy = ketBuffer.data(g1off + 168 * j + 161);
 
-                    auto g1_zz_yyyyyz = contrBuffer.data(g1off + 168 * j + 162);
+                    auto g1_zz_yyyyyz = ketBuffer.data(g1off + 168 * j + 162);
 
-                    auto g1_zz_yyyyzz = contrBuffer.data(g1off + 168 * j + 163);
+                    auto g1_zz_yyyyzz = ketBuffer.data(g1off + 168 * j + 163);
 
-                    auto g1_zz_yyyzzz = contrBuffer.data(g1off + 168 * j + 164);
+                    auto g1_zz_yyyzzz = ketBuffer.data(g1off + 168 * j + 164);
 
-                    auto g1_zz_yyzzzz = contrBuffer.data(g1off + 168 * j + 165);
+                    auto g1_zz_yyzzzz = ketBuffer.data(g1off + 168 * j + 165);
 
-                    auto g1_zz_yzzzzz = contrBuffer.data(g1off + 168 * j + 166);
+                    auto g1_zz_yzzzzz = ketBuffer.data(g1off + 168 * j + 166);
 
-                    auto g1_zz_zzzzzz = contrBuffer.data(g1off + 168 * j + 167);
+                    auto g1_zz_zzzzzz = ketBuffer.data(g1off + 168 * j + 167);
 
-                    // set up pointers to (SX|g(r,r')|FH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|FH) integrals
 
-                    auto g_xxx_xxxxx = contrBuffer.data(goff + 210 * j);
+                    auto g_xxx_xxxxx = ketBuffer.data(goff + 210 * j);
 
-                    auto g_xxx_xxxxy = contrBuffer.data(goff + 210 * j + 1);
+                    auto g_xxx_xxxxy = ketBuffer.data(goff + 210 * j + 1);
 
-                    auto g_xxx_xxxxz = contrBuffer.data(goff + 210 * j + 2);
+                    auto g_xxx_xxxxz = ketBuffer.data(goff + 210 * j + 2);
 
-                    auto g_xxx_xxxyy = contrBuffer.data(goff + 210 * j + 3);
+                    auto g_xxx_xxxyy = ketBuffer.data(goff + 210 * j + 3);
 
-                    auto g_xxx_xxxyz = contrBuffer.data(goff + 210 * j + 4);
+                    auto g_xxx_xxxyz = ketBuffer.data(goff + 210 * j + 4);
 
-                    auto g_xxx_xxxzz = contrBuffer.data(goff + 210 * j + 5);
+                    auto g_xxx_xxxzz = ketBuffer.data(goff + 210 * j + 5);
 
-                    auto g_xxx_xxyyy = contrBuffer.data(goff + 210 * j + 6);
+                    auto g_xxx_xxyyy = ketBuffer.data(goff + 210 * j + 6);
 
-                    auto g_xxx_xxyyz = contrBuffer.data(goff + 210 * j + 7);
+                    auto g_xxx_xxyyz = ketBuffer.data(goff + 210 * j + 7);
 
-                    auto g_xxx_xxyzz = contrBuffer.data(goff + 210 * j + 8);
+                    auto g_xxx_xxyzz = ketBuffer.data(goff + 210 * j + 8);
 
-                    auto g_xxx_xxzzz = contrBuffer.data(goff + 210 * j + 9);
+                    auto g_xxx_xxzzz = ketBuffer.data(goff + 210 * j + 9);
 
-                    auto g_xxx_xyyyy = contrBuffer.data(goff + 210 * j + 10);
+                    auto g_xxx_xyyyy = ketBuffer.data(goff + 210 * j + 10);
 
-                    auto g_xxx_xyyyz = contrBuffer.data(goff + 210 * j + 11);
+                    auto g_xxx_xyyyz = ketBuffer.data(goff + 210 * j + 11);
 
-                    auto g_xxx_xyyzz = contrBuffer.data(goff + 210 * j + 12);
+                    auto g_xxx_xyyzz = ketBuffer.data(goff + 210 * j + 12);
 
-                    auto g_xxx_xyzzz = contrBuffer.data(goff + 210 * j + 13);
+                    auto g_xxx_xyzzz = ketBuffer.data(goff + 210 * j + 13);
 
-                    auto g_xxx_xzzzz = contrBuffer.data(goff + 210 * j + 14);
+                    auto g_xxx_xzzzz = ketBuffer.data(goff + 210 * j + 14);
 
-                    auto g_xxx_yyyyy = contrBuffer.data(goff + 210 * j + 15);
+                    auto g_xxx_yyyyy = ketBuffer.data(goff + 210 * j + 15);
 
-                    auto g_xxx_yyyyz = contrBuffer.data(goff + 210 * j + 16);
+                    auto g_xxx_yyyyz = ketBuffer.data(goff + 210 * j + 16);
 
-                    auto g_xxx_yyyzz = contrBuffer.data(goff + 210 * j + 17);
+                    auto g_xxx_yyyzz = ketBuffer.data(goff + 210 * j + 17);
 
-                    auto g_xxx_yyzzz = contrBuffer.data(goff + 210 * j + 18);
+                    auto g_xxx_yyzzz = ketBuffer.data(goff + 210 * j + 18);
 
-                    auto g_xxx_yzzzz = contrBuffer.data(goff + 210 * j + 19);
+                    auto g_xxx_yzzzz = ketBuffer.data(goff + 210 * j + 19);
 
-                    auto g_xxx_zzzzz = contrBuffer.data(goff + 210 * j + 20);
+                    auto g_xxx_zzzzz = ketBuffer.data(goff + 210 * j + 20);
 
-                    auto g_xxy_xxxxx = contrBuffer.data(goff + 210 * j + 21);
+                    auto g_xxy_xxxxx = ketBuffer.data(goff + 210 * j + 21);
 
-                    auto g_xxy_xxxxy = contrBuffer.data(goff + 210 * j + 22);
+                    auto g_xxy_xxxxy = ketBuffer.data(goff + 210 * j + 22);
 
-                    auto g_xxy_xxxxz = contrBuffer.data(goff + 210 * j + 23);
+                    auto g_xxy_xxxxz = ketBuffer.data(goff + 210 * j + 23);
 
-                    auto g_xxy_xxxyy = contrBuffer.data(goff + 210 * j + 24);
+                    auto g_xxy_xxxyy = ketBuffer.data(goff + 210 * j + 24);
 
-                    auto g_xxy_xxxyz = contrBuffer.data(goff + 210 * j + 25);
+                    auto g_xxy_xxxyz = ketBuffer.data(goff + 210 * j + 25);
 
-                    auto g_xxy_xxxzz = contrBuffer.data(goff + 210 * j + 26);
+                    auto g_xxy_xxxzz = ketBuffer.data(goff + 210 * j + 26);
 
-                    auto g_xxy_xxyyy = contrBuffer.data(goff + 210 * j + 27);
+                    auto g_xxy_xxyyy = ketBuffer.data(goff + 210 * j + 27);
 
-                    auto g_xxy_xxyyz = contrBuffer.data(goff + 210 * j + 28);
+                    auto g_xxy_xxyyz = ketBuffer.data(goff + 210 * j + 28);
 
-                    auto g_xxy_xxyzz = contrBuffer.data(goff + 210 * j + 29);
+                    auto g_xxy_xxyzz = ketBuffer.data(goff + 210 * j + 29);
 
-                    auto g_xxy_xxzzz = contrBuffer.data(goff + 210 * j + 30);
+                    auto g_xxy_xxzzz = ketBuffer.data(goff + 210 * j + 30);
 
-                    auto g_xxy_xyyyy = contrBuffer.data(goff + 210 * j + 31);
+                    auto g_xxy_xyyyy = ketBuffer.data(goff + 210 * j + 31);
 
-                    auto g_xxy_xyyyz = contrBuffer.data(goff + 210 * j + 32);
+                    auto g_xxy_xyyyz = ketBuffer.data(goff + 210 * j + 32);
 
-                    auto g_xxy_xyyzz = contrBuffer.data(goff + 210 * j + 33);
+                    auto g_xxy_xyyzz = ketBuffer.data(goff + 210 * j + 33);
 
-                    auto g_xxy_xyzzz = contrBuffer.data(goff + 210 * j + 34);
+                    auto g_xxy_xyzzz = ketBuffer.data(goff + 210 * j + 34);
 
-                    auto g_xxy_xzzzz = contrBuffer.data(goff + 210 * j + 35);
+                    auto g_xxy_xzzzz = ketBuffer.data(goff + 210 * j + 35);
 
-                    auto g_xxy_yyyyy = contrBuffer.data(goff + 210 * j + 36);
+                    auto g_xxy_yyyyy = ketBuffer.data(goff + 210 * j + 36);
 
-                    auto g_xxy_yyyyz = contrBuffer.data(goff + 210 * j + 37);
+                    auto g_xxy_yyyyz = ketBuffer.data(goff + 210 * j + 37);
 
-                    auto g_xxy_yyyzz = contrBuffer.data(goff + 210 * j + 38);
+                    auto g_xxy_yyyzz = ketBuffer.data(goff + 210 * j + 38);
 
-                    auto g_xxy_yyzzz = contrBuffer.data(goff + 210 * j + 39);
+                    auto g_xxy_yyzzz = ketBuffer.data(goff + 210 * j + 39);
 
-                    auto g_xxy_yzzzz = contrBuffer.data(goff + 210 * j + 40);
+                    auto g_xxy_yzzzz = ketBuffer.data(goff + 210 * j + 40);
 
-                    auto g_xxy_zzzzz = contrBuffer.data(goff + 210 * j + 41);
+                    auto g_xxy_zzzzz = ketBuffer.data(goff + 210 * j + 41);
 
-                    auto g_xxz_xxxxx = contrBuffer.data(goff + 210 * j + 42);
+                    auto g_xxz_xxxxx = ketBuffer.data(goff + 210 * j + 42);
 
-                    auto g_xxz_xxxxy = contrBuffer.data(goff + 210 * j + 43);
+                    auto g_xxz_xxxxy = ketBuffer.data(goff + 210 * j + 43);
 
-                    auto g_xxz_xxxxz = contrBuffer.data(goff + 210 * j + 44);
+                    auto g_xxz_xxxxz = ketBuffer.data(goff + 210 * j + 44);
 
-                    auto g_xxz_xxxyy = contrBuffer.data(goff + 210 * j + 45);
+                    auto g_xxz_xxxyy = ketBuffer.data(goff + 210 * j + 45);
 
-                    auto g_xxz_xxxyz = contrBuffer.data(goff + 210 * j + 46);
+                    auto g_xxz_xxxyz = ketBuffer.data(goff + 210 * j + 46);
 
-                    auto g_xxz_xxxzz = contrBuffer.data(goff + 210 * j + 47);
+                    auto g_xxz_xxxzz = ketBuffer.data(goff + 210 * j + 47);
 
-                    auto g_xxz_xxyyy = contrBuffer.data(goff + 210 * j + 48);
+                    auto g_xxz_xxyyy = ketBuffer.data(goff + 210 * j + 48);
 
-                    auto g_xxz_xxyyz = contrBuffer.data(goff + 210 * j + 49);
+                    auto g_xxz_xxyyz = ketBuffer.data(goff + 210 * j + 49);
 
-                    auto g_xxz_xxyzz = contrBuffer.data(goff + 210 * j + 50);
+                    auto g_xxz_xxyzz = ketBuffer.data(goff + 210 * j + 50);
 
-                    auto g_xxz_xxzzz = contrBuffer.data(goff + 210 * j + 51);
+                    auto g_xxz_xxzzz = ketBuffer.data(goff + 210 * j + 51);
 
-                    auto g_xxz_xyyyy = contrBuffer.data(goff + 210 * j + 52);
+                    auto g_xxz_xyyyy = ketBuffer.data(goff + 210 * j + 52);
 
-                    auto g_xxz_xyyyz = contrBuffer.data(goff + 210 * j + 53);
+                    auto g_xxz_xyyyz = ketBuffer.data(goff + 210 * j + 53);
 
-                    auto g_xxz_xyyzz = contrBuffer.data(goff + 210 * j + 54);
+                    auto g_xxz_xyyzz = ketBuffer.data(goff + 210 * j + 54);
 
-                    auto g_xxz_xyzzz = contrBuffer.data(goff + 210 * j + 55);
+                    auto g_xxz_xyzzz = ketBuffer.data(goff + 210 * j + 55);
 
-                    auto g_xxz_xzzzz = contrBuffer.data(goff + 210 * j + 56);
+                    auto g_xxz_xzzzz = ketBuffer.data(goff + 210 * j + 56);
 
-                    auto g_xxz_yyyyy = contrBuffer.data(goff + 210 * j + 57);
+                    auto g_xxz_yyyyy = ketBuffer.data(goff + 210 * j + 57);
 
-                    auto g_xxz_yyyyz = contrBuffer.data(goff + 210 * j + 58);
+                    auto g_xxz_yyyyz = ketBuffer.data(goff + 210 * j + 58);
 
-                    auto g_xxz_yyyzz = contrBuffer.data(goff + 210 * j + 59);
+                    auto g_xxz_yyyzz = ketBuffer.data(goff + 210 * j + 59);
 
-                    auto g_xxz_yyzzz = contrBuffer.data(goff + 210 * j + 60);
+                    auto g_xxz_yyzzz = ketBuffer.data(goff + 210 * j + 60);
 
-                    auto g_xxz_yzzzz = contrBuffer.data(goff + 210 * j + 61);
+                    auto g_xxz_yzzzz = ketBuffer.data(goff + 210 * j + 61);
 
-                    auto g_xxz_zzzzz = contrBuffer.data(goff + 210 * j + 62);
+                    auto g_xxz_zzzzz = ketBuffer.data(goff + 210 * j + 62);
 
-                    auto g_xyy_xxxxx = contrBuffer.data(goff + 210 * j + 63);
+                    auto g_xyy_xxxxx = ketBuffer.data(goff + 210 * j + 63);
 
-                    auto g_xyy_xxxxy = contrBuffer.data(goff + 210 * j + 64);
+                    auto g_xyy_xxxxy = ketBuffer.data(goff + 210 * j + 64);
 
-                    auto g_xyy_xxxxz = contrBuffer.data(goff + 210 * j + 65);
+                    auto g_xyy_xxxxz = ketBuffer.data(goff + 210 * j + 65);
 
-                    auto g_xyy_xxxyy = contrBuffer.data(goff + 210 * j + 66);
+                    auto g_xyy_xxxyy = ketBuffer.data(goff + 210 * j + 66);
 
-                    auto g_xyy_xxxyz = contrBuffer.data(goff + 210 * j + 67);
+                    auto g_xyy_xxxyz = ketBuffer.data(goff + 210 * j + 67);
 
-                    auto g_xyy_xxxzz = contrBuffer.data(goff + 210 * j + 68);
+                    auto g_xyy_xxxzz = ketBuffer.data(goff + 210 * j + 68);
 
-                    auto g_xyy_xxyyy = contrBuffer.data(goff + 210 * j + 69);
+                    auto g_xyy_xxyyy = ketBuffer.data(goff + 210 * j + 69);
 
-                    auto g_xyy_xxyyz = contrBuffer.data(goff + 210 * j + 70);
+                    auto g_xyy_xxyyz = ketBuffer.data(goff + 210 * j + 70);
 
-                    auto g_xyy_xxyzz = contrBuffer.data(goff + 210 * j + 71);
+                    auto g_xyy_xxyzz = ketBuffer.data(goff + 210 * j + 71);
 
-                    auto g_xyy_xxzzz = contrBuffer.data(goff + 210 * j + 72);
+                    auto g_xyy_xxzzz = ketBuffer.data(goff + 210 * j + 72);
 
-                    auto g_xyy_xyyyy = contrBuffer.data(goff + 210 * j + 73);
+                    auto g_xyy_xyyyy = ketBuffer.data(goff + 210 * j + 73);
 
-                    auto g_xyy_xyyyz = contrBuffer.data(goff + 210 * j + 74);
+                    auto g_xyy_xyyyz = ketBuffer.data(goff + 210 * j + 74);
 
-                    auto g_xyy_xyyzz = contrBuffer.data(goff + 210 * j + 75);
+                    auto g_xyy_xyyzz = ketBuffer.data(goff + 210 * j + 75);
 
-                    auto g_xyy_xyzzz = contrBuffer.data(goff + 210 * j + 76);
+                    auto g_xyy_xyzzz = ketBuffer.data(goff + 210 * j + 76);
 
-                    auto g_xyy_xzzzz = contrBuffer.data(goff + 210 * j + 77);
+                    auto g_xyy_xzzzz = ketBuffer.data(goff + 210 * j + 77);
 
-                    auto g_xyy_yyyyy = contrBuffer.data(goff + 210 * j + 78);
+                    auto g_xyy_yyyyy = ketBuffer.data(goff + 210 * j + 78);
 
-                    auto g_xyy_yyyyz = contrBuffer.data(goff + 210 * j + 79);
+                    auto g_xyy_yyyyz = ketBuffer.data(goff + 210 * j + 79);
 
-                    auto g_xyy_yyyzz = contrBuffer.data(goff + 210 * j + 80);
+                    auto g_xyy_yyyzz = ketBuffer.data(goff + 210 * j + 80);
 
-                    auto g_xyy_yyzzz = contrBuffer.data(goff + 210 * j + 81);
+                    auto g_xyy_yyzzz = ketBuffer.data(goff + 210 * j + 81);
 
-                    auto g_xyy_yzzzz = contrBuffer.data(goff + 210 * j + 82);
+                    auto g_xyy_yzzzz = ketBuffer.data(goff + 210 * j + 82);
 
-                    auto g_xyy_zzzzz = contrBuffer.data(goff + 210 * j + 83);
+                    auto g_xyy_zzzzz = ketBuffer.data(goff + 210 * j + 83);
 
-                    auto g_xyz_xxxxx = contrBuffer.data(goff + 210 * j + 84);
+                    auto g_xyz_xxxxx = ketBuffer.data(goff + 210 * j + 84);
 
-                    auto g_xyz_xxxxy = contrBuffer.data(goff + 210 * j + 85);
+                    auto g_xyz_xxxxy = ketBuffer.data(goff + 210 * j + 85);
 
-                    auto g_xyz_xxxxz = contrBuffer.data(goff + 210 * j + 86);
+                    auto g_xyz_xxxxz = ketBuffer.data(goff + 210 * j + 86);
 
-                    auto g_xyz_xxxyy = contrBuffer.data(goff + 210 * j + 87);
+                    auto g_xyz_xxxyy = ketBuffer.data(goff + 210 * j + 87);
 
-                    auto g_xyz_xxxyz = contrBuffer.data(goff + 210 * j + 88);
+                    auto g_xyz_xxxyz = ketBuffer.data(goff + 210 * j + 88);
 
-                    auto g_xyz_xxxzz = contrBuffer.data(goff + 210 * j + 89);
+                    auto g_xyz_xxxzz = ketBuffer.data(goff + 210 * j + 89);
 
-                    auto g_xyz_xxyyy = contrBuffer.data(goff + 210 * j + 90);
+                    auto g_xyz_xxyyy = ketBuffer.data(goff + 210 * j + 90);
 
-                    auto g_xyz_xxyyz = contrBuffer.data(goff + 210 * j + 91);
+                    auto g_xyz_xxyyz = ketBuffer.data(goff + 210 * j + 91);
 
-                    auto g_xyz_xxyzz = contrBuffer.data(goff + 210 * j + 92);
+                    auto g_xyz_xxyzz = ketBuffer.data(goff + 210 * j + 92);
 
-                    auto g_xyz_xxzzz = contrBuffer.data(goff + 210 * j + 93);
+                    auto g_xyz_xxzzz = ketBuffer.data(goff + 210 * j + 93);
 
-                    auto g_xyz_xyyyy = contrBuffer.data(goff + 210 * j + 94);
+                    auto g_xyz_xyyyy = ketBuffer.data(goff + 210 * j + 94);
 
-                    auto g_xyz_xyyyz = contrBuffer.data(goff + 210 * j + 95);
+                    auto g_xyz_xyyyz = ketBuffer.data(goff + 210 * j + 95);
 
-                    auto g_xyz_xyyzz = contrBuffer.data(goff + 210 * j + 96);
+                    auto g_xyz_xyyzz = ketBuffer.data(goff + 210 * j + 96);
 
-                    auto g_xyz_xyzzz = contrBuffer.data(goff + 210 * j + 97);
+                    auto g_xyz_xyzzz = ketBuffer.data(goff + 210 * j + 97);
 
-                    auto g_xyz_xzzzz = contrBuffer.data(goff + 210 * j + 98);
+                    auto g_xyz_xzzzz = ketBuffer.data(goff + 210 * j + 98);
 
-                    auto g_xyz_yyyyy = contrBuffer.data(goff + 210 * j + 99);
+                    auto g_xyz_yyyyy = ketBuffer.data(goff + 210 * j + 99);
 
-                    auto g_xyz_yyyyz = contrBuffer.data(goff + 210 * j + 100);
+                    auto g_xyz_yyyyz = ketBuffer.data(goff + 210 * j + 100);
 
-                    auto g_xyz_yyyzz = contrBuffer.data(goff + 210 * j + 101);
+                    auto g_xyz_yyyzz = ketBuffer.data(goff + 210 * j + 101);
 
-                    auto g_xyz_yyzzz = contrBuffer.data(goff + 210 * j + 102);
+                    auto g_xyz_yyzzz = ketBuffer.data(goff + 210 * j + 102);
 
-                    auto g_xyz_yzzzz = contrBuffer.data(goff + 210 * j + 103);
+                    auto g_xyz_yzzzz = ketBuffer.data(goff + 210 * j + 103);
 
-                    auto g_xyz_zzzzz = contrBuffer.data(goff + 210 * j + 104);
+                    auto g_xyz_zzzzz = ketBuffer.data(goff + 210 * j + 104);
 
-                    auto g_xzz_xxxxx = contrBuffer.data(goff + 210 * j + 105);
+                    auto g_xzz_xxxxx = ketBuffer.data(goff + 210 * j + 105);
 
-                    auto g_xzz_xxxxy = contrBuffer.data(goff + 210 * j + 106);
+                    auto g_xzz_xxxxy = ketBuffer.data(goff + 210 * j + 106);
 
-                    auto g_xzz_xxxxz = contrBuffer.data(goff + 210 * j + 107);
+                    auto g_xzz_xxxxz = ketBuffer.data(goff + 210 * j + 107);
 
-                    auto g_xzz_xxxyy = contrBuffer.data(goff + 210 * j + 108);
+                    auto g_xzz_xxxyy = ketBuffer.data(goff + 210 * j + 108);
 
-                    auto g_xzz_xxxyz = contrBuffer.data(goff + 210 * j + 109);
+                    auto g_xzz_xxxyz = ketBuffer.data(goff + 210 * j + 109);
 
-                    auto g_xzz_xxxzz = contrBuffer.data(goff + 210 * j + 110);
+                    auto g_xzz_xxxzz = ketBuffer.data(goff + 210 * j + 110);
 
-                    auto g_xzz_xxyyy = contrBuffer.data(goff + 210 * j + 111);
+                    auto g_xzz_xxyyy = ketBuffer.data(goff + 210 * j + 111);
 
-                    auto g_xzz_xxyyz = contrBuffer.data(goff + 210 * j + 112);
+                    auto g_xzz_xxyyz = ketBuffer.data(goff + 210 * j + 112);
 
-                    auto g_xzz_xxyzz = contrBuffer.data(goff + 210 * j + 113);
+                    auto g_xzz_xxyzz = ketBuffer.data(goff + 210 * j + 113);
 
-                    auto g_xzz_xxzzz = contrBuffer.data(goff + 210 * j + 114);
+                    auto g_xzz_xxzzz = ketBuffer.data(goff + 210 * j + 114);
 
-                    auto g_xzz_xyyyy = contrBuffer.data(goff + 210 * j + 115);
+                    auto g_xzz_xyyyy = ketBuffer.data(goff + 210 * j + 115);
 
-                    auto g_xzz_xyyyz = contrBuffer.data(goff + 210 * j + 116);
+                    auto g_xzz_xyyyz = ketBuffer.data(goff + 210 * j + 116);
 
-                    auto g_xzz_xyyzz = contrBuffer.data(goff + 210 * j + 117);
+                    auto g_xzz_xyyzz = ketBuffer.data(goff + 210 * j + 117);
 
-                    auto g_xzz_xyzzz = contrBuffer.data(goff + 210 * j + 118);
+                    auto g_xzz_xyzzz = ketBuffer.data(goff + 210 * j + 118);
 
-                    auto g_xzz_xzzzz = contrBuffer.data(goff + 210 * j + 119);
+                    auto g_xzz_xzzzz = ketBuffer.data(goff + 210 * j + 119);
 
-                    auto g_xzz_yyyyy = contrBuffer.data(goff + 210 * j + 120);
+                    auto g_xzz_yyyyy = ketBuffer.data(goff + 210 * j + 120);
 
-                    auto g_xzz_yyyyz = contrBuffer.data(goff + 210 * j + 121);
+                    auto g_xzz_yyyyz = ketBuffer.data(goff + 210 * j + 121);
 
-                    auto g_xzz_yyyzz = contrBuffer.data(goff + 210 * j + 122);
+                    auto g_xzz_yyyzz = ketBuffer.data(goff + 210 * j + 122);
 
-                    auto g_xzz_yyzzz = contrBuffer.data(goff + 210 * j + 123);
+                    auto g_xzz_yyzzz = ketBuffer.data(goff + 210 * j + 123);
 
-                    auto g_xzz_yzzzz = contrBuffer.data(goff + 210 * j + 124);
+                    auto g_xzz_yzzzz = ketBuffer.data(goff + 210 * j + 124);
 
-                    auto g_xzz_zzzzz = contrBuffer.data(goff + 210 * j + 125);
+                    auto g_xzz_zzzzz = ketBuffer.data(goff + 210 * j + 125);
 
-                    auto g_yyy_xxxxx = contrBuffer.data(goff + 210 * j + 126);
+                    auto g_yyy_xxxxx = ketBuffer.data(goff + 210 * j + 126);
 
-                    auto g_yyy_xxxxy = contrBuffer.data(goff + 210 * j + 127);
+                    auto g_yyy_xxxxy = ketBuffer.data(goff + 210 * j + 127);
 
-                    auto g_yyy_xxxxz = contrBuffer.data(goff + 210 * j + 128);
+                    auto g_yyy_xxxxz = ketBuffer.data(goff + 210 * j + 128);
 
-                    auto g_yyy_xxxyy = contrBuffer.data(goff + 210 * j + 129);
+                    auto g_yyy_xxxyy = ketBuffer.data(goff + 210 * j + 129);
 
-                    auto g_yyy_xxxyz = contrBuffer.data(goff + 210 * j + 130);
+                    auto g_yyy_xxxyz = ketBuffer.data(goff + 210 * j + 130);
 
-                    auto g_yyy_xxxzz = contrBuffer.data(goff + 210 * j + 131);
+                    auto g_yyy_xxxzz = ketBuffer.data(goff + 210 * j + 131);
 
-                    auto g_yyy_xxyyy = contrBuffer.data(goff + 210 * j + 132);
+                    auto g_yyy_xxyyy = ketBuffer.data(goff + 210 * j + 132);
 
-                    auto g_yyy_xxyyz = contrBuffer.data(goff + 210 * j + 133);
+                    auto g_yyy_xxyyz = ketBuffer.data(goff + 210 * j + 133);
 
-                    auto g_yyy_xxyzz = contrBuffer.data(goff + 210 * j + 134);
+                    auto g_yyy_xxyzz = ketBuffer.data(goff + 210 * j + 134);
 
-                    auto g_yyy_xxzzz = contrBuffer.data(goff + 210 * j + 135);
+                    auto g_yyy_xxzzz = ketBuffer.data(goff + 210 * j + 135);
 
-                    auto g_yyy_xyyyy = contrBuffer.data(goff + 210 * j + 136);
+                    auto g_yyy_xyyyy = ketBuffer.data(goff + 210 * j + 136);
 
-                    auto g_yyy_xyyyz = contrBuffer.data(goff + 210 * j + 137);
+                    auto g_yyy_xyyyz = ketBuffer.data(goff + 210 * j + 137);
 
-                    auto g_yyy_xyyzz = contrBuffer.data(goff + 210 * j + 138);
+                    auto g_yyy_xyyzz = ketBuffer.data(goff + 210 * j + 138);
 
-                    auto g_yyy_xyzzz = contrBuffer.data(goff + 210 * j + 139);
+                    auto g_yyy_xyzzz = ketBuffer.data(goff + 210 * j + 139);
 
-                    auto g_yyy_xzzzz = contrBuffer.data(goff + 210 * j + 140);
+                    auto g_yyy_xzzzz = ketBuffer.data(goff + 210 * j + 140);
 
-                    auto g_yyy_yyyyy = contrBuffer.data(goff + 210 * j + 141);
+                    auto g_yyy_yyyyy = ketBuffer.data(goff + 210 * j + 141);
 
-                    auto g_yyy_yyyyz = contrBuffer.data(goff + 210 * j + 142);
+                    auto g_yyy_yyyyz = ketBuffer.data(goff + 210 * j + 142);
 
-                    auto g_yyy_yyyzz = contrBuffer.data(goff + 210 * j + 143);
+                    auto g_yyy_yyyzz = ketBuffer.data(goff + 210 * j + 143);
 
-                    auto g_yyy_yyzzz = contrBuffer.data(goff + 210 * j + 144);
+                    auto g_yyy_yyzzz = ketBuffer.data(goff + 210 * j + 144);
 
-                    auto g_yyy_yzzzz = contrBuffer.data(goff + 210 * j + 145);
+                    auto g_yyy_yzzzz = ketBuffer.data(goff + 210 * j + 145);
 
-                    auto g_yyy_zzzzz = contrBuffer.data(goff + 210 * j + 146);
+                    auto g_yyy_zzzzz = ketBuffer.data(goff + 210 * j + 146);
 
-                    auto g_yyz_xxxxx = contrBuffer.data(goff + 210 * j + 147);
+                    auto g_yyz_xxxxx = ketBuffer.data(goff + 210 * j + 147);
 
-                    auto g_yyz_xxxxy = contrBuffer.data(goff + 210 * j + 148);
+                    auto g_yyz_xxxxy = ketBuffer.data(goff + 210 * j + 148);
 
-                    auto g_yyz_xxxxz = contrBuffer.data(goff + 210 * j + 149);
+                    auto g_yyz_xxxxz = ketBuffer.data(goff + 210 * j + 149);
 
-                    auto g_yyz_xxxyy = contrBuffer.data(goff + 210 * j + 150);
+                    auto g_yyz_xxxyy = ketBuffer.data(goff + 210 * j + 150);
 
-                    auto g_yyz_xxxyz = contrBuffer.data(goff + 210 * j + 151);
+                    auto g_yyz_xxxyz = ketBuffer.data(goff + 210 * j + 151);
 
-                    auto g_yyz_xxxzz = contrBuffer.data(goff + 210 * j + 152);
+                    auto g_yyz_xxxzz = ketBuffer.data(goff + 210 * j + 152);
 
-                    auto g_yyz_xxyyy = contrBuffer.data(goff + 210 * j + 153);
+                    auto g_yyz_xxyyy = ketBuffer.data(goff + 210 * j + 153);
 
-                    auto g_yyz_xxyyz = contrBuffer.data(goff + 210 * j + 154);
+                    auto g_yyz_xxyyz = ketBuffer.data(goff + 210 * j + 154);
 
-                    auto g_yyz_xxyzz = contrBuffer.data(goff + 210 * j + 155);
+                    auto g_yyz_xxyzz = ketBuffer.data(goff + 210 * j + 155);
 
-                    auto g_yyz_xxzzz = contrBuffer.data(goff + 210 * j + 156);
+                    auto g_yyz_xxzzz = ketBuffer.data(goff + 210 * j + 156);
 
-                    auto g_yyz_xyyyy = contrBuffer.data(goff + 210 * j + 157);
+                    auto g_yyz_xyyyy = ketBuffer.data(goff + 210 * j + 157);
 
-                    auto g_yyz_xyyyz = contrBuffer.data(goff + 210 * j + 158);
+                    auto g_yyz_xyyyz = ketBuffer.data(goff + 210 * j + 158);
 
-                    auto g_yyz_xyyzz = contrBuffer.data(goff + 210 * j + 159);
+                    auto g_yyz_xyyzz = ketBuffer.data(goff + 210 * j + 159);
 
-                    auto g_yyz_xyzzz = contrBuffer.data(goff + 210 * j + 160);
+                    auto g_yyz_xyzzz = ketBuffer.data(goff + 210 * j + 160);
 
-                    auto g_yyz_xzzzz = contrBuffer.data(goff + 210 * j + 161);
+                    auto g_yyz_xzzzz = ketBuffer.data(goff + 210 * j + 161);
 
-                    auto g_yyz_yyyyy = contrBuffer.data(goff + 210 * j + 162);
+                    auto g_yyz_yyyyy = ketBuffer.data(goff + 210 * j + 162);
 
-                    auto g_yyz_yyyyz = contrBuffer.data(goff + 210 * j + 163);
+                    auto g_yyz_yyyyz = ketBuffer.data(goff + 210 * j + 163);
 
-                    auto g_yyz_yyyzz = contrBuffer.data(goff + 210 * j + 164);
+                    auto g_yyz_yyyzz = ketBuffer.data(goff + 210 * j + 164);
 
-                    auto g_yyz_yyzzz = contrBuffer.data(goff + 210 * j + 165);
+                    auto g_yyz_yyzzz = ketBuffer.data(goff + 210 * j + 165);
 
-                    auto g_yyz_yzzzz = contrBuffer.data(goff + 210 * j + 166);
+                    auto g_yyz_yzzzz = ketBuffer.data(goff + 210 * j + 166);
 
-                    auto g_yyz_zzzzz = contrBuffer.data(goff + 210 * j + 167);
+                    auto g_yyz_zzzzz = ketBuffer.data(goff + 210 * j + 167);
 
-                    auto g_yzz_xxxxx = contrBuffer.data(goff + 210 * j + 168);
+                    auto g_yzz_xxxxx = ketBuffer.data(goff + 210 * j + 168);
 
-                    auto g_yzz_xxxxy = contrBuffer.data(goff + 210 * j + 169);
+                    auto g_yzz_xxxxy = ketBuffer.data(goff + 210 * j + 169);
 
-                    auto g_yzz_xxxxz = contrBuffer.data(goff + 210 * j + 170);
+                    auto g_yzz_xxxxz = ketBuffer.data(goff + 210 * j + 170);
 
-                    auto g_yzz_xxxyy = contrBuffer.data(goff + 210 * j + 171);
+                    auto g_yzz_xxxyy = ketBuffer.data(goff + 210 * j + 171);
 
-                    auto g_yzz_xxxyz = contrBuffer.data(goff + 210 * j + 172);
+                    auto g_yzz_xxxyz = ketBuffer.data(goff + 210 * j + 172);
 
-                    auto g_yzz_xxxzz = contrBuffer.data(goff + 210 * j + 173);
+                    auto g_yzz_xxxzz = ketBuffer.data(goff + 210 * j + 173);
 
-                    auto g_yzz_xxyyy = contrBuffer.data(goff + 210 * j + 174);
+                    auto g_yzz_xxyyy = ketBuffer.data(goff + 210 * j + 174);
 
-                    auto g_yzz_xxyyz = contrBuffer.data(goff + 210 * j + 175);
+                    auto g_yzz_xxyyz = ketBuffer.data(goff + 210 * j + 175);
 
-                    auto g_yzz_xxyzz = contrBuffer.data(goff + 210 * j + 176);
+                    auto g_yzz_xxyzz = ketBuffer.data(goff + 210 * j + 176);
 
-                    auto g_yzz_xxzzz = contrBuffer.data(goff + 210 * j + 177);
+                    auto g_yzz_xxzzz = ketBuffer.data(goff + 210 * j + 177);
 
-                    auto g_yzz_xyyyy = contrBuffer.data(goff + 210 * j + 178);
+                    auto g_yzz_xyyyy = ketBuffer.data(goff + 210 * j + 178);
 
-                    auto g_yzz_xyyyz = contrBuffer.data(goff + 210 * j + 179);
+                    auto g_yzz_xyyyz = ketBuffer.data(goff + 210 * j + 179);
 
-                    auto g_yzz_xyyzz = contrBuffer.data(goff + 210 * j + 180);
+                    auto g_yzz_xyyzz = ketBuffer.data(goff + 210 * j + 180);
 
-                    auto g_yzz_xyzzz = contrBuffer.data(goff + 210 * j + 181);
+                    auto g_yzz_xyzzz = ketBuffer.data(goff + 210 * j + 181);
 
-                    auto g_yzz_xzzzz = contrBuffer.data(goff + 210 * j + 182);
+                    auto g_yzz_xzzzz = ketBuffer.data(goff + 210 * j + 182);
 
-                    auto g_yzz_yyyyy = contrBuffer.data(goff + 210 * j + 183);
+                    auto g_yzz_yyyyy = ketBuffer.data(goff + 210 * j + 183);
 
-                    auto g_yzz_yyyyz = contrBuffer.data(goff + 210 * j + 184);
+                    auto g_yzz_yyyyz = ketBuffer.data(goff + 210 * j + 184);
 
-                    auto g_yzz_yyyzz = contrBuffer.data(goff + 210 * j + 185);
+                    auto g_yzz_yyyzz = ketBuffer.data(goff + 210 * j + 185);
 
-                    auto g_yzz_yyzzz = contrBuffer.data(goff + 210 * j + 186);
+                    auto g_yzz_yyzzz = ketBuffer.data(goff + 210 * j + 186);
 
-                    auto g_yzz_yzzzz = contrBuffer.data(goff + 210 * j + 187);
+                    auto g_yzz_yzzzz = ketBuffer.data(goff + 210 * j + 187);
 
-                    auto g_yzz_zzzzz = contrBuffer.data(goff + 210 * j + 188);
+                    auto g_yzz_zzzzz = ketBuffer.data(goff + 210 * j + 188);
 
-                    auto g_zzz_xxxxx = contrBuffer.data(goff + 210 * j + 189);
+                    auto g_zzz_xxxxx = ketBuffer.data(goff + 210 * j + 189);
 
-                    auto g_zzz_xxxxy = contrBuffer.data(goff + 210 * j + 190);
+                    auto g_zzz_xxxxy = ketBuffer.data(goff + 210 * j + 190);
 
-                    auto g_zzz_xxxxz = contrBuffer.data(goff + 210 * j + 191);
+                    auto g_zzz_xxxxz = ketBuffer.data(goff + 210 * j + 191);
 
-                    auto g_zzz_xxxyy = contrBuffer.data(goff + 210 * j + 192);
+                    auto g_zzz_xxxyy = ketBuffer.data(goff + 210 * j + 192);
 
-                    auto g_zzz_xxxyz = contrBuffer.data(goff + 210 * j + 193);
+                    auto g_zzz_xxxyz = ketBuffer.data(goff + 210 * j + 193);
 
-                    auto g_zzz_xxxzz = contrBuffer.data(goff + 210 * j + 194);
+                    auto g_zzz_xxxzz = ketBuffer.data(goff + 210 * j + 194);
 
-                    auto g_zzz_xxyyy = contrBuffer.data(goff + 210 * j + 195);
+                    auto g_zzz_xxyyy = ketBuffer.data(goff + 210 * j + 195);
 
-                    auto g_zzz_xxyyz = contrBuffer.data(goff + 210 * j + 196);
+                    auto g_zzz_xxyyz = ketBuffer.data(goff + 210 * j + 196);
 
-                    auto g_zzz_xxyzz = contrBuffer.data(goff + 210 * j + 197);
+                    auto g_zzz_xxyzz = ketBuffer.data(goff + 210 * j + 197);
 
-                    auto g_zzz_xxzzz = contrBuffer.data(goff + 210 * j + 198);
+                    auto g_zzz_xxzzz = ketBuffer.data(goff + 210 * j + 198);
 
-                    auto g_zzz_xyyyy = contrBuffer.data(goff + 210 * j + 199);
+                    auto g_zzz_xyyyy = ketBuffer.data(goff + 210 * j + 199);
 
-                    auto g_zzz_xyyyz = contrBuffer.data(goff + 210 * j + 200);
+                    auto g_zzz_xyyyz = ketBuffer.data(goff + 210 * j + 200);
 
-                    auto g_zzz_xyyzz = contrBuffer.data(goff + 210 * j + 201);
+                    auto g_zzz_xyyzz = ketBuffer.data(goff + 210 * j + 201);
 
-                    auto g_zzz_xyzzz = contrBuffer.data(goff + 210 * j + 202);
+                    auto g_zzz_xyzzz = ketBuffer.data(goff + 210 * j + 202);
 
-                    auto g_zzz_xzzzz = contrBuffer.data(goff + 210 * j + 203);
+                    auto g_zzz_xzzzz = ketBuffer.data(goff + 210 * j + 203);
 
-                    auto g_zzz_yyyyy = contrBuffer.data(goff + 210 * j + 204);
+                    auto g_zzz_yyyyy = ketBuffer.data(goff + 210 * j + 204);
 
-                    auto g_zzz_yyyyz = contrBuffer.data(goff + 210 * j + 205);
+                    auto g_zzz_yyyyz = ketBuffer.data(goff + 210 * j + 205);
 
-                    auto g_zzz_yyyzz = contrBuffer.data(goff + 210 * j + 206);
+                    auto g_zzz_yyyzz = ketBuffer.data(goff + 210 * j + 206);
 
-                    auto g_zzz_yyzzz = contrBuffer.data(goff + 210 * j + 207);
+                    auto g_zzz_yyzzz = ketBuffer.data(goff + 210 * j + 207);
 
-                    auto g_zzz_yzzzz = contrBuffer.data(goff + 210 * j + 208);
+                    auto g_zzz_yzzzz = ketBuffer.data(goff + 210 * j + 208);
 
-                    auto g_zzz_zzzzz = contrBuffer.data(goff + 210 * j + 209);
+                    auto g_zzz_zzzzz = ketBuffer.data(goff + 210 * j + 209);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_xx_xxxxx, g2_xx_xxxxy,\
                                              g2_xx_xxxxz, g2_xx_xxxyy, g2_xx_xxxyz,\
@@ -10052,7 +10052,7 @@ namespace kethrrfunc { // kethrrfunc namespace
     }
     
     void
-    compElectronRepulsionForSXGG(      CMemBlock2D<double>&  contrBuffer,
+    compElectronRepulsionForSXGG(      CMemBlock2D<double>&  ketBuffer,
                                  const CVecThreeIndexes&     recPattern,
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  cdDistances,
@@ -10103,1103 +10103,1103 @@ namespace kethrrfunc { // kethrrfunc namespace
 
                 for (int32_t j = 0; j < bcomp; j++)
                 {
-                    // set up pointers to (SX|g(r,r')|FG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|FG) integrals
 
-                    auto g2_xxx_xxxx = contrBuffer.data(g2off + 150 * j);
+                    auto g2_xxx_xxxx = ketBuffer.data(g2off + 150 * j);
 
-                    auto g2_xxx_xxxy = contrBuffer.data(g2off + 150 * j + 1);
+                    auto g2_xxx_xxxy = ketBuffer.data(g2off + 150 * j + 1);
 
-                    auto g2_xxx_xxxz = contrBuffer.data(g2off + 150 * j + 2);
+                    auto g2_xxx_xxxz = ketBuffer.data(g2off + 150 * j + 2);
 
-                    auto g2_xxx_xxyy = contrBuffer.data(g2off + 150 * j + 3);
+                    auto g2_xxx_xxyy = ketBuffer.data(g2off + 150 * j + 3);
 
-                    auto g2_xxx_xxyz = contrBuffer.data(g2off + 150 * j + 4);
+                    auto g2_xxx_xxyz = ketBuffer.data(g2off + 150 * j + 4);
 
-                    auto g2_xxx_xxzz = contrBuffer.data(g2off + 150 * j + 5);
+                    auto g2_xxx_xxzz = ketBuffer.data(g2off + 150 * j + 5);
 
-                    auto g2_xxx_xyyy = contrBuffer.data(g2off + 150 * j + 6);
+                    auto g2_xxx_xyyy = ketBuffer.data(g2off + 150 * j + 6);
 
-                    auto g2_xxx_xyyz = contrBuffer.data(g2off + 150 * j + 7);
+                    auto g2_xxx_xyyz = ketBuffer.data(g2off + 150 * j + 7);
 
-                    auto g2_xxx_xyzz = contrBuffer.data(g2off + 150 * j + 8);
+                    auto g2_xxx_xyzz = ketBuffer.data(g2off + 150 * j + 8);
 
-                    auto g2_xxx_xzzz = contrBuffer.data(g2off + 150 * j + 9);
+                    auto g2_xxx_xzzz = ketBuffer.data(g2off + 150 * j + 9);
 
-                    auto g2_xxx_yyyy = contrBuffer.data(g2off + 150 * j + 10);
+                    auto g2_xxx_yyyy = ketBuffer.data(g2off + 150 * j + 10);
 
-                    auto g2_xxx_yyyz = contrBuffer.data(g2off + 150 * j + 11);
+                    auto g2_xxx_yyyz = ketBuffer.data(g2off + 150 * j + 11);
 
-                    auto g2_xxx_yyzz = contrBuffer.data(g2off + 150 * j + 12);
+                    auto g2_xxx_yyzz = ketBuffer.data(g2off + 150 * j + 12);
 
-                    auto g2_xxx_yzzz = contrBuffer.data(g2off + 150 * j + 13);
+                    auto g2_xxx_yzzz = ketBuffer.data(g2off + 150 * j + 13);
 
-                    auto g2_xxx_zzzz = contrBuffer.data(g2off + 150 * j + 14);
+                    auto g2_xxx_zzzz = ketBuffer.data(g2off + 150 * j + 14);
 
-                    auto g2_xxy_xxxx = contrBuffer.data(g2off + 150 * j + 15);
+                    auto g2_xxy_xxxx = ketBuffer.data(g2off + 150 * j + 15);
 
-                    auto g2_xxy_xxxy = contrBuffer.data(g2off + 150 * j + 16);
+                    auto g2_xxy_xxxy = ketBuffer.data(g2off + 150 * j + 16);
 
-                    auto g2_xxy_xxxz = contrBuffer.data(g2off + 150 * j + 17);
+                    auto g2_xxy_xxxz = ketBuffer.data(g2off + 150 * j + 17);
 
-                    auto g2_xxy_xxyy = contrBuffer.data(g2off + 150 * j + 18);
+                    auto g2_xxy_xxyy = ketBuffer.data(g2off + 150 * j + 18);
 
-                    auto g2_xxy_xxyz = contrBuffer.data(g2off + 150 * j + 19);
+                    auto g2_xxy_xxyz = ketBuffer.data(g2off + 150 * j + 19);
 
-                    auto g2_xxy_xxzz = contrBuffer.data(g2off + 150 * j + 20);
+                    auto g2_xxy_xxzz = ketBuffer.data(g2off + 150 * j + 20);
 
-                    auto g2_xxy_xyyy = contrBuffer.data(g2off + 150 * j + 21);
+                    auto g2_xxy_xyyy = ketBuffer.data(g2off + 150 * j + 21);
 
-                    auto g2_xxy_xyyz = contrBuffer.data(g2off + 150 * j + 22);
+                    auto g2_xxy_xyyz = ketBuffer.data(g2off + 150 * j + 22);
 
-                    auto g2_xxy_xyzz = contrBuffer.data(g2off + 150 * j + 23);
+                    auto g2_xxy_xyzz = ketBuffer.data(g2off + 150 * j + 23);
 
-                    auto g2_xxy_xzzz = contrBuffer.data(g2off + 150 * j + 24);
+                    auto g2_xxy_xzzz = ketBuffer.data(g2off + 150 * j + 24);
 
-                    auto g2_xxy_yyyy = contrBuffer.data(g2off + 150 * j + 25);
+                    auto g2_xxy_yyyy = ketBuffer.data(g2off + 150 * j + 25);
 
-                    auto g2_xxy_yyyz = contrBuffer.data(g2off + 150 * j + 26);
+                    auto g2_xxy_yyyz = ketBuffer.data(g2off + 150 * j + 26);
 
-                    auto g2_xxy_yyzz = contrBuffer.data(g2off + 150 * j + 27);
+                    auto g2_xxy_yyzz = ketBuffer.data(g2off + 150 * j + 27);
 
-                    auto g2_xxy_yzzz = contrBuffer.data(g2off + 150 * j + 28);
+                    auto g2_xxy_yzzz = ketBuffer.data(g2off + 150 * j + 28);
 
-                    auto g2_xxy_zzzz = contrBuffer.data(g2off + 150 * j + 29);
+                    auto g2_xxy_zzzz = ketBuffer.data(g2off + 150 * j + 29);
 
-                    auto g2_xxz_xxxx = contrBuffer.data(g2off + 150 * j + 30);
+                    auto g2_xxz_xxxx = ketBuffer.data(g2off + 150 * j + 30);
 
-                    auto g2_xxz_xxxy = contrBuffer.data(g2off + 150 * j + 31);
+                    auto g2_xxz_xxxy = ketBuffer.data(g2off + 150 * j + 31);
 
-                    auto g2_xxz_xxxz = contrBuffer.data(g2off + 150 * j + 32);
+                    auto g2_xxz_xxxz = ketBuffer.data(g2off + 150 * j + 32);
 
-                    auto g2_xxz_xxyy = contrBuffer.data(g2off + 150 * j + 33);
+                    auto g2_xxz_xxyy = ketBuffer.data(g2off + 150 * j + 33);
 
-                    auto g2_xxz_xxyz = contrBuffer.data(g2off + 150 * j + 34);
+                    auto g2_xxz_xxyz = ketBuffer.data(g2off + 150 * j + 34);
 
-                    auto g2_xxz_xxzz = contrBuffer.data(g2off + 150 * j + 35);
+                    auto g2_xxz_xxzz = ketBuffer.data(g2off + 150 * j + 35);
 
-                    auto g2_xxz_xyyy = contrBuffer.data(g2off + 150 * j + 36);
+                    auto g2_xxz_xyyy = ketBuffer.data(g2off + 150 * j + 36);
 
-                    auto g2_xxz_xyyz = contrBuffer.data(g2off + 150 * j + 37);
+                    auto g2_xxz_xyyz = ketBuffer.data(g2off + 150 * j + 37);
 
-                    auto g2_xxz_xyzz = contrBuffer.data(g2off + 150 * j + 38);
+                    auto g2_xxz_xyzz = ketBuffer.data(g2off + 150 * j + 38);
 
-                    auto g2_xxz_xzzz = contrBuffer.data(g2off + 150 * j + 39);
+                    auto g2_xxz_xzzz = ketBuffer.data(g2off + 150 * j + 39);
 
-                    auto g2_xxz_yyyy = contrBuffer.data(g2off + 150 * j + 40);
+                    auto g2_xxz_yyyy = ketBuffer.data(g2off + 150 * j + 40);
 
-                    auto g2_xxz_yyyz = contrBuffer.data(g2off + 150 * j + 41);
+                    auto g2_xxz_yyyz = ketBuffer.data(g2off + 150 * j + 41);
 
-                    auto g2_xxz_yyzz = contrBuffer.data(g2off + 150 * j + 42);
+                    auto g2_xxz_yyzz = ketBuffer.data(g2off + 150 * j + 42);
 
-                    auto g2_xxz_yzzz = contrBuffer.data(g2off + 150 * j + 43);
+                    auto g2_xxz_yzzz = ketBuffer.data(g2off + 150 * j + 43);
 
-                    auto g2_xxz_zzzz = contrBuffer.data(g2off + 150 * j + 44);
+                    auto g2_xxz_zzzz = ketBuffer.data(g2off + 150 * j + 44);
 
-                    auto g2_xyy_xxxx = contrBuffer.data(g2off + 150 * j + 45);
+                    auto g2_xyy_xxxx = ketBuffer.data(g2off + 150 * j + 45);
 
-                    auto g2_xyy_xxxy = contrBuffer.data(g2off + 150 * j + 46);
+                    auto g2_xyy_xxxy = ketBuffer.data(g2off + 150 * j + 46);
 
-                    auto g2_xyy_xxxz = contrBuffer.data(g2off + 150 * j + 47);
+                    auto g2_xyy_xxxz = ketBuffer.data(g2off + 150 * j + 47);
 
-                    auto g2_xyy_xxyy = contrBuffer.data(g2off + 150 * j + 48);
+                    auto g2_xyy_xxyy = ketBuffer.data(g2off + 150 * j + 48);
 
-                    auto g2_xyy_xxyz = contrBuffer.data(g2off + 150 * j + 49);
+                    auto g2_xyy_xxyz = ketBuffer.data(g2off + 150 * j + 49);
 
-                    auto g2_xyy_xxzz = contrBuffer.data(g2off + 150 * j + 50);
+                    auto g2_xyy_xxzz = ketBuffer.data(g2off + 150 * j + 50);
 
-                    auto g2_xyy_xyyy = contrBuffer.data(g2off + 150 * j + 51);
+                    auto g2_xyy_xyyy = ketBuffer.data(g2off + 150 * j + 51);
 
-                    auto g2_xyy_xyyz = contrBuffer.data(g2off + 150 * j + 52);
+                    auto g2_xyy_xyyz = ketBuffer.data(g2off + 150 * j + 52);
 
-                    auto g2_xyy_xyzz = contrBuffer.data(g2off + 150 * j + 53);
+                    auto g2_xyy_xyzz = ketBuffer.data(g2off + 150 * j + 53);
 
-                    auto g2_xyy_xzzz = contrBuffer.data(g2off + 150 * j + 54);
+                    auto g2_xyy_xzzz = ketBuffer.data(g2off + 150 * j + 54);
 
-                    auto g2_xyy_yyyy = contrBuffer.data(g2off + 150 * j + 55);
+                    auto g2_xyy_yyyy = ketBuffer.data(g2off + 150 * j + 55);
 
-                    auto g2_xyy_yyyz = contrBuffer.data(g2off + 150 * j + 56);
+                    auto g2_xyy_yyyz = ketBuffer.data(g2off + 150 * j + 56);
 
-                    auto g2_xyy_yyzz = contrBuffer.data(g2off + 150 * j + 57);
+                    auto g2_xyy_yyzz = ketBuffer.data(g2off + 150 * j + 57);
 
-                    auto g2_xyy_yzzz = contrBuffer.data(g2off + 150 * j + 58);
+                    auto g2_xyy_yzzz = ketBuffer.data(g2off + 150 * j + 58);
 
-                    auto g2_xyy_zzzz = contrBuffer.data(g2off + 150 * j + 59);
+                    auto g2_xyy_zzzz = ketBuffer.data(g2off + 150 * j + 59);
 
-                    auto g2_xyz_xxxx = contrBuffer.data(g2off + 150 * j + 60);
+                    auto g2_xyz_xxxx = ketBuffer.data(g2off + 150 * j + 60);
 
-                    auto g2_xyz_xxxy = contrBuffer.data(g2off + 150 * j + 61);
+                    auto g2_xyz_xxxy = ketBuffer.data(g2off + 150 * j + 61);
 
-                    auto g2_xyz_xxxz = contrBuffer.data(g2off + 150 * j + 62);
+                    auto g2_xyz_xxxz = ketBuffer.data(g2off + 150 * j + 62);
 
-                    auto g2_xyz_xxyy = contrBuffer.data(g2off + 150 * j + 63);
+                    auto g2_xyz_xxyy = ketBuffer.data(g2off + 150 * j + 63);
 
-                    auto g2_xyz_xxyz = contrBuffer.data(g2off + 150 * j + 64);
+                    auto g2_xyz_xxyz = ketBuffer.data(g2off + 150 * j + 64);
 
-                    auto g2_xyz_xxzz = contrBuffer.data(g2off + 150 * j + 65);
+                    auto g2_xyz_xxzz = ketBuffer.data(g2off + 150 * j + 65);
 
-                    auto g2_xyz_xyyy = contrBuffer.data(g2off + 150 * j + 66);
+                    auto g2_xyz_xyyy = ketBuffer.data(g2off + 150 * j + 66);
 
-                    auto g2_xyz_xyyz = contrBuffer.data(g2off + 150 * j + 67);
+                    auto g2_xyz_xyyz = ketBuffer.data(g2off + 150 * j + 67);
 
-                    auto g2_xyz_xyzz = contrBuffer.data(g2off + 150 * j + 68);
+                    auto g2_xyz_xyzz = ketBuffer.data(g2off + 150 * j + 68);
 
-                    auto g2_xyz_xzzz = contrBuffer.data(g2off + 150 * j + 69);
+                    auto g2_xyz_xzzz = ketBuffer.data(g2off + 150 * j + 69);
 
-                    auto g2_xyz_yyyy = contrBuffer.data(g2off + 150 * j + 70);
+                    auto g2_xyz_yyyy = ketBuffer.data(g2off + 150 * j + 70);
 
-                    auto g2_xyz_yyyz = contrBuffer.data(g2off + 150 * j + 71);
+                    auto g2_xyz_yyyz = ketBuffer.data(g2off + 150 * j + 71);
 
-                    auto g2_xyz_yyzz = contrBuffer.data(g2off + 150 * j + 72);
+                    auto g2_xyz_yyzz = ketBuffer.data(g2off + 150 * j + 72);
 
-                    auto g2_xyz_yzzz = contrBuffer.data(g2off + 150 * j + 73);
+                    auto g2_xyz_yzzz = ketBuffer.data(g2off + 150 * j + 73);
 
-                    auto g2_xyz_zzzz = contrBuffer.data(g2off + 150 * j + 74);
+                    auto g2_xyz_zzzz = ketBuffer.data(g2off + 150 * j + 74);
 
-                    auto g2_xzz_xxxx = contrBuffer.data(g2off + 150 * j + 75);
+                    auto g2_xzz_xxxx = ketBuffer.data(g2off + 150 * j + 75);
 
-                    auto g2_xzz_xxxy = contrBuffer.data(g2off + 150 * j + 76);
+                    auto g2_xzz_xxxy = ketBuffer.data(g2off + 150 * j + 76);
 
-                    auto g2_xzz_xxxz = contrBuffer.data(g2off + 150 * j + 77);
+                    auto g2_xzz_xxxz = ketBuffer.data(g2off + 150 * j + 77);
 
-                    auto g2_xzz_xxyy = contrBuffer.data(g2off + 150 * j + 78);
+                    auto g2_xzz_xxyy = ketBuffer.data(g2off + 150 * j + 78);
 
-                    auto g2_xzz_xxyz = contrBuffer.data(g2off + 150 * j + 79);
+                    auto g2_xzz_xxyz = ketBuffer.data(g2off + 150 * j + 79);
 
-                    auto g2_xzz_xxzz = contrBuffer.data(g2off + 150 * j + 80);
+                    auto g2_xzz_xxzz = ketBuffer.data(g2off + 150 * j + 80);
 
-                    auto g2_xzz_xyyy = contrBuffer.data(g2off + 150 * j + 81);
+                    auto g2_xzz_xyyy = ketBuffer.data(g2off + 150 * j + 81);
 
-                    auto g2_xzz_xyyz = contrBuffer.data(g2off + 150 * j + 82);
+                    auto g2_xzz_xyyz = ketBuffer.data(g2off + 150 * j + 82);
 
-                    auto g2_xzz_xyzz = contrBuffer.data(g2off + 150 * j + 83);
+                    auto g2_xzz_xyzz = ketBuffer.data(g2off + 150 * j + 83);
 
-                    auto g2_xzz_xzzz = contrBuffer.data(g2off + 150 * j + 84);
+                    auto g2_xzz_xzzz = ketBuffer.data(g2off + 150 * j + 84);
 
-                    auto g2_xzz_yyyy = contrBuffer.data(g2off + 150 * j + 85);
+                    auto g2_xzz_yyyy = ketBuffer.data(g2off + 150 * j + 85);
 
-                    auto g2_xzz_yyyz = contrBuffer.data(g2off + 150 * j + 86);
+                    auto g2_xzz_yyyz = ketBuffer.data(g2off + 150 * j + 86);
 
-                    auto g2_xzz_yyzz = contrBuffer.data(g2off + 150 * j + 87);
+                    auto g2_xzz_yyzz = ketBuffer.data(g2off + 150 * j + 87);
 
-                    auto g2_xzz_yzzz = contrBuffer.data(g2off + 150 * j + 88);
+                    auto g2_xzz_yzzz = ketBuffer.data(g2off + 150 * j + 88);
 
-                    auto g2_xzz_zzzz = contrBuffer.data(g2off + 150 * j + 89);
+                    auto g2_xzz_zzzz = ketBuffer.data(g2off + 150 * j + 89);
 
-                    auto g2_yyy_xxxx = contrBuffer.data(g2off + 150 * j + 90);
+                    auto g2_yyy_xxxx = ketBuffer.data(g2off + 150 * j + 90);
 
-                    auto g2_yyy_xxxy = contrBuffer.data(g2off + 150 * j + 91);
+                    auto g2_yyy_xxxy = ketBuffer.data(g2off + 150 * j + 91);
 
-                    auto g2_yyy_xxxz = contrBuffer.data(g2off + 150 * j + 92);
+                    auto g2_yyy_xxxz = ketBuffer.data(g2off + 150 * j + 92);
 
-                    auto g2_yyy_xxyy = contrBuffer.data(g2off + 150 * j + 93);
+                    auto g2_yyy_xxyy = ketBuffer.data(g2off + 150 * j + 93);
 
-                    auto g2_yyy_xxyz = contrBuffer.data(g2off + 150 * j + 94);
+                    auto g2_yyy_xxyz = ketBuffer.data(g2off + 150 * j + 94);
 
-                    auto g2_yyy_xxzz = contrBuffer.data(g2off + 150 * j + 95);
+                    auto g2_yyy_xxzz = ketBuffer.data(g2off + 150 * j + 95);
 
-                    auto g2_yyy_xyyy = contrBuffer.data(g2off + 150 * j + 96);
+                    auto g2_yyy_xyyy = ketBuffer.data(g2off + 150 * j + 96);
 
-                    auto g2_yyy_xyyz = contrBuffer.data(g2off + 150 * j + 97);
+                    auto g2_yyy_xyyz = ketBuffer.data(g2off + 150 * j + 97);
 
-                    auto g2_yyy_xyzz = contrBuffer.data(g2off + 150 * j + 98);
+                    auto g2_yyy_xyzz = ketBuffer.data(g2off + 150 * j + 98);
 
-                    auto g2_yyy_xzzz = contrBuffer.data(g2off + 150 * j + 99);
+                    auto g2_yyy_xzzz = ketBuffer.data(g2off + 150 * j + 99);
 
-                    auto g2_yyy_yyyy = contrBuffer.data(g2off + 150 * j + 100);
+                    auto g2_yyy_yyyy = ketBuffer.data(g2off + 150 * j + 100);
 
-                    auto g2_yyy_yyyz = contrBuffer.data(g2off + 150 * j + 101);
+                    auto g2_yyy_yyyz = ketBuffer.data(g2off + 150 * j + 101);
 
-                    auto g2_yyy_yyzz = contrBuffer.data(g2off + 150 * j + 102);
+                    auto g2_yyy_yyzz = ketBuffer.data(g2off + 150 * j + 102);
 
-                    auto g2_yyy_yzzz = contrBuffer.data(g2off + 150 * j + 103);
+                    auto g2_yyy_yzzz = ketBuffer.data(g2off + 150 * j + 103);
 
-                    auto g2_yyy_zzzz = contrBuffer.data(g2off + 150 * j + 104);
+                    auto g2_yyy_zzzz = ketBuffer.data(g2off + 150 * j + 104);
 
-                    auto g2_yyz_xxxx = contrBuffer.data(g2off + 150 * j + 105);
+                    auto g2_yyz_xxxx = ketBuffer.data(g2off + 150 * j + 105);
 
-                    auto g2_yyz_xxxy = contrBuffer.data(g2off + 150 * j + 106);
+                    auto g2_yyz_xxxy = ketBuffer.data(g2off + 150 * j + 106);
 
-                    auto g2_yyz_xxxz = contrBuffer.data(g2off + 150 * j + 107);
+                    auto g2_yyz_xxxz = ketBuffer.data(g2off + 150 * j + 107);
 
-                    auto g2_yyz_xxyy = contrBuffer.data(g2off + 150 * j + 108);
+                    auto g2_yyz_xxyy = ketBuffer.data(g2off + 150 * j + 108);
 
-                    auto g2_yyz_xxyz = contrBuffer.data(g2off + 150 * j + 109);
+                    auto g2_yyz_xxyz = ketBuffer.data(g2off + 150 * j + 109);
 
-                    auto g2_yyz_xxzz = contrBuffer.data(g2off + 150 * j + 110);
+                    auto g2_yyz_xxzz = ketBuffer.data(g2off + 150 * j + 110);
 
-                    auto g2_yyz_xyyy = contrBuffer.data(g2off + 150 * j + 111);
+                    auto g2_yyz_xyyy = ketBuffer.data(g2off + 150 * j + 111);
 
-                    auto g2_yyz_xyyz = contrBuffer.data(g2off + 150 * j + 112);
+                    auto g2_yyz_xyyz = ketBuffer.data(g2off + 150 * j + 112);
 
-                    auto g2_yyz_xyzz = contrBuffer.data(g2off + 150 * j + 113);
+                    auto g2_yyz_xyzz = ketBuffer.data(g2off + 150 * j + 113);
 
-                    auto g2_yyz_xzzz = contrBuffer.data(g2off + 150 * j + 114);
+                    auto g2_yyz_xzzz = ketBuffer.data(g2off + 150 * j + 114);
 
-                    auto g2_yyz_yyyy = contrBuffer.data(g2off + 150 * j + 115);
+                    auto g2_yyz_yyyy = ketBuffer.data(g2off + 150 * j + 115);
 
-                    auto g2_yyz_yyyz = contrBuffer.data(g2off + 150 * j + 116);
+                    auto g2_yyz_yyyz = ketBuffer.data(g2off + 150 * j + 116);
 
-                    auto g2_yyz_yyzz = contrBuffer.data(g2off + 150 * j + 117);
+                    auto g2_yyz_yyzz = ketBuffer.data(g2off + 150 * j + 117);
 
-                    auto g2_yyz_yzzz = contrBuffer.data(g2off + 150 * j + 118);
+                    auto g2_yyz_yzzz = ketBuffer.data(g2off + 150 * j + 118);
 
-                    auto g2_yyz_zzzz = contrBuffer.data(g2off + 150 * j + 119);
+                    auto g2_yyz_zzzz = ketBuffer.data(g2off + 150 * j + 119);
 
-                    auto g2_yzz_xxxx = contrBuffer.data(g2off + 150 * j + 120);
+                    auto g2_yzz_xxxx = ketBuffer.data(g2off + 150 * j + 120);
 
-                    auto g2_yzz_xxxy = contrBuffer.data(g2off + 150 * j + 121);
+                    auto g2_yzz_xxxy = ketBuffer.data(g2off + 150 * j + 121);
 
-                    auto g2_yzz_xxxz = contrBuffer.data(g2off + 150 * j + 122);
+                    auto g2_yzz_xxxz = ketBuffer.data(g2off + 150 * j + 122);
 
-                    auto g2_yzz_xxyy = contrBuffer.data(g2off + 150 * j + 123);
+                    auto g2_yzz_xxyy = ketBuffer.data(g2off + 150 * j + 123);
 
-                    auto g2_yzz_xxyz = contrBuffer.data(g2off + 150 * j + 124);
+                    auto g2_yzz_xxyz = ketBuffer.data(g2off + 150 * j + 124);
 
-                    auto g2_yzz_xxzz = contrBuffer.data(g2off + 150 * j + 125);
+                    auto g2_yzz_xxzz = ketBuffer.data(g2off + 150 * j + 125);
 
-                    auto g2_yzz_xyyy = contrBuffer.data(g2off + 150 * j + 126);
+                    auto g2_yzz_xyyy = ketBuffer.data(g2off + 150 * j + 126);
 
-                    auto g2_yzz_xyyz = contrBuffer.data(g2off + 150 * j + 127);
+                    auto g2_yzz_xyyz = ketBuffer.data(g2off + 150 * j + 127);
 
-                    auto g2_yzz_xyzz = contrBuffer.data(g2off + 150 * j + 128);
+                    auto g2_yzz_xyzz = ketBuffer.data(g2off + 150 * j + 128);
 
-                    auto g2_yzz_xzzz = contrBuffer.data(g2off + 150 * j + 129);
+                    auto g2_yzz_xzzz = ketBuffer.data(g2off + 150 * j + 129);
 
-                    auto g2_yzz_yyyy = contrBuffer.data(g2off + 150 * j + 130);
+                    auto g2_yzz_yyyy = ketBuffer.data(g2off + 150 * j + 130);
 
-                    auto g2_yzz_yyyz = contrBuffer.data(g2off + 150 * j + 131);
+                    auto g2_yzz_yyyz = ketBuffer.data(g2off + 150 * j + 131);
 
-                    auto g2_yzz_yyzz = contrBuffer.data(g2off + 150 * j + 132);
+                    auto g2_yzz_yyzz = ketBuffer.data(g2off + 150 * j + 132);
 
-                    auto g2_yzz_yzzz = contrBuffer.data(g2off + 150 * j + 133);
+                    auto g2_yzz_yzzz = ketBuffer.data(g2off + 150 * j + 133);
 
-                    auto g2_yzz_zzzz = contrBuffer.data(g2off + 150 * j + 134);
+                    auto g2_yzz_zzzz = ketBuffer.data(g2off + 150 * j + 134);
 
-                    auto g2_zzz_xxxx = contrBuffer.data(g2off + 150 * j + 135);
+                    auto g2_zzz_xxxx = ketBuffer.data(g2off + 150 * j + 135);
 
-                    auto g2_zzz_xxxy = contrBuffer.data(g2off + 150 * j + 136);
+                    auto g2_zzz_xxxy = ketBuffer.data(g2off + 150 * j + 136);
 
-                    auto g2_zzz_xxxz = contrBuffer.data(g2off + 150 * j + 137);
+                    auto g2_zzz_xxxz = ketBuffer.data(g2off + 150 * j + 137);
 
-                    auto g2_zzz_xxyy = contrBuffer.data(g2off + 150 * j + 138);
+                    auto g2_zzz_xxyy = ketBuffer.data(g2off + 150 * j + 138);
 
-                    auto g2_zzz_xxyz = contrBuffer.data(g2off + 150 * j + 139);
+                    auto g2_zzz_xxyz = ketBuffer.data(g2off + 150 * j + 139);
 
-                    auto g2_zzz_xxzz = contrBuffer.data(g2off + 150 * j + 140);
+                    auto g2_zzz_xxzz = ketBuffer.data(g2off + 150 * j + 140);
 
-                    auto g2_zzz_xyyy = contrBuffer.data(g2off + 150 * j + 141);
+                    auto g2_zzz_xyyy = ketBuffer.data(g2off + 150 * j + 141);
 
-                    auto g2_zzz_xyyz = contrBuffer.data(g2off + 150 * j + 142);
+                    auto g2_zzz_xyyz = ketBuffer.data(g2off + 150 * j + 142);
 
-                    auto g2_zzz_xyzz = contrBuffer.data(g2off + 150 * j + 143);
+                    auto g2_zzz_xyzz = ketBuffer.data(g2off + 150 * j + 143);
 
-                    auto g2_zzz_xzzz = contrBuffer.data(g2off + 150 * j + 144);
+                    auto g2_zzz_xzzz = ketBuffer.data(g2off + 150 * j + 144);
 
-                    auto g2_zzz_yyyy = contrBuffer.data(g2off + 150 * j + 145);
+                    auto g2_zzz_yyyy = ketBuffer.data(g2off + 150 * j + 145);
 
-                    auto g2_zzz_yyyz = contrBuffer.data(g2off + 150 * j + 146);
+                    auto g2_zzz_yyyz = ketBuffer.data(g2off + 150 * j + 146);
 
-                    auto g2_zzz_yyzz = contrBuffer.data(g2off + 150 * j + 147);
+                    auto g2_zzz_yyzz = ketBuffer.data(g2off + 150 * j + 147);
 
-                    auto g2_zzz_yzzz = contrBuffer.data(g2off + 150 * j + 148);
+                    auto g2_zzz_yzzz = ketBuffer.data(g2off + 150 * j + 148);
 
-                    auto g2_zzz_zzzz = contrBuffer.data(g2off + 150 * j + 149);
+                    auto g2_zzz_zzzz = ketBuffer.data(g2off + 150 * j + 149);
 
-                    // set up pointers to (SX|g(r,r')|FH)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|FH) integrals
 
-                    auto g1_xxx_xxxxx = contrBuffer.data(g1off + 210 * j);
+                    auto g1_xxx_xxxxx = ketBuffer.data(g1off + 210 * j);
 
-                    auto g1_xxx_xxxxy = contrBuffer.data(g1off + 210 * j + 1);
+                    auto g1_xxx_xxxxy = ketBuffer.data(g1off + 210 * j + 1);
 
-                    auto g1_xxx_xxxxz = contrBuffer.data(g1off + 210 * j + 2);
+                    auto g1_xxx_xxxxz = ketBuffer.data(g1off + 210 * j + 2);
 
-                    auto g1_xxx_xxxyy = contrBuffer.data(g1off + 210 * j + 3);
+                    auto g1_xxx_xxxyy = ketBuffer.data(g1off + 210 * j + 3);
 
-                    auto g1_xxx_xxxyz = contrBuffer.data(g1off + 210 * j + 4);
+                    auto g1_xxx_xxxyz = ketBuffer.data(g1off + 210 * j + 4);
 
-                    auto g1_xxx_xxxzz = contrBuffer.data(g1off + 210 * j + 5);
+                    auto g1_xxx_xxxzz = ketBuffer.data(g1off + 210 * j + 5);
 
-                    auto g1_xxx_xxyyy = contrBuffer.data(g1off + 210 * j + 6);
+                    auto g1_xxx_xxyyy = ketBuffer.data(g1off + 210 * j + 6);
 
-                    auto g1_xxx_xxyyz = contrBuffer.data(g1off + 210 * j + 7);
+                    auto g1_xxx_xxyyz = ketBuffer.data(g1off + 210 * j + 7);
 
-                    auto g1_xxx_xxyzz = contrBuffer.data(g1off + 210 * j + 8);
+                    auto g1_xxx_xxyzz = ketBuffer.data(g1off + 210 * j + 8);
 
-                    auto g1_xxx_xxzzz = contrBuffer.data(g1off + 210 * j + 9);
+                    auto g1_xxx_xxzzz = ketBuffer.data(g1off + 210 * j + 9);
 
-                    auto g1_xxx_xyyyy = contrBuffer.data(g1off + 210 * j + 10);
+                    auto g1_xxx_xyyyy = ketBuffer.data(g1off + 210 * j + 10);
 
-                    auto g1_xxx_xyyyz = contrBuffer.data(g1off + 210 * j + 11);
+                    auto g1_xxx_xyyyz = ketBuffer.data(g1off + 210 * j + 11);
 
-                    auto g1_xxx_xyyzz = contrBuffer.data(g1off + 210 * j + 12);
+                    auto g1_xxx_xyyzz = ketBuffer.data(g1off + 210 * j + 12);
 
-                    auto g1_xxx_xyzzz = contrBuffer.data(g1off + 210 * j + 13);
+                    auto g1_xxx_xyzzz = ketBuffer.data(g1off + 210 * j + 13);
 
-                    auto g1_xxx_xzzzz = contrBuffer.data(g1off + 210 * j + 14);
+                    auto g1_xxx_xzzzz = ketBuffer.data(g1off + 210 * j + 14);
 
-                    auto g1_xxy_xxxxx = contrBuffer.data(g1off + 210 * j + 21);
+                    auto g1_xxy_xxxxx = ketBuffer.data(g1off + 210 * j + 21);
 
-                    auto g1_xxy_xxxxy = contrBuffer.data(g1off + 210 * j + 22);
+                    auto g1_xxy_xxxxy = ketBuffer.data(g1off + 210 * j + 22);
 
-                    auto g1_xxy_xxxxz = contrBuffer.data(g1off + 210 * j + 23);
+                    auto g1_xxy_xxxxz = ketBuffer.data(g1off + 210 * j + 23);
 
-                    auto g1_xxy_xxxyy = contrBuffer.data(g1off + 210 * j + 24);
+                    auto g1_xxy_xxxyy = ketBuffer.data(g1off + 210 * j + 24);
 
-                    auto g1_xxy_xxxyz = contrBuffer.data(g1off + 210 * j + 25);
+                    auto g1_xxy_xxxyz = ketBuffer.data(g1off + 210 * j + 25);
 
-                    auto g1_xxy_xxxzz = contrBuffer.data(g1off + 210 * j + 26);
+                    auto g1_xxy_xxxzz = ketBuffer.data(g1off + 210 * j + 26);
 
-                    auto g1_xxy_xxyyy = contrBuffer.data(g1off + 210 * j + 27);
+                    auto g1_xxy_xxyyy = ketBuffer.data(g1off + 210 * j + 27);
 
-                    auto g1_xxy_xxyyz = contrBuffer.data(g1off + 210 * j + 28);
+                    auto g1_xxy_xxyyz = ketBuffer.data(g1off + 210 * j + 28);
 
-                    auto g1_xxy_xxyzz = contrBuffer.data(g1off + 210 * j + 29);
+                    auto g1_xxy_xxyzz = ketBuffer.data(g1off + 210 * j + 29);
 
-                    auto g1_xxy_xxzzz = contrBuffer.data(g1off + 210 * j + 30);
+                    auto g1_xxy_xxzzz = ketBuffer.data(g1off + 210 * j + 30);
 
-                    auto g1_xxy_xyyyy = contrBuffer.data(g1off + 210 * j + 31);
+                    auto g1_xxy_xyyyy = ketBuffer.data(g1off + 210 * j + 31);
 
-                    auto g1_xxy_xyyyz = contrBuffer.data(g1off + 210 * j + 32);
+                    auto g1_xxy_xyyyz = ketBuffer.data(g1off + 210 * j + 32);
 
-                    auto g1_xxy_xyyzz = contrBuffer.data(g1off + 210 * j + 33);
+                    auto g1_xxy_xyyzz = ketBuffer.data(g1off + 210 * j + 33);
 
-                    auto g1_xxy_xyzzz = contrBuffer.data(g1off + 210 * j + 34);
+                    auto g1_xxy_xyzzz = ketBuffer.data(g1off + 210 * j + 34);
 
-                    auto g1_xxy_xzzzz = contrBuffer.data(g1off + 210 * j + 35);
+                    auto g1_xxy_xzzzz = ketBuffer.data(g1off + 210 * j + 35);
 
-                    auto g1_xxz_xxxxx = contrBuffer.data(g1off + 210 * j + 42);
+                    auto g1_xxz_xxxxx = ketBuffer.data(g1off + 210 * j + 42);
 
-                    auto g1_xxz_xxxxy = contrBuffer.data(g1off + 210 * j + 43);
+                    auto g1_xxz_xxxxy = ketBuffer.data(g1off + 210 * j + 43);
 
-                    auto g1_xxz_xxxxz = contrBuffer.data(g1off + 210 * j + 44);
+                    auto g1_xxz_xxxxz = ketBuffer.data(g1off + 210 * j + 44);
 
-                    auto g1_xxz_xxxyy = contrBuffer.data(g1off + 210 * j + 45);
+                    auto g1_xxz_xxxyy = ketBuffer.data(g1off + 210 * j + 45);
 
-                    auto g1_xxz_xxxyz = contrBuffer.data(g1off + 210 * j + 46);
+                    auto g1_xxz_xxxyz = ketBuffer.data(g1off + 210 * j + 46);
 
-                    auto g1_xxz_xxxzz = contrBuffer.data(g1off + 210 * j + 47);
+                    auto g1_xxz_xxxzz = ketBuffer.data(g1off + 210 * j + 47);
 
-                    auto g1_xxz_xxyyy = contrBuffer.data(g1off + 210 * j + 48);
+                    auto g1_xxz_xxyyy = ketBuffer.data(g1off + 210 * j + 48);
 
-                    auto g1_xxz_xxyyz = contrBuffer.data(g1off + 210 * j + 49);
+                    auto g1_xxz_xxyyz = ketBuffer.data(g1off + 210 * j + 49);
 
-                    auto g1_xxz_xxyzz = contrBuffer.data(g1off + 210 * j + 50);
+                    auto g1_xxz_xxyzz = ketBuffer.data(g1off + 210 * j + 50);
 
-                    auto g1_xxz_xxzzz = contrBuffer.data(g1off + 210 * j + 51);
+                    auto g1_xxz_xxzzz = ketBuffer.data(g1off + 210 * j + 51);
 
-                    auto g1_xxz_xyyyy = contrBuffer.data(g1off + 210 * j + 52);
+                    auto g1_xxz_xyyyy = ketBuffer.data(g1off + 210 * j + 52);
 
-                    auto g1_xxz_xyyyz = contrBuffer.data(g1off + 210 * j + 53);
+                    auto g1_xxz_xyyyz = ketBuffer.data(g1off + 210 * j + 53);
 
-                    auto g1_xxz_xyyzz = contrBuffer.data(g1off + 210 * j + 54);
+                    auto g1_xxz_xyyzz = ketBuffer.data(g1off + 210 * j + 54);
 
-                    auto g1_xxz_xyzzz = contrBuffer.data(g1off + 210 * j + 55);
+                    auto g1_xxz_xyzzz = ketBuffer.data(g1off + 210 * j + 55);
 
-                    auto g1_xxz_xzzzz = contrBuffer.data(g1off + 210 * j + 56);
+                    auto g1_xxz_xzzzz = ketBuffer.data(g1off + 210 * j + 56);
 
-                    auto g1_xyy_xxxxx = contrBuffer.data(g1off + 210 * j + 63);
+                    auto g1_xyy_xxxxx = ketBuffer.data(g1off + 210 * j + 63);
 
-                    auto g1_xyy_xxxxy = contrBuffer.data(g1off + 210 * j + 64);
+                    auto g1_xyy_xxxxy = ketBuffer.data(g1off + 210 * j + 64);
 
-                    auto g1_xyy_xxxxz = contrBuffer.data(g1off + 210 * j + 65);
+                    auto g1_xyy_xxxxz = ketBuffer.data(g1off + 210 * j + 65);
 
-                    auto g1_xyy_xxxyy = contrBuffer.data(g1off + 210 * j + 66);
+                    auto g1_xyy_xxxyy = ketBuffer.data(g1off + 210 * j + 66);
 
-                    auto g1_xyy_xxxyz = contrBuffer.data(g1off + 210 * j + 67);
+                    auto g1_xyy_xxxyz = ketBuffer.data(g1off + 210 * j + 67);
 
-                    auto g1_xyy_xxxzz = contrBuffer.data(g1off + 210 * j + 68);
+                    auto g1_xyy_xxxzz = ketBuffer.data(g1off + 210 * j + 68);
 
-                    auto g1_xyy_xxyyy = contrBuffer.data(g1off + 210 * j + 69);
+                    auto g1_xyy_xxyyy = ketBuffer.data(g1off + 210 * j + 69);
 
-                    auto g1_xyy_xxyyz = contrBuffer.data(g1off + 210 * j + 70);
+                    auto g1_xyy_xxyyz = ketBuffer.data(g1off + 210 * j + 70);
 
-                    auto g1_xyy_xxyzz = contrBuffer.data(g1off + 210 * j + 71);
+                    auto g1_xyy_xxyzz = ketBuffer.data(g1off + 210 * j + 71);
 
-                    auto g1_xyy_xxzzz = contrBuffer.data(g1off + 210 * j + 72);
+                    auto g1_xyy_xxzzz = ketBuffer.data(g1off + 210 * j + 72);
 
-                    auto g1_xyy_xyyyy = contrBuffer.data(g1off + 210 * j + 73);
+                    auto g1_xyy_xyyyy = ketBuffer.data(g1off + 210 * j + 73);
 
-                    auto g1_xyy_xyyyz = contrBuffer.data(g1off + 210 * j + 74);
+                    auto g1_xyy_xyyyz = ketBuffer.data(g1off + 210 * j + 74);
 
-                    auto g1_xyy_xyyzz = contrBuffer.data(g1off + 210 * j + 75);
+                    auto g1_xyy_xyyzz = ketBuffer.data(g1off + 210 * j + 75);
 
-                    auto g1_xyy_xyzzz = contrBuffer.data(g1off + 210 * j + 76);
+                    auto g1_xyy_xyzzz = ketBuffer.data(g1off + 210 * j + 76);
 
-                    auto g1_xyy_xzzzz = contrBuffer.data(g1off + 210 * j + 77);
+                    auto g1_xyy_xzzzz = ketBuffer.data(g1off + 210 * j + 77);
 
-                    auto g1_xyz_xxxxx = contrBuffer.data(g1off + 210 * j + 84);
+                    auto g1_xyz_xxxxx = ketBuffer.data(g1off + 210 * j + 84);
 
-                    auto g1_xyz_xxxxy = contrBuffer.data(g1off + 210 * j + 85);
+                    auto g1_xyz_xxxxy = ketBuffer.data(g1off + 210 * j + 85);
 
-                    auto g1_xyz_xxxxz = contrBuffer.data(g1off + 210 * j + 86);
+                    auto g1_xyz_xxxxz = ketBuffer.data(g1off + 210 * j + 86);
 
-                    auto g1_xyz_xxxyy = contrBuffer.data(g1off + 210 * j + 87);
+                    auto g1_xyz_xxxyy = ketBuffer.data(g1off + 210 * j + 87);
 
-                    auto g1_xyz_xxxyz = contrBuffer.data(g1off + 210 * j + 88);
+                    auto g1_xyz_xxxyz = ketBuffer.data(g1off + 210 * j + 88);
 
-                    auto g1_xyz_xxxzz = contrBuffer.data(g1off + 210 * j + 89);
+                    auto g1_xyz_xxxzz = ketBuffer.data(g1off + 210 * j + 89);
 
-                    auto g1_xyz_xxyyy = contrBuffer.data(g1off + 210 * j + 90);
+                    auto g1_xyz_xxyyy = ketBuffer.data(g1off + 210 * j + 90);
 
-                    auto g1_xyz_xxyyz = contrBuffer.data(g1off + 210 * j + 91);
+                    auto g1_xyz_xxyyz = ketBuffer.data(g1off + 210 * j + 91);
 
-                    auto g1_xyz_xxyzz = contrBuffer.data(g1off + 210 * j + 92);
+                    auto g1_xyz_xxyzz = ketBuffer.data(g1off + 210 * j + 92);
 
-                    auto g1_xyz_xxzzz = contrBuffer.data(g1off + 210 * j + 93);
+                    auto g1_xyz_xxzzz = ketBuffer.data(g1off + 210 * j + 93);
 
-                    auto g1_xyz_xyyyy = contrBuffer.data(g1off + 210 * j + 94);
+                    auto g1_xyz_xyyyy = ketBuffer.data(g1off + 210 * j + 94);
 
-                    auto g1_xyz_xyyyz = contrBuffer.data(g1off + 210 * j + 95);
+                    auto g1_xyz_xyyyz = ketBuffer.data(g1off + 210 * j + 95);
 
-                    auto g1_xyz_xyyzz = contrBuffer.data(g1off + 210 * j + 96);
+                    auto g1_xyz_xyyzz = ketBuffer.data(g1off + 210 * j + 96);
 
-                    auto g1_xyz_xyzzz = contrBuffer.data(g1off + 210 * j + 97);
+                    auto g1_xyz_xyzzz = ketBuffer.data(g1off + 210 * j + 97);
 
-                    auto g1_xyz_xzzzz = contrBuffer.data(g1off + 210 * j + 98);
+                    auto g1_xyz_xzzzz = ketBuffer.data(g1off + 210 * j + 98);
 
-                    auto g1_xzz_xxxxx = contrBuffer.data(g1off + 210 * j + 105);
+                    auto g1_xzz_xxxxx = ketBuffer.data(g1off + 210 * j + 105);
 
-                    auto g1_xzz_xxxxy = contrBuffer.data(g1off + 210 * j + 106);
+                    auto g1_xzz_xxxxy = ketBuffer.data(g1off + 210 * j + 106);
 
-                    auto g1_xzz_xxxxz = contrBuffer.data(g1off + 210 * j + 107);
+                    auto g1_xzz_xxxxz = ketBuffer.data(g1off + 210 * j + 107);
 
-                    auto g1_xzz_xxxyy = contrBuffer.data(g1off + 210 * j + 108);
+                    auto g1_xzz_xxxyy = ketBuffer.data(g1off + 210 * j + 108);
 
-                    auto g1_xzz_xxxyz = contrBuffer.data(g1off + 210 * j + 109);
+                    auto g1_xzz_xxxyz = ketBuffer.data(g1off + 210 * j + 109);
 
-                    auto g1_xzz_xxxzz = contrBuffer.data(g1off + 210 * j + 110);
+                    auto g1_xzz_xxxzz = ketBuffer.data(g1off + 210 * j + 110);
 
-                    auto g1_xzz_xxyyy = contrBuffer.data(g1off + 210 * j + 111);
+                    auto g1_xzz_xxyyy = ketBuffer.data(g1off + 210 * j + 111);
 
-                    auto g1_xzz_xxyyz = contrBuffer.data(g1off + 210 * j + 112);
+                    auto g1_xzz_xxyyz = ketBuffer.data(g1off + 210 * j + 112);
 
-                    auto g1_xzz_xxyzz = contrBuffer.data(g1off + 210 * j + 113);
+                    auto g1_xzz_xxyzz = ketBuffer.data(g1off + 210 * j + 113);
 
-                    auto g1_xzz_xxzzz = contrBuffer.data(g1off + 210 * j + 114);
+                    auto g1_xzz_xxzzz = ketBuffer.data(g1off + 210 * j + 114);
 
-                    auto g1_xzz_xyyyy = contrBuffer.data(g1off + 210 * j + 115);
+                    auto g1_xzz_xyyyy = ketBuffer.data(g1off + 210 * j + 115);
 
-                    auto g1_xzz_xyyyz = contrBuffer.data(g1off + 210 * j + 116);
+                    auto g1_xzz_xyyyz = ketBuffer.data(g1off + 210 * j + 116);
 
-                    auto g1_xzz_xyyzz = contrBuffer.data(g1off + 210 * j + 117);
+                    auto g1_xzz_xyyzz = ketBuffer.data(g1off + 210 * j + 117);
 
-                    auto g1_xzz_xyzzz = contrBuffer.data(g1off + 210 * j + 118);
+                    auto g1_xzz_xyzzz = ketBuffer.data(g1off + 210 * j + 118);
 
-                    auto g1_xzz_xzzzz = contrBuffer.data(g1off + 210 * j + 119);
+                    auto g1_xzz_xzzzz = ketBuffer.data(g1off + 210 * j + 119);
 
-                    auto g1_yyy_xxxxx = contrBuffer.data(g1off + 210 * j + 126);
+                    auto g1_yyy_xxxxx = ketBuffer.data(g1off + 210 * j + 126);
 
-                    auto g1_yyy_xxxxy = contrBuffer.data(g1off + 210 * j + 127);
+                    auto g1_yyy_xxxxy = ketBuffer.data(g1off + 210 * j + 127);
 
-                    auto g1_yyy_xxxxz = contrBuffer.data(g1off + 210 * j + 128);
+                    auto g1_yyy_xxxxz = ketBuffer.data(g1off + 210 * j + 128);
 
-                    auto g1_yyy_xxxyy = contrBuffer.data(g1off + 210 * j + 129);
+                    auto g1_yyy_xxxyy = ketBuffer.data(g1off + 210 * j + 129);
 
-                    auto g1_yyy_xxxyz = contrBuffer.data(g1off + 210 * j + 130);
+                    auto g1_yyy_xxxyz = ketBuffer.data(g1off + 210 * j + 130);
 
-                    auto g1_yyy_xxxzz = contrBuffer.data(g1off + 210 * j + 131);
+                    auto g1_yyy_xxxzz = ketBuffer.data(g1off + 210 * j + 131);
 
-                    auto g1_yyy_xxyyy = contrBuffer.data(g1off + 210 * j + 132);
+                    auto g1_yyy_xxyyy = ketBuffer.data(g1off + 210 * j + 132);
 
-                    auto g1_yyy_xxyyz = contrBuffer.data(g1off + 210 * j + 133);
+                    auto g1_yyy_xxyyz = ketBuffer.data(g1off + 210 * j + 133);
 
-                    auto g1_yyy_xxyzz = contrBuffer.data(g1off + 210 * j + 134);
+                    auto g1_yyy_xxyzz = ketBuffer.data(g1off + 210 * j + 134);
 
-                    auto g1_yyy_xxzzz = contrBuffer.data(g1off + 210 * j + 135);
+                    auto g1_yyy_xxzzz = ketBuffer.data(g1off + 210 * j + 135);
 
-                    auto g1_yyy_xyyyy = contrBuffer.data(g1off + 210 * j + 136);
+                    auto g1_yyy_xyyyy = ketBuffer.data(g1off + 210 * j + 136);
 
-                    auto g1_yyy_xyyyz = contrBuffer.data(g1off + 210 * j + 137);
+                    auto g1_yyy_xyyyz = ketBuffer.data(g1off + 210 * j + 137);
 
-                    auto g1_yyy_xyyzz = contrBuffer.data(g1off + 210 * j + 138);
+                    auto g1_yyy_xyyzz = ketBuffer.data(g1off + 210 * j + 138);
 
-                    auto g1_yyy_xyzzz = contrBuffer.data(g1off + 210 * j + 139);
+                    auto g1_yyy_xyzzz = ketBuffer.data(g1off + 210 * j + 139);
 
-                    auto g1_yyy_xzzzz = contrBuffer.data(g1off + 210 * j + 140);
+                    auto g1_yyy_xzzzz = ketBuffer.data(g1off + 210 * j + 140);
 
-                    auto g1_yyy_yyyyy = contrBuffer.data(g1off + 210 * j + 141);
+                    auto g1_yyy_yyyyy = ketBuffer.data(g1off + 210 * j + 141);
 
-                    auto g1_yyy_yyyyz = contrBuffer.data(g1off + 210 * j + 142);
+                    auto g1_yyy_yyyyz = ketBuffer.data(g1off + 210 * j + 142);
 
-                    auto g1_yyy_yyyzz = contrBuffer.data(g1off + 210 * j + 143);
+                    auto g1_yyy_yyyzz = ketBuffer.data(g1off + 210 * j + 143);
 
-                    auto g1_yyy_yyzzz = contrBuffer.data(g1off + 210 * j + 144);
+                    auto g1_yyy_yyzzz = ketBuffer.data(g1off + 210 * j + 144);
 
-                    auto g1_yyy_yzzzz = contrBuffer.data(g1off + 210 * j + 145);
+                    auto g1_yyy_yzzzz = ketBuffer.data(g1off + 210 * j + 145);
 
-                    auto g1_yyz_xxxxx = contrBuffer.data(g1off + 210 * j + 147);
+                    auto g1_yyz_xxxxx = ketBuffer.data(g1off + 210 * j + 147);
 
-                    auto g1_yyz_xxxxy = contrBuffer.data(g1off + 210 * j + 148);
+                    auto g1_yyz_xxxxy = ketBuffer.data(g1off + 210 * j + 148);
 
-                    auto g1_yyz_xxxxz = contrBuffer.data(g1off + 210 * j + 149);
+                    auto g1_yyz_xxxxz = ketBuffer.data(g1off + 210 * j + 149);
 
-                    auto g1_yyz_xxxyy = contrBuffer.data(g1off + 210 * j + 150);
+                    auto g1_yyz_xxxyy = ketBuffer.data(g1off + 210 * j + 150);
 
-                    auto g1_yyz_xxxyz = contrBuffer.data(g1off + 210 * j + 151);
+                    auto g1_yyz_xxxyz = ketBuffer.data(g1off + 210 * j + 151);
 
-                    auto g1_yyz_xxxzz = contrBuffer.data(g1off + 210 * j + 152);
+                    auto g1_yyz_xxxzz = ketBuffer.data(g1off + 210 * j + 152);
 
-                    auto g1_yyz_xxyyy = contrBuffer.data(g1off + 210 * j + 153);
+                    auto g1_yyz_xxyyy = ketBuffer.data(g1off + 210 * j + 153);
 
-                    auto g1_yyz_xxyyz = contrBuffer.data(g1off + 210 * j + 154);
+                    auto g1_yyz_xxyyz = ketBuffer.data(g1off + 210 * j + 154);
 
-                    auto g1_yyz_xxyzz = contrBuffer.data(g1off + 210 * j + 155);
+                    auto g1_yyz_xxyzz = ketBuffer.data(g1off + 210 * j + 155);
 
-                    auto g1_yyz_xxzzz = contrBuffer.data(g1off + 210 * j + 156);
+                    auto g1_yyz_xxzzz = ketBuffer.data(g1off + 210 * j + 156);
 
-                    auto g1_yyz_xyyyy = contrBuffer.data(g1off + 210 * j + 157);
+                    auto g1_yyz_xyyyy = ketBuffer.data(g1off + 210 * j + 157);
 
-                    auto g1_yyz_xyyyz = contrBuffer.data(g1off + 210 * j + 158);
+                    auto g1_yyz_xyyyz = ketBuffer.data(g1off + 210 * j + 158);
 
-                    auto g1_yyz_xyyzz = contrBuffer.data(g1off + 210 * j + 159);
+                    auto g1_yyz_xyyzz = ketBuffer.data(g1off + 210 * j + 159);
 
-                    auto g1_yyz_xyzzz = contrBuffer.data(g1off + 210 * j + 160);
+                    auto g1_yyz_xyzzz = ketBuffer.data(g1off + 210 * j + 160);
 
-                    auto g1_yyz_xzzzz = contrBuffer.data(g1off + 210 * j + 161);
+                    auto g1_yyz_xzzzz = ketBuffer.data(g1off + 210 * j + 161);
 
-                    auto g1_yyz_yyyyy = contrBuffer.data(g1off + 210 * j + 162);
+                    auto g1_yyz_yyyyy = ketBuffer.data(g1off + 210 * j + 162);
 
-                    auto g1_yyz_yyyyz = contrBuffer.data(g1off + 210 * j + 163);
+                    auto g1_yyz_yyyyz = ketBuffer.data(g1off + 210 * j + 163);
 
-                    auto g1_yyz_yyyzz = contrBuffer.data(g1off + 210 * j + 164);
+                    auto g1_yyz_yyyzz = ketBuffer.data(g1off + 210 * j + 164);
 
-                    auto g1_yyz_yyzzz = contrBuffer.data(g1off + 210 * j + 165);
+                    auto g1_yyz_yyzzz = ketBuffer.data(g1off + 210 * j + 165);
 
-                    auto g1_yyz_yzzzz = contrBuffer.data(g1off + 210 * j + 166);
+                    auto g1_yyz_yzzzz = ketBuffer.data(g1off + 210 * j + 166);
 
-                    auto g1_yzz_xxxxx = contrBuffer.data(g1off + 210 * j + 168);
+                    auto g1_yzz_xxxxx = ketBuffer.data(g1off + 210 * j + 168);
 
-                    auto g1_yzz_xxxxy = contrBuffer.data(g1off + 210 * j + 169);
+                    auto g1_yzz_xxxxy = ketBuffer.data(g1off + 210 * j + 169);
 
-                    auto g1_yzz_xxxxz = contrBuffer.data(g1off + 210 * j + 170);
+                    auto g1_yzz_xxxxz = ketBuffer.data(g1off + 210 * j + 170);
 
-                    auto g1_yzz_xxxyy = contrBuffer.data(g1off + 210 * j + 171);
+                    auto g1_yzz_xxxyy = ketBuffer.data(g1off + 210 * j + 171);
 
-                    auto g1_yzz_xxxyz = contrBuffer.data(g1off + 210 * j + 172);
+                    auto g1_yzz_xxxyz = ketBuffer.data(g1off + 210 * j + 172);
 
-                    auto g1_yzz_xxxzz = contrBuffer.data(g1off + 210 * j + 173);
+                    auto g1_yzz_xxxzz = ketBuffer.data(g1off + 210 * j + 173);
 
-                    auto g1_yzz_xxyyy = contrBuffer.data(g1off + 210 * j + 174);
+                    auto g1_yzz_xxyyy = ketBuffer.data(g1off + 210 * j + 174);
 
-                    auto g1_yzz_xxyyz = contrBuffer.data(g1off + 210 * j + 175);
+                    auto g1_yzz_xxyyz = ketBuffer.data(g1off + 210 * j + 175);
 
-                    auto g1_yzz_xxyzz = contrBuffer.data(g1off + 210 * j + 176);
+                    auto g1_yzz_xxyzz = ketBuffer.data(g1off + 210 * j + 176);
 
-                    auto g1_yzz_xxzzz = contrBuffer.data(g1off + 210 * j + 177);
+                    auto g1_yzz_xxzzz = ketBuffer.data(g1off + 210 * j + 177);
 
-                    auto g1_yzz_xyyyy = contrBuffer.data(g1off + 210 * j + 178);
+                    auto g1_yzz_xyyyy = ketBuffer.data(g1off + 210 * j + 178);
 
-                    auto g1_yzz_xyyyz = contrBuffer.data(g1off + 210 * j + 179);
+                    auto g1_yzz_xyyyz = ketBuffer.data(g1off + 210 * j + 179);
 
-                    auto g1_yzz_xyyzz = contrBuffer.data(g1off + 210 * j + 180);
+                    auto g1_yzz_xyyzz = ketBuffer.data(g1off + 210 * j + 180);
 
-                    auto g1_yzz_xyzzz = contrBuffer.data(g1off + 210 * j + 181);
+                    auto g1_yzz_xyzzz = ketBuffer.data(g1off + 210 * j + 181);
 
-                    auto g1_yzz_xzzzz = contrBuffer.data(g1off + 210 * j + 182);
+                    auto g1_yzz_xzzzz = ketBuffer.data(g1off + 210 * j + 182);
 
-                    auto g1_yzz_yyyyy = contrBuffer.data(g1off + 210 * j + 183);
+                    auto g1_yzz_yyyyy = ketBuffer.data(g1off + 210 * j + 183);
 
-                    auto g1_yzz_yyyyz = contrBuffer.data(g1off + 210 * j + 184);
+                    auto g1_yzz_yyyyz = ketBuffer.data(g1off + 210 * j + 184);
 
-                    auto g1_yzz_yyyzz = contrBuffer.data(g1off + 210 * j + 185);
+                    auto g1_yzz_yyyzz = ketBuffer.data(g1off + 210 * j + 185);
 
-                    auto g1_yzz_yyzzz = contrBuffer.data(g1off + 210 * j + 186);
+                    auto g1_yzz_yyzzz = ketBuffer.data(g1off + 210 * j + 186);
 
-                    auto g1_yzz_yzzzz = contrBuffer.data(g1off + 210 * j + 187);
+                    auto g1_yzz_yzzzz = ketBuffer.data(g1off + 210 * j + 187);
 
-                    auto g1_zzz_xxxxx = contrBuffer.data(g1off + 210 * j + 189);
+                    auto g1_zzz_xxxxx = ketBuffer.data(g1off + 210 * j + 189);
 
-                    auto g1_zzz_xxxxy = contrBuffer.data(g1off + 210 * j + 190);
+                    auto g1_zzz_xxxxy = ketBuffer.data(g1off + 210 * j + 190);
 
-                    auto g1_zzz_xxxxz = contrBuffer.data(g1off + 210 * j + 191);
+                    auto g1_zzz_xxxxz = ketBuffer.data(g1off + 210 * j + 191);
 
-                    auto g1_zzz_xxxyy = contrBuffer.data(g1off + 210 * j + 192);
+                    auto g1_zzz_xxxyy = ketBuffer.data(g1off + 210 * j + 192);
 
-                    auto g1_zzz_xxxyz = contrBuffer.data(g1off + 210 * j + 193);
+                    auto g1_zzz_xxxyz = ketBuffer.data(g1off + 210 * j + 193);
 
-                    auto g1_zzz_xxxzz = contrBuffer.data(g1off + 210 * j + 194);
+                    auto g1_zzz_xxxzz = ketBuffer.data(g1off + 210 * j + 194);
 
-                    auto g1_zzz_xxyyy = contrBuffer.data(g1off + 210 * j + 195);
+                    auto g1_zzz_xxyyy = ketBuffer.data(g1off + 210 * j + 195);
 
-                    auto g1_zzz_xxyyz = contrBuffer.data(g1off + 210 * j + 196);
+                    auto g1_zzz_xxyyz = ketBuffer.data(g1off + 210 * j + 196);
 
-                    auto g1_zzz_xxyzz = contrBuffer.data(g1off + 210 * j + 197);
+                    auto g1_zzz_xxyzz = ketBuffer.data(g1off + 210 * j + 197);
 
-                    auto g1_zzz_xxzzz = contrBuffer.data(g1off + 210 * j + 198);
+                    auto g1_zzz_xxzzz = ketBuffer.data(g1off + 210 * j + 198);
 
-                    auto g1_zzz_xyyyy = contrBuffer.data(g1off + 210 * j + 199);
+                    auto g1_zzz_xyyyy = ketBuffer.data(g1off + 210 * j + 199);
 
-                    auto g1_zzz_xyyyz = contrBuffer.data(g1off + 210 * j + 200);
+                    auto g1_zzz_xyyyz = ketBuffer.data(g1off + 210 * j + 200);
 
-                    auto g1_zzz_xyyzz = contrBuffer.data(g1off + 210 * j + 201);
+                    auto g1_zzz_xyyzz = ketBuffer.data(g1off + 210 * j + 201);
 
-                    auto g1_zzz_xyzzz = contrBuffer.data(g1off + 210 * j + 202);
+                    auto g1_zzz_xyzzz = ketBuffer.data(g1off + 210 * j + 202);
 
-                    auto g1_zzz_xzzzz = contrBuffer.data(g1off + 210 * j + 203);
+                    auto g1_zzz_xzzzz = ketBuffer.data(g1off + 210 * j + 203);
 
-                    auto g1_zzz_yyyyy = contrBuffer.data(g1off + 210 * j + 204);
+                    auto g1_zzz_yyyyy = ketBuffer.data(g1off + 210 * j + 204);
 
-                    auto g1_zzz_yyyyz = contrBuffer.data(g1off + 210 * j + 205);
+                    auto g1_zzz_yyyyz = ketBuffer.data(g1off + 210 * j + 205);
 
-                    auto g1_zzz_yyyzz = contrBuffer.data(g1off + 210 * j + 206);
+                    auto g1_zzz_yyyzz = ketBuffer.data(g1off + 210 * j + 206);
 
-                    auto g1_zzz_yyzzz = contrBuffer.data(g1off + 210 * j + 207);
+                    auto g1_zzz_yyzzz = ketBuffer.data(g1off + 210 * j + 207);
 
-                    auto g1_zzz_yzzzz = contrBuffer.data(g1off + 210 * j + 208);
+                    auto g1_zzz_yzzzz = ketBuffer.data(g1off + 210 * j + 208);
 
-                    auto g1_zzz_zzzzz = contrBuffer.data(g1off + 210 * j + 209);
+                    auto g1_zzz_zzzzz = ketBuffer.data(g1off + 210 * j + 209);
 
-                    // set up pointers to (SX|g(r,r')|GG)^(m) integrals
+                    // set up pointers to (SX|g(r,r')|GG) integrals
 
-                    auto g_xxxx_xxxx = contrBuffer.data(goff + 225 * j);
+                    auto g_xxxx_xxxx = ketBuffer.data(goff + 225 * j);
 
-                    auto g_xxxx_xxxy = contrBuffer.data(goff + 225 * j + 1);
+                    auto g_xxxx_xxxy = ketBuffer.data(goff + 225 * j + 1);
 
-                    auto g_xxxx_xxxz = contrBuffer.data(goff + 225 * j + 2);
+                    auto g_xxxx_xxxz = ketBuffer.data(goff + 225 * j + 2);
 
-                    auto g_xxxx_xxyy = contrBuffer.data(goff + 225 * j + 3);
+                    auto g_xxxx_xxyy = ketBuffer.data(goff + 225 * j + 3);
 
-                    auto g_xxxx_xxyz = contrBuffer.data(goff + 225 * j + 4);
+                    auto g_xxxx_xxyz = ketBuffer.data(goff + 225 * j + 4);
 
-                    auto g_xxxx_xxzz = contrBuffer.data(goff + 225 * j + 5);
+                    auto g_xxxx_xxzz = ketBuffer.data(goff + 225 * j + 5);
 
-                    auto g_xxxx_xyyy = contrBuffer.data(goff + 225 * j + 6);
+                    auto g_xxxx_xyyy = ketBuffer.data(goff + 225 * j + 6);
 
-                    auto g_xxxx_xyyz = contrBuffer.data(goff + 225 * j + 7);
+                    auto g_xxxx_xyyz = ketBuffer.data(goff + 225 * j + 7);
 
-                    auto g_xxxx_xyzz = contrBuffer.data(goff + 225 * j + 8);
+                    auto g_xxxx_xyzz = ketBuffer.data(goff + 225 * j + 8);
 
-                    auto g_xxxx_xzzz = contrBuffer.data(goff + 225 * j + 9);
+                    auto g_xxxx_xzzz = ketBuffer.data(goff + 225 * j + 9);
 
-                    auto g_xxxx_yyyy = contrBuffer.data(goff + 225 * j + 10);
+                    auto g_xxxx_yyyy = ketBuffer.data(goff + 225 * j + 10);
 
-                    auto g_xxxx_yyyz = contrBuffer.data(goff + 225 * j + 11);
+                    auto g_xxxx_yyyz = ketBuffer.data(goff + 225 * j + 11);
 
-                    auto g_xxxx_yyzz = contrBuffer.data(goff + 225 * j + 12);
+                    auto g_xxxx_yyzz = ketBuffer.data(goff + 225 * j + 12);
 
-                    auto g_xxxx_yzzz = contrBuffer.data(goff + 225 * j + 13);
+                    auto g_xxxx_yzzz = ketBuffer.data(goff + 225 * j + 13);
 
-                    auto g_xxxx_zzzz = contrBuffer.data(goff + 225 * j + 14);
+                    auto g_xxxx_zzzz = ketBuffer.data(goff + 225 * j + 14);
 
-                    auto g_xxxy_xxxx = contrBuffer.data(goff + 225 * j + 15);
+                    auto g_xxxy_xxxx = ketBuffer.data(goff + 225 * j + 15);
 
-                    auto g_xxxy_xxxy = contrBuffer.data(goff + 225 * j + 16);
+                    auto g_xxxy_xxxy = ketBuffer.data(goff + 225 * j + 16);
 
-                    auto g_xxxy_xxxz = contrBuffer.data(goff + 225 * j + 17);
+                    auto g_xxxy_xxxz = ketBuffer.data(goff + 225 * j + 17);
 
-                    auto g_xxxy_xxyy = contrBuffer.data(goff + 225 * j + 18);
+                    auto g_xxxy_xxyy = ketBuffer.data(goff + 225 * j + 18);
 
-                    auto g_xxxy_xxyz = contrBuffer.data(goff + 225 * j + 19);
+                    auto g_xxxy_xxyz = ketBuffer.data(goff + 225 * j + 19);
 
-                    auto g_xxxy_xxzz = contrBuffer.data(goff + 225 * j + 20);
+                    auto g_xxxy_xxzz = ketBuffer.data(goff + 225 * j + 20);
 
-                    auto g_xxxy_xyyy = contrBuffer.data(goff + 225 * j + 21);
+                    auto g_xxxy_xyyy = ketBuffer.data(goff + 225 * j + 21);
 
-                    auto g_xxxy_xyyz = contrBuffer.data(goff + 225 * j + 22);
+                    auto g_xxxy_xyyz = ketBuffer.data(goff + 225 * j + 22);
 
-                    auto g_xxxy_xyzz = contrBuffer.data(goff + 225 * j + 23);
+                    auto g_xxxy_xyzz = ketBuffer.data(goff + 225 * j + 23);
 
-                    auto g_xxxy_xzzz = contrBuffer.data(goff + 225 * j + 24);
+                    auto g_xxxy_xzzz = ketBuffer.data(goff + 225 * j + 24);
 
-                    auto g_xxxy_yyyy = contrBuffer.data(goff + 225 * j + 25);
+                    auto g_xxxy_yyyy = ketBuffer.data(goff + 225 * j + 25);
 
-                    auto g_xxxy_yyyz = contrBuffer.data(goff + 225 * j + 26);
+                    auto g_xxxy_yyyz = ketBuffer.data(goff + 225 * j + 26);
 
-                    auto g_xxxy_yyzz = contrBuffer.data(goff + 225 * j + 27);
+                    auto g_xxxy_yyzz = ketBuffer.data(goff + 225 * j + 27);
 
-                    auto g_xxxy_yzzz = contrBuffer.data(goff + 225 * j + 28);
+                    auto g_xxxy_yzzz = ketBuffer.data(goff + 225 * j + 28);
 
-                    auto g_xxxy_zzzz = contrBuffer.data(goff + 225 * j + 29);
+                    auto g_xxxy_zzzz = ketBuffer.data(goff + 225 * j + 29);
 
-                    auto g_xxxz_xxxx = contrBuffer.data(goff + 225 * j + 30);
+                    auto g_xxxz_xxxx = ketBuffer.data(goff + 225 * j + 30);
 
-                    auto g_xxxz_xxxy = contrBuffer.data(goff + 225 * j + 31);
+                    auto g_xxxz_xxxy = ketBuffer.data(goff + 225 * j + 31);
 
-                    auto g_xxxz_xxxz = contrBuffer.data(goff + 225 * j + 32);
+                    auto g_xxxz_xxxz = ketBuffer.data(goff + 225 * j + 32);
 
-                    auto g_xxxz_xxyy = contrBuffer.data(goff + 225 * j + 33);
+                    auto g_xxxz_xxyy = ketBuffer.data(goff + 225 * j + 33);
 
-                    auto g_xxxz_xxyz = contrBuffer.data(goff + 225 * j + 34);
+                    auto g_xxxz_xxyz = ketBuffer.data(goff + 225 * j + 34);
 
-                    auto g_xxxz_xxzz = contrBuffer.data(goff + 225 * j + 35);
+                    auto g_xxxz_xxzz = ketBuffer.data(goff + 225 * j + 35);
 
-                    auto g_xxxz_xyyy = contrBuffer.data(goff + 225 * j + 36);
+                    auto g_xxxz_xyyy = ketBuffer.data(goff + 225 * j + 36);
 
-                    auto g_xxxz_xyyz = contrBuffer.data(goff + 225 * j + 37);
+                    auto g_xxxz_xyyz = ketBuffer.data(goff + 225 * j + 37);
 
-                    auto g_xxxz_xyzz = contrBuffer.data(goff + 225 * j + 38);
+                    auto g_xxxz_xyzz = ketBuffer.data(goff + 225 * j + 38);
 
-                    auto g_xxxz_xzzz = contrBuffer.data(goff + 225 * j + 39);
+                    auto g_xxxz_xzzz = ketBuffer.data(goff + 225 * j + 39);
 
-                    auto g_xxxz_yyyy = contrBuffer.data(goff + 225 * j + 40);
+                    auto g_xxxz_yyyy = ketBuffer.data(goff + 225 * j + 40);
 
-                    auto g_xxxz_yyyz = contrBuffer.data(goff + 225 * j + 41);
+                    auto g_xxxz_yyyz = ketBuffer.data(goff + 225 * j + 41);
 
-                    auto g_xxxz_yyzz = contrBuffer.data(goff + 225 * j + 42);
+                    auto g_xxxz_yyzz = ketBuffer.data(goff + 225 * j + 42);
 
-                    auto g_xxxz_yzzz = contrBuffer.data(goff + 225 * j + 43);
+                    auto g_xxxz_yzzz = ketBuffer.data(goff + 225 * j + 43);
 
-                    auto g_xxxz_zzzz = contrBuffer.data(goff + 225 * j + 44);
+                    auto g_xxxz_zzzz = ketBuffer.data(goff + 225 * j + 44);
 
-                    auto g_xxyy_xxxx = contrBuffer.data(goff + 225 * j + 45);
+                    auto g_xxyy_xxxx = ketBuffer.data(goff + 225 * j + 45);
 
-                    auto g_xxyy_xxxy = contrBuffer.data(goff + 225 * j + 46);
+                    auto g_xxyy_xxxy = ketBuffer.data(goff + 225 * j + 46);
 
-                    auto g_xxyy_xxxz = contrBuffer.data(goff + 225 * j + 47);
+                    auto g_xxyy_xxxz = ketBuffer.data(goff + 225 * j + 47);
 
-                    auto g_xxyy_xxyy = contrBuffer.data(goff + 225 * j + 48);
+                    auto g_xxyy_xxyy = ketBuffer.data(goff + 225 * j + 48);
 
-                    auto g_xxyy_xxyz = contrBuffer.data(goff + 225 * j + 49);
+                    auto g_xxyy_xxyz = ketBuffer.data(goff + 225 * j + 49);
 
-                    auto g_xxyy_xxzz = contrBuffer.data(goff + 225 * j + 50);
+                    auto g_xxyy_xxzz = ketBuffer.data(goff + 225 * j + 50);
 
-                    auto g_xxyy_xyyy = contrBuffer.data(goff + 225 * j + 51);
+                    auto g_xxyy_xyyy = ketBuffer.data(goff + 225 * j + 51);
 
-                    auto g_xxyy_xyyz = contrBuffer.data(goff + 225 * j + 52);
+                    auto g_xxyy_xyyz = ketBuffer.data(goff + 225 * j + 52);
 
-                    auto g_xxyy_xyzz = contrBuffer.data(goff + 225 * j + 53);
+                    auto g_xxyy_xyzz = ketBuffer.data(goff + 225 * j + 53);
 
-                    auto g_xxyy_xzzz = contrBuffer.data(goff + 225 * j + 54);
+                    auto g_xxyy_xzzz = ketBuffer.data(goff + 225 * j + 54);
 
-                    auto g_xxyy_yyyy = contrBuffer.data(goff + 225 * j + 55);
+                    auto g_xxyy_yyyy = ketBuffer.data(goff + 225 * j + 55);
 
-                    auto g_xxyy_yyyz = contrBuffer.data(goff + 225 * j + 56);
+                    auto g_xxyy_yyyz = ketBuffer.data(goff + 225 * j + 56);
 
-                    auto g_xxyy_yyzz = contrBuffer.data(goff + 225 * j + 57);
+                    auto g_xxyy_yyzz = ketBuffer.data(goff + 225 * j + 57);
 
-                    auto g_xxyy_yzzz = contrBuffer.data(goff + 225 * j + 58);
+                    auto g_xxyy_yzzz = ketBuffer.data(goff + 225 * j + 58);
 
-                    auto g_xxyy_zzzz = contrBuffer.data(goff + 225 * j + 59);
+                    auto g_xxyy_zzzz = ketBuffer.data(goff + 225 * j + 59);
 
-                    auto g_xxyz_xxxx = contrBuffer.data(goff + 225 * j + 60);
+                    auto g_xxyz_xxxx = ketBuffer.data(goff + 225 * j + 60);
 
-                    auto g_xxyz_xxxy = contrBuffer.data(goff + 225 * j + 61);
+                    auto g_xxyz_xxxy = ketBuffer.data(goff + 225 * j + 61);
 
-                    auto g_xxyz_xxxz = contrBuffer.data(goff + 225 * j + 62);
+                    auto g_xxyz_xxxz = ketBuffer.data(goff + 225 * j + 62);
 
-                    auto g_xxyz_xxyy = contrBuffer.data(goff + 225 * j + 63);
+                    auto g_xxyz_xxyy = ketBuffer.data(goff + 225 * j + 63);
 
-                    auto g_xxyz_xxyz = contrBuffer.data(goff + 225 * j + 64);
+                    auto g_xxyz_xxyz = ketBuffer.data(goff + 225 * j + 64);
 
-                    auto g_xxyz_xxzz = contrBuffer.data(goff + 225 * j + 65);
+                    auto g_xxyz_xxzz = ketBuffer.data(goff + 225 * j + 65);
 
-                    auto g_xxyz_xyyy = contrBuffer.data(goff + 225 * j + 66);
+                    auto g_xxyz_xyyy = ketBuffer.data(goff + 225 * j + 66);
 
-                    auto g_xxyz_xyyz = contrBuffer.data(goff + 225 * j + 67);
+                    auto g_xxyz_xyyz = ketBuffer.data(goff + 225 * j + 67);
 
-                    auto g_xxyz_xyzz = contrBuffer.data(goff + 225 * j + 68);
+                    auto g_xxyz_xyzz = ketBuffer.data(goff + 225 * j + 68);
 
-                    auto g_xxyz_xzzz = contrBuffer.data(goff + 225 * j + 69);
+                    auto g_xxyz_xzzz = ketBuffer.data(goff + 225 * j + 69);
 
-                    auto g_xxyz_yyyy = contrBuffer.data(goff + 225 * j + 70);
+                    auto g_xxyz_yyyy = ketBuffer.data(goff + 225 * j + 70);
 
-                    auto g_xxyz_yyyz = contrBuffer.data(goff + 225 * j + 71);
+                    auto g_xxyz_yyyz = ketBuffer.data(goff + 225 * j + 71);
 
-                    auto g_xxyz_yyzz = contrBuffer.data(goff + 225 * j + 72);
+                    auto g_xxyz_yyzz = ketBuffer.data(goff + 225 * j + 72);
 
-                    auto g_xxyz_yzzz = contrBuffer.data(goff + 225 * j + 73);
+                    auto g_xxyz_yzzz = ketBuffer.data(goff + 225 * j + 73);
 
-                    auto g_xxyz_zzzz = contrBuffer.data(goff + 225 * j + 74);
+                    auto g_xxyz_zzzz = ketBuffer.data(goff + 225 * j + 74);
 
-                    auto g_xxzz_xxxx = contrBuffer.data(goff + 225 * j + 75);
+                    auto g_xxzz_xxxx = ketBuffer.data(goff + 225 * j + 75);
 
-                    auto g_xxzz_xxxy = contrBuffer.data(goff + 225 * j + 76);
+                    auto g_xxzz_xxxy = ketBuffer.data(goff + 225 * j + 76);
 
-                    auto g_xxzz_xxxz = contrBuffer.data(goff + 225 * j + 77);
+                    auto g_xxzz_xxxz = ketBuffer.data(goff + 225 * j + 77);
 
-                    auto g_xxzz_xxyy = contrBuffer.data(goff + 225 * j + 78);
+                    auto g_xxzz_xxyy = ketBuffer.data(goff + 225 * j + 78);
 
-                    auto g_xxzz_xxyz = contrBuffer.data(goff + 225 * j + 79);
+                    auto g_xxzz_xxyz = ketBuffer.data(goff + 225 * j + 79);
 
-                    auto g_xxzz_xxzz = contrBuffer.data(goff + 225 * j + 80);
+                    auto g_xxzz_xxzz = ketBuffer.data(goff + 225 * j + 80);
 
-                    auto g_xxzz_xyyy = contrBuffer.data(goff + 225 * j + 81);
+                    auto g_xxzz_xyyy = ketBuffer.data(goff + 225 * j + 81);
 
-                    auto g_xxzz_xyyz = contrBuffer.data(goff + 225 * j + 82);
+                    auto g_xxzz_xyyz = ketBuffer.data(goff + 225 * j + 82);
 
-                    auto g_xxzz_xyzz = contrBuffer.data(goff + 225 * j + 83);
+                    auto g_xxzz_xyzz = ketBuffer.data(goff + 225 * j + 83);
 
-                    auto g_xxzz_xzzz = contrBuffer.data(goff + 225 * j + 84);
+                    auto g_xxzz_xzzz = ketBuffer.data(goff + 225 * j + 84);
 
-                    auto g_xxzz_yyyy = contrBuffer.data(goff + 225 * j + 85);
+                    auto g_xxzz_yyyy = ketBuffer.data(goff + 225 * j + 85);
 
-                    auto g_xxzz_yyyz = contrBuffer.data(goff + 225 * j + 86);
+                    auto g_xxzz_yyyz = ketBuffer.data(goff + 225 * j + 86);
 
-                    auto g_xxzz_yyzz = contrBuffer.data(goff + 225 * j + 87);
+                    auto g_xxzz_yyzz = ketBuffer.data(goff + 225 * j + 87);
 
-                    auto g_xxzz_yzzz = contrBuffer.data(goff + 225 * j + 88);
+                    auto g_xxzz_yzzz = ketBuffer.data(goff + 225 * j + 88);
 
-                    auto g_xxzz_zzzz = contrBuffer.data(goff + 225 * j + 89);
+                    auto g_xxzz_zzzz = ketBuffer.data(goff + 225 * j + 89);
 
-                    auto g_xyyy_xxxx = contrBuffer.data(goff + 225 * j + 90);
+                    auto g_xyyy_xxxx = ketBuffer.data(goff + 225 * j + 90);
 
-                    auto g_xyyy_xxxy = contrBuffer.data(goff + 225 * j + 91);
+                    auto g_xyyy_xxxy = ketBuffer.data(goff + 225 * j + 91);
 
-                    auto g_xyyy_xxxz = contrBuffer.data(goff + 225 * j + 92);
+                    auto g_xyyy_xxxz = ketBuffer.data(goff + 225 * j + 92);
 
-                    auto g_xyyy_xxyy = contrBuffer.data(goff + 225 * j + 93);
+                    auto g_xyyy_xxyy = ketBuffer.data(goff + 225 * j + 93);
 
-                    auto g_xyyy_xxyz = contrBuffer.data(goff + 225 * j + 94);
+                    auto g_xyyy_xxyz = ketBuffer.data(goff + 225 * j + 94);
 
-                    auto g_xyyy_xxzz = contrBuffer.data(goff + 225 * j + 95);
+                    auto g_xyyy_xxzz = ketBuffer.data(goff + 225 * j + 95);
 
-                    auto g_xyyy_xyyy = contrBuffer.data(goff + 225 * j + 96);
+                    auto g_xyyy_xyyy = ketBuffer.data(goff + 225 * j + 96);
 
-                    auto g_xyyy_xyyz = contrBuffer.data(goff + 225 * j + 97);
+                    auto g_xyyy_xyyz = ketBuffer.data(goff + 225 * j + 97);
 
-                    auto g_xyyy_xyzz = contrBuffer.data(goff + 225 * j + 98);
+                    auto g_xyyy_xyzz = ketBuffer.data(goff + 225 * j + 98);
 
-                    auto g_xyyy_xzzz = contrBuffer.data(goff + 225 * j + 99);
+                    auto g_xyyy_xzzz = ketBuffer.data(goff + 225 * j + 99);
 
-                    auto g_xyyy_yyyy = contrBuffer.data(goff + 225 * j + 100);
+                    auto g_xyyy_yyyy = ketBuffer.data(goff + 225 * j + 100);
 
-                    auto g_xyyy_yyyz = contrBuffer.data(goff + 225 * j + 101);
+                    auto g_xyyy_yyyz = ketBuffer.data(goff + 225 * j + 101);
 
-                    auto g_xyyy_yyzz = contrBuffer.data(goff + 225 * j + 102);
+                    auto g_xyyy_yyzz = ketBuffer.data(goff + 225 * j + 102);
 
-                    auto g_xyyy_yzzz = contrBuffer.data(goff + 225 * j + 103);
+                    auto g_xyyy_yzzz = ketBuffer.data(goff + 225 * j + 103);
 
-                    auto g_xyyy_zzzz = contrBuffer.data(goff + 225 * j + 104);
+                    auto g_xyyy_zzzz = ketBuffer.data(goff + 225 * j + 104);
 
-                    auto g_xyyz_xxxx = contrBuffer.data(goff + 225 * j + 105);
+                    auto g_xyyz_xxxx = ketBuffer.data(goff + 225 * j + 105);
 
-                    auto g_xyyz_xxxy = contrBuffer.data(goff + 225 * j + 106);
+                    auto g_xyyz_xxxy = ketBuffer.data(goff + 225 * j + 106);
 
-                    auto g_xyyz_xxxz = contrBuffer.data(goff + 225 * j + 107);
+                    auto g_xyyz_xxxz = ketBuffer.data(goff + 225 * j + 107);
 
-                    auto g_xyyz_xxyy = contrBuffer.data(goff + 225 * j + 108);
+                    auto g_xyyz_xxyy = ketBuffer.data(goff + 225 * j + 108);
 
-                    auto g_xyyz_xxyz = contrBuffer.data(goff + 225 * j + 109);
+                    auto g_xyyz_xxyz = ketBuffer.data(goff + 225 * j + 109);
 
-                    auto g_xyyz_xxzz = contrBuffer.data(goff + 225 * j + 110);
+                    auto g_xyyz_xxzz = ketBuffer.data(goff + 225 * j + 110);
 
-                    auto g_xyyz_xyyy = contrBuffer.data(goff + 225 * j + 111);
+                    auto g_xyyz_xyyy = ketBuffer.data(goff + 225 * j + 111);
 
-                    auto g_xyyz_xyyz = contrBuffer.data(goff + 225 * j + 112);
+                    auto g_xyyz_xyyz = ketBuffer.data(goff + 225 * j + 112);
 
-                    auto g_xyyz_xyzz = contrBuffer.data(goff + 225 * j + 113);
+                    auto g_xyyz_xyzz = ketBuffer.data(goff + 225 * j + 113);
 
-                    auto g_xyyz_xzzz = contrBuffer.data(goff + 225 * j + 114);
+                    auto g_xyyz_xzzz = ketBuffer.data(goff + 225 * j + 114);
 
-                    auto g_xyyz_yyyy = contrBuffer.data(goff + 225 * j + 115);
+                    auto g_xyyz_yyyy = ketBuffer.data(goff + 225 * j + 115);
 
-                    auto g_xyyz_yyyz = contrBuffer.data(goff + 225 * j + 116);
+                    auto g_xyyz_yyyz = ketBuffer.data(goff + 225 * j + 116);
 
-                    auto g_xyyz_yyzz = contrBuffer.data(goff + 225 * j + 117);
+                    auto g_xyyz_yyzz = ketBuffer.data(goff + 225 * j + 117);
 
-                    auto g_xyyz_yzzz = contrBuffer.data(goff + 225 * j + 118);
+                    auto g_xyyz_yzzz = ketBuffer.data(goff + 225 * j + 118);
 
-                    auto g_xyyz_zzzz = contrBuffer.data(goff + 225 * j + 119);
+                    auto g_xyyz_zzzz = ketBuffer.data(goff + 225 * j + 119);
 
-                    auto g_xyzz_xxxx = contrBuffer.data(goff + 225 * j + 120);
+                    auto g_xyzz_xxxx = ketBuffer.data(goff + 225 * j + 120);
 
-                    auto g_xyzz_xxxy = contrBuffer.data(goff + 225 * j + 121);
+                    auto g_xyzz_xxxy = ketBuffer.data(goff + 225 * j + 121);
 
-                    auto g_xyzz_xxxz = contrBuffer.data(goff + 225 * j + 122);
+                    auto g_xyzz_xxxz = ketBuffer.data(goff + 225 * j + 122);
 
-                    auto g_xyzz_xxyy = contrBuffer.data(goff + 225 * j + 123);
+                    auto g_xyzz_xxyy = ketBuffer.data(goff + 225 * j + 123);
 
-                    auto g_xyzz_xxyz = contrBuffer.data(goff + 225 * j + 124);
+                    auto g_xyzz_xxyz = ketBuffer.data(goff + 225 * j + 124);
 
-                    auto g_xyzz_xxzz = contrBuffer.data(goff + 225 * j + 125);
+                    auto g_xyzz_xxzz = ketBuffer.data(goff + 225 * j + 125);
 
-                    auto g_xyzz_xyyy = contrBuffer.data(goff + 225 * j + 126);
+                    auto g_xyzz_xyyy = ketBuffer.data(goff + 225 * j + 126);
 
-                    auto g_xyzz_xyyz = contrBuffer.data(goff + 225 * j + 127);
+                    auto g_xyzz_xyyz = ketBuffer.data(goff + 225 * j + 127);
 
-                    auto g_xyzz_xyzz = contrBuffer.data(goff + 225 * j + 128);
+                    auto g_xyzz_xyzz = ketBuffer.data(goff + 225 * j + 128);
 
-                    auto g_xyzz_xzzz = contrBuffer.data(goff + 225 * j + 129);
+                    auto g_xyzz_xzzz = ketBuffer.data(goff + 225 * j + 129);
 
-                    auto g_xyzz_yyyy = contrBuffer.data(goff + 225 * j + 130);
+                    auto g_xyzz_yyyy = ketBuffer.data(goff + 225 * j + 130);
 
-                    auto g_xyzz_yyyz = contrBuffer.data(goff + 225 * j + 131);
+                    auto g_xyzz_yyyz = ketBuffer.data(goff + 225 * j + 131);
 
-                    auto g_xyzz_yyzz = contrBuffer.data(goff + 225 * j + 132);
+                    auto g_xyzz_yyzz = ketBuffer.data(goff + 225 * j + 132);
 
-                    auto g_xyzz_yzzz = contrBuffer.data(goff + 225 * j + 133);
+                    auto g_xyzz_yzzz = ketBuffer.data(goff + 225 * j + 133);
 
-                    auto g_xyzz_zzzz = contrBuffer.data(goff + 225 * j + 134);
+                    auto g_xyzz_zzzz = ketBuffer.data(goff + 225 * j + 134);
 
-                    auto g_xzzz_xxxx = contrBuffer.data(goff + 225 * j + 135);
+                    auto g_xzzz_xxxx = ketBuffer.data(goff + 225 * j + 135);
 
-                    auto g_xzzz_xxxy = contrBuffer.data(goff + 225 * j + 136);
+                    auto g_xzzz_xxxy = ketBuffer.data(goff + 225 * j + 136);
 
-                    auto g_xzzz_xxxz = contrBuffer.data(goff + 225 * j + 137);
+                    auto g_xzzz_xxxz = ketBuffer.data(goff + 225 * j + 137);
 
-                    auto g_xzzz_xxyy = contrBuffer.data(goff + 225 * j + 138);
+                    auto g_xzzz_xxyy = ketBuffer.data(goff + 225 * j + 138);
 
-                    auto g_xzzz_xxyz = contrBuffer.data(goff + 225 * j + 139);
+                    auto g_xzzz_xxyz = ketBuffer.data(goff + 225 * j + 139);
 
-                    auto g_xzzz_xxzz = contrBuffer.data(goff + 225 * j + 140);
+                    auto g_xzzz_xxzz = ketBuffer.data(goff + 225 * j + 140);
 
-                    auto g_xzzz_xyyy = contrBuffer.data(goff + 225 * j + 141);
+                    auto g_xzzz_xyyy = ketBuffer.data(goff + 225 * j + 141);
 
-                    auto g_xzzz_xyyz = contrBuffer.data(goff + 225 * j + 142);
+                    auto g_xzzz_xyyz = ketBuffer.data(goff + 225 * j + 142);
 
-                    auto g_xzzz_xyzz = contrBuffer.data(goff + 225 * j + 143);
+                    auto g_xzzz_xyzz = ketBuffer.data(goff + 225 * j + 143);
 
-                    auto g_xzzz_xzzz = contrBuffer.data(goff + 225 * j + 144);
+                    auto g_xzzz_xzzz = ketBuffer.data(goff + 225 * j + 144);
 
-                    auto g_xzzz_yyyy = contrBuffer.data(goff + 225 * j + 145);
+                    auto g_xzzz_yyyy = ketBuffer.data(goff + 225 * j + 145);
 
-                    auto g_xzzz_yyyz = contrBuffer.data(goff + 225 * j + 146);
+                    auto g_xzzz_yyyz = ketBuffer.data(goff + 225 * j + 146);
 
-                    auto g_xzzz_yyzz = contrBuffer.data(goff + 225 * j + 147);
+                    auto g_xzzz_yyzz = ketBuffer.data(goff + 225 * j + 147);
 
-                    auto g_xzzz_yzzz = contrBuffer.data(goff + 225 * j + 148);
+                    auto g_xzzz_yzzz = ketBuffer.data(goff + 225 * j + 148);
 
-                    auto g_xzzz_zzzz = contrBuffer.data(goff + 225 * j + 149);
+                    auto g_xzzz_zzzz = ketBuffer.data(goff + 225 * j + 149);
 
-                    auto g_yyyy_xxxx = contrBuffer.data(goff + 225 * j + 150);
+                    auto g_yyyy_xxxx = ketBuffer.data(goff + 225 * j + 150);
 
-                    auto g_yyyy_xxxy = contrBuffer.data(goff + 225 * j + 151);
+                    auto g_yyyy_xxxy = ketBuffer.data(goff + 225 * j + 151);
 
-                    auto g_yyyy_xxxz = contrBuffer.data(goff + 225 * j + 152);
+                    auto g_yyyy_xxxz = ketBuffer.data(goff + 225 * j + 152);
 
-                    auto g_yyyy_xxyy = contrBuffer.data(goff + 225 * j + 153);
+                    auto g_yyyy_xxyy = ketBuffer.data(goff + 225 * j + 153);
 
-                    auto g_yyyy_xxyz = contrBuffer.data(goff + 225 * j + 154);
+                    auto g_yyyy_xxyz = ketBuffer.data(goff + 225 * j + 154);
 
-                    auto g_yyyy_xxzz = contrBuffer.data(goff + 225 * j + 155);
+                    auto g_yyyy_xxzz = ketBuffer.data(goff + 225 * j + 155);
 
-                    auto g_yyyy_xyyy = contrBuffer.data(goff + 225 * j + 156);
+                    auto g_yyyy_xyyy = ketBuffer.data(goff + 225 * j + 156);
 
-                    auto g_yyyy_xyyz = contrBuffer.data(goff + 225 * j + 157);
+                    auto g_yyyy_xyyz = ketBuffer.data(goff + 225 * j + 157);
 
-                    auto g_yyyy_xyzz = contrBuffer.data(goff + 225 * j + 158);
+                    auto g_yyyy_xyzz = ketBuffer.data(goff + 225 * j + 158);
 
-                    auto g_yyyy_xzzz = contrBuffer.data(goff + 225 * j + 159);
+                    auto g_yyyy_xzzz = ketBuffer.data(goff + 225 * j + 159);
 
-                    auto g_yyyy_yyyy = contrBuffer.data(goff + 225 * j + 160);
+                    auto g_yyyy_yyyy = ketBuffer.data(goff + 225 * j + 160);
 
-                    auto g_yyyy_yyyz = contrBuffer.data(goff + 225 * j + 161);
+                    auto g_yyyy_yyyz = ketBuffer.data(goff + 225 * j + 161);
 
-                    auto g_yyyy_yyzz = contrBuffer.data(goff + 225 * j + 162);
+                    auto g_yyyy_yyzz = ketBuffer.data(goff + 225 * j + 162);
 
-                    auto g_yyyy_yzzz = contrBuffer.data(goff + 225 * j + 163);
+                    auto g_yyyy_yzzz = ketBuffer.data(goff + 225 * j + 163);
 
-                    auto g_yyyy_zzzz = contrBuffer.data(goff + 225 * j + 164);
+                    auto g_yyyy_zzzz = ketBuffer.data(goff + 225 * j + 164);
 
-                    auto g_yyyz_xxxx = contrBuffer.data(goff + 225 * j + 165);
+                    auto g_yyyz_xxxx = ketBuffer.data(goff + 225 * j + 165);
 
-                    auto g_yyyz_xxxy = contrBuffer.data(goff + 225 * j + 166);
+                    auto g_yyyz_xxxy = ketBuffer.data(goff + 225 * j + 166);
 
-                    auto g_yyyz_xxxz = contrBuffer.data(goff + 225 * j + 167);
+                    auto g_yyyz_xxxz = ketBuffer.data(goff + 225 * j + 167);
 
-                    auto g_yyyz_xxyy = contrBuffer.data(goff + 225 * j + 168);
+                    auto g_yyyz_xxyy = ketBuffer.data(goff + 225 * j + 168);
 
-                    auto g_yyyz_xxyz = contrBuffer.data(goff + 225 * j + 169);
+                    auto g_yyyz_xxyz = ketBuffer.data(goff + 225 * j + 169);
 
-                    auto g_yyyz_xxzz = contrBuffer.data(goff + 225 * j + 170);
+                    auto g_yyyz_xxzz = ketBuffer.data(goff + 225 * j + 170);
 
-                    auto g_yyyz_xyyy = contrBuffer.data(goff + 225 * j + 171);
+                    auto g_yyyz_xyyy = ketBuffer.data(goff + 225 * j + 171);
 
-                    auto g_yyyz_xyyz = contrBuffer.data(goff + 225 * j + 172);
+                    auto g_yyyz_xyyz = ketBuffer.data(goff + 225 * j + 172);
 
-                    auto g_yyyz_xyzz = contrBuffer.data(goff + 225 * j + 173);
+                    auto g_yyyz_xyzz = ketBuffer.data(goff + 225 * j + 173);
 
-                    auto g_yyyz_xzzz = contrBuffer.data(goff + 225 * j + 174);
+                    auto g_yyyz_xzzz = ketBuffer.data(goff + 225 * j + 174);
 
-                    auto g_yyyz_yyyy = contrBuffer.data(goff + 225 * j + 175);
+                    auto g_yyyz_yyyy = ketBuffer.data(goff + 225 * j + 175);
 
-                    auto g_yyyz_yyyz = contrBuffer.data(goff + 225 * j + 176);
+                    auto g_yyyz_yyyz = ketBuffer.data(goff + 225 * j + 176);
 
-                    auto g_yyyz_yyzz = contrBuffer.data(goff + 225 * j + 177);
+                    auto g_yyyz_yyzz = ketBuffer.data(goff + 225 * j + 177);
 
-                    auto g_yyyz_yzzz = contrBuffer.data(goff + 225 * j + 178);
+                    auto g_yyyz_yzzz = ketBuffer.data(goff + 225 * j + 178);
 
-                    auto g_yyyz_zzzz = contrBuffer.data(goff + 225 * j + 179);
+                    auto g_yyyz_zzzz = ketBuffer.data(goff + 225 * j + 179);
 
-                    auto g_yyzz_xxxx = contrBuffer.data(goff + 225 * j + 180);
+                    auto g_yyzz_xxxx = ketBuffer.data(goff + 225 * j + 180);
 
-                    auto g_yyzz_xxxy = contrBuffer.data(goff + 225 * j + 181);
+                    auto g_yyzz_xxxy = ketBuffer.data(goff + 225 * j + 181);
 
-                    auto g_yyzz_xxxz = contrBuffer.data(goff + 225 * j + 182);
+                    auto g_yyzz_xxxz = ketBuffer.data(goff + 225 * j + 182);
 
-                    auto g_yyzz_xxyy = contrBuffer.data(goff + 225 * j + 183);
+                    auto g_yyzz_xxyy = ketBuffer.data(goff + 225 * j + 183);
 
-                    auto g_yyzz_xxyz = contrBuffer.data(goff + 225 * j + 184);
+                    auto g_yyzz_xxyz = ketBuffer.data(goff + 225 * j + 184);
 
-                    auto g_yyzz_xxzz = contrBuffer.data(goff + 225 * j + 185);
+                    auto g_yyzz_xxzz = ketBuffer.data(goff + 225 * j + 185);
 
-                    auto g_yyzz_xyyy = contrBuffer.data(goff + 225 * j + 186);
+                    auto g_yyzz_xyyy = ketBuffer.data(goff + 225 * j + 186);
 
-                    auto g_yyzz_xyyz = contrBuffer.data(goff + 225 * j + 187);
+                    auto g_yyzz_xyyz = ketBuffer.data(goff + 225 * j + 187);
 
-                    auto g_yyzz_xyzz = contrBuffer.data(goff + 225 * j + 188);
+                    auto g_yyzz_xyzz = ketBuffer.data(goff + 225 * j + 188);
 
-                    auto g_yyzz_xzzz = contrBuffer.data(goff + 225 * j + 189);
+                    auto g_yyzz_xzzz = ketBuffer.data(goff + 225 * j + 189);
 
-                    auto g_yyzz_yyyy = contrBuffer.data(goff + 225 * j + 190);
+                    auto g_yyzz_yyyy = ketBuffer.data(goff + 225 * j + 190);
 
-                    auto g_yyzz_yyyz = contrBuffer.data(goff + 225 * j + 191);
+                    auto g_yyzz_yyyz = ketBuffer.data(goff + 225 * j + 191);
 
-                    auto g_yyzz_yyzz = contrBuffer.data(goff + 225 * j + 192);
+                    auto g_yyzz_yyzz = ketBuffer.data(goff + 225 * j + 192);
 
-                    auto g_yyzz_yzzz = contrBuffer.data(goff + 225 * j + 193);
+                    auto g_yyzz_yzzz = ketBuffer.data(goff + 225 * j + 193);
 
-                    auto g_yyzz_zzzz = contrBuffer.data(goff + 225 * j + 194);
+                    auto g_yyzz_zzzz = ketBuffer.data(goff + 225 * j + 194);
 
-                    auto g_yzzz_xxxx = contrBuffer.data(goff + 225 * j + 195);
+                    auto g_yzzz_xxxx = ketBuffer.data(goff + 225 * j + 195);
 
-                    auto g_yzzz_xxxy = contrBuffer.data(goff + 225 * j + 196);
+                    auto g_yzzz_xxxy = ketBuffer.data(goff + 225 * j + 196);
 
-                    auto g_yzzz_xxxz = contrBuffer.data(goff + 225 * j + 197);
+                    auto g_yzzz_xxxz = ketBuffer.data(goff + 225 * j + 197);
 
-                    auto g_yzzz_xxyy = contrBuffer.data(goff + 225 * j + 198);
+                    auto g_yzzz_xxyy = ketBuffer.data(goff + 225 * j + 198);
 
-                    auto g_yzzz_xxyz = contrBuffer.data(goff + 225 * j + 199);
+                    auto g_yzzz_xxyz = ketBuffer.data(goff + 225 * j + 199);
 
-                    auto g_yzzz_xxzz = contrBuffer.data(goff + 225 * j + 200);
+                    auto g_yzzz_xxzz = ketBuffer.data(goff + 225 * j + 200);
 
-                    auto g_yzzz_xyyy = contrBuffer.data(goff + 225 * j + 201);
+                    auto g_yzzz_xyyy = ketBuffer.data(goff + 225 * j + 201);
 
-                    auto g_yzzz_xyyz = contrBuffer.data(goff + 225 * j + 202);
+                    auto g_yzzz_xyyz = ketBuffer.data(goff + 225 * j + 202);
 
-                    auto g_yzzz_xyzz = contrBuffer.data(goff + 225 * j + 203);
+                    auto g_yzzz_xyzz = ketBuffer.data(goff + 225 * j + 203);
 
-                    auto g_yzzz_xzzz = contrBuffer.data(goff + 225 * j + 204);
+                    auto g_yzzz_xzzz = ketBuffer.data(goff + 225 * j + 204);
 
-                    auto g_yzzz_yyyy = contrBuffer.data(goff + 225 * j + 205);
+                    auto g_yzzz_yyyy = ketBuffer.data(goff + 225 * j + 205);
 
-                    auto g_yzzz_yyyz = contrBuffer.data(goff + 225 * j + 206);
+                    auto g_yzzz_yyyz = ketBuffer.data(goff + 225 * j + 206);
 
-                    auto g_yzzz_yyzz = contrBuffer.data(goff + 225 * j + 207);
+                    auto g_yzzz_yyzz = ketBuffer.data(goff + 225 * j + 207);
 
-                    auto g_yzzz_yzzz = contrBuffer.data(goff + 225 * j + 208);
+                    auto g_yzzz_yzzz = ketBuffer.data(goff + 225 * j + 208);
 
-                    auto g_yzzz_zzzz = contrBuffer.data(goff + 225 * j + 209);
+                    auto g_yzzz_zzzz = ketBuffer.data(goff + 225 * j + 209);
 
-                    auto g_zzzz_xxxx = contrBuffer.data(goff + 225 * j + 210);
+                    auto g_zzzz_xxxx = ketBuffer.data(goff + 225 * j + 210);
 
-                    auto g_zzzz_xxxy = contrBuffer.data(goff + 225 * j + 211);
+                    auto g_zzzz_xxxy = ketBuffer.data(goff + 225 * j + 211);
 
-                    auto g_zzzz_xxxz = contrBuffer.data(goff + 225 * j + 212);
+                    auto g_zzzz_xxxz = ketBuffer.data(goff + 225 * j + 212);
 
-                    auto g_zzzz_xxyy = contrBuffer.data(goff + 225 * j + 213);
+                    auto g_zzzz_xxyy = ketBuffer.data(goff + 225 * j + 213);
 
-                    auto g_zzzz_xxyz = contrBuffer.data(goff + 225 * j + 214);
+                    auto g_zzzz_xxyz = ketBuffer.data(goff + 225 * j + 214);
 
-                    auto g_zzzz_xxzz = contrBuffer.data(goff + 225 * j + 215);
+                    auto g_zzzz_xxzz = ketBuffer.data(goff + 225 * j + 215);
 
-                    auto g_zzzz_xyyy = contrBuffer.data(goff + 225 * j + 216);
+                    auto g_zzzz_xyyy = ketBuffer.data(goff + 225 * j + 216);
 
-                    auto g_zzzz_xyyz = contrBuffer.data(goff + 225 * j + 217);
+                    auto g_zzzz_xyyz = ketBuffer.data(goff + 225 * j + 217);
 
-                    auto g_zzzz_xyzz = contrBuffer.data(goff + 225 * j + 218);
+                    auto g_zzzz_xyzz = ketBuffer.data(goff + 225 * j + 218);
 
-                    auto g_zzzz_xzzz = contrBuffer.data(goff + 225 * j + 219);
+                    auto g_zzzz_xzzz = ketBuffer.data(goff + 225 * j + 219);
 
-                    auto g_zzzz_yyyy = contrBuffer.data(goff + 225 * j + 220);
+                    auto g_zzzz_yyyy = ketBuffer.data(goff + 225 * j + 220);
 
-                    auto g_zzzz_yyyz = contrBuffer.data(goff + 225 * j + 221);
+                    auto g_zzzz_yyyz = ketBuffer.data(goff + 225 * j + 221);
 
-                    auto g_zzzz_yyzz = contrBuffer.data(goff + 225 * j + 222);
+                    auto g_zzzz_yyzz = ketBuffer.data(goff + 225 * j + 222);
 
-                    auto g_zzzz_yzzz = contrBuffer.data(goff + 225 * j + 223);
+                    auto g_zzzz_yzzz = ketBuffer.data(goff + 225 * j + 223);
 
-                    auto g_zzzz_zzzz = contrBuffer.data(goff + 225 * j + 224);
+                    auto g_zzzz_zzzz = ketBuffer.data(goff + 225 * j + 224);
 
                     #pragma omp simd aligned(rcdx, rcdy, rcdz, g2_xxx_xxxx, g2_xxx_xxxy,\
                                              g2_xxx_xxxz, g2_xxx_xxyy, g2_xxx_xxyz,\

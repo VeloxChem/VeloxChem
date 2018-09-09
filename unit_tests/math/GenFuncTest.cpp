@@ -983,6 +983,25 @@ TEST_F(CGenFuncTest, FindTripleIndex)
     ASSERT_EQ(-1, genfunc::findTripleIndex(idx, vec, {2, 4, 2}));
 }
 
+TEST_F(CGenFuncTest, FindQuadrupleIndex)
+{
+    CVecFourIndexes vec{{0, 1, 1, 2}, {2, 4, 3, 1}, {7, -1, 2, 0}, {8, 2, 4, 7}};
+    
+    std::vector<int32_t> idx{1, 3, 7, 8};
+    
+    ASSERT_EQ(8, genfunc::findQuadrupleIndex(idx, vec, {8, 2, 4, 7}));
+    
+    ASSERT_EQ(7, genfunc::findQuadrupleIndex(idx, vec, {7, -1, 2, 0}));
+    
+    ASSERT_EQ(3, genfunc::findQuadrupleIndex(idx, vec, {2, 4, 3, 1}));
+    
+    ASSERT_EQ(1, genfunc::findQuadrupleIndex(idx, vec, {0, 1, 1, 2}));
+    
+    ASSERT_EQ(-1, genfunc::findQuadrupleIndex(idx, vec, {0, 0, 0, 0}));
+    
+    ASSERT_EQ(-1, genfunc::findQuadrupleIndex(idx, vec, {2, 4, 2, 2}));
+}
+
 TEST_F(CGenFuncTest, MaxOrderOfPair)
 {
     CVecThreeIndexes vec{{0, 1, 1}, {2, 4, 3}, {0, 1, 0}, {0, 1, 4}};
