@@ -112,6 +112,34 @@ namespace PyVLX { // PyVLX namespace
 }
 
 // ==> boost python helper function <==
+// for creating CAppManager object
+
+static std::shared_ptr<CAppManager>
+CAppManager_create(std::string input_string, std::string output_string)
+{
+    int argc = 3;
+
+    char* argv[argc];
+
+    std::vector<std::string> inputs ({std::string("exe"), input_string, output_string});
+
+    for (int i = 0; i < argc; i++)
+    {
+        const char* text = inputs[i].c_str();
+
+        argv[i] = (char*)malloc(sizeof(char) * (strlen(text) + 1));
+
+        memset(argv[i], '\0', sizeof(char) * (strlen(text) + 1));
+
+        memcpy(argv[i], text, sizeof(char) * strlen(text));
+    }
+
+    mpi::init(argc, argv);
+
+    return std::shared_ptr<CAppManager>(new CAppManager (argc, argv));
+}
+
+// ==> boost python helper function <==
 // for creating COverlapIntegralsDriver object
 
 static std::shared_ptr<COverlapIntegralsDriver>
@@ -215,10 +243,10 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
             "CAppManager",
             bp::init<int, char**>()
         )
-        .def("create",    &CAppManager::create)
-        .staticmethod("create")
+        .def("create",    &CAppManager_create)
         .def("execute",   &CAppManager::execute)
         .def("get_state", &CAppManager::getState)
+        .staticmethod("create")
     ;
 
     // ----------------------
@@ -380,10 +408,10 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
             "COverlapIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create", &COverlapIntegralsDriver_create)
-        .staticmethod("create")
+        .def("create",  &COverlapIntegralsDriver_create)
         .def("compute", &COverlapIntegralsDriver_compute_1)
         .def("compute", &COverlapIntegralsDriver_compute_2)
         .def("compute", &COverlapIntegralsDriver_compute_3)
+        .staticmethod("create")
     ;
 }
