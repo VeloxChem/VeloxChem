@@ -1,16 +1,7 @@
 from VeloxChemMP import *
 
-inpdata   = CInputData()
-xyzreader = CMolXYZReader()
-mol       = CMolecule()
+app_manager = CAppManager.create("test.inp", "test.out")
 
-cout = COutputStream("test.out")
-cin  = CInputStream("test.inp", cout)
+app_manager.execute()
 
-cin.read(inpdata, cout)
-xyzreader.parse(mol, inpdata, cout)
-
-mol.print_geometry(cout)
-cout.flush()
-
-assert xyzreader.get_state() == True
+assert app_manager.get_state() == True

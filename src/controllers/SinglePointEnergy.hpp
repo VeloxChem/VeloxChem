@@ -40,6 +40,11 @@ class CSinglePointEnergy : public CBaseJob
      */
     CMolecularBasis _riBasis;
 
+    /**
+     The minimal AO basis set for initial guess
+     */
+    CMolecularBasis _minBasis;
+
     //CAODensityMatrix _density;
 
     /**

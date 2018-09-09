@@ -18,8 +18,8 @@ CXX := mpiicpc
 
 # Compiler flags for generic intel CPUs
 
-CXX_REL_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall
-CXX_DEB_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall -g
+CXX_REL_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall -qoverride-limits
+CXX_DEB_FLG := -std=c++11 -O3 -xHost -qopenmp -Wall -qoverride-limits -g
 CXX_DEB_FLG += -qopt-report=5 -qopt-report-phase=vec
 
 # Generic preprocessor flags
@@ -86,7 +86,7 @@ BOOST_PATH := /home/xinli/software/boost
 
 ifeq ($(USE_PYTHON),true)
   PYTHON_INC := $(shell $(PYTHON)-config --includes)
-  #PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
+  PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
   PYTHON_INC += -I$(BOOST_PATH)/include
 
   PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)

@@ -99,6 +99,39 @@ CMolecule::~CMolecule()
 
 }
 
+CMolecule
+CMolecule::getSubMolecule(int32_t start_index, int32_t num_atoms)
+{
+    std::vector<double>      atomCoordinates;
+    std::vector<double>      atomCharges;
+    std::vector<double>      atomMasses;
+    std::vector<std::string> atomLabels;
+    std::vector<int32_t>     idsElemental;
+
+    for (int i = start_index; i < start_index + num_atoms; i++) {
+        atomCoordinates.push_back(_atomCoordinates.data(0)[i]);
+    }
+    for (int i = start_index; i < start_index + num_atoms; i++) {
+        atomCoordinates.push_back(_atomCoordinates.data(1)[i]);
+    }
+    for (int i = start_index; i < start_index + num_atoms; i++) {
+        atomCoordinates.push_back(_atomCoordinates.data(2)[i]);
+    }
+
+    for (int i = start_index; i < start_index + num_atoms; i++) {
+        atomCharges.push_back(_atomCharges.data()[i]);
+        atomMasses.push_back(_atomMasses.data()[i]);
+        atomLabels.push_back(_atomLabels.data()[i]);
+        idsElemental.push_back(_idsElemental.data()[i]);
+    }
+
+    return CMolecule(atomCoordinates,
+                     atomCharges,
+                     atomMasses,
+                     atomLabels,
+                     idsElemental);
+}
+
 CMolecule&
 CMolecule::operator=(const CMolecule& source)
 {

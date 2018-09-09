@@ -104,6 +104,16 @@ CBasisReader::getRIJBasis(const std::string&   pathToBasisSets,
     return _getBasis(rilbl, pathToBasisSets, molecule, oStream);
 }
 
+CMolecularBasis
+CBasisReader::getMinBasis(const std::string&   pathToBasisSets,
+                          const CMolecule&     molecule,
+                                COutputStream& oStream)
+{
+    auto minlbl = std::string("MIN-CC-PVDZ");
+    
+    return _getBasis(minlbl, pathToBasisSets, molecule, oStream);
+}
+
 CAtomBasis
 CBasisReader::_readAtomBasis(const int32_t        idElemental,
                              const std::string&   basisLabel,

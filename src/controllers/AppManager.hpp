@@ -104,12 +104,6 @@ public:
     ~CAppManager();
     
     /**
-     Creates an application manager object (for boost python).
-     */
-    static std::shared_ptr<CAppManager>
-    create(std::string input_string, std::string output_string);
-
-    /**
      Executes a list of jobs assigned to application manager object.
      */
     void execute();

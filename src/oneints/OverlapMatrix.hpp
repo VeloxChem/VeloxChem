@@ -9,6 +9,8 @@
 #ifndef OverlapMatrix_hpp
 #define OverlapMatrix_hpp
 
+#include <string>
+
 #include "DenseMatrix.hpp"
 
 /**
@@ -56,6 +58,13 @@ public:
      Destroys a overlap matrix object.
      */
     ~COverlapMatrix();
+    
+    /**
+     Gets string representation of overlap matrix.
+
+     @return a string for printing the overlap matrix.
+     */
+    std::string getString() const;
     
     /**
      Assigns a overlap matrix object by copying other overlap matrix object.
