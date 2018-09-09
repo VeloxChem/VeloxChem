@@ -6,10 +6,12 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-//#include <mpi4py/mpi4py.h>
 #include <boost/python.hpp>
 #include <boost/python/list.hpp>
 #include <boost/python/extract.hpp>
+
+#include <mpi.h>
+#include <mpi4py/mpi4py.h>
 
 #include <cmath>
 #include <cstdio>
@@ -26,6 +28,9 @@
 #include "BasisReader.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
+#include "DenseMatrix.hpp"
+#include "OverlapMatrix.hpp"
+#include "OverlapIntegralsDriver.hpp"
 
 namespace bp = boost::python;
 
@@ -104,20 +109,103 @@ namespace PyVLX { // PyVLX namespace
 
         return vlx_run(argc, argv);
     }
-
 }
+
+// ==> boost python helper function <==
+// for creating COverlapIntegralsDriver object
+
+static std::shared_ptr<COverlapIntegralsDriver>
+COverlapIntegralsDriver_create(int32_t    globRank,
+                               int32_t    globNodes,
+                               bp::object py_comm)
+{
+    PyObject* py_obj = py_comm.ptr();
+    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
+    if (comm_ptr == NULL) bp::throw_error_already_set();
+
+    return std::shared_ptr<COverlapIntegralsDriver>(
+        new COverlapIntegralsDriver (globRank, globNodes, *comm_ptr)
+        );
+}
+
+// ==> boost python helper function <==
+// for overloading COverlapIntegralsDriver::compute
+
+COverlapMatrix
+COverlapIntegralsDriver_compute_1(
+          COverlapIntegralsDriver& self,
+    const CMolecule&               molecule,
+    const CMolecularBasis&         basis,
+          COutputStream&           oStream,
+          bp::object               py_comm)
+{
+    PyObject* py_obj = py_comm.ptr();
+    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
+    if (comm_ptr == NULL) bp::throw_error_already_set();
+
+    return self.compute(molecule, basis, oStream, *comm_ptr);
+}
+
+COverlapMatrix
+COverlapIntegralsDriver_compute_2(
+          COverlapIntegralsDriver& self,
+    const CMolecule&               molecule,
+    const CMolecularBasis&         braBasis,
+    const CMolecularBasis&         ketBasis,
+          COutputStream&           oStream,
+          bp::object               py_comm)
+{
+    PyObject* py_obj = py_comm.ptr();
+    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
+    if (comm_ptr == NULL) bp::throw_error_already_set();
+
+    return self.compute(molecule, braBasis, ketBasis, oStream, *comm_ptr);
+}
+
+COverlapMatrix
+COverlapIntegralsDriver_compute_3(
+          COverlapIntegralsDriver& self,
+    const CMolecule&               braMolecule,
+    const CMolecule&               ketMolecule,
+    const CMolecularBasis&         braBasis,
+    const CMolecularBasis&         ketBasis,
+          COutputStream&           oStream,
+          bp::object               py_comm)
+{
+    PyObject* py_obj = py_comm.ptr();
+    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
+    if (comm_ptr == NULL) bp::throw_error_already_set();
+
+    return self.compute(braMolecule, ketMolecule, braBasis, ketBasis, oStream, *comm_ptr);
+}
+
+// ==> boost python helper function <==
+// for printing COverlapMatrix in python
+
+std::string
+COverlapMatrix_str (const COverlapMatrix& self)
+{
+    return self.getString();
+}
+
+// ==> boost python <==
+// functions and classes
 
 BOOST_PYTHON_MODULE(VeloxChemMP)
 {
     // initialize mpi4py's C-API
-    //if (import_mpi4py() < 0) return;
+    if (import_mpi4py() < 0) return;
 
-    // ==> expose functions <==
+    // -----------------
+    // ==> Functions <==
+    // -----------------
 
     // run VeloxChem
     bp::def("run", PyVLX::py_vlx_run);
 
-    // ==> expose classes <==
+    // -----------------------
+    // ==> Manager classes <==
+    // -----------------------
 
     // CAppManager class
     // Note: "create" is a static method that returns a CAppManager object
@@ -128,10 +216,14 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
             bp::init<int, char**>()
         )
         .def("create",    &CAppManager::create)
+        .staticmethod("create")
         .def("execute",   &CAppManager::execute)
         .def("get_state", &CAppManager::getState)
-        .staticmethod("create")
     ;
+
+    // ----------------------
+    // ==> Stream classes <==
+    // ----------------------
 
     // COutputStream class
 
@@ -163,22 +255,9 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
         )
     ;
 
-    // CMolecule class
-    // Note: CMolecule has two constructors
-
-    bp::class_< CMolecule, std::shared_ptr<CMolecule> >
-        (
-            "CMolecule", bp::init<
-                const std::vector<double>&,
-                const std::vector<double>&,
-                const std::vector<double>&,
-                const std::vector<std::string>&,
-                const std::vector<int32_t>&
-                >()
-        )
-        .def(bp::init<>())
-        .def("print_geometry", &CMolecule::printGeometry)
-    ;
+    // ----------------------
+    // ==> Reader classes <==
+    // ----------------------
 
     // CMolXYZReader class
     // Note: Need member function pointers for proper overloading
@@ -227,6 +306,28 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
         .def("get_min_basis", &CBasisReader::getMinBasis)
     ;
 
+    // ------------------------------
+    // ==> Molecule/Basis classes <==
+    // ------------------------------
+
+    // CMolecule class
+    // Note: CMolecule has two constructors
+
+    bp::class_< CMolecule, std::shared_ptr<CMolecule> >
+        (
+            "CMolecule", bp::init<
+                const std::vector<double>&,
+                const std::vector<double>&,
+                const std::vector<double>&,
+                const std::vector<std::string>&,
+                const std::vector<int32_t>&
+                >()
+        )
+        .def(bp::init<>())
+        .def("print_geometry", &CMolecule::printGeometry)
+        .def("get_sub_molecule", &CMolecule::getSubMolecule)
+    ;
+
     // CMolecularBasis class
 
     bp::class_< CMolecularBasis >
@@ -234,5 +335,55 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
             "CMolecularBasis", bp::init<>()
         )
         .def("get_label", &CMolecularBasis::getLabel)
+    ;
+
+    // ----------------------
+    // ==> Matrix classes <==
+    // ----------------------
+
+    // CDenseMatrix class
+
+    bp::class_< CDenseMatrix, std::shared_ptr<CDenseMatrix> >
+        (
+            "CDenseMatrix", bp::init<
+                const std::vector<double>&,
+                const int32_t,
+                const int32_t
+                >()
+        )
+        .def(bp::init<>())
+        .def(bp::init<const int32_t, const int32_t>())
+        .def(bp::init<const int32_t>())
+        .def("get_number_of_rows", &CDenseMatrix::getNumberOfRows)
+        .def("get_number_of_columns", &CDenseMatrix::getNumberOfColumns)
+    ;
+
+    // COverlapMatrix class
+
+    bp::class_< COverlapMatrix, std::shared_ptr<COverlapMatrix> >
+        (
+            "COverlapMatrix",
+            bp::init<const CDenseMatrix&>()
+        )
+        .def(bp::init<>())
+        .def("__str__", &COverlapMatrix_str);
+    ;
+
+    // -------------------------------
+    // ==> Integral driver classes <==
+    // -------------------------------
+
+    // COverlapIntegralsDriver class
+
+    bp::class_< COverlapIntegralsDriver, std::shared_ptr<COverlapIntegralsDriver> >
+        (
+            "COverlapIntegralsDriver",
+            bp::init<const int32_t, const int32_t, MPI_Comm>()
+        )
+        .def("create", &COverlapIntegralsDriver_create)
+        .staticmethod("create")
+        .def("compute", &COverlapIntegralsDriver_compute_1)
+        .def("compute", &COverlapIntegralsDriver_compute_2)
+        .def("compute", &COverlapIntegralsDriver_compute_3)
     ;
 }

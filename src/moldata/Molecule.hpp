@@ -122,6 +122,14 @@ public:
     ~CMolecule();
 
     /**
+     Creates a sub-molecule object by slicing the molecule object.
+     
+     @param start_index the starting index of the sub-molecule (0-based).
+     @param num_atoms the number of atoms in the sub-molecule.
+     */
+    CMolecule getSubMolecule(int32_t start_index, int32_t num_atoms);
+
+    /**
      Assigns a molecule object by copying other molecule object.
      
      @param source the molecule object.

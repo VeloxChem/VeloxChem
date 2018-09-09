@@ -86,7 +86,7 @@ BOOST_PATH := /home/xinli/software/boost
 
 ifeq ($(USE_PYTHON),true)
   PYTHON_INC := $(shell $(PYTHON)-config --includes)
-  #PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
+  PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
   PYTHON_INC += -I$(BOOST_PATH)/include
 
   PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
