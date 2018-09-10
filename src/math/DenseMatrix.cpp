@@ -7,9 +7,11 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include "DenseMatrix.hpp"
+#include "StringFormat.hpp"
 
 #include <utility>
 #include <cmath>
+#include <sstream>
 
 CDenseMatrix::CDenseMatrix()
 
@@ -179,6 +181,25 @@ CDenseMatrix::row(const int32_t iRow)
     }
     
     return nullptr;
+}
+
+std::string
+CDenseMatrix::getString() const
+{
+    std::stringstream sStream;
+
+    const double* data = _values.data();
+
+    sStream << "[Dimension " << _nRows << " x " << _nColumns << "]" << std::endl;
+
+    for (int32_t iRow = 0; iRow < _nRows; iRow++) {
+        for (int32_t iColumn = 0; iColumn < _nColumns; iColumn++) {
+            sStream << fstr::to_string(data[iRow * _nColumns + iColumn], 8, 15, fmt::right);
+        }
+        sStream << std::endl;
+    }
+
+    return sStream.str();
 }
 
 std::ostream&

@@ -18,13 +18,13 @@ namespace gpu { // gpu namespace
     void get_device_prop()
     {
 
-        int nDevices = 0;
+        int32_t nDevices = 0;
 
         cudaGetDeviceCount(&nDevices);
 
         printf("Total Number of Devices: %d\n", nDevices);
 
-        for (int i = 0; i < nDevices; i++) {
+        for (int32_t i = 0; i < nDevices; i++) {
 
             cudaDeviceProp prop;
 

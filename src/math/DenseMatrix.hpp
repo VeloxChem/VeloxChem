@@ -171,6 +171,13 @@ public:
      @return the pointer to first element of specific row.
      */
     double* row(const int32_t iRow);
+
+    /**
+     Gets string representation of dense matrix.
+
+     @return a string for printing the dense matrix.
+     */
+    std::string getString() const;
     
     /**
      Converts dense matrix object to text output and insert it into output
