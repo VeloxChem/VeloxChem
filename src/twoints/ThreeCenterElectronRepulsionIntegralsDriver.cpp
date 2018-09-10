@@ -174,7 +174,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoBlocks(
     
     // allocate spherical integrals buffer
     
-    auto bcomp = angmom::to_SphericalComponents(bragtos.getAngularMomentum());
+    auto bcomp = angmom::to_SphericalComponents(baang);
     
     nblk = bcomp * angmom::to_SphericalComponents(kcang, kdang);
     

@@ -521,6 +521,114 @@ transform_ket(      CMemBlock2D<double>&  spherData,
                   kdim, bcomp);
     }
 }
+    
+void
+transform_bra(      CMemBlock2D<double>&  spherData,
+              const CMemBlock2D<double>&  cartData,
+              const CSphericalMomentum&   braMomentumA,
+              const CSphericalMomentum&   braMomentumB,
+              const CVecFourIndexes&      cartPattern,
+              const std::vector<int32_t>& cartIndexes,
+              const CGtoPairsBlock&       ketGtoPairsBlock,
+              const bool                  isBraEqualKet,
+              const int32_t               iContrPair)
+{
+    // set up dimensions on ket side
+    
+    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    if (isBraEqualKet) kdim  = iContrPair + 1;
+    
+    // set up angular momentum on ket side
+    
+    auto cang = ketGtoPairsBlock.getBraAngularMomentum();
+    
+    auto dang = ketGtoPairsBlock.getKetAngularMomentum();
+    
+    // set up angulat momentum on bra side
+    
+    auto aang = braMomentumA.getAngularMomentum();
+    
+    auto bang = braMomentumB.getAngularMomentum();
+    
+    // determine Cartisian index
+    
+    auto cidx = findQuadrupleIndex(cartIndexes, cartPattern,
+                                   CFourIndexes(aang, bang, cang, dang));
+    
+    // set up angular momentum data
+    
+    auto acomp = braMomentumA.getNumberOfComponents();
+    
+    auto bcomp = braMomentumB.getNumberOfComponents();
+    
+    // set up number of Cartisian components on B center
+    
+    auto bcart = angmom::to_CartesianComponents(bang);
+    
+    // set up number of spherical components on ket side
+    
+    auto kcomp = angmom::to_SphericalComponents(cang, dang);
+    
+    // loop over spherical components on bra side
+    
+    for (int32_t i = 0; i < acomp; i++)
+    {
+        // set up transformation data for A center
+        
+        auto anfact = braMomentumA.getNumberOfFactors(i);
+        
+        auto atidx = braMomentumA.getIndexes(i);
+        
+        auto atfact = braMomentumA.getFactors(i);
+        
+        for (int32_t j = 0; j < bcomp; j ++)
+        {
+            // set up transformation data for B center
+            
+            auto bnfact = braMomentumB.getNumberOfFactors(j);
+            
+            auto btidx = braMomentumB.getIndexes(j);
+            
+            auto btfact = braMomentumB.getFactors(j);
+            
+            // loop over ket side spherical components
+            
+            for (int32_t k = 0; k < kcomp; k++)
+            {
+                // set up spherical integrals vector
+                
+                auto sphervec = spherData.data((i * bcomp + j) * kcomp + k);
+                
+                // zero spherical integrals vector
+                
+                mathfunc::zero(sphervec, kdim);
+                
+                // apply Cartesian to spherical transformation
+                
+                for (int32_t l = 0; l < anfact; l++)
+                {
+                    for (int32_t m = 0; m < bnfact; m++)
+                    {
+                        // set up pointer to Cartesian component
+                        
+                        auto cartvec = cartData.data(cidx + (atidx[l] * bcart + btidx[m]) * kcomp + k);
+                        
+                        auto cfact = atfact[l] * btfact[m];
+                        
+                        // loop over integrals
+                        
+                        #pragma omp simd aligned(sphervec, cartvec: VLX_ALIGN)
+                        for (int32_t n = 0; n < kdim; n++)
+                        {
+                            sphervec[n] += cfact * cartvec[n];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 void
 compress(      CSparseMatrix&       sparseMatrix,

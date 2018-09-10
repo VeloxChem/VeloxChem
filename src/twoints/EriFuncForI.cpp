@@ -32,8 +32,6 @@ namespace erifunc { // erifunc namespace
 
         if (bord < 0) return;
 
-        if (iContrPair == 0) printf("-> computing VRR(00|06)\n");
-
         // set up pointers to primitive pairs data on bra side
 
         auto spos = braGtoPairsBlock.getStartPositions();
@@ -444,8 +442,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(06|00)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -860,8 +856,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(01|06)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -1518,8 +1512,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(06|01)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -2564,8 +2556,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(02|06)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -4101,8 +4091,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(06|02)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -6124,8 +6112,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(03|06)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -8952,8 +8938,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(06|03)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -12284,8 +12268,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(04|06)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -16830,8 +16812,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(06|04)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -21805,8 +21785,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(05|06)\n");
 
         // set up pointers to primitive pairs data on bra side
 
@@ -28500,8 +28478,6 @@ namespace erifunc { // erifunc namespace
         // skip integrals if not included in recursion pattern
 
         if (bord < 0) return;
-
-        if (iContrPair == 0) printf("-> computing VRR(06|05)\n");
 
         // set up pointers to primitive pairs data on bra side
 

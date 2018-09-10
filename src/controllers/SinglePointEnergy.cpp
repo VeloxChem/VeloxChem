@@ -215,13 +215,13 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     //CGtoBlock pgtos(_molecule, _aoBasis, 1);
     
-    CGtoBlock bgtos(_molecule, _aoBasis, 4);
+    //CGtoBlock bgtos(_molecule, _aoBasis, 4);
     
-    CGtoPairsBlock bpairs(bgtos, 1.0e-13);
+    //CGtoPairsBlock bpairs(bgtos, 1.0e-13);
     
     //CGtoPairsBlock kpairs(sgtos, pgtos, 1.0e-13);
 
-    eridrv.compElectronRepulsionForGtoPairsBlocks(bpairs, bpairs);
+    eridrv.compute(_molecule, _aoBasis, 1.0e-13, oStream, comm);
 }
 
 void

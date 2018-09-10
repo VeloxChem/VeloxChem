@@ -202,7 +202,7 @@ namespace genfunc { // genfunc namespace
     
     /**
      Transforms Cartesian integrals to half-transformed  integrals by
-     applying ket side transformation: <cart|g(x,y)|cart> to <vart|g(x,y)|spher>.
+     applying ket side transformation: <cart|g(x,y)|cart> to <cart|g(x,y)|spher>.
      
      @param spherData the spherical data vectors.
      @param cartData the Cartesian data vectors.
@@ -211,7 +211,7 @@ namespace genfunc { // genfunc namespace
      @param spherPattern the half-transformed data vectors distribution pattern.
      @param spherIndexes the half-transformend data vectors indexing pattern.
      @param cartPattern the Cartesian data vectors distribution pattern.
-     @param cartIndexes the Cartesian data vectors indexing pattern,
+     @param cartIndexes the Cartesian data vectors indexing pattern.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
      blocks.
@@ -224,6 +224,31 @@ namespace genfunc { // genfunc namespace
                        const CVecFourIndexes&      spherPattern,
                        const std::vector<int32_t>& spherIndexes,
                        const CVecThreeIndexes&     cartPattern,
+                       const std::vector<int32_t>& cartIndexes,
+                       const CGtoPairsBlock&       ketGtoPairsBlock,
+                       const bool                  isBraEqualKet,
+                       const int32_t               iContrPair);
+    
+    /**
+     Transforms half-transformed integrals to spherical integrals by
+     applying bra side transformation: <cart|g(x,y)|spher> to <spher|g(x,y)|spher>.
+     
+     @param spherData the spherical data vectors.
+     @param cartData the Cartesian data vectors.
+     @param ketMomentumA the spherical momentum object for A center on bra side.
+     @param ketMomentumB the spherical momentum object for B center on bra side.
+     @param cartPattern the Cartesian data vectors distribution pattern.
+     @param cartIndexes the Cartesian data vectors indexing pattern.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+     blocks.
+     @param iContrPair the index of contracted GTOs pair on bra side.
+     */
+    void transform_bra(      CMemBlock2D<double>&  spherData,
+                       const CMemBlock2D<double>&  cartData,
+                       const CSphericalMomentum&   ketMomentumA,
+                       const CSphericalMomentum&   ketMomentumB,
+                       const CVecFourIndexes&      cartPattern,
                        const std::vector<int32_t>& cartIndexes,
                        const CGtoPairsBlock&       ketGtoPairsBlock,
                        const bool                  isBraEqualKet,

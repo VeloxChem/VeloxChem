@@ -42,8 +42,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 1) && (recPattern[i].third() == 1))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|11)\n");
-             
                 // determine angular momentum of bra side
                 
                 auto bang = recPattern[i].first();
@@ -177,8 +175,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 1) && (recPattern[i].third() == 2))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|12)\n");
-                
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -368,8 +364,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 1) && (recPattern[i].third() == 3))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|13)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -630,8 +624,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 1) && (recPattern[i].third() == 4))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|14)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -982,8 +974,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 1) && (recPattern[i].third() == 5))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|15)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -1442,8 +1432,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 1) && (recPattern[i].third() == 6))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|16)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -2033,8 +2021,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 1) && (recPattern[i].third() == 7))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|17)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -2768,8 +2754,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 2) && (recPattern[i].third() == 2))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|22)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -3096,8 +3080,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 2) && (recPattern[i].third() == 3))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|23)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -3585,8 +3567,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 2) && (recPattern[i].third() == 4))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|24)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -4278,8 +4258,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 2) && (recPattern[i].third() == 5))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|25)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -5227,8 +5205,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 2) && (recPattern[i].third() == 6))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|26)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -6461,8 +6437,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 3) && (recPattern[i].third() == 3))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|33)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -7272,8 +7246,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 3) && (recPattern[i].third() == 4))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|34)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -8458,8 +8430,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 3) && (recPattern[i].third() == 5))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|35)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();
@@ -10080,8 +10050,6 @@ namespace kethrrfunc { // kethrrfunc namespace
         {
             if ((recPattern[i].second() == 4) && (recPattern[i].third() == 4))
             {
-                if (iContrPair == 0) printf("-> applying ket HRR for (0X|44)\n");
-
                 // determine angular momentum of bra side
 
                 auto bang  = recPattern[i].first();

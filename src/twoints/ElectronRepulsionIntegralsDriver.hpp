@@ -19,6 +19,8 @@
 #include "GtoPairsBlock.hpp"
 #include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
+#include "GtoPairsContainer.hpp"
+#include "SystemClock.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -200,6 +202,36 @@ class CElectronRepulsionIntegralsDriver
                         const CGtoPairsBlock&       ketGtoPairsBlock,
                         const bool                  isBraEqualKet,
                         const int32_t               iContrPair) const;
+    
+    /**
+     Prints start header for computation of two-electron repulsion
+     integrals.
+     
+     @param gtoPairs the GTOs pairs container on ket side.
+     @param oStream the output stream.
+     */
+    void _startHeader(const CGtoPairsContainer& gtoPairs,
+                            COutputStream&      oStream) const;
+    
+    /**
+     Prints timing statistics for evaluation of electron repulsion integrals.
+     
+     @param molecule the molecule.
+     @param timer the timer.
+     @param oStream the output stream.
+     */
+    void _printTiming(const CMolecule&     molecule,
+                      const CSystemClock&  timer,
+                            COutputStream& oStream) const;
+    
+    /**
+     Comutes electronic repulsion integrals for two GTOs pairs containers.
+     
+     @param braGtoPairsContainer the GTOs pairs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     */
+    void _compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
+                                         const CGtoPairsContainer* ketGtoPairsContainer) const;
     
 public:
     

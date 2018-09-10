@@ -21,6 +21,7 @@
 #include "EriFuncForL.hpp"
 #include "KetHrrFunc.hpp"
 #include "BraHrrFunc.hpp"
+#include "StringFormat.hpp"
 
 CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(const int32_t  globRank,
                                                                      const int32_t  globNodes,
@@ -59,9 +60,19 @@ CElectronRepulsionIntegralsDriver::compute(const CMolecule&       molecule,
     
     // split GTOs pairs into batches on bra side
     
-    auto bbpairs = bgtopairs.split(5000);
+    auto bbpairs = bgtopairs.split(500);
     
-    // FIX ME: ....
+    // print start header
+    
+    if (_globRank == mpi::master()) _startHeader(bgtopairs, oStream);
+    
+    // compute repulsion integrals
+    
+    _compElectronRepulsionIntegrals(&bbpairs, &bbpairs); 
+    
+    // print evaluation timing statistics
+    
+    _printTiming(molecule, eritim, oStream);
 }
 
 void
@@ -160,6 +171,15 @@ CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const 
     
     auto rab = brapairs.getDistancesAB();
     
+    // allocate spherical integrals buffer
+    
+    nblk = angmom::to_SphericalComponents(brapairs.getBraAngularMomentum(),
+                                          brapairs.getKetAngularMomentum())
+         * angmom::to_SphericalComponents(ketpairs.getBraAngularMomentum(),
+                                          ketpairs.getKetAngularMomentum());
+    
+    CMemBlock2D<double> spherbuffer(cdim, nblk);
+    
     // initialize Boys function evaluator
     
     auto bord = genfunc::maxOrderOfPair(vrrvec, 0, 0);
@@ -169,57 +189,6 @@ CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const 
     CMemBlock<double> bargs(pdim);
     
     CMemBlock2D<double> bvals(pdim, bord + 1);
-    
-    // TESTING INFO:
-    
-    printf("*** INTEGRALS (%i,%i|%i,%i) Sym %i:\n", amom.getAngularMomentum(),
-           bmom.getAngularMomentum(), cmom.getAngularMomentum(),
-           dmom.getAngularMomentum(), symbk);
-
-    printf("HRR on bra side:\n");
-    
-    for (size_t i = 0; i < bhrrvec.size(); i++)
-    {
-        printf("-> BHRR(%i,%i|%i,%i): %i\n", bhrrvec[i].first(), bhrrvec[i].second(),
-               bhrrvec[i].third(), bhrrvec[i].fourth(), bhrridx[i]); 
-    }
-    
-    printf("Contr. Intermidiates:\n");
-    
-    for (size_t i = 0; i < tcvec.size(); i++)
-    {
-        printf("(0,%i|%i,%i) ", tcvec[i].first(), tcvec[i].second(), tcvec[i].third());
-    }
-    
-    printf("\n");
-    
-    printf("HRR on ket side:\n");
-    
-    for (size_t i = 0; i < khrrvec.size(); i++)
-    {
-        printf("-> KHRR(0,%i|%i,%i): %i\n", khrrvec[i].first(), khrrvec[i].second(),
-               khrrvec[i].third(), khrridx[i]);
-    }
-    
-    printf("Prim. Intermidiates:\n");
-    
-    for (size_t i = 0; i < tpvec.size(); i++)
-    {
-        printf("(0,%i|0,%i)^(%i) ", tpvec[i].first(), tpvec[i].second(),
-               tpvec[i].third());
-    }
-    
-    printf("\n");
-    
-    printf("VRR:\n");
-    
-    for (size_t i = 0; i < vrrvec.size(); i++)
-    {
-        printf("-> VRR(0,%i|0,%i)^(%i): %i pmax %i pdim %i\n", vrrvec[i].first(), vrrvec[i].second(),
-               vrrvec[i].third(), vrridx[i], pmax, pdim);
-    }
-    
-    // END OF TESTING INFO
     
     // loop over contracted GTOs ob bra side
     
@@ -270,6 +239,14 @@ CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const 
         // apply horizontal recursion on bra side
         
         _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, ketpairs, symbk, i);
+        
+        
+        // transform bra side to spherical form
+        
+        genfunc::transform_bra(spherbuffer, bhrrbuffer, amom, bmom, bhrrvec, bhrridx,
+                               ketpairs, symbk, i);
+        
+        // distribute integrals: add distribution or Fock formation code
     }
 }
 
@@ -1398,4 +1375,125 @@ CElectronRepulsionIntegralsDriver::_applyHRRonBra(      CMemBlock2D<double>&  br
     brahrrfunc::compElectronRepulsionForGGXX(braBuffer, recPattern, recIndexes,
                                              abDistances, ketGtoPairsBlock,
                                              isBraEqualKet, iContrPair);
+}
+
+void
+CElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContainer& gtoPairs,
+                                                      COutputStream&      oStream) const
+{
+    oStream << fmt::header << "Electron Repulsion Integrals" << fmt::end;
+    
+    oStream << std::string(27, '=') << fmt::end << fmt::blank;
+    
+    // GTO pairs screening information
+    
+    gtoPairs.printScreeningInfo(oStream);
+    
+    oStream << fmt::blank;
+}
+
+void
+CElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
+                                                const CSystemClock&  timer,
+                                                      COutputStream& oStream) const
+{
+    // NOTE: Silent for local execution mode
+    
+    if (_isLocalMode) return;
+    
+    // collect timing data from MPI nodes
+    
+    auto tsec = timer.getElapsedTimeInSeconds();
+    
+    CMemBlock<double> tvec;
+    
+    if (_globRank == mpi::master()) tvec = CMemBlock<double>(_globNodes);
+    
+    mpi::gather(tvec.data(), tsec, _globRank, MPI_COMM_WORLD);
+    
+    // print timing data
+    
+    if (_globRank == mpi::master())
+    {
+        auto natoms = molecule.getNumberOfAtoms();
+        
+        std::string str("Two-Electron Integrals Evaluation Timings: ");
+        
+        oStream << fstr::format(str, 80, fmt::left) << fmt::end << fmt::blank;
+        
+        for (int32_t i = 0; i < _globNodes; i++)
+        {
+            // node information
+            
+            str.assign("MPI Node: ");
+            
+            str.append(fstr::to_string(i, 3, fmt::left));
+            
+            // atom batches information
+            
+            auto nodatm = mpi::batch_size(natoms, i, _globNodes);
+            
+            auto nodoff = mpi::batch_offset(natoms, i, _globNodes);
+            
+            str.append(" Atoms in batch: ");
+            
+            std::string bstr(std::to_string(nodoff));
+            
+            bstr.append("-");
+            
+            bstr.append(std::to_string(nodoff + nodatm));
+            
+            str.append(fstr::format(bstr, 8, fmt::left));
+            
+            // evaluation time info
+            
+            str.append(" Time: ");
+            
+            str.append(fstr::to_string(tvec.at(i), 2));
+            
+            str.append(" sec.");
+            
+            oStream << fstr::format(str, 80, fmt::left) << fmt::end;
+        }
+    }
+}
+
+void
+CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
+                                                                   const CGtoPairsContainer* ketGtoPairsContainer) const
+{
+    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs pairs blocks in bra/ket sides
+            
+            auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
+            
+            auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
+            
+            // determine symmetry of bra/ket GTOs pairs containers
+            
+            auto symbk = ((*braGtoPairsContainer) == (*ketGtoPairsContainer));
+            
+            // loop over pairs of GTOs blocks
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                auto bpairs = braGtoPairsContainer->getGtoPairsBlock(i);
+                
+                auto joff = (symbk) ? i : 0;
+                
+                for (int32_t j = joff; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(j)
+                    {
+                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
+                        
+                        compElectronRepulsionForGtoPairsBlocks(bpairs, kpairs);
+                    }
+                }
+            }
+        }
+    }
 }
