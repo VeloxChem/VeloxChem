@@ -6,26 +6,21 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#ifndef BoysFunctionTest_hpp
-#define BoysFunctionTest_hpp
+#ifndef OneIntsDistributionTest_hpp
+#define OneIntsDistributionTest_hpp
 
 #include "gtest/gtest.h"
 
 #include "MemBlock.hpp"
 
-class CBoysFunctionTest : public ::testing::Test
+class COneIntsDistributionTest : public ::testing::Test
 {
 protected:
-
-    CBoysFunctionTest() {};
-
-    virtual ~CBoysFunctionTest() {};
-
-    CMemBlock<double> getSmallArguments() const;
-
-    CMemBlock<double> getMediumArguments() const;
-
-    CMemBlock<double> getLargeArguments() const;
+    
+    COneIntsDistributionTest() {};
+    
+    virtual ~COneIntsDistributionTest() {};
 };
 
-#endif /* BoysFunctionTest_hpp */
+
+#endif /* OneIntsDistributionTest_hpp */

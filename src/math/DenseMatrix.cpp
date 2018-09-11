@@ -10,6 +10,9 @@
 
 #include <utility>
 #include <cmath>
+#include <sstream>
+
+#include "StringFormat.hpp"
 
 CDenseMatrix::CDenseMatrix()
 
@@ -179,6 +182,34 @@ CDenseMatrix::row(const int32_t iRow)
     }
     
     return nullptr;
+}
+
+std::string
+CDenseMatrix::getString() const
+{
+    std::stringstream sst("");
+    
+    auto vals = _values.data();
+    
+    sst << "[Dimension " << _nRows << " x " << _nColumns << "]" << std::endl;
+    
+    for (int32_t i = 0; i < _nRows; i++)
+    {
+        for (int j = 0; j < _nColumns; j++)
+        {
+            sst << fstr::to_string(vals[i * _nColumns + j], 7, 12, fmt::right);
+        }
+        
+        sst << std::endl;
+    }
+    
+    return sst.str();
+}
+
+void
+CDenseMatrix::zero()
+{
+    mathfunc::zero(_values.data(), _nRows * _nColumns); 
 }
 
 std::ostream&

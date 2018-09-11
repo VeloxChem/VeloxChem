@@ -21,7 +21,9 @@
  */
 enum class xcfun
 {
-    lda, gga, mgga
+    lda,
+    gga,
+    mgga
 };
 
 /**

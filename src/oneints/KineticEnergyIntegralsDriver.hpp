@@ -24,6 +24,7 @@
 #include "SparseMatrix.hpp"
 #include "OutputStream.hpp"
 #include "SystemClock.hpp"
+#include "OneIntsDistributor.hpp"
 
 /**
  Class CKineticEnergyIntegralsDriver computes one-electron kinetic energy
@@ -70,22 +71,15 @@ class CKineticEnergyIntegralsDriver
     
     /**
      Computes kinetic energy integrals for specific pair of GTOs blocks and
-     stores integrals in matrix of predefined size.
-     NOTE: If size of integrals matrix, nRows and nColumns, is set to zero, then
-     size of integrals matrix is defined by GTOs block objects on bra and ket
-     sides.
+     stores integrals into distribution buffer.
      
-     @param intsValues the matrix of kinetic energy integrals.
+     @param distPattern the pointer to integrals distribution pattern.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
-     @param nRows the number of rows in kinetic energy integrals matrix.
-     @param nColumns the number of columns in kinetic energy integrals matrix.
      */
-    void _compKineticEnergyForGtoBlocks(      double*    intsValues,
-                                        const CGtoBlock& braGtoBlock,
-                                        const CGtoBlock& ketGtoBlock,
-                                        const int32_t    nRows,
-                                        const int32_t    nColumns) const;
+    void _compKineticEnergyForGtoBlocks(      COneIntsDistribution* distPattern,
+                                        const CGtoBlock&            braGtoBlock,
+                                        const CGtoBlock&            ketGtoBlock) const;
     
     /**
      Computes batch of primitive kinetic energy integrals using Obara-Saika
@@ -239,13 +233,14 @@ public:
                                        MPI_Comm         comm) const;
     
     /**
-     Computes kinetic energy integrals blocks for pair of GTOs blocks.
+     Computes kinetic energy integrals blocks for pair of GTOs blocks and stores
+     them into integrals batch.
      
-     @param intsValues the matrix of kinetic energy integrals.
+     @param intsBatch the pointer to integrals batch buffer.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
-    void compute(      double*    intsValues,
+    void compute(      double*    intsBatch,
                  const CGtoBlock& braGtoBlock,
                  const CGtoBlock& ketGtoBlock) const;
 };

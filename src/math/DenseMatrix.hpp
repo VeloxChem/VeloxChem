@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <vector>
+#include <string>
 
 #include "MemBlock.hpp"
 
@@ -171,6 +172,18 @@ public:
      @return the pointer to first element of specific row.
      */
     double* row(const int32_t iRow);
+    
+    /**
+     Gets string representation of dense matrix object.
+
+     @return the string representation.
+     */
+    std::string getString() const;
+    
+    /**
+     Sets all values in dense matrix to zero.
+     */
+    void zero();
     
     /**
      Converts dense matrix object to text output and insert it into output
