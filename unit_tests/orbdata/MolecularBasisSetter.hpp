@@ -17,10 +17,16 @@ CMolecularBasis getMolecularBasisEmpty();
 
 CMolecularBasis getMolecularBasisForLiH();
     
+CMolecularBasis getMolecularBasisForH2O();
+
+CMolecularBasis getMinimalBasisForH2O();
+
+CMolecularBasis getMinimalBasisForNH3CH4();
+    
 CMolecularBasis getTestBasisForLiH();
     
 CMolecularBasis getReducedTestBasisForLiH();
-    
+
 } // vlxbas namespace
 
 #endif /* MolecularBasisSetter_hpp */

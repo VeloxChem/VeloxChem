@@ -202,15 +202,15 @@ TEST_F(CMoleculeTest, GetSubMolecule)
 
     CMolecule dimer = vlxmol::getMoleculeH2ODimer();
 
-    ASSERT_TRUE(dimer.getSubMolecule(-1,3) == empty_molecule);
+    ASSERT_EQ(dimer.getSubMolecule(-1,3), empty_molecule);
 
-    ASSERT_TRUE(dimer.getSubMolecule(0,-1) == empty_molecule);
+    ASSERT_EQ(dimer.getSubMolecule(0,-1), empty_molecule);
 
-    ASSERT_TRUE(dimer.getSubMolecule(0,0) == empty_molecule);
+    ASSERT_EQ(dimer.getSubMolecule(0,0), empty_molecule);
 
-    ASSERT_TRUE(dimer.getSubMolecule(0,7) == empty_molecule);
+    ASSERT_EQ(dimer.getSubMolecule(0,7), empty_molecule);
 
-    ASSERT_TRUE(dimer.getSubMolecule(0,3) == water);
+    ASSERT_EQ(dimer.getSubMolecule(0,3), water);
 
-    ASSERT_TRUE(dimer.getSubMolecule(0,6) == dimer);
+    ASSERT_EQ(dimer.getSubMolecule(0,6), dimer);
 }

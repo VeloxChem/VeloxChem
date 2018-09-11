@@ -131,4 +131,35 @@ getMoleculeH2ODimer()
     return mol;
 }
 
+CMolecule
+getMoleculeNH3CH4()
+{
+    std::vector<double> coords({ -3.710, -3.702, -4.704, -4.780,
+                                 -1.621, -0.819, -3.412, -0.381, -1.872,
+                                  3.019,  4.942,  2.415,  2.569,
+                                 -5.080, -6.698, -4.654, -3.498, -5.468,
+                                 -0.037,  0.059,  1.497, -1.573,
+                                  0.444, -0.465, -0.393,  0.222,  2.413});
+    
+    std::vector<double> charges({7.0, 1.0, 1.0, 1.0,
+                                 6.0, 1.0, 1.0, 1.0, 1.0});
+    
+    std::vector<double> masses({14.007, 1.008, 1.008, 1.008,
+                                12.011, 1.008, 1.008, 1.008, 1.008});
+    
+    std::vector<std::string> labels({"N", "H", "H", "H",
+                                     "C", "H", "H", "H", "H"});
+    
+    std::vector<int32_t> idselem({7, 1, 1, 1,
+                                  6, 1, 1, 1, 1});
+    
+    CMolecule mol(coords, charges, masses, labels, idselem);
+    
+    mol.setCharge(0.0);
+
+    mol.setMultiplicity(1);
+
+    return mol;
+}
+
 } // vlxmol namespace

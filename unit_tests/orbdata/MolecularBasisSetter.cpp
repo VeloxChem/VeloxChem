@@ -37,6 +37,50 @@ getMolecularBasisForLiH()
 }
 
 CMolecularBasis
+getMolecularBasisForH2O()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"def2-SVP"});
+
+    mbas.addAtomBasis(getAtomBasisForO());
+
+    mbas.addAtomBasis(getAtomBasisForH());
+
+    return mbas;
+}
+    
+CMolecularBasis
+getMinimalBasisForH2O()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"MIN-CC-PVDZ"});
+
+    mbas.addAtomBasis(getMinimalBasisForO());
+
+    mbas.addAtomBasis(getMinimalBasisForH());
+
+    return mbas;
+}
+
+CMolecularBasis
+getMinimalBasisForNH3CH4()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"MIN-CC-PVDZ"});
+
+    mbas.addAtomBasis(getMinimalBasisForC());
+
+    mbas.addAtomBasis(getMinimalBasisForN());
+
+    mbas.addAtomBasis(getMinimalBasisForH());
+
+    return mbas;
+}
+    
+CMolecularBasis
 getTestBasisForLiH()
 {
     CMolecularBasis mbas;
@@ -63,6 +107,6 @@ getReducedTestBasisForLiH()
     
     return mbas;
 }
-    
+
 } // vlxbas namespace
 

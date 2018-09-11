@@ -65,6 +65,27 @@ public:
      @return a string for printing the overlap matrix.
      */
     std::string getString() const;
+
+    /**
+     Gets number of rows in overlap matrix.
+
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows() const;
+    
+    /**
+     Gets number of columns in overlap matrix.
+
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns() const;
+    
+    /**
+     Gets constant pointer to first element of overlap matrix.
+
+     @return the constant pointer to first element of overlap matrix.
+     */
+    const double* values() const;
     
     /**
      Assigns a overlap matrix object by copying other overlap matrix object.

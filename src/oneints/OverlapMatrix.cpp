@@ -50,6 +50,24 @@ COverlapMatrix::getString() const
     return _matrix.getString(); 
 }
 
+int32_t
+COverlapMatrix::getNumberOfRows() const
+{
+    return _matrix.getNumberOfRows(); 
+}
+
+int32_t
+COverlapMatrix::getNumberOfColumns() const
+{
+    return _matrix.getNumberOfColumns(); 
+}
+
+const double*
+COverlapMatrix::values() const
+{
+    return _matrix.values(); 
+}
+
 COverlapMatrix&
 COverlapMatrix::operator=(const COverlapMatrix& source)
 {
