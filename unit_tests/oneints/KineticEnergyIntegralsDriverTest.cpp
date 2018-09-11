@@ -11,6 +11,7 @@
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
+#include "AssembleMatrices.hpp"
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7279,5 +7280,85 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
     }
 
     ASSERT_NEAR(0.0, maxDiff, 2.0e-13);
+}
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+    
+    auto mdimer = vlxmol::getMoleculeH2ODimer();
+
+    auto mh2o_1 = mdimer.getSubMolecule(0,3);
+
+    auto mh2o_2 = mdimer.getSubMolecule(3,3);
+    
+    auto mbas = vlxbas::getMolecularBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S11 = kindrv.compute(mh2o_1, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S22 = kindrv.compute(mh2o_2, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S12 = kindrv.compute(mh2o_1, mh2o_2, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S21 = kindrv.compute(mh2o_2, mh2o_1, mbas, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    CKineticEnergyMatrix S_new = assembleKineticEnergyMatrices(mh2o_1, mh2o_2, mbas, mbas,
+                                                               S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
+}
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForNH3CH4)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+
+    auto mdimer = vlxmol::getMoleculeNH3CH4();
+
+    auto mnh3 = mdimer.getSubMolecule(0,4);
+
+    auto mch4 = mdimer.getSubMolecule(4,5);
+    
+    auto mbas = vlxbas::getMinimalBasisForNH3CH4();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S11 = kindrv.compute(mnh3, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S22 = kindrv.compute(mch4, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S12 = kindrv.compute(mnh3, mch4, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S21 = kindrv.compute(mch4, mnh3, mbas, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    CKineticEnergyMatrix S_new = assembleKineticEnergyMatrices(mnh3, mch4, mbas, mbas,
+                                                               S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
 }
 

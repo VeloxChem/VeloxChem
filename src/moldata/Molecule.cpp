@@ -94,6 +94,91 @@ CMolecule::CMolecule(CMolecule&& source) noexcept
 
 }
 
+CMolecule::CMolecule(const CMolecule& mol_1, const CMolecule& mol_2)
+{
+    std::vector<double>      atomCoordinates;
+    std::vector<double>      atomCharges;
+    std::vector<double>      atomMasses;
+    std::vector<std::string> atomLabels;
+    std::vector<int32_t>     idsElemental;
+
+    // x, y, and z coordinates
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_1._atomCoordinates.data(0)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_2._atomCoordinates.data(0)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_1._atomCoordinates.data(1)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_2._atomCoordinates.data(1)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_1._atomCoordinates.data(2)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_2._atomCoordinates.data(2)[i]);
+    }
+
+    // charges, masses, labels, ids
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCharges.push_back(mol_1._atomCharges.data()[i]);
+
+        atomMasses.push_back(mol_1._atomMasses.data()[i]);
+
+        atomLabels.push_back(mol_1._atomLabels.data()[i]);
+
+        idsElemental.push_back(mol_1._idsElemental.data()[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCharges.push_back(mol_2._atomCharges.data()[i]);
+
+        atomMasses.push_back(mol_2._atomMasses.data()[i]);
+
+        atomLabels.push_back(mol_2._atomLabels.data()[i]);
+
+        idsElemental.push_back(mol_2._idsElemental.data()[i]);
+    }
+
+    // set up combined molecule
+
+    auto natoms = static_cast<int32_t>(idsElemental.size());
+    
+    _atomCoordinates = CMemBlock2D<double>(atomCoordinates, natoms, 3);
+    
+    _atomCharges = CMemBlock<double>(atomCharges);
+    
+    _atomMasses = CMemBlock<double>(atomMasses);
+    
+    _atomLabels = atomLabels;
+    
+    _idsElemental = CMemBlock<int32_t>(idsElemental);
+    
+    setAtomicIndexes(0);
+
+    setCharge(mol_1._charge + mol_2._charge);
+
+    setMultiplicity(mol_1._multiplicity + mol_2._multiplicity - 1);
+}
+
 CMolecule::~CMolecule()
 {
 

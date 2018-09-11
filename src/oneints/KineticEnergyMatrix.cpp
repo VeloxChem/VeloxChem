@@ -57,6 +57,12 @@ CKineticEnergyMatrix::getNumberOfColumns() const
     return _matrix.getNumberOfColumns(); 
 }
 
+int32_t
+CKineticEnergyMatrix::getNumberOfElements() const
+{
+    return _matrix.getNumberOfElements(); 
+}
+
 const double*
 CKineticEnergyMatrix::values() const
 {

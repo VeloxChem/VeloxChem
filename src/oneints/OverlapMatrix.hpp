@@ -79,6 +79,13 @@ public:
      @return the number of columns.
      */
     int32_t getNumberOfColumns() const;
+
+    /**
+     Gets number of elements in overlap matrix.
+
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements() const;
     
     /**
      Gets constant pointer to first element of overlap matrix.

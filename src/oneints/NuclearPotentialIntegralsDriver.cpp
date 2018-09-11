@@ -69,6 +69,46 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
     return npotmat;
 }
 
+CNuclearPotentialMatrix
+CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
+                                          const CMolecule&       ketMolecule,
+                                          const CMolecularBasis& basis,
+                                          const CMolecule&       pchgMolecule_1,
+                                          const CMolecule&       pchgMolecule_2,
+                                                COutputStream&   oStream,
+                                                MPI_Comm         comm) const
+{
+    CSystemClock timer;
+    
+    CNuclearPotentialMatrix npotmat;
+    
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs container
+        
+        CGtoContainer bracontr(braMolecule, basis);
+
+        CGtoContainer ketcontr(ketMolecule, basis);
+        
+        // set up point charges data
+        
+        CMolecule molecule (pchgMolecule_1, pchgMolecule_2);
+
+        auto pcharges = molecule.getCharges();
+        
+        auto pcoords  = molecule.getCoordinates();
+        
+        // compute nuclear potential integrals
+        
+        npotmat = _compNuclearPotentialIntegrals(&pcharges, &pcoords, &bracontr,
+                                                 &ketcontr);
+    }
+    
+    _printComputationTime(timer, oStream);
+    
+    return npotmat;
+}
+
 void
 CNuclearPotentialIntegralsDriver::compute(      double*              intsBatch,
                                           const CMemBlock<double>*   charges,

@@ -81,6 +81,13 @@ public:
     int32_t getNumberOfColumns() const;
     
     /**
+     Gets number of elements in kinetic energy matrix.
+
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements() const;
+    
+    /**
      Gets constant pointer to first element of kinetic energy matrix.
 
      @return the constant pointer to first element of kinetic energy matrix.

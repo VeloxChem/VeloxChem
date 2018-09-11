@@ -62,6 +62,12 @@ COverlapMatrix::getNumberOfColumns() const
     return _matrix.getNumberOfColumns(); 
 }
 
+int32_t
+COverlapMatrix::getNumberOfElements() const
+{
+    return _matrix.getNumberOfElements(); 
+}
+
 const double*
 COverlapMatrix::values() const
 {

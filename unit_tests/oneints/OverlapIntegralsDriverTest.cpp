@@ -11,11 +11,7 @@
 #include "OverlapIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
-#include "DenseMatrix.hpp"
-
-#include <algorithm>
-#include <vector>
-#include <string>
+#include "AssembleMatrices.hpp"
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7269,147 +7265,6 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2O)
     ASSERT_EQ(ovlmat, COverlapMatrix(CDenseMatrix(intvals, 7, 7)));
 }
 
-int32_t
-getMolecularMaxAM(const CMolecule&       mol,
-                  const CMolecularBasis& basis)
-{
-    int32_t maxAM = 0;
-
-    for (int32_t i = 0; i < mol.getNumberOfAtoms(); i++)
-    {
-        int32_t idElem = mol.getIdsElemental()[i];
-
-        int32_t elemMaxAM = basis.getMaxAngularMomentum(idElem);
-
-        if (elemMaxAM > maxAM)
-        {
-            maxAM = elemMaxAM;
-        }
-    }
-
-    return maxAM;
-}
-
-COverlapMatrix
-assembleOverlapMatrices(const CMolecule&       mol_1,
-                        const CMolecule&       mol_2,
-                        const CMolecularBasis& basis_1,
-                        const CMolecularBasis& basis_2,
-                        const COverlapMatrix&  S11,
-                        const COverlapMatrix&  S22,
-                        const COverlapMatrix&  S12,
-                        const COverlapMatrix&  S21)
-{
-    // assign the AOs to molecules
-    
-    // angular momentum based AO ordering
-    // S, P-1, P0, P+1, D-2, D-1, D0, D+1, D+2, ...
-    
-    // AO_type:  S S S S S S S S P-1 P-1 P0 P0 P+1 P+1
-    // Molecule: A A A A B B B B A   B   A  B  A   B
-
-    int32_t maxAM_1 = getMolecularMaxAM(mol_1, basis_1);
-
-    int32_t maxAM_2 = getMolecularMaxAM(mol_2, basis_2);
-
-    std::vector<std::string> molIdx;
-
-    for (int32_t i = 0; i <= std::max(maxAM_1, maxAM_2); i++)
-    {
-        for (int32_t s = -i; s <= i; s++)
-        {
-            if (i <= maxAM_1)
-            {
-                for (int32_t k = 0; k < basis_1.getNumberOfBasisFunctions(mol_1, i); k++)
-                {
-                    molIdx.push_back("A");
-                }
-            }
-
-            if (i <= maxAM_2)
-            {
-                for (int32_t k = 0; k < basis_2.getNumberOfBasisFunctions(mol_2, i); k++)
-                {
-                    molIdx.push_back("B");
-                }
-            }
-        }
-    }
-
-    // find out the AO index mapping from monomer to dimer
-
-    std::vector<int32_t> aoIdx_1;
-
-    std::vector<int32_t> aoIdx_2;
-
-    for (int32_t i = 0; i < molIdx.size(); i++)
-    {
-        if (molIdx[i] == std::string("A"))
-        {
-            aoIdx_1.push_back(i);
-        }
-
-        if (molIdx[i] == std::string("B"))
-        {
-            aoIdx_2.push_back(i);
-        }
-    }
-
-    // form the four blocks of dimer matrix
-
-    const int32_t nAO_1 = S11.getNumberOfRows();
-
-    const int32_t nAO_2 = S22.getNumberOfRows();
-
-    const int32_t nAO = nAO_1 + nAO_2;
-
-    CDenseMatrix smat (nAO, nAO);
-
-    smat.zero();
-
-    // [1,1] block
-
-    for (int32_t i = 0; i < nAO_1; i++)
-    {
-        for (int32_t j = 0; j < nAO_1; j++)
-        {
-            smat.values()[aoIdx_1[i] * nAO + aoIdx_1[j]] = S11.values()[i * nAO_1 + j];
-        }
-    }
-
-    // [2,2] block
-
-    for (int32_t i = 0; i < nAO_2; i++)
-    {
-        for (int32_t j = 0; j < nAO_2; j++)
-        {
-            smat.values()[aoIdx_2[i] * nAO + aoIdx_2[j]] = S22.values()[i * nAO_2 + j];
-        }
-    }
-
-    // [1,2] block
-
-    for (int32_t i = 0; i < nAO_1; i++)
-    {
-        for (int32_t j = 0; j < nAO_2; j++)
-        {
-            smat.values()[aoIdx_1[i] * nAO + aoIdx_2[j]] = S12.values()[i * nAO_2 + j];
-        }
-    }
-
-    // [2,1] block
-
-    for (int32_t i = 0; i < nAO_2; i++)
-    {
-        for (int32_t j = 0; j < nAO_1; j++)
-        {
-            smat.values()[aoIdx_2[i] * nAO + aoIdx_1[j]] = S21.values()[i * nAO_1 + j];
-        }
-    }
-
-    return COverlapMatrix(smat);
-}
-
 TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
 {
     COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
@@ -7422,8 +7277,6 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
 
     auto mh2o_2 = mdimer.getSubMolecule(3,3);
     
-    //auto mbas = vlxbas::getMinimalBasisForH2O();
-
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
     COutputStream ost(std::string("dummy.out"));

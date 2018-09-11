@@ -214,3 +214,22 @@ TEST_F(CMoleculeTest, GetSubMolecule)
 
     ASSERT_EQ(dimer.getSubMolecule(0,6), dimer);
 }
+
+TEST_F(CMoleculeTest, CombineMolecule)
+{
+    CMolecule empty_molecule;
+
+    CMolecule dimer = vlxmol::getMoleculeH2ODimer();
+
+    CMolecule h2o_1 = dimer.getSubMolecule(0,3);
+
+    CMolecule h2o_2 = dimer.getSubMolecule(3,3);
+
+    CMolecule h2o_11 (h2o_1, empty_molecule);
+
+    ASSERT_EQ(h2o_11, h2o_1);
+
+    CMolecule h2o_dimer (h2o_1, h2o_2);
+
+    ASSERT_EQ(h2o_dimer, dimer);
+}

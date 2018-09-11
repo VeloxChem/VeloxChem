@@ -57,6 +57,12 @@ CNuclearPotentialMatrix::getNumberOfColumns() const
     return _matrix.getNumberOfColumns(); 
 }
 
+int32_t
+CNuclearPotentialMatrix::getNumberOfElements() const
+{
+    return _matrix.getNumberOfElements(); 
+}
+
 const double*
 CNuclearPotentialMatrix::values() const
 {

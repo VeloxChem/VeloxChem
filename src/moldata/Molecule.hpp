@@ -117,6 +117,14 @@ public:
     CMolecule(CMolecule&& source) noexcept;
 
     /**
+     Creates a molecule object by combining two molecule object.
+     
+     @param mol_1 the first molecule object.
+     @param mol_2 the second molecule object.
+     */
+    CMolecule(const CMolecule& mol_1, const CMolecule& mol_2);
+
+    /**
      Destroys a molecule object.
      */
     ~CMolecule();
