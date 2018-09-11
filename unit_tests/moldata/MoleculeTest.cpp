@@ -193,3 +193,24 @@ TEST_F(CMoleculeTest, GetMinDistances)
     
     ASSERT_EQ(mdist, mol.getMinDistances());
 }
+
+TEST_F(CMoleculeTest, GetSubMolecule)
+{
+    CMolecule empty_molecule;
+
+    CMolecule water = vlxmol::getMoleculeH2O();
+
+    CMolecule dimer = vlxmol::getMoleculeH2ODimer();
+
+    ASSERT_TRUE(dimer.getSubMolecule(-1,3) == empty_molecule);
+
+    ASSERT_TRUE(dimer.getSubMolecule(0,-1) == empty_molecule);
+
+    ASSERT_TRUE(dimer.getSubMolecule(0,0) == empty_molecule);
+
+    ASSERT_TRUE(dimer.getSubMolecule(0,7) == empty_molecule);
+
+    ASSERT_TRUE(dimer.getSubMolecule(0,3) == water);
+
+    ASSERT_TRUE(dimer.getSubMolecule(0,6) == dimer);
+}
