@@ -174,13 +174,6 @@ public:
     double* row(const int32_t iRow);
 
     /**
-     Gets string representation of dense matrix.
-
-     @return a string for printing the dense matrix.
-     */
-    std::string getString() const;
-    
-    /**
      Gets string representation of dense matrix object.
 
      @return the string representation.
