@@ -61,7 +61,7 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
         // compute nuclear potential integrals
         
         npotmat = _compNuclearPotentialIntegrals(&pcharges, &pcoords, &bracontr,
-                                              &bracontr);
+                                                 &bracontr);
     }
     
     _printComputationTime(timer, oStream);
@@ -70,14 +70,30 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
 }
 
 void
-CNuclearPotentialIntegralsDriver::compute(      double*              intsValues,
+CNuclearPotentialIntegralsDriver::compute(      double*              intsBatch,
                                           const CMemBlock<double>*   charges,
                                           const CMemBlock2D<double>* coordinates,
                                           const CGtoBlock&           braGtoBlock,
                                           const CGtoBlock&           ketGtoBlock) const
 {
-    _compNuclearPotentialForGtoBlocks(intsValues, charges, coordinates, braGtoBlock,
-                                      ketGtoBlock, 0, 0);
+    // determine dimensions of integrals batch
+    
+    auto nrow = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum())
+    
+              * braGtoBlock.getNumberOfContrGtos();
+    
+    auto ncol = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum())
+    
+              * ketGtoBlock.getNumberOfContrGtos();
+    
+    // set up distribution pattern
+    
+    COneIntsDistribution dist(intsBatch, nrow, ncol, dist1e::batch);
+    
+    // compute nuclear potential integrals
+    
+    _compNuclearPotentialForGtoBlocks(&dist, charges, coordinates, braGtoBlock,
+                                      ketGtoBlock);
 }
 
 CNuclearPotentialMatrix
@@ -90,7 +106,7 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
     
     auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
     
-    // determine dimensions of nuclear potential matrix
+    // determine dimensions of overlap matrix
     
     auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
     
@@ -100,12 +116,16 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
     
     CDenseMatrix npotmat(nrow, ncol);
     
-    auto npotvals = npotmat.values();
+    // set up distributio pattern
+    
+    dist1e dstyp = (symbk) ? dist1e::symsq : dist1e::rect;
+    
+    COneIntsDistribution* distpat = new COneIntsDistribution(npotmat.values(),
+                                                             nrow, ncol, dstyp);
     
     // compute nuclear potential integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, npotvals,\
-                                nrow, ncol, symbk)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat, symbk)
     {
         #pragma omp single nowait
         {
@@ -129,31 +149,37 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
                     {
                         auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
-                        _compNuclearPotentialForGtoBlocks(npotvals, charges, coordinates,
-                                                          bgtos, kgtos, nrow, ncol);
+                        _compNuclearPotentialForGtoBlocks(distpat, charges, coordinates,
+                                                          bgtos, kgtos);
                     }
                 }
             }
         }
     }
     
+    // deallocate distribution pattern
+    
+    delete distpat;
+    
     return CNuclearPotentialMatrix(npotmat);
 }
 
 void
-CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      double*              intsValues,
-                                                                    const CMemBlock<double>*   charges,
-                                                                    const CMemBlock2D<double>* coordinates,
-                                                                    const CGtoBlock&           braGtoBlock,
-                                                                    const CGtoBlock&           ketGtoBlock,
-                                                                    const int32_t              nRows,
-                                                                    const int32_t              nColumns) const
+CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIntsDistribution* distPattern,
+                                                                    const CMemBlock<double>*    charges,
+                                                                    const CMemBlock2D<double>*  coordinates,
+                                                                    const CGtoBlock&            braGtoBlock,
+                                                                    const CGtoBlock&            ketGtoBlock) const
 {
     // copy GTOs blocks for bra and ket sides
     
     auto bragtos = braGtoBlock;
     
     auto ketgtos = ketGtoBlock;
+    
+    // copy distribution pattern
+    
+    auto distpat = *distPattern;
     
     // copy charges and their coordinates
     
@@ -215,8 +241,6 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      double
     
     // set up contracted GTOs dimensions
     
-    auto bdim = bragtos.getNumberOfContrGtos();
-    
     auto kdim = ketgtos.getNumberOfContrGtos();
     
     // allocate contracted Cartesian integrals buffer
@@ -239,11 +263,9 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      double
     
     CMemBlock2D<double> bvals(pdim, bord + 1);
     
-    // determine integrals storage scheme
+    // determine bra and ket sides symmetry
     
-    bool diagblk = (bragtos == ketgtos);
-    
-    bool origord = ((nRows == 0) && (nColumns == 0));
+    bool symbk = (bragtos == ketgtos);
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -301,15 +323,9 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      double
         
         // add batch of integrals to integrals matrix
         
-        if (origord)
-        {
-            genfunc::distribute(intsValues, spherbuffer, bang, kang, bdim, kdim, i);
-        }
-        else
-        {
-            genfunc::distribute(intsValues, spherbuffer, bragtos, ketgtos,
-                                diagblk, nColumns, i);
-        }
+        // add batch of integrals to integrals matrix
+        
+        distpat.distribute(spherbuffer, bragtos, ketgtos, symbk, i);
     }
 }
 

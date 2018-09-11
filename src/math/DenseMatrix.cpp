@@ -186,20 +186,29 @@ CDenseMatrix::row(const int32_t iRow)
 std::string
 CDenseMatrix::getString() const
 {
-    std::stringstream sStream;
-
-    const double* data = _values.data();
-
-    sStream << "[Dimension " << _nRows << " x " << _nColumns << "]" << std::endl;
-
-    for (int32_t iRow = 0; iRow < _nRows; iRow++) {
-        for (int32_t iColumn = 0; iColumn < _nColumns; iColumn++) {
-            sStream << fstr::to_string(data[iRow * _nColumns + iColumn], 8, 15, fmt::right);
+    std::stringstream sst("");
+    
+    auto vals = _values.data();
+    
+    sst << "[Dimension " << _nRows << " x " << _nColumns << "]" << std::endl;
+    
+    for (int32_t i = 0; i < _nRows; i++)
+    {
+        for (int32_t j = 0; j < _nColumns; j++)
+        {
+            sst << fstr::to_string(vals[i * _nColumns + j], 8, 15, fmt::right);
         }
-        sStream << std::endl;
+        
+        sst << std::endl;
     }
+    
+    return sst.str();
+}
 
-    return sStream.str();
+void
+CDenseMatrix::zero()
+{
+    mathfunc::zero(_values.data(), _nRows * _nColumns); 
 }
 
 std::ostream&

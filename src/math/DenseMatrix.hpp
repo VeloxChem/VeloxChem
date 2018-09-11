@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <vector>
+#include <string>
 
 #include "MemBlock.hpp"
 
@@ -178,6 +179,18 @@ public:
      @return a string for printing the dense matrix.
      */
     std::string getString() const;
+    
+    /**
+     Gets string representation of dense matrix object.
+
+     @return the string representation.
+     */
+    std::string getString() const;
+    
+    /**
+     Sets all values in dense matrix to zero.
+     */
+    void zero();
     
     /**
      Converts dense matrix object to text output and insert it into output

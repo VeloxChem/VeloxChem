@@ -47,7 +47,7 @@ COverlapMatrix::~COverlapMatrix()
 std::string
 COverlapMatrix::getString() const
 {
-    return _matrix.getString();
+    return _matrix.getString(); 
 }
 
 COverlapMatrix&

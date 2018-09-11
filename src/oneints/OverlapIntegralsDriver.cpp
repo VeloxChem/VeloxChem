@@ -141,11 +141,27 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
 }
 
 void
-COverlapIntegralsDriver::compute(      double*    intsValues,
+COverlapIntegralsDriver::compute(      double*    intsBatch,
                                  const CGtoBlock& braGtoBlock,
                                  const CGtoBlock& ketGtoBlock) const
 {
-    _compOverlapForGtoBlocks(intsValues, braGtoBlock, ketGtoBlock, 0, 0); 
+    // determine dimensions of integrals batch
+    
+    auto nrow = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum())
+    
+              * braGtoBlock.getNumberOfContrGtos();
+    
+    auto ncol = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum())
+    
+              * ketGtoBlock.getNumberOfContrGtos();
+    
+    // set up distribution pattern
+    
+    COneIntsDistribution dist(intsBatch, nrow, ncol, dist1e::batch);
+    
+    // compute overlap integrals
+    
+    _compOverlapForGtoBlocks(&dist, braGtoBlock, ketGtoBlock);
 }
 
 COverlapMatrix
@@ -166,12 +182,16 @@ COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContai
     
     CDenseMatrix ovlmat(nrow, ncol);
     
-    auto ovlvals = ovlmat.values();
+    // set up distributio pattern
+    
+    dist1e dstyp = (symbk) ? dist1e::symsq : dist1e::rect;
+    
+    COneIntsDistribution* distpat = new COneIntsDistribution(ovlmat.values(),
+                                                             nrow, ncol, dstyp);
     
     // compute overlap integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, ovlvals,\
-                                nrow, ncol, symbk)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat, symbk)
     {
         #pragma omp single nowait
         {
@@ -195,28 +215,34 @@ COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContai
                     {
                         auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
-                        _compOverlapForGtoBlocks(ovlvals, bgtos, kgtos, nrow, ncol);
+                        _compOverlapForGtoBlocks(distpat, bgtos, kgtos);
                     }
                 }
             }
         }
     }
     
+    // deallocate distribution pattern
+    
+    delete distpat;
+    
     return COverlapMatrix(ovlmat);
 }
 
 void
-COverlapIntegralsDriver::_compOverlapForGtoBlocks(      double*    intsValues,
-                                                  const CGtoBlock& braGtoBlock,
-                                                  const CGtoBlock& ketGtoBlock,
-                                                  const int32_t    nRows,
-                                                  const int32_t    nColumns) const
+COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* distPattern,
+                                                  const CGtoBlock&            braGtoBlock,
+                                                  const CGtoBlock&            ketGtoBlock) const
 {
     // copy GTOs blocks for bra and ket sides
     
     auto bragtos = braGtoBlock;
     
     auto ketgtos = ketGtoBlock;
+    
+    // copy distribution pattern
+    
+    auto distpat = *distPattern;
     
     // set up spherical angular momentum for bra and ket sides
     
@@ -262,8 +288,6 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      double*    intsValues,
     
     // set up contracted GTOs dimensions
     
-    auto bdim = bragtos.getNumberOfContrGtos();
-    
     auto kdim = ketgtos.getNumberOfContrGtos();
     
     // allocate contracted Cartesian integrals buffer
@@ -278,13 +302,11 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      double*    intsValues,
     
     CMemBlock2D<double> spherbuffer(kdim, nspher);
     
-    // determine integrals storage scheme
+    // determine bra and ket sides symmetry
     
-    bool diagblk = (bragtos == ketgtos);
-    
-    bool origord = ((nRows == 0) && (nColumns == 0));
-    
-    for (int32_t i = 0; i < bdim; i++)
+    bool symbk = (bragtos == ketgtos);
+
+    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
         // compute distances: R(AB) = A - B
         
@@ -317,15 +339,7 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      double*    intsValues,
         
         // add batch of integrals to integrals matrix
         
-        if (origord)
-        {
-            genfunc::distribute(intsValues, spherbuffer, bang, kang, bdim, kdim, i);
-        }
-        else
-        {
-            genfunc::distribute(intsValues, spherbuffer, bragtos, ketgtos,
-                                diagblk, nColumns, i); 
-        }
+        distpat.distribute(spherbuffer, bragtos, ketgtos, symbk, i);
     }
 }
 
