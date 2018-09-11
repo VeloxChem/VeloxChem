@@ -60,6 +60,34 @@ public:
     ~CKineticEnergyMatrix();
     
     /**
+     Gets string representation of kinetic energy matrix.
+
+     @return a string for printing the kinetic energy matrix.
+     */
+    std::string getString() const;
+
+    /**
+     Gets number of rows in kinetic energy matrix.
+
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows() const;
+    
+    /**
+     Gets number of columns in kinetic energy matrix.
+
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns() const;
+    
+    /**
+     Gets constant pointer to first element of kinetic energy matrix.
+
+     @return the constant pointer to first element of kinetic energy matrix.
+     */
+    const double* values() const;
+    
+    /**
      Assigns a kinetic energy matrix object by copying other kinetic energy
      matrix object.
      

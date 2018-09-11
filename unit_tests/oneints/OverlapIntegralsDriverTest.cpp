@@ -7412,7 +7412,8 @@ assembleOverlapMatrices(const CMolecule&       mol_1,
 
 TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
 {
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD), mpi::nodes(MPI_COMM_WORLD),
+    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
+                                   mpi::nodes(MPI_COMM_WORLD),
                                    MPI_COMM_WORLD);
     
     auto mdimer = vlxmol::getMoleculeH2ODimer();

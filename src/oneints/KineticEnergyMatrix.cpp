@@ -39,6 +39,30 @@ CKineticEnergyMatrix::~CKineticEnergyMatrix()
     
 }
 
+std::string
+CKineticEnergyMatrix::getString() const
+{
+    return _matrix.getString(); 
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfRows() const
+{
+    return _matrix.getNumberOfRows(); 
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfColumns() const
+{
+    return _matrix.getNumberOfColumns(); 
+}
+
+const double*
+CKineticEnergyMatrix::values() const
+{
+    return _matrix.values(); 
+}
+
 CKineticEnergyMatrix&
 CKineticEnergyMatrix::operator=(const CKineticEnergyMatrix& source)
 {

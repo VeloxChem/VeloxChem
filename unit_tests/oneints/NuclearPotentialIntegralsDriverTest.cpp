@@ -7327,3 +7327,39 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeForLiH)
     
     ASSERT_EQ(npotmat, CNuclearPotentialMatrix(tmat));
 }
+
+TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
+{
+    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
+                                             mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+    
+    auto mh2o = vlxmol::getMoleculeH2O();
+    
+    auto mbas = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    CNuclearPotentialMatrix npotmat = npotdrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{ 62.261732410191442, -8.650991192817283,  2.065430486627468,
+                                  2.065430486627468, -0.000000000000000,  0.024052907649167,
+                                 -0.000000000000000, -8.650991192817283, 11.223085337897011,
+                                  3.857691679815868,  3.857691679815867, -0.000000000000000,
+                                  0.227986891499864, -0.000000000000000,  2.065430486627468,
+                                  3.857691679815868,  5.491589444662075,  2.309855005590105,
+                                  2.146701489224252,  1.786089614208449, -0.000000000000000,
+                                  2.065430486627468,  3.857691679815867,  2.309855005590105,
+                                  5.491589444662075, -2.146701489224252,  1.786089614208449,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                  2.146701489224252, -2.146701489224252, 10.042007304866125,
+                                 -0.000000000000000, -0.000000000000000,  0.024052907649167,
+                                  0.227986891499864,  1.786089614208449,  1.786089614208449,
+                                 -0.000000000000000,  9.979971897073701, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                  9.879888105835255};
+
+    ASSERT_EQ(npotmat, CNuclearPotentialMatrix(CDenseMatrix(intvals, 7, 7)));
+}
+

@@ -7227,3 +7227,57 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeForLiH)
     
     ASSERT_EQ(kinmat, CKineticEnergyMatrix(tmat));
 }
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+    
+    auto mh2o = vlxmol::getMoleculeH2O();
+    
+    auto mbas = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    CKineticEnergyMatrix kinmat = kindrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{ 29.214928025012597, -8.024942204230197,  0.008082948871883,
+                                  0.008082948871883,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000, -8.024942204230197,  3.106077721447130,
+                                  0.139640482389069,  0.139640482389069,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.008082948871883,
+                                  0.139640482389069,  0.499289232499792,  0.036427455545920,
+                                  0.206717223807131,  0.162420675848460,  0.000000000000000,
+                                  0.008082948871883,  0.139640482389069,  0.036427455545920,
+                                  0.499289232499792, -0.206717223807131,  0.162420675848460,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.206717223807131, -0.206717223807131,  2.535960686917080,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.162420675848460,  0.162420675848460,
+                                  0.000000000000000,  2.535960686917080,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  2.535960686917080};
+
+    CKineticEnergyMatrix T (CDenseMatrix(intvals, 7, 7));
+
+    ASSERT_EQ(kinmat.getNumberOfRows(), T.getNumberOfRows());
+
+    ASSERT_EQ(kinmat.getNumberOfColumns(), T.getNumberOfColumns());
+
+    double maxDiff = 0.0;
+
+    for (int32_t i = 0; i < kinmat.getNumberOfRows() * kinmat.getNumberOfColumns(); i++)
+    {
+        double diff = std::fabs(kinmat.values()[i] - T.values()[i]);
+
+        if (diff > maxDiff)
+        {
+            maxDiff = diff;
+        }
+    }
+
+    ASSERT_NEAR(0.0, maxDiff, 2.0e-13);
+}
+

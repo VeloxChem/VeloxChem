@@ -39,6 +39,30 @@ CNuclearPotentialMatrix::~CNuclearPotentialMatrix()
     
 }
 
+std::string
+CNuclearPotentialMatrix::getString() const
+{
+    return _matrix.getString(); 
+}
+
+int32_t
+CNuclearPotentialMatrix::getNumberOfRows() const
+{
+    return _matrix.getNumberOfRows(); 
+}
+
+int32_t
+CNuclearPotentialMatrix::getNumberOfColumns() const
+{
+    return _matrix.getNumberOfColumns(); 
+}
+
+const double*
+CNuclearPotentialMatrix::values() const
+{
+    return _matrix.values(); 
+}
+
 CNuclearPotentialMatrix&
 CNuclearPotentialMatrix::operator=(const CNuclearPotentialMatrix& source)
 {
