@@ -73,37 +73,94 @@ getAtomBasisForLi()
 
     return bas;
 }
+
+CAtomBasis
+getNormalizedAtomBasisForH()
+{
+    CAtomBasis bas;
+
+    bas.setIdElemental(1);
+
+    CBasisFunction bf_1({1.301070100000e+01, 1.962257200000e+00,
+                         4.445379600000e-01},
+                        {1.968215800000e-02, 1.379652400000e-01,
+                         4.783193500000e-01}, 0);
+
+    CBasisFunction bf_2({1.219496200000e-01},
+                        {1.000000000000e+00}, 0);
+
+    CBasisFunction bf_3({8.000000000000e-01},
+                        {1.000000000000e+00}, 1);
+
+    bf_1.normalize();
+
+    bf_2.normalize();
+
+    bf_3.normalize();
+
+    bas.addBasisFunction(bf_1);
+
+    bas.addBasisFunction(bf_2);
+
+    bas.addBasisFunction(bf_3);
+
+    return bas;
+}
   
 CAtomBasis
-getAtomBasisForO()
+getNormalizedAtomBasisForO()
 {
     CAtomBasis bas;
 
     bas.setIdElemental(8);
 
-    bas.addBasisFunction(CBasisFunction({ 2.266176778500e+03,  3.408701019100e+02,
-                                          7.736313516700e+01,  2.147964494000e+01,
-                                          6.658943312400e+00},
-                                        {-5.343180992600e-03, -3.989003923000e-02,
-                                         -1.785391198500e-01, -4.642768495900e-01,
-                                         -4.430974517200e-01}, 0));
+    CBasisFunction bf_1({ 2.266176778500e+03,  3.408701019100e+02,
+                          7.736313516700e+01,  2.147964494000e+01,
+                          6.658943312400e+00},
+                        {-5.343180992600e-03, -3.989003923000e-02,
+                         -1.785391198500e-01, -4.642768495900e-01,
+                         -4.430974517200e-01}, 0);
+                       
+    CBasisFunction bf_2({ 8.097597566800e-01},
+                        { 1.000000000000e+00}, 0);
+                       
+    CBasisFunction bf_3({ 2.553077223400e-01},
+                        { 1.000000000000e+00}, 0);
+                       
+    CBasisFunction bf_4({ 1.772150431700e+01,  3.863550544000e+00,
+                          1.048092088300e+00},
+                        { 4.339457319300e-02,  2.309412076500e-01,
+                          5.137531106400e-01}, 1);
+                       
+    CBasisFunction bf_5({ 2.764154441100e-01},
+                        { 1.000000000000e+00}, 1);
+                       
+    CBasisFunction bf_6({ 1.200000000000e+00},
+                        { 1.000000000000e+00}, 2);
 
-    bas.addBasisFunction(CBasisFunction({ 8.097597566800e-01},
-                                        { 1.000000000000e+00}, 0));
+    bf_1.normalize();
 
-    bas.addBasisFunction(CBasisFunction({ 2.553077223400e-01},
-                                        { 1.000000000000e+00}, 0));
+    bf_2.normalize();
 
-    bas.addBasisFunction(CBasisFunction({ 1.772150431700e+01,  3.863550544000e+00,
-                                          1.048092088300e+00},
-                                        { 4.339457319300e-02,  2.309412076500e-01,
-                                          5.137531106400e-01}, 1));
+    bf_3.normalize();
 
-    bas.addBasisFunction(CBasisFunction({ 2.764154441100e-01},
-                                        { 1.000000000000e+00}, 1));
+    bf_4.normalize();
 
-    bas.addBasisFunction(CBasisFunction({ 1.200000000000e+00},
-                                        { 1.000000000000e+00}, 2));
+    bf_5.normalize();
+
+    bf_6.normalize();
+
+    bas.addBasisFunction(bf_1);
+
+    bas.addBasisFunction(bf_2);
+
+    bas.addBasisFunction(bf_3);
+
+    bas.addBasisFunction(bf_4);
+
+    bas.addBasisFunction(bf_5);
+
+    bas.addBasisFunction(bf_6);
 
     return bas;
 }

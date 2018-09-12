@@ -43,9 +43,9 @@ getMolecularBasisForH2O()
 
     mbas.setLabel({"def2-SVP"});
 
-    mbas.addAtomBasis(getAtomBasisForO());
+    mbas.addAtomBasis(getNormalizedAtomBasisForO());
 
-    mbas.addAtomBasis(getAtomBasisForH());
+    mbas.addAtomBasis(getNormalizedAtomBasisForH());
 
     return mbas;
 }
