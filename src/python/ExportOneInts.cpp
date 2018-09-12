@@ -328,12 +328,12 @@ void export_oneints()
             "COverlapIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create",  &bp_oneints::COverlapIntegralsDriver_create)
+        .def("create", &bp_oneints::COverlapIntegralsDriver_create)
+        .staticmethod("create")
         .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_1)
         .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_2)
         .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_3)
         .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_4)
-        .staticmethod("create")
     ;
 
     // CKineticEnergyMatrix class
@@ -355,12 +355,12 @@ void export_oneints()
             "CKineticEnergyIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create",  &bp_oneints::CKineticEnergyIntegralsDriver_create)
+        .def("create", &bp_oneints::CKineticEnergyIntegralsDriver_create)
+        .staticmethod("create")
         .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_1)
         .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_2)
         .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_3)
         .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_4)
-        .staticmethod("create")
     ;
 
     // CNuclearPotentialMatrix class
@@ -382,11 +382,11 @@ void export_oneints()
             "CNuclearPotentialIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create",  &bp_oneints::CNuclearPotentialIntegralsDriver_create)
+        .def("create", &bp_oneints::CNuclearPotentialIntegralsDriver_create)
+        .staticmethod("create")
         .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_1)
         .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_2)
         .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_3)
         .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_4)
-        .staticmethod("create")
     ;
 }
