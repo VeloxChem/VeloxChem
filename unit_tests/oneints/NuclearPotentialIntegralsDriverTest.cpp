@@ -7402,8 +7402,9 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
 
     ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
 
-    CNuclearPotentialMatrix S_new = assembleNuclearPotentialMatrices(mh2o_1, mh2o_2, mbas, mbas,
-                                                                     S11, S22, S12, S21);
+    CNuclearPotentialMatrix S_new = dimerfunc::assembleNuclearPotentialMatrices(
+                                               mh2o_1, mh2o_2, mbas, mbas,
+                                               S11, S22, S12, S21);
 
     ASSERT_EQ(S, S_new);
 }
@@ -7442,8 +7443,9 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
 
     ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
 
-    CNuclearPotentialMatrix S_new = assembleNuclearPotentialMatrices(mnh3, mch4, mbas, mbas,
-                                                                     S11, S22, S12, S21);
+    CNuclearPotentialMatrix S_new = dimerfunc::assembleNuclearPotentialMatrices(
+                                               mnh3, mch4, mbas, mbas,
+                                               S11, S22, S12, S21);
 
     ASSERT_EQ(S, S_new);
 }

@@ -12,6 +12,8 @@
 #include <vector>
 #include <string>
 
+namespace dimerfunc { // dimerfunc namespace
+
 int32_t
 getMolecularMaxAngularMomentum(const CMolecule&       mol,
                                const CMolecularBasis& basis)
@@ -252,3 +254,4 @@ assembleNuclearPotentialMatrices(const CMolecule&               mol_1,
     return CNuclearPotentialMatrix(m);
 }
 
+} // dimerfunc namespace

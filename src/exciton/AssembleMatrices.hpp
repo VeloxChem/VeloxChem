@@ -16,6 +16,8 @@
 #include "KineticEnergyMatrix.hpp"
 #include "NuclearPotentialMatrix.hpp"
 
+namespace dimerfunc { // dimerfunc namespace
+
 /**
  Gets the maximum angular momentum of a molecule & basis set.
  
@@ -117,5 +119,7 @@ assembleNuclearPotentialMatrices(const CMolecule&                mol_1,
                                  const CNuclearPotentialMatrix&  S22,
                                  const CNuclearPotentialMatrix&  S12,
                                  const CNuclearPotentialMatrix&  S21);
+
+} // dimerfunc namespace
 
 #endif /* AssembleMatrices_hpp */

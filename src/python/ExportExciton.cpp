@@ -17,5 +17,5 @@ namespace bp = boost::python;
 
 void export_exciton()
 {
-    bp::def("assemble_overlap_matrices", &assembleOverlapMatrices);
+    bp::def("assemble_overlap_matrices", &dimerfunc::assembleOverlapMatrices);
 }
