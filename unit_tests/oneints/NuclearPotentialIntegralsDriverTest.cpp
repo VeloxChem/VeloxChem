@@ -7361,7 +7361,11 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
                                  -0.000000000000000, -0.000000000000000, -0.000000000000000,
                                   9.879888105835255};
 
-    ASSERT_EQ(npotmat, CNuclearPotentialMatrix(CDenseMatrix(intvals, 7, 7)));
+    ASSERT_EQ(npotmat.getNumberOfElements(), intvals.size());
+
+    CDenseMatrix m (intvals, npotmat.getNumberOfRows(), npotmat.getNumberOfColumns());
+
+    ASSERT_EQ(npotmat, CNuclearPotentialMatrix(m));
 }
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
@@ -7382,13 +7386,13 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
 
     CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mh2o_1, mbas, mh2o_1, mh2o_2, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mbas, mdimer, ost, MPI_COMM_WORLD);
                                                                   
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mh2o_2, mbas, mh2o_1, mh2o_2, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mbas, mdimer, ost, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mh2o_1, mh2o_2, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mdimer, ost, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mh2o_1, mh2o_2, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mdimer, ost, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7422,13 +7426,13 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
 
     CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mnh3, mbas, mnh3, mch4, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mbas, mdimer, ost, MPI_COMM_WORLD);
                                                                                 
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mch4, mbas, mnh3, mch4, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mbas, mdimer, ost, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mnh3, mch4, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mdimer, ost, MPI_COMM_WORLD);
                                                                                 
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mnh3, mch4, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mdimer, ost, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 

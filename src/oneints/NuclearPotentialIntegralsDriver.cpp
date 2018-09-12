@@ -70,11 +70,44 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
 }
 
 CNuclearPotentialMatrix
+CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
+                                          const CMolecularBasis& basis,
+                                          const CMolecule&       pchgMolecule,
+                                                COutputStream&   oStream,
+                                                MPI_Comm         comm) const
+{
+    CSystemClock timer;
+    
+    CNuclearPotentialMatrix npotmat;
+    
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs container
+        
+        CGtoContainer bracontr(molecule, basis);
+        
+        // set up point charges data
+        
+        auto pcharges = pchgMolecule.getCharges();
+        
+        auto pcoords  = pchgMolecule.getCoordinates();
+        
+        // compute nuclear potential integrals
+        
+        npotmat = _compNuclearPotentialIntegrals(&pcharges, &pcoords, &bracontr,
+                                                 &bracontr);
+    }
+    
+    _printComputationTime(timer, oStream);
+    
+    return npotmat;
+}
+
+CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecule&       ketMolecule,
                                           const CMolecularBasis& basis,
-                                          const CMolecule&       pchgMolecule_1,
-                                          const CMolecule&       pchgMolecule_2,
+                                          const CMolecule&       pchgMolecule,
                                                 COutputStream&   oStream,
                                                 MPI_Comm         comm) const
 {
@@ -92,11 +125,9 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         // set up point charges data
         
-        CMolecule molecule (pchgMolecule_1, pchgMolecule_2);
-
-        auto pcharges = molecule.getCharges();
+        auto pcharges = pchgMolecule.getCharges();
         
-        auto pcoords  = molecule.getCoordinates();
+        auto pcoords  = pchgMolecule.getCoordinates();
         
         // compute nuclear potential integrals
         

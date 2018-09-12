@@ -7261,7 +7261,11 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   2.535960686917080};
 
-    CKineticEnergyMatrix T (CDenseMatrix(intvals, 7, 7));
+    ASSERT_EQ(kinmat.getNumberOfElements(), intvals.size());
+
+    CDenseMatrix m (intvals, kinmat.getNumberOfRows(), kinmat.getNumberOfColumns());
+
+    CKineticEnergyMatrix T (m);
 
     ASSERT_EQ(kinmat.getNumberOfRows(), T.getNumberOfRows());
 
