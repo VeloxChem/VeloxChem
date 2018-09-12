@@ -8,35 +8,22 @@
 
 #include <boost/python.hpp>
 
-// ==> boost python <==
-// forward declarations
+#include "MolecularBasis.hpp"
 
-void export_controllers();
-
-void export_oneints();
-
-void export_streams();
-
-void export_readers();
-
-void export_moldata();
-
-void export_orbdata();
+namespace bp = boost::python;
 
 // ==> boost python <==
 // functions and classes
 
-BOOST_PYTHON_MODULE(VeloxChemMP)
+void export_orbdata()
 {
-    export_controllers();
+    // CMolecularBasis class
 
-    export_oneints();
-
-    export_streams();
-
-    export_readers();
-
-    export_moldata();
-
-    export_orbdata();
+    bp::class_< CMolecularBasis >
+        (
+            "CMolecularBasis",
+            bp::init<>()
+        )
+        .def("get_label", &CMolecularBasis::getLabel)
+    ;
 }
