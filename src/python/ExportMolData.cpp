@@ -22,7 +22,7 @@ namespace bp = boost::python;
 void export_moldata()
 {
     // CMolecule class
-    // Note: CMolecule has two constructors
+    // Note: CMolecule has several constructors
 
     bp::class_< CMolecule, std::shared_ptr<CMolecule> >
         (
@@ -36,6 +36,8 @@ void export_moldata()
                 >()
         )
         .def(bp::init<>())
+        .def(bp::init<const CMolecule&>())
+        .def(bp::init<const CMolecule&, const CMolecule&>())
         .def("print_geometry", &CMolecule::printGeometry)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
     ;

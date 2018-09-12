@@ -45,20 +45,27 @@ output_stream.flush()
 
 path_to_basis_sets = env_reader.get_path_to_basis_sets()
 
-basis_1 = basis_reader.get_min_basis(path_to_basis_sets, mol_1, output_stream)
-basis_2 = basis_reader.get_min_basis(path_to_basis_sets, mol_2, output_stream)
+basis = basis_reader.get_min_basis(path_to_basis_sets, molecule, output_stream)
 
 # compute overlap
 
 overlap_driver = COverlapIntegralsDriver.create(rank, size, comm)
 
-S11 = overlap_driver.compute(mol_1, basis_1, output_stream, comm)
-S22 = overlap_driver.compute(mol_2, basis_2, output_stream, comm)
-S21 = overlap_driver.compute(mol_2, mol_1, basis_2, basis_1, output_stream, comm)
+S = overlap_driver.compute(molecule, basis, output_stream, comm)
 
-print("Overlap of mol_1\n", S11)
-print("Overlap of mol_2\n", S22)
-print("Overlap across mol_2 & mol_1\n", S21)
+S11 = overlap_driver.compute(mol_1, basis, output_stream, comm)
+S22 = overlap_driver.compute(mol_2, basis, output_stream, comm)
+S21 = overlap_driver.compute(mol_2, mol_1, basis, output_stream, comm)
+S12 = overlap_driver.compute(mol_1, mol_2, basis, output_stream, comm)
+
+S_new = assemble_overlap_matrices(mol_1, mol_2, basis, basis, S11, S22, S12, S21)
+
+print("Overlap \n", S)
+print("Overlap new\n", S_new)
+
+print(S == S_new)
+
+assert(S == S_new)
 
 # check state
 

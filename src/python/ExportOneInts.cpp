@@ -79,6 +79,22 @@ COverlapIntegralsDriver_compute_3(
           COverlapIntegralsDriver& self,
     const CMolecule&               braMolecule,
     const CMolecule&               ketMolecule,
+    const CMolecularBasis&         basis,
+          COutputStream&           oStream,
+          bp::object               py_comm)
+{
+    PyObject* py_obj = py_comm.ptr();
+    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
+    if (comm_ptr == NULL) bp::throw_error_already_set();
+
+    return self.compute(braMolecule, ketMolecule, basis, oStream, *comm_ptr);
+}
+
+COverlapMatrix
+COverlapIntegralsDriver_compute_4(
+          COverlapIntegralsDriver& self,
+    const CMolecule&               braMolecule,
+    const CMolecule&               ketMolecule,
     const CMolecularBasis&         braBasis,
     const CMolecularBasis&         ketBasis,
           COutputStream&           oStream,
@@ -118,7 +134,8 @@ void export_oneints()
             bp::init<const CDenseMatrix&>()
         )
         .def(bp::init<>())
-        .def("__str__", &COverlapMatrix_str);
+        .def("__str__", &COverlapMatrix_str)
+        .def(bp::self == bp::other<COverlapMatrix>())
     ;
 
     // COverlapIntegralsDriver class
@@ -132,6 +149,7 @@ void export_oneints()
         .def("compute", &COverlapIntegralsDriver_compute_1)
         .def("compute", &COverlapIntegralsDriver_compute_2)
         .def("compute", &COverlapIntegralsDriver_compute_3)
+        .def("compute", &COverlapIntegralsDriver_compute_4)
         .staticmethod("create")
     ;
 }

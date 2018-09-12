@@ -23,6 +23,8 @@ void export_moldata();
 
 void export_orbdata();
 
+void export_exciton();
+
 // ==> boost python <==
 // functions and classes
 
@@ -39,4 +41,6 @@ BOOST_PYTHON_MODULE(VeloxChemMP)
     export_moldata();
 
     export_orbdata();
+
+    export_exciton();
 }
