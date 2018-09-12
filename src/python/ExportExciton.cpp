@@ -17,5 +17,12 @@ namespace bp = boost::python;
 
 void export_exciton()
 {
-    bp::def("assemble_overlap_matrices", &dimerfunc::assembleOverlapMatrices);
+    bp::def("assemble_overlap_matrices",
+            &dimerfunc::assembleOverlapMatrices);
+
+    bp::def("assemble_kinetic_energy_matrices",
+            &dimerfunc::assembleKineticEnergyMatrices);
+
+    bp::def("assemble_nuclear_potential_matrices",
+            &dimerfunc::assembleNuclearPotentialMatrices);
 }
