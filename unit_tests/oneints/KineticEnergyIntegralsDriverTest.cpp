@@ -7243,14 +7243,14 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
     
     CKineticEnergyMatrix kinmat = kindrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
 
-    std::vector<double> intvals{ 29.214928025012597, -8.024942204230197,  0.008082948871883,
-                                  0.008082948871883,  0.000000000000000,  0.000000000000000,
-                                  0.000000000000000, -8.024942204230197,  3.106077721447130,
-                                  0.139640482389069,  0.139640482389069,  0.000000000000000,
-                                  0.000000000000000,  0.000000000000000,  0.008082948871883,
-                                  0.139640482389069,  0.499289232499792,  0.036427455545920,
+    std::vector<double> intvals{ 29.214928025012597, -8.024942204230191,  0.008082948871740,
+                                  0.008082948871740,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000, -8.024942204230191,  3.106077721447130,
+                                  0.139640482389104,  0.139640482389104,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.008082948871740,
+                                  0.139640482389104,  0.499289232499792,  0.036427455545920,
                                   0.206717223807131,  0.162420675848460,  0.000000000000000,
-                                  0.008082948871883,  0.139640482389069,  0.036427455545920,
+                                  0.008082948871740,  0.139640482389104,  0.036427455545920,
                                   0.499289232499792, -0.206717223807131,  0.162420675848460,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   0.206717223807131, -0.206717223807131,  2.535960686917080,
@@ -7265,25 +7265,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
 
     CDenseMatrix m (intvals, kinmat.getNumberOfRows(), kinmat.getNumberOfColumns());
 
-    CKineticEnergyMatrix T (m);
-
-    ASSERT_EQ(kinmat.getNumberOfRows(), T.getNumberOfRows());
-
-    ASSERT_EQ(kinmat.getNumberOfColumns(), T.getNumberOfColumns());
-
-    double maxDiff = 0.0;
-
-    for (int32_t i = 0; i < kinmat.getNumberOfRows() * kinmat.getNumberOfColumns(); i++)
-    {
-        double diff = std::fabs(kinmat.values()[i] - T.values()[i]);
-
-        if (diff > maxDiff)
-        {
-            maxDiff = diff;
-        }
-    }
-
-    ASSERT_NEAR(0.0, maxDiff, 2.0e-13);
+    ASSERT_EQ(kinmat, CKineticEnergyMatrix(m));
 }
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
