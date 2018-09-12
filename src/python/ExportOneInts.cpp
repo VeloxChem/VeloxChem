@@ -230,7 +230,7 @@ CNuclearPotentialIntegralsDriver_create(int32_t    globRank,
 // for overloading CNuclearPotentialIntegralsDriver::compute
 
 CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute_1(
+CNuclearPotentialIntegralsDriver_compute_0(
           CNuclearPotentialIntegralsDriver& self,
     const CMolecule&                        molecule,
     const CMolecularBasis&                  basis,
@@ -243,7 +243,7 @@ CNuclearPotentialIntegralsDriver_compute_1(
 }
 
 CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute_2(
+CNuclearPotentialIntegralsDriver_compute_1(
           CNuclearPotentialIntegralsDriver& self,
     const CMolecule&                        molecule,
     const CMolecularBasis&                  basis,
@@ -254,6 +254,22 @@ CNuclearPotentialIntegralsDriver_compute_2(
     MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, pchgMolecule, oStream, *comm_ptr);
+}
+
+CNuclearPotentialMatrix
+CNuclearPotentialIntegralsDriver_compute_2(
+          CNuclearPotentialIntegralsDriver& self,
+    const CMolecule&                        molecule,
+    const CMolecularBasis&                  braBasis,
+    const CMolecularBasis&                  ketBasis,
+    const CMolecule&                        pchgMolecule,
+          COutputStream&                    oStream, 
+          bp::object                        py_comm)
+{
+    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+
+    return self.compute(molecule, braBasis, ketBasis, pchgMolecule,
+                        oStream, *comm_ptr);
 }
 
 CNuclearPotentialMatrix
@@ -384,6 +400,7 @@ void export_oneints()
         )
         .def("create", &bp_oneints::CNuclearPotentialIntegralsDriver_create)
         .staticmethod("create")
+        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_0)
         .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_1)
         .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_2)
         .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_3)

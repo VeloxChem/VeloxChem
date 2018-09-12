@@ -235,6 +235,25 @@ public:
                                           MPI_Comm         comm) const;
 
     /**
+     Computes nuclear potential integrals for molecules in two basis sets and
+     stores results in nuclear potential matrix object.
+     
+     @param molecule the molecule.
+     @param braBasis the molecular basis for bra side of nuclear potential matrix.
+     @param ketBasis the molecular basis for ket side of nuclear potential matrix.
+     @param pchgMolecule the molecule providing nuclear point charges.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the nuclear potential matrix object.
+     */
+    CNuclearPotentialMatrix compute(const CMolecule&       molecule,
+                                    const CMolecularBasis& braBasis,
+                                    const CMolecularBasis& ketBasis,
+                                    const CMolecule&       pchgMolecule,
+                                          COutputStream&   oStream,
+                                          MPI_Comm         comm) const;
+
+    /**
      Computes nuclear potential integrals for two molecules in specific basis
      set and stores results in nuclear potential matrix object.
      
