@@ -183,7 +183,7 @@ public:
      insert it into output text stream.
      
      @param output the output text stream.
-     @param source the overlap matrix object.
+     @param source the one electron integrals distributor object.
      */
     friend std::ostream& operator<<(      std::ostream&         output,
                                     const COneIntsDistribution& source);
