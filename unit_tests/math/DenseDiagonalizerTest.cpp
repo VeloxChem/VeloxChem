@@ -57,8 +57,8 @@ TEST_F(CDenseDiagonalizerTest, Diagonalize)
 
 TEST_F(CDenseDiagonalizerTest, GetInvertedSqrtMatrix)
 {
-    CDenseMatrix mata({ 10.0, 3.0,  4.0,
-                        3.0, 1.2,  1.0,
+    CDenseMatrix mata({10.0, 3.0, 4.0,
+                        3.0, 1.2, 1.0,
                         4.0, 1.0, 4.0},
                       3, 3);
     

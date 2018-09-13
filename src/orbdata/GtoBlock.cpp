@@ -71,7 +71,7 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         auto ncdim = basis.getNumberOfBasisFunctions(molecule, iAtom, nAtoms,
                                                      angularMomentum);
         
-        _contrPattern = CMemBlock2D<int32_t>(ncdim, 2 + angcomp);
+        _contrPattern = CMemBlock2D<int32_t>(ncdim, 3 + angcomp);
         
         // determine partial dimensions of AO basis
         
@@ -98,6 +98,8 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         auto spos = _contrPattern.data(0);
         
         auto epos = _contrPattern.data(1);
+        
+        auto idxatm = _contrPattern.data(2);
         
         // primitives data
         
@@ -142,9 +144,11 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
                 
                 epos[icgto] = iprim + nprim;
                 
+                idxatm[icgto] = i;
+                
                 for (int32_t k = 0; k < angcomp; k++)
                 {
-                    auto pgtoidx = _contrPattern.data(2 + k);
+                    auto pgtoidx = _contrPattern.data(3 + k);
                     
                     pgtoidx[icgto] = npartdim + k * ncfuncs + ncoff + icgto;
                 }
@@ -293,6 +297,8 @@ CGtoBlock::compress(const CGtoBlock&         source,
     
     auto srcepos = source.getEndPositions();
     
+    auto sridxatm = source.getAtomicIdentifiers();
+    
     // set up pointer to screening factors
     
     auto sfacts = screeningFactors.data();
@@ -320,6 +326,8 @@ CGtoBlock::compress(const CGtoBlock&         source,
     auto cspos = getStartPositions();
     
     auto cepos = getEndPositions();
+    
+    auto cidxatm = getAtomicIdentifiers();
     
     // primitive and contracted GTOs counters
     
@@ -362,6 +370,8 @@ CGtoBlock::compress(const CGtoBlock&         source,
             cspos[ncgto] = npgto;
             
             cepos[ncgto] = npgto + cprim;
+            
+            cidxatm[ncgto] = sridxatm[i];
            
             // store GTOs indexes
             
@@ -434,11 +444,23 @@ CGtoBlock::getEndPositions()
 }
 
 const int32_t*
+CGtoBlock::getAtomicIdentifiers() const
+{
+    return _contrPattern.data(2);
+}
+
+int32_t*
+CGtoBlock::getAtomicIdentifiers()
+{
+    return _contrPattern.data(2);
+}
+
+const int32_t*
 CGtoBlock::getIdentifiers(const int32_t iComponent) const
 {
     if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
     {
-        return _contrPattern.data(2 + iComponent);
+        return _contrPattern.data(3 + iComponent);
     }
     
     return nullptr; 
@@ -449,7 +471,7 @@ CGtoBlock::getIdentifiers(const int32_t iComponent)
 {
     if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
     {
-        return _contrPattern.data(2 + iComponent);
+        return _contrPattern.data(3 + iComponent);
     }
     
     return nullptr;
