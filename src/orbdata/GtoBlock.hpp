@@ -213,6 +213,20 @@ public:
     int32_t* getEndPositions();
     
     /**
+     Gets constant pointer to atomic identifiers vector.
+     
+     @return the atomic identifiers.
+     */
+    const int32_t* getAtomicIdentifiers() const;
+    
+    /**
+     Gets pointer to atomic identifiers vector.
+     
+     @return the atomic identifiers.
+     */
+    int32_t* getAtomicIdentifiers();
+    
+    /**
      Gets constant pointer to basis function indexes in full AO basis for
      specific angular momentum component.
 
