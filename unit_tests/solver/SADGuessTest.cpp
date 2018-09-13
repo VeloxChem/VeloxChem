@@ -15,6 +15,17 @@
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
 
+TEST_F(CSADGuessTest, AtomIdxForAO)
+{
+    auto h2o = vlxmol::getMoleculeH2O();
+    
+    auto min_basis = vlxbas::getMinimalBasisForH2O();
+
+    std::vector<int32_t> atomIdx = sad_guess::getAtomIdxForAO(h2o, min_basis);
+
+    ASSERT_EQ(atomIdx, std::vector<int32_t>({0,0,1,2,0,0,0}));
+}
+
 TEST_F(CSADGuessTest, InitialGuess)
 {
     COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),

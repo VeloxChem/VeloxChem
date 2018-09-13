@@ -19,16 +19,6 @@
 namespace dimerfunc { // dimerfunc namespace
 
 /**
- Gets the maximum angular momentum of a molecule & basis set.
- 
- @param mol the molecule.
- @param basis the basis set for the molecule.
- */
-int32_t
-getMolecularMaxAngularMomentum(const CMolecule&       mol,
-                               const CMolecularBasis& basis);
-
-/**
  Assembles dense matrices of two molecules into one dense matrix of the
  molecular dimer.
  
