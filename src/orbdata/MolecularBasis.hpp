@@ -143,6 +143,14 @@ public:
     int32_t getMaxAngularMomentum(const int32_t idElemental) const;
 
     /**
+     Gets maximum angular momentum of a molecule in this basis set.
+
+     @param molecule the molecule.
+     @return the maximum angular momentum.
+     */
+    int32_t getMolecularMaxAngularMomentum(const CMolecule& molecule) const;
+
+    /**
      Gets name of molecular basis.
 
      @return the name of molecular basis.

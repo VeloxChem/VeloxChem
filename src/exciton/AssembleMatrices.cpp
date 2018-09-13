@@ -14,27 +14,6 @@
 
 namespace dimerfunc { // dimerfunc namespace
 
-int32_t
-getMolecularMaxAngularMomentum(const CMolecule&       mol,
-                               const CMolecularBasis& basis)
-{
-    int32_t maxAM = 0;
-
-    for (int32_t i = 0; i < mol.getNumberOfAtoms(); i++)
-    {
-        int32_t idElem = mol.getIdsElemental()[i];
-
-        int32_t elemMaxAM = basis.getMaxAngularMomentum(idElem);
-
-        if (elemMaxAM > maxAM)
-        {
-            maxAM = elemMaxAM;
-        }
-    }
-
-    return maxAM;
-}
-
 CDenseMatrix
 assembleDenseMatrices(const CMolecule&       mol_1,
                       const CMolecule&       mol_2,
@@ -53,9 +32,9 @@ assembleDenseMatrices(const CMolecule&       mol_1,
     // AO_type:  S S S S S S S S P-1 P-1 P0 P0 P+1 P+1 ...
     // Molecule: A A A A B B B B A   B   A  B  A   B   ...
 
-    int32_t maxAM_1 = getMolecularMaxAngularMomentum(mol_1, basis_1);
+    int32_t maxAM_1 = basis_1.getMolecularMaxAngularMomentum(mol_1);
 
-    int32_t maxAM_2 = getMolecularMaxAngularMomentum(mol_2, basis_2);
+    int32_t maxAM_2 = basis_2.getMolecularMaxAngularMomentum(mol_2);
 
     std::vector<std::string> molIdx;
 

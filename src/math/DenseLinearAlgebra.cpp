@@ -24,7 +24,14 @@ namespace denblas { // denblas namespace
         
         // set up dimensions of matrix B
         
+        auto nbrow = matrixB.getNumberOfRows();
+
         auto nbcol = matrixB.getNumberOfColumns();
+
+        if (nacol != nbrow)
+        {
+            throw "Inconsistent matrix sizes in DenseMatrix multiplication!";
+        }
         
         // allocate dense matrix
         
@@ -58,6 +65,11 @@ namespace denblas { // denblas namespace
         auto nbrow = matrixB.getNumberOfRows();
         
         auto nbcol = matrixB.getNumberOfColumns();
+
+        if (nacol != nbcol)
+        {
+            throw "Inconsistent matrix sizes in DenseMatrix multiplication!";
+        }
         
         // allocate dense matrix
         
@@ -88,8 +100,15 @@ namespace denblas { // denblas namespace
         
         // set up dimensions of matrix B
         
+        auto nbrow = matrixB.getNumberOfRows();
+
         auto nbcol = matrixB.getNumberOfColumns();
         
+        if (narow != nbrow)
+        {
+            throw "Inconsistent matrix sizes in DenseMatrix multiplication!";
+        }
+
         // allocate dense matrix
         
         CDenseMatrix mat(nacol, nbcol);
@@ -192,6 +211,11 @@ namespace denblas { // denblas namespace
     subAB(const CDenseMatrix& matrixA,
           const CDenseMatrix& matrixB)
     {
+        if (matrixA.getNumberOfElements() != matrixB.getNumberOfElements())
+        {
+            throw "Inconsistent matrix sizes in DenseMatrix subtraction!";
+        }
+
         // copy matrix
         
         CDenseMatrix mat = matrixA;
@@ -209,6 +233,11 @@ namespace denblas { // denblas namespace
           const CDenseMatrix& matrixB,
           const double        factor)
     {
+        if (matrixA.getNumberOfElements() != matrixB.getNumberOfElements())
+        {
+            throw "Inconsistent matrix sizes in DenseMatrix addition!";
+        }
+
         // copy matrix
         
         CDenseMatrix mat = matrixA;

@@ -143,6 +143,26 @@ CMolecularBasis::getMaxAngularMomentum(const int32_t idElemental) const
     return -1;
 }
 
+int32_t
+CMolecularBasis::getMolecularMaxAngularMomentum(const CMolecule& molecule) const
+{
+    int32_t maxAngMom = 0;
+
+    for (int32_t i = 0; i < molecule.getNumberOfAtoms(); i++)
+    {
+        int32_t idElem = molecule.getIdsElemental()[i];
+
+        int32_t elemMaxAngMom = getMaxAngularMomentum(idElem);
+
+        if (elemMaxAngMom > maxAngMom)
+        {
+            maxAngMom = elemMaxAngMom;
+        }
+    }
+
+    return maxAngMom;
+}
+
 std::string
 CMolecularBasis::getLabel() const
 {
