@@ -10,6 +10,7 @@
 #define DenseLinearAlgebra_hpp
 
 #include "DenseMatrix.hpp"
+#include "MemBlock.hpp"
 
 namespace denblas { // denblas namespace
     
@@ -42,6 +43,26 @@ namespace denblas { // denblas namespace
      */
     CDenseMatrix multAtB(const CDenseMatrix& matrixA,
                          const CDenseMatrix& matrixB);
+    
+    /**
+     Computes diagonal matrix and matrix multiplication: diag(M) * A.
+
+     @param diagonal the diagonal matrix.
+     @param matrix the square matrix.
+     @return the matrix diag(M) * A.
+     */
+    CDenseMatrix multDiagByA(const CMemBlock<double>& diagonal,
+                             const CDenseMatrix&      matrix);
+    
+    /**
+     Computes diagonal matrix and matrix multiplication: diag(M) * A^T.
+     
+     @param diagonal the diagonal matrix.
+     @param matrix the square matrix.
+     @return the matrix diag(M) * A^T.
+     */
+    CDenseMatrix multDiagByAt(const CMemBlock<double>& diagonal,
+                              const CDenseMatrix&      matrix);
 
     /**
      Computes matrix substraction: A - B.

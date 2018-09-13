@@ -81,6 +81,47 @@ TEST_F(CDenseLinearAlgebraTest, MultABt)
     ASSERT_EQ(matab, refab);
 }
 
+TEST_F(CDenseLinearAlgebraTest, MultDiagByA)
+{
+    CDenseMatrix mata({ 2.0, 3.0, 4.0,
+                       -3.0, 3.0, 1.0,
+                       6.0, 2.3, 7.0,
+                       1.0, 2.0, 4.0},
+                      4, 3);
+    
+    CMemBlock<double> diagb({1.0, 2.0, -2.0, 5.0});
+    
+    auto matab = denblas::multDiagByA(diagb, mata);
+    
+    CDenseMatrix refab({  2.0,  3.0,   4.0,
+                         -6.0,  6.0,   2.0,
+                        -12.0, -4.6, -14.0,
+                          5.0, 10.0,  20.0},
+                       4, 3);
+    
+    ASSERT_EQ(matab, refab);
+}
+
+TEST_F(CDenseLinearAlgebraTest, MultDiagByAt)
+{
+    CDenseMatrix mata({ 2.0, 3.0, 4.0,
+                       -3.0, 3.0, 1.0,
+                        6.0, 2.3, 7.0,
+                        1.0, 2.0, 4.0},
+                       4, 3);
+    
+    CMemBlock<double> diagb({1.0, 2.0, -2.0});
+    
+    auto matab = denblas::multDiagByAt(diagb, mata);
+    
+    CDenseMatrix refab({ 2.0, -3.0,  6.0,   1.0,
+                         6.0,  6.0,  4.6,   4.0,
+                        -8.0, -2.0, -14.0, -8.0},
+                       3, 4);
+    
+    ASSERT_EQ(matab, refab);
+}
+
 TEST_F(CDenseLinearAlgebraTest, SubAB)
 {
     CDenseMatrix mata({ 2.0, 3.0, 4.0,

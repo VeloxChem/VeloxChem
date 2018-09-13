@@ -106,6 +106,89 @@ namespace denblas { // denblas namespace
     }
     
     CDenseMatrix
+    multDiagByA(const CMemBlock<double>& diagonal,
+                const CDenseMatrix&      matrix)
+    {
+        // set up dimensions of matrix
+        
+        auto nrow = matrix.getNumberOfRows();
+        
+        auto ncol = matrix.getNumberOfColumns();
+        
+        // allocate results matrix
+        
+        CDenseMatrix mat(nrow, ncol);
+        
+        // set up pointers to matrices
+        
+        auto mval = mat.values();
+        
+        auto sval = matrix.values();
+        
+        auto dval = diagonal.data();
+        
+        // compute matrix multiplication
+        
+        for (int32_t i = 0; i < nrow; i++)
+        {
+            // set up local pointers to rows
+            
+            auto cmval = &mval[i * ncol];
+            
+            auto csval = &sval[i * ncol];
+            
+            // fetch value of diagonal
+            
+            auto f = dval[i];
+            
+            #pragma omp simd
+            for (int32_t j = 0; j < ncol; j++)
+            {
+                cmval[j] = f * csval[j];
+            }
+        }
+        
+        return mat;
+    }
+    
+    CDenseMatrix
+    multDiagByAt(const CMemBlock<double>& diagonal,
+                 const CDenseMatrix&      matrix)
+    {
+        // set up dimensions of matrix
+        
+        auto nrow = matrix.getNumberOfRows();
+        
+        auto ncol = matrix.getNumberOfColumns();
+        
+        // allocate results matrix
+        
+        CDenseMatrix mat(ncol, nrow);
+        
+        // set up pointers to matrices
+        
+        auto mval = mat.values();
+        
+        auto sval = matrix.values();
+        
+        auto dval = diagonal.data();
+        
+        // compute matrix multiplication
+        
+        for (int32_t i = 0; i < ncol; i++)
+        {
+            auto ioff = i * nrow;
+            
+            for (int32_t j = 0; j < nrow; j++)
+            {
+                mval[ioff + j] = dval[i] * sval[j * ncol + i];
+            }
+        }
+        
+        return mat;
+    }
+    
+    CDenseMatrix
     subAB(const CDenseMatrix& matrixA,
           const CDenseMatrix& matrixB)
     {
