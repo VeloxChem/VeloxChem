@@ -30,7 +30,7 @@ build_veloxchem:
   script:
     - cd src 
     - cp ../config/Setup.Monkey Makefile.setup 
-    - make release 
+    - make -j 6 release 
    
 build_unit_test:
   tags: 
@@ -40,7 +40,7 @@ build_unit_test:
     - cd src
     - cp ../config/Setup.Monkey Makefile.setup
     - cd ../unit_tests/
-    - make release 
+    - make -j 6 release 
 
 build_veloxchem_python3:
   tags: 
@@ -49,7 +49,7 @@ build_veloxchem_python3:
   script:
     - cd src 
     - cp ../config/Setup.Monkey.Python Makefile.setup 
-    - make release 
+    - make -j 6 release 
 
 run_unit_test: 
   tags: 
@@ -59,7 +59,7 @@ run_unit_test:
     - cd src
     - cp ../config/Setup.Monkey Makefile.setup
     - cd ../unit_tests/
-    - make release
+    - make -j 6 release
     - cd ../bin/
     - ./UnitTestVeloxChemMP.x
 
@@ -70,6 +70,6 @@ run_test_python3:
   script: 
     - cd src
     - cp ../config/Setup.Monkey.Python Makefile.setup
-    - make release
+    - make -j 6 release
     - cd ../integration_tests/
     - python3 test.py

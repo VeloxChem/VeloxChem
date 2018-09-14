@@ -13,7 +13,7 @@
 
 #include "TwoIntsDistType.hpp"
 #include "MemBlock2D.hpp"
-#include "GtoBlock.hpp"
+#include "GtoPairsBlock.hpp"
 
 /**
  Class CTwoIntsDistribution provides set of two electron integrals distribution
@@ -48,6 +48,22 @@ class CTwoIntsDistribution
      The pointer to two electron integrals destination data buffer.
      */
     double* _intsData;
+    
+    /**
+     Distributes two electron integrals into data batch.
+     
+     @param spherInts the spherical two electron integrals buffer.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
+            bra and ket sides.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void _distSpherIntsIntoBatch(const CMemBlock2D<double>& spherInts,
+                                 const CGtoPairsBlock&      braGtoPairsBlock,
+                                 const CGtoPairsBlock&      ketGtoPairsBlock,
+                                 const bool                 isBraEqualKet,
+                                 const int32_t              iContrPair);
     
 public:
     
@@ -109,6 +125,30 @@ public:
      false otherwise.
      */
     bool operator!=(const CTwoIntsDistribution& other) const;
+    
+    /**
+     Gets flag for synchronization lock
+
+     @return true if synchronization lock is needed for distribution mode,
+             false - otherwise.
+     */
+    bool needSyncLock() const;
+    
+    /**
+     Distributes two electron integrals into data buffer.
+
+     @param spherInts the spherical two electron integrals buffer.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
+            bra and ket sides.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void distribute(const CMemBlock2D<double>& spherInts,
+                    const CGtoPairsBlock&      braGtoPairsBlock,
+                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const bool                 isBraEqualKet,
+                    const int32_t              iContrPair);
     
     /**
      Converts two electron integrals distributor object to text output and

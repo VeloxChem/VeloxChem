@@ -101,6 +101,38 @@ CTwoIntsDistribution::operator!=(const CTwoIntsDistribution& other) const
     return !(*this == other);
 }
 
+bool
+CTwoIntsDistribution::needSyncLock() const
+{
+    return _needSyncLock;
+}
+
+void
+CTwoIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
+                                 const CGtoPairsBlock&      braGtoPairsBlock,
+                                 const CGtoPairsBlock&      ketGtoPairsBlock,
+                                 const bool                 isBraEqualKet,
+                                 const int32_t              iContrPair)
+{
+    if (_distPattern == dist2e::batch)
+    {
+        _distSpherIntsIntoBatch(spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                isBraEqualKet, iContrPair);
+        
+        return; 
+    }
+}
+
+void
+CTwoIntsDistribution::_distSpherIntsIntoBatch(const CMemBlock2D<double>& spherInts,
+                                              const CGtoPairsBlock&      braGtoPairsBlock,
+                                              const CGtoPairsBlock&      ketGtoPairsBlock,
+                                              const bool                 isBraEqualKet,
+                                              const int32_t              iContrPair)
+{
+    
+}
+
 std::ostream&
 operator<<(      std::ostream&         output,
            const CTwoIntsDistribution& source)

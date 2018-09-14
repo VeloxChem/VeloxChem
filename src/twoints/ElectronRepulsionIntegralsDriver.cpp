@@ -76,14 +76,40 @@ CElectronRepulsionIntegralsDriver::compute(const CMolecule&       molecule,
 }
 
 void
-CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const CGtoPairsBlock& braGtoPairsBlock,
-                                                                          const CGtoPairsBlock& ketGtoPairsBlock) const
+CElectronRepulsionIntegralsDriver::compute(      double*         intsBatch,
+                                           const CGtoPairsBlock& braGtoPairsBlock,
+                                           const CGtoPairsBlock& ketGtoPairsBlock) const
+{
+    // set up dimensions of integrals batch
+    
+    auto nrow = braGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    auto ncol = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    // initialize two electron distributor
+    
+    CTwoIntsDistribution distpat(intsBatch, nrow, ncol, dist2e::batch);
+    
+    // compute batch of two electron integrals
+    
+    _compElectronRepulsionForGtoPairsBlocks(&distpat, braGtoPairsBlock,
+                                            ketGtoPairsBlock); 
+}
+
+void
+CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution* distPattern,
+                                                                           const CGtoPairsBlock&       braGtoPairsBlock,
+                                                                           const CGtoPairsBlock&       ketGtoPairsBlock) const
 {
     // copy GTOs pairs blocks for bra and ket sides
     
     auto brapairs = braGtoPairsBlock;
     
     auto ketpairs = ketGtoPairsBlock;
+    
+    // copy distribution pattern
+    
+    auto distpat = *distPattern;
     
     // determine symmetry of bra and ket sides
     
@@ -247,6 +273,8 @@ CElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoPairsBlocks(const 
                                ketpairs, symbk, i);
         
         // distribute integrals: add distribution or Fock formation code
+        
+        distpat.distribute(spherbuffer, brapairs, ketpairs, symbk, i);
     }
 }
 
@@ -1462,7 +1490,9 @@ void
 CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
                                                                    const CGtoPairsContainer* ketGtoPairsContainer) const
 {
-    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer)
+    CTwoIntsDistribution* distpat = new CTwoIntsDistribution();
+    
+    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer, distpat)
     {
         #pragma omp single nowait
         {
@@ -1490,10 +1520,12 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPai
                     {
                         auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
                         
-                        compElectronRepulsionForGtoPairsBlocks(bpairs, kpairs);
+                        _compElectronRepulsionForGtoPairsBlocks(distpat, bpairs, kpairs);
                     }
                 }
             }
         }
     }
+    
+    delete distpat; 
 }

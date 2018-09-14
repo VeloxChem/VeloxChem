@@ -21,6 +21,7 @@
 #include "BoysFunction.hpp"
 #include "GtoPairsContainer.hpp"
 #include "SystemClock.hpp"
+#include "TwoIntsDistributor.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -54,6 +55,18 @@ class CElectronRepulsionIntegralsDriver
      The flag for local execution mode.
      */
     bool _isLocalMode;
+    
+    /**
+     Computes electronic repulsion integrals for combination of GTOs pairs
+     blocks.
+     
+     @param distPattern the ponter to integrals distribution pattern.
+     @param braGtoPairsBlock the GTOs pairsblock on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     */
+    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution* distPattern,
+                                                 const CGtoPairsBlock&       braGtoPairsBlock,
+                                                 const CGtoPairsBlock&       ketGtoPairsBlock) const;
     
     /**
      Gets Obara-Saika bra side horizontal recursion pattern for specific
@@ -261,21 +274,23 @@ public:
      @param oStream the output stream.
      @param comm the MPI communicator.
      */
-    void  compute(const CMolecule&       molecule,
-                  const CMolecularBasis& aoBasis,
-                  const double           threshold,
-                        COutputStream&   oStream,
-                        MPI_Comm         comm) const;
+    void compute(const CMolecule&       molecule,
+                 const CMolecularBasis& aoBasis,
+                 const double           threshold,
+                       COutputStream&   oStream,
+                       MPI_Comm         comm) const;
     
     /**
-     Computes electronic repulsion integrals for combination of GTOs pairs
-     blocks.
+     Computes electron repulsion integrals blocks for pair of GTOs pairs blocks
+     and stores them into integrals batch.
      
-     @param braGtoPairsBlock the GTOs pairsblock on bra side.
+     @param intsBatch the pointer to integrals batch buffer.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      */
-    void compElectronRepulsionForGtoPairsBlocks(const CGtoPairsBlock& braGtoPairsBlock,
-                                                const CGtoPairsBlock& ketGtoPairsBlock) const;
+    void compute(      double*         intsBatch,
+                 const CGtoPairsBlock& braGtoPairsBlock,
+                 const CGtoPairsBlock& ketGtoPairsBlock) const;
 };
 
 

@@ -148,11 +148,11 @@ CMolecularBasis::getMolecularMaxAngularMomentum(const CMolecule& molecule) const
 {
     int32_t maxAngMom = 0;
 
-    for (int32_t i = 0; i < molecule.getNumberOfAtoms(); i++)
+    auto elmlst = molecule.getElementalComposition();
+    
+    for (auto i = elmlst.cbegin(); i != elmlst.cend(); ++i)
     {
-        int32_t idElem = molecule.getIdsElemental()[i];
-
-        int32_t elemMaxAngMom = getMaxAngularMomentum(idElem);
+        int32_t elemMaxAngMom = getMaxAngularMomentum(*i);
 
         if (elemMaxAngMom > maxAngMom)
         {
