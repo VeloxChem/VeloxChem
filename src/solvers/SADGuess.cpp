@@ -66,15 +66,22 @@ std::vector< std::vector<double> > buildQocc()
     return qocc;
 }
 
-std::vector<int32_t>
-getAtomIdxForAO(const CMolecule&       molecule,
-                const CMolecularBasis& basis)
+std::vector< std::vector<int32_t> >
+getAOIndicesOfAtoms(const CMolecule&       molecule,
+                    const CMolecularBasis& basis)
 {
-    std::vector<int32_t> atomIdxForAO;
+    std::vector< std::vector<int32_t> > aoIndicesOfAtoms;
+
+    int32_t numAtoms = molecule.getNumberOfAtoms();
+
+    for (int32_t atomIdx = 0; atomIdx < numAtoms; atomIdx++)
+    {
+        aoIndicesOfAtoms.push_back(std::vector<int32_t>());
+    }
 
     int32_t maxAngMom = basis.getMolecularMaxAngularMomentum(molecule);
 
-    int32_t numAtoms = molecule.getNumberOfAtoms();
+    int32_t aoIdx = 0;
 
     for (int32_t angMom = 0; angMom <= maxAngMom; angMom++)
     {
@@ -86,15 +93,17 @@ getAtomIdxForAO(const CMolecule&       molecule,
 
                 int32_t numAOs = basis.getNumberOfBasisFunctions(idElem, angMom);
 
-                for (int32_t aoIdx = 0; aoIdx < numAOs ; aoIdx++)
+                for (int32_t i = 0; i < numAOs; i++)
                 {
-                    atomIdxForAO.push_back(atomIdx);
+                    aoIndicesOfAtoms[atomIdx].push_back(aoIdx);
+
+                    aoIdx++;
                 }
             }
         }
     }
 
-    return atomIdxForAO;
+    return aoIndicesOfAtoms;
 }
 
 CDenseMatrix
@@ -110,11 +119,15 @@ getSADInitialGuess(const CMolecule&       molecule,
 
     int32_t numAO_2 = S12.getNumberOfColumns();
 
-    // atom indices for AOs
+    // AO indices for atoms
 
-    std::vector<int32_t> atomIdxForAO_1 = getAtomIdxForAO(molecule, basis_1);
+    std::vector< std::vector<int32_t> >
 
-    std::vector<int32_t> atomIdxForAO_2 = getAtomIdxForAO(molecule, basis_2);
+        aoIndicesOfAtoms_1 = getAOIndicesOfAtoms(molecule, basis_1);
+
+    std::vector< std::vector<int32_t> >
+        
+        aoIndicesOfAtoms_2 = getAOIndicesOfAtoms(molecule, basis_2);
 
     // occupation numbers
 
@@ -128,27 +141,11 @@ getSADInitialGuess(const CMolecule&       molecule,
 
     for (int atomIdx = 0; atomIdx < numAtoms; atomIdx++) {
 
-        // AO indices for the atom
+        // AO indices for this atom
 
-        std::vector<int32_t> aoIdx_1;
+        const std::vector<int32_t>& aoIdx_1 = aoIndicesOfAtoms_1[atomIdx];
 
-        std::vector<int32_t> aoIdx_2;
-
-        for (int32_t idx = 0; idx < atomIdxForAO_1.size(); idx++)
-        {
-            if (atomIdxForAO_1[idx] == atomIdx)
-            {
-                aoIdx_1.push_back(idx);
-            }
-        }
-
-        for (int32_t idx = 0; idx < atomIdxForAO_2.size(); idx++)
-        {
-            if (atomIdxForAO_2[idx] == atomIdx)
-            {
-                aoIdx_2.push_back(idx);
-            }
-        }
+        const std::vector<int32_t>& aoIdx_2 = aoIndicesOfAtoms_2[atomIdx];
 
         // atomic block of AOs
 
@@ -182,16 +179,16 @@ getSADInitialGuess(const CMolecule&       molecule,
 
         // A = S12' C1(identity)
 
-        CDenseMatrix c1 (aoIdx_1.size(), aoIdx_1.size());
+        CDenseMatrix C1 (aoIdx_1.size(), aoIdx_1.size());
 
-        c1.zero();
+        C1.zero();
 
         for (int32_t i = 0; i < aoIdx_1.size(); i++)
         {
-            c1.values()[i * aoIdx_1.size() + i] = 1.0;
+            C1.values()[i * aoIdx_1.size() + i] = 1.0;
         }
 
-        CDenseMatrix A = denblas::multAtB(block_12, c1);
+        CDenseMatrix A = denblas::multAtB(block_12, C1);
 
         // S22^-1
 
@@ -227,7 +224,7 @@ getSADInitialGuess(const CMolecule&       molecule,
 
         prod = denblas::multAB(A, M_invsqrt);
 
-        CDenseMatrix c2 = denblas::multAB(block_22_inv, prod);
+        CDenseMatrix C2 = denblas::multAB(block_22_inv, prod);
 
         // update C_SAD
 
@@ -239,7 +236,7 @@ getSADInitialGuess(const CMolecule&       molecule,
             {
                 C_SAD.values()[aoIdx_2[j] * numAO_1 + aoIdx_1[i]] = 
 
-                    c2.values()[j * aoIdx_1.size() + i] * sqrt(qocc[idElem][i]);
+                    C2.values()[j * aoIdx_1.size() + i] * sqrt(qocc[idElem][i]);
             }
         }
     }
