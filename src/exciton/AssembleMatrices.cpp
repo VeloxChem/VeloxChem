@@ -14,27 +14,6 @@
 
 namespace dimerfunc { // dimerfunc namespace
 
-int32_t
-getMolecularMaxAngularMomentum(const CMolecule&       mol,
-                               const CMolecularBasis& basis)
-{
-    int32_t maxAM = 0;
-
-    for (int32_t i = 0; i < mol.getNumberOfAtoms(); i++)
-    {
-        int32_t idElem = mol.getIdsElemental()[i];
-
-        int32_t elemMaxAM = basis.getMaxAngularMomentum(idElem);
-
-        if (elemMaxAM > maxAM)
-        {
-            maxAM = elemMaxAM;
-        }
-    }
-
-    return maxAM;
-}
-
 CDenseMatrix
 assembleDenseMatrices(const CMolecule&       mol_1,
                       const CMolecule&       mol_2,
@@ -53,27 +32,31 @@ assembleDenseMatrices(const CMolecule&       mol_1,
     // AO_type:  S S S S S S S S P-1 P-1 P0 P0 P+1 P+1 ...
     // Molecule: A A A A B B B B A   B   A  B  A   B   ...
 
-    int32_t maxAM_1 = getMolecularMaxAngularMomentum(mol_1, basis_1);
+    int32_t maxAngMom_1 = basis_1.getMolecularMaxAngularMomentum(mol_1);
 
-    int32_t maxAM_2 = getMolecularMaxAngularMomentum(mol_2, basis_2);
+    int32_t maxAngMom_2 = basis_2.getMolecularMaxAngularMomentum(mol_2);
 
     std::vector<std::string> molIdx;
 
-    for (int32_t i = 0; i <= std::max(maxAM_1, maxAM_2); i++)
+    for (int32_t angMom = 0; angMom <= std::max(maxAngMom_1, maxAngMom_2); angMom++)
     {
-        for (int32_t s = -i; s <= i; s++)
+        int32_t numAO_1 = basis_1.getNumberOfBasisFunctions(mol_1, angMom);
+
+        int32_t numAO_2 = basis_2.getNumberOfBasisFunctions(mol_2, angMom);
+
+        for (int32_t s = -angMom; s <= angMom; s++)
         {
-            if (i <= maxAM_1)
+            if (angMom <= maxAngMom_1)
             {
-                for (int32_t k = 0; k < basis_1.getNumberOfBasisFunctions(mol_1, i); k++)
+                for (int32_t k = 0; k < numAO_1; k++)
                 {
                     molIdx.push_back("A");
                 }
             }
 
-            if (i <= maxAM_2)
+            if (angMom <= maxAngMom_2)
             {
-                for (int32_t k = 0; k < basis_2.getNumberOfBasisFunctions(mol_2, i); k++)
+                for (int32_t k = 0; k < numAO_2; k++)
                 {
                     molIdx.push_back("B");
                 }
@@ -102,53 +85,53 @@ assembleDenseMatrices(const CMolecule&       mol_1,
 
     // form the four blocks of dimer matrix
 
-    const int32_t nAO_1 = S11.getNumberOfRows();
+    const int32_t numAO_1 = S11.getNumberOfRows();
 
-    const int32_t nAO_2 = S22.getNumberOfRows();
+    const int32_t numAO_2 = S22.getNumberOfRows();
 
-    const int32_t nAO = nAO_1 + nAO_2;
+    const int32_t numAO = numAO_1 + numAO_2;
 
-    CDenseMatrix smat (nAO, nAO);
+    CDenseMatrix smat (numAO, numAO);
 
     smat.zero();
 
     // [1,1] block
 
-    for (int32_t i = 0; i < nAO_1; i++)
+    for (int32_t i = 0; i < numAO_1; i++)
     {
-        for (int32_t j = 0; j < nAO_1; j++)
+        for (int32_t j = 0; j < numAO_1; j++)
         {
-            smat.values()[aoIdx_1[i] * nAO + aoIdx_1[j]] = S11.values()[i * nAO_1 + j];
+            smat.values()[aoIdx_1[i] * numAO + aoIdx_1[j]] = S11.values()[i * numAO_1 + j];
         }
     }
 
     // [2,2] block
 
-    for (int32_t i = 0; i < nAO_2; i++)
+    for (int32_t i = 0; i < numAO_2; i++)
     {
-        for (int32_t j = 0; j < nAO_2; j++)
+        for (int32_t j = 0; j < numAO_2; j++)
         {
-            smat.values()[aoIdx_2[i] * nAO + aoIdx_2[j]] = S22.values()[i * nAO_2 + j];
+            smat.values()[aoIdx_2[i] * numAO + aoIdx_2[j]] = S22.values()[i * numAO_2 + j];
         }
     }
 
     // [1,2] block
 
-    for (int32_t i = 0; i < nAO_1; i++)
+    for (int32_t i = 0; i < numAO_1; i++)
     {
-        for (int32_t j = 0; j < nAO_2; j++)
+        for (int32_t j = 0; j < numAO_2; j++)
         {
-            smat.values()[aoIdx_1[i] * nAO + aoIdx_2[j]] = S12.values()[i * nAO_2 + j];
+            smat.values()[aoIdx_1[i] * numAO + aoIdx_2[j]] = S12.values()[i * numAO_2 + j];
         }
     }
 
     // [2,1] block
 
-    for (int32_t i = 0; i < nAO_2; i++)
+    for (int32_t i = 0; i < numAO_2; i++)
     {
-        for (int32_t j = 0; j < nAO_1; j++)
+        for (int32_t j = 0; j < numAO_1; j++)
         {
-            smat.values()[aoIdx_2[i] * nAO + aoIdx_1[j]] = S21.values()[i * nAO_1 + j];
+            smat.values()[aoIdx_2[i] * numAO + aoIdx_1[j]] = S21.values()[i * numAO_1 + j];
         }
     }
 

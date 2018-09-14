@@ -104,6 +104,19 @@ TEST_F(CMolecularBasisTest, GetMaxAngularMomentumWithIdElemental)
     ASSERT_EQ(-1, ambas.getMaxAngularMomentum(2));
 }
 
+TEST_F(CMolecularBasisTest, GetMolecularMaxAngularMomentum)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+    
+    CMolecularBasis ao_basis = vlxbas::getMolecularBasisForH2O();
+
+    CMolecularBasis min_basis = vlxbas::getMinimalBasisForH2O();
+
+    ASSERT_EQ(2, ao_basis.getMolecularMaxAngularMomentum(h2o));
+
+    ASSERT_EQ(1, min_basis.getMolecularMaxAngularMomentum(h2o));
+}
+
 TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctions)
 {
     CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
