@@ -46,20 +46,6 @@ CAppManager::CAppManager(int    argc,
         }
     }
 
-    // detect gpu
-
-    if (_globRank == mpi::master())
-    {
-        if (_state)
-        {
-            #ifdef ENABLE_GPU
-
-            gpu::get_device_prop();
-
-            #endif
-        }
-    }
-    
     // update state of application manager across MPI processes
 
     mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
@@ -84,6 +70,20 @@ CAppManager::execute()
     CInputStream istream(_iFilename, ostream);
     
     updateState(istream.getState());
+
+    // detect gpu
+
+    if (_globRank == mpi::master())
+    {
+        if (_state)
+        {
+            #ifdef ENABLE_GPU
+
+            gpu::get_device_prop(ostream);
+
+            #endif
+        }
+    }
     
     // update state of application manager across MPI processes
     

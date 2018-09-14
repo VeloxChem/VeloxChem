@@ -9,11 +9,13 @@
 #ifndef DeviceProp_hpp
 #define DeviceProp_hpp
 
+#include "OutputStream.hpp"
+
 namespace gpu {
 
     #ifdef ENABLE_GPU
 
-    void get_device_prop();
+    void get_device_prop(COutputStream& oStream);
 
     #endif
 

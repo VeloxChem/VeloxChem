@@ -7,22 +7,25 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <cmath>
-#include <cstdio>
+#include <string>
 
 #include "DeviceProp.hpp"
+#include "StringFormat.hpp"
 
 namespace gpu { // gpu namespace
 
     #ifdef ENABLE_GPU
 
-    void get_device_prop()
+    void get_device_prop(COutputStream& oStream)
     {
 
         int32_t nDevices = 0;
 
         cudaGetDeviceCount(&nDevices);
 
-        printf("Total Number of Devices: %d\n", nDevices);
+        oStream << fmt::info << "Total Number of GPU Devices: ";
+
+        oStream << std::to_string(nDevices) << fmt::end;
 
         for (int32_t i = 0; i < nDevices; i++) {
 
@@ -30,20 +33,35 @@ namespace gpu { // gpu namespace
 
             cudaGetDeviceProperties(&prop, i);
 
-            printf("Device ID: %d\n", i);
+            oStream << "Device ID: " << std::to_string(i) << fmt::end;
 
-            printf("  Device name:             %s\n", prop.name);
+            oStream << "  Device name:             ";
 
-            printf("  Compute Capability:      %d.%d\n", prop.major, prop.minor);
+            oStream << prop.name << fmt::end;
 
-            printf("  Multiprocessor Count:    %d\n", prop.multiProcessorCount);
+            oStream << "  Compute Capability:      ";
 
-            printf("  Max Clock Rate:          %.2f GHz\n", prop.clockRate * 1.0e-6);
+            oStream << std::to_string(prop.major) << "." << std::to_string(prop.minor) << fmt::end;
 
-            printf("  Global Memory:           %.0f GB\n", (float)prop.totalGlobalMem/pow(1024,3));
+            oStream << "  Multiprocessor Count:    ";
+            
+            oStream << std::to_string(prop.multiProcessorCount) << fmt::end;
 
-            printf("  Peak Memory Bandwidth:   %.0f GB/s\n",
-                    2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e+6);
+            oStream << "  Max Clock Rate:          ";
+            
+            oStream << fstr::to_string(prop.clockRate * 1.0e-6, 2) << " GHz" << fmt::end;
+
+            double globalMem = (double)prop.totalGlobalMem / std::pow(1024, 3);
+
+            oStream << "  Global Memory:           ";
+            
+            oStream << fstr::to_string(globalMem, 0) << " GB" << fmt::end;
+
+            oStream << "  Peak Memory Bandwidth:   ";
+
+            double memBandwidth = 2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e+6;
+            
+            oStream << fstr::to_string(memBandwidth, 0) << " GB/s" << fmt::end;
 
         }
 
