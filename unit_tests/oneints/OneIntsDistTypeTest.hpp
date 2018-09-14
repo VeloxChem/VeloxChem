@@ -6,19 +6,18 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#ifndef OneIntsDistributionTest_hpp
-#define OneIntsDistributionTest_hpp
+#ifndef OneIntsDistTypeTest_hpp
+#define OneIntsDistTypeTest_hpp
 
 #include "gtest/gtest.h"
 
-class COneIntsDistributionTest : public ::testing::Test
+class COneIntsDistTypeTest : public ::testing::Test
 {
 protected:
     
-    COneIntsDistributionTest() {};
+    COneIntsDistTypeTest() {};
     
-    virtual ~COneIntsDistributionTest() {};
+    virtual ~COneIntsDistTypeTest() {};
 };
 
-
-#endif /* OneIntsDistributionTest_hpp */
+#endif /* OneIntsDistTypeTest_hpp */

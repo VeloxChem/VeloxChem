@@ -8,9 +8,13 @@
 
 #include "TwoIntsDistributor.hpp"
 
+#include "StringFormat.hpp"
+
 CTwoIntsDistribution::CTwoIntsDistribution()
 
     : _distPattern(dist2e::batch)
+
+    , _needSyncLock(false)
 
     , _nRows(0)
 
@@ -28,6 +32,8 @@ CTwoIntsDistribution::CTwoIntsDistribution(      double* intsData,
 
     : _distPattern(distPattern)
 
+    , _needSyncLock(false)
+
     , _nRows(nRows)
 
     , _nColumns(nColumns)
@@ -40,6 +46,8 @@ CTwoIntsDistribution::CTwoIntsDistribution(      double* intsData,
 CTwoIntsDistribution::CTwoIntsDistribution(const CTwoIntsDistribution& source)
 
     : _distPattern(source._distPattern)
+
+    , _needSyncLock(source._needSyncLock)
 
     , _nRows(source._nRows)
 
@@ -60,6 +68,8 @@ CTwoIntsDistribution::operator=(const CTwoIntsDistribution& source)
     
     _distPattern = source._distPattern;
     
+    _needSyncLock = source._needSyncLock;
+    
     _nRows = source._nRows;
     
     _nColumns = source._nColumns;
@@ -74,11 +84,14 @@ CTwoIntsDistribution::operator==(const CTwoIntsDistribution& other) const
 {
     if (_distPattern != other._distPattern) return false;
     
+    if (_needSyncLock != other._needSyncLock) return false;
+    
     if (_nRows != other._nRows) return false;
     
     if (_nColumns != other._nColumns) return false;
     
     if (_intsData != other._intsData) return false;
+    
     return true;
 }
 
@@ -97,6 +110,8 @@ operator<<(      std::ostream&         output,
     output << "[CTwoIntsDistribution (Object):" << &source << "]" << std::endl;
     
     output << "_distPattern: " << to_string(source._distPattern) << std::endl;
+    
+    output << "_needSyncLock: " << fstr::to_string(source._needSyncLock) << std::endl;
     
     output << "_nRows: " << source._nRows << std::endl;
     

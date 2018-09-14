@@ -183,6 +183,13 @@ TEST_F(CStringFormatTest, To_StringForSizeT)
     ASSERT_EQ(mstr, std::string("  1024"));
 }
 
+TEST_F(CStringFormatTest, To_String_Boolean)
+{
+    ASSERT_EQ(fstr::to_string(true), std::string("True"));
+    
+    ASSERT_EQ(fstr::to_string(false), std::string("False"));
+}
+
 TEST_F(CStringFormatTest, To_AngularMomentum)
 {
     ASSERT_EQ(-1, fstr::to_AngularMomentum({"X"}));

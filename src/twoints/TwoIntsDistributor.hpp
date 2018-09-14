@@ -29,6 +29,12 @@ class CTwoIntsDistribution
     dist2e _distPattern;
     
     /**
+     The flag indicating need of synchronization lock for updating integrals to
+     integrals buffer. 
+     */
+    bool _needSyncLock;
+    
+    /**
      The number of rows.
      */
     int32_t _nRows;

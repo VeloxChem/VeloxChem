@@ -81,6 +81,7 @@ COneIntsDistribution::operator==(const COneIntsDistribution& other) const
     if (_nColumns != other._nColumns) return false;
     
     if (_intsData != other._intsData) return false;
+    
     return true;
 }
 

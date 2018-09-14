@@ -132,6 +132,14 @@ to_string(const size_t source,
     return fstr::format(str, width, aligment);
 }
 
+std::string
+to_string(const bool source)
+{
+    if (source) return std::string("True");
+        
+    return std::string("False");
+}
+    
 int32_t
 to_AngularMomentum(const std::string& label)
 {
