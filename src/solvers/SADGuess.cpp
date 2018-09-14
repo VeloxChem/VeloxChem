@@ -81,9 +81,7 @@ getAOIndicesOfAtoms(const CMolecule&       molecule,
 
     int32_t maxAngMom = basis.getMolecularMaxAngularMomentum(molecule);
 
-    int32_t aoIdx = 0;
-
-    for (int32_t angMom = 0; angMom <= maxAngMom; angMom++)
+    for (int32_t aoIdx = 0, angMom = 0; angMom <= maxAngMom; angMom++)
     {
         for (int32_t s = -angMom; s <= angMom; s++)
         {
@@ -93,11 +91,9 @@ getAOIndicesOfAtoms(const CMolecule&       molecule,
 
                 int32_t numAOs = basis.getNumberOfBasisFunctions(idElem, angMom);
 
-                for (int32_t i = 0; i < numAOs; i++)
+                for (int32_t i = 0; i < numAOs; i++, aoIdx++)
                 {
                     aoIndicesOfAtoms[atomIdx].push_back(aoIdx);
-
-                    aoIdx++;
                 }
             }
         }
