@@ -162,4 +162,27 @@ getMoleculeNH3CH4()
     return mol;
 }
 
+CMolecule
+getTestLiH2()
+{
+    std::vector<double> coords({0.00, 0.40, -0.20, 0.00, 0.60, 0.38,
+                                0.00, 1.10, -1.50});
+    
+    std::vector<double> charges({3.0, 1.0, 1.0});
+    
+    std::vector<double> masses({7.016005, 1.007825, 1.007825});
+    
+    std::vector<std::string> labels({{"Li"}, {"H"}, {"H"}});
+    
+    std::vector<int32_t> idselem({3, 1, 1});
+    
+    CMolecule mol(coords, charges, masses, labels, idselem);
+    
+    mol.setCharge(1.0);
+    
+    mol.setMultiplicity(1);
+    
+    return mol;
+}
+    
 } // vlxmol namespace

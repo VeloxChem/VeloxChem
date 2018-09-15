@@ -174,6 +174,14 @@ public:
     std::vector<CGtoPairsBlock> split(const int32_t batchSize) const;
     
     /**
+     Creates GTOs pairs object consisting from specific GTOs pairs object.
+
+     @param iGtoPair the index of requested GTOs pair.
+     @return the GTOs pairs object.
+     */
+    CGtoPairsBlock pick(const int32_t iGtoPair) const;
+    
+    /**
      Gets angular momentum of bra side in GTOs pairs block object.
      
      @return the angular momentum of bra side.

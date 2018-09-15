@@ -27,6 +27,8 @@ namespace vlxmol { // vlxmol namespace
 
     CMolecule getMoleculeNH3CH4();
     
+    CMolecule getTestLiH2();
+    
 } // vlxmol namespace
 
 #endif /* MoleculeSetter_hpp */

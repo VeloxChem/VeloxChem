@@ -98,7 +98,7 @@ COneIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
                                  const bool                 isBraEqualKet,
                                  const int32_t              iContrGto)
 {
-    // distribute one-electron integrals into data batch
+    // distribute one electron integrals into data batch
     
     if (_distPattern == dist1e::batch)
     {
@@ -107,7 +107,7 @@ COneIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
         return;
     }
     
-    // distribute one-electron integrals into symmetric square matrix
+    // distribute one electron integrals into symmetric square matrix
     
     if (_distPattern == dist1e::symsq)
     {
@@ -117,7 +117,7 @@ COneIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
         return;
     }
     
-    // distribute one-electron integrals into ant-symmetric square matrix
+    // distribute one electron integrals into ant-symmetric square matrix
     
     if (_distPattern == dist1e::antisq)
     {
@@ -127,7 +127,7 @@ COneIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
         return;
     }
     
-    // distribute one-electron integrals into data batch
+    // distribute one electron integrals into data batch
     
     if (_distPattern == dist1e::rect)
     {

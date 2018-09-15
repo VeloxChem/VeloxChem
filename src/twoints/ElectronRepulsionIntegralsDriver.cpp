@@ -1490,7 +1490,7 @@ void
 CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
                                                                    const CGtoPairsContainer* ketGtoPairsContainer) const
 {
-    CTwoIntsDistribution* distpat = new CTwoIntsDistribution();
+    CTwoIntsDistribution* distpat = new CTwoIntsDistribution(nullptr, 0, 0, dist2e::rfock);
     
     #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer, distpat)
     {

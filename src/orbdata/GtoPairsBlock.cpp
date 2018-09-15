@@ -596,6 +596,46 @@ CGtoPairsBlock::split(const int32_t batchSize) const
     return ppvec;
 }
 
+CGtoPairsBlock
+CGtoPairsBlock::pick(const int32_t iGtoPair) const
+{
+    if (iGtoPair < _nScreenedContrPairs)
+    {
+        // primitive space start and end positions
+        
+        auto spos = getStartPositions();
+        
+        auto epos = getEndPositions();
+        
+        // slice contracted GTOs pairs
+        
+        auto cdat = _contrPattern.slice(iGtoPair, 1);
+        
+        // slice primitive GTOs pairs
+        
+        auto pidx = spos[iGtoPair];
+        
+        auto pdim = epos[iGtoPair] - pidx;
+        
+        auto pdat = _pairFactors.slice(pidx, pdim);
+        
+        // adjust primitive GTOs pairs indexing
+        
+        auto scurpos = cdat.data(0);
+        
+        auto ecurpos = cdat.data(1);
+        
+        scurpos[0] = 0;
+            
+        ecurpos[0] = pdim;
+        
+        return CGtoPairsBlock(cdat, pdat, _braAngularMomentum, _ketAngularMomentum,
+                              _threshold);
+    }
+    
+    return CGtoPairsBlock(); 
+}
+
 int32_t
 CGtoPairsBlock::getBraAngularMomentum() const
 {

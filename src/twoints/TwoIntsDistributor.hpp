@@ -65,6 +65,19 @@ class CTwoIntsDistribution
                                  const bool                 isBraEqualKet,
                                  const int32_t              iContrPair);
     
+    /**
+     Gets starting index of spherical integrals vector in batch of integrals.
+
+     @param nShellComponents the number of components in shell.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs
+            blocks on bra and ket sides.
+     @return the starting index.
+     */
+    int32_t _getStartIndexForBatch(const int32_t nShellComponents, 
+                                   const int32_t iContrPair,
+                                   const bool    isBraEqualKet) const;
+    
 public:
     
     /**

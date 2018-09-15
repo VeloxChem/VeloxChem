@@ -9,6 +9,7 @@
 #include "TwoIntsDistributor.hpp"
 
 #include "StringFormat.hpp"
+#include "AngularMomentum.hpp"
 
 CTwoIntsDistribution::CTwoIntsDistribution()
 
@@ -114,6 +115,8 @@ CTwoIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
                                  const bool                 isBraEqualKet,
                                  const int32_t              iContrPair)
 {
+    // distribute two electron integrals into data batch
+    
     if (_distPattern == dist2e::batch)
     {
         _distSpherIntsIntoBatch(spherInts, braGtoPairsBlock, ketGtoPairsBlock,
@@ -130,7 +133,54 @@ CTwoIntsDistribution::_distSpherIntsIntoBatch(const CMemBlock2D<double>& spherIn
                                               const bool                 isBraEqualKet,
                                               const int32_t              iContrPair)
 {
+    // determine number of angular components in shhell
     
+    auto ncomp = angmom::to_SphericalComponents(braGtoPairsBlock.getBraAngularMomentum(),
+                                                braGtoPairsBlock.getKetAngularMomentum())
+    
+               * angmom::to_SphericalComponents(ketGtoPairsBlock.getBraAngularMomentum(),
+                                                ketGtoPairsBlock.getKetAngularMomentum());
+    
+    // determine starting poisition in integrals batch
+    
+    auto spos = _getStartIndexForBatch(ncomp, iContrPair, isBraEqualKet);
+    
+    // determine dimensions of GTOs pairs vector on ket side
+    
+    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+
+    if (isBraEqualKet) kdim = iContrPair + 1;
+    
+    // store integrals into batch of integrals
+    
+    for (int32_t i = 0; i < kdim; i++)
+    {
+        for (int32_t j = 0; j < ncomp; j++)
+        {
+            _intsData[spos + j] = (spherInts.data(j))[i];
+        }
+        
+        spos += ncomp;
+    }
+}
+
+int32_t
+CTwoIntsDistribution::_getStartIndexForBatch(const int32_t nShellComponents,
+                                             const int32_t iContrPair,
+                                             const bool    isBraEqualKet) const
+{
+    int32_t idx = 0;
+    
+    if (isBraEqualKet)
+    {
+        for (int32_t i = 0; i < iContrPair; i++) idx += i + 1; 
+    }
+    else
+    {
+        idx = iContrPair * _nColumns;
+    }
+    
+    return idx * nShellComponents;
 }
 
 std::ostream&
