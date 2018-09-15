@@ -24,7 +24,7 @@ assembleDenseMatrices(const CMolecule&       mol_1,
                       const CDenseMatrix&    S12,
                       const CDenseMatrix&    S21)
 {
-    // assign the AOs to molecules
+    // get indices of atomic orbitals located on each molecule
     
     // angular momentum based AO ordering
     // S, P-1, P0, P+1, D-2, D-1, D0, D+1, D+2, ...
@@ -36,9 +36,15 @@ assembleDenseMatrices(const CMolecule&       mol_1,
 
     int32_t maxAngMom_2 = basis_2.getMolecularMaxAngularMomentum(mol_2);
 
-    std::vector<std::string> molIdx;
+    int32_t maxAngMom = std::max(maxAngMom_1, maxAngMom_2);
 
-    for (int32_t angMom = 0; angMom <= std::max(maxAngMom_1, maxAngMom_2); angMom++)
+    std::vector< std::vector<int32_t> > aoIndicesOfMolecules;
+
+    aoIndicesOfMolecules.push_back(std::vector<int32_t>());
+
+    aoIndicesOfMolecules.push_back(std::vector<int32_t>());
+
+    for (int32_t aoIdx = 0, angMom = 0; angMom <= maxAngMom; angMom++)
     {
         int32_t numAO_1 = basis_1.getNumberOfBasisFunctions(mol_1, angMom);
 
@@ -46,42 +52,23 @@ assembleDenseMatrices(const CMolecule&       mol_1,
 
         for (int32_t s = -angMom; s <= angMom; s++)
         {
-            if (angMom <= maxAngMom_1)
+            for (int32_t i = 0; i < numAO_1; i++, aoIdx++)
             {
-                for (int32_t k = 0; k < numAO_1; k++)
-                {
-                    molIdx.push_back("A");
-                }
+                aoIndicesOfMolecules[0].push_back(aoIdx);
             }
 
-            if (angMom <= maxAngMom_2)
+            for (int32_t i = 0; i < numAO_2; i++, aoIdx++)
             {
-                for (int32_t k = 0; k < numAO_2; k++)
-                {
-                    molIdx.push_back("B");
-                }
+                aoIndicesOfMolecules[1].push_back(aoIdx);
             }
         }
     }
 
     // find out the AO index mapping from monomer to dimer
 
-    std::vector<int32_t> aoIdx_1;
+    const std::vector<int32_t>& aoIdx_1 = aoIndicesOfMolecules[0];
 
-    std::vector<int32_t> aoIdx_2;
-
-    for (int32_t i = 0; i < molIdx.size(); i++)
-    {
-        if (molIdx[i] == std::string("A"))
-        {
-            aoIdx_1.push_back(i);
-        }
-
-        if (molIdx[i] == std::string("B"))
-        {
-            aoIdx_2.push_back(i);
-        }
-    }
+    const std::vector<int32_t>& aoIdx_2 = aoIndicesOfMolecules[1];
 
     // form the four blocks of dimer matrix
 
@@ -101,7 +88,9 @@ assembleDenseMatrices(const CMolecule&       mol_1,
     {
         for (int32_t j = 0; j < numAO_1; j++)
         {
-            smat.values()[aoIdx_1[i] * numAO + aoIdx_1[j]] = S11.values()[i * numAO_1 + j];
+            smat.values()[aoIdx_1[i] * numAO + aoIdx_1[j]] = 
+                
+                S11.values()[i * numAO_1 + j];
         }
     }
 
@@ -111,7 +100,9 @@ assembleDenseMatrices(const CMolecule&       mol_1,
     {
         for (int32_t j = 0; j < numAO_2; j++)
         {
-            smat.values()[aoIdx_2[i] * numAO + aoIdx_2[j]] = S22.values()[i * numAO_2 + j];
+            smat.values()[aoIdx_2[i] * numAO + aoIdx_2[j]] = 
+                
+                S22.values()[i * numAO_2 + j];
         }
     }
 
@@ -121,7 +112,9 @@ assembleDenseMatrices(const CMolecule&       mol_1,
     {
         for (int32_t j = 0; j < numAO_2; j++)
         {
-            smat.values()[aoIdx_1[i] * numAO + aoIdx_2[j]] = S12.values()[i * numAO_2 + j];
+            smat.values()[aoIdx_1[i] * numAO + aoIdx_2[j]] = 
+                
+                S12.values()[i * numAO_2 + j];
         }
     }
 
@@ -131,7 +124,9 @@ assembleDenseMatrices(const CMolecule&       mol_1,
     {
         for (int32_t j = 0; j < numAO_1; j++)
         {
-            smat.values()[aoIdx_2[i] * numAO + aoIdx_1[j]] = S21.values()[i * numAO_1 + j];
+            smat.values()[aoIdx_2[i] * numAO + aoIdx_1[j]] = 
+                
+                S21.values()[i * numAO_1 + j];
         }
     }
 

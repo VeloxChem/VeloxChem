@@ -21,9 +21,19 @@ TEST_F(CSADGuessTest, AtomIdxForAO)
     
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    std::vector<int32_t> atomIdx = sad_guess::getAtomIdxForAO(h2o, min_basis);
+    std::vector< std::vector<int32_t> > aoIndices = 
+        
+        sad_guess::getAOIndicesOfAtoms(h2o, min_basis);
 
-    ASSERT_EQ(atomIdx, std::vector<int32_t>({0,0,1,2,0,0,0}));
+    std::vector< std::vector<int32_t> > refIndices;
+
+    refIndices.push_back(std::vector<int32_t>({0,1,4,5,6}));
+
+    refIndices.push_back(std::vector<int32_t>({2}));
+
+    refIndices.push_back(std::vector<int32_t>({3}));
+
+    ASSERT_EQ(aoIndices, refIndices);
 }
 
 TEST_F(CSADGuessTest, InitialGuess)

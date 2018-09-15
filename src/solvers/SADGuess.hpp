@@ -28,15 +28,16 @@ namespace sad_guess { // sad_guess namespace
 std::vector< std::vector<double> > buildQocc();
 
 /**
- Gets the atomic indices associated with each atomic orbital.
+ Gets the indices of atomic orbitals that are located on specific atoms.
  
  @param molecule the molecule.
  @param basis the basis set.
- @return a vector of atomic indices for atomic oribtals.
+ @return a vector of vector with the first dimension for atoms and the second
+         dimension for the atomic orbitals on that atom.
  */
-std::vector<int32_t>
-getAtomIdxForAO(const CMolecule&       molecule,
-                const CMolecularBasis& basis);
+std::vector< std::vector<int32_t> >
+getAOIndicesOfAtoms(const CMolecule&       molecule,
+                    const CMolecularBasis& basis);
 
 /**
  Form the density matrix of SAD initial guess.
