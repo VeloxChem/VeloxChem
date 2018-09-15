@@ -32,101 +32,101 @@ assembleDenseMatrices(const CMolecule&       mol_1,
     // AO_type:  S S S S S S S S P-1 P-1 P0 P0 P+1 P+1 ...
     // Molecule: A A A A B B B B A   B   A  B  A   B   ...
 
-    int32_t maxAngMom_1 = basis_1.getMolecularMaxAngularMomentum(mol_1);
+    int32_t max_angl_1 = basis_1.getMolecularMaxAngularMomentum(mol_1);
 
-    int32_t maxAngMom_2 = basis_2.getMolecularMaxAngularMomentum(mol_2);
+    int32_t max_angl_2 = basis_2.getMolecularMaxAngularMomentum(mol_2);
 
-    int32_t maxAngMom = std::max(maxAngMom_1, maxAngMom_2);
+    int32_t max_angl = std::max(max_angl_1, max_angl_2);
 
-    std::vector< std::vector<int32_t> > aoIndicesOfMolecules;
+    std::vector< std::vector<int32_t> > aoinds_mol;
 
-    aoIndicesOfMolecules.push_back(std::vector<int32_t>());
+    aoinds_mol.push_back(std::vector<int32_t>());
 
-    aoIndicesOfMolecules.push_back(std::vector<int32_t>());
+    aoinds_mol.push_back(std::vector<int32_t>());
 
-    for (int32_t aoIdx = 0, angMom = 0; angMom <= maxAngMom; angMom++)
+    for (int32_t aoidx = 0, angl = 0; angl <= max_angl; angl++)
     {
-        int32_t numAO_1 = basis_1.getNumberOfBasisFunctions(mol_1, angMom);
+        int32_t nao_1 = basis_1.getNumberOfBasisFunctions(mol_1, angl);
 
-        int32_t numAO_2 = basis_2.getNumberOfBasisFunctions(mol_2, angMom);
+        int32_t nao_2 = basis_2.getNumberOfBasisFunctions(mol_2, angl);
 
-        for (int32_t s = -angMom; s <= angMom; s++)
+        for (int32_t s = -angl; s <= angl; s++)
         {
-            for (int32_t i = 0; i < numAO_1; i++, aoIdx++)
+            for (int32_t i = 0; i < nao_1; i++, aoidx++)
             {
-                aoIndicesOfMolecules[0].push_back(aoIdx);
+                aoinds_mol[0].push_back(aoidx);
             }
 
-            for (int32_t i = 0; i < numAO_2; i++, aoIdx++)
+            for (int32_t i = 0; i < nao_2; i++, aoidx++)
             {
-                aoIndicesOfMolecules[1].push_back(aoIdx);
+                aoinds_mol[1].push_back(aoidx);
             }
         }
     }
 
     // find out the AO index mapping from monomer to dimer
 
-    const std::vector<int32_t>& aoIdx_1 = aoIndicesOfMolecules[0];
+    const std::vector<int32_t>& aoinds_1 = aoinds_mol[0];
 
-    const std::vector<int32_t>& aoIdx_2 = aoIndicesOfMolecules[1];
+    const std::vector<int32_t>& aoinds_2 = aoinds_mol[1];
 
     // form the four blocks of dimer matrix
 
-    const int32_t numAO_1 = S11.getNumberOfRows();
+    const int32_t nao_1 = S11.getNumberOfRows();
 
-    const int32_t numAO_2 = S22.getNumberOfRows();
+    const int32_t nao_2 = S22.getNumberOfRows();
 
-    const int32_t numAO = numAO_1 + numAO_2;
+    const int32_t nao = nao_1 + nao_2;
 
-    CDenseMatrix smat (numAO, numAO);
+    CDenseMatrix smat (nao, nao);
 
     smat.zero();
 
     // [1,1] block
 
-    for (int32_t i = 0; i < numAO_1; i++)
+    for (int32_t i = 0; i < nao_1; i++)
     {
-        for (int32_t j = 0; j < numAO_1; j++)
+        for (int32_t j = 0; j < nao_1; j++)
         {
-            smat.values()[aoIdx_1[i] * numAO + aoIdx_1[j]] = 
+            smat.values()[aoinds_1[i] * nao + aoinds_1[j]] = 
                 
-                S11.values()[i * numAO_1 + j];
+                S11.values()[i * nao_1 + j];
         }
     }
 
     // [2,2] block
 
-    for (int32_t i = 0; i < numAO_2; i++)
+    for (int32_t i = 0; i < nao_2; i++)
     {
-        for (int32_t j = 0; j < numAO_2; j++)
+        for (int32_t j = 0; j < nao_2; j++)
         {
-            smat.values()[aoIdx_2[i] * numAO + aoIdx_2[j]] = 
+            smat.values()[aoinds_2[i] * nao + aoinds_2[j]] = 
                 
-                S22.values()[i * numAO_2 + j];
+                S22.values()[i * nao_2 + j];
         }
     }
 
     // [1,2] block
 
-    for (int32_t i = 0; i < numAO_1; i++)
+    for (int32_t i = 0; i < nao_1; i++)
     {
-        for (int32_t j = 0; j < numAO_2; j++)
+        for (int32_t j = 0; j < nao_2; j++)
         {
-            smat.values()[aoIdx_1[i] * numAO + aoIdx_2[j]] = 
+            smat.values()[aoinds_1[i] * nao + aoinds_2[j]] = 
                 
-                S12.values()[i * numAO_2 + j];
+                S12.values()[i * nao_2 + j];
         }
     }
 
     // [2,1] block
 
-    for (int32_t i = 0; i < numAO_2; i++)
+    for (int32_t i = 0; i < nao_2; i++)
     {
-        for (int32_t j = 0; j < numAO_1; j++)
+        for (int32_t j = 0; j < nao_1; j++)
         {
-            smat.values()[aoIdx_2[i] * numAO + aoIdx_1[j]] = 
+            smat.values()[aoinds_2[i] * nao + aoinds_1[j]] = 
                 
-                S21.values()[i * numAO_1 + j];
+                S21.values()[i * nao_1 + j];
         }
     }
 

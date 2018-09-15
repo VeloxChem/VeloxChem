@@ -146,21 +146,21 @@ CMolecularBasis::getMaxAngularMomentum(const int32_t idElemental) const
 int32_t
 CMolecularBasis::getMolecularMaxAngularMomentum(const CMolecule& molecule) const
 {
-    int32_t maxAngMom = 0;
+    int32_t max_angl = 0;
 
     auto elmlst = molecule.getElementalComposition();
     
     for (auto i = elmlst.cbegin(); i != elmlst.cend(); ++i)
     {
-        int32_t elemMaxAngMom = getMaxAngularMomentum(*i);
+        int32_t elem_angl = getMaxAngularMomentum(*i);
 
-        if (elemMaxAngMom > maxAngMom)
+        if (max_angl < elem_angl)
         {
-            maxAngMom = elemMaxAngMom;
+            max_angl = elem_angl;
         }
     }
 
-    return maxAngMom;
+    return max_angl;
 }
 
 std::string

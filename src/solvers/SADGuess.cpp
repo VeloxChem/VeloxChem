@@ -70,36 +70,36 @@ std::vector< std::vector<int32_t> >
 getAOIndicesOfAtoms(const CMolecule&       molecule,
                     const CMolecularBasis& basis)
 {
-    std::vector< std::vector<int32_t> > aoIndicesOfAtoms;
+    std::vector< std::vector<int32_t> > aoinds_atoms;
 
-    int32_t numAtoms = molecule.getNumberOfAtoms();
+    int32_t natoms = molecule.getNumberOfAtoms();
 
-    for (int32_t atomIdx = 0; atomIdx < numAtoms; atomIdx++)
+    for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
     {
-        aoIndicesOfAtoms.push_back(std::vector<int32_t>());
+        aoinds_atoms.push_back(std::vector<int32_t>());
     }
 
-    int32_t maxAngMom = basis.getMolecularMaxAngularMomentum(molecule);
+    int32_t max_angl = basis.getMolecularMaxAngularMomentum(molecule);
 
-    for (int32_t aoIdx = 0, angMom = 0; angMom <= maxAngMom; angMom++)
+    for (int32_t aoidx = 0, angl = 0; angl <= max_angl; angl++)
     {
-        for (int32_t s = -angMom; s <= angMom; s++)
+        for (int32_t s = -angl; s <= angl; s++)
         {
-            for (int32_t atomIdx = 0; atomIdx < numAtoms; atomIdx++)
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
             {
-                int32_t idElem = molecule.getIdsElemental()[atomIdx];
+                int32_t idelem = molecule.getIdsElemental()[atomidx];
 
-                int32_t numAOs = basis.getNumberOfBasisFunctions(idElem, angMom);
+                int32_t nao = basis.getNumberOfBasisFunctions(idelem, angl);
 
-                for (int32_t i = 0; i < numAOs; i++, aoIdx++)
+                for (int32_t i = 0; i < nao; i++, aoidx++)
                 {
-                    aoIndicesOfAtoms[atomIdx].push_back(aoIdx);
+                    aoinds_atoms[atomidx].push_back(aoidx);
                 }
             }
         }
     }
 
-    return aoIndicesOfAtoms;
+    return aoinds_atoms;
 }
 
 CDenseMatrix
@@ -109,21 +109,21 @@ getSADInitialGuess(const CMolecule&       molecule,
                    const COverlapMatrix&  S12,
                    const COverlapMatrix&  S22)
 {
-    int32_t numAtoms = molecule.getNumberOfAtoms();
+    int32_t natoms = molecule.getNumberOfAtoms();
 
-    int32_t numAO_1 = S12.getNumberOfRows();
+    int32_t nao_1 = S12.getNumberOfRows();
 
-    int32_t numAO_2 = S12.getNumberOfColumns();
+    int32_t nao_2 = S12.getNumberOfColumns();
 
     // AO indices for atoms
 
     std::vector< std::vector<int32_t> >
 
-        aoIndicesOfAtoms_1 = getAOIndicesOfAtoms(molecule, basis_1);
+        aoinds_atoms_1 = getAOIndicesOfAtoms(molecule, basis_1);
 
     std::vector< std::vector<int32_t> >
         
-        aoIndicesOfAtoms_2 = getAOIndicesOfAtoms(molecule, basis_2);
+        aoinds_atoms_2 = getAOIndicesOfAtoms(molecule, basis_2);
 
     // occupation numbers
 
@@ -131,60 +131,60 @@ getSADInitialGuess(const CMolecule&       molecule,
 
     // C_SAD matrix
 
-    CDenseMatrix C_SAD (numAO_2, numAO_1);
+    CDenseMatrix csad (nao_2, nao_1);
 
-    C_SAD.zero();
+    csad.zero();
 
-    for (int atomIdx = 0; atomIdx < numAtoms; atomIdx++) {
+    for (int atomidx = 0; atomidx < natoms; atomidx++) {
 
         // AO indices for this atom
 
-        const std::vector<int32_t>& aoIdx_1 = aoIndicesOfAtoms_1[atomIdx];
+        const std::vector<int32_t>& aoinds_1 = aoinds_atoms_1[atomidx];
 
-        const std::vector<int32_t>& aoIdx_2 = aoIndicesOfAtoms_2[atomIdx];
+        const std::vector<int32_t>& aoinds_2 = aoinds_atoms_2[atomidx];
 
         // atomic block of AOs
 
-        CDenseMatrix block_12 (aoIdx_1.size(), aoIdx_2.size());
+        CDenseMatrix block_12 (aoinds_1.size(), aoinds_2.size());
 
-        CDenseMatrix block_22 (aoIdx_2.size(), aoIdx_2.size());
+        CDenseMatrix block_22 (aoinds_2.size(), aoinds_2.size());
 
         block_12.zero();
 
         block_22.zero();
 
-        for (int32_t i = 0; i < aoIdx_1.size(); i++)
+        for (int32_t i = 0; i < aoinds_1.size(); i++)
         {
-            for (int32_t j = 0; j < aoIdx_2.size(); j++)
+            for (int32_t j = 0; j < aoinds_2.size(); j++)
             {
-                block_12.values()[i * aoIdx_2.size() + j] = 
+                block_12.values()[i * aoinds_2.size() + j] = 
                     
-                    S12.values()[aoIdx_1[i] * numAO_2 + aoIdx_2[j]];
+                    S12.values()[aoinds_1[i] * nao_2 + aoinds_2[j]];
             }
         }
 
-        for (int32_t i = 0; i < aoIdx_2.size(); i++)
+        for (int32_t i = 0; i < aoinds_2.size(); i++)
         {
-            for (int32_t j = 0; j < aoIdx_2.size(); j++)
+            for (int32_t j = 0; j < aoinds_2.size(); j++)
             {
-                block_22.values()[i * aoIdx_2.size() + j] = 
+                block_22.values()[i * aoinds_2.size() + j] = 
                     
-                    S22.values()[aoIdx_2[i] * numAO_2 + aoIdx_2[j]];
+                    S22.values()[aoinds_2[i] * nao_2 + aoinds_2[j]];
             }
         }
 
         // A = S12' C1(identity)
 
-        CDenseMatrix C1 (aoIdx_1.size(), aoIdx_1.size());
+        CDenseMatrix mat_c1 (aoinds_1.size(), aoinds_1.size());
 
-        C1.zero();
+        mat_c1.zero();
 
-        for (int32_t i = 0; i < aoIdx_1.size(); i++)
+        for (int32_t i = 0; i < aoinds_1.size(); i++)
         {
-            C1.values()[i * aoIdx_1.size() + i] = 1.0;
+            mat_c1.values()[i * aoinds_1.size() + i] = 1.0;
         }
 
-        CDenseMatrix A = denblas::multAtB(block_12, C1);
+        CDenseMatrix mat_a = denblas::multAtB(block_12, mat_c1);
 
         // S22^-1
 
@@ -201,47 +201,47 @@ getSADInitialGuess(const CMolecule&       molecule,
 
         // M = A' S22^-1 A
 
-        CDenseMatrix prod = denblas::multAB(block_22_inv, A);
+        CDenseMatrix prod = denblas::multAB(block_22_inv, mat_a);
 
-        CDenseMatrix M = denblas::multAtB(A, prod);
+        CDenseMatrix mat_m = denblas::multAtB(mat_a, prod);
 
         // M^-1/2
 
-        diagdrv.diagonalize(M);
+        diagdrv.diagonalize(mat_m);
 
         if (! diagdrv.getState())
         {
             throw "DenseMatrix diagonalization failed in getSADInitialGuess!";
         }
 
-        CDenseMatrix M_invsqrt = diagdrv.getInvertedSqrtMatrix();
+        CDenseMatrix mat_m_invsqrt = diagdrv.getInvertedSqrtMatrix();
 
         // C2 = S22^-1 A M^-1/2
 
-        prod = denblas::multAB(A, M_invsqrt);
+        prod = denblas::multAB(mat_a, mat_m_invsqrt);
 
-        CDenseMatrix C2 = denblas::multAB(block_22_inv, prod);
+        CDenseMatrix mat_c2 = denblas::multAB(block_22_inv, prod);
 
-        // update C_SAD
+        // update csad
 
-        const int32_t idElem = molecule.getIdsElemental()[atomIdx];
+        const int32_t idelem = molecule.getIdsElemental()[atomidx];
 
-        for (int32_t j = 0; j < aoIdx_2.size(); j++)
+        for (int32_t j = 0; j < aoinds_2.size(); j++)
         {
-            for (int32_t i = 0; i < aoIdx_1.size(); i++)
+            for (int32_t i = 0; i < aoinds_1.size(); i++)
             {
-                C_SAD.values()[aoIdx_2[j] * numAO_1 + aoIdx_1[i]] = 
+                csad.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
 
-                    C2.values()[j * aoIdx_1.size() + i] * sqrt(qocc[idElem][i]);
+                    mat_c2.values()[j * aoinds_1.size() + i] * sqrt(qocc[idelem][i]);
             }
         }
     }
 
-    // density matrix
+    // D_SAD density matrix
 
-    CDenseMatrix D_SAD = denblas::multABt(C_SAD, C_SAD);
+    CDenseMatrix dsad = denblas::multABt(csad, csad);
 
-    return D_SAD;
+    return dsad;
 }
 
 } // sad_guess namespace
