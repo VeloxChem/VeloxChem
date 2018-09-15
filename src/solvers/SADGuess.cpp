@@ -23,15 +23,23 @@ std::vector< std::vector<double> > buildQocc()
 
     // H,He
 
+    //                                    1s
+
     qocc.push_back(std::vector<double> ({ 0.5 }));
 
     qocc.push_back(std::vector<double> ({ 1.0 }));
 
-    // Li,Be,B,C,N,O,F,Ne
+    // Li,Be
+
+    //                                    1s   2s
 
     qocc.push_back(std::vector<double> ({ 1.0, 0.5 }));
 
     qocc.push_back(std::vector<double> ({ 1.0, 1.0 }));
+
+    // B,C,N,O,F,Ne
+
+    //                                    1s   2s     2p-1   2p0    2p+1
 
     qocc.push_back(std::vector<double> ({ 1.0, 0.375, 0.375, 0.375, 0.375 }));
 
@@ -45,23 +53,29 @@ std::vector< std::vector<double> > buildQocc()
 
     qocc.push_back(std::vector<double> ({ 1.0, 1.000, 1.000, 1.000, 1.000 }));
 
-    // Na,Mg,Al,Si,P,S,Cl,Ar
+    // Na,Mg
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 0.500 }));
+    //                                    1s   2s   3s     2p-1 2p0  2p+1
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 1.000 }));
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.500, 1.0, 1.0, 1.0 }));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 0.375, 0.375, 0.375, 0.375 }));
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.000, 1.0, 1.0, 1.0 }));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 0.500, 0.500, 0.500, 0.500 }));
+    // Al,Si,P,S,Cl,Ar
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 0.625, 0.625, 0.625, 0.625 }));
+    //                                    1s   2s   3s     2p-1 3p-1   2p0  3p0    2p+1 3p+1
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 0.750, 0.750, 0.750, 0.750 }));
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.375, 1.0, 0.375, 1.0, 0.375, 1.0, 0.375 }));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 0.875, 0.875, 0.875, 0.875 }));
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.500, 1.0, 0.500, 1.0, 0.500, 1.0, 0.500 }));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.0, 1.0, 1.0, 1.000, 1.000, 1.000, 1.000 }));
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.625, 1.0, 0.625, 1.0, 0.625, 1.0, 0.625 }));
+
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.750, 1.0, 0.750, 1.0, 0.750, 1.0, 0.750 }));
+
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.875, 1.0, 0.875, 1.0, 0.875, 1.0, 0.875 }));
+
+    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.000, 1.0, 1.000, 1.0, 1.000, 1.0, 1.000 }));
 
     return qocc;
 }
