@@ -142,32 +142,38 @@ getSADInitialGuess(const CMolecule&       molecule,
         const std::vector<int32_t>& aoinds_1 = aoinds_atoms_1[atomidx];
 
         const std::vector<int32_t>& aoinds_2 = aoinds_atoms_2[atomidx];
-
+        
+        // set up AO indices dimensions
+        
+        auto naodim_1 = static_cast<int32_t>(aoinds_1.size());
+        
+        auto naodim_2 = static_cast<int32_t>(aoinds_2.size());
+        
         // atomic block of AOs
 
-        CDenseMatrix block_12 (aoinds_1.size(), aoinds_2.size());
+        CDenseMatrix block_12 (naodim_1, naodim_2);
 
-        CDenseMatrix block_22 (aoinds_2.size(), aoinds_2.size());
+        CDenseMatrix block_22 (naodim_2, naodim_2);
 
         block_12.zero();
 
         block_22.zero();
 
-        for (int32_t i = 0; i < aoinds_1.size(); i++)
+        for (int32_t i = 0; i < naodim_1; i++)
         {
-            for (int32_t j = 0; j < aoinds_2.size(); j++)
+            for (int32_t j = 0; j < naodim_2; j++)
             {
-                block_12.values()[i * aoinds_2.size() + j] = 
+                block_12.values()[i * naodim_2 + j] = 
                     
                     S12.values()[aoinds_1[i] * nao_2 + aoinds_2[j]];
             }
         }
 
-        for (int32_t i = 0; i < aoinds_2.size(); i++)
+        for (int32_t i = 0; i < naodim_2; i++)
         {
-            for (int32_t j = 0; j < aoinds_2.size(); j++)
+            for (int32_t j = 0; j < naodim_2; j++)
             {
-                block_22.values()[i * aoinds_2.size() + j] = 
+                block_22.values()[i * naodim_2 + j] = 
                     
                     S22.values()[aoinds_2[i] * nao_2 + aoinds_2[j]];
             }
@@ -175,13 +181,13 @@ getSADInitialGuess(const CMolecule&       molecule,
 
         // A = S12' C1(identity)
 
-        CDenseMatrix mat_c1 (aoinds_1.size(), aoinds_1.size());
+        CDenseMatrix mat_c1 (naodim_1, naodim_1);
 
         mat_c1.zero();
 
-        for (int32_t i = 0; i < aoinds_1.size(); i++)
+        for (int32_t i = 0; i < naodim_1; i++)
         {
-            mat_c1.values()[i * aoinds_1.size() + i] = 1.0;
+            mat_c1.values()[i * naodim_1 + i] = 1.0;
         }
 
         CDenseMatrix mat_a = denblas::multAtB(block_12, mat_c1);
@@ -226,13 +232,13 @@ getSADInitialGuess(const CMolecule&       molecule,
 
         const int32_t idelem = molecule.getIdsElemental()[atomidx];
 
-        for (int32_t j = 0; j < aoinds_2.size(); j++)
+        for (int32_t j = 0; j < naodim_2; j++)
         {
-            for (int32_t i = 0; i < aoinds_1.size(); i++)
+            for (int32_t i = 0; i < naodim_1; i++)
             {
                 csad.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
 
-                    mat_c2.values()[j * aoinds_1.size() + i] * sqrt(qocc[idelem][i]);
+                    mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i]);
             }
         }
     }
