@@ -16,10 +16,13 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 
+#include "ExportReaders.hpp"
+
 namespace bp = boost::python;
 
-// ==> boost python <==
-// functions and classes
+namespace bp_readers { // bp_readers namespace
+
+// Exports classes/functions in src/readers to python
 
 void export_readers()
 {
@@ -73,3 +76,5 @@ void export_readers()
         .def("get_min_basis", &CBasisReader::getMinBasis)
     ;
 }
+
+} // bp_readers namespace

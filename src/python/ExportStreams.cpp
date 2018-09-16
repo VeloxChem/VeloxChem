@@ -10,14 +10,33 @@
 
 #include <memory>
 #include <string>
+#include <iostream>
 
 #include "InputStream.hpp"
 #include "OutputStream.hpp"
 
+#include "ExportStreams.hpp"
+
 namespace bp = boost::python;
 
-// ==> boost python <==
-// functions and classes
+namespace bp_streams { // bp_streams namespace
+
+// Helper function for writing to output stream
+
+void COutputStream_put_info(      COutputStream& self,
+                            const std::string&   source)
+{
+    self << fmt::info << source.c_str() << fmt::end;
+}
+
+void COutputStream_new_line(COutputStream& self)
+{
+    self << fmt::blank;
+
+    self.flush();
+}
+
+// Exports classes/functions in src/streams to python
 
 void export_streams()
 {
@@ -29,7 +48,9 @@ void export_streams()
             bp::init<const std::string&>()
         )
         .def("get_state", &COutputStream::getState)
-        .def("flush",     &COutputStream::flush)
+        .def("flush", &COutputStream::flush)
+        .def("put_info", &COutputStream_put_info)
+        .def("new_line", &COutputStream_new_line)
     ;
 
     // CInputStream class
@@ -52,3 +73,5 @@ void export_streams()
         )
     ;
 }
+
+} // bp_streams namespace

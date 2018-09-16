@@ -15,12 +15,13 @@
 #include "MpiFunc.hpp"
 #include "AppManager.hpp"
 
+#include "ExportControllers.hpp"
+
 namespace bp = boost::python;
 
 namespace bp_controllers { // bp_controllers namespace
 
-// ==> boost python helper function <==
-// for creating CAppManager object
+// Helper function for broadcasting a CAppManager object
 
 static std::shared_ptr<CAppManager>
 CAppManager_create(std::string input_string, std::string output_string)
@@ -47,10 +48,7 @@ CAppManager_create(std::string input_string, std::string output_string)
     return std::shared_ptr<CAppManager>(new CAppManager (argc, argv));
 }
 
-} // bp_controllers namespace
-
-// ==> boost python <==
-// functions and classes
+// Exports classes/functions in src/controllers to python
 
 void export_controllers()
 {
@@ -68,3 +66,5 @@ void export_controllers()
         .def("get_state", &CAppManager::getState)
     ;
 }
+
+} // bp_controllers namespace
