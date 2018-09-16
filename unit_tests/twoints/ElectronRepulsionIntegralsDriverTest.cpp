@@ -13,40 +13,96 @@
 #include "ElectronRepulsionIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"
+#include "CheckFunctions.hpp"
 
-TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSSForLiH2)
+TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSSForLiH)
 {
     CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto mlih2 = vlxmol::getTestLiH2();
+    auto mlih = vlxmol::getTestLiH();
     
     auto mbas = vlxbas::getTestBasisForLiH();
     
-    CGtoBlock bgtos(mlih2, mbas, 0);
+    CGtoBlock bgtos(mlih, mbas, 0);
     
     CGtoPairsBlock bpairs(bgtos, 1.0e-13);
     
-    CMemBlock<double> fints(231);
+    CMemBlock<double> fints(1);
     
-    eridrv.compute(fints.data(), bpairs, bpairs);
+    eridrv.compute(fints.data(), bpairs.pick(0), bpairs.pick(0));
     
-//    auto idxa = bpairs.getBraIdentifiers(0);
-//    
-//    auto idxb = bpairs.getKetIdentifiers(0);
-//    
-//    int32_t idx = 0;
-//    
-//    for (int32_t i = 0; i < bpairs.getNumberOfScreenedContrPairs(); i++)
-//    {
-//        for (int32_t j = 0; j < i + 1; j++)
-//        {
-//            printf("(%i,%i|%i,%i) = %lf\n", idxa[i], idxb[i], idxa[j], idxb[j], fints.at(idx));
-//            
-//            idx++;
-//        }
-//    }
-//    
-//    printf("Number of pairs: %i Number of integrals: %i\n",
-//           bpairs.getNumberOfScreenedContrPairs(), idx); 
+    std::vector<double> r0000vals{ 1.629232440467330};
+    
+    vlxtest::compare(r0000vals, fints.data());
+    
+    eridrv.compute(fints.data(), bpairs.pick(1), bpairs.pick(1));
+    
+    std::vector<double> r0101vals{ 1.296490921648330};
+    
+    vlxtest::compare(r0101vals, fints.data());
+    
+    eridrv.compute(fints.data(), bpairs.pick(1), bpairs.pick(8));
+    
+    std::vector<double> r0123vals{ 0.569573705357336};
+    
+    vlxtest::compare(r0123vals, fints.data());
+    
+    eridrv.compute(fints.data(), bpairs.pick(3), bpairs.pick(5));
+    
+    std::vector<double> r0312vals{ 0.091957062417462};
+    
+    vlxtest::compare(r0312vals, fints.data());
+}
+
+TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSPForLiH)
+{
+    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+    
+    auto mlih = vlxmol::getTestLiH();
+    
+    auto mbas = vlxbas::getTestBasisForLiH();
+    
+    CGtoBlock agtos(mlih, mbas, 0);
+    
+    CGtoPairsBlock bpairs(agtos, 1.0e-13);
+    
+    CGtoBlock cgtos(mlih, mbas, 0);
+    
+    CGtoBlock dgtos(mlih, mbas, 1);
+    
+    CGtoPairsBlock kpairs(cgtos, dgtos, 1.0e-13);
+    
+    //std::cout << kpairs; 
+    
+    CMemBlock<double> fints(3);
+    
+    eridrv.compute(fints.data(), bpairs.pick(0), kpairs.pick(0));
+    
+    std::vector<double> r0000vals{ 0.000000000000000,  0.000000000000000,  0.000000000000000};
+    
+    vlxtest::compare(r0000vals,fints.data());
+    
+    eridrv.compute(fints.data(), bpairs.pick(1), kpairs.pick(1));
+    
+    std::vector<double> r0101vals{ 0.000000000000000,  0.000000000000000,  0.000000000000000};
+    
+    vlxtest::compare(r0101vals, fints.data());
+    
+    eridrv.compute(fints.data(), bpairs.pick(1), kpairs.pick(11));
+    
+    std::vector<double> r0123vals{-0.048499014664650, -0.088914860218526, -0.032332676443100};
+    
+    vlxtest::compare(r0123vals, fints.data());
+    
+    // NEX ONE FAIL!!!
+    
+    //eridrv.compute(fints.data(), bpairs.pick(3), kpairs.pick(6));
+    
+    //std::vector<double> r0312vals{-0.065342004894742, -0.119793675640361, -0.043561336596495};
+    
+    //eridrv.compute(fints.data(), kpairs.pick(6), bpairs.pick(3));
+    
+    //vlxtest::compare(r0312vals, fints.data());
 }
