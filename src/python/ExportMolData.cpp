@@ -62,7 +62,7 @@ void export_moldata()
         .def(bp::init<const CMolecule&, const CMolecule&>())
         .def("print_geometry", &CMolecule::printGeometry)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
-        .def("broadcast", &bp_moldata::CMolecule_broadcast)
+        .def("broadcast", &CMolecule_broadcast)
     ;
 }
 

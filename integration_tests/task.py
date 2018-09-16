@@ -19,19 +19,19 @@ class Task(object):
 
         # input/output stream objects
 
-        self.output_stream = COutputStream(self.output_file)
-        self.input_stream  = CInputStream(self.input_file, self.output_stream)
+        self.ostream = COutputStream(self.output_file)
+        self.input_stream  = CInputStream(self.input_file, self.ostream)
 
         # read input file and parse input data
 
-        self.input_stream.read(self.input_data, self.output_stream)
-        self.xyz_reader.parse(self.molecule, self.input_data, self.output_stream)
-        self.env_reader.parse(self.input_data, self.output_stream)
-        self.basis_reader.parse(self.input_data, self.output_stream)
+        self.input_stream.read(self.input_data, self.ostream)
+        self.xyz_reader.parse(self.molecule, self.input_data, self.ostream)
+        self.env_reader.parse(self.input_data, self.ostream)
+        self.basis_reader.parse(self.input_data, self.ostream)
 
         # write molecular geometry
 
-        self.molecule.print_geometry(self.output_stream)
+        self.molecule.print_geometry(self.ostream)
 
         # basis set objects
 
@@ -39,13 +39,13 @@ class Task(object):
 
         self.ao_basis = self.basis_reader.get_ao_basis(self.path_to_basis_sets,
                                                        self.molecule,
-                                                       self.output_stream)
+                                                       self.ostream)
 
         self.min_basis = self.basis_reader.get_min_basis(self.path_to_basis_sets,
                                                          self.molecule,
-                                                         self.output_stream)
+                                                         self.ostream)
 
-        self.output_stream.flush()
+        self.ostream.flush()
 
         assert(self.xyz_reader.get_state() == True)
         assert(self.env_reader.get_state() == True)

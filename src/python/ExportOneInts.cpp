@@ -310,7 +310,7 @@ void export_oneints()
             bp::init<const CDenseMatrix&>()
         )
         .def(bp::init<>())
-        .def("__str__", &bp_oneints::COverlapMatrix_str)
+        .def("__str__", &COverlapMatrix_str)
         .def(bp::self == bp::other<COverlapMatrix>())
     ;
 
@@ -321,12 +321,12 @@ void export_oneints()
             "COverlapIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create", &bp_oneints::COverlapIntegralsDriver_create)
+        .def("create", &COverlapIntegralsDriver_create)
         .staticmethod("create")
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_1)
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_2)
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_3)
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_4)
+        .def("compute", &COverlapIntegralsDriver_compute_1)
+        .def("compute", &COverlapIntegralsDriver_compute_2)
+        .def("compute", &COverlapIntegralsDriver_compute_3)
+        .def("compute", &COverlapIntegralsDriver_compute_4)
     ;
 
     // CKineticEnergyMatrix class
@@ -337,7 +337,7 @@ void export_oneints()
             bp::init<const CDenseMatrix&>()
         )
         .def(bp::init<>())
-        .def("__str__", &bp_oneints::CKineticEnergyMatrix_str)
+        .def("__str__", &CKineticEnergyMatrix_str)
         .def(bp::self == bp::other<CKineticEnergyMatrix>())
     ;
 
@@ -348,12 +348,12 @@ void export_oneints()
             "CKineticEnergyIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create", &bp_oneints::CKineticEnergyIntegralsDriver_create)
+        .def("create", &CKineticEnergyIntegralsDriver_create)
         .staticmethod("create")
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_1)
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_2)
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_3)
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_4)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_1)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_2)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_3)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_4)
     ;
 
     // CNuclearPotentialMatrix class
@@ -364,7 +364,7 @@ void export_oneints()
             bp::init<const CDenseMatrix&>()
         )
         .def(bp::init<>())
-        .def("__str__", &bp_oneints::CNuclearPotentialMatrix_str)
+        .def("__str__", &CNuclearPotentialMatrix_str)
         .def(bp::self == bp::other<CNuclearPotentialMatrix>())
     ;
 
@@ -375,13 +375,13 @@ void export_oneints()
             "CNuclearPotentialIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create", &bp_oneints::CNuclearPotentialIntegralsDriver_create)
+        .def("create", &CNuclearPotentialIntegralsDriver_create)
         .staticmethod("create")
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_0)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_1)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_2)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_3)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_4)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_0)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_1)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_2)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_3)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_4)
     ;
 }
 

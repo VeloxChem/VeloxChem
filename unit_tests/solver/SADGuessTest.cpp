@@ -8,7 +8,7 @@
 
 #include "SADGuessTest.hpp"
 
-#include "SADGuess.hpp"
+#include "SADGuessDriver.hpp"
 #include "DenseMatrix.hpp"
 #include "OverlapMatrix.hpp"
 #include "OverlapIntegralsDriver.hpp"
@@ -17,23 +17,27 @@
 
 TEST_F(CSADGuessTest, AtomIdxForAO)
 {
+    CSADGuessDriver saddrv(mpi::rank(MPI_COMM_WORLD),
+                           mpi::nodes(MPI_COMM_WORLD),
+                           MPI_COMM_WORLD);
+
     auto h2o = vlxmol::getMoleculeH2O();
     
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    std::vector< std::vector<int32_t> > aoIndices = 
+    std::vector< std::vector<int32_t> > ao_inds = 
         
-        sad_guess::getAOIndicesOfAtoms(h2o, min_basis);
+        saddrv.getAOIndicesOfAtoms(h2o, min_basis);
 
-    std::vector< std::vector<int32_t> > refIndices;
+    std::vector< std::vector<int32_t> > ref_inds;
 
-    refIndices.push_back(std::vector<int32_t>({0,1,4,5,6}));
+    ref_inds.push_back(std::vector<int32_t>({0,1,4,5,6}));
 
-    refIndices.push_back(std::vector<int32_t>({2}));
+    ref_inds.push_back(std::vector<int32_t>({2}));
 
-    refIndices.push_back(std::vector<int32_t>({3}));
+    ref_inds.push_back(std::vector<int32_t>({3}));
 
-    ASSERT_EQ(aoIndices, refIndices);
+    ASSERT_EQ(ao_inds, ref_inds);
 }
 
 TEST_F(CSADGuessTest, InitialGuess)
@@ -42,6 +46,10 @@ TEST_F(CSADGuessTest, InitialGuess)
                                    mpi::nodes(MPI_COMM_WORLD),
                                    MPI_COMM_WORLD);
     
+    CSADGuessDriver saddrv(mpi::rank(MPI_COMM_WORLD),
+                           mpi::nodes(MPI_COMM_WORLD),
+                           MPI_COMM_WORLD);
+
     auto h2o = vlxmol::getMoleculeH2O();
     
     auto min_basis = vlxbas::getMinimalBasisForH2O();
@@ -54,7 +62,7 @@ TEST_F(CSADGuessTest, InitialGuess)
 
     COverlapMatrix S22 = ovldrv.compute(h2o, ao_basis, ost, MPI_COMM_WORLD);
 
-    CDenseMatrix D_SAD = sad_guess::getSADInitialGuess(h2o, min_basis, ao_basis, S12, S22);
+    CDenseMatrix dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, ost, MPI_COMM_WORLD);
 
     std::vector<double> intvals{  1.057352923440807,  0.129815238298234,  0.111536835372263,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
@@ -249,9 +257,9 @@ TEST_F(CSADGuessTest, InitialGuess)
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000};
 
-    ASSERT_EQ(D_SAD.getNumberOfElements(), intvals.size());
+    ASSERT_EQ(dsad.getNumberOfElements(), intvals.size());
 
-    CDenseMatrix denMat (intvals, D_SAD.getNumberOfRows(), D_SAD.getNumberOfColumns());
+    CDenseMatrix m (intvals, dsad.getNumberOfRows(), dsad.getNumberOfColumns());
 
-    ASSERT_EQ(D_SAD, denMat);
+    ASSERT_EQ(dsad, m);
 }

@@ -47,7 +47,7 @@ void export_orbdata()
             bp::init<>()
         )
         .def("get_label", &CMolecularBasis::getLabel)
-        .def("broadcast", &bp_orbdata::CMolecularBasis_broadcast)
+        .def("broadcast", &CMolecularBasis_broadcast)
     ;
 }
 

@@ -60,7 +60,7 @@ void export_controllers()
             "CAppManager",
             bp::init<int, char**>()
         )
-        .def("create", &bp_controllers::CAppManager_create)
+        .def("create", &CAppManager_create)
         .staticmethod("create")
         .def("execute", &CAppManager::execute)
         .def("get_state", &CAppManager::getState)

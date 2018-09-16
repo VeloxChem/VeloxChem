@@ -44,7 +44,7 @@ void export_math()
         .def(bp::init<const int32_t>())
         .def(bp::init<const int32_t, const int32_t>())
         .def(bp::init<const CDenseMatrix&>())
-        .def("__str__", &bp_math::CDenseMatrix_str)
+        .def("__str__", &CDenseMatrix_str)
         .def(bp::self == bp::other<CDenseMatrix>())
     ;
 }
