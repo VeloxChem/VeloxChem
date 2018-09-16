@@ -50,7 +50,7 @@ endif
 MKL_INCLUDES := $(MKLROOT)/include
 
 LIB_LIST := -L${MKLROOT}/lib -Wl,-rpath,${MKLROOT}/lib -lmkl_intel_lp64
-LIB_LIST += -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
+LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx -liomp5 -lpthread -lm -ldl
 
 # Google Test root directory
 
