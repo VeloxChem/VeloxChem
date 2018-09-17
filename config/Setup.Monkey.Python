@@ -50,7 +50,7 @@ endif
 MKL_INCLUDES := $(MKLROOT)/include
 
 LIB_LIST := -L${MKLROOT}/lib -Wl,-rpath,${MKLROOT}/lib -lmkl_intel_lp64
-LIB_LIST += -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
+LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx -liomp5 -lpthread -lm -ldl
 
 # Google Test root directory
 
@@ -87,10 +87,11 @@ BOOST_PATH := /home/xinli/software/boost
 ifeq ($(USE_PYTHON),true)
   PYTHON_INC := $(shell $(PYTHON)-config --includes)
   PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
+  PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
   PYTHON_INC += -I$(BOOST_PATH)/include
 
   PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
-  PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python3
+  PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python3 -lboost_numpy3
 
   CXX_REL_FLG += -fPIC ${PYTHON_INC}
   CXX_DEB_FLG += -fPIC ${PYTHON_INC}

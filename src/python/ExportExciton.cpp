@@ -10,10 +10,13 @@
 
 #include "AssembleMatrices.hpp"
 
+#include "ExportExciton.hpp"
+
 namespace bp = boost::python;
 
-// ==> boost python <==
-// functions and classes
+namespace bp_exciton { // bp_exciton namespace
+
+// Exports classes/functions in src/exciton to python
 
 void export_exciton()
 {
@@ -26,3 +29,5 @@ void export_exciton()
     bp::def("assemble_nuclear_potential_matrices",
             &dimerfunc::assembleNuclearPotentialMatrices);
 }
+
+} // bp_exciton namespace

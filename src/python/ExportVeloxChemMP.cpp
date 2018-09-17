@@ -8,39 +8,36 @@
 
 #include <boost/python.hpp>
 
-// ==> boost python <==
-// forward declarations
-
-void export_controllers();
-
-void export_oneints();
-
-void export_streams();
-
-void export_readers();
-
-void export_moldata();
-
-void export_orbdata();
-
-void export_exciton();
-
-// ==> boost python <==
-// functions and classes
+#include "ExportGeneral.hpp"
+#include "ExportStreams.hpp"
+#include "ExportReaders.hpp"
+#include "ExportMolData.hpp"
+#include "ExportOrbData.hpp"
+#include "ExportOneInts.hpp"
+#include "ExportMath.hpp"
+#include "ExportSolvers.hpp"
+#include "ExportExciton.hpp"
+#include "ExportControllers.hpp"
 
 BOOST_PYTHON_MODULE(VeloxChemMP)
 {
-    export_controllers();
+    bp_general::export_general();
 
-    export_oneints();
+    bp_streams::export_streams();
 
-    export_streams();
+    bp_readers::export_readers();
 
-    export_readers();
+    bp_moldata::export_moldata();
 
-    export_moldata();
+    bp_orbdata::export_orbdata();
 
-    export_orbdata();
+    bp_oneints::export_oneints();
 
-    export_exciton();
+    bp_math::export_math();
+
+    bp_solvers::export_solvers();
+
+    bp_exciton::export_exciton();
+
+    bp_controllers::export_controllers();
 }

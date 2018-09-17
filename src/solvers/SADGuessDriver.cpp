@@ -6,14 +6,37 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include "SADGuess.hpp"
+#include "SADGuessDriver.hpp"
 
+#include "SystemClock.hpp"
+#include "StringFormat.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DenseDiagonalizer.hpp"
 
-namespace sad_guess { // sad_guess namespace
+CSADGuessDriver::CSADGuessDriver(const int32_t  globRank,
+                                 const int32_t  globNodes,
+                                       MPI_Comm comm)
 
-std::vector< std::vector<double> > buildQocc()
+    : _globRank(globRank)
+
+    , _globNodes(globNodes)
+
+    , _isLocalMode(false)
+{
+    _locRank  = mpi::rank(comm);
+    
+    _locNodes = mpi::nodes(comm);
+    
+    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+}
+
+CSADGuessDriver::~CSADGuessDriver()
+{
+    
+}
+
+std::vector< std::vector<double> >
+CSADGuessDriver::_buildQocc() const
 {
     std::vector< std::vector<double> > qocc;
 
@@ -81,8 +104,8 @@ std::vector< std::vector<double> > buildQocc()
 }
 
 std::vector< std::vector<int32_t> >
-getAOIndicesOfAtoms(const CMolecule&       molecule,
-                    const CMolecularBasis& basis)
+CSADGuessDriver::getAOIndicesOfAtoms(const CMolecule&       molecule,
+                                     const CMolecularBasis& basis) const
 {
     std::vector< std::vector<int32_t> > aoinds_atoms;
 
@@ -117,11 +140,36 @@ getAOIndicesOfAtoms(const CMolecule&       molecule,
 }
 
 CDenseMatrix
-getSADInitialGuess(const CMolecule&       molecule,
-                   const CMolecularBasis& basis_1,
-                   const CMolecularBasis& basis_2,
-                   const COverlapMatrix&  S12,
-                   const COverlapMatrix&  S22)
+CSADGuessDriver::compute(const CMolecule&       molecule,
+                         const CMolecularBasis& basis_1,
+                         const CMolecularBasis& basis_2,
+                         const COverlapMatrix&  S12,
+                         const COverlapMatrix&  S22,
+                               COutputStream&   oStream,
+                               MPI_Comm         comm) const 
+{
+    CSystemClock timer;
+    
+    CDenseMatrix dsad;
+    
+    if (_locRank == mpi::master())
+    {
+        // generate SAD guess
+        
+        dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22);
+    }
+    
+    _printComputationTime(timer, oStream);
+    
+    return dsad;
+}
+
+CDenseMatrix
+CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
+                               const CMolecularBasis& basis_1,
+                               const CMolecularBasis& basis_2,
+                               const COverlapMatrix&  S12,
+                               const COverlapMatrix&  S22) const
 {
     int32_t natoms = molecule.getNumberOfAtoms();
 
@@ -141,7 +189,7 @@ getSADInitialGuess(const CMolecule&       molecule,
 
     // occupation numbers
 
-    std::vector< std::vector<double> > qocc = buildQocc();
+    std::vector< std::vector<double> > qocc = _buildQocc();
 
     // C_SAD matrix
 
@@ -149,6 +197,7 @@ getSADInitialGuess(const CMolecule&       molecule,
 
     csad.zero();
 
+    #pragma omp parallel for schedule(dynamic)
     for (int atomidx = 0; atomidx < natoms; atomidx++) {
 
         // AO indices for this atom
@@ -264,4 +313,24 @@ getSADInitialGuess(const CMolecule&       molecule,
     return dsad;
 }
 
-} // sad_guess namespace
+void
+CSADGuessDriver::_printComputationTime(const CSystemClock&  timer,
+                                             COutputStream& oStream) const
+{
+    auto tsec = timer.getElapsedTimeInSeconds();
+    
+    if (_isLocalMode)
+    {
+        // FIX ME: we need tags for each driver to be implemented to manage
+        //         MPI send/receive cycle.
+    }
+    
+    if (_globRank == mpi::master())
+    {
+        oStream << fmt::info << "SAD initial guess computed in ";
+        
+        oStream << fstr::to_string(tsec, 2) << " sec.";
+        
+        oStream << fmt::end << fmt::blank;
+    }
+}

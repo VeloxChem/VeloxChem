@@ -1,61 +1,88 @@
 from mpi4py import MPI
 from VeloxChemMP import *
+from task import *
+import numpy as np
 
 # mpi settings
 
 comm = MPI.COMM_WORLD
 rank, size = comm.Get_rank(), comm.Get_size()
 
-# input data, readers, and molecule objects
+# initialize mandatory objects
 
-input_data   = CInputData()
-xyz_reader   = CMolXYZReader()
-env_reader   = CEnvironmentReader()
-basis_reader = CBasisReader()
-molecule     = CMolecule()
+molecule = CMolecule()
+ao_basis = CMolecularBasis()
+min_basis = CMolecularBasis()
+ostream = COutputStream("dummy.out")
 
-# input/output stream objects
+# process input file on master node
 
-output_stream = COutputStream("water.out")
-input_stream  = CInputStream("water.inp", output_stream)
+if (rank == mpi_master()):
+    task = Task("water.inp", "water.out")
+    molecule = task.molecule
+    ao_basis = task.ao_basis
+    min_basis = task.min_basis
+    ostream = task.ostream
+    ostream.put_info("Molecular basis set: %s" % ao_basis.get_label())
+    ostream.put_info("Minimal basis set: %s" % min_basis.get_label())
+    ostream.new_line()
 
-# read input file and parse input data
+# broadcast molecule and basis
 
-input_stream.read(input_data, output_stream)
-xyz_reader.parse(molecule, input_data, output_stream)
-env_reader.parse(input_data, output_stream)
-basis_reader.parse(input_data, output_stream)
-
-# write molecular geometry
-
-molecule.print_geometry(output_stream)
-output_stream.flush()
-
-# basis set objects
-
-path_to_basis_sets = env_reader.get_path_to_basis_sets()
-
-ao_basis  = basis_reader.get_ao_basis (path_to_basis_sets, molecule, output_stream)
-min_basis = basis_reader.get_min_basis(path_to_basis_sets, molecule, output_stream)
-
-print("AO basis set:", ao_basis.get_label())
-print("Mininal basis set:", min_basis.get_label())
-print()
+molecule.broadcast(rank, comm)
+ao_basis.broadcast(rank, comm)
+min_basis.broadcast(rank, comm)
 
 # compute overlap
 
 overlap_driver = COverlapIntegralsDriver.create(rank, size, comm)
 
-overlap_ao  = overlap_driver.compute(molecule, ao_basis, output_stream, comm)
-overlap_min = overlap_driver.compute(molecule, min_basis, output_stream, comm)
-overlap_mix = overlap_driver.compute(molecule, ao_basis, min_basis, output_stream, comm)
+S12 = overlap_driver.compute(molecule, min_basis, ao_basis, ostream, comm)
 
-print("Overlap of AO basis\n", overlap_ao)
-print("Overlap of minimal basis\n", overlap_min)
-print("Overlap of mixed basis\n", overlap_mix)
+S22 = overlap_driver.compute(molecule, ao_basis, ostream, comm)
 
-# check state
+# compute initial guess
 
-assert xyz_reader.get_state() == True
-assert env_reader.get_state() == True
-assert basis_reader.get_state() == True
+sad_driver = CSADGuessDriver.create(rank, size, comm)
+
+density_mat = sad_driver.compute(molecule, min_basis, ao_basis, S12, S22, ostream, comm)
+
+# numpy stuff
+
+if (rank == mpi_master()):
+
+    s_rect = to_numpy(S12)
+
+    s_square = to_numpy(S22)
+
+    dmat = to_numpy(density_mat)
+
+    # get attributes
+
+    print("The dimension of the rectangular overlap matrix is:", end=' ')
+    for i in range(s_rect.ndim):
+        print(s_rect.shape[i], end=', '),
+    print()
+
+    print("The dimension of the square overlap matrix is:", end=' ')
+    for i in range(s_square.ndim):
+        print(s_square.shape[i], end=', '),
+    print()
+
+    print("The dimension of the density matrix is:", end=' ')
+    for i in range(dmat.ndim):
+        print(dmat.shape[i], end=', '),
+    print()
+
+    # get number of electrons
+
+    ds = dmat.dot(s_square)
+
+    nelec = 0.0
+    for i in range(ds.shape[0]):
+        nelec += ds[i][i]
+    nelec *= 2.0
+
+    print("The number of electrons is:", nelec)
+
+    ostream.flush()

@@ -7,6 +7,7 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <boost/python.hpp>
+#include <boost/python/numpy.hpp>
 #include <mpi.h>
 #include <mpi4py/mpi4py.h>
 
@@ -25,41 +26,30 @@
 #include "NuclearPotentialMatrix.hpp"
 #include "NuclearPotentialIntegralsDriver.hpp"
 
+#include "ExportGeneral.hpp"
+#include "ExportOneInts.hpp"
+
 namespace bp = boost::python;
+
+namespace np = boost::python::numpy;
 
 namespace bp_oneints { // bp_oneints namespace
 
-// ==> boost python helper function <==
-// for converting mpi4py communicator to MPI communicator
-
-MPI_Comm* get_mpi_comm(bp::object py_comm)
-{
-    PyObject* py_obj = py_comm.ptr();
-
-    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
-
-    if (comm_ptr == NULL) bp::throw_error_already_set();
-
-    return comm_ptr;
-}
-
-// ==> boost python helper function <==
-// for creating COverlapIntegralsDriver object
+// Helper function for creating a COverlapIntegralsDriver object
 
 static std::shared_ptr<COverlapIntegralsDriver>
 COverlapIntegralsDriver_create(int32_t    globRank,
                                int32_t    globNodes,
                                bp::object py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<COverlapIntegralsDriver>(
         new COverlapIntegralsDriver(globRank, globNodes, *comm_ptr)
         );
 }
 
-// ==> boost python helper function <==
-// for overloading COverlapIntegralsDriver::compute
+// Helper functions for overloading COverlapIntegralsDriver::compute
 
 COverlapMatrix
 COverlapIntegralsDriver_compute_1(
@@ -69,7 +59,7 @@ COverlapIntegralsDriver_compute_1(
           COutputStream&           oStream,
           bp::object               py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, oStream, *comm_ptr);
 }
@@ -83,7 +73,7 @@ COverlapIntegralsDriver_compute_2(
           COutputStream&           oStream,
           bp::object               py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, braBasis, ketBasis, oStream, *comm_ptr);
 }
@@ -97,7 +87,7 @@ COverlapIntegralsDriver_compute_3(
           COutputStream&           oStream,
           bp::object               py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, basis, oStream, *comm_ptr);
 }
@@ -112,14 +102,13 @@ COverlapIntegralsDriver_compute_4(
           COutputStream&           oStream,
           bp::object               py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
                         oStream, *comm_ptr);
 }
 
-// ==> boost python helper function <==
-// for printing COverlapMatrix in python
+// Helper function for printing COverlapMatrix
 
 std::string
 COverlapMatrix_str (const COverlapMatrix& self)
@@ -127,23 +116,31 @@ COverlapMatrix_str (const COverlapMatrix& self)
     return self.getString();
 }
 
-// ==> boost python helper function <==
-// for creating CKineticEnergyIntegralsDriver object
+// Helper function for converting COverlapMatrix to numpy array
+
+np::ndarray
+overlap_to_numpy(const COverlapMatrix& mat)
+{
+    return bp_general::pointer_to_numpy(mat.values(),
+                                        mat.getNumberOfRows(),
+                                        mat.getNumberOfColumns());
+}
+
+// Helper function for creating a CKineticEnergyIntegralsDriver object
 
 static std::shared_ptr<CKineticEnergyIntegralsDriver>
 CKineticEnergyIntegralsDriver_create(int32_t    globRank,
                                      int32_t    globNodes,
                                      bp::object py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CKineticEnergyIntegralsDriver>(
         new CKineticEnergyIntegralsDriver(globRank, globNodes, *comm_ptr)
         );
 }
 
-// ==> boost python helper function <==
-// for overloading CKineticEnergyIntegralsDriver::compute
+// Helper functions for overloading CKineticEnergyIntegralsDriver::compute
 
 CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver_compute_1(
@@ -153,7 +150,7 @@ CKineticEnergyIntegralsDriver_compute_1(
           COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, oStream, *comm_ptr);
 }
@@ -167,7 +164,7 @@ CKineticEnergyIntegralsDriver_compute_2(
           COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, braBasis, ketBasis, oStream, *comm_ptr);
 }
@@ -181,7 +178,7 @@ CKineticEnergyIntegralsDriver_compute_3(
           COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, basis, oStream, *comm_ptr);
 }
@@ -196,14 +193,13 @@ CKineticEnergyIntegralsDriver_compute_4(
           COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
                         oStream, *comm_ptr);
 }
 
-// ==> boost python helper function <==
-// for printing CKineticEnergyMatrix in python
+// Helper function for printing CKineticEnergyMatrix
 
 std::string
 CKineticEnergyMatrix_str (const CKineticEnergyMatrix& self)
@@ -211,23 +207,31 @@ CKineticEnergyMatrix_str (const CKineticEnergyMatrix& self)
     return self.getString();
 }
 
-// ==> boost python helper function <==
-// for creating CNuclearPotentialIntegralsDriver object
+// Helper function for converting CKineticEnergyMatrix to numpy array
+
+np::ndarray
+kinetic_energy_to_numpy(const CKineticEnergyMatrix& mat)
+{
+    return bp_general::pointer_to_numpy(mat.values(),
+                                        mat.getNumberOfRows(),
+                                        mat.getNumberOfColumns());
+}
+
+// Helper function for creating a CKineticEnergyIntegralsDriver object
 
 static std::shared_ptr<CNuclearPotentialIntegralsDriver>
 CNuclearPotentialIntegralsDriver_create(int32_t    globRank,
                                         int32_t    globNodes,
                                         bp::object py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CNuclearPotentialIntegralsDriver>(
         new CNuclearPotentialIntegralsDriver(globRank, globNodes, *comm_ptr)
         );
 }
 
-// ==> boost python helper function <==
-// for overloading CNuclearPotentialIntegralsDriver::compute
+// Helper functions for overloading CNuclearPotentialIntegralsDriver::compute
 
 CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver_compute_0(
@@ -237,7 +241,7 @@ CNuclearPotentialIntegralsDriver_compute_0(
           COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, oStream, *comm_ptr);
 }
@@ -251,7 +255,7 @@ CNuclearPotentialIntegralsDriver_compute_1(
           COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, pchgMolecule, oStream, *comm_ptr);
 }
@@ -266,7 +270,7 @@ CNuclearPotentialIntegralsDriver_compute_2(
           COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, braBasis, ketBasis, pchgMolecule,
                         oStream, *comm_ptr);
@@ -282,7 +286,7 @@ CNuclearPotentialIntegralsDriver_compute_3(
           COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, basis, pchgMolecule,
                         oStream, *comm_ptr);
@@ -299,14 +303,13 @@ CNuclearPotentialIntegralsDriver_compute_4(
           COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis, pchgMolecule,
                         oStream, *comm_ptr);
 }
 
-// ==> boost python helper function <==
-// for printing CNuclearPotentialMatrix in python
+// Helper function for printing CNuclearPotentialMatrix
 
 std::string
 CNuclearPotentialMatrix_str (const CNuclearPotentialMatrix& self)
@@ -314,16 +317,35 @@ CNuclearPotentialMatrix_str (const CNuclearPotentialMatrix& self)
     return self.getString();
 }
 
-} // bp_oneints namespace
+// Helper function for converting CNuclearPotentialMatrix to numpy array
 
-// ==> boost python <==
-// functions and classes
+np::ndarray
+nuclear_potential_to_numpy(const CNuclearPotentialMatrix& mat)
+{
+    return bp_general::pointer_to_numpy(mat.values(),
+                                        mat.getNumberOfRows(),
+                                        mat.getNumberOfColumns());
+}
+
+// Exports classes/functions in src/oneints to python
 
 void export_oneints()
 {
     // initialize mpi4py's C-API
 
     if (import_mpi4py() < 0) return;
+
+    // initialize numpy
+
+    Py_Initialize();
+
+    np::initialize();
+
+    // exposing functions
+
+    bp::def("to_numpy", &overlap_to_numpy);
+    bp::def("to_numpy", &kinetic_energy_to_numpy);
+    bp::def("to_numpy", &nuclear_potential_to_numpy);
 
     // COverlapMatrix class
 
@@ -333,7 +355,7 @@ void export_oneints()
             bp::init<const CDenseMatrix&>()
         )
         .def(bp::init<>())
-        .def("__str__", &bp_oneints::COverlapMatrix_str)
+        .def("__str__", &COverlapMatrix_str)
         .def(bp::self == bp::other<COverlapMatrix>())
     ;
 
@@ -344,12 +366,12 @@ void export_oneints()
             "COverlapIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create", &bp_oneints::COverlapIntegralsDriver_create)
+        .def("create", &COverlapIntegralsDriver_create)
         .staticmethod("create")
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_1)
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_2)
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_3)
-        .def("compute", &bp_oneints::COverlapIntegralsDriver_compute_4)
+        .def("compute", &COverlapIntegralsDriver_compute_1)
+        .def("compute", &COverlapIntegralsDriver_compute_2)
+        .def("compute", &COverlapIntegralsDriver_compute_3)
+        .def("compute", &COverlapIntegralsDriver_compute_4)
     ;
 
     // CKineticEnergyMatrix class
@@ -360,7 +382,7 @@ void export_oneints()
             bp::init<const CDenseMatrix&>()
         )
         .def(bp::init<>())
-        .def("__str__", &bp_oneints::CKineticEnergyMatrix_str)
+        .def("__str__", &CKineticEnergyMatrix_str)
         .def(bp::self == bp::other<CKineticEnergyMatrix>())
     ;
 
@@ -371,12 +393,12 @@ void export_oneints()
             "CKineticEnergyIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create", &bp_oneints::CKineticEnergyIntegralsDriver_create)
+        .def("create", &CKineticEnergyIntegralsDriver_create)
         .staticmethod("create")
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_1)
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_2)
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_3)
-        .def("compute", &bp_oneints::CKineticEnergyIntegralsDriver_compute_4)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_1)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_2)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_3)
+        .def("compute", &CKineticEnergyIntegralsDriver_compute_4)
     ;
 
     // CNuclearPotentialMatrix class
@@ -387,7 +409,7 @@ void export_oneints()
             bp::init<const CDenseMatrix&>()
         )
         .def(bp::init<>())
-        .def("__str__", &bp_oneints::CNuclearPotentialMatrix_str)
+        .def("__str__", &CNuclearPotentialMatrix_str)
         .def(bp::self == bp::other<CNuclearPotentialMatrix>())
     ;
 
@@ -398,12 +420,14 @@ void export_oneints()
             "CNuclearPotentialIntegralsDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
-        .def("create", &bp_oneints::CNuclearPotentialIntegralsDriver_create)
+        .def("create", &CNuclearPotentialIntegralsDriver_create)
         .staticmethod("create")
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_0)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_1)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_2)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_3)
-        .def("compute", &bp_oneints::CNuclearPotentialIntegralsDriver_compute_4)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_0)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_1)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_2)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_3)
+        .def("compute", &CNuclearPotentialIntegralsDriver_compute_4)
     ;
 }
+
+} // bp_oneints namespace
