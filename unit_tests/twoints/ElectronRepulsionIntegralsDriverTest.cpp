@@ -74,8 +74,6 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSPForLiH)
     
     CGtoPairsBlock kpairs(cgtos, dgtos, 1.0e-13);
     
-    //std::cout << kpairs; 
-    
     CMemBlock<double> fints(3);
     
     eridrv.compute(fints.data(), bpairs.pick(0), kpairs.pick(0));
@@ -96,13 +94,9 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSPForLiH)
     
     vlxtest::compare(r0123vals, fints.data());
     
-    // NEX ONE FAIL!!!
+    eridrv.compute(fints.data(), bpairs.pick(3), kpairs.pick(6));
     
-    //eridrv.compute(fints.data(), bpairs.pick(3), kpairs.pick(6));
+    std::vector<double> r0312vals{-0.065342004894742, -0.119793675640361, -0.043561336596495};
     
-    //std::vector<double> r0312vals{-0.065342004894742, -0.119793675640361, -0.043561336596495};
-    
-    //eridrv.compute(fints.data(), kpairs.pick(6), bpairs.pick(3));
-    
-    //vlxtest::compare(r0312vals, fints.data());
+    vlxtest::compare(r0312vals, fints.data());
 }

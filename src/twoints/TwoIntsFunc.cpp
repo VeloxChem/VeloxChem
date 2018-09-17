@@ -560,7 +560,7 @@ namespace twointsfunc { // twointsfunc namespace
         
         auto bpz = braGtoPairsBlock.getCoordinatesPZ();
         
-        auto bfxi = ketGtoPairsBlock.getFactorsXi();
+        auto bfxi = braGtoPairsBlock.getFactorsXi();
         
         auto spos = braGtoPairsBlock.getStartPositions();
         
@@ -612,7 +612,7 @@ namespace twointsfunc { // twointsfunc namespace
             auto wz = wCoordinates.data(3 * idx + 2);
             
             #pragma omp simd aligned(fx, wx, wy, wz, kfxi, kqx, kqy,\
-                                    kqz: VLX_ALIGN)
+                                     kqz: VLX_ALIGN)
             for (int32_t j = 0; j < ndim; j++)
             {
                 double fact = fx[j];
