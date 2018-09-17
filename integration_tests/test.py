@@ -1,6 +1,6 @@
 from VeloxChemMP import *
 
-app_manager = CAppManager.create("test.inp", "test.out")
+app_manager = AppManager.create("test.inp", "test.out")
 
 app_manager.execute()
 

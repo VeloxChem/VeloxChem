@@ -48,7 +48,7 @@ void export_moldata()
 
     bp::class_< CMolecule, std::shared_ptr<CMolecule> >
         (
-            "CMolecule",
+            "Molecule",
             bp::init<
                 const std::vector<double>&,
                 const std::vector<double>&,

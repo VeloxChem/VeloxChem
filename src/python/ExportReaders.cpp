@@ -42,7 +42,7 @@ void export_readers()
 
     bp::class_< CMolXYZReader >
         (
-            "CMolXYZReader",
+            "MolXYZReader",
             bp::init<>()
         )
         .def("parse", parse_1)
@@ -54,7 +54,7 @@ void export_readers()
 
     bp::class_< CEnvironmentReader >
         (
-            "CEnvironmentReader",
+            "EnvironmentReader",
             bp::init<>()
         )
         .def("parse", &CEnvironmentReader::parse)
@@ -66,7 +66,7 @@ void export_readers()
 
     bp::class_< CBasisReader >
         (
-            "CBasisReader",
+            "BasisReader",
             bp::init<>()
         )
         .def("parse", &CBasisReader::parse)

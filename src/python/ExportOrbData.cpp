@@ -43,7 +43,7 @@ void export_orbdata()
 
     bp::class_< CMolecularBasis >
         (
-            "CMolecularBasis",
+            "MolecularBasis",
             bp::init<>()
         )
         .def("get_label", &CMolecularBasis::getLabel)
