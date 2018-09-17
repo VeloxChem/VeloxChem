@@ -8,16 +8,16 @@ rank, size = comm.Get_rank(), comm.Get_size()
 
 # input data, readers, and molecule objects
 
-input_data   = CInputData()
-xyz_reader   = CMolXYZReader()
-env_reader   = CEnvironmentReader()
-basis_reader = CBasisReader()
-molecule     = CMolecule()
+input_data   = InputData()
+xyz_reader   = MolXYZReader()
+env_reader   = EnvironmentReader()
+basis_reader = BasisReader()
+molecule     = Molecule()
 
 # input/output stream objects
 
-output_stream = COutputStream("dimer.out")
-input_stream  = CInputStream("dimer.inp", output_stream)
+output_stream = OutputStream("dimer.out")
+input_stream  = InputStream("dimer.inp", output_stream)
 
 # read input file and parse input data
 
@@ -52,7 +52,7 @@ basis_2 = basis_reader.get_ao_basis(path_to_basis_sets, mol_2, output_stream)
 
 # compute overlap
 
-overlap_driver = COverlapIntegralsDriver.create(rank, size, comm)
+overlap_driver = OverlapIntegralsDriver.create(rank, size, comm)
 
 S = overlap_driver.compute(molecule, basis, output_stream, comm)
 
@@ -73,7 +73,7 @@ print("Done: Overlap integral")
 
 # compute kinetic energy
 
-kinetic_energy_driver = CKineticEnergyIntegralsDriver.create(rank, size, comm)
+kinetic_energy_driver = KineticEnergyIntegralsDriver.create(rank, size, comm)
 
 T = kinetic_energy_driver.compute(molecule, basis, output_stream, comm)
 
@@ -94,7 +94,7 @@ print("Done: Kinetic energy integral")
 
 # compute nuclear potential
 
-nuclear_potential_driver = CNuclearPotentialIntegralsDriver.create(rank, size, comm)
+nuclear_potential_driver = NuclearPotentialIntegralsDriver.create(rank, size, comm)
 
 V = nuclear_potential_driver.compute(molecule, basis, output_stream, comm)
 

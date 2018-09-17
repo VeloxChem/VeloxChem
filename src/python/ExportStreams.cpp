@@ -44,7 +44,7 @@ void export_streams()
 
     bp::class_< COutputStream, std::shared_ptr<COutputStream> >
         (
-            "COutputStream",
+            "OutputStream",
             bp::init<const std::string&>()
         )
         .def("get_state", &COutputStream::getState)
@@ -57,7 +57,7 @@ void export_streams()
 
     bp::class_< CInputStream, std::shared_ptr<CInputStream> >
         (
-            "CInputStream",
+            "InputStream",
             bp::init<const std::string&, COutputStream&>()
         )
         .def("read",      &CInputStream::read)
@@ -68,7 +68,7 @@ void export_streams()
 
     bp::class_< CInputData, std::shared_ptr<CInputData> >
         (
-            "CInputData",
+            "InputData",
             bp::init<>()
         )
     ;

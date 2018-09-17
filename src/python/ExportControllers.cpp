@@ -57,7 +57,7 @@ void export_controllers()
 
     bp::class_< CAppManager, std::shared_ptr<CAppManager> >
         (
-            "CAppManager",
+            "AppManager",
             bp::init<int, char**>()
         )
         .def("create", &CAppManager_create)

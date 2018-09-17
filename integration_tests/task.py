@@ -11,16 +11,16 @@ class Task(object):
 
         # input data, readers, and molecule objects
 
-        self.input_data   = CInputData()
-        self.xyz_reader   = CMolXYZReader()
-        self.env_reader   = CEnvironmentReader()
-        self.basis_reader = CBasisReader()
-        self.molecule     = CMolecule()
+        self.input_data   = InputData()
+        self.xyz_reader   = MolXYZReader()
+        self.env_reader   = EnvironmentReader()
+        self.basis_reader = BasisReader()
+        self.molecule     = Molecule()
 
         # input/output stream objects
 
-        self.ostream = COutputStream(self.output_file)
-        self.input_stream  = CInputStream(self.input_file, self.ostream)
+        self.ostream = OutputStream(self.output_file)
+        self.input_stream  = InputStream(self.input_file, self.ostream)
 
         # read input file and parse input data
 

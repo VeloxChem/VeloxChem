@@ -10,10 +10,10 @@ rank, size = comm.Get_rank(), comm.Get_size()
 
 # initialize mandatory objects
 
-molecule = CMolecule()
-ao_basis = CMolecularBasis()
-min_basis = CMolecularBasis()
-ostream = COutputStream("dummy.out")
+molecule = Molecule()
+ao_basis = MolecularBasis()
+min_basis = MolecularBasis()
+ostream = OutputStream("dummy.out")
 
 # process input file on master node
 
@@ -35,7 +35,7 @@ min_basis.broadcast(rank, comm)
 
 # compute overlap
 
-overlap_driver = COverlapIntegralsDriver.create(rank, size, comm)
+overlap_driver = OverlapIntegralsDriver.create(rank, size, comm)
 
 S12 = overlap_driver.compute(molecule, min_basis, ao_basis, ostream, comm)
 
@@ -43,46 +43,51 @@ S22 = overlap_driver.compute(molecule, ao_basis, ostream, comm)
 
 # compute initial guess
 
-sad_driver = CSADGuessDriver.create(rank, size, comm)
+sad_driver = SADGuessDriver.create(rank, size, comm)
 
-density_mat = sad_driver.compute(molecule, min_basis, ao_basis, S12, S22, ostream, comm)
+D = sad_driver.compute(molecule, min_basis, ao_basis, S12, S22, ostream, comm)
 
-# numpy stuff
+# matrix to numpy
+
+overlap = to_numpy(S22)
+
+density = to_numpy(D)
 
 if (rank == mpi_master()):
 
-    s_rect = to_numpy(S12)
-
-    s_square = to_numpy(S22)
-
-    dmat = to_numpy(density_mat)
-
     # get attributes
 
-    print("The dimension of the rectangular overlap matrix is:", end=' ')
-    for i in range(s_rect.ndim):
-        print(s_rect.shape[i], end=', '),
     print()
-
-    print("The dimension of the square overlap matrix is:", end=' ')
-    for i in range(s_square.ndim):
-        print(s_square.shape[i], end=', '),
-    print()
-
     print("The dimension of the density matrix is:", end=' ')
-    for i in range(dmat.ndim):
-        print(dmat.shape[i], end=', '),
-    print()
+    for i in range(density.ndim):
+        print(density.shape[i], end=', '),
+    print('\n')
 
     # get number of electrons
 
-    ds = dmat.dot(s_square)
+    DS = density.dot(overlap)
 
     nelec = 0.0
-    for i in range(ds.shape[0]):
-        nelec += ds[i][i]
+    for i in range(DS.shape[0]):
+        nelec += DS[i][i]
     nelec *= 2.0
 
     print("The number of electrons is:", nelec)
+    print()
+
+# numpy to matrix
+
+S22new = OverlapMatrix.from_numpy(overlap)
+
+D_new = sad_driver.compute(molecule, min_basis, ao_basis, S12, S22new, ostream, comm);
+
+if (rank == mpi_master()):
+
+    print("Difference =", np.max(np.abs(to_numpy(D) - to_numpy(D_new))))
+    print()
+
+# flush output stream
+
+if (rank == mpi_master()):
 
     ostream.flush()

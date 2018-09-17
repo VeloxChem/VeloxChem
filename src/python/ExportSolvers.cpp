@@ -61,7 +61,7 @@ void export_solvers()
 
     bp::class_< CSADGuessDriver, std::shared_ptr<CSADGuessDriver> >
         (
-            "CSADGuessDriver",
+            "SADGuessDriver",
             bp::init<const int32_t, const int32_t, MPI_Comm>()
         )
         .def("create", &CSADGuessDriver_create)
