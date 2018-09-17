@@ -1,6 +1,7 @@
 from mpi4py import MPI
 from VeloxChemMP import *
 from task import *
+import numpy as np
 
 # mpi settings
 
@@ -37,11 +38,51 @@ min_basis.broadcast(rank, comm)
 overlap_driver = COverlapIntegralsDriver.create(rank, size, comm)
 
 S12 = overlap_driver.compute(molecule, min_basis, ao_basis, ostream, comm)
+
 S22 = overlap_driver.compute(molecule, ao_basis, ostream, comm)
 
+# compute initial guess
+
 sad_driver = CSADGuessDriver.create(rank, size, comm)
+
 density_mat = sad_driver.compute(molecule, min_basis, ao_basis, S12, S22, ostream, comm)
 
+# numpy stuff
+
 if (rank == mpi_master()):
-    print("SAD guess\n%s" % density_mat)
+
+    s_rect = to_numpy(S12)
+
+    s_square = to_numpy(S22)
+
+    dmat = to_numpy(density_mat)
+
+    # get attributes
+
+    print("The dimension of the rectangular overlap matrix is:", end=' ')
+    for i in range(s_rect.ndim):
+        print(s_rect.shape[i], end=', '),
+    print()
+
+    print("The dimension of the square overlap matrix is:", end=' ')
+    for i in range(s_square.ndim):
+        print(s_square.shape[i], end=', '),
+    print()
+
+    print("The dimension of the density matrix is:", end=' ')
+    for i in range(dmat.ndim):
+        print(dmat.shape[i], end=', '),
+    print()
+
+    # get number of electrons
+
+    ds = dmat.dot(s_square)
+
+    nelec = 0.0
+    for i in range(ds.shape[0]):
+        nelec += ds[i][i]
+    nelec *= 2.0
+
+    print("The number of electrons is:", nelec)
+
     ostream.flush()

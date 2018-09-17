@@ -7,6 +7,7 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <boost/python.hpp>
+#include <boost/python/numpy.hpp>
 #include <mpi.h>
 #include <mpi4py/mpi4py.h>
 
@@ -29,6 +30,8 @@
 #include "ExportOneInts.hpp"
 
 namespace bp = boost::python;
+
+namespace np = boost::python::numpy;
 
 namespace bp_oneints { // bp_oneints namespace
 
@@ -113,6 +116,16 @@ COverlapMatrix_str (const COverlapMatrix& self)
     return self.getString();
 }
 
+// Helper function for converting COverlapMatrix to numpy array
+
+np::ndarray
+overlap_to_numpy(const COverlapMatrix& mat)
+{
+    return bp_general::pointer_to_numpy(mat.values(),
+                                        mat.getNumberOfRows(),
+                                        mat.getNumberOfColumns());
+}
+
 // Helper function for creating a CKineticEnergyIntegralsDriver object
 
 static std::shared_ptr<CKineticEnergyIntegralsDriver>
@@ -192,6 +205,16 @@ std::string
 CKineticEnergyMatrix_str (const CKineticEnergyMatrix& self)
 {
     return self.getString();
+}
+
+// Helper function for converting CKineticEnergyMatrix to numpy array
+
+np::ndarray
+kinetic_energy_to_numpy(const CKineticEnergyMatrix& mat)
+{
+    return bp_general::pointer_to_numpy(mat.values(),
+                                        mat.getNumberOfRows(),
+                                        mat.getNumberOfColumns());
 }
 
 // Helper function for creating a CKineticEnergyIntegralsDriver object
@@ -294,6 +317,16 @@ CNuclearPotentialMatrix_str (const CNuclearPotentialMatrix& self)
     return self.getString();
 }
 
+// Helper function for converting CNuclearPotentialMatrix to numpy array
+
+np::ndarray
+nuclear_potential_to_numpy(const CNuclearPotentialMatrix& mat)
+{
+    return bp_general::pointer_to_numpy(mat.values(),
+                                        mat.getNumberOfRows(),
+                                        mat.getNumberOfColumns());
+}
+
 // Exports classes/functions in src/oneints to python
 
 void export_oneints()
@@ -301,6 +334,18 @@ void export_oneints()
     // initialize mpi4py's C-API
 
     if (import_mpi4py() < 0) return;
+
+    // initialize numpy
+
+    Py_Initialize();
+
+    np::initialize();
+
+    // exposing functions
+
+    bp::def("to_numpy", &overlap_to_numpy);
+    bp::def("to_numpy", &kinetic_energy_to_numpy);
+    bp::def("to_numpy", &nuclear_potential_to_numpy);
 
     // COverlapMatrix class
 

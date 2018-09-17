@@ -7,12 +7,16 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <boost/python.hpp>
+#include <boost/python/numpy.hpp>
 
 #include "DenseMatrix.hpp"
 
+#include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 
 namespace bp = boost::python;
+
+namespace np = boost::python::numpy;
 
 namespace bp_math { // bp_math namespace
 
@@ -24,10 +28,30 @@ CDenseMatrix_str (const CDenseMatrix& self)
     return self.getString();
 }
 
+// Helper function for converting CDenseMatrix to numpy array
+
+np::ndarray
+dense_to_numpy(const CDenseMatrix& mat)
+{
+    return bp_general::pointer_to_numpy(mat.values(),
+                                        mat.getNumberOfRows(),
+                                        mat.getNumberOfColumns());
+}
+
 // Exports classes/functions in src/math to python
 
 void export_math()
 {
+    // initialize numpy
+
+    Py_Initialize();
+
+    np::initialize();
+
+    // exposing functions
+
+    bp::def("to_numpy", &dense_to_numpy);
+
     // CDenseMatrix class
     // Note: CDenseMatrix has several constructors
 
