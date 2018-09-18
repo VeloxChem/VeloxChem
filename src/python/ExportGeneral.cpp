@@ -43,14 +43,19 @@ pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns)
 {
     np::dtype dt_double = np::dtype::get_builtin<double>();
 
+    if (ptr == nullptr || nRows == 0 || nColumns == 0)
+    {
+        bp::tuple shape = bp::make_tuple(0, 0);
+
+        return np::empty(shape, dt_double);
+    }
+
     bp::tuple shape = bp::make_tuple(nRows, nColumns);
 
     bp::tuple stride = bp::make_tuple(sizeof(double) * nColumns,
                                       sizeof(double) * 1);
 
-    np::ndarray array = np::from_data(ptr, dt_double, shape, stride, bp::object());
-
-    return array;
+    return np::from_data(ptr, dt_double, shape, stride, bp::object());
 }
 
 // Exports classes/functions in src/general to python

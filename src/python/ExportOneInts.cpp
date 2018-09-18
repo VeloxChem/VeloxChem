@@ -120,11 +120,11 @@ COverlapMatrix_str (const COverlapMatrix& self)
 // Helper function for converting COverlapMatrix to numpy array
 
 np::ndarray
-overlap_matrix_to_numpy(const COverlapMatrix& mat)
+COverlapMatrix_to_numpy(const COverlapMatrix& self)
 {
-    return bp_general::pointer_to_numpy(mat.values(),
-                                        mat.getNumberOfRows(),
-                                        mat.getNumberOfColumns());
+    return bp_general::pointer_to_numpy(self.values(),
+                                        self.getNumberOfRows(),
+                                        self.getNumberOfColumns());
 }
 
 // Helper function for converting numpy array to COverlapMatrix
@@ -221,11 +221,11 @@ CKineticEnergyMatrix_str (const CKineticEnergyMatrix& self)
 // Helper function for converting CKineticEnergyMatrix to numpy array
 
 np::ndarray
-kinetic_energy_matrix_to_numpy(const CKineticEnergyMatrix& mat)
+CKineticEnergyMatrix_to_numpy(const CKineticEnergyMatrix& self)
 {
-    return bp_general::pointer_to_numpy(mat.values(),
-                                        mat.getNumberOfRows(),
-                                        mat.getNumberOfColumns());
+    return bp_general::pointer_to_numpy(self.values(),
+                                        self.getNumberOfRows(),
+                                        self.getNumberOfColumns());
 }
 
 // Helper function for converting numpy array to CKineticEnergyMatrix
@@ -341,11 +341,11 @@ CNuclearPotentialMatrix_str (const CNuclearPotentialMatrix& self)
 // Helper function for converting CNuclearPotentialMatrix to numpy array
 
 np::ndarray
-nuclear_potential_matrix_to_numpy(const CNuclearPotentialMatrix& mat)
+CNuclearPotentialMatrix_to_numpy(const CNuclearPotentialMatrix& self)
 {
-    return bp_general::pointer_to_numpy(mat.values(),
-                                        mat.getNumberOfRows(),
-                                        mat.getNumberOfColumns());
+    return bp_general::pointer_to_numpy(self.values(),
+                                        self.getNumberOfRows(),
+                                        self.getNumberOfColumns());
 }
 
 // Helper function for converting numpy array to CNuclearPotentialMatrix
@@ -372,12 +372,6 @@ void export_oneints()
 
     np::initialize();
 
-    // exposing functions
-
-    bp::def("to_numpy", &overlap_matrix_to_numpy);
-    bp::def("to_numpy", &kinetic_energy_matrix_to_numpy);
-    bp::def("to_numpy", &nuclear_potential_matrix_to_numpy);
-
     // COverlapMatrix class
 
     bp::class_< COverlapMatrix, std::shared_ptr<COverlapMatrix> >
@@ -387,6 +381,7 @@ void export_oneints()
         )
         .def(bp::init<>())
         .def("__str__", &COverlapMatrix_str)
+        .def("to_numpy", &COverlapMatrix_to_numpy)
         .def("from_numpy", &COverlapMatrix_from_numpy)
         .staticmethod("from_numpy")
         .def(bp::self == bp::other<COverlapMatrix>())
@@ -416,6 +411,7 @@ void export_oneints()
         )
         .def(bp::init<>())
         .def("__str__", &CKineticEnergyMatrix_str)
+        .def("to_numpy", &CKineticEnergyMatrix_to_numpy)
         .def("from_numpy", &CKineticEnergyMatrix_from_numpy)
         .staticmethod("from_numpy")
         .def(bp::self == bp::other<CKineticEnergyMatrix>())
@@ -445,6 +441,7 @@ void export_oneints()
         )
         .def(bp::init<>())
         .def("__str__", &CNuclearPotentialMatrix_str)
+        .def("to_numpy", &CNuclearPotentialMatrix_to_numpy)
         .def("from_numpy", &CNuclearPotentialMatrix_from_numpy)
         .staticmethod("from_numpy")
         .def(bp::self == bp::other<CNuclearPotentialMatrix>())
