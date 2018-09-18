@@ -6,26 +6,30 @@ import numpy as np
 # mpi settings
 
 comm = MPI.COMM_WORLD
-rank, size = comm.Get_rank(), comm.Get_size()
-
-# initialize mandatory objects
-
-molecule = Molecule()
-ao_basis = MolecularBasis()
-min_basis = MolecularBasis()
-ostream = OutputStream("dummy.out")
+rank = comm.Get_rank()
+size = comm.Get_size()
 
 # process input file on master node
 
 if (rank == mpi_master()):
+
     task = Task("water.inp", "water.out")
+
     molecule = task.molecule
     ao_basis = task.ao_basis
     min_basis = task.min_basis
     ostream = task.ostream
+
     ostream.put_info("Molecular basis set: %s" % ao_basis.get_label())
     ostream.put_info("Minimal basis set: %s" % min_basis.get_label())
     ostream.new_line()
+
+else:
+
+    molecule = Molecule()
+    ao_basis = MolecularBasis()
+    min_basis = MolecularBasis()
+    ostream = OutputStream("")
 
 # broadcast molecule and basis
 
@@ -38,7 +42,6 @@ min_basis.broadcast(rank, comm)
 overlap_driver = OverlapIntegralsDriver.create(rank, size, comm)
 
 S12 = overlap_driver.compute(molecule, min_basis, ao_basis, ostream, comm)
-
 S22 = overlap_driver.compute(molecule, ao_basis, ostream, comm)
 
 # compute initial guess
@@ -49,16 +52,15 @@ D = sad_driver.compute(molecule, min_basis, ao_basis, S12, S22, ostream, comm)
 
 # matrix to numpy
 
-overlap = to_numpy(S22)
-
-density = to_numpy(D)
+overlap = S22.to_numpy()
+density = D.total_to_numpy(0)
 
 if (rank == mpi_master()):
 
     # get attributes
 
     print()
-    print("The dimension of the density matrix is:", end=' ')
+    print("Dimension of density matrix:", end=' ')
     for i in range(density.ndim):
         print(density.shape[i], end=', '),
     print('\n')
@@ -72,19 +74,27 @@ if (rank == mpi_master()):
         nelec += DS[i][i]
     nelec *= 2.0
 
-    print("The number of electrons is:", nelec)
+    print("Number of electrons:", nelec)
+    print()
+
+    # check DSD-D
+
+    DSD = DS.dot(density)
+
+    print("DSD-D MaxDiff =", np.max(np.abs(DSD - density)))
     print()
 
 # numpy to matrix
 
-S22new = OverlapMatrix.from_numpy(overlap)
-
-D_new = sad_driver.compute(molecule, min_basis, ao_basis, S12, S22new, ostream, comm);
+S22new   = OverlapMatrix.from_numpy(overlap)
+D_rest   = AODensityMatrix.from_numpy_list([density], True)
+D_unrest = AODensityMatrix.from_numpy_list([density, density], False)
 
 if (rank == mpi_master()):
 
-    print("Difference =", np.max(np.abs(to_numpy(D) - to_numpy(D_new))))
-    print()
+    assert(S22new == S22)
+
+    assert(D_rest == D)
 
 # flush output stream
 

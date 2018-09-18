@@ -18,6 +18,8 @@
 #include "MolecularBasis.hpp"
 #include "DenseMatrix.hpp"
 #include "OverlapMatrix.hpp"
+#include "AODensityMatrix.hpp"
+#include "DensityMatrixType.hpp"
 #include "SystemClock.hpp"
 
 /**
@@ -71,7 +73,7 @@ class CSADGuessDriver
      @param S22 the overlap matrix computed from basis_2.
      @return the density matrix of SAD guess.
      */
-    CDenseMatrix
+    CAODensityMatrix
     _compSADGuess(const CMolecule&       molecule,
                   const CMolecularBasis& basis_1,
                   const CMolecularBasis& basis_2,
@@ -117,7 +119,7 @@ public:
      @param comm the MPI communicator.
      @return the density matrix of SAD guess.
      */
-    CDenseMatrix
+    CAODensityMatrix
     compute(const CMolecule&       molecule,
             const CMolecularBasis& basis_1,
             const CMolecularBasis& basis_2,

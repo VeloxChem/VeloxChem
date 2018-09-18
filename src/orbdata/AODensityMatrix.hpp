@@ -164,6 +164,13 @@ public:
     const double* betaDensity(const int32_t iDensityMatrix) const;
     
     /**
+     Gets string representation of density matrix object.
+
+     @return the string representation.
+     */
+    std::string getString() const;
+
+    /**
      Converts AO density matrix object to text output and insert it into output
      text stream.
      

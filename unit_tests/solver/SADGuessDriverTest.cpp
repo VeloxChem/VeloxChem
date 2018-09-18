@@ -6,16 +6,18 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include "SADGuessTest.hpp"
+#include "SADGuessDriverTest.hpp"
 
 #include "SADGuessDriver.hpp"
 #include "DenseMatrix.hpp"
+#include "AODensityMatrix.hpp"
+#include "DensityMatrixType.hpp"
 #include "OverlapMatrix.hpp"
 #include "OverlapIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
 
-TEST_F(CSADGuessTest, AtomIdxForAO)
+TEST_F(CSADGuessDriverTest, AtomIdxForAO)
 {
     CSADGuessDriver saddrv(mpi::rank(MPI_COMM_WORLD),
                            mpi::nodes(MPI_COMM_WORLD),
@@ -25,9 +27,7 @@ TEST_F(CSADGuessTest, AtomIdxForAO)
     
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    std::vector< std::vector<int32_t> > ao_inds = 
-        
-        saddrv.getAOIndicesOfAtoms(h2o, min_basis);
+    auto ao_inds = saddrv.getAOIndicesOfAtoms(h2o, min_basis);
 
     std::vector< std::vector<int32_t> > ref_inds;
 
@@ -40,7 +40,7 @@ TEST_F(CSADGuessTest, AtomIdxForAO)
     ASSERT_EQ(ao_inds, ref_inds);
 }
 
-TEST_F(CSADGuessTest, InitialGuess)
+TEST_F(CSADGuessDriverTest, InitialGuess)
 {
     COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
                                    mpi::nodes(MPI_COMM_WORLD),
@@ -58,13 +58,21 @@ TEST_F(CSADGuessTest, InitialGuess)
 
     COutputStream ost(std::string("dummy.out"));
     
-    COverlapMatrix S12 = ovldrv.compute(h2o, min_basis, ao_basis, ost, MPI_COMM_WORLD);
+    auto S12 = ovldrv.compute(h2o, min_basis, ao_basis, ost, MPI_COMM_WORLD);
 
-    COverlapMatrix S22 = ovldrv.compute(h2o, ao_basis, ost, MPI_COMM_WORLD);
+    auto S22 = ovldrv.compute(h2o, ao_basis, ost, MPI_COMM_WORLD);
 
-    CDenseMatrix dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, ost, MPI_COMM_WORLD);
+    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, ost, MPI_COMM_WORLD);
 
-    std::vector<double> intvals{  1.057352923440807,  0.129815238298234,  0.111536835372263,
+    ASSERT_EQ(1, dsad.getNumberOfDensityMatrices());
+
+    int32_t nrows = dsad.getNumberOfRows(0);
+
+    int32_t ncols = dsad.getNumberOfColumns(0);
+
+    ASSERT_EQ(nrows * ncols, dsad.getNumberOfElements(0));
+
+    std::vector<double> denvals{  1.057352923440807,  0.129815238298234,  0.111536835372263,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
@@ -257,9 +265,23 @@ TEST_F(CSADGuessTest, InitialGuess)
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000};
 
-    ASSERT_EQ(dsad.getNumberOfElements(), intvals.size());
+    CDenseMatrix m (denvals, nrows, ncols);
 
-    CDenseMatrix m (intvals, dsad.getNumberOfRows(), dsad.getNumberOfColumns());
+    CAODensityMatrix dref (std::vector<CDenseMatrix>({m}), denmat::rest);
 
-    ASSERT_EQ(dsad, m);
+    ASSERT_EQ(dsad, dref);
+
+    // out of bounds test
+
+    ASSERT_EQ(0, dsad.getNumberOfRows(1));
+
+    ASSERT_EQ(0, dsad.getNumberOfColumns(1));
+
+    ASSERT_EQ(0, dsad.getNumberOfElements(1));
+
+    ASSERT_EQ(nullptr, dsad.totalDensity(1));
+
+    ASSERT_EQ(nullptr, dsad.alphaDensity(0));
+
+    ASSERT_EQ(nullptr, dsad.betaDensity(0));
 }

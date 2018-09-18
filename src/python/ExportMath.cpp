@@ -31,11 +31,11 @@ CDenseMatrix_str(const CDenseMatrix& self)
 // Helper function for converting CDenseMatrix to numpy array
 
 np::ndarray
-dense_matrix_to_numpy(const CDenseMatrix& mat)
+CDenseMatrix_to_numpy(const CDenseMatrix& self)
 {
-    return bp_general::pointer_to_numpy(mat.values(),
-                                        mat.getNumberOfRows(),
-                                        mat.getNumberOfColumns());
+    return bp_general::pointer_to_numpy(self.values(),
+                                        self.getNumberOfRows(),
+                                        self.getNumberOfColumns());
 }
 
 // Helper function for converting numpy array to CDenseMatrix
@@ -45,7 +45,11 @@ CDenseMatrix_from_numpy(const np::ndarray& arr)
 {
     const double* data = reinterpret_cast<double*>(arr.get_data());
 
+    if (data == nullptr) return CDenseMatrix();
+
     int size = arr.shape(0) * arr.shape(1);
+
+    if (size == 0) return CDenseMatrix();
 
     std::vector<double> vec (data, data + size);
 
@@ -66,10 +70,6 @@ void export_math()
 
     np::initialize();
 
-    // exposing functions
-
-    bp::def("to_numpy", &dense_matrix_to_numpy);
-
     // CDenseMatrix class
     // Note: CDenseMatrix has several constructors
 
@@ -87,6 +87,7 @@ void export_math()
         .def(bp::init<const int32_t, const int32_t>())
         .def(bp::init<const CDenseMatrix&>())
         .def("__str__", &CDenseMatrix_str)
+        .def("to_numpy", &CDenseMatrix_to_numpy)
         .def("from_numpy", &CDenseMatrix_from_numpy)
         .staticmethod("from_numpy")
         .def(bp::self == bp::other<CDenseMatrix>())

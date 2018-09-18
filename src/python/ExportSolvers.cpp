@@ -12,6 +12,8 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "DenseMatrix.hpp"
+#include "AODensityMatrix.hpp"
+#include "DensityMatrixType.hpp"
 #include "OverlapMatrix.hpp"
 
 #include "ExportGeneral.hpp"
@@ -37,7 +39,7 @@ CSADGuessDriver_create(int32_t    globRank,
 
 // Helper functions for overloading CSADGuessDriver::compute
 
-CDenseMatrix
+CAODensityMatrix
 CSADGuessDriver_compute(
           CSADGuessDriver& self,
     const CMolecule&       molecule,

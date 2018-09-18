@@ -6,18 +6,18 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#ifndef SADGuessTest_hpp
-#define SADGuessTest_hpp
+#ifndef SADGuessDriverTest_hpp
+#define SADGuessDriverTest_hpp
 
 #include "gtest/gtest.h"
 
-class CSADGuessTest : public ::testing::Test
+class CSADGuessDriverTest : public ::testing::Test
 {
 protected:
     
-    CSADGuessTest() {};
+    CSADGuessDriverTest() {};
     
-    virtual ~CSADGuessTest() {};
+    virtual ~CSADGuessDriverTest() {};
 };
 
-#endif /* SADGuessTest_hpp */
+#endif /* SADGuessDriverTest_hpp */

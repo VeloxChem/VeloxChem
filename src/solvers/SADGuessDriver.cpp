@@ -12,6 +12,8 @@
 #include "StringFormat.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DenseDiagonalizer.hpp"
+#include "AODensityMatrix.hpp"
+#include "DensityMatrixType.hpp"
 
 CSADGuessDriver::CSADGuessDriver(const int32_t  globRank,
                                  const int32_t  globNodes,
@@ -139,7 +141,7 @@ CSADGuessDriver::getAOIndicesOfAtoms(const CMolecule&       molecule,
     return aoinds_atoms;
 }
 
-CDenseMatrix
+CAODensityMatrix
 CSADGuessDriver::compute(const CMolecule&       molecule,
                          const CMolecularBasis& basis_1,
                          const CMolecularBasis& basis_2,
@@ -150,7 +152,7 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
 {
     CSystemClock timer;
     
-    CDenseMatrix dsad;
+    CAODensityMatrix dsad;
     
     if (_locRank == mpi::master())
     {
@@ -164,7 +166,7 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
     return dsad;
 }
 
-CDenseMatrix
+CAODensityMatrix
 CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                                const CMolecularBasis& basis_1,
                                const CMolecularBasis& basis_2,
@@ -308,9 +310,11 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     // D_SAD density matrix
 
-    CDenseMatrix dsad = denblas::multABt(csad, csad);
+    std::vector<CDenseMatrix> dsad;
+    
+    dsad.push_back(denblas::multABt(csad, csad));
 
-    return dsad;
+    return CAODensityMatrix(dsad, denmat::rest);
 }
 
 void

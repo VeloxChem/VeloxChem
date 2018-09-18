@@ -11,8 +11,12 @@
 #include <mpi4py/mpi4py.h>
 
 #include "MolecularBasis.hpp"
+#include "DenseMatrix.hpp"
+#include "AODensityMatrix.hpp"
+#include "DensityMatrixType.hpp"
 
 #include "ExportGeneral.hpp"
+#include "ExportMath.hpp"
 #include "ExportOrbData.hpp"
 
 namespace bp = boost::python;
@@ -29,6 +33,61 @@ CMolecularBasis_broadcast(CMolecularBasis& self,
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     self.broadcast(rank, *comm_ptr);
+}
+
+// Helper function for printing CAODensityMatrix
+
+std::string
+CAODensityMatrix_str (const CAODensityMatrix& self)
+{
+    return self.getString();
+}
+
+// Helper function for converting CAODensityMatrix to numpy array
+
+np::ndarray
+CAODensityMatrix_total_density_to_numpy(const CAODensityMatrix& self,
+                                        const int32_t iDensityMatrix)
+{
+    return bp_general::pointer_to_numpy(self.totalDensity(iDensityMatrix),
+                                        self.getNumberOfRows(iDensityMatrix),
+                                        self.getNumberOfColumns(iDensityMatrix));
+}
+
+np::ndarray
+CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self,
+                                        const int32_t iDensityMatrix)
+{
+    return bp_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix),
+                                        self.getNumberOfRows(iDensityMatrix),
+                                        self.getNumberOfColumns(iDensityMatrix));
+}
+
+np::ndarray
+CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self,
+                                       const int32_t iDensityMatrix)
+{
+    return bp_general::pointer_to_numpy(self.betaDensity(iDensityMatrix),
+                                        self.getNumberOfRows(iDensityMatrix),
+                                        self.getNumberOfColumns(iDensityMatrix));
+}
+
+// Helper function for converting a list of numpy array to CAODensityMatrix
+
+CAODensityMatrix
+CAODensityMatrix_from_numpy_list(const bp::list& arr_list,
+                                 const bool      isRestricted)
+{
+    std::vector<CDenseMatrix> dmat;
+
+    for (int i = 0; i < bp::len(arr_list); i++)
+    {
+        np::ndarray arr = np::array(arr_list[i]);
+
+        dmat.push_back(bp_math::CDenseMatrix_from_numpy(arr));
+    }
+
+    return CAODensityMatrix(dmat, isRestricted ? denmat::rest : denmat::unrest);
 }
 
 // Exports classes/functions in src/orbdata to python
@@ -48,6 +107,27 @@ void export_orbdata()
         )
         .def("get_label", &CMolecularBasis::getLabel)
         .def("broadcast", &CMolecularBasis_broadcast)
+    ;
+
+    // CAODensityMatrix class
+
+    bp::class_< CAODensityMatrix >
+        (
+            "AODensityMatrix",
+            bp::init<
+                const std::vector<CDenseMatrix>&,
+                const denmat
+                >()
+        )
+        .def(bp::init<>())
+        .def(bp::init<const CAODensityMatrix&>())
+        .def("__str__", &CAODensityMatrix_str)
+        .def("total_to_numpy", &CAODensityMatrix_total_density_to_numpy)
+        .def("alpha_to_numpy", &CAODensityMatrix_alpha_density_to_numpy)
+        .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy)
+        .def("from_numpy_list", &CAODensityMatrix_from_numpy_list)
+        .staticmethod("from_numpy_list")
+        .def(bp::self == bp::other<CAODensityMatrix>())
     ;
 }
 
