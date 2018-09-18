@@ -65,8 +65,13 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     ASSERT_EQ(1, dsad.getNumberOfDensityMatrices());
 
-    std::vector<double> denvec (dsad.totalDensity(0),
-                                dsad.totalDensity(0) + dsad.getNumberOfElements(0));
+    int32_t nrows = dsad.getNumberOfRows(0);
+
+    int32_t ncols = dsad.getNumberOfColumns(0);
+
+    ASSERT_EQ(nrows * ncols, dsad.getNumberOfElements(0));
+
+    std::vector<double> denvec (dsad.totalDensity(0), dsad.totalDensity(0) + nrows * ncols);
 
     std::vector<double> denvals{  1.057352923440807,  0.129815238298234,  0.111536835372263,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
@@ -261,5 +266,9 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000};
 
-    ASSERT_EQ(denvec, denvals);
+    CDenseMatrix denmat(denvec, nrows, ncols);
+
+    CDenseMatrix refmat(denvals, nrows, ncols);
+
+    ASSERT_EQ(denmat, refmat);
 }
