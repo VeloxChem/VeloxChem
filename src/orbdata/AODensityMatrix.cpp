@@ -119,14 +119,14 @@ CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
 {
     // restricted density matrix
     
-    if (_denType == denmat::rest)
+    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[iDensityMatrix].getNumberOfRows();
     }
     
     // unrestricted density matrix
     
-    if (_denType == denmat::unrest)
+    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix].getNumberOfRows();
     }
@@ -139,14 +139,14 @@ CAODensityMatrix::getNumberOfColumns(const int32_t iDensityMatrix) const
 {
     // restricted density matrix
     
-    if (_denType == denmat::rest)
+    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[iDensityMatrix].getNumberOfColumns();
     }
     
     // unrestricted density matrix
     
-    if (_denType == denmat::unrest)
+    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix].getNumberOfColumns();
     }
@@ -159,14 +159,14 @@ CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
 {
     // restricted density matrix
     
-    if (_denType == denmat::rest)
+    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[iDensityMatrix].getNumberOfElements();
     }
     
     // unrestricted density matrix
     
-    if (_denType == denmat::unrest)
+    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix].getNumberOfElements();
     }
@@ -177,7 +177,7 @@ CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
 const double*
 CAODensityMatrix::totalDensity(const int32_t iDensityMatrix) const
 {
-    if (_denType == denmat::rest)
+    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[iDensityMatrix].values();
     }
@@ -188,7 +188,7 @@ CAODensityMatrix::totalDensity(const int32_t iDensityMatrix) const
 const double*
 CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
 {
-    if (_denType == denmat::unrest)
+    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix].values();
     }
@@ -199,12 +199,27 @@ CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
 const double*
 CAODensityMatrix::betaDensity(const int32_t iDensityMatrix) const
 {
-    if (_denType == denmat::unrest)
+    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix + 1].values();
     }
     
     return nullptr;
+}
+
+std::string
+CAODensityMatrix::getString() const
+{
+    std::string dmat_str;
+
+    dmat_str += "Density Type: " + to_string(_denType) + "\n";
+
+    for (size_t i = 0; i < _denMatrices.size(); i++)
+    {
+        dmat_str += _denMatrices[i].getString();
+    }
+
+    return dmat_str;
 }
 
 std::ostream&
