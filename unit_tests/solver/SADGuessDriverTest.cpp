@@ -11,6 +11,7 @@
 #include "SADGuessDriver.hpp"
 #include "DenseMatrix.hpp"
 #include "AODensityMatrix.hpp"
+#include "DensityMatrixType.hpp"
 #include "OverlapMatrix.hpp"
 #include "OverlapIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
@@ -70,8 +71,6 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
     int32_t ncols = dsad.getNumberOfColumns(0);
 
     ASSERT_EQ(nrows * ncols, dsad.getNumberOfElements(0));
-
-    std::vector<double> denvec (dsad.totalDensity(0), dsad.totalDensity(0) + nrows * ncols);
 
     std::vector<double> denvals{  1.057352923440807,  0.129815238298234,  0.111536835372263,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
@@ -266,9 +265,23 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000};
 
-    CDenseMatrix denmat(denvec, nrows, ncols);
+    CDenseMatrix m (denvals, nrows, ncols);
 
-    CDenseMatrix refmat(denvals, nrows, ncols);
+    CAODensityMatrix dref (std::vector<CDenseMatrix>({m}), denmat::rest);
 
-    ASSERT_EQ(denmat, refmat);
+    ASSERT_EQ(dsad, dref);
+
+    // out of bounds test
+
+    ASSERT_EQ(0, dsad.getNumberOfRows(1));
+
+    ASSERT_EQ(0, dsad.getNumberOfColumns(1));
+
+    ASSERT_EQ(0, dsad.getNumberOfElements(1));
+
+    ASSERT_EQ(nullptr, dsad.totalDensity(1));
+
+    ASSERT_EQ(nullptr, dsad.alphaDensity(0));
+
+    ASSERT_EQ(nullptr, dsad.betaDensity(0));
 }
