@@ -9,6 +9,7 @@
 #include "KineticEnergyMatrixTest.hpp"
 
 #include "KineticEnergyMatrix.hpp"
+#include "CheckFunctions.hpp"
 
 TEST_F(CKineticEnergyMatrixTest, DefaultConstructor)
 {
@@ -58,7 +59,52 @@ TEST_F(CKineticEnergyMatrixTest, MoveAssignment)
         
     CKineticEnergyMatrix smata(ma);
     
-    CKineticEnergyMatrix smatb(CKineticEnergyMatrix({ma}));
+    CKineticEnergyMatrix smatb = CKineticEnergyMatrix({ma});
     
     ASSERT_EQ(smata, smatb);
+}
+
+TEST_F(CKineticEnergyMatrixTest, GetString)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CKineticEnergyMatrix smata(ma);
+    
+    ASSERT_EQ(ma.getString(), smata.getString());
+}
+
+TEST_F(CKineticEnergyMatrixTest, GetNumberOfRows)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CKineticEnergyMatrix smata(ma);
+    
+    ASSERT_EQ(3, smata.getNumberOfRows());
+}
+
+TEST_F(CKineticEnergyMatrixTest, GetNumberOfColumns)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CKineticEnergyMatrix smata(ma);
+    
+    ASSERT_EQ(2, smata.getNumberOfColumns());
+}
+
+TEST_F(CKineticEnergyMatrixTest, GetNumberOfElements)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CKineticEnergyMatrix smata(ma);
+    
+    ASSERT_EQ(6, smata.getNumberOfElements());
+}
+
+TEST_F(CKineticEnergyMatrixTest, Values)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    const CKineticEnergyMatrix smata(ma);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, smata.values());
 }

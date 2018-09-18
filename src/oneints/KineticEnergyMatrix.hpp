@@ -60,41 +60,6 @@ public:
     ~CKineticEnergyMatrix();
     
     /**
-     Gets string representation of kinetic energy matrix.
-
-     @return a string for printing the kinetic energy matrix.
-     */
-    std::string getString() const;
-
-    /**
-     Gets number of rows in kinetic energy matrix.
-
-     @return the number of rows.
-     */
-    int32_t getNumberOfRows() const;
-    
-    /**
-     Gets number of columns in kinetic energy matrix.
-
-     @return the number of columns.
-     */
-    int32_t getNumberOfColumns() const;
-    
-    /**
-     Gets number of elements in kinetic energy matrix.
-
-     @return the number of elements.
-     */
-    int32_t getNumberOfElements() const;
-    
-    /**
-     Gets constant pointer to first element of kinetic energy matrix.
-
-     @return the constant pointer to first element of kinetic energy matrix.
-     */
-    const double* values() const;
-    
-    /**
      Assigns a kinetic energy matrix object by copying other kinetic energy
      matrix object.
      
@@ -127,6 +92,41 @@ public:
      @return true if kinetic energy matrix objects are not equal, false otherwise.
      */
     bool operator!=(const CKineticEnergyMatrix& other) const;
+    
+    /**
+     Gets string representation of kinetic energy matrix.
+     
+     @return a string for printing the kinetic energy matrix.
+     */
+    std::string getString() const;
+    
+    /**
+     Gets number of rows in kinetic energy matrix.
+     
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows() const;
+    
+    /**
+     Gets number of columns in kinetic energy matrix.
+     
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns() const;
+    
+    /**
+     Gets number of elements in kinetic energy matrix.
+     
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements() const;
+    
+    /**
+     Gets constant pointer to first element of kinetic energy matrix.
+     
+     @return the constant pointer to first element of kinetic energy matrix.
+     */
+    const double* values() const;
     
     /**
      Converts kinetic energy matrix object to text output and insert it into

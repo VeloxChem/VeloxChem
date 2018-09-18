@@ -58,7 +58,7 @@ TEST_F(CElectronicPotentialMatrixTest, MoveAssignment)
     
     CElectronicPotentialMatrix smata(ma);
     
-    CElectronicPotentialMatrix smatb(CElectronicPotentialMatrix({ma}));
+    CElectronicPotentialMatrix smatb = CElectronicPotentialMatrix({ma});
     
     ASSERT_EQ(smata, smatb);
 }

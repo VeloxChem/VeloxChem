@@ -39,36 +39,6 @@ CKineticEnergyMatrix::~CKineticEnergyMatrix()
     
 }
 
-std::string
-CKineticEnergyMatrix::getString() const
-{
-    return _matrix.getString(); 
-}
-
-int32_t
-CKineticEnergyMatrix::getNumberOfRows() const
-{
-    return _matrix.getNumberOfRows(); 
-}
-
-int32_t
-CKineticEnergyMatrix::getNumberOfColumns() const
-{
-    return _matrix.getNumberOfColumns(); 
-}
-
-int32_t
-CKineticEnergyMatrix::getNumberOfElements() const
-{
-    return _matrix.getNumberOfElements(); 
-}
-
-const double*
-CKineticEnergyMatrix::values() const
-{
-    return _matrix.values(); 
-}
-
 CKineticEnergyMatrix&
 CKineticEnergyMatrix::operator=(const CKineticEnergyMatrix& source)
 {
@@ -101,6 +71,36 @@ bool
 CKineticEnergyMatrix::operator!=(const CKineticEnergyMatrix& other) const
 {
     return !(*this == other);
+}
+
+std::string
+CKineticEnergyMatrix::getString() const
+{
+    return _matrix.getString();
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfRows() const
+{
+    return _matrix.getNumberOfRows();
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfColumns() const
+{
+    return _matrix.getNumberOfColumns();
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfElements() const
+{
+    return _matrix.getNumberOfElements();
+}
+
+const double*
+CKineticEnergyMatrix::values() const
+{
+    return _matrix.values();
 }
 
 std::ostream&

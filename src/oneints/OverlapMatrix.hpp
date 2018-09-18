@@ -60,41 +60,6 @@ public:
     ~COverlapMatrix();
     
     /**
-     Gets string representation of overlap matrix.
-
-     @return a string for printing the overlap matrix.
-     */
-    std::string getString() const;
-
-    /**
-     Gets number of rows in overlap matrix.
-
-     @return the number of rows.
-     */
-    int32_t getNumberOfRows() const;
-    
-    /**
-     Gets number of columns in overlap matrix.
-
-     @return the number of columns.
-     */
-    int32_t getNumberOfColumns() const;
-
-    /**
-     Gets number of elements in overlap matrix.
-
-     @return the number of elements.
-     */
-    int32_t getNumberOfElements() const;
-    
-    /**
-     Gets constant pointer to first element of overlap matrix.
-
-     @return the constant pointer to first element of overlap matrix.
-     */
-    const double* values() const;
-    
-    /**
      Assigns a overlap matrix object by copying other overlap matrix object.
      
      @param source the overlap matrix object.
@@ -123,6 +88,41 @@ public:
      @return true if overlap matrix objects are not equal, false otherwise.
      */
     bool operator!=(const COverlapMatrix& other) const;
+    
+    /**
+     Gets string representation of overlap matrix.
+     
+     @return a string for printing the overlap matrix.
+     */
+    std::string getString() const;
+    
+    /**
+     Gets number of rows in overlap matrix.
+     
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows() const;
+    
+    /**
+     Gets number of columns in overlap matrix.
+     
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns() const;
+    
+    /**
+     Gets number of elements in overlap matrix.
+     
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements() const;
+    
+    /**
+     Gets constant pointer to first element of overlap matrix.
+     
+     @return the constant pointer to first element of overlap matrix.
+     */
+    const double* values() const;
     
     /**
      Converts overlap matrix object to text output and insert it into output

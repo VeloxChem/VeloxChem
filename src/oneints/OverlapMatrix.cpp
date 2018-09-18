@@ -6,11 +6,6 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <string>
-
 #include "OverlapMatrix.hpp"
 
 COverlapMatrix::COverlapMatrix()
@@ -42,36 +37,6 @@ COverlapMatrix::COverlapMatrix(COverlapMatrix&& source) noexcept
 COverlapMatrix::~COverlapMatrix()
 {
     
-}
-
-std::string
-COverlapMatrix::getString() const
-{
-    return _matrix.getString(); 
-}
-
-int32_t
-COverlapMatrix::getNumberOfRows() const
-{
-    return _matrix.getNumberOfRows(); 
-}
-
-int32_t
-COverlapMatrix::getNumberOfColumns() const
-{
-    return _matrix.getNumberOfColumns(); 
-}
-
-int32_t
-COverlapMatrix::getNumberOfElements() const
-{
-    return _matrix.getNumberOfElements(); 
-}
-
-const double*
-COverlapMatrix::values() const
-{
-    return _matrix.values(); 
 }
 
 COverlapMatrix&
@@ -106,6 +71,36 @@ bool
 COverlapMatrix::operator!=(const COverlapMatrix& other) const
 {
     return !(*this == other);
+}
+
+std::string
+COverlapMatrix::getString() const
+{
+    return _matrix.getString();
+}
+
+int32_t
+COverlapMatrix::getNumberOfRows() const
+{
+    return _matrix.getNumberOfRows();
+}
+
+int32_t
+COverlapMatrix::getNumberOfColumns() const
+{
+    return _matrix.getNumberOfColumns();
+}
+
+int32_t
+COverlapMatrix::getNumberOfElements() const
+{
+    return _matrix.getNumberOfElements();
+}
+
+const double*
+COverlapMatrix::values() const
+{
+    return _matrix.values();
 }
 
 std::ostream&

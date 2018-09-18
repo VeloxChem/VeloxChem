@@ -146,7 +146,7 @@ CGtoContainer::operator=(CGtoContainer&& source) noexcept
 bool
 CGtoContainer::operator==(const CGtoContainer& other) const
 {
-     if (_maxAngularMomentum != other._maxAngularMomentum) return false;
+    if (_maxAngularMomentum != other._maxAngularMomentum) return false;
     
     if (_gtoBlocks.size() != other._gtoBlocks.size()) return false;
 

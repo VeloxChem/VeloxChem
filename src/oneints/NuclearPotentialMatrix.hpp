@@ -60,41 +60,6 @@ public:
     ~CNuclearPotentialMatrix();
     
     /**
-     Gets string representation of nuclear potential matrix.
-
-     @return a string for printing the nuclear potential matrix.
-     */
-    std::string getString() const;
-
-    /**
-     Gets number of rows in nuclear potential matrix.
-
-     @return the number of rows.
-     */
-    int32_t getNumberOfRows() const;
-    
-    /**
-     Gets number of columns in nuclear potential matrix.
-
-     @return the number of columns.
-     */
-    int32_t getNumberOfColumns() const;
-    
-    /**
-     Gets number of elements in nuclear potential matrix.
-
-     @return the number of elements.
-     */
-    int32_t getNumberOfElements() const;
-    
-    /**
-     Gets constant pointer to first element of nuclear potential matrix.
-
-     @return the constant pointer to first element of nuclear potential matrix.
-     */
-    const double* values() const;
-    
-    /**
      Assigns a nuclear potential matrix object by copying other nuclear potential
      matrix object.
      
@@ -128,6 +93,41 @@ public:
              otherwise.
      */
     bool operator!=(const CNuclearPotentialMatrix& other) const;
+    
+    /**
+     Gets string representation of nuclear potential matrix.
+     
+     @return a string for printing the nuclear potential matrix.
+     */
+    std::string getString() const;
+    
+    /**
+     Gets number of rows in nuclear potential matrix.
+     
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows() const;
+    
+    /**
+     Gets number of columns in nuclear potential matrix.
+     
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns() const;
+    
+    /**
+     Gets number of elements in nuclear potential matrix.
+     
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements() const;
+    
+    /**
+     Gets constant pointer to first element of nuclear potential matrix.
+     
+     @return the constant pointer to first element of nuclear potential matrix.
+     */
+    const double* values() const;
     
     /**
      Converts nuclear potential matrix object to text output and insert it into
