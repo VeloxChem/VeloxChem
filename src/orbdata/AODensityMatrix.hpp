@@ -103,7 +103,14 @@ public:
     bool operator!=(const CAODensityMatrix& other) const;
     
     /**
-     Gets number of rows in overlap matrix.
+     Gets number of density matrices.
+     
+     @return the number of density matrices.
+     */
+    int32_t getNumberOfDensityMatrices() const;
+    
+    /**
+     Gets number of rows in specific density matrix.
      
      @param iDensityMatrix the index of density matrix.
      @return the number of rows.
@@ -111,7 +118,7 @@ public:
     int32_t getNumberOfRows(const int32_t iDensityMatrix) const;
     
     /**
-     Gets number of columns in specific matrix.
+     Gets number of columns in specific density matrix.
      
      @param iDensityMatrix the index of density matrix.
      @return the number of columns.

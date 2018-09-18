@@ -94,6 +94,27 @@ CAODensityMatrix::operator!=(const CAODensityMatrix& other) const
 }
 
 int32_t
+CAODensityMatrix::getNumberOfDensityMatrices() const
+{
+    // restricted density matrix
+    
+    if (_denType == denmat::rest)
+    {
+        return static_cast<int32_t>(_denMatrices.size());
+    }
+    
+    // unrestricted density matrix
+    
+    if (_denType == denmat::unrest)
+    {
+        return static_cast<int32_t>(_denMatrices.size()) / 2;
+    }
+    
+    return 0;
+}
+
+
+int32_t
 CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
 {
     // restricted density matrix

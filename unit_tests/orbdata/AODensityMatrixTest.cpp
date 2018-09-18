@@ -68,6 +68,19 @@ TEST_F(CAODensityMatrixTest, MoveAssignment)
     ASSERT_EQ(dmata, dmatb);
 }
 
+TEST_F(CAODensityMatrixTest, GetNumberOfDensityMatrices)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CAODensityMatrix dmata({ma, ma}, denmat::unrest);
+    
+    CAODensityMatrix dmatb({ma, ma}, denmat::rest);
+    
+    ASSERT_EQ(1, dmata.getNumberOfDensityMatrices());
+    
+    ASSERT_EQ(2, dmatb.getNumberOfDensityMatrices());
+}
+
 TEST_F(CAODensityMatrixTest, GetNumberOfRows)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
