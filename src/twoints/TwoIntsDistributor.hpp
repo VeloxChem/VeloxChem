@@ -66,6 +66,25 @@ class CTwoIntsDistribution
                                  const int32_t              iContrPair);
     
     /**
+     Distributes two electron integrals into Q values vector. Only largest
+     component from shell is stored.
+     NOTE: GTOs pairs blocks on bra and ket sides must contain single
+           contracted GTO.
+     
+     @param spherInts the spherical two electron integrals buffer.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
+            bra and ket sides.
+     @param iContrPair the index of contracted GTO pair being computed.
+     */
+    void _distSpherIntsIntoQValues(const CMemBlock2D<double>& spherInts,
+                                   const CGtoPairsBlock&      braGtoPairsBlock,
+                                   const CGtoPairsBlock&      ketGtoPairsBlock,
+                                   const bool                 isBraEqualKet,
+                                   const int32_t              iContrPair);
+    
+    /**
      Gets starting index of spherical integrals vector in batch of integrals.
 
      @param nShellComponents the number of components in shell.

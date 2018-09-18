@@ -124,6 +124,16 @@ CTwoIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
         
         return; 
     }
+    
+    // distribute two electron integrals into qvalues vector
+    
+    if (_distPattern == dist2e::qvalues)
+    {
+        _distSpherIntsIntoQValues(spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                  isBraEqualKet, iContrPair);
+        
+        return;
+    }
 }
 
 void
@@ -162,6 +172,16 @@ CTwoIntsDistribution::_distSpherIntsIntoBatch(const CMemBlock2D<double>& spherIn
         
         spos += ncomp;
     }
+}
+
+void
+CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spherInts,
+                                                const CGtoPairsBlock&      braGtoPairsBlock,
+                                                const CGtoPairsBlock&      ketGtoPairsBlock,
+                                                const bool                 isBraEqualKet,
+                                                const int32_t              iContrPair)
+{
+    // TO DO: Add max Q-values distribution code. 
 }
 
 int32_t

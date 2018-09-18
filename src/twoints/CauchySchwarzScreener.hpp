@@ -1,0 +1,200 @@
+//
+//                     V.E.L.O.X. C.H.E.M. MP
+//      ---------------------------------------------------
+//           An Electronic Structure Code for Nanoscale
+//
+//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+
+#ifndef CauchySchwarzScreener_hpp
+#define CauchySchwarzScreener_hpp
+
+#include <cstdint>
+
+#include "MemBlock.hpp"
+#include "EriScreenerType.hpp"
+#include "GtoPairsBlock.hpp"
+
+/**
+ Class CCauchySchwarzScreener class stores information required for screening of
+ electron repulsion integrals using Cauchy-Schwarz (QQ) and distance dependent
+ Cauchy-Schwarz (QQR) methods and provides set of methods for computing and
+ handling of screening data.
+ 
+ @author Z. Rinkevicius
+ */
+class CCauchySchwarzScreener
+{
+    /**
+     The screening scheme used in Cauchy-Schwarz screener object. 
+     */
+    ericut _screeningScheme;
+    
+    /**
+     The vector of Q values, sqrt([ab|ab]), for GTOs pairs batch on bra side.
+     */
+    CMemBlock<double> _braQValues;
+    
+    /**
+     The vector of Q values, sqrt([cd|cd]), for GTOs pairs batch on ket side.
+     */
+    CMemBlock<double> _ketQValues;
+    
+    /**
+     The vector of GTO pair extends for GTOs pairs batch on bra side.
+     */
+    CMemBlock<double> _braPairExtends;
+    
+    /**
+     The vector of GTO pair extends for GTOs pairs batch on ket side.
+     */
+    CMemBlock<double> _ketPairExtends;
+    
+    /**
+     The screening threshold of electron repulsion integrals.
+     */
+    double _threshold;
+    
+public:
+    
+    /**
+     Creates an empty Cauchy-Schwarz screener object.
+     */
+    CCauchySchwarzScreener();
+    
+    /**
+     Creates a Cauchy-Schwarz screener object.
+     
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param screeningScheme the screening scheme.
+     
+     */
+    CCauchySchwarzScreener(const CGtoPairsBlock& braGtoPairsBlock,
+                           const CGtoPairsBlock& ketGtoPairsBlock,
+                           const ericut          screeningScheme,
+                           const double          threshold);
+    
+    /**
+     Creates a Cauchy-Schwarz screener object by copying other Cauchy-Schwarz
+     screener object.
+     
+     @param source the Cauchy-Schwarz screener object.
+     */
+    CCauchySchwarzScreener(const CCauchySchwarzScreener& source);
+    
+    /**
+     Creates a Cauchy-Schwarz screener object by moving other Cauchy-Schwarz
+     screener object.
+     
+     @param source the Cauchy-Schwarz screener object.
+     */
+    CCauchySchwarzScreener(CCauchySchwarzScreener&& source) noexcept;
+    
+    /**
+     Destroys a Cauchy-Schwarz screener object.
+     */
+    ~CCauchySchwarzScreener();
+    
+    /**
+     Assigns a Cauchy-Schwarz screener object by copying other Cauchy-Schwarz
+     screener object.
+     
+     @param source the Cauchy-Schwarz screener object.
+     */
+    CCauchySchwarzScreener& operator=(const CCauchySchwarzScreener& source);
+    
+    /**
+     Assigns a Cauchy-Schwarz screener object by moving other Cauchy-Schwarz
+     screener object.
+     
+     @param source the Cauchy-Schwarz screener object.
+     */
+    CCauchySchwarzScreener& operator=(CCauchySchwarzScreener&& source) noexcept;
+    
+    /**
+     Compares Cauchy-Schwarz screener object with other Cauchy-Schwarz screener
+     object.
+     
+     @param other the Cauchy-Schwarz screener object.
+     @return true if Cauchy-Schwarz screener objects are equal, false otherwise.
+     */
+    bool operator==(const CCauchySchwarzScreener& other) const;
+    
+    /**
+     Compares Cauchy-Schwarz screener object with other Cauchy-Schwarz screener
+     object.
+     
+     @param other the Cauchy-Schwarz screener object.
+     @return true if Cauchy-Schwarz screener objects are not equal, false otherwise.
+     */
+    bool operator!=(const CCauchySchwarzScreener& other) const;
+    
+    /**
+     Sets screening scheme for Cauchy-Schwarz screener object.
+
+     @param screeningScheme the screening scheme.
+     */
+    void setScreeningScheme(const ericut screeningScheme);
+    
+    /**
+     Sets threshold for screening of electron repulsion integrals.
+
+     @param threshold the screening threshold.
+     */
+    void setThreshold(const double threshold);
+    
+    /**
+     Gets screening scheme used by Cauchy-Schwarz screener object.
+
+     @return the screening scheme.
+     */
+    ericut getScreeningScheme() const;
+    
+    /**
+     Gets screening threshold of electron repulion integrals.
+
+     @return the screening threshold.
+     */
+    double getThreshold() const;
+    
+    /**
+     Gets pointer to first element of Q values vector on bra side.
+
+     @return the pointer to Q values vector.
+     */
+    double* getBraQValues();
+    
+    /**
+     Gets constant pointer to first element of Q values vector on bra side.
+     
+     @return the constant pointer to Q values vector.
+     */
+    const double* getBraQValues() const;
+    
+    /**
+     Gets pointer to first element of Q values vector on ket side.
+     
+     @return the pointer to Q values vector.
+     */
+    double* getKetQValues();
+    
+    /**
+     Gets constant pointer to first element of Q values vector on ket side.
+     
+     @return the constant pointer to Q values vector.
+     */
+    const double* getKetQValues() const;
+    
+    /**
+     Converts Cauchy-Schwarz screener object to text output and insert it into
+     output text stream.
+     
+     @param output the output text stream.
+     @param source the Cauchy-Schwarz screener object.
+     */
+    friend std::ostream& operator<<(      std::ostream&           output,
+                                    const CCauchySchwarzScreener& source);
+}; 
+
+#endif /* CauchySchwarzScreener_hpp */
