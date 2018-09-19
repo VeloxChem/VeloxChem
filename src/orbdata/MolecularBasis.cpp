@@ -226,7 +226,7 @@ CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
 {
     int32_t npfuncs = 0;
     
-    for (int32_t i = 0; i < _atomicBasisSets.size(); i++)
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
     {
         npfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
         

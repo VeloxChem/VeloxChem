@@ -81,7 +81,7 @@ CControlGroup
 CInputData::getControlGroup(const size_t       indexOfControlGroup,
                             const std::string& nameOfControlGroup) const
 {
-    if (indexOfControlGroup < getNumberOfControlGroups(nameOfControlGroup))
+    if (indexOfControlGroup < static_cast<size_t>(getNumberOfControlGroups(nameOfControlGroup)))
     {
         size_t curgroup = 0;
 

@@ -32,9 +32,9 @@ CSparseVector::CSparseVector(const std::vector<double>&  values,
 
     , _indexes(CMemBlock<int32_t>(indexes))
 
-    , _nElements(_values.size())
-
     , _nMaxElements(_values.size())
+
+    , _nElements(_values.size())
 
     , _threshold(threshold)
 {

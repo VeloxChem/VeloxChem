@@ -35,23 +35,23 @@ CSparseMatrix::CSparseMatrix(const std::vector<double>&  values,
                              const int32_t               nColumns,
                              const double                threshold)
 
-    : _values(CMemBlock<double>(values))
+    : _nRows(nRows)
+
+    , _nColumns(nColumns)
+
+    , _values(CMemBlock<double>(values))
 
     , _rows(CMemBlock<int32_t>(rows))
 
     , _columns(CMemBlock<int32_t>(columns))
 
-    , _nRows(nRows)
+    , _nMaxElements(static_cast<int32_t>(values.size()))
 
-    , _nColumns(nColumns)
+    , _nElements(static_cast<int32_t>(values.size()))
 
     , _rowPositions(CMemBlock<int32_t>(nRows))
 
     , _rowSizes(CMemBlock<int32_t>(nRows))
-
-    , _nElements(static_cast<int32_t>(values.size()))
-
-    , _nMaxElements(static_cast<int32_t>(values.size()))
 
     , _threshold(threshold)
 {
@@ -66,11 +66,11 @@ CSparseMatrix::CSparseMatrix(const int32_t nRows,
 
     , _nColumns(nColumns)
 
+    , _nElements(0)
+
     , _rowPositions(CMemBlock<int32_t>(nRows))
 
     , _rowSizes(CMemBlock<int32_t>(nRows))
-
-    , _nElements(0)
 
     , _threshold(threshold)
 {

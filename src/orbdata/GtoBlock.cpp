@@ -25,11 +25,11 @@ CGtoBlock::CGtoBlock(const CMemBlock2D<double>&  gtoPrimitives,
                      const CMemBlock2D<int32_t>& contrPattern,
                      const int32_t               angularMomentum)
 
-    : _gtoPrimitives(gtoPrimitives)
+    : _angularMomentum(angularMomentum)
 
     , _contrPattern(contrPattern)
 
-    , _angularMomentum(angularMomentum)
+    , _gtoPrimitives(gtoPrimitives)
 {
 
 }

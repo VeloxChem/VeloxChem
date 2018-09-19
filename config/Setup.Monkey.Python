@@ -41,8 +41,8 @@ ifeq ($(USE_GPU),true)
 endif
 
 ifeq ($(USE_PYTHON),true)
-  CPP_REL_FLG += -DENABLE_PYTHON
-  CPP_DEB_FLG += -DENABLE_PYTHON
+  CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
+  CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 endif
 
 # MKL header and library

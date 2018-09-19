@@ -420,30 +420,30 @@ CMemBlock2D<T>::CMemBlock2D(const std::vector<T>&       dataVector,
 template <class T>
 CMemBlock2D<T>::CMemBlock2D(const CMemBlock2D<T>& source)
 
-    : _nElements(source._nElements)
-
-    , _positions(source._positions)
-
-    , _paddedSizes(source._paddedSizes)
+    : _data(source._data)
 
     , _originalSizes(source._originalSizes)
 
-    , _data(source._data)
+    , _paddedSizes(source._paddedSizes)
+
+    , _positions(source._positions)
+
+    , _nElements(source._nElements)
 {
 }
 
 template <class T>
 CMemBlock2D<T>::CMemBlock2D(CMemBlock2D<T>&& source) noexcept
 
-    : _nElements(std::move(source._nElements))
-
-    , _positions(std::move(source._positions))
-
-    , _paddedSizes(std::move(source._paddedSizes))
+    : _data(std::move(source._data))
 
     , _originalSizes(std::move(source._originalSizes))
 
-    , _data(std::move(source._data))
+    , _paddedSizes(std::move(source._paddedSizes))
+
+    , _positions(std::move(source._positions))
+
+    , _nElements(std::move(source._nElements))
 {
 
 }

@@ -11,9 +11,9 @@
 CInputStream::CInputStream(const std::string&   iFilename,
                                  COutputStream& oStream)
 
-    : _iFilename(iFilename)
+    : _state(true)
 
-    , _state(true)
+    , _iFilename(iFilename)
 {
     if (!_iFilename.empty())
     {

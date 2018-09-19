@@ -26,11 +26,11 @@ CCauchySchwarzScreener::CCauchySchwarzScreener(const CGtoPairsBlock& braGtoPairs
                                                const double          threshold)
     : _screeningScheme(screeningScheme)
 
-    , _threshold(threshold)
-
     , _braQValues(CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedContrPairs()))
 
     , _ketQValues(CMemBlock<double>(ketGtoPairsBlock.getNumberOfScreenedContrPairs()))
+
+    , _threshold(threshold)
 {
     if (_screeningScheme == ericut::qqr)
     {

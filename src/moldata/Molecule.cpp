@@ -514,7 +514,7 @@ CMolecule::printGeometry(COutputStream& oStream) const
     
     auto coordz = _atomCoordinates.data(2);
     
-    for (size_t i = 0; i < _atomCoordinates.size(0); i++)
+    for (int32_t i = 0; i < _atomCoordinates.size(0); i++)
     {
         std::string label("  ");
         

@@ -1,3 +1,4 @@
+from mpi4py import MPI
 from VeloxChemMP import *
 
 app_manager = AppManager.create("test.inp", "test.out")

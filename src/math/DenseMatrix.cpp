@@ -26,11 +26,11 @@ CDenseMatrix::CDenseMatrix(const std::vector<double>& values,
                            const int32_t              nRows,
                            const int32_t              nColumns)
 
-    : _values(CMemBlock<double>(values))
-
-    , _nRows(nRows)
+    : _nRows(nRows)
 
     , _nColumns(nColumns)
+
+    , _values(CMemBlock<double>(values))
 {
     
 }
@@ -38,22 +38,22 @@ CDenseMatrix::CDenseMatrix(const std::vector<double>& values,
 CDenseMatrix::CDenseMatrix(const int32_t nRows,
                            const int32_t nColumns)
 
-    : _values(CMemBlock<double>(nRows * nColumns))
-
-    , _nRows(nRows)
+    : _nRows(nRows)
 
     , _nColumns(nColumns)
+
+    , _values(CMemBlock<double>(nRows * nColumns))
 {
     
 }
 
 CDenseMatrix::CDenseMatrix(const int32_t nRows)
 
-    : _values(CMemBlock<double>(nRows * nRows))
-
-    , _nRows(nRows)
+    : _nRows(nRows)
 
     , _nColumns(nRows)
+
+    , _values(CMemBlock<double>(nRows * nRows))
 {
     
 }
