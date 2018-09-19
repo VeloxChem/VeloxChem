@@ -45,6 +45,11 @@ class CTwoIntsDistribution
     int32_t _nColumns;
     
     /**
+     The identifier of GTOs pair (used for storing Q values).
+     */
+    int32_t _idGtoPair;
+    
+    /**
      The pointer to two electron integrals destination data buffer.
      */
     double* _intsData;
@@ -115,6 +120,21 @@ public:
     CTwoIntsDistribution(      double* intsData,
                          const int32_t nRows,
                          const int32_t nColumns,
+                         const dist2e  distPattern);
+    
+    /**
+     Creates a two electron integrals distributor object.
+     
+     @param intsData the pointer to one electron integrals data buffer.
+     @param nRows the number of rows in data buffer.
+     @param nColumns the number of columns in data buffer.
+     @param idGtoPair the index of GTOs pair.
+     @param distPattern the two electron integrals distribution pattern.
+     */
+    CTwoIntsDistribution(      double* intsData,
+                         const int32_t nRows,
+                         const int32_t nColumns,
+                         const int32_t idGtoPair,
                          const dist2e  distPattern);
     
     /**

@@ -8,6 +8,8 @@
 
 #include "TwoIntsDistributor.hpp"
 
+#include <cmath>
+
 #include "StringFormat.hpp"
 #include "AngularMomentum.hpp"
 
@@ -20,6 +22,8 @@ CTwoIntsDistribution::CTwoIntsDistribution()
     , _nRows(0)
 
     , _nColumns(0)
+
+    , _idGtoPair(-1)
 
     , _intsData(nullptr)
 {
@@ -39,10 +43,35 @@ CTwoIntsDistribution::CTwoIntsDistribution(      double* intsData,
 
     , _nColumns(nColumns)
 
+    , _idGtoPair(-1)
+
     , _intsData(intsData)
 {
     
 }
+
+CTwoIntsDistribution::CTwoIntsDistribution(      double* intsData,
+                                           const int32_t nRows,
+                                           const int32_t nColumns,
+                                           const int32_t idGtoPair,
+                                           const dist2e  distPattern)
+    : _distPattern(distPattern)
+
+    , _needSyncLock(false)
+
+    , _nRows(nRows)
+
+    , _nColumns(nColumns)
+
+    , _idGtoPair(idGtoPair)
+
+    , _intsData(intsData)
+{
+    // override identifier of GTOs pair if not used in distributing integrals
+    
+    if (_distPattern != dist2e::qvalues) _idGtoPair = -1;
+}
+
 
 CTwoIntsDistribution::CTwoIntsDistribution(const CTwoIntsDistribution& source)
 
@@ -53,6 +82,8 @@ CTwoIntsDistribution::CTwoIntsDistribution(const CTwoIntsDistribution& source)
     , _nRows(source._nRows)
 
     , _nColumns(source._nColumns)
+
+    , _idGtoPair(source._idGtoPair)
 {
     _intsData = source._intsData;
 }
@@ -75,6 +106,8 @@ CTwoIntsDistribution::operator=(const CTwoIntsDistribution& source)
     
     _nColumns = source._nColumns;
     
+    _idGtoPair = source._idGtoPair;
+    
     _intsData = source._intsData;
     
     return *this;
@@ -90,6 +123,8 @@ CTwoIntsDistribution::operator==(const CTwoIntsDistribution& other) const
     if (_nRows != other._nRows) return false;
     
     if (_nColumns != other._nColumns) return false;
+    
+    if (_idGtoPair != other._idGtoPair) return false;
     
     if (_intsData != other._intsData) return false;
     
@@ -181,7 +216,38 @@ CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spher
                                                 const bool                 isBraEqualKet,
                                                 const int32_t              iContrPair)
 {
-    // TO DO: Add max Q-values distribution code. 
+    // check if dimensions on bra and ket sides are correct
+    
+    if ((braGtoPairsBlock.getNumberOfScreenedContrPairs() != 1) ||
+        (ketGtoPairsBlock.getNumberOfScreenedContrPairs() != 1))
+    {
+        // error handling code...
+        
+        return;
+    }
+    
+    // determine number of angular components in shhell
+    
+    auto ncomp = angmom::to_SphericalComponents(braGtoPairsBlock.getBraAngularMomentum(),
+                                                braGtoPairsBlock.getKetAngularMomentum())
+    
+               * angmom::to_SphericalComponents(ketGtoPairsBlock.getBraAngularMomentum(),
+                                                ketGtoPairsBlock.getKetAngularMomentum());
+    
+    //  determine maximum integral value in shell
+    
+    auto mval = (spherInts.data(0))[0];
+    
+    for (int32_t j = 1; j < ncomp; j++)
+    {
+        auto fval = (spherInts.data(j))[0];
+        
+        if (fval > mval) mval = fval;
+    }
+    
+    // compute Q value for contracted pair
+    
+    _intsData[_idGtoPair] = std::sqrt(mval);
 }
 
 int32_t
@@ -218,6 +284,8 @@ operator<<(      std::ostream&         output,
     output << "_nRows: " << source._nRows << std::endl;
     
     output << "_nColumns: " << source._nColumns << std::endl;
+    
+    output << "_idGtoPair: " << source._idGtoPair << std::endl;
     
     output << "_intsData: " << source._intsData << std::endl;
     
