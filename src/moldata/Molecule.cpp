@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "Molecule.hpp"
 
@@ -514,7 +514,7 @@ CMolecule::printGeometry(COutputStream& oStream) const
     
     auto coordz = _atomCoordinates.data(2);
     
-    for (size_t i = 0; i < _atomCoordinates.size(0); i++)
+    for (int32_t i = 0; i < _atomCoordinates.size(0); i++)
     {
         std::string label("  ");
         

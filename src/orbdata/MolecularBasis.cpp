@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "MolecularBasis.hpp"
 
@@ -226,7 +226,7 @@ CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
 {
     int32_t npfuncs = 0;
     
-    for (int32_t i = 0; i < _atomicBasisSets.size(); i++)
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
     {
         npfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
         

@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "DensityGridDriver.hpp"
 
@@ -25,11 +25,11 @@ CDensityGridDriver::CDensityGridDriver(const int32_t  globRank,
 
     , _isLocalMode(false)
 
-    , _runMode(runMode)
-
     , _thresholdOfDensity(1.0e-13)
 
     , _thresholdOfPrimGTOs(1.0e-15)
+
+    , _runMode(runMode)
 {
     _locRank  = mpi::rank(comm);
     
@@ -109,7 +109,7 @@ CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
     // generate density on grid points
     
     #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz,\
-                                gtovec, xcFunctional)
+                                gtovec)
     {
         #pragma omp single nowait
         {

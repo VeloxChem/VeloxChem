@@ -12,7 +12,6 @@
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
 #include <mpi.h>
-#include <mpi4py/mpi4py.h>
 
 namespace bp = boost::python;
 
