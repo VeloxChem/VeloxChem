@@ -72,7 +72,7 @@ TEST_F(CMemBlockTest, Data)
 
     auto dptr = ma.data();
 
-    ASSERT_EQ(0, ((size_t) dptr % VLX_ALIGN));
+    ASSERT_EQ(0u, ((size_t) dptr % VLX_ALIGN));
 
     ASSERT_EQ(1, dptr[0]);
 
@@ -91,7 +91,7 @@ TEST_F(CMemBlockTest, ConstData)
 
     auto dptr = ma.data();
 
-    ASSERT_EQ(0, ((size_t) dptr) % VLX_ALIGN);
+    ASSERT_EQ(0u, ((size_t) dptr) % VLX_ALIGN);
 
     ASSERT_NEAR(1.0, dptr[0], 1.0e-13);
 

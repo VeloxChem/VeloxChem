@@ -7261,7 +7261,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
                                   0.000000000000000,  0.000000000000000,  0.000000000000000,
                                   2.535960686917080};
 
-    ASSERT_EQ(kinmat.getNumberOfElements(), intvals.size());
+    ASSERT_EQ(kinmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
 
     CDenseMatrix m (intvals, kinmat.getNumberOfRows(), kinmat.getNumberOfColumns());
 
@@ -7423,7 +7423,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForTwoBasis)
                                   0.000000000000000, -0.121565731304830, -0.121565731304830,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000};
 
-    ASSERT_EQ(kinmat.getNumberOfElements(), intvals.size());
+    ASSERT_EQ(kinmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
 
     CDenseMatrix m (intvals, kinmat.getNumberOfRows(), kinmat.getNumberOfColumns());
 

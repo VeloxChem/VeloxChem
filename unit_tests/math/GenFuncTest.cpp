@@ -711,7 +711,7 @@ TEST_F(CGenFuncTest, AddValidAndUniquePair)
     
     genfunc::addValidAndUniquePair(vec, {2, 1});
     
-    ASSERT_EQ(vec.size(), 3);
+    ASSERT_EQ(vec.size(), 3u);
     
     ASSERT_EQ(vec[0], CTwoIndexes(0, 1));
     
@@ -734,7 +734,7 @@ TEST_F(CGenFuncTest, AddValidAndUniqueTriple)
     
     genfunc::addValidAndUniqueTriple(vec, {2, 1, 1});
     
-    ASSERT_EQ(vec.size(), 3);
+    ASSERT_EQ(vec.size(), 3u);
     
     ASSERT_EQ(vec[0], CThreeIndexes(0, 1, 1));
     
@@ -761,7 +761,7 @@ TEST_F(CGenFuncTest, AddValidAndUniqueQuadruple)
     
     genfunc::addValidAndUniqueQuadruple(vec, {2, 1, 1, -1});
     
-    ASSERT_EQ(vec.size(), 4);
+    ASSERT_EQ(vec.size(), 4u);
     
     ASSERT_EQ(vec[0], CFourIndexes(0, 1, 1, 2));
     
@@ -848,7 +848,7 @@ TEST_F(CGenFuncTest, GetPairsFromTripleIndexes)
     
     auto xyvec = genfunc::getPairsFromTripleIndexes(vec);
     
-    ASSERT_EQ(2, xyvec.size());
+    ASSERT_EQ(2u, xyvec.size());
     
     ASSERT_EQ(xyvec[0], CThreeIndexes(0, 1, 0));
     
@@ -861,7 +861,7 @@ TEST_F(CGenFuncTest, GetTriplesFromQuadrupleIndexes)
     
     auto xyzvec = genfunc::getTriplesFromQuadrupleIndexes(vec);
     
-    ASSERT_EQ(2, xyzvec.size());
+    ASSERT_EQ(2u, xyzvec.size());
     
     ASSERT_EQ(xyzvec[0], CThreeIndexes(0, 1, 2));
     

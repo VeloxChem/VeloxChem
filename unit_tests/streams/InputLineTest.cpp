@@ -83,7 +83,7 @@ TEST_F(CInputLineTest, GetNumberOfKeywords)
 {
     CInputLine aln(std::string(" Velox Chem "));
 
-    ASSERT_EQ(aln.getNumberOfKeywords(), 2);
+    ASSERT_EQ(aln.getNumberOfKeywords(), 2u);
 }
 
 TEST_F(CInputLineTest, IsRealNumber)

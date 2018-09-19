@@ -134,7 +134,7 @@ TEST_F(CMemBlock2DTest, Data)
     
     auto ar = ma.data(0);
     
-    ASSERT_EQ(0, ((size_t) ar) % VLX_ALIGN);
+    ASSERT_EQ(0u, ((size_t) ar) % VLX_ALIGN);
     
     ASSERT_NEAR(1.0, ar[0], 1.0e-13);
     
@@ -146,7 +146,7 @@ TEST_F(CMemBlock2DTest, Data)
     
     auto br = ma.data(1);
     
-    ASSERT_EQ(0, ((size_t) br) % VLX_ALIGN);
+    ASSERT_EQ(0u, ((size_t) br) % VLX_ALIGN);
     
     ASSERT_NEAR(3.0, br[0], 1.0e-13);
     
@@ -167,7 +167,7 @@ TEST_F(CMemBlock2DTest, DataConstant)
     
     auto ar = ma.data(0);
     
-    ASSERT_EQ(0, ((size_t) ar) % VLX_ALIGN);
+    ASSERT_EQ(0u, ((size_t) ar) % VLX_ALIGN);
     
     ASSERT_NEAR(1.0, ar[0], 1.0e-13);
     
@@ -175,7 +175,7 @@ TEST_F(CMemBlock2DTest, DataConstant)
     
     auto br = ma.data(1);
     
-    ASSERT_EQ(0, ((size_t) br) % VLX_ALIGN);
+    ASSERT_EQ(0u, ((size_t) br) % VLX_ALIGN);
     
     ASSERT_NEAR(3.0, br[0], 1.0e-13);
     

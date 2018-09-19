@@ -109,7 +109,7 @@ TEST_F(CGtoPairsBlockTest, Split)
     
     auto ppvec = apairs.split(4);
     
-    ASSERT_EQ(2, ppvec.size());
+    ASSERT_EQ(2u, ppvec.size());
     
     CMemBlock2D<int32_t> cpat00({ 0,  4,  6,
                                   4,  6,  8,

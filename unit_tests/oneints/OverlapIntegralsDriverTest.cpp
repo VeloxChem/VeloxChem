@@ -7262,7 +7262,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2O)
                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
                                  1.000000000000000};
 
-    ASSERT_EQ(ovlmat.getNumberOfElements(), intvals.size());
+    ASSERT_EQ(ovlmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
 
     CDenseMatrix m (intvals, ovlmat.getNumberOfRows(), ovlmat.getNumberOfColumns());
 
@@ -7424,7 +7424,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForTwoBasis)
                                   0.000000000000000, -0.078975128350178, -0.078975128350178,
                                   0.000000000000000,  0.000000000000000,  0.000000000000000};
  
-    ASSERT_EQ(ovlmat.getNumberOfElements(), intvals.size());
+    ASSERT_EQ(ovlmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
 
     CDenseMatrix m (intvals, ovlmat.getNumberOfRows(), ovlmat.getNumberOfColumns());
 

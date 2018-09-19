@@ -96,7 +96,7 @@ getNormalizedAtomBasisForH()
     bf.push_back(CBasisFunction ({8.000000000000e-01},
                                  {1.000000000000e+00}, 1));
 
-    for (int32_t i = 0; i < bf.size(); i++)
+    for (size_t i = 0; i < bf.size(); i++)
     {
         bf[i].normalize();
 
@@ -145,7 +145,7 @@ getNormalizedAtomBasisForO()
     bf.push_back(CBasisFunction ({ 1.200000000000e+00},
                                  { 1.000000000000e+00}, 2));
 
-    for (int32_t i = 0; i < bf.size(); i++)
+    for (size_t i = 0; i < bf.size(); i++)
     {
         bf[i].normalize();
 

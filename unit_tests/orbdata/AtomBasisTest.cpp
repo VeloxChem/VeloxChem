@@ -141,7 +141,7 @@ TEST_F(CAtomBasisTest, GetBasisFunctions)
 
     auto sbfs = abas.getBasisFunctions(0);
 
-    ASSERT_EQ(3, sbfs.size());
+    ASSERT_EQ(3u, sbfs.size());
 
     ASSERT_EQ(sbfs[0], CBasisFunction({2.662778551600e+02, 4.006978344700e+01,
                                        9.055994438900e+00, 2.450300905100e+00,
@@ -158,7 +158,7 @@ TEST_F(CAtomBasisTest, GetBasisFunctions)
 
     auto pbfs = abas.getBasisFunctions(1);
 
-    ASSERT_EQ(2, pbfs.size());
+    ASSERT_EQ(2u, pbfs.size());
 
     ASSERT_EQ(pbfs[0], CBasisFunction({1.450000000000e+00, 3.000000000000e-01},
                                       {2.586000000000e-01, 1.000000000000e+00},
@@ -169,5 +169,5 @@ TEST_F(CAtomBasisTest, GetBasisFunctions)
 
     auto dbfs = abas.getBasisFunctions(2);
 
-    ASSERT_EQ(0, dbfs.size());
+    ASSERT_EQ(0u, dbfs.size());
 }

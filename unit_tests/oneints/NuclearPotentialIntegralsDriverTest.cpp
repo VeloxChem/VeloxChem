@@ -7361,7 +7361,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
                                  -0.000000000000000, -0.000000000000000, -0.000000000000000,
                                   9.879888105835258};
 
-    ASSERT_EQ(npotmat.getNumberOfElements(), intvals.size());
+    ASSERT_EQ(npotmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
 
     CDenseMatrix m (intvals, npotmat.getNumberOfRows(), npotmat.getNumberOfColumns());
 
@@ -7523,7 +7523,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForTwoBasis)
                                  -0.108391185500332, -0.655280900587007, -0.655280900587007,
                                   0.000000000000000, -0.059045007255033, -0.000000000000000};
 
-    ASSERT_EQ(npotmat.getNumberOfElements(), intvals.size());
+    ASSERT_EQ(npotmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
 
     CDenseMatrix m (intvals, npotmat.getNumberOfRows(), npotmat.getNumberOfColumns());
 

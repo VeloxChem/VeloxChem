@@ -517,7 +517,7 @@ TEST_F(CGtoContainerTest, GetPrimBuffer)
     
     auto pbuff = acont.getPrimBuffer();
     
-    ASSERT_EQ(2, pbuff.size());
+    ASSERT_EQ(2u, pbuff.size());
     
     ASSERT_EQ(pbuff[0].size(), 11);
     
@@ -534,7 +534,7 @@ TEST_F(CGtoContainerTest, GetPrimAngBuffer)
     
     auto abuff = acont.getPrimAngBuffer(2);
     
-    ASSERT_EQ(2, abuff.size());
+    ASSERT_EQ(2u, abuff.size());
     
     ASSERT_EQ(abuff[0].size(0), 11);
     
@@ -571,7 +571,7 @@ TEST_F(CGtoContainerTest, GetCartesianBuffer)
     
     auto abuff = acont.getCartesianBuffer(2);
     
-    ASSERT_EQ(2, abuff.size());
+    ASSERT_EQ(2u, abuff.size());
     
     ASSERT_EQ(abuff[0].size(0), 5);
     
@@ -604,7 +604,7 @@ TEST_F(CGtoContainerTest, GetSphericalBuffer)
     
     auto abuff = acont.getSphericalBuffer(2);
     
-    ASSERT_EQ(2, abuff.size());
+    ASSERT_EQ(2u, abuff.size());
     
     ASSERT_EQ(abuff[0].size(0), 5);
     
@@ -637,7 +637,7 @@ TEST_F(CGtoContainerTest, GetSphericalMomentumVector)
     
     auto momvec = acont.getSphericalMomentumVector();
     
-    ASSERT_EQ(2, momvec.size());
+    ASSERT_EQ(2u, momvec.size());
     
     ASSERT_EQ(momvec[0], CSphericalMomentum(0));
     
