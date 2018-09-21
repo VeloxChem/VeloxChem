@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "GtoContainer.hpp"
 
@@ -19,9 +19,9 @@ CGtoContainer::CGtoContainer()
 
 CGtoContainer::CGtoContainer(const std::vector<CGtoBlock>& gtoBlocks)
 
-    : _gtoBlocks(gtoBlocks)
+    : _maxAngularMomentum(-1)
 
-    , _maxAngularMomentum(-1)
+    , _gtoBlocks(gtoBlocks)
 {
     for (size_t i = 0; i < _gtoBlocks.size(); i++)
     {
@@ -98,18 +98,18 @@ CGtoContainer::CGtoContainer(const CMolecule&            molecule,
 
 CGtoContainer::CGtoContainer(const CGtoContainer& source)
 
-    : _gtoBlocks(source._gtoBlocks)
+    : _maxAngularMomentum(source._maxAngularMomentum)
 
-    , _maxAngularMomentum(source._maxAngularMomentum)
+    , _gtoBlocks(source._gtoBlocks)
 {
 
 }
 
 CGtoContainer::CGtoContainer(CGtoContainer&& source) noexcept
 
-    : _gtoBlocks(std::move(source._gtoBlocks))
+    : _maxAngularMomentum(std::move(source._maxAngularMomentum))
 
-    , _maxAngularMomentum(std::move(source._maxAngularMomentum))
+    , _gtoBlocks(std::move(source._gtoBlocks))
 {
 
 }
@@ -146,7 +146,7 @@ CGtoContainer::operator=(CGtoContainer&& source) noexcept
 bool
 CGtoContainer::operator==(const CGtoContainer& other) const
 {
-     if (_maxAngularMomentum != other._maxAngularMomentum) return false;
+    if (_maxAngularMomentum != other._maxAngularMomentum) return false;
     
     if (_gtoBlocks.size() != other._gtoBlocks.size()) return false;
 

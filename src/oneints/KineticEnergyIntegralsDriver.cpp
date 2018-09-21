@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "KineticEnergyIntegralsDriver.hpp"
 
@@ -150,11 +150,27 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
 }
 
 void
-CKineticEnergyIntegralsDriver::compute(      double*    intsValues,
+CKineticEnergyIntegralsDriver::compute(      double*    intsBatch,
                                        const CGtoBlock& braGtoBlock,
                                        const CGtoBlock& ketGtoBlock) const
 {
-    _compKineticEnergyForGtoBlocks(intsValues, braGtoBlock, ketGtoBlock, 0, 0); 
+    // determine dimensions of integrals batch
+    
+    auto nrow = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum())
+    
+              * braGtoBlock.getNumberOfContrGtos();
+    
+    auto ncol = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum())
+    
+              * ketGtoBlock.getNumberOfContrGtos();
+    
+    // set up distribution pattern
+    
+    COneIntsDistribution dist(intsBatch, nrow, ncol, dist1e::batch);
+    
+    // compute kinetic energy integrals
+    
+    _compKineticEnergyForGtoBlocks(&dist, braGtoBlock, ketGtoBlock); 
 }
 
 CKineticEnergyMatrix
@@ -165,7 +181,7 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyIntegrals(const CGtoContainer* 
     
     auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
     
-    // determine dimensions of kinetic energy matrix
+    // determine dimensions of overlap matrix
     
     auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
     
@@ -175,12 +191,16 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyIntegrals(const CGtoContainer* 
     
     CDenseMatrix kinmat(nrow, ncol);
     
-    auto kinvals = kinmat.values();
+    // set up distributio pattern
+    
+    dist1e dstyp = (symbk) ? dist1e::symsq : dist1e::rect;
+    
+    COneIntsDistribution* distpat = new COneIntsDistribution(kinmat.values(),
+                                                             nrow, ncol, dstyp);
     
     // compute kinetic energy integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, kinvals,\
-                                nrow, ncol, symbk)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat, symbk)
     {
         #pragma omp single nowait
         {
@@ -204,28 +224,34 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyIntegrals(const CGtoContainer* 
                     {
                         auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
-                        _compKineticEnergyForGtoBlocks(kinvals, bgtos, kgtos, nrow, ncol);
+                        _compKineticEnergyForGtoBlocks(distpat, bgtos, kgtos);
                     }
                 }
             }
         }
     }
     
+    // deallocate distribution pattern
+    
+    delete distpat;
+    
     return CKineticEnergyMatrix(kinmat);
 }
 
 void
-CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      double*    intsValues,
-                                                              const CGtoBlock& braGtoBlock,
-                                                              const CGtoBlock& ketGtoBlock,
-                                                              const int32_t    nRows,
-                                                              const int32_t    nColumns) const
+CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDistribution* distPattern,
+                                                              const CGtoBlock&            braGtoBlock,
+                                                              const CGtoBlock&            ketGtoBlock) const
 {
     // copy GTOs blocks for bra and ket sides
     
     auto bragtos = braGtoBlock;
     
     auto ketgtos = ketGtoBlock;
+    
+    // copy distribution pattern
+    
+    auto distpat = *distPattern;
     
     // set up spherical angular momentum for bra and ket sides
     
@@ -271,8 +297,6 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      double*    i
     
     // set up contracted GTOs dimensions
     
-    auto bdim = bragtos.getNumberOfContrGtos();
-    
     auto kdim = ketgtos.getNumberOfContrGtos();
     
     // allocate contracted Cartesian integrals buffer
@@ -287,11 +311,9 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      double*    i
     
     CMemBlock2D<double> spherbuffer(kdim, nspher);
     
-    // determine integrals storage scheme
+    // determine bra and ket sides symmetry
     
-    bool diagblk = (bragtos == ketgtos);
-    
-    bool origord = ((nRows == 0) && (nColumns == 0));
+    bool symbk = (bragtos == ketgtos);
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -326,15 +348,7 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      double*    i
         
         // add batch of integrals to integrals matrix
         
-        if (origord)
-        {
-            genfunc::distribute(intsValues, spherbuffer, bang, kang, bdim, kdim, i);
-        }
-        else
-        {
-            genfunc::distribute(intsValues, spherbuffer, bragtos, ketgtos,
-                                diagblk, nColumns, i);
-        }
+        distpat.distribute(spherbuffer, bragtos, ketgtos, symbk, i);
     }
 }
 

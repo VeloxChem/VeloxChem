@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef GtoBlock_hpp
 #define GtoBlock_hpp
@@ -211,6 +211,20 @@ public:
      @return the end positions of basis fucntions.
      */
     int32_t* getEndPositions();
+    
+    /**
+     Gets constant pointer to atomic identifiers vector.
+     
+     @return the atomic identifiers.
+     */
+    const int32_t* getAtomicIdentifiers() const;
+    
+    /**
+     Gets pointer to atomic identifiers vector.
+     
+     @return the atomic identifiers.
+     */
+    int32_t* getAtomicIdentifiers();
     
     /**
      Gets constant pointer to basis function indexes in full AO basis for

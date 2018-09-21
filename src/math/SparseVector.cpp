@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "SparseVector.hpp"
 
@@ -32,9 +32,9 @@ CSparseVector::CSparseVector(const std::vector<double>&  values,
 
     , _indexes(CMemBlock<int32_t>(indexes))
 
-    , _nElements(_values.size())
-
     , _nMaxElements(_values.size())
+
+    , _nElements(_values.size())
 
     , _threshold(threshold)
 {

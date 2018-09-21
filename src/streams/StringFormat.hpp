@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef StringFormat_hpp
 #define StringFormat_hpp
@@ -106,6 +106,14 @@ namespace fstr { // fstr namespace
                           const size_t width,
                           const fmt    aligment);
 
+    /**
+     Creates formatted string from boolean.
+     
+     @param source the boolean.
+     @return the formatted string.
+     */
+    std::string to_string(const bool source);
+    
     /**
      Converts angular momentum label to angular momentum quantum number.
      Supported angular momentum: from S to I.

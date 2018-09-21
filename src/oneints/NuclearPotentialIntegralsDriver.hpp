@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef NuclearPotentialIntegralsDriver_hpp
 #define NuclearPotentialIntegralsDriver_hpp
@@ -21,6 +21,7 @@
 #include "BoysFunction.hpp"
 #include "OutputStream.hpp"
 #include "SystemClock.hpp"
+#include "OneIntsDistributor.hpp"
 
 /**
  Class CNuclearPotentialIntegralsDriver computes one-electron nuclear potential
@@ -72,21 +73,17 @@ class CNuclearPotentialIntegralsDriver
     /**
      Computes nuclear potential integrals for specific pair of GTOs blocks.
      
-     @param intsValues the matrix of kinetic energy integrals.
+     @param distPattern the pointer to integrals distribution pattern.
      @param charges the vector of point charges.
      @param coordinates the vector of point charges coordines.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
-     @param nRows the number of rows in nuclear potential integrals matrix.
-     @param nColumns the number of columns in nuclear potential integrals matrix.
      */
-    void _compNuclearPotentialForGtoBlocks(      double*              intsValues,
-                                           const CMemBlock<double>*   charges,
-                                           const CMemBlock2D<double>* coordinates,
-                                           const CGtoBlock&           braGtoBlock,
-                                           const CGtoBlock&           ketGtoBlock,
-                                           const int32_t              nRows,
-                                           const int32_t              nColumns) const;
+    void _compNuclearPotentialForGtoBlocks(      COneIntsDistribution* distPattern,
+                                           const CMemBlock<double>*    charges,
+                                           const CMemBlock2D<double>*  coordinates,
+                                           const CGtoBlock&            braGtoBlock,
+                                           const CGtoBlock&            ketGtoBlock) const;
     
     /**
      Gets Obara-Saika recursion pattern for specific combination of GTOs blocks
@@ -221,15 +218,92 @@ public:
                                           MPI_Comm         comm) const;
     
     /**
-     Computes nuclear potential integrals blocks for pair of GTOs blocks.
+     Computes nuclear potential integrals for molecules in specific basis set
+     and stores results in nuclear potential matrix object.
      
-     @param intsValues the matrix of nuclear potential integrals.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param pchgMolecule the molecule providing nuclear point charges.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the nuclear potential matrix object.
+     */
+    CNuclearPotentialMatrix compute(const CMolecule&       molecule,
+                                    const CMolecularBasis& basis,
+                                    const CMolecule&       pchgMolecule,
+                                          COutputStream&   oStream,
+                                          MPI_Comm         comm) const;
+
+    /**
+     Computes nuclear potential integrals for molecules in two basis sets and
+     stores results in nuclear potential matrix object.
+     
+     @param molecule the molecule.
+     @param braBasis the molecular basis for bra side of nuclear potential matrix.
+     @param ketBasis the molecular basis for ket side of nuclear potential matrix.
+     @param pchgMolecule the molecule providing nuclear point charges.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the nuclear potential matrix object.
+     */
+    CNuclearPotentialMatrix compute(const CMolecule&       molecule,
+                                    const CMolecularBasis& braBasis,
+                                    const CMolecularBasis& ketBasis,
+                                    const CMolecule&       pchgMolecule,
+                                          COutputStream&   oStream,
+                                          MPI_Comm         comm) const;
+
+    /**
+     Computes nuclear potential integrals for two molecules in specific basis
+     set and stores results in nuclear potential matrix object.
+     
+     @param braMolecule the molecule for bra side of nuclear potential matrix.
+     @param ketMolecule the molecule for ket side of nuclear potential matrix.
+     @param basis the molecular basis.
+     @param pchgMolecule the molecule providing nuclear point charges.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the nuclear potential matrix object.
+     */
+    CNuclearPotentialMatrix compute(const CMolecule&       braMolecule,
+                                    const CMolecule&       ketMolecule,
+                                    const CMolecularBasis& basis,
+                                    const CMolecule&       pchgMolecule,
+                                          COutputStream&   oStream,
+                                          MPI_Comm         comm) const;
+
+    /**
+     Computes nuclear potential integrals for two molecules in two basis sets
+     and stores results in nuclear potential matrix object.
+     
+     @param braMolecule the molecule for bra side of nuclear potential matrix.
+     @param ketMolecule the molecule for ket side of nuclear potential matrix.
+     @param braBasis the molecular basis for bra side of nuclear potential matrix.
+     @param ketBasis the molecular basis for ket side of nuclear potential matrix.
+     @param pchgMolecule the molecule providing nuclear point charges.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the nuclear potential matrix object.
+     */
+    CNuclearPotentialMatrix compute(const CMolecule&       braMolecule,
+                                    const CMolecule&       ketMolecule,
+                                    const CMolecularBasis& braBasis,
+                                    const CMolecularBasis& ketBasis,
+                                    const CMolecule&       pchgMolecule,
+                                          COutputStream&   oStream,
+                                          MPI_Comm         comm) const;
+
+    /**
+     Computes nuclear potential integrals blocks for pair of GTOs blocks and
+     stores them into integrals batch.
+     
+     @param intsBatch the pointer to integrals batch buffer.
      @param charges the vector of point charges.
      @param coordinates the vector of point charges coordines.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
-    void compute(      double*              intsValues,
+    void compute(      double*              intsBatch,
                  const CMemBlock<double>*   charges,
                  const CMemBlock2D<double>* coordinates,
                  const CGtoBlock&           braGtoBlock,

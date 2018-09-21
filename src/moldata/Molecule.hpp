@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef Molecule_hpp
 #define Molecule_hpp
@@ -117,9 +117,25 @@ public:
     CMolecule(CMolecule&& source) noexcept;
 
     /**
+     Creates a molecule object by combining two molecule object.
+     
+     @param mol_1 the first molecule object.
+     @param mol_2 the second molecule object.
+     */
+    CMolecule(const CMolecule& mol_1, const CMolecule& mol_2);
+
+    /**
      Destroys a molecule object.
      */
     ~CMolecule();
+
+    /**
+     Creates a sub-molecule object by slicing the molecule object.
+     
+     @param start_index the starting index of the sub-molecule (0-based).
+     @param num_atoms the number of atoms in the sub-molecule.
+     */
+    CMolecule getSubMolecule(int32_t start_index, int32_t num_atoms);
 
     /**
      Assigns a molecule object by copying other molecule object.

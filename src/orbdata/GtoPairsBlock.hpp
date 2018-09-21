@@ -3,12 +3,13 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 #ifndef GtoPairsBlock_hpp
 #define GtoPairsBlock_hpp
 
 #include <cstdint>
+#include <vector>
 
 #include "MemBlock2D.hpp"
 #include "GtoBlock.hpp"
@@ -162,6 +163,23 @@ public:
      @return true if GTOs pairs block objects are not equal, false otherwise.
      */
     bool operator!=(const CGtoPairsBlock& other) const;
+    
+    
+    /**
+     Creates vector of GTOs pairs objects by splitting GTOs pairs object.
+
+     @param batchSize the size of contracted GTOs pairs batch.
+     @return the vector of GTOs pairs objects.
+     */
+    std::vector<CGtoPairsBlock> split(const int32_t batchSize) const;
+    
+    /**
+     Creates GTOs pairs object consisting from specific GTOs pairs object.
+
+     @param iGtoPair the index of requested GTOs pair.
+     @return the GTOs pairs object.
+     */
+    CGtoPairsBlock pick(const int32_t iGtoPair) const;
     
     /**
      Gets angular momentum of bra side in GTOs pairs block object.
@@ -393,6 +411,21 @@ public:
      @return the number of primitive pairs.
      */
     int32_t getNumberOfScreenedPrimPairs() const;
+    
+    /**
+     Gets maximum contraction depth of GTOs pair in GTOs pairs object.
+     
+     @return the maximum contraction depth.
+     */
+    int32_t getMaxContractionDepth() const;
+    
+    /**
+     Gets number of primitive pairs in set of contracted pairs ([0..iContrPair]).
+
+     @param iContrPair the index of lasr contracted pair.
+     @return the number of primitive pairs.
+     */
+    int32_t getNumberOfPrimPairs(const int32_t iContrPair) const;
     
     /**
      Gets number of initial contracted pairs generated from input data.

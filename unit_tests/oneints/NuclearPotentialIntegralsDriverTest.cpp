@@ -3,14 +3,15 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "NuclearPotentialIntegralsDriverTest.hpp"
 
 #include "NuclearPotentialIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
+#include "AssembleMatrices.hpp"
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7326,4 +7327,205 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeForLiH)
     CDenseMatrix tmat(intvals, 100, 100);
     
     ASSERT_EQ(npotmat, CNuclearPotentialMatrix(tmat));
+}
+
+TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
+{
+    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
+                                             mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+    
+    auto mh2o = vlxmol::getMoleculeH2O();
+    
+    auto mbas = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    CNuclearPotentialMatrix npotmat = npotdrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{ 62.261732410191456, -8.650991192817287,  2.065430486627472,
+                                  2.065430486627472, -0.000000000000000,  0.024052907649167,
+                                 -0.000000000000000, -8.650991192817287, 11.223085337897011,
+                                  3.857691679815866,  3.857691679815866, -0.000000000000000,
+                                  0.227986891499864, -0.000000000000000,  2.065430486627472,
+                                  3.857691679815866,  5.491589444662075,  2.309855005590105,
+                                  2.146701489224253,  1.786089614208450, -0.000000000000000,
+                                  2.065430486627472,  3.857691679815866,  2.309855005590105,
+                                  5.491589444662075, -2.146701489224253,  1.786089614208450,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                  2.146701489224253, -2.146701489224253, 10.042007304866125,
+                                 -0.000000000000000, -0.000000000000000,  0.024052907649167,
+                                  0.227986891499864,  1.786089614208450,  1.786089614208450,
+                                 -0.000000000000000,  9.979971897073703, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                  9.879888105835258};
+
+    ASSERT_EQ(npotmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
+
+    CDenseMatrix m (intvals, npotmat.getNumberOfRows(), npotmat.getNumberOfColumns());
+
+    ASSERT_EQ(npotmat, CNuclearPotentialMatrix(m));
+}
+
+TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
+{
+    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
+                                             mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+    
+    auto mdimer = vlxmol::getMoleculeH2ODimer();
+
+    auto mh2o_1 = mdimer.getSubMolecule(0,3);
+
+    auto mh2o_2 = mdimer.getSubMolecule(3,3);
+
+    auto mbas = vlxbas::getMolecularBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mbas, mdimer, ost, MPI_COMM_WORLD);
+                                                                  
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mbas, mdimer, ost, MPI_COMM_WORLD);
+
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mdimer, ost, MPI_COMM_WORLD);
+
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mdimer, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    CNuclearPotentialMatrix S_new = dimerfunc::assembleNuclearPotentialMatrices(
+                                               mh2o_1, mh2o_2, mbas, mbas,
+                                               S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
+}
+
+TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
+{
+    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
+                                             mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+
+    auto mdimer = vlxmol::getMoleculeNH3CH4();
+
+    auto mnh3 = mdimer.getSubMolecule(0,4);
+
+    auto mch4 = mdimer.getSubMolecule(4,5);
+    
+    auto mbas = vlxbas::getMinimalBasisForNH3CH4();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mbas, mdimer, ost, MPI_COMM_WORLD);
+                                                                                
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mbas, mdimer, ost, MPI_COMM_WORLD);
+
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mdimer, ost, MPI_COMM_WORLD);
+                                                                                
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mdimer, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    CNuclearPotentialMatrix S_new = dimerfunc::assembleNuclearPotentialMatrices(
+                                               mnh3, mch4, mbas, mbas,
+                                               S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
+}
+
+TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForTwoBasis)
+{
+    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
+                                             mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+    
+    auto h2o = vlxmol::getMoleculeH2O();
+    
+    auto ao_basis  = vlxbas::getMolecularBasisForH2O();
+
+    auto min_basis = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    CNuclearPotentialMatrix npotmat = npotdrv.compute(h2o, ao_basis, min_basis, h2o, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{-62.330818445846084,  8.873516667931849, -2.006175030692724,
+                                 -2.006175030692724, -0.000000000000000, -0.020725456424117,
+                                 -0.000000000000000, 12.097769134174202,  8.247109922279364,
+                                  3.889202405649832,  3.889202405649832, -0.000000000000000,
+                                  0.197958497971005, -0.000000000000000,  5.386150854940981,
+                                  7.078864731231282,  4.390287155756082,  4.390287155756082,
+                                 -0.000000000000000,  0.237769385097298, -0.000000000000000,
+                                  1.688244335889629,  3.302729561369462,  5.540231619940720,
+                                  1.593730269315078,  2.684921842531494,  2.167576321693008,
+                                 -0.000000000000000,  2.141451098117940,  3.824285258366312,
+                                  4.460356492579914,  2.740151902935604,  1.134556556449201,
+                                  1.021761830157180, -0.000000000000000,  1.688244335889629,
+                                  3.302729561369462,  1.593730269315078,  5.540231619940720,
+                                 -2.684921842531494,  2.167576321693007, -0.000000000000000,
+                                  2.141451098117940,  3.824285258366313,  2.740151902935604,
+                                  4.460356492579914, -1.134556556449201,  1.021761830157180,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                  1.509457241728980, -1.509457241728980, 10.892781427800529,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000,  2.410246188616577, -2.410246188616577,
+                                  5.587829900169669, -0.000000000000000, -0.000000000000000,
+                                 -2.577437867860573, -3.020773674783878, -1.240849532970108,
+                                 -1.483908424793870, -1.312569996064643, -2.748445469838690,
+                                 -0.000000000000000,  2.577437867860573,  3.020773674783878,
+                                  1.483908424793870,  1.240849532970108, -1.312569996064643,
+                                  2.748445469838690, -0.000000000000000,  0.031499623172589,
+                                  0.195943432260410,  1.254520856210464,  1.254520856210464,
+                                 -0.000000000000000, 10.846444588451012, -0.000000000000000,
+                                  0.005351283158051,  0.203192280280988,  2.007424454059257,
+                                  2.007424454059257, -0.000000000000000,  5.522170610351094,
+                                 -0.000000000000000, -2.023572738726907, -2.328887071670198,
+                                 -0.911619073275693, -0.358320039197348, -2.667201839637162,
+                                 -0.012577652702443, -0.000000000000000, -2.023572738726907,
+                                 -2.328887071670198, -0.358320039197348, -0.911619073275693,
+                                  2.667201839637161, -0.012577652702443, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 10.771687820967140, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000,  5.416240289443794, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000,  2.106816684235769,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                  2.106816684235769, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000,  0.994446643075144, -0.994446643075145,
+                                  0.254823666309497, -0.000000000000000, -0.000000000000000,
+                                  0.000436107773221,  0.014687067784768,  0.114160478589619,
+                                  0.114160478589620,  0.000000000000000,  0.165887053685720,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000, -0.000000000000000, -0.000000000000000,
+                                 -0.000000000000000,  0.136733651799431, -0.003218493932076,
+                                 -0.108391185500332, -0.655280900587007, -0.655280900587007,
+                                  0.000000000000000, -0.059045007255033, -0.000000000000000};
+
+    ASSERT_EQ(npotmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
+
+    CDenseMatrix m (intvals, npotmat.getNumberOfRows(), npotmat.getNumberOfColumns());
+
+    ASSERT_EQ(npotmat, CNuclearPotentialMatrix(m));
 }

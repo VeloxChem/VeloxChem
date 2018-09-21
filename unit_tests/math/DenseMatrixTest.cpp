@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "DenseMatrixTest.hpp"
 
@@ -142,6 +142,17 @@ TEST_F(CDenseMatrixTest, Row)
     r1dat[1] = -6.0;
     
     CDenseMatrix mb({8.0, -1.0, 9.0, -2.0, -6.0, 4.0}, 2, 3);
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CDenseMatrixTest, Zero)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 2, 3);
+    
+    ma.zero();
+    
+    CDenseMatrix mb({0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 2, 3);
     
     ASSERT_EQ(ma, mb);
 }

@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "ElectronicPotentialIntegralsDriver.hpp"
 
@@ -63,11 +63,27 @@ CElectronicPotentialIntegralsDriver::compute(const CMolecule&       molecule,
 }
 
 void
-CElectronicPotentialIntegralsDriver::compute(      double*    intsValues,
+CElectronicPotentialIntegralsDriver::compute(      double*    intsBatch,
                                              const CGtoBlock& braGtoBlock,
                                              const CGtoBlock& ketGtoBlock) const
 {
-    _compElectronicPotentialForGtoBlocks(intsValues, braGtoBlock, ketGtoBlock, 0, 0);
+    // determine dimensions of integrals batch
+    
+    auto nrow = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum())
+    
+              * braGtoBlock.getNumberOfContrGtos();
+    
+    auto ncol = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum())
+    
+             * ketGtoBlock.getNumberOfContrGtos();
+    
+    // set up distribution pattern
+    
+    COneIntsDistribution dist(intsBatch, nrow, ncol, dist1e::batch);
+    
+    // compute electronic potential integrals
+    
+    _compElectronicPotentialForGtoBlocks(&dist, braGtoBlock, ketGtoBlock);
 }
 
 CElectronicPotentialMatrix
@@ -78,7 +94,7 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialIntegrals(const CGt
     
     auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
     
-    // determine dimensions of electronic potential matrix
+    // determine dimensions of overlap matrix
     
     auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
     
@@ -88,12 +104,16 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialIntegrals(const CGt
     
     CDenseMatrix epotmat(nrow, ncol);
     
-    auto epotvals = epotmat.values();
+    // set up distributio pattern
+    
+    dist1e dstyp = (symbk) ? dist1e::symsq : dist1e::rect;
+    
+    COneIntsDistribution* distpat = new COneIntsDistribution(epotmat.values(),
+                                                             nrow, ncol, dstyp);
     
     // compute electronic potential integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, epotvals,\
-                                nrow, ncol, symbk)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat, symbk)
     {
         #pragma omp single nowait
         {
@@ -117,29 +137,34 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialIntegrals(const CGt
                     {
                          auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
-                        _compElectronicPotentialForGtoBlocks(epotvals, bgtos, kgtos,
-                                                             nrow, ncol);
+                        _compElectronicPotentialForGtoBlocks(distpat, bgtos, kgtos);
                     }
                 }
             }
         }
     }
     
+    // deallocate distribution pattern
+    
+    delete distpat;
+    
     return CElectronicPotentialMatrix(epotmat);
 }
 
 void
-CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      double*    intsValues,
-                                                                          const CGtoBlock& braGtoBlock,
-                                                                          const CGtoBlock& ketGtoBlock,
-                                                                          const int32_t    nRows,
-                                                                          const int32_t    nColumns) const
+CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      COneIntsDistribution* distPattern,
+                                                                          const CGtoBlock&            braGtoBlock,
+                                                                          const CGtoBlock&            ketGtoBlock) const
 {
     // copy GTOs blocks for bra and ket sides
     
     auto bragtos = braGtoBlock;
     
     auto ketgtos = ketGtoBlock;
+    
+    // copy distribution pattern
+    
+    auto distpat = *distPattern;
     
     // set up spherical angular momentum for bra and ket sides
     
@@ -185,8 +210,6 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      
     
     // set up contracted GTOs dimensions
     
-    auto bdim = bragtos.getNumberOfContrGtos();
-    
     auto kdim = ketgtos.getNumberOfContrGtos();
     
     // allocate contracted Cartesian integrals buffer
@@ -211,11 +234,9 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      
     
     CMemBlock2D<double> bvals(pdim, bord + 1);
     
-    // determine integrals storage scheme
+    // determine bra and ket sides symmetry
     
-    bool diagblk = (bragtos == ketgtos);
-    
-    bool origord = ((nRows == 0) && (nColumns == 0));
+    bool symbk = (bragtos == ketgtos);
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -251,15 +272,7 @@ CElectronicPotentialIntegralsDriver::_compElectronicPotentialForGtoBlocks(      
         
         // add batch of integrals to integrals matrix
         
-        if (origord)
-        {
-            genfunc::distribute(intsValues, spherbuffer, bang, kang, bdim, kdim, i);
-        }
-        else
-        {
-            genfunc::distribute(intsValues, spherbuffer, bragtos, ketgtos,
-                                diagblk, nColumns, i);
-        }
+        distpat.distribute(spherbuffer, bragtos, ketgtos, symbk, i);
     }
 }
 

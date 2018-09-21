@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "Molecule.hpp"
 
@@ -94,9 +94,151 @@ CMolecule::CMolecule(CMolecule&& source) noexcept
 
 }
 
+CMolecule::CMolecule(const CMolecule& mol_1, const CMolecule& mol_2)
+{
+    std::vector<double>      atomCoordinates;
+    std::vector<double>      atomCharges;
+    std::vector<double>      atomMasses;
+    std::vector<std::string> atomLabels;
+    std::vector<int32_t>     idsElemental;
+
+    // x, y, and z coordinates
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_1._atomCoordinates.data(0)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_2._atomCoordinates.data(0)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_1._atomCoordinates.data(1)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_2._atomCoordinates.data(1)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_1._atomCoordinates.data(2)[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCoordinates.push_back(mol_2._atomCoordinates.data(2)[i]);
+    }
+
+    // charges, masses, labels, ids
+
+    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
+    {
+        atomCharges.push_back(mol_1._atomCharges.data()[i]);
+
+        atomMasses.push_back(mol_1._atomMasses.data()[i]);
+
+        atomLabels.push_back(mol_1._atomLabels.data()[i]);
+
+        idsElemental.push_back(mol_1._idsElemental.data()[i]);
+    }
+
+    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
+    {
+        atomCharges.push_back(mol_2._atomCharges.data()[i]);
+
+        atomMasses.push_back(mol_2._atomMasses.data()[i]);
+
+        atomLabels.push_back(mol_2._atomLabels.data()[i]);
+
+        idsElemental.push_back(mol_2._idsElemental.data()[i]);
+    }
+
+    // set up combined molecule
+
+    auto natoms = static_cast<int32_t>(idsElemental.size());
+    
+    _atomCoordinates = CMemBlock2D<double>(atomCoordinates, natoms, 3);
+    
+    _atomCharges = CMemBlock<double>(atomCharges);
+    
+    _atomMasses = CMemBlock<double>(atomMasses);
+    
+    _atomLabels = atomLabels;
+    
+    _idsElemental = CMemBlock<int32_t>(idsElemental);
+    
+    setAtomicIndexes(0);
+
+    setCharge(mol_1._charge + mol_2._charge);
+
+    setMultiplicity(mol_1._multiplicity + mol_2._multiplicity - 1);
+}
+
 CMolecule::~CMolecule()
 {
 
+}
+
+CMolecule
+CMolecule::getSubMolecule(int32_t start_index, int32_t num_atoms)
+{
+    std::vector<double>      atomCoordinates;
+    std::vector<double>      atomCharges;
+    std::vector<double>      atomMasses;
+    std::vector<std::string> atomLabels;
+    std::vector<int32_t>     idsElemental;
+
+    // boundary check
+
+    auto total_natoms = getNumberOfAtoms();
+
+    if (start_index < 0 || num_atoms <= 0 || start_index + num_atoms > total_natoms)
+    {
+        return CMolecule();
+    }
+
+    // x, y, and z coordinates
+
+    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    {
+        atomCoordinates.push_back(_atomCoordinates.data(0)[i]);
+    }
+
+    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    {
+        atomCoordinates.push_back(_atomCoordinates.data(1)[i]);
+    }
+
+    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    {
+        atomCoordinates.push_back(_atomCoordinates.data(2)[i]);
+    }
+
+    // charges, masses, labels, ids
+
+    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    {
+        atomCharges.push_back(_atomCharges.data()[i]);
+
+        atomMasses.push_back(_atomMasses.data()[i]);
+
+        atomLabels.push_back(_atomLabels.data()[i]);
+
+        idsElemental.push_back(_idsElemental.data()[i]);
+    }
+
+    // create sub-molecule
+
+    return CMolecule(atomCoordinates,
+                     atomCharges,
+                     atomMasses,
+                     atomLabels,
+                     idsElemental);
 }
 
 CMolecule&
@@ -372,7 +514,7 @@ CMolecule::printGeometry(COutputStream& oStream) const
     
     auto coordz = _atomCoordinates.data(2);
     
-    for (size_t i = 0; i < _atomCoordinates.size(0); i++)
+    for (int32_t i = 0; i < _atomCoordinates.size(0); i++)
     {
         std::string label("  ");
         

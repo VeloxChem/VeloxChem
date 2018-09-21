@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef GenFunc_hpp
 #define GenFunc_hpp
@@ -91,6 +91,34 @@ namespace genfunc { // genfunc namespace
                   const int32_t               iContrGto);
     
     /**
+     Contracts set of primitive data vectoes to contracted data vectors using
+     two step procedure. NOTE: Primitive data is destroyed during contraction
+     process.
+     
+     @param contrData the contracted data vectors.
+     @param primData the primitive data vectors.
+     @param contrPattern the contracted data vectors distribution pattern.
+     @param contrIndexes the contracted data vectors indexing pattern.
+     @param primPattern the primitive data vectors distribution pattern.
+     @param primIndexes the primitive data vectors indexing pattern,
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTOs pair on bra side.
+     */
+    void contract(      CMemBlock2D<double>&  contrData,
+                        CMemBlock2D<double>&  primData,
+                  const CVecThreeIndexes&     contrPattern,
+                  const std::vector<int32_t>& contrIndexes,
+                  const CVecThreeIndexes&     primPattern,
+                  const std::vector<int32_t>& primIndexes,
+                  const CGtoPairsBlock&       braGtoPairsBlock,
+                  const CGtoPairsBlock&       ketGtoPairsBlock,
+                  const bool                  isBraEqualKet,
+                  const int32_t               iContrPair);
+    
+    /**
      Transforms Cartesian data vectors to spherical data vectors.
 
      @param spherData the spherical data vectors.
@@ -171,6 +199,60 @@ namespace genfunc { // genfunc namespace
                    const int32_t              cartIndex,
                    const int32_t              nElements,
                    const int32_t              nBlocks);
+    
+    /**
+     Transforms Cartesian integrals to half-transformed  integrals by
+     applying ket side transformation: <cart|g(x,y)|cart> to <cart|g(x,y)|spher>.
+     
+     @param spherData the spherical data vectors.
+     @param cartData the Cartesian data vectors.
+     @param ketMomentumC the spherical momentum object for C center on ket side.
+     @param ketMomentumD the spherical momentum object for D center on ket side.
+     @param spherPattern the half-transformed data vectors distribution pattern.
+     @param spherIndexes the half-transformend data vectors indexing pattern.
+     @param cartPattern the Cartesian data vectors distribution pattern.
+     @param cartIndexes the Cartesian data vectors indexing pattern.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+     blocks.
+     @param iContrPair the index of contracted GTOs pair on bra side.
+     */
+    void transform_ket(      CMemBlock2D<double>&  spherData,
+                       const CMemBlock2D<double>&  cartData,
+                       const CSphericalMomentum&   ketMomentumC,
+                       const CSphericalMomentum&   ketMomentumD,
+                       const CVecFourIndexes&      spherPattern,
+                       const std::vector<int32_t>& spherIndexes,
+                       const CVecThreeIndexes&     cartPattern,
+                       const std::vector<int32_t>& cartIndexes,
+                       const CGtoPairsBlock&       ketGtoPairsBlock,
+                       const bool                  isBraEqualKet,
+                       const int32_t               iContrPair);
+    
+    /**
+     Transforms half-transformed integrals to spherical integrals by
+     applying bra side transformation: <cart|g(x,y)|spher> to <spher|g(x,y)|spher>.
+     
+     @param spherData the spherical data vectors.
+     @param cartData the Cartesian data vectors.
+     @param ketMomentumA the spherical momentum object for A center on bra side.
+     @param ketMomentumB the spherical momentum object for B center on bra side.
+     @param cartPattern the Cartesian data vectors distribution pattern.
+     @param cartIndexes the Cartesian data vectors indexing pattern.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+     blocks.
+     @param iContrPair the index of contracted GTOs pair on bra side.
+     */
+    void transform_bra(      CMemBlock2D<double>&  spherData,
+                       const CMemBlock2D<double>&  cartData,
+                       const CSphericalMomentum&   ketMomentumA,
+                       const CSphericalMomentum&   ketMomentumB,
+                       const CVecFourIndexes&      cartPattern,
+                       const std::vector<int32_t>& cartIndexes,
+                       const CGtoPairsBlock&       ketGtoPairsBlock,
+                       const bool                  isBraEqualKet,
+                       const int32_t               iContrPair);
     
     /**
      Reshapes batch of integrals batch (1 contracted GTO on bra side x all
@@ -269,9 +351,20 @@ namespace genfunc { // genfunc namespace
                     const CThreeIndexes&    triple);
     
     /**
+     Checks if four indexes object is inside vector of four indexes objects.
+     
+     @param vector the vector of four indexes objects.
+     @param quadruple the four indexes object.
+     @return true if four indexes object is found in vector of four indexes
+     objects, false - otherwise.
+     */
+    bool isInVector(const CVecFourIndexes& vector,
+                    const CFourIndexes&    quadruple);
+    
+    /**
      Conditionally adds two indexes object to vector of two indexes objects.
      Addition is skipped if two indexes object is not valid indexing pair or
-     is already resides in vector of two indexes objects.
+     already resides in vector of two indexes objects.
 
      @param vector the vector of two indexes objects.
      @param pair the two indexes object.
@@ -284,7 +377,7 @@ namespace genfunc { // genfunc namespace
     /**
     Conditionally adds three indexes object to vector of three indexes objects.
     Addition is skipped if three indexes object is not valid indexing triple or
-    is already resides in vector of three indexes objects.
+    already resides in vector of three indexes objects.
         
     @param vector the vector of three indexes objects.
     @param triple the three indexes object.
@@ -293,6 +386,19 @@ namespace genfunc { // genfunc namespace
     */
     bool addValidAndUniqueTriple(      CVecThreeIndexes& vector,
                                  const CThreeIndexes&    triple);
+    
+    /**
+     Conditionally adds four indexes object to vector of four indexes objects.
+     Addition is skipped if four indexes object is not valid indexing quadruple
+     or already resides in vector of four indexes objects.
+     
+     @param vector the vector of three indexes objects.
+     @param quadruple the four indexes object.
+     @return true if four indexes object is added to vector of four indexes
+     objects, false otherwise.
+     */
+    bool addValidAndUniqueQuadruple(      CVecFourIndexes& vector,
+                                    const CFourIndexes&    quadruple);
     
     /**
      Finds index from vector of indexes associated with two indexes object in
@@ -321,6 +427,19 @@ namespace genfunc { // genfunc namespace
                             const CThreeIndexes&        triple);
     
     /**
+     Finds index from vector of indexes associated with four indexes object in
+     vector of four indexes objects.
+     
+     @param indexes the vector of indexes.
+     @param vector the vector of four indexes objects.
+     @param quadruple the four indexes object.
+     @return the index assocated with quadruple indexes object.
+     */
+    int32_t findQuadrupleIndex(const std::vector<int32_t>& indexes,
+                               const CVecFourIndexes&      vector,
+                               const CFourIndexes&         quadruple);
+    
+    /**
      Gets maximum order of indexes pair in vector of triple indexes objects,
      where third index in triple object is used to store order information.
 
@@ -342,6 +461,16 @@ namespace genfunc { // genfunc namespace
      @return the vector of three indexes objects of (x,y,0) type.
      */
     CVecThreeIndexes getPairsFromTripleIndexes(const CVecThreeIndexes& vector);
+    
+    /**
+     Creates vector of three indexes objects of (x,y,z) type coresponding to
+     all four index objects of (0,x,y,z) type found in vector of four indexes
+     objects.
+     
+     @param vector the vector of four indexes objects.
+     @return the vector of three indexes objects of (x,y,z) type.
+     */
+    CVecThreeIndexes getTriplesFromQuadrupleIndexes(const CVecFourIndexes& vector);
 
 } // genfunc namespace
 

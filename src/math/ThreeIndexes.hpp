@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef ThreeIndexes_hpp
 #define ThreeIndexes_hpp
@@ -47,7 +47,7 @@ public:
      
      @param iIndex the first index from triple of indexes.
      @param jIndex the second index from triple of indexes.
-     @param kIndex the second index from triple of indexes.
+     @param kIndex the third index from triple of indexes.
      */
     CThreeIndexes(const int32_t iIndex,
                   const int32_t jIndex,
@@ -61,7 +61,7 @@ public:
     CThreeIndexes(const CThreeIndexes& source);
 
     /**
-     Creates a three indexes object by moving other two indexes object.
+     Creates a three indexes object by moving other three indexes object.
      
      @param source the three indexes object.
      */

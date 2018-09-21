@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "MolecularBasisTest.hpp"
 
@@ -102,6 +102,19 @@ TEST_F(CMolecularBasisTest, GetMaxAngularMomentumWithIdElemental)
     ASSERT_EQ(1, ambas.getMaxAngularMomentum(3));
 
     ASSERT_EQ(-1, ambas.getMaxAngularMomentum(2));
+}
+
+TEST_F(CMolecularBasisTest, GetMolecularMaxAngularMomentum)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+    
+    CMolecularBasis ao_basis = vlxbas::getMolecularBasisForH2O();
+
+    CMolecularBasis min_basis = vlxbas::getMinimalBasisForH2O();
+
+    ASSERT_EQ(2, ao_basis.getMolecularMaxAngularMomentum(h2o));
+
+    ASSERT_EQ(1, min_basis.getMolecularMaxAngularMomentum(h2o));
 }
 
 TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctions)
@@ -255,7 +268,7 @@ TEST_F(CMolecularBasisTest, GetBasisFunctions)
 
     auto bfa = mbas.getBasisFunctions(1, 0);
 
-    ASSERT_EQ(2, bfa.size());
+    ASSERT_EQ(2u, bfa.size());
 
     ASSERT_EQ(bfa[0], CBasisFunction({1.301070100000e+01, 1.962257200000e+00,
                                       4.445379600000e-01},
@@ -268,34 +281,34 @@ TEST_F(CMolecularBasisTest, GetBasisFunctions)
 
     bfa = mbas.getBasisFunctions(1, 1);
 
-    ASSERT_EQ(1, bfa.size());
+    ASSERT_EQ(1u, bfa.size());
 
     ASSERT_EQ(bfa[0], CBasisFunction({8.000000000000e-01}, {1.000000000000e+00},
                                      1));
 
     bfa = mbas.getBasisFunctions(1, 2);
 
-    ASSERT_EQ(0, bfa.size());
+    ASSERT_EQ(0u, bfa.size());
 
     // boron atom
 
     bfa = mbas.getBasisFunctions(5, 0);
 
-    ASSERT_EQ(0, bfa.size());
+    ASSERT_EQ(0u, bfa.size());
 
     bfa = mbas.getBasisFunctions(5, 1);
 
-    ASSERT_EQ(0, bfa.size());
+    ASSERT_EQ(0u, bfa.size());
 
     bfa = mbas.getBasisFunctions(5, 2);
 
-    ASSERT_EQ(0, bfa.size());
+    ASSERT_EQ(0u, bfa.size());
 
     // lithium atom
 
     bfa = mbas.getBasisFunctions(3, 0);
 
-    ASSERT_EQ(3, bfa.size());
+    ASSERT_EQ(3u, bfa.size());
 
     ASSERT_EQ(bfa[0], CBasisFunction({2.662778551600e+02, 4.006978344700e+01,
                                       9.055994438900e+00, 2.450300905100e+00,
@@ -312,7 +325,7 @@ TEST_F(CMolecularBasisTest, GetBasisFunctions)
 
     bfa = mbas.getBasisFunctions(3, 1);
 
-    ASSERT_EQ(2, bfa.size());
+    ASSERT_EQ(2u, bfa.size());
 
     ASSERT_EQ(bfa[0], CBasisFunction({1.450000000000e+00, 3.000000000000e-01},
                                      {2.586000000000e-01, 1.000000000000e+00},
@@ -323,5 +336,5 @@ TEST_F(CMolecularBasisTest, GetBasisFunctions)
 
     bfa = mbas.getBasisFunctions(3, 2);
 
-    ASSERT_EQ(0, bfa.size());
+    ASSERT_EQ(0u, bfa.size());
 }

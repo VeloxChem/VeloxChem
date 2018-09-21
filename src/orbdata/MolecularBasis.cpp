@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "MolecularBasis.hpp"
 
@@ -143,6 +143,26 @@ CMolecularBasis::getMaxAngularMomentum(const int32_t idElemental) const
     return -1;
 }
 
+int32_t
+CMolecularBasis::getMolecularMaxAngularMomentum(const CMolecule& molecule) const
+{
+    int32_t max_angl = 0;
+
+    auto elmlst = molecule.getElementalComposition();
+    
+    for (auto i = elmlst.cbegin(); i != elmlst.cend(); ++i)
+    {
+        int32_t elem_angl = getMaxAngularMomentum(*i);
+
+        if (max_angl < elem_angl)
+        {
+            max_angl = elem_angl;
+        }
+    }
+
+    return max_angl;
+}
+
 std::string
 CMolecularBasis::getLabel() const
 {
@@ -206,7 +226,7 @@ CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
 {
     int32_t npfuncs = 0;
     
-    for (int32_t i = 0; i < _atomicBasisSets.size(); i++)
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
     {
         npfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
         

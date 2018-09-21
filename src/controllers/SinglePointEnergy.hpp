@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef SinglePointEnergy_hpp
 #define SinglePointEnergy_hpp
@@ -39,6 +39,11 @@ class CSinglePointEnergy : public CBaseJob
      The AO-RI/J(K) basis set.
      */
     CMolecularBasis _riBasis;
+
+    /**
+     The minimal AO basis set for initial guess
+     */
+    CMolecularBasis _minBasis;
 
     //CAODensityMatrix _density;
 

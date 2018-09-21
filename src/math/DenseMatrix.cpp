@@ -3,13 +3,15 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "DenseMatrix.hpp"
+#include "StringFormat.hpp"
 
 #include <utility>
 #include <cmath>
+#include <sstream>
 
 CDenseMatrix::CDenseMatrix()
 
@@ -24,11 +26,11 @@ CDenseMatrix::CDenseMatrix(const std::vector<double>& values,
                            const int32_t              nRows,
                            const int32_t              nColumns)
 
-    : _values(CMemBlock<double>(values))
-
-    , _nRows(nRows)
+    : _nRows(nRows)
 
     , _nColumns(nColumns)
+
+    , _values(CMemBlock<double>(values))
 {
     
 }
@@ -36,22 +38,22 @@ CDenseMatrix::CDenseMatrix(const std::vector<double>& values,
 CDenseMatrix::CDenseMatrix(const int32_t nRows,
                            const int32_t nColumns)
 
-    : _values(CMemBlock<double>(nRows * nColumns))
-
-    , _nRows(nRows)
+    : _nRows(nRows)
 
     , _nColumns(nColumns)
+
+    , _values(CMemBlock<double>(nRows * nColumns))
 {
     
 }
 
 CDenseMatrix::CDenseMatrix(const int32_t nRows)
 
-    : _values(CMemBlock<double>(nRows * nRows))
-
-    , _nRows(nRows)
+    : _nRows(nRows)
 
     , _nColumns(nRows)
+
+    , _values(CMemBlock<double>(nRows * nRows))
 {
     
 }
@@ -179,6 +181,34 @@ CDenseMatrix::row(const int32_t iRow)
     }
     
     return nullptr;
+}
+
+std::string
+CDenseMatrix::getString() const
+{
+    std::stringstream sst("");
+    
+    auto vals = _values.data();
+    
+    sst << "[Dimension " << _nRows << " x " << _nColumns << "]" << std::endl;
+    
+    for (int32_t i = 0; i < _nRows; i++)
+    {
+        for (int32_t j = 0; j < _nColumns; j++)
+        {
+            sst << fstr::to_string(vals[i * _nColumns + j], 8, 15, fmt::right);
+        }
+        
+        sst << std::endl;
+    }
+    
+    return sst.str();
+}
+
+void
+CDenseMatrix::zero()
+{
+    mathfunc::zero(_values.data(), _nRows * _nColumns); 
 }
 
 std::ostream&

@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "NuclearPotentialMatrix.hpp"
 
@@ -71,6 +71,36 @@ bool
 CNuclearPotentialMatrix::operator!=(const CNuclearPotentialMatrix& other) const
 {
     return !(*this == other);
+}
+
+std::string
+CNuclearPotentialMatrix::getString() const
+{
+    return _matrix.getString();
+}
+
+int32_t
+CNuclearPotentialMatrix::getNumberOfRows() const
+{
+    return _matrix.getNumberOfRows();
+}
+
+int32_t
+CNuclearPotentialMatrix::getNumberOfColumns() const
+{
+    return _matrix.getNumberOfColumns();
+}
+
+int32_t
+CNuclearPotentialMatrix::getNumberOfElements() const
+{
+    return _matrix.getNumberOfElements();
+}
+
+const double*
+CNuclearPotentialMatrix::values() const
+{
+    return _matrix.values();
 }
 
 std::ostream&

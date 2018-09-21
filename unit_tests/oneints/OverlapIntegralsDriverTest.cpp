@@ -3,15 +3,15 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "OverlapIntegralsDriverTest.hpp"
 
 #include "OverlapIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
-#include "DenseMatrix.hpp"
+#include "AssembleMatrices.hpp"
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7228,4 +7228,205 @@ TEST_F(COverlapIntegralsDriverTest, ComputeForLiH)
     CDenseMatrix tmat(intvals, 100, 100);
     
     ASSERT_EQ(ovlmat, COverlapMatrix(tmat));
+}
+
+TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2O)
+{
+    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
+                                   mpi::nodes(MPI_COMM_WORLD),
+                                   MPI_COMM_WORLD);
+    
+    auto mh2o = vlxmol::getMoleculeH2O();
+    
+    auto mbas = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    COverlapMatrix ovlmat = ovldrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{ 1.000000000000000,  0.000001138186634,  0.066919971398352,
+                                 0.066919971398352,  0.000000000000000,  0.000000000000000,
+                                 0.000000000000000,  0.000001138186634,  1.000000000000000,
+                                 0.527761226196536,  0.527761226196536,  0.000000000000000,
+                                 0.000000000000000,  0.000000000000000,  0.066919971398352,
+                                 0.527761226196536,  1.000000000000000,  0.388569260509849,
+                                 0.323599846356892,  0.254257022137558,  0.000000000000000,
+                                 0.066919971398352,  0.527761226196536,  0.388569260509849,
+                                 1.000000000000000, -0.323599846356892,  0.254257022137558,
+                                 0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                 0.323599846356892, -0.323599846356892,  1.000000000000000,
+                                 0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                 0.000000000000000,  0.254257022137558,  0.254257022137558,
+                                 0.000000000000000,  1.000000000000000,  0.000000000000000,
+                                 0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                 0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                 1.000000000000000};
+
+    ASSERT_EQ(ovlmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
+
+    CDenseMatrix m (intvals, ovlmat.getNumberOfRows(), ovlmat.getNumberOfColumns());
+
+    ASSERT_EQ(ovlmat, COverlapMatrix(m));
+}
+
+TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
+{
+    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
+                                   mpi::nodes(MPI_COMM_WORLD),
+                                   MPI_COMM_WORLD);
+    
+    auto mdimer = vlxmol::getMoleculeH2ODimer();
+
+    auto mh2o_1 = mdimer.getSubMolecule(0,3);
+
+    auto mh2o_2 = mdimer.getSubMolecule(3,3);
+    
+    auto mbas = vlxbas::getMolecularBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    COverlapMatrix S = ovldrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S11 = ovldrv.compute(mh2o_1, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S22 = ovldrv.compute(mh2o_2, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S12 = ovldrv.compute(mh2o_1, mh2o_2, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S21 = ovldrv.compute(mh2o_2, mh2o_1, mbas, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    COverlapMatrix S_new = dimerfunc::assembleOverlapMatrices(
+                                      mh2o_1, mh2o_2, mbas, mbas,
+                                      S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
+}
+
+TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForNH3CH4)
+{
+    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
+                                   mpi::nodes(MPI_COMM_WORLD),
+                                   MPI_COMM_WORLD);
+
+    auto mdimer = vlxmol::getMoleculeNH3CH4();
+
+    auto mnh3 = mdimer.getSubMolecule(0,4);
+
+    auto mch4 = mdimer.getSubMolecule(4,5);
+    
+    auto mbas = vlxbas::getMinimalBasisForNH3CH4();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    COverlapMatrix S = ovldrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S11 = ovldrv.compute(mnh3, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S22 = ovldrv.compute(mch4, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S12 = ovldrv.compute(mnh3, mch4, mbas, ost, MPI_COMM_WORLD);
+
+    COverlapMatrix S21 = ovldrv.compute(mch4, mnh3, mbas, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    COverlapMatrix S_new = dimerfunc::assembleOverlapMatrices(
+                                      mnh3, mch4, mbas, mbas,
+                                      S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
+}
+
+TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForTwoBasis)
+{
+    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
+                                   mpi::nodes(MPI_COMM_WORLD),
+                                   MPI_COMM_WORLD);
+    
+    auto h2o = vlxmol::getMoleculeH2O();
+    
+    auto ao_basis  = vlxbas::getMolecularBasisForH2O();
+
+    auto min_basis = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    COverlapMatrix ovlmat = ovldrv.compute(h2o, ao_basis, min_basis, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{ -0.999725064261023,  0.018870459069969, -0.061222289562095,
+                                 -0.061222289562095,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.363566475721069,  0.900125619840061,
+                                  0.398616619247294,  0.398616619247294,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.170727255398788,
+                                  0.908051175865939,  0.654897168951498,  0.654897168951498,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.055094665531777,  0.435894843242583,  0.930947272271856,
+                                  0.236795065398953,  0.381928053205371,  0.300086327518506,
+                                  0.000000000000000,  0.068918962291858,  0.541895411523244,
+                                  0.903611380613688,  0.497691990720010,  0.197770155792241,
+                                  0.155390836693904,  0.000000000000000,  0.055094665531777,
+                                  0.435894843242583,  0.236795065398953,  0.930947272271856,
+                                 -0.381928053205371,  0.300086327518506,  0.000000000000000,
+                                  0.068918962291858,  0.541895411523244,  0.497691990720010,
+                                  0.903611380613688, -0.197770155792241,  0.155390836693904,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.174861418234671, -0.174861418234671,  0.916850415491323,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.441302734534691, -0.441302734534691,
+                                  0.805636497660398,  0.000000000000000,  0.000000000000000,
+                                 -0.083037983563247, -0.322441067526812, -0.000000000000000,
+                                 -0.171233943413531, -0.081034871867513, -0.302326183749816,
+                                  0.000000000000000,  0.083037983563247,  0.322441067526812,
+                                  0.171233943413531,  0.000000000000000, -0.081034871867513,
+                                  0.302326183749816,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.137391114327241,  0.137391114327241,
+                                  0.000000000000000,  0.916850415491323,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.346737862848686,
+                                  0.346737862848686,  0.000000000000000,  0.805636497660398,
+                                  0.000000000000000, -0.065244129942551, -0.253346553056781,
+                                  0.000000000000000,  0.000000000000000, -0.302326183749815,
+                                  0.066201905932721,  0.000000000000000, -0.065244129942551,
+                                 -0.253346553056781,  0.000000000000000,  0.000000000000000,
+                                  0.302326183749815,  0.066201905932721,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.916850415491323,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.805636497660398,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.303743907450434,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.303743907450434,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.124103773121709, -0.124103773121709,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.010701175174306,
+                                  0.010701175174306,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000, -0.078975128350178, -0.078975128350178,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000};
+ 
+    ASSERT_EQ(ovlmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
+
+    CDenseMatrix m (intvals, ovlmat.getNumberOfRows(), ovlmat.getNumberOfColumns());
+
+    ASSERT_EQ(ovlmat, COverlapMatrix(m));
 }

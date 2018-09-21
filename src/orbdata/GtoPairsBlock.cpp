@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "GtoPairsBlock.hpp"
 
@@ -525,6 +525,117 @@ CGtoPairsBlock::operator==(const CGtoPairsBlock& other) const
     return true;
 }
 
+std::vector<CGtoPairsBlock>
+CGtoPairsBlock::split(const int32_t batchSize) const
+{
+    // determine number of batches
+    
+    auto nbtch = _nScreenedContrPairs / batchSize;
+    
+    if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
+    
+    // set up batches distribution pattern
+    
+    CMemBlock2D<int32_t> bblk(nbtch, 2);
+    
+    mpi::batches_pattern(bblk.data(0), _nScreenedContrPairs, nbtch);
+    
+    mathfunc::indexes(bblk.data(1), bblk.data(0), nbtch);
+    
+    // set up pointers to distribution pattern
+    
+    auto boff = bblk.data(1);
+    
+    auto bdim = bblk.data(0);
+    
+    // primitive space start and end positions
+    
+    auto spos = getStartPositions();
+    
+    auto epos = getEndPositions();
+    
+    // split GTOs pairs block
+    
+    std::vector<CGtoPairsBlock> ppvec;
+    
+    for (int32_t i = 0; i < nbtch; i++)
+    {
+        // slice contracted GTOs pairs
+        
+        auto cidx = boff[i];
+        
+        auto cdim = bdim[i];
+        
+        auto cdat = _contrPattern.slice(cidx, cdim);
+        
+        // slice primitive GTOs pairs
+        
+        auto pidx = spos[cidx];
+        
+        auto pdim = epos[cidx + cdim - 1] - pidx;
+        
+        auto pdat = _pairFactors.slice(pidx, pdim);
+        
+        // adjust primitive GTOs pairs indexing
+        
+        auto scurpos = cdat.data(0);
+        
+        auto ecurpos = cdat.data(1);
+        
+        for (int32_t j = 0; j < cdim; j++)
+        {
+            scurpos[j] = spos[cidx + j] - pidx;
+            
+            ecurpos[j] = epos[cidx + j] - pidx;
+        }
+        
+        ppvec.push_back(CGtoPairsBlock(cdat, pdat, _braAngularMomentum,
+                                       _ketAngularMomentum, _threshold));
+    }
+    
+    return ppvec;
+}
+
+CGtoPairsBlock
+CGtoPairsBlock::pick(const int32_t iGtoPair) const
+{
+    if (iGtoPair < _nScreenedContrPairs)
+    {
+        // primitive space start and end positions
+        
+        auto spos = getStartPositions();
+        
+        auto epos = getEndPositions();
+        
+        // slice contracted GTOs pairs
+        
+        auto cdat = _contrPattern.slice(iGtoPair, 1);
+        
+        // slice primitive GTOs pairs
+        
+        auto pidx = spos[iGtoPair];
+        
+        auto pdim = epos[iGtoPair] - pidx;
+        
+        auto pdat = _pairFactors.slice(pidx, pdim);
+        
+        // adjust primitive GTOs pairs indexing
+        
+        auto scurpos = cdat.data(0);
+        
+        auto ecurpos = cdat.data(1);
+        
+        scurpos[0] = 0;
+            
+        ecurpos[0] = pdim;
+        
+        return CGtoPairsBlock(cdat, pdat, _braAngularMomentum, _ketAngularMomentum,
+                              _threshold);
+    }
+    
+    return CGtoPairsBlock(); 
+}
+
 int32_t
 CGtoPairsBlock::getBraAngularMomentum() const
 {
@@ -756,6 +867,37 @@ int32_t
 CGtoPairsBlock::getNumberOfScreenedPrimPairs() const
 {
     return _nScreenedPrimPairs;
+}
+
+int32_t
+CGtoPairsBlock::getMaxContractionDepth() const
+{
+    // set up pointers to positions data
+    
+    auto spos = getStartPositions();
+    
+    auto epos = getEndPositions();
+    
+    // loop over contracted GTOs pairs
+    
+    int32_t mpdim = 0;
+    
+    for (int32_t i = 0; i < _contrPattern.size(0); i++)
+    {
+        auto cpdim = epos[i] - spos[i];
+        
+        if (cpdim > mpdim) mpdim = cpdim;
+    }
+    
+    return mpdim;
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfPrimPairs(const int32_t iContrPair) const
+{
+    auto epos = getEndPositions();
+    
+    return epos[iContrPair]; 
 }
 
 int32_t

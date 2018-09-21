@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "GtoPairsContainer.hpp"
 
@@ -104,6 +104,24 @@ bool
 CGtoPairsContainer::operator!=(const CGtoPairsContainer& other) const
 {
     return !(*this == other);
+}
+
+CGtoPairsContainer
+CGtoPairsContainer::split(const int32_t batchSize) const
+{
+    std::vector<CGtoPairsBlock> ppvec;
+    
+    for (size_t i = 0; i < _gtoPairsBlocks.size(); i++)
+    {
+        auto cvec = _gtoPairsBlocks[i].split(batchSize);
+        
+        for (size_t j = 0; j < cvec.size(); j++)
+        {
+            ppvec.push_back(cvec[j]);
+        }
+    }
+    
+   return CGtoPairsContainer(ppvec);
 }
 
 int32_t

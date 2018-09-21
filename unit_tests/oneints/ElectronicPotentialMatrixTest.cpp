@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "ElectronicPotentialMatrixTest.hpp"
 
@@ -58,7 +58,7 @@ TEST_F(CElectronicPotentialMatrixTest, MoveAssignment)
     
     CElectronicPotentialMatrix smata(ma);
     
-    CElectronicPotentialMatrix smatb(CElectronicPotentialMatrix({ma}));
+    CElectronicPotentialMatrix smatb = CElectronicPotentialMatrix({ma});
     
     ASSERT_EQ(smata, smatb);
 }

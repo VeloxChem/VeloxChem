@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef MemBlock2D_hpp
 #define MemBlock2D_hpp
@@ -210,7 +210,7 @@ public:
      @return the 2D memory block object.
      */
     CMemBlock2D<T> slice(const int32_t iPosition,
-                         const int32_t nElements);
+                         const int32_t nElements) const;
     
     /**
      Sets all elements of contiguous memory block to zero.
@@ -420,30 +420,30 @@ CMemBlock2D<T>::CMemBlock2D(const std::vector<T>&       dataVector,
 template <class T>
 CMemBlock2D<T>::CMemBlock2D(const CMemBlock2D<T>& source)
 
-    : _nElements(source._nElements)
-
-    , _positions(source._positions)
-
-    , _paddedSizes(source._paddedSizes)
+    : _data(source._data)
 
     , _originalSizes(source._originalSizes)
 
-    , _data(source._data)
+    , _paddedSizes(source._paddedSizes)
+
+    , _positions(source._positions)
+
+    , _nElements(source._nElements)
 {
 }
 
 template <class T>
 CMemBlock2D<T>::CMemBlock2D(CMemBlock2D<T>&& source) noexcept
 
-    : _nElements(std::move(source._nElements))
-
-    , _positions(std::move(source._positions))
-
-    , _paddedSizes(std::move(source._paddedSizes))
+    : _data(std::move(source._data))
 
     , _originalSizes(std::move(source._originalSizes))
 
-    , _data(std::move(source._data))
+    , _paddedSizes(std::move(source._paddedSizes))
+
+    , _positions(std::move(source._positions))
+
+    , _nElements(std::move(source._nElements))
 {
 
 }
@@ -519,7 +519,7 @@ CMemBlock2D<T>::operator!=(const CMemBlock2D<T>& other) const
 template <class T>
 CMemBlock2D<T>
 CMemBlock2D<T>::slice(const int32_t iPosition,
-                      const int32_t nElements)
+                      const int32_t nElements) const
 {
     CMemBlock2D<T> mblock(nElements, blocks());
         

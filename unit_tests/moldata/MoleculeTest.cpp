@@ -193,3 +193,43 @@ TEST_F(CMoleculeTest, GetMinDistances)
     
     ASSERT_EQ(mdist, mol.getMinDistances());
 }
+
+TEST_F(CMoleculeTest, GetSubMolecule)
+{
+    CMolecule empty_molecule;
+
+    CMolecule water = vlxmol::getMoleculeH2O();
+
+    CMolecule dimer = vlxmol::getMoleculeH2ODimer();
+
+    ASSERT_EQ(dimer.getSubMolecule(-1,3), empty_molecule);
+
+    ASSERT_EQ(dimer.getSubMolecule(0,-1), empty_molecule);
+
+    ASSERT_EQ(dimer.getSubMolecule(0,0), empty_molecule);
+
+    ASSERT_EQ(dimer.getSubMolecule(0,7), empty_molecule);
+
+    ASSERT_EQ(dimer.getSubMolecule(0,3), water);
+
+    ASSERT_EQ(dimer.getSubMolecule(0,6), dimer);
+}
+
+TEST_F(CMoleculeTest, CombineMolecule)
+{
+    CMolecule empty_molecule;
+
+    CMolecule dimer = vlxmol::getMoleculeH2ODimer();
+
+    CMolecule h2o_1 = dimer.getSubMolecule(0,3);
+
+    CMolecule h2o_2 = dimer.getSubMolecule(3,3);
+
+    CMolecule h2o_11 (h2o_1, empty_molecule);
+
+    ASSERT_EQ(h2o_11, h2o_1);
+
+    CMolecule h2o_dimer (h2o_1, h2o_2);
+
+    ASSERT_EQ(h2o_dimer, dimer);
+}

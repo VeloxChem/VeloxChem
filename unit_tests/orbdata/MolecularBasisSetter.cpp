@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "MolecularBasisSetter.hpp"
 
@@ -37,6 +37,50 @@ getMolecularBasisForLiH()
 }
 
 CMolecularBasis
+getMolecularBasisForH2O()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"def2-SVP"});
+
+    mbas.addAtomBasis(getNormalizedAtomBasisForO());
+
+    mbas.addAtomBasis(getNormalizedAtomBasisForH());
+
+    return mbas;
+}
+    
+CMolecularBasis
+getMinimalBasisForH2O()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"MIN-CC-PVDZ"});
+
+    mbas.addAtomBasis(getMinimalBasisForO());
+
+    mbas.addAtomBasis(getMinimalBasisForH());
+
+    return mbas;
+}
+
+CMolecularBasis
+getMinimalBasisForNH3CH4()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"MIN-CC-PVDZ"});
+
+    mbas.addAtomBasis(getMinimalBasisForC());
+
+    mbas.addAtomBasis(getMinimalBasisForN());
+
+    mbas.addAtomBasis(getMinimalBasisForH());
+
+    return mbas;
+}
+    
+CMolecularBasis
 getTestBasisForLiH()
 {
     CMolecularBasis mbas;
@@ -63,6 +107,6 @@ getReducedTestBasisForLiH()
     
     return mbas;
 }
-    
+
 } // vlxbas namespace
 

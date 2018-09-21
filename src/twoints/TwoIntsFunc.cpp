@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "TwoIntsFunc.hpp"
 
@@ -62,7 +62,7 @@ namespace twointsfunc { // twointsfunc namespace
         
         auto epos = braGtoBlock.getEndPositions();
         
-        // set up pointers to primitives data on ket side
+        // set up pointers to primitive pairs data on ket side
         
         auto kfxi = ketGtoPairsBlock.getFactorsXi();
         
@@ -344,10 +344,7 @@ namespace twointsfunc { // twointsfunc namespace
                     const CGtoPairsBlock&      ketGtoPairsBlock,
                     const int32_t              iContrGto)
     {
-        // skip computation for zero angular momentum on ket side or non-zero
-        // angular momentum on bra side
-        
-        if (braGtoBlock.getAngularMomentum() > 0) return;
+        // skip computation for zero angular momentum on ket side
         
         if ((ketGtoPairsBlock.getBraAngularMomentum() == 0) &&
             (ketGtoPairsBlock.getKetAngularMomentum() == 0)) return;
@@ -405,5 +402,381 @@ namespace twointsfunc { // twointsfunc namespace
         }
     }
     
+    void
+    compDistancesPQ(      CMemBlock2D<double>& pqDistances,
+                    const CGtoPairsBlock&      braGtoPairsBlock,
+                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const bool                 isBraEqualKet,
+                    const int32_t              iContrPair)
+    {
+        // set up pointers to primitive pairs data on bra side
+        
+        auto brx = braGtoPairsBlock.getCoordinatesPX();
+        
+        auto bry = braGtoPairsBlock.getCoordinatesPY();
+        
+        auto brz = braGtoPairsBlock.getCoordinatesPZ();
+        
+        auto spos = braGtoPairsBlock.getStartPositions();
+        
+        auto epos = braGtoPairsBlock.getEndPositions();
+        
+        // determine dimensions of GTOs pairs batch
+        
+        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+        
+        if (isBraEqualKet)
+        {
+            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
+        }
+        
+        // loop over componets of contracted GTOs pair
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrPair]; i < epos[iContrPair]; i++)
+        {
+            // compute distances
+            
+            mathfunc::distances(pqDistances.data(3 * idx),
+                                pqDistances.data(3 * idx + 1),
+                                pqDistances.data(3 * idx + 2),
+                                brx[i], bry[i], brz[i],
+                                ketGtoPairsBlock.getCoordinatesPX(),
+                                ketGtoPairsBlock.getCoordinatesPY(),
+                                ketGtoPairsBlock.getCoordinatesPZ(),
+                                ndim);
+            
+            idx++; 
+        }
+    }
+    
+    void
+    compFactorsForElectronRepulsion(      CMemBlock2D<double>& osFactors,
+                                    const CGtoPairsBlock&      braGtoPairsBlock,
+                                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                                    const bool                 isBraEqualKet,
+                                    const int32_t              iContrPair)
+    {
+        // set up angular momentum data
+        
+        auto bang = braGtoPairsBlock.getBraAngularMomentum()
+        
+                  + braGtoPairsBlock.getKetAngularMomentum();
+        
+        auto kang = ketGtoPairsBlock.getBraAngularMomentum()
+        
+                  + ketGtoPairsBlock.getKetAngularMomentum();
+        
+        // set up pointers to primitive pairs data on bra side
+        
+        auto bfxi = braGtoPairsBlock.getFactorsXi();
+        
+        auto boxi = braGtoPairsBlock.getFactorsOneOverXi();
+        
+        auto spos = braGtoPairsBlock.getStartPositions();
+        
+        auto epos = braGtoPairsBlock.getEndPositions();
+        
+         // set up pointers to primitive pairs data on ket side
+        
+        auto kfxi = ketGtoPairsBlock.getFactorsXi();
+        
+        auto koxi = ketGtoPairsBlock.getFactorsOneOverXi();
+        
+        // determine dimensions of GTOs pairs batch
+        
+        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+        
+        if (isBraEqualKet)
+        {
+            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
+        }
+        
+        // loop over componets of contracted GTOs pair
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrPair]; i < epos[iContrPair]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(4 * idx);
+            
+            auto fz = osFactors.data(4 * idx + 1);
+            
+            auto fb = bfxi[i];
+            
+            #pragma omp simd aligned(fx, fz, kfxi: VLX_ALIGN)
+            for (int32_t j = 0; j < ndim; j++)
+            {
+                fx[j] = 1.0 / (fb + kfxi[j]);
+                
+                fz[j] = fb * kfxi[j] * fx[j];
+            }
+            
+            if (bang > 1)
+            {
+                auto ta = osFactors.data(4 * idx + 2);
+                
+                auto fga = boxi[i];
+                
+                #pragma omp simd aligned(ta, fz: VLX_ALIGN)
+                for (int32_t j = 0; j < ndim; j++)
+                {
+                    ta[j] = fga * fz[j];
+                }
+            }
+            
+            if (kang > 1)
+            {
+                auto td = osFactors.data(4 * idx + 3);
+                
+                #pragma omp simd aligned(td, koxi, fz: VLX_ALIGN)
+                for (int32_t j = 0; j < ndim; j++)
+                {
+                    td[j] = koxi[j] * fz[j];
+                }
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compCoordinatesForW(      CMemBlock2D<double>& wCoordinates,
+                        const CMemBlock2D<double>& osFactors,
+                        const int32_t              nFactors,
+                        const CGtoPairsBlock&      braGtoPairsBlock,
+                        const CGtoPairsBlock&      ketGtoPairsBlock,
+                        const bool                 isBraEqualKet,
+                        const int32_t              iContrPair)
+    {
+        // set up pointers to primitives data on bra side
+        
+        auto bpx = braGtoPairsBlock.getCoordinatesPX();
+        
+        auto bpy = braGtoPairsBlock.getCoordinatesPY();
+        
+        auto bpz = braGtoPairsBlock.getCoordinatesPZ();
+        
+        auto bfxi = braGtoPairsBlock.getFactorsXi();
+        
+        auto spos = braGtoPairsBlock.getStartPositions();
+        
+        auto epos = braGtoPairsBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto kqx = ketGtoPairsBlock.getCoordinatesPX();
+        
+        auto kqy = ketGtoPairsBlock.getCoordinatesPY();
+        
+        auto kqz = ketGtoPairsBlock.getCoordinatesPZ();
+        
+        auto kfxi = ketGtoPairsBlock.getFactorsXi();
+        
+        // determine dimensions of GTOs pairs batch
+        
+        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+        
+        if (isBraEqualKet)
+        {
+            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
+        }
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrPair]; i < epos[iContrPair]; i++)
+        {
+            // set up pointers to prefactors
+            
+            auto fx = osFactors.data(nFactors * idx);
+            
+            // set up primitive GTO pair data on bra side
+            
+            auto fax = bfxi[i] * bpx[i];
+            
+            auto fay = bfxi[i] * bpy[i];
+            
+            auto faz = bfxi[i] * bpz[i];
+            
+            // set up pointers to coordinates of W
+            
+            auto wx = wCoordinates.data(3 * idx);
+            
+            auto wy = wCoordinates.data(3 * idx + 1);
+            
+            auto wz = wCoordinates.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(fx, wx, wy, wz, kfxi, kqx, kqy,\
+                                     kqz: VLX_ALIGN)
+            for (int32_t j = 0; j < ndim; j++)
+            {
+                double fact = fx[j];
+                
+                wx[j] = fact * (fax + kfxi[j] * kqx[j]);
+                
+                wy[j] = fact * (fay + kfxi[j] * kqy[j]);
+                
+                wz[j] = fact * (faz + kfxi[j] * kqz[j]);
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compDistancesWP(      CMemBlock2D<double>& wpDistances,
+                    const CMemBlock2D<double>& wCoordinates,
+                    const CGtoPairsBlock&      braGtoPairsBlock,
+                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const bool                 isBraEqualKet,
+                    const int32_t              iContrPair)
+    {
+        // skip computation for zero angular momentum on bra side
+        
+        if ((braGtoPairsBlock.getBraAngularMomentum() == 0) &&
+            (braGtoPairsBlock.getKetAngularMomentum() == 0)) return;
+        
+        // set up pointers to primitive pairs data on bra side
+        
+        auto rpx = braGtoPairsBlock.getCoordinatesPX();
+        
+        auto rpy = braGtoPairsBlock.getCoordinatesPY();
+        
+        auto rpz = braGtoPairsBlock.getCoordinatesPZ();
+        
+        auto spos = braGtoPairsBlock.getStartPositions();
+        
+        auto epos = braGtoPairsBlock.getEndPositions();
+        
+        // determine dimensions of GTOs pairs batch
+        
+        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+        
+        if (isBraEqualKet)
+        {
+            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
+        }
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrPair]; i < epos[iContrPair]; i++)
+        {
+            // set up pointers to coordinates of W
+            
+            auto wx = wCoordinates.data(3 * idx);
+            
+            auto wy = wCoordinates.data(3 * idx + 1);
+            
+            auto wz = wCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(WP)
+            
+            auto wpx = wpDistances.data(3 * idx);
+            
+            auto wpy = wpDistances.data(3 * idx + 1);
+            
+            auto wpz = wpDistances.data(3 * idx + 2);
+            
+            // set up distances
+            
+            auto cpx = rpx[i];
+            
+            auto cpy = rpy[i];
+            
+            auto cpz = rpz[i];
+            
+            #pragma omp simd aligned(wx, wy, wz, wpx, wpy, wpz: VLX_ALIGN)
+            for (int32_t j = 0; j < ndim; j++)
+            {
+                wpx[j] = wx[j] - cpx;
+                
+                wpy[j] = wy[j] - cpy;
+                
+                wpz[j] = wz[j] - cpz;
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compDistancesWQ(      CMemBlock2D<double>& wqDistances,
+                    const CMemBlock2D<double>& wCoordinates,
+                    const CGtoPairsBlock&      braGtoPairsBlock,
+                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const bool                 isBraEqualKet,
+                    const int32_t              iContrPair)
+    {
+        // skip computation for zero angular momentum on ket side
+        
+        if ((ketGtoPairsBlock.getBraAngularMomentum() == 0) &&
+            (ketGtoPairsBlock.getKetAngularMomentum() == 0)) return;
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoPairsBlock.getStartPositions();
+        
+        auto epos = braGtoPairsBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto rqx = ketGtoPairsBlock.getCoordinatesPX();
+        
+        auto rqy = ketGtoPairsBlock.getCoordinatesPY();
+        
+        auto rqz = ketGtoPairsBlock.getCoordinatesPZ();
+        
+        // determine dimensions of GTOs pairs batch
+        
+        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+        
+        if (isBraEqualKet)
+        {
+            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
+        }
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrPair]; i < epos[iContrPair]; i++)
+        {
+            // set up pointers to coordinates of W
+            
+            auto wx = wCoordinates.data(3 * idx);
+            
+            auto wy = wCoordinates.data(3 * idx + 1);
+            
+            auto wz = wCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(WQ)
+            
+            auto wqx = wqDistances.data(3 * idx);
+            
+            auto wqy = wqDistances.data(3 * idx + 1);
+            
+            auto wqz = wqDistances.data(3 * idx + 2);
+            
+            #pragma omp simd aligned(wx, wy, wz, wqx, wqy, wqz, rqx, rqy,\
+                                     rqz: VLX_ALIGN)
+            for (int32_t j = 0; j < ndim; j++)
+            {
+                wqx[j] = wx[j] - rqx[j];
+                
+                wqy[j] = wy[j] - rqy[j];
+                
+                wqz[j] = wz[j] - rqz[j];
+            }
+            
+            idx++;
+        }
+    }
     
 } // twointsfunc namespace

@@ -3,15 +3,15 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef BoysFunctionTest_hpp
 #define BoysFunctionTest_hpp
 
 #include "gtest/gtest.h"
 
-#include "DenseMatrix.hpp"
+#include "MemBlock.hpp"
 
 class CBoysFunctionTest : public ::testing::Test
 {
@@ -27,6 +27,5 @@ protected:
 
     CMemBlock<double> getLargeArguments() const;
 };
-
 
 #endif /* BoysFunctionTest_hpp */

@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "StringFormatTest.hpp"
 
@@ -181,6 +181,13 @@ TEST_F(CStringFormatTest, To_StringForSizeT)
     mstr = fstr::to_string(f, 6, fmt::right);
 
     ASSERT_EQ(mstr, std::string("  1024"));
+}
+
+TEST_F(CStringFormatTest, To_String_Boolean)
+{
+    ASSERT_EQ(fstr::to_string(true), std::string("True"));
+    
+    ASSERT_EQ(fstr::to_string(false), std::string("False"));
 }
 
 TEST_F(CStringFormatTest, To_AngularMomentum)

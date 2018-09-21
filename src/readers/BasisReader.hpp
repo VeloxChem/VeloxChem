@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef BasisReader_hpp
 #define BasisReader_hpp
@@ -194,6 +194,19 @@ public:
      @return the molecular basis object.
      */
     CMolecularBasis getRIJBasis(const std::string&   pathToBasisSets,
+                                const CMolecule&     molecule,
+                                      COutputStream& oStream);
+    
+    /**
+     Creates minimal AO basis object by reading basis set data from basis 
+     library for selected molecule. Reading errors are printed to output stream.
+     
+     @param pathToBasisSets the path to basis set library.
+     @param molecule the molecule.
+     @param oStream the output stream.
+     @return the molecular basis object.
+     */
+    CMolecularBasis getMinBasis(const std::string&   pathToBasisSets,
                                 const CMolecule&     molecule,
                                       COutputStream& oStream);
     

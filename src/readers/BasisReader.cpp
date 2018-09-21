@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "BasisReader.hpp"
 
@@ -102,6 +102,16 @@ CBasisReader::getRIJBasis(const std::string&   pathToBasisSets,
     if (!_state) return CMolecularBasis();
     
     return _getBasis(rilbl, pathToBasisSets, molecule, oStream);
+}
+
+CMolecularBasis
+CBasisReader::getMinBasis(const std::string&   pathToBasisSets,
+                          const CMolecule&     molecule,
+                                COutputStream& oStream)
+{
+    auto minlbl = std::string("MIN-CC-PVDZ");
+    
+    return _getBasis(minlbl, pathToBasisSets, molecule, oStream);
 }
 
 CAtomBasis

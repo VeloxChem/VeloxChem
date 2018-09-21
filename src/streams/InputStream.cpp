@@ -3,17 +3,17 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "InputStream.hpp"
 
 CInputStream::CInputStream(const std::string&   iFilename,
                                  COutputStream& oStream)
 
-    : _iFilename(iFilename)
+    : _state(true)
 
-    , _state(true)
+    , _iFilename(iFilename)
 {
     if (!_iFilename.empty())
     {

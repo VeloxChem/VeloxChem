@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "AppManager.hpp"
 
@@ -46,20 +46,6 @@ CAppManager::CAppManager(int    argc,
         }
     }
 
-    // detect gpu
-
-    if (_globRank == mpi::master())
-    {
-        if (_state)
-        {
-            #ifdef ENABLE_GPU
-
-            gpu::get_device_prop();
-
-            #endif
-        }
-    }
-    
     // update state of application manager across MPI processes
 
     mpi::bcast(_state, _globRank, MPI_COMM_WORLD);
@@ -68,37 +54,6 @@ CAppManager::CAppManager(int    argc,
 CAppManager::~CAppManager()
 {
 
-}
-
-std::shared_ptr<CAppManager>
-CAppManager::create(std::string input_string, std::string output_string)
-{
-    int argc = 3;
-
-    char* argv[argc];
-
-    std::vector<std::string> inputs;
-
-    inputs.push_back("exe");
-
-    inputs.push_back(input_string);
-
-    inputs.push_back(output_string);
-
-    for (int i = 0; i < argc; i++)
-    {
-        const char* text = inputs[i].c_str();
-
-        argv[i] = (char*)malloc(sizeof(char) * (strlen(text) + 1));
-
-        memset(argv[i], '\0', sizeof(char) * (strlen(text) + 1));
-
-        memcpy(argv[i], text, sizeof(char) * strlen(text));
-    }
-
-    mpi::init(argc, argv);
-
-    return std::shared_ptr<CAppManager>(new CAppManager (argc, argv));
 }
 
 void
@@ -115,6 +70,20 @@ CAppManager::execute()
     CInputStream istream(_iFilename, ostream);
     
     updateState(istream.getState());
+
+    // detect gpu
+
+    if (_globRank == mpi::master())
+    {
+        if (_state)
+        {
+            #ifdef ENABLE_GPU
+
+            gpu::get_device_prop(ostream);
+
+            #endif
+        }
+    }
     
     // update state of application manager across MPI processes
     

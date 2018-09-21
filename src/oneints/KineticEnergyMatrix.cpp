@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "KineticEnergyMatrix.hpp"
 
@@ -71,6 +71,36 @@ bool
 CKineticEnergyMatrix::operator!=(const CKineticEnergyMatrix& other) const
 {
     return !(*this == other);
+}
+
+std::string
+CKineticEnergyMatrix::getString() const
+{
+    return _matrix.getString();
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfRows() const
+{
+    return _matrix.getNumberOfRows();
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfColumns() const
+{
+    return _matrix.getNumberOfColumns();
+}
+
+int32_t
+CKineticEnergyMatrix::getNumberOfElements() const
+{
+    return _matrix.getNumberOfElements();
+}
+
+const double*
+CKineticEnergyMatrix::values() const
+{
+    return _matrix.values();
 }
 
 std::ostream&

@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "GenFunc.hpp"
 
@@ -157,6 +157,96 @@ contract(      CMemBlock2D<double>&  contrData,
         // set up number angular components
         
         auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.second());
+        
+        // first step: vertical summation over bra GTO
+        
+        for (int32_t j = 1; j < bdim; j++)
+        {
+            // accumulate summation over primitives on bra side
+            
+            for (int32_t k = 0; k < ncomp; k++)
+            {
+                // summation buffer
+                
+                auto sumbuf = primData.data(pidx + k);
+                
+                // source buffer
+                
+                auto srcbuf = primData.data(pidx + j * ncomp + k);
+                
+                // loop over primitive GTOs on ket side
+                
+                #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
+                for (int32_t l = 0; l < nprim; l++)
+                {
+                    sumbuf[l] += srcbuf[l];
+                }
+            }
+        }
+        
+        // second step: direct contraction over ket side
+        
+        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, kdim, ncomp);
+    }
+}
+
+void
+contract(      CMemBlock2D<double>&  contrData,
+               CMemBlock2D<double>&  primData,
+         const CVecThreeIndexes&     contrPattern,
+         const std::vector<int32_t>& contrIndexes,
+         const CVecThreeIndexes&     primPattern,
+         const std::vector<int32_t>& primIndexes,
+         const CGtoPairsBlock&       braGtoPairsBlock,
+         const CGtoPairsBlock&       ketGtoPairsBlock,
+         const bool                  isBraEqualKet,
+         const int32_t               iContrPair)
+{
+    // set up pointers to primitives data on bra side
+    
+    auto spos = braGtoPairsBlock.getStartPositions();
+    
+    auto epos = braGtoPairsBlock.getEndPositions();
+    
+    auto bdim = epos[iContrPair] - spos[iContrPair];
+    
+    // set up pointers to primitives data on ket side
+    
+    auto kspos = ketGtoPairsBlock.getStartPositions();
+    
+    auto kepos = ketGtoPairsBlock.getEndPositions();
+    
+    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    auto nprim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
+    
+    if (isBraEqualKet)
+    {
+        kdim  = iContrPair + 1;
+        
+        nprim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
+    }
+    
+    // loop over set of data vectors
+    
+    for (size_t i = 0; i < contrPattern.size(); i++)
+    {
+        // determine positions of contracted and primitive vectors
+        
+        auto tidx = contrPattern[i];
+        
+        // skip undesirable terms
+        
+        if (tidx.second() != 0) continue; 
+        
+        auto cidx = genfunc::findTripleIndex(contrIndexes, contrPattern, tidx);
+        
+        auto pidx = genfunc::findTripleIndex(primIndexes, primPattern,
+                                             {tidx.first(), tidx.third(), 0});
+        
+        // set up number angular components
+        
+        auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.third());
         
         // first step: vertical summation over bra GTO
         
@@ -384,7 +474,162 @@ transform(      CMemBlock2D<double>& spherData,
                            sidx, cidx, nElements);
     }
 }
+
+void
+transform_ket(      CMemBlock2D<double>&  spherData,
+              const CMemBlock2D<double>&  cartData,
+              const CSphericalMomentum&   ketMomentumC,
+              const CSphericalMomentum&   ketMomentumD,
+              const CVecFourIndexes&      spherPattern,
+              const std::vector<int32_t>& spherIndexes,
+              const CVecThreeIndexes&     cartPattern,
+              const std::vector<int32_t>& cartIndexes,
+              const CGtoPairsBlock&       ketGtoPairsBlock,
+              const bool                  isBraEqualKet,
+              const int32_t               iContrPair)
+{
+    // set up dimensions on ket side
     
+    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    if (isBraEqualKet) kdim  = iContrPair + 1;
+    
+    // loop over set of data vectors
+    
+    for (size_t i = 0; i < spherPattern.size(); i++)
+    {
+        // skip terms not presented in Cartesian integrals buffer
+        
+        if (spherPattern[i].first() != 0) continue;
+        
+        // set up spherical and Cartesian data indexes
+        
+        auto sidx = spherIndexes[i];
+        
+        auto cidx = findTripleIndex(cartIndexes, cartPattern,
+                                    CThreeIndexes(spherPattern[i].second(),
+                                                  spherPattern[i].third(),
+                                                  spherPattern[i].fourth()));
+        
+        // set up number of bra components
+        
+        auto bcomp = angmom::to_CartesianComponents(spherPattern[i].second());
+        
+        // transform ket side of integrals from Cartesian to spherical form
+        
+        transform(spherData, cartData, ketMomentumC, ketMomentumD, sidx, cidx,
+                  kdim, bcomp);
+    }
+}
+    
+void
+transform_bra(      CMemBlock2D<double>&  spherData,
+              const CMemBlock2D<double>&  cartData,
+              const CSphericalMomentum&   braMomentumA,
+              const CSphericalMomentum&   braMomentumB,
+              const CVecFourIndexes&      cartPattern,
+              const std::vector<int32_t>& cartIndexes,
+              const CGtoPairsBlock&       ketGtoPairsBlock,
+              const bool                  isBraEqualKet,
+              const int32_t               iContrPair)
+{
+    // set up dimensions on ket side
+    
+    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    if (isBraEqualKet) kdim  = iContrPair + 1;
+    
+    // set up angular momentum on ket side
+    
+    auto cang = ketGtoPairsBlock.getBraAngularMomentum();
+    
+    auto dang = ketGtoPairsBlock.getKetAngularMomentum();
+    
+    // set up angulat momentum on bra side
+    
+    auto aang = braMomentumA.getAngularMomentum();
+    
+    auto bang = braMomentumB.getAngularMomentum();
+    
+    // determine Cartisian index
+    
+    auto cidx = findQuadrupleIndex(cartIndexes, cartPattern,
+                                   CFourIndexes(aang, bang, cang, dang));
+    
+    // set up angular momentum data
+    
+    auto acomp = braMomentumA.getNumberOfComponents();
+    
+    auto bcomp = braMomentumB.getNumberOfComponents();
+    
+    // set up number of Cartisian components on B center
+    
+    auto bcart = angmom::to_CartesianComponents(bang);
+    
+    // set up number of spherical components on ket side
+    
+    auto kcomp = angmom::to_SphericalComponents(cang, dang);
+    
+    // loop over spherical components on bra side
+    
+    for (int32_t i = 0; i < acomp; i++)
+    {
+        // set up transformation data for A center
+        
+        auto anfact = braMomentumA.getNumberOfFactors(i);
+        
+        auto atidx = braMomentumA.getIndexes(i);
+        
+        auto atfact = braMomentumA.getFactors(i);
+        
+        for (int32_t j = 0; j < bcomp; j ++)
+        {
+            // set up transformation data for B center
+            
+            auto bnfact = braMomentumB.getNumberOfFactors(j);
+            
+            auto btidx = braMomentumB.getIndexes(j);
+            
+            auto btfact = braMomentumB.getFactors(j);
+            
+            // loop over ket side spherical components
+            
+            for (int32_t k = 0; k < kcomp; k++)
+            {
+                // set up spherical integrals vector
+                
+                auto sphervec = spherData.data((i * bcomp + j) * kcomp + k);
+                
+                // zero spherical integrals vector
+                
+                mathfunc::zero(sphervec, kdim);
+                
+                // apply Cartesian to spherical transformation
+                
+                for (int32_t l = 0; l < anfact; l++)
+                {
+                    for (int32_t m = 0; m < bnfact; m++)
+                    {
+                        // set up pointer to Cartesian component
+                        
+                        auto cartvec = cartData.data(cidx + (atidx[l] * bcart + btidx[m]) * kcomp + k);
+                        
+                        auto cfact = atfact[l] * btfact[m];
+                        
+                        // loop over integrals
+                        
+                        #pragma omp simd aligned(sphervec, cartvec: VLX_ALIGN)
+                        for (int32_t n = 0; n < kdim; n++)
+                        {
+                            sphervec[n] += cfact * cartvec[n];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void
 compress(      CSparseMatrix&       sparseMatrix,
                CMemBlock<double>&   rowValues,
@@ -561,106 +806,6 @@ distribute(const CSparseMatrix* listOfMatrices,
     return spmat;
 }
     
-void
-distribute(      double*              values,
-           const CMemBlock2D<double>& spherData,
-           const int32_t              braAngularMomentum,
-           const int32_t              ketAngularMomentum,
-           const int32_t              nBraContrGtos,
-           const int32_t              nKetContrGtos,
-           const int32_t              iContrGto)
-{
-    // set up number of angular components
-    
-    auto bcomp = angmom::to_SphericalComponents(braAngularMomentum);
-    
-    auto kcomp= angmom::to_SphericalComponents(ketAngularMomentum);
-    
-    // determine number of columns in integrals matrix
-    
-    auto ncol = kcomp * nKetContrGtos;
-    
-    for (int32_t i = 0; i < bcomp; i++)
-    {
-        // offset in rows indexing space
-        
-        auto ioff = (i * nBraContrGtos + iContrGto) * ncol;
-        
-        for (int32_t j = 0; j < kcomp; j++)
-        {
-            // set up pointer to integrals
-            
-            auto vals = spherData.data(i * kcomp + j);
-            
-            // offset in full indexing space
-            
-            auto ijoff = ioff + j * nKetContrGtos;
-            
-            // distribute integrals
-            
-            for (int32_t k = 0; k < nKetContrGtos; k++)
-            {
-                values[ijoff + k] = vals[k];
-            }
-        }
-    }
-}
-
-void
-distribute(      double*              values,
-           const CMemBlock2D<double>& spherData,
-           const CGtoBlock&           braGtoBlock,
-           const CGtoBlock&           ketGtoBlock,
-           const bool                 isBraEqualKet,
-           const int32_t              nColumns,
-           const int32_t              iContrGto)
-{
-    // set up angular momentum components
-    
-    auto bcomp = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
-    
-    auto kcomp = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
-    
-    // set up number of contracted GTOs on ket side
-
-    auto kdim = ketGtoBlock.getNumberOfContrGtos();
-    
-    for (int32_t i = 0; i < bcomp; i++)
-    {
-        auto bidx = (braGtoBlock.getIdentifiers(i))[iContrGto];
-        
-        // loop over ket components
-        
-        for (int32_t j = 0; j < kcomp; j++)
-        {
-            // set up pointer to integrals
-            
-            auto vals = spherData.data(i * kcomp + j);
-            
-            auto kidx = ketGtoBlock.getIdentifiers(j);
-            
-            // loop over integrals
- 
-            if (isBraEqualKet)
-            {
-                for (int32_t k = 0; k < kdim; k++)
-                {
-                    values[bidx * nColumns + kidx[k]] = vals[k];
-                }
-            }
-            else
-            {
-                for (int32_t k = 0; k < kdim; k++)
-                {
-                    values[bidx * nColumns + kidx[k]] = vals[k];
-                    
-                    values[kidx[k] * nColumns + bidx] = vals[k];
-                }
-            }
-        }
-    }
-}
-    
 bool
 isInVector(const CVecTwoIndexes& vector,
            const CTwoIndexes&    pair)
@@ -686,6 +831,18 @@ isInVector(const CVecThreeIndexes& vector,
 }
 
 bool
+isInVector(const CVecFourIndexes& vector,
+           const CFourIndexes&    quadruple)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (quadruple == vector[i]) return true;
+    }
+    
+    return false;
+}
+    
+bool
 addValidAndUniquePair(      CVecTwoIndexes& vector,
                       const CTwoIndexes&    pair)
 {
@@ -708,6 +865,19 @@ addValidAndUniqueTriple(      CVecThreeIndexes& vector,
         
     vector.push_back(triple);
         
+    return true;
+}
+    
+bool
+addValidAndUniqueQuadruple(      CVecFourIndexes& vector,
+                           const CFourIndexes&    quadruple)
+{
+    if (!quadruple.isValidQuadruple()) return false;
+    
+    if (genfunc::isInVector(vector, quadruple)) return false;
+    
+    vector.push_back(quadruple);
+    
     return true;
 }
 
@@ -734,6 +904,19 @@ findTripleIndex(const std::vector<int32_t>& indexes,
         if (triple == vector[i]) return indexes[i];
     }
         
+    return -1;
+}
+    
+int32_t
+findQuadrupleIndex(const std::vector<int32_t>& indexes,
+                   const CVecFourIndexes&      vector,
+                   const CFourIndexes&         quadruple)
+{
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (quadruple == vector[i]) return indexes[i];
+    }
+    
     return -1;
 }
     
@@ -771,5 +954,23 @@ getPairsFromTripleIndexes(const CVecThreeIndexes& vector)
     
     return xyvec;
 }
+
+CVecThreeIndexes
+getTriplesFromQuadrupleIndexes(const CVecFourIndexes& vector)
+{
+    CVecThreeIndexes xyzvec;
+        
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if (vector[i].first() == 0)
+        {
+            xyzvec.push_back(CThreeIndexes(vector[i].second(), vector[i].third(),
+                                           vector[i].fourth()));
+        }
+    }
+        
+    return xyzvec;
+}
+    
     
 } // genfunc namespace

@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef MolecularBasis_hpp
 #define MolecularBasis_hpp
@@ -141,6 +141,14 @@ public:
      @return the maximum angular momentum.
      */
     int32_t getMaxAngularMomentum(const int32_t idElemental) const;
+
+    /**
+     Gets maximum angular momentum of a molecule in this basis set.
+
+     @param molecule the molecule.
+     @return the maximum angular momentum.
+     */
+    int32_t getMolecularMaxAngularMomentum(const CMolecule& molecule) const;
 
     /**
      Gets name of molecular basis.

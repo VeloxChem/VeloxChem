@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "InputData.hpp"
 
@@ -81,7 +81,9 @@ CControlGroup
 CInputData::getControlGroup(const size_t       indexOfControlGroup,
                             const std::string& nameOfControlGroup) const
 {
-    if (indexOfControlGroup < getNumberOfControlGroups(nameOfControlGroup))
+    auto ngrps = static_cast<size_t>(getNumberOfControlGroups(nameOfControlGroup));
+
+    if (indexOfControlGroup < ngrps)
     {
         size_t curgroup = 0;
 

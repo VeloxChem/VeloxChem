@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "MemBlockTest.hpp"
 
@@ -72,7 +72,7 @@ TEST_F(CMemBlockTest, Data)
 
     auto dptr = ma.data();
 
-    ASSERT_EQ(0, ((size_t) dptr % VLX_ALIGN));
+    ASSERT_EQ(0u, ((size_t) dptr % VLX_ALIGN));
 
     ASSERT_EQ(1, dptr[0]);
 
@@ -91,7 +91,7 @@ TEST_F(CMemBlockTest, ConstData)
 
     auto dptr = ma.data();
 
-    ASSERT_EQ(0, ((size_t) dptr) % VLX_ALIGN);
+    ASSERT_EQ(0u, ((size_t) dptr) % VLX_ALIGN);
 
     ASSERT_NEAR(1.0, dptr[0], 1.0e-13);
 

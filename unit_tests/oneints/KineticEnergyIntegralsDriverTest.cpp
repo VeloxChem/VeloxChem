@@ -3,14 +3,15 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "KineticEnergyIntegralsDriverTest.hpp"
 
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
+#include "AssembleMatrices.hpp"
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7226,4 +7227,205 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeForLiH)
     CDenseMatrix tmat(intvals, 100, 100);
     
     ASSERT_EQ(kinmat, CKineticEnergyMatrix(tmat));
+}
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+    
+    auto mh2o = vlxmol::getMoleculeH2O();
+    
+    auto mbas = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    CKineticEnergyMatrix kinmat = kindrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{ 29.214928025012597, -8.024942204230191,  0.008082948871740,
+                                  0.008082948871740,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000, -8.024942204230191,  3.106077721447130,
+                                  0.139640482389104,  0.139640482389104,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.008082948871740,
+                                  0.139640482389104,  0.499289232499792,  0.036427455545920,
+                                  0.206717223807131,  0.162420675848460,  0.000000000000000,
+                                  0.008082948871740,  0.139640482389104,  0.036427455545920,
+                                  0.499289232499792, -0.206717223807131,  0.162420675848460,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.206717223807131, -0.206717223807131,  2.535960686917080,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.162420675848460,  0.162420675848460,
+                                  0.000000000000000,  2.535960686917080,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  2.535960686917080};
+
+    ASSERT_EQ(kinmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
+
+    CDenseMatrix m (intvals, kinmat.getNumberOfRows(), kinmat.getNumberOfColumns());
+
+    ASSERT_EQ(kinmat, CKineticEnergyMatrix(m));
+}
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+    
+    auto mdimer = vlxmol::getMoleculeH2ODimer();
+
+    auto mh2o_1 = mdimer.getSubMolecule(0,3);
+
+    auto mh2o_2 = mdimer.getSubMolecule(3,3);
+    
+    auto mbas = vlxbas::getMolecularBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S11 = kindrv.compute(mh2o_1, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S22 = kindrv.compute(mh2o_2, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S12 = kindrv.compute(mh2o_1, mh2o_2, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S21 = kindrv.compute(mh2o_2, mh2o_1, mbas, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    CKineticEnergyMatrix S_new = dimerfunc::assembleKineticEnergyMatrices(
+                                            mh2o_1, mh2o_2, mbas, mbas,
+                                            S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
+}
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForNH3CH4)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+
+    auto mdimer = vlxmol::getMoleculeNH3CH4();
+
+    auto mnh3 = mdimer.getSubMolecule(0,4);
+
+    auto mch4 = mdimer.getSubMolecule(4,5);
+    
+    auto mbas = vlxbas::getMinimalBasisForNH3CH4();
+
+    COutputStream ost(std::string("dummy.out"));
+
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S11 = kindrv.compute(mnh3, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S22 = kindrv.compute(mch4, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S12 = kindrv.compute(mnh3, mch4, mbas, ost, MPI_COMM_WORLD);
+
+    CKineticEnergyMatrix S21 = kindrv.compute(mch4, mnh3, mbas, ost, MPI_COMM_WORLD);
+
+    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
+
+    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
+
+    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
+
+    CKineticEnergyMatrix S_new = dimerfunc::assembleKineticEnergyMatrices(
+                                            mnh3, mch4, mbas, mbas,
+                                            S11, S22, S12, S21);
+
+    ASSERT_EQ(S, S_new);
+}
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForTwoBasis)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+    
+    auto h2o = vlxmol::getMoleculeH2O();
+    
+    auto ao_basis  = vlxbas::getMolecularBasisForH2O();
+
+    auto min_basis = vlxbas::getMinimalBasisForH2O();
+
+    COutputStream ost(std::string("dummy.out"));
+    
+    CKineticEnergyMatrix kinmat = kindrv.compute(h2o, ao_basis, min_basis, ost, MPI_COMM_WORLD);
+
+    std::vector<double> intvals{-29.279305345784234,  8.076500670892111, -0.006981963263064,
+                                 -0.006981963263064,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.795656728292838,  0.770972532725994,
+                                  0.102148813444084,  0.102148813444084,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.126108474337691,
+                                  0.435578268042847,  0.170386390014674,  0.170386390014674,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                 -0.002042996830733,  0.134101024337979,  0.670490896810933,
+                                  0.006173533163767,  0.283402492391250,  0.222673386878839,
+                                  0.000000000000000,  0.018529396177628,  0.121357991906264,
+                                  0.209898167218634,  0.065447580049363,  0.080104161798502,
+                                  0.062938984270251,  0.000000000000000, -0.002042996830733,
+                                  0.134101024337979,  0.006173533163767,  0.670490896810933,
+                                 -0.283402492391250,  0.222673386878839,  0.000000000000000,
+                                  0.018529396177628,  0.121357991906264,  0.065447580049363,
+                                  0.209898167218634, -0.080104161798502,  0.062938984270251,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.127783319288756, -0.127783319288756,  3.227571916494806,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.258375931915513, -0.258375931915513,
+                                  0.703152813147250,  0.000000000000000,  0.000000000000000,
+                                 -0.025786785069401, -0.303273379116608, -0.000000000000000,
+                                 -0.029878338448846, -0.371073071171944, -0.488898098431210,
+                                  0.000000000000000,  0.025786785069401,  0.303273379116608,
+                                  0.029878338448846,  0.000000000000000, -0.371073071171944,
+                                  0.488898098431210,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.100401179441166,  0.100401179441166,
+                                  0.000000000000000,  3.227571916494806,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.203009660790760,
+                                  0.203009660790760,  0.000000000000000,  0.703152813147250,
+                                  0.000000000000000, -0.020261045411672, -0.238286226448763,
+                                  0.000000000000000, -0.000000000000000, -0.488898098431210,
+                                 -0.132973347909991,  0.000000000000000, -0.020261045411672,
+                                 -0.238286226448763, -0.000000000000000,  0.000000000000000,
+                                  0.488898098431210, -0.132973347909991,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  3.227571916494806,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.703152813147250,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.251160872285959,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.251160872285959,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.191031863479019, -0.191031863479019,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                 -0.000000000000000,  0.000000000000000,  0.016472226295314,
+                                  0.016472226295314,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000,
+                                  0.000000000000000,  0.000000000000000, -0.000000000000000,
+                                  0.000000000000000, -0.121565731304830, -0.121565731304830,
+                                  0.000000000000000,  0.000000000000000,  0.000000000000000};
+
+    ASSERT_EQ(kinmat.getNumberOfElements(), static_cast<int32_t>(intvals.size()));
+
+    CDenseMatrix m (intvals, kinmat.getNumberOfRows(), kinmat.getNumberOfColumns());
+
+    ASSERT_EQ(kinmat, CKineticEnergyMatrix(m));
 }

@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "InputLineTest.hpp"
 
@@ -83,7 +83,7 @@ TEST_F(CInputLineTest, GetNumberOfKeywords)
 {
     CInputLine aln(std::string(" Velox Chem "));
 
-    ASSERT_EQ(aln.getNumberOfKeywords(), 2);
+    ASSERT_EQ(aln.getNumberOfKeywords(), 2u);
 }
 
 TEST_F(CInputLineTest, IsRealNumber)

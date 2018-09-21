@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef NuclearPotentialMatrix_hpp
 #define NuclearPotentialMatrix_hpp
@@ -93,6 +93,41 @@ public:
              otherwise.
      */
     bool operator!=(const CNuclearPotentialMatrix& other) const;
+    
+    /**
+     Gets string representation of nuclear potential matrix.
+     
+     @return a string for printing the nuclear potential matrix.
+     */
+    std::string getString() const;
+    
+    /**
+     Gets number of rows in nuclear potential matrix.
+     
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows() const;
+    
+    /**
+     Gets number of columns in nuclear potential matrix.
+     
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns() const;
+    
+    /**
+     Gets number of elements in nuclear potential matrix.
+     
+     @return the number of elements.
+     */
+    int32_t getNumberOfElements() const;
+    
+    /**
+     Gets constant pointer to first element of nuclear potential matrix.
+     
+     @return the constant pointer to first element of nuclear potential matrix.
+     */
+    const double* values() const;
     
     /**
      Converts nuclear potential matrix object to text output and insert it into

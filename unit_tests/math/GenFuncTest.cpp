@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "GenFuncTest.hpp"
 
@@ -125,6 +125,63 @@ TEST_F(CGenFuncTest, ContractWithGtoBlockAndGtoPairsBlock)
                               18.7, 10.2,  8.0, 1.8, 4.3, 2.3,
                                9.9,  4.0,  6.0, 7.0, 3.9, 2.0},
                               6, 4);
+    
+    ASSERT_EQ(cdat, tdat);
+}
+
+TEST_F(CGenFuncTest, ContractWithGtoPairsBlocks)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock2D<double> pdat({1.0, 0.2, 3.0, 2.3, 0.0, 1.0, 0.7, 0.2, 3.1, 1.2, 0.8,
+                              0.3, 0.5, 2.1, 0.5, 0.9, 2.1, 1.7, 3.4, 3.9, 2.7, 1.2,
+                              3.1, 0.8, 0.4, 2.1, 2.7, 0.6, 2.0, 2.7, 1.7, 0.6, 0.3,
+                              1.2, 2.6, 0.8, 1.3, 2.9, 2.5, 1.7, 2.2, 2.1, 2.0, 1.5,
+                              0.9, 3.2, 2.1, 2.6, 2.7, 0.3, 2.2, 0.9, 1.1, 2.7, 0.2,
+                              0.8, 1.5, 0.8, 1.5, 1.4, 1.9, 2.7, 4.2, 0.5, 2.3, 2.8,
+                              0.1, 1.8, 2.2, 0.5, 0.8, 2.2, 3.7, 1.2, 2.9, 1.7, 1.3,
+                              4.1, 3.6, 0.7, 1.5, 3.2, 4.0, 1.7, 3.2, 0.7, 1.6, 2.1},
+                             11, 8);
+    
+    CVecThreeIndexes cvec({{0, 0, 0}, {0, 3, 1}, {0, 0, 1}});
+    
+    std::vector<int32_t> cidx({3, 2, 0});
+    
+    CVecThreeIndexes pvec({{0, 2, 3}, {0, 0, 0}, {0, 0, 1},  {0, 1, 0}});
+    
+    std::vector<int32_t> pidx({7, 0, 8, 2});
+    
+    auto p2dat = pdat; 
+    
+    CMemBlock2D<double> c2dat(2, 4);
+    
+    genfunc::contract(c2dat, p2dat, cvec, cidx, pvec, pidx, ppairs, ppairs,
+                      true, 1);
+    
+    CMemBlock2D<double> t2dat({11.0,  6.6,
+                              10.5,  8.4,
+                              18.7, 10.2,
+                               9.9,  4.0},
+                              2, 4);
+    
+    ASSERT_EQ(c2dat, t2dat);
+    
+    CMemBlock2D<double> cdat(6, 4);
+    
+    genfunc::contract(cdat, pdat, cvec, cidx, pvec, pidx, ppairs, ppairs,
+                      false, 1);
+    
+    CMemBlock2D<double> tdat({11.0,  6.6, 11.6, 2.2, 2.9, 3.1,
+                              10.5,  8.4,  8.8, 5.0, 3.7, 2.8,
+                              18.7, 10.2,  8.0, 1.8, 4.3, 2.3,
+                               9.9,  4.0,  6.0, 7.0, 3.9, 2.0},
+                             6, 4);
     
     ASSERT_EQ(cdat, tdat);
 }
@@ -579,179 +636,6 @@ TEST_F(CGenFuncTest, Distribute)
     ASSERT_EQ(spmat, tmat); 
 }
 
-TEST_F(CGenFuncTest, DistributeWithNaturalPattern)
-{
-    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
-    
-    auto lih = vlxmol::getMoleculeLiH();
-    
-    CGtoBlock bgtos(lih, bas, 1);
-    
-    CGtoBlock kgtos(lih, bas, 1);
-    
-    CDenseMatrix spmat(9, 9);
-    
-    CMemBlock2D<double> adat({ 1.0,  2.0,  0.0,
-                              -3.0,  4.0,  2.0,
-                               6.0,  7.0,  8.0,
-                               1.0,  5.7, -1.0,
-                               0.0,  0.0,  2.0,
-                               0.0,  0.0,  0.0,
-                               1.0,  2.0,  3.0,
-                               0.0, -1.0,  2.0,
-                               0.1, -1.2,  0.0},
-                              3, 9);
-    
-    genfunc::distribute(spmat.values(), adat, 1, 1, 3, 3, 0);
-    
-    genfunc::distribute(spmat.values(), adat, 1, 1, 3, 3, 2);
-    
-    CMemBlock2D<double> bdat({ 1.0,  2.0,  0.0,
-                               0.0,  4.0,  0.0,
-                               0.0,  7.0,  8.0,
-                               0.0,  0.0, -1.0,
-                               0.0,  0.0,  2.0,
-                               0.0,  0.0,  0.0,
-                               2.0,  2.0,  3.0,
-                               0.0, -1.0,  2.0,
-                               0.1, -1.2,  0.0},
-                             3, 9);
-    
-    
-    genfunc::distribute(spmat.values(), bdat, 1, 1, 3, 3, 1);
-    
-    CDenseMatrix bmat({1.0,  2.0,  0.0, -3.0,  4.0,  2.0, 6.0,  7.0,  8.0,
-                       1.0,  2.0,  0.0,  0.0,  4.0,  0.0, 0.0,  7.0,  8.0,
-                       1.0,  2.0,  0.0, -3.0,  4.0,  2.0, 6.0,  7.0,  8.0,
-                       1.0,  5.7, -1.0,  0.0,  0.0,  2.0, 0.0,  0.0,  0.0,
-                       0.0,  0.0, -1.0,  0.0,  0.0,  2.0, 0.0,  0.0,  0.0,
-                       1.0,  5.7, -1.0,  0.0,  0.0,  2.0, 0.0,  0.0,  0.0,
-                       1.0,  2.0,  3.0,  0.0, -1.0,  2.0, 0.1, -1.2,  0.0,
-                       2.0,  2.0,  3.0,  0.0, -1.0,  2.0, 0.1, -1.2,  0.0,
-                       1.0,  2.0,  3.0,  0.0, -1.0,  2.0, 0.1, -1.2,  0.0},
-                      9, 9);
-    
-    ASSERT_EQ(spmat, bmat);
-}
-
-TEST_F(CGenFuncTest, DistributeWithFullMatrix)
-{
-    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
-    
-    auto lih = vlxmol::getMoleculeLiH();
-    
-    CGtoBlock bgtos(lih, bas, 0);
-    
-    CGtoBlock kgtos(lih, bas, 0);
-    
-    CDenseMatrix spmat(14, 14);
-    
-    CMemBlock2D<double> s0dat({1.1, 1.2, 1.3, 1.4, 1.5}, 5, 1);
-    
-    genfunc::distribute(spmat.values(), s0dat, bgtos, kgtos, true, 14, 0);
-    
-    CMemBlock2D<double> s1dat({2.1, 2.2, 2.3, 2.4, 2.5}, 5, 1);
-    
-    genfunc::distribute(spmat.values(), s1dat, bgtos, kgtos, true, 14, 1);
-    
-    CMemBlock2D<double> s2dat({3.1, 3.2, 3.3, 3.4, 3.5}, 5, 1);
-    
-    genfunc::distribute(spmat.values(), s2dat, bgtos, kgtos, true, 14, 2);
-    
-    CMemBlock2D<double> s3dat({4.1, 4.2, 4.3, 4.4, 4.5}, 5, 1);
-    
-    genfunc::distribute(spmat.values(), s3dat, bgtos, kgtos, true, 14, 3);
-    
-    CMemBlock2D<double> s4dat({5.1, 5.2, 5.3, 5.4, 5.5}, 5, 1);
-    
-    genfunc::distribute(spmat.values(), s4dat, bgtos, kgtos, true, 14, 4);
-    
-    kgtos = CGtoBlock(lih, bas, 1);
-    
-    CMemBlock2D<double> sp0dat({2.2, 2.4, 2.6,
-                                2.3, 2.6, 2.9,
-                                2.0, 2.5, 3.0},
-                                3, 3);
-    
-    genfunc::distribute(spmat.values(), sp0dat, bgtos, kgtos, false, 14,  0);
-    
-    CMemBlock2D<double> sp1dat({3.2, 3.4, 3.6,
-                                3.3, 3.6, 3.9,
-                                3.0, 3.5, 4.0},
-                                3, 3);
-    
-    genfunc::distribute(spmat.values(), sp1dat, bgtos, kgtos, false, 14, 1);
-    
-    CMemBlock2D<double> sp2dat({4.2, 4.4, 4.6,
-                                4.3, 4.6, 4.9,
-                                4.0, 4.5, 5.0},
-                                3, 3);
-    
-    genfunc::distribute(spmat.values(), sp2dat, bgtos, kgtos, false, 14,  2);
-    
-    CMemBlock2D<double> sp3dat({5.2, 5.4, 5.6,
-                                5.3, 5.6, 5.9,
-                                5.0, 5.5, 6.0},
-                                3, 3);
-    
-    genfunc::distribute(spmat.values(), sp3dat, bgtos, kgtos, false, 14, 3);
-    
-    CMemBlock2D<double> sp4dat({6.2, 6.4, 6.6,
-                                6.3, 6.6, 6.9,
-                                6.0, 6.5, 7.0},
-                                3, 3);
-    
-    genfunc::distribute(spmat.values(), sp4dat, bgtos, kgtos, false, 14, 4);
-    
-    bgtos = CGtoBlock(lih, bas, 1);
-    
-    CMemBlock2D<double> pp0dat({ 1.0,  2.0,  0.0,
-                                -3.0,  4.0,  2.0,
-                                 6.0,  7.0,  8.0,
-                                 1.0,  5.7, -1.0,
-                                 0.0,  0.0,  2.0,
-                                 0.0,  0.0,  0.0,
-                                 1.0,  2.0,  3.0,
-                                 0.0, -1.0,  2.0,
-                                 0.1, -1.2,  0.0},
-                                3, 9);
-    
-    genfunc::distribute(spmat.values(), pp0dat, bgtos, kgtos, true, 14,  0);
-    
-    genfunc::distribute(spmat.values(), pp0dat, bgtos, kgtos, true, 14, 2);
-    
-    CMemBlock2D<double> pp1dat({ 1.0,  2.0,  0.0,
-                                 0.0,  4.0,  0.0,
-                                 0.0,  7.0,  8.0,
-                                 0.0,  0.0, -1.0,
-                                 0.0,  0.0,  2.0,
-                                 0.0,  0.0,  0.0,
-                                 2.0,  2.0,  3.0,
-                                 0.0, -1.0,  2.0,
-                                 0.1, -1.2,  0.0},
-                                3, 9);
-    
-    genfunc::distribute(spmat.values(), pp1dat, bgtos, kgtos, true, 14,  1);
-   
-    CDenseMatrix bmat({1.1, 1.2, 1.3, 1.4, 1.5, 2.2, 2.4,  2.6,  2.3,  2.6, 2.9, 2.0,  2.5, 3.0,
-                       2.1, 2.2, 2.3, 2.4, 2.5, 3.2, 3.4,  3.6,  3.3,  3.6, 3.9, 3.0,  3.5, 4.0,
-                       3.1, 3.2, 3.3, 3.4, 3.5, 4.2, 4.4,  4.6,  4.3,  4.6, 4.9, 4.0,  4.5, 5.0,
-                       4.1, 4.2, 4.3, 4.4, 4.5, 5.2, 5.4,  5.6,  5.3,  5.6, 5.9, 5.0,  5.5, 6.0,
-                       5.1, 5.2, 5.3, 5.4, 5.5, 6.2, 6.4,  6.6,  6.3,  6.6, 6.9, 6.0,  6.5, 7.0,
-                       2.2, 3.2, 4.2, 5.2, 6.2, 1.0, 2.0,  0.0, -3.0,  4.0, 2.0, 6.0,  7.0, 8.0,
-                       2.4, 3.4, 4.4, 5.4, 6.4, 1.0, 2.0,  0.0,  0.0,  4.0, 0.0, 0.0,  7.0, 8.0,
-                       2.6, 3.6, 4.6, 5.6, 6.6, 1.0, 2.0,  0.0, -3.0,  4.0, 2.0, 6.0,  7.0, 8.0,
-                       2.3, 3.3, 4.3, 5.3, 6.3, 1.0, 5.7, -1.0,  0.0,  0.0, 2.0, 0.0,  0.0, 0.0,
-                       2.6, 3.6, 4.6, 5.6, 6.6, 0.0, 0.0, -1.0,  0.0,  0.0, 2.0, 0.0,  0.0, 0.0,
-                       2.9, 3.9, 4.9, 5.9, 6.9, 1.0, 5.7, -1.0,  0.0,  0.0, 2.0, 0.0,  0.0, 0.0,
-                       2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 2.0,  3.0,  0.0, -1.0, 2.0, 0.1, -1.2, 0.0,
-                       2.5, 3.5, 4.5, 5.5, 6.5, 2.0, 2.0,  3.0,  0.0, -1.0, 2.0, 0.1, -1.2, 0.0,
-                       3.0, 4.0, 5.0, 6.0, 7.0, 1.0, 2.0,  3.0,  0.0, -1.0, 2.0, 0.1, -1.2, 0.0},
-                      14, 14);
-    
-    ASSERT_EQ(spmat, bmat);
-}
-
 TEST_F(CGenFuncTest, IsInVectorForTwoIndexes)
 {
     CVecTwoIndexes vec{{0, 1}, {2, 4}, {7, -1}, {8, 2}};
@@ -794,6 +678,27 @@ TEST_F(CGenFuncTest, IsInVectorForThreeIndexes)
     ASSERT_FALSE(genfunc::isInVector(vec, {7, 1, 2}));
 }
 
+TEST_F(CGenFuncTest, IsInVectorForFourIndexes)
+{
+    CVecFourIndexes vec{{0, 1, 3, 4}, {2, 4, 2, 1}, {7, -1, 3, 4}, {8, 2, 4, 5}};
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {0, 1, 3, 4}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {2, 4, 2, 1}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {7, -1, 3, 4}));
+    
+    ASSERT_TRUE(genfunc::isInVector(vec, {8,  2, 4, 5}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {0, 0, 0, 0}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 0, 1, 1}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {1, 1, 2, 1}));
+    
+    ASSERT_FALSE(genfunc::isInVector(vec, {7, 1, 2, 3}));
+}
+
 TEST_F(CGenFuncTest, AddValidAndUniquePair)
 {
     CVecTwoIndexes vec{{0, 1}, {2, 4}};
@@ -806,7 +711,7 @@ TEST_F(CGenFuncTest, AddValidAndUniquePair)
     
     genfunc::addValidAndUniquePair(vec, {2, 1});
     
-    ASSERT_EQ(vec.size(), 3);
+    ASSERT_EQ(vec.size(), 3u);
     
     ASSERT_EQ(vec[0], CTwoIndexes(0, 1));
     
@@ -829,13 +734,42 @@ TEST_F(CGenFuncTest, AddValidAndUniqueTriple)
     
     genfunc::addValidAndUniqueTriple(vec, {2, 1, 1});
     
-    ASSERT_EQ(vec.size(), 3);
+    ASSERT_EQ(vec.size(), 3u);
     
     ASSERT_EQ(vec[0], CThreeIndexes(0, 1, 1));
     
     ASSERT_EQ(vec[1], CThreeIndexes(2, 4, 0));
     
     ASSERT_EQ(vec[2], CThreeIndexes(2, 1, 1));
+}
+
+TEST_F(CGenFuncTest, AddValidAndUniqueQuadruple)
+{
+    CVecFourIndexes vec{{0, 1, 1, 2}, {2, 4, 0, 7}};
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {7, -1, 1, 2});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, 1, 3});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 4, 0, 7});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, -1, 1});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, 1, 2});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {-2, 1, 1, 2});
+    
+    genfunc::addValidAndUniqueQuadruple(vec, {2, 1, 1, -1});
+    
+    ASSERT_EQ(vec.size(), 4u);
+    
+    ASSERT_EQ(vec[0], CFourIndexes(0, 1, 1, 2));
+    
+    ASSERT_EQ(vec[1], CFourIndexes(2, 4, 0, 7));
+    
+    ASSERT_EQ(vec[2], CFourIndexes(2, 1, 1, 3));
+    
+    ASSERT_EQ(vec[3], CFourIndexes(2, 1, 1, 2));
 }
 
 TEST_F(CGenFuncTest, FindPairIndex)
@@ -876,6 +810,25 @@ TEST_F(CGenFuncTest, FindTripleIndex)
     ASSERT_EQ(-1, genfunc::findTripleIndex(idx, vec, {2, 4, 2}));
 }
 
+TEST_F(CGenFuncTest, FindQuadrupleIndex)
+{
+    CVecFourIndexes vec{{0, 1, 1, 2}, {2, 4, 3, 1}, {7, -1, 2, 0}, {8, 2, 4, 7}};
+    
+    std::vector<int32_t> idx{1, 3, 7, 8};
+    
+    ASSERT_EQ(8, genfunc::findQuadrupleIndex(idx, vec, {8, 2, 4, 7}));
+    
+    ASSERT_EQ(7, genfunc::findQuadrupleIndex(idx, vec, {7, -1, 2, 0}));
+    
+    ASSERT_EQ(3, genfunc::findQuadrupleIndex(idx, vec, {2, 4, 3, 1}));
+    
+    ASSERT_EQ(1, genfunc::findQuadrupleIndex(idx, vec, {0, 1, 1, 2}));
+    
+    ASSERT_EQ(-1, genfunc::findQuadrupleIndex(idx, vec, {0, 0, 0, 0}));
+    
+    ASSERT_EQ(-1, genfunc::findQuadrupleIndex(idx, vec, {2, 4, 2, 2}));
+}
+
 TEST_F(CGenFuncTest, MaxOrderOfPair)
 {
     CVecThreeIndexes vec{{0, 1, 1}, {2, 4, 3}, {0, 1, 0}, {0, 1, 4}};
@@ -895,9 +848,22 @@ TEST_F(CGenFuncTest, GetPairsFromTripleIndexes)
     
     auto xyvec = genfunc::getPairsFromTripleIndexes(vec);
     
-    ASSERT_EQ(2, xyvec.size());
+    ASSERT_EQ(2u, xyvec.size());
     
     ASSERT_EQ(xyvec[0], CThreeIndexes(0, 1, 0));
     
     ASSERT_EQ(xyvec[1], CThreeIndexes(7, 2, 0));
+}
+
+TEST_F(CGenFuncTest, GetTriplesFromQuadrupleIndexes)
+{
+    CVecFourIndexes vec{{0, 0, 1, 2}, {2, 4, 3, 2}, {1, 7, 0, 2}, {0, 8, -2, 4}};
+    
+    auto xyzvec = genfunc::getTriplesFromQuadrupleIndexes(vec);
+    
+    ASSERT_EQ(2u, xyzvec.size());
+    
+    ASSERT_EQ(xyzvec[0], CThreeIndexes(0, 1, 2));
+    
+    ASSERT_EQ(xyzvec[1], CThreeIndexes(8, -2, 4));
 }

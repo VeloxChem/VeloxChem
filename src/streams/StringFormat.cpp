@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "StringFormat.hpp"
 
@@ -132,6 +132,14 @@ to_string(const size_t source,
     return fstr::format(str, width, aligment);
 }
 
+std::string
+to_string(const bool source)
+{
+    if (source) return std::string("True");
+        
+    return std::string("False");
+}
+    
 int32_t
 to_AngularMomentum(const std::string& label)
 {

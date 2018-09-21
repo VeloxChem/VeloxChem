@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef AppManager_hpp
 #define AppManager_hpp
@@ -103,12 +103,6 @@ public:
      */
     ~CAppManager();
     
-    /**
-     Creates an application manager object (for boost python).
-     */
-    static std::shared_ptr<CAppManager>
-    create(std::string input_string, std::string output_string);
-
     /**
      Executes a list of jobs assigned to application manager object.
      */

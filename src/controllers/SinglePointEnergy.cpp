@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "SinglePointEnergy.hpp"
 
@@ -22,6 +22,7 @@
 #include "NuclearPotentialIntegralsDriver.hpp"
 #include "ElectronicPotentialIntegralsDriver.hpp"
 #include "ThreeCenterElectronRepulsionIntegralsDriver.hpp"
+#include "ElectronRepulsionIntegralsDriver.hpp"
 
 #include "MemBlock2D.hpp"
 
@@ -91,18 +92,28 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
         
         if (_state)
         {
-             _aoBasis = rdraobasis.getAOBasis(pathToBasisSets, _molecule,
-                                              oStream);
+            _aoBasis = rdraobasis.getAOBasis(pathToBasisSets, _molecule,
+                                             oStream);
         }
 
         _state = rdraobasis.getState();
         
         // read RI-J basis
         
+        //if (_state)
+        //{
+        //    _riBasis = rdraobasis.getRIJBasis(pathToBasisSets, _molecule,
+        //                                      oStream);
+        // }
+
+        //_state = rdraobasis.getState();
+        
+        // read minimal AO basis
+        
         if (_state)
         {
-            _riBasis = rdraobasis.getRIJBasis(pathToBasisSets, _molecule,
-                                              oStream);
+            _minBasis = rdraobasis.getMinBasis(pathToBasisSets, _molecule,
+                                               oStream);
         }
         
         _state = rdraobasis.getState();
@@ -118,7 +129,7 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
     
     // broadcast RI basis
     
-    _riBasis.broadcast(_globRank, MPI_COMM_WORLD);
+    //_riBasis.broadcast(_globRank, MPI_COMM_WORLD);
     
     // print atomic orbitals i.e. AO basis
 
@@ -127,8 +138,8 @@ CSinglePointEnergy::set(const std::string&   pathToBasisSets,
     
     // print RI basis i.e. Coulomb fitting
     
-    if (_globRank == mpi::master()) _riBasis.printBasis("Coulomb Fitting Orbitals",
-                                                        _molecule, oStream);
+    //if (_globRank == mpi::master()) _riBasis.printBasis("Coulomb Fitting Orbitals",
+    //                                                    _molecule, oStream);
 
 //    if (_globRank == mpi::master())
 //    {
@@ -168,33 +179,49 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     // compute overlap integrals
     
-    COverlapIntegralsDriver ovldrv(_globRank, _globNodes, comm);
+    //COverlapIntegralsDriver ovldrv(_globRank, _globNodes, comm);
     
-    auto ovlmat = ovldrv.compute(_molecule, _aoBasis, oStream, comm);
+    //auto ovlmat = ovldrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute kinetic energy integrals
     
-    CKineticEnergyIntegralsDriver kindrv(_globRank, _globNodes, comm);
+    //CKineticEnergyIntegralsDriver kindrv(_globRank, _globNodes, comm);
     
-    auto kinmat = kindrv.compute(_molecule, _aoBasis, oStream, comm);
+    //auto kinmat = kindrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute nuclear potential integrals
     
-    CNuclearPotentialIntegralsDriver npotdrv(_globRank, _globNodes, comm);
+    //CNuclearPotentialIntegralsDriver npotdrv(_globRank, _globNodes, comm);
     
-    auto npotmat = npotdrv.compute(_molecule, _aoBasis, oStream, comm);
+    //auto npotmat = npotdrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute electronic potential integrals
     
-    CElectronicPotentialIntegralsDriver epotdrv(_globRank, _globNodes, comm);
+    //CElectronicPotentialIntegralsDriver epotdrv(_globRank, _globNodes, comm);
     
-    auto epotmat = epotdrv.compute(_molecule, _aoBasis, oStream, comm);
+    //auto epotmat = epotdrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute three center electron repulsion integrals
     
-    CThreeCenterElectronRepulsionIntegralsDriver ridrv(_globRank, _globNodes, comm);
+    // CThreeCenterElectronRepulsionIntegralsDriver ridrv(_globRank, _globNodes, comm);
     
-    ridrv.compute(_molecule, _aoBasis, _riBasis, 1.0e-13, oStream, comm);
+    // ridrv.compute(_molecule, _aoBasis, _riBasis, 1.0e-13, oStream, comm);
+    
+    // compute electron repulsion integrals
+    
+    CElectronRepulsionIntegralsDriver eridrv(_globRank, _globNodes, comm);
+    
+    //CGtoBlock sgtos(_molecule, _aoBasis, 0);
+    
+    //CGtoBlock pgtos(_molecule, _aoBasis, 1);
+    
+    //CGtoBlock bgtos(_molecule, _aoBasis, 4);
+    
+    //CGtoPairsBlock bpairs(bgtos, 1.0e-13);
+    
+    //CGtoPairsBlock kpairs(sgtos, pgtos, 1.0e-13);
+
+    eridrv.compute(_molecule, _aoBasis, 1.0e-13, oStream, comm);
 }
 
 void

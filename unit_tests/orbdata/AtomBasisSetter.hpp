@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef AtomBasisSetter_hpp
 #define AtomBasisSetter_hpp
@@ -20,6 +20,18 @@ CAtomBasis getAtomBasisEmpty();
 CAtomBasis getAtomBasisForH();
 
 CAtomBasis getAtomBasisForLi();
+
+CAtomBasis getNormalizedAtomBasisForH();
+
+CAtomBasis getNormalizedAtomBasisForO();
+
+CAtomBasis getMinimalBasisForH();
+
+CAtomBasis getMinimalBasisForC();
+
+CAtomBasis getMinimalBasisForN();
+
+CAtomBasis getMinimalBasisForO();
     
 CAtomBasis getTestBasisForH();
     

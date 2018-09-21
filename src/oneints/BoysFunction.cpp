@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "BoysFunction.hpp"
 
@@ -33,209 +33,217 @@ void CBoysFunction::compute(      CMemBlock2D<double>& values,
                             const CMemBlock<double>&   arguments,
                             const int32_t              iOrder) const
 {
+    compute(values, arguments, arguments.size(), iOrder);
+}
+
+void CBoysFunction::compute(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments,
+                            const int32_t              iOrder) const
+{
     if (iOrder < 0) return;
 
     if (iOrder > 28) return;
 
     if (iOrder == 0)
     {
-        _computeBF00(values, arguments);
+        _computeBF00(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 1)
     {
-        _computeBF01(values, arguments);
+        _computeBF01(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 2)
     {
-        _computeBF02(values, arguments);
+        _computeBF02(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 3)
     {
-        _computeBF03(values, arguments);
+        _computeBF03(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 4)
     {
-        _computeBF04(values, arguments);
+        _computeBF04(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 5)
     {
-        _computeBF05(values, arguments);
+        _computeBF05(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 6)
     {
-        _computeBF06(values, arguments);
+        _computeBF06(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 7)
     {
-        _computeBF07(values, arguments);
+        _computeBF07(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 8)
     {
-        _computeBF08(values, arguments);
+        _computeBF08(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 9)
     {
-        _computeBF09(values, arguments);
+        _computeBF09(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 10)
     {
-        _computeBF10(values, arguments);
+        _computeBF10(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 11)
     {
-        _computeBF11(values, arguments);
+        _computeBF11(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 12)
     {
-        _computeBF12(values, arguments);
+        _computeBF12(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 13)
     {
-        _computeBF13(values, arguments);
+        _computeBF13(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 14)
     {
-        _computeBF14(values, arguments);
+        _computeBF14(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 15)
     {
-        _computeBF15(values, arguments);
+        _computeBF15(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 16)
     {
-        _computeBF16(values, arguments);
+        _computeBF16(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 17)
     {
-        _computeBF17(values, arguments);
+        _computeBF17(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 18)
     {
-        _computeBF18(values, arguments);
+        _computeBF18(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 19)
     {
-        _computeBF19(values, arguments);
+        _computeBF19(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 20)
     {
-        _computeBF20(values, arguments);
+        _computeBF20(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 21)
     {
-        _computeBF21(values, arguments);
+        _computeBF21(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 22)
     {
-        _computeBF22(values, arguments);
+        _computeBF22(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 23)
     {
-        _computeBF23(values, arguments);
+        _computeBF23(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 24)
     {
-        _computeBF23(values, arguments);
+        _computeBF23(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 25)
     {
-        _computeBF25(values, arguments);
+        _computeBF25(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 26)
     {
-        _computeBF26(values, arguments);
+        _computeBF26(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 27)
     {
-        _computeBF27(values, arguments);
+        _computeBF27(values, arguments, nArguments);
 
         return;
     }
 
     if (iOrder == 28)
     {
-        _computeBF28(values, arguments);
+        _computeBF28(values, arguments, nArguments);
 
         return;
     }
@@ -370,17 +378,16 @@ CBoysFunction::_setTable()
 
 void
 CBoysFunction::_computeBF00(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
     auto val00 = values.data(0);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -420,11 +427,10 @@ CBoysFunction::_computeBF00(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -432,7 +438,7 @@ CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
 
     auto val01 = values.data(1);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -486,13 +492,12 @@ CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 2> ft{1.0, 1.0 / 3.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -502,7 +507,7 @@ CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
 
     auto val02 = values.data(2);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -572,13 +577,12 @@ CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 3> ft{1.0, 1.0 / 3.0, 1.0 / 5.0 };
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -590,7 +594,7 @@ CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
 
     auto val03 = values.data(3);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -671,13 +675,12 @@ CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 4> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -691,7 +694,7 @@ CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
 
     auto val04 = values.data(4);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -782,13 +785,12 @@ CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 5> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -804,7 +806,7 @@ CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
 
     auto val05 = values.data(5);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -905,14 +907,13 @@ CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 6> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                              1.0 / 11.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -930,7 +931,7 @@ CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
 
     auto val06 = values.data(6);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -1041,14 +1042,13 @@ CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 7> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                              1.0 / 11.0, 1.0 / 13.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -1068,7 +1068,7 @@ CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
 
     auto val07 = values.data(7);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -1189,14 +1189,13 @@ CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 8> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -1218,7 +1217,7 @@ CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
 
     auto val08 = values.data(8);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -1349,14 +1348,13 @@ CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 9> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -1380,7 +1378,7 @@ CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
 
     auto val09 = values.data(9);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -1521,15 +1519,14 @@ CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 10> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -1555,7 +1552,7 @@ CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
 
     auto val10 = values.data(10);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -1706,15 +1703,14 @@ CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 11> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0, 1.0 / 21.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -1742,7 +1738,7 @@ CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
 
     auto val11 = values.data(11);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -1903,15 +1899,14 @@ CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 12> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -1941,7 +1936,7 @@ CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
 
     auto val12 = values.data(12);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -2112,15 +2107,14 @@ CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
     std::array<double, 13> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -2152,7 +2146,7 @@ CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
 
     auto val13 = values.data(13);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -2333,7 +2327,8 @@ CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -2341,8 +2336,6 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -2376,7 +2369,7 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
 
     auto val14 = values.data(14);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -2567,7 +2560,8 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -2575,8 +2569,6 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0, 1.0 / 29.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -2612,7 +2604,7 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
 
     auto val15 = values.data(15);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -2813,7 +2805,8 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -2821,8 +2814,6 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -2860,7 +2851,7 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
 
     auto val16 = values.data(16);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -3071,7 +3062,8 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3079,8 +3071,6 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
                               1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -3120,7 +3110,7 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
 
     auto val17 = values.data(17);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -3341,7 +3331,8 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3350,8 +3341,6 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -3393,7 +3382,7 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
 
     auto val18 = values.data(18);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -3624,7 +3613,8 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3633,8 +3623,6 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0, 1.0 / 37.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -3678,7 +3666,7 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
 
     auto val19 = values.data(19);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -3919,7 +3907,8 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3928,8 +3917,6 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -3975,7 +3962,7 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
 
     auto val20 = values.data(20);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -4226,7 +4213,8 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -4235,8 +4223,6 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
                               1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -4284,7 +4270,7 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
 
     auto val21 = values.data(21);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -4545,7 +4531,8 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -4555,8 +4542,6 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
                               1.0 / 43.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -4606,7 +4591,7 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
 
     auto val22 = values.data(22);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -4877,7 +4862,8 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -4887,8 +4873,6 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
                               1.0 / 43.0, 1.0 / 45.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -4940,7 +4924,7 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
 
     auto val23 = values.data(23);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -5221,7 +5205,8 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -5231,8 +5216,6 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
                               1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -5286,7 +5269,7 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
 
     auto val24 = values.data(24);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -5577,7 +5560,8 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -5587,8 +5571,6 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
                               1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
                               1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -5644,7 +5626,7 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
 
     auto val25 = values.data(25);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -5945,7 +5927,8 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -5956,8 +5939,6 @@ CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
                               1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0,
                               1.0 / 51.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -6015,7 +5996,7 @@ CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
 
     auto val26 = values.data(26);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -6325,7 +6306,8 @@ CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -6336,8 +6318,6 @@ CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
                               1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0,
                               1.0 / 51.0, 1.0 / 53.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -6397,7 +6377,7 @@ CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
 
     auto val27 = values.data(27);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
@@ -6717,7 +6697,8 @@ CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
 
 void
 CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments) const
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -6728,8 +6709,6 @@ CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
                               1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
                               1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0,
                               1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
-
-    auto ndim = arguments.size();
 
     auto argv = arguments.data();
 
@@ -6791,7 +6770,7 @@ CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
 
     auto val28 = values.data(28);
 
-    for (int32_t i = 0; i < ndim; i++)
+    for (int32_t i = 0; i < nArguments; i++)
     {
         int32_t pnt = (argv[i] > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * argv[i] + 0.5);
 
