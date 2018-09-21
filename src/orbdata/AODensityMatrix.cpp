@@ -7,6 +7,7 @@
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "AODensityMatrix.hpp"
+#include "ErrorHandler.hpp"
 
 CAODensityMatrix::CAODensityMatrix()
 
@@ -22,7 +23,13 @@ CAODensityMatrix::CAODensityMatrix(const std::vector<CDenseMatrix>& denMatrices,
 
     , _denType(denType)
 {
-    
+    if (denType == denmat::unrest)
+    {
+        errors::assertMsgCritical(
+                denMatrices.size() % 2 == 0,
+                "Odd number of matrices for unrestricted AO density!"
+                );
+    }
 }
 
 CAODensityMatrix::CAODensityMatrix(const CAODensityMatrix& source)

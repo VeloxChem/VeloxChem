@@ -14,6 +14,7 @@
 #include "DenseDiagonalizer.hpp"
 #include "AODensityMatrix.hpp"
 #include "DensityMatrixType.hpp"
+#include "ErrorHandler.hpp"
 
 CSADGuessDriver::CSADGuessDriver(const int32_t  globRank,
                                  const int32_t  globNodes,
@@ -173,25 +174,21 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                                const COverlapMatrix&  S12,
                                const COverlapMatrix&  S22) const
 {
-    int32_t natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.getNumberOfAtoms();
 
-    int32_t nao_1 = S12.getNumberOfRows();
+    auto nao_1 = S12.getNumberOfRows();
 
-    int32_t nao_2 = S12.getNumberOfColumns();
+    auto nao_2 = S12.getNumberOfColumns();
 
     // AO indices for atoms
 
-    std::vector< std::vector<int32_t> >
+    auto aoinds_atoms_1 = getAOIndicesOfAtoms(molecule, basis_1);
 
-        aoinds_atoms_1 = getAOIndicesOfAtoms(molecule, basis_1);
-
-    std::vector< std::vector<int32_t> >
-        
-        aoinds_atoms_2 = getAOIndicesOfAtoms(molecule, basis_2);
+    auto aoinds_atoms_2 = getAOIndicesOfAtoms(molecule, basis_2);
 
     // occupation numbers
 
-    std::vector< std::vector<double> > qocc = _buildQocc();
+    auto qocc = _buildQocc();
 
     // C_SAD matrix
 
@@ -255,7 +252,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
             mat_c1.values()[i * naodim_1 + i] = 1.0;
         }
 
-        CDenseMatrix mat_a = denblas::multAtB(block_12, mat_c1);
+        auto mat_a = denblas::multAtB(block_12, mat_c1);
 
         // S22^-1
 
@@ -263,35 +260,35 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         diagdrv.diagonalize(block_22);
 
-        if (! diagdrv.getState())
-        {
-            throw "DenseMatrix diagonalization failed in getSADInitialGuess!";
-        }
+        errors::assertMsgCritical(
+                diagdrv.getState(),
+                "Matrix diagonalization failed in SAD initial guess!"
+                );
 
-        CDenseMatrix block_22_inv = diagdrv.getInvertedMatrix();
+        auto block_22_inv = diagdrv.getInvertedMatrix();
 
         // M = A' S22^-1 A
 
-        CDenseMatrix prod = denblas::multAB(block_22_inv, mat_a);
+        auto prod = denblas::multAB(block_22_inv, mat_a);
 
-        CDenseMatrix mat_m = denblas::multAtB(mat_a, prod);
+        auto mat_m = denblas::multAtB(mat_a, prod);
 
         // M^-1/2
 
         diagdrv.diagonalize(mat_m);
 
-        if (! diagdrv.getState())
-        {
-            throw "DenseMatrix diagonalization failed in getSADInitialGuess!";
-        }
+        errors::assertMsgCritical(
+                diagdrv.getState(),
+                "Matrix diagonalization failed in SAD initial guess!"
+                );
 
-        CDenseMatrix mat_m_invsqrt = diagdrv.getInvertedSqrtMatrix();
+        auto mat_m_invsqrt = diagdrv.getInvertedSqrtMatrix();
 
         // C2 = S22^-1 A M^-1/2
 
         prod = denblas::multAB(mat_a, mat_m_invsqrt);
 
-        CDenseMatrix mat_c2 = denblas::multAB(block_22_inv, prod);
+        auto mat_c2 = denblas::multAB(block_22_inv, prod);
 
         // update csad
 

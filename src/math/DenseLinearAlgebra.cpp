@@ -7,6 +7,7 @@
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "DenseLinearAlgebra.hpp"
+#include "ErrorHandler.hpp"
 
 #include "mkl.h"
 
@@ -28,10 +29,10 @@ namespace denblas { // denblas namespace
 
         auto nbcol = matrixB.getNumberOfColumns();
 
-        if (nacol != nbrow)
-        {
-            throw "Inconsistent matrix sizes in DenseMatrix multiplication!";
-        }
+        errors::assertMsgCritical(
+                nacol == nbrow,
+                "Inconsistent sizes in matrix multiplication!"
+                );
         
         // allocate dense matrix
         
@@ -66,10 +67,10 @@ namespace denblas { // denblas namespace
         
         auto nbcol = matrixB.getNumberOfColumns();
 
-        if (nacol != nbcol)
-        {
-            throw "Inconsistent matrix sizes in DenseMatrix multiplication!";
-        }
+        errors::assertMsgCritical(
+                nacol == nbcol,
+                "Inconsistent sizes in matrix multiplication!"
+                );
         
         // allocate dense matrix
         
@@ -104,10 +105,10 @@ namespace denblas { // denblas namespace
 
         auto nbcol = matrixB.getNumberOfColumns();
         
-        if (narow != nbrow)
-        {
-            throw "Inconsistent matrix sizes in DenseMatrix multiplication!";
-        }
+        errors::assertMsgCritical(
+                narow == nbrow,
+                "Inconsistent sizes in matrix multiplication!"
+                );
 
         // allocate dense matrix
         
@@ -211,10 +212,10 @@ namespace denblas { // denblas namespace
     subAB(const CDenseMatrix& matrixA,
           const CDenseMatrix& matrixB)
     {
-        if (matrixA.getNumberOfElements() != matrixB.getNumberOfElements())
-        {
-            throw "Inconsistent matrix sizes in DenseMatrix subtraction!";
-        }
+        errors::assertMsgCritical(
+                matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
+                "Inconsistent sizes in matrix subtraction!"
+                );
 
         // copy matrix
         
@@ -233,10 +234,10 @@ namespace denblas { // denblas namespace
           const CDenseMatrix& matrixB,
           const double        factor)
     {
-        if (matrixA.getNumberOfElements() != matrixB.getNumberOfElements())
-        {
-            throw "Inconsistent matrix sizes in DenseMatrix addition!";
-        }
+        errors::assertMsgCritical(
+                matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
+                "Inconsistent sizes in matrix addition!"
+                );
 
         // copy matrix
         
