@@ -49,12 +49,10 @@ initialized()
 
         MPI_Initialized(&minit);
 
-        return static_cast<bool>(minit);
+        if (minit) return true;
     }
-    else
-    {
-        return false;
-    }
+
+    return false;
 }
 
 bool
