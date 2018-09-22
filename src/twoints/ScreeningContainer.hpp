@@ -30,19 +30,6 @@ class CScreeningContainer
      */
     std::vector<CCauchySchwarzScreener> _screeners;
     
-    /**
-     Initializes vector of screener objects for bra and ket sides.
-
-     @param braGtoPairsContainer the GTOs pairs container on bra side.
-     @param ketGtoPairsContainer the GTOs pairs container on ket side.
-     @param screeningScheme the screening scheme.
-     @param threshold the screening threshold.
-     */
-    void _setScreeners(const CGtoPairsContainer& braGtoPairsContainer,
-                       const CGtoPairsContainer& ketGtoPairsContainer,
-                       const ericut              screeningScheme,
-                       const double              threshold);
-    
 public:
     
     /**
@@ -53,15 +40,15 @@ public:
     /**
      Creates a screening container object.
      
-     @param molecule the molecule.
-     @param aoBasis the molecular AO basis.
+     @param braGtoPairsContainer the GTOs pairs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
      @param screeningScheme the screening scheme.
      @param threshold the screening threshold.
      */
-    CScreeningContainer(const CMolecule&       molecule,
-                        const CMolecularBasis& aoBasis,
-                        const ericut           screeningScheme,
-                        const double           threshold);
+    CScreeningContainer(const CGtoPairsContainer& braGtoPairsContainer,
+                        const CGtoPairsContainer& ketGtoPairsContainer,
+                        const ericut              screeningScheme,
+                        const double              threshold);
     
     /**
      Destroys a screening container object.

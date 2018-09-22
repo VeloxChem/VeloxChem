@@ -75,6 +75,49 @@ CElectronRepulsionIntegralsDriver::compute(const CMolecule&       molecule,
     _printTiming(molecule, eritim, oStream);
 }
 
+CScreeningContainer
+CElectronRepulsionIntegralsDriver::compute(const ericut           screeningScheme,
+                                           const double           threshold,
+                                           const CMolecule&       molecule,
+                                           const CMolecularBasis& aoBasis,
+                                                 COutputStream&   oStream,
+                                                 MPI_Comm         comm) const
+{
+    CSystemClock eritim;
+    
+    // generate GTOs pairs blocks for AO basis on bra side
+    
+    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-13);
+    
+    // split GTOs pairs into batches on bra side
+    
+    auto bbpairs = bgtopairs.split(500);
+    
+    // initialize screening container
+    
+    CScreeningContainer qcont(bbpairs, bbpairs, screeningScheme, threshold);
+    
+    // allocate temporary buffer for Q values on bra side
+    
+    auto bqbuff = _getQValuesBuffer(bbpairs);
+    
+    CVecMemBlock<double> kqbuff;
+    
+    // compute Q values on bra side
+    
+    _compMaxQValues(&bqbuff, &kqbuff, &bbpairs, &bbpairs);
+    
+    // copy Q values from bra to ket side
+    
+    kqbuff = bqbuff;
+    
+    // print Q values computation timings
+    
+    _printQValuesTiming(molecule, eritim, oStream); 
+    
+    return qcont;
+}
+
 void
 CElectronRepulsionIntegralsDriver::compute(      double*         intsBatch,
                                            const CGtoPairsBlock& braGtoPairsBlock,
@@ -1487,6 +1530,29 @@ CElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
 }
 
 void
+CElectronRepulsionIntegralsDriver::_printQValuesTiming(const CMolecule&     molecule,
+                                                       const CSystemClock&  timer,
+                                                             COutputStream& oStream) const
+{
+    // NOTE: Silent for local execution mode
+    
+    if (_isLocalMode) return;
+    
+    // collect timing data from MPI nodes
+    
+    if (_globRank == mpi::master())
+    {
+        auto tsec = timer.getElapsedTimeInSeconds();
+        
+        oStream << fmt::info << "Q values for ERIs is computed in ";
+        
+        oStream << fstr::to_string(tsec, 2) << " sec.";
+        
+        oStream << fmt::end << fmt::blank;
+    }
+}
+
+void
 CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
                                                                    const CGtoPairsContainer* ketGtoPairsContainer) const
 {
@@ -1528,4 +1594,93 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPai
     }
     
     delete distpat; 
+}
+
+void
+CElectronRepulsionIntegralsDriver::_compMaxQValues(      CVecMemBlock<double>* braQValuesBuffer,
+                                                         CVecMemBlock<double>* ketQValuesBuffer,
+                                                   const CGtoPairsContainer*   braGtoPairsContainer,
+                                                   const CGtoPairsContainer*   ketGtoPairsContainer) const
+{
+    // determine symmetry of GTOs pairs containers on bra and ket sides
+    
+    auto symbk = (*braGtoPairsContainer == *ketGtoPairsContainer);
+    
+    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer)
+    {
+        #pragma omp single nowait
+        {
+            // Q values for bra side
+            
+            auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                #pragma omp task firstprivate(i)
+                {
+                    auto bqprt = (*braQValuesBuffer)[i].data();
+                    
+                    auto bpairs = braGtoPairsContainer->getGtoPairsBlock(i);
+                    
+                    _compMaxQValuesForGtoPairsBlock(bqprt, bpairs);
+                }
+            }
+            
+            // Q values for ket side if needed
+            
+            if (!symbk)
+            {
+                auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
+                
+                for (int32_t i = 0; i < nket; i++)
+                {
+                    #pragma omp task firstprivate(i)
+                    {
+                        auto kqprt = (*ketQValuesBuffer)[i].data();
+                        
+                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(i);
+                        
+                        _compMaxQValuesForGtoPairsBlock(kqprt, kpairs);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void
+CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*         qValuesBuffer,
+                                                                   const CGtoPairsBlock& gtoPairsBlock) const
+{
+    // determine number of contracted GTOs pairs
+    
+    auto ngto = gtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    // loop over contracted GTOs pairs
+    
+    for (int32_t i = 0; i < ngto; i++)
+    {
+        auto cpair = gtoPairsBlock.pick(i);
+        
+        CTwoIntsDistribution cdist(qValuesBuffer, 1, 1, i, dist2e::qvalues);
+        
+        _compElectronRepulsionForGtoPairsBlocks(&cdist, cpair, cpair); 
+    }
+}
+
+CVecMemBlock<double>
+CElectronRepulsionIntegralsDriver::_getQValuesBuffer(const CGtoPairsContainer& gtoPairsContainer) const
+{
+    CVecMemBlock<double> buffvec;
+    
+    auto nppblk = gtoPairsContainer.getNumberOfGtoPairsBlocks();
+    
+    for (int32_t i = 0; i < nppblk; i++)
+    {
+        auto cpairs = gtoPairsContainer.getGtoPairsBlock(i);
+        
+        buffvec.push_back(CMemBlock<double>(cpairs.getNumberOfScreenedContrPairs()));
+    }
+    
+    return buffvec;
 }

@@ -22,6 +22,8 @@
 #include "GtoPairsContainer.hpp"
 #include "SystemClock.hpp"
 #include "TwoIntsDistributor.hpp"
+#include "ScreeningContainer.hpp"
+#include "VecMemBlocks.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -238,13 +240,57 @@ class CElectronRepulsionIntegralsDriver
                             COutputStream& oStream) const;
     
     /**
-     Comutes electronic repulsion integrals for two GTOs pairs containers.
+     Prints timing statistics for evaluation of Q values.
+     
+     @param molecule the molecule.
+     @param timer the timer.
+     @param oStream the output stream.
+     */
+    void _printQValuesTiming(const CMolecule&     molecule,
+                             const CSystemClock&  timer,
+                                   COutputStream& oStream) const;
+    
+    /**
+     Comutes electron repulsion integrals for two GTOs pairs containers.
      
      @param braGtoPairsContainer the GTOs pairs container on bra side.
      @param ketGtoPairsContainer the GTOs pairs container on ket side.
      */
     void _compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
                                          const CGtoPairsContainer* ketGtoPairsContainer) const;
+    
+    /**
+     Comutes maximum Q values of electron repulsion integrals for two GTOs
+     pairs containers and store results in bra and ket Q values buffers.
+     
+     @param braQValuesBuffer the Q values buffer on bra side.
+     @param ketQValuesBuffer the Q values buffer on ket side.
+     @param braGtoPairsContainer the GTOs pairs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     */
+    void _compMaxQValues(      CVecMemBlock<double>* braQValuesBuffer,
+                               CVecMemBlock<double>* ketQValuesBuffer,
+                         const CGtoPairsContainer*   braGtoPairsContainer,
+                         const CGtoPairsContainer*   ketGtoPairsContainer) const;
+    
+    
+    /**
+     Comutes maximum Q values of electron repulsion integrals for GTOs pairs
+     block.
+
+     @param qValuesBuffer the Q values buffer.
+     @param gtoPairsBlock the GTOs pairs block.
+     */
+    void _compMaxQValuesForGtoPairsBlock(      double*         qValuesBuffer,
+                                         const CGtoPairsBlock& gtoPairsBlock) const;
+    
+    /**
+     Allocates Q values buffer for GTOs pair blocks container.
+
+     @param gtoPairsContainer the GTOs pair blocks container.
+     @return the Q values buffer as vector of mememory block objects.
+     */
+     CVecMemBlock<double> _getQValuesBuffer(const CGtoPairsContainer& gtoPairsContainer) const;
     
 public:
     
@@ -279,6 +325,25 @@ public:
                  const double           threshold,
                        COutputStream&   oStream,
                        MPI_Comm         comm) const;
+    
+    /**
+     Computes Q values for electron repulsion integrals for molecule with
+     specific AO basis set and stores results in screening container object.
+     
+     @param screeningScheme the screening scheme for screening container object.
+     @param threshold the screening threshold for screening container object.
+     @param molecule the molecule.
+     @param aoBasis the molecular AO basis.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the screening container with Q values.
+     */
+    CScreeningContainer compute(const ericut           screeningScheme,
+                                const double           threshold,
+                                const CMolecule&       molecule,
+                                const CMolecularBasis& aoBasis,
+                                      COutputStream&   oStream,
+                                      MPI_Comm         comm) const;
     
     /**
      Computes electron repulsion integrals blocks for pair of GTOs pairs blocks

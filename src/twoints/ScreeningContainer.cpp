@@ -14,34 +14,10 @@ CScreeningContainer::CScreeningContainer()
     
 }
 
-CScreeningContainer::CScreeningContainer(const CMolecule&       molecule,
-                                         const CMolecularBasis& aoBasis,
-                                         const ericut           screeningScheme,
-                                         const double           threshold)
-{
-    // generate GTOs pairs blocks for AO basis on bra side
-    
-    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-13);
-    
-    // split GTOs pairs into batches on bra side
-    
-    auto bbpairs = bgtopairs.split(500);
-    
-    // generate bra and ket sides screener objects
-    
-    _setScreeners(bbpairs, bbpairs, screeningScheme, threshold); 
-}
-
-CScreeningContainer::~CScreeningContainer()
-{
-    
-}
-
-void
-CScreeningContainer::_setScreeners(const CGtoPairsContainer& braGtoPairsContainer,
-                                   const CGtoPairsContainer& ketGtoPairsContainer,
-                                   const ericut              screeningScheme,
-                                   const double              threshold)
+CScreeningContainer::CScreeningContainer(const CGtoPairsContainer& braGtoPairsContainer,
+                                         const CGtoPairsContainer& ketGtoPairsContainer,
+                                         const ericut              screeningScheme,
+                                         const double              threshold)
 {
     // determine symmetry of GTOs containers
     
@@ -70,6 +46,11 @@ CScreeningContainer::_setScreeners(const CGtoPairsContainer& braGtoPairsContaine
                                                         threshold));
         }
     }
+}
+
+CScreeningContainer::~CScreeningContainer()
+{
+    
 }
 
 std::ostream&
