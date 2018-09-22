@@ -31,7 +31,7 @@ namespace denblas { // denblas namespace
 
         errors::assertMsgCritical(
                 nacol == nbrow,
-                "Inconsistent sizes in matrix multiplication!"
+                "denblas::multAB - Inconsistent sizes in matrix multiplication"
                 );
         
         // allocate dense matrix
@@ -69,7 +69,7 @@ namespace denblas { // denblas namespace
 
         errors::assertMsgCritical(
                 nacol == nbcol,
-                "Inconsistent sizes in matrix multiplication!"
+                "denblas::multABt - Inconsistent sizes in matrix multiplication"
                 );
         
         // allocate dense matrix
@@ -107,7 +107,7 @@ namespace denblas { // denblas namespace
         
         errors::assertMsgCritical(
                 narow == nbrow,
-                "Inconsistent sizes in matrix multiplication!"
+                "denblas::multAtB - Inconsistent sizes in matrix multiplication"
                 );
 
         // allocate dense matrix
@@ -214,7 +214,7 @@ namespace denblas { // denblas namespace
     {
         errors::assertMsgCritical(
                 matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
-                "Inconsistent sizes in matrix subtraction!"
+                "denblas::subAB - Inconsistent sizes in matrix subtraction"
                 );
 
         // copy matrix
@@ -236,7 +236,7 @@ namespace denblas { // denblas namespace
     {
         errors::assertMsgCritical(
                 matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
-                "Inconsistent sizes in matrix addition!"
+                "denblas::addAB - Inconsistent sizes in matrix addition"
                 );
 
         // copy matrix

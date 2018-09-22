@@ -9,6 +9,7 @@
 #include "MpiFunc.hpp"
 
 #include <iostream>
+#include <sstream>
 
 namespace mpi { // mpi namespace
 
@@ -18,11 +19,10 @@ init(int    argc,
 {
     if (ENABLE_MPI)
     {
-        int32_t minit = 0;
-
-        MPI_Initialized(&minit);
-
-        if (minit) return true;
+        if (initialized())
+        {
+            return true;
+        }
 
         int32_t mlevel = 0;
 
@@ -31,13 +31,30 @@ init(int    argc,
 
         if (merror != MPI_SUCCESS)
         {
-            mpi::abort(merror, "init()");
+            mpi::abort(merror, "mpi::init()");
         
             return false;
         }
     }
 
     return true;
+}
+
+bool
+initialized()
+{
+    if (ENABLE_MPI)
+    {
+        int minit = 0;
+
+        MPI_Initialized(&minit);
+
+        return static_cast<bool>(minit);
+    }
+    else
+    {
+        return false;
+    }
 }
 
 bool
@@ -49,7 +66,7 @@ finalize()
 
         if (merror != MPI_SUCCESS)
         {
-            mpi::abort(merror, "finalize()"); 
+            mpi::abort(merror, "mpi::finalize()"); 
 
             return false;
         }
@@ -90,7 +107,7 @@ compare(MPI_Comm comm1,
 
         if (merror != MPI_SUCCESS)
         {
-            mpi::abort(merror, "compare()");
+            mpi::abort(merror, "mpi::compare()");
 
             return false;
         }
@@ -111,7 +128,7 @@ bcast(int32_t& value,
     {
         auto merror = MPI_Bcast(&value, 1, MPI_INT32_T, mpi::master(), comm);
 
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "bcast(int32_t)");
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcast(int32_t)");
     }
 }
 
@@ -123,7 +140,7 @@ bcast(double&  value,
     {
         auto merror = MPI_Bcast(&value, 1, MPI_DOUBLE, mpi::master(), comm);
 
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "bcast(double)");
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcast(double)");
     }
 }
 
@@ -152,7 +169,7 @@ bcast(char&    value,
     {
         auto merror = MPI_Bcast(&value, 1, MPI_CHAR, mpi::master(), comm);
 
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "bcast(char)");
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcast(char)");
     }
 }
     
@@ -285,7 +302,7 @@ send(      double&  value,
     {
         auto merror = MPI_Send(&value, 1, MPI_DOUBLE, rank, 0, comm);
             
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "send(double)");
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::send(double)");
     }
 }
   
@@ -300,7 +317,7 @@ receive(      double&  value,
         
         auto merror = MPI_Recv(&value, 1, MPI_DOUBLE, rank, 0, comm, &mstat);
         
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "receive(double)");
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::receive(double)");
     }
 }
     
@@ -355,7 +372,7 @@ gather(int32_t* vector,
         auto merror = MPI_Gather(&value, 1, MPI_INT32_T, vector, 1, MPI_INT32_T,
                                  mpi::master(), comm);
 
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "gather(integer)");
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::gather(integer)");
     }
     else
     {
@@ -374,7 +391,7 @@ gather(double*  vector,
         auto merror = MPI_Gather(&value, 1, MPI_DOUBLE, vector, 1, MPI_DOUBLE,
                                  mpi::master(), comm);
         
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "gather(double)");
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::gather(double)");
     }
     else
     {
@@ -400,8 +417,14 @@ abort(const int   errorcode,
         
         MPI_Error_string(errorcode, errstr, &errlen);
 
-        std::cerr << "MPI ERROR " << errclass << ": " << errstr << std::endl;
-        
+        std::stringstream sst;
+
+        sst << "**** Critical Error in " << label << " ****" << std::endl;
+
+        sst << "MPI ERROR " << errclass << ": " << errstr << std::endl;
+
+        std::cerr << sst.str();
+
         MPI_Abort(MPI_COMM_WORLD, errorcode);
     }
 }

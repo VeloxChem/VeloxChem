@@ -7,22 +7,31 @@
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "ErrorHandler.hpp"
+#include "MpiFunc.hpp"
 
 #include <string>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 
 namespace errors { // errors namespace
 
 void
 assertMsgCritical(const bool         condition,
-                  const std::string& message)
+                  const std::string& label)
 {
     if (! condition)
     {
-        std::cerr << std::endl;
-        
-        std::cerr << "Critical Error: " << message << std::endl << std::endl;
+        if (mpi::initialized())
+        {
+            mpi::abort(MPI_ERR_OTHER, label.c_str());
+        }
+
+        std::stringstream sst;
+
+        sst << "**** Critical Error in " << label << " ****" << std::endl;
+
+        std::cerr << sst.str();
 
         std::abort();
     }

@@ -27,7 +27,7 @@ CAODensityMatrix::CAODensityMatrix(const std::vector<CDenseMatrix>& denMatrices,
     {
         errors::assertMsgCritical(
                 denMatrices.size() % 2 == 0,
-                "Odd number of matrices for unrestricted AO density!"
+                "AODensityMatrix - Odd number of matrices for unrestricted density"
                 );
     }
 }

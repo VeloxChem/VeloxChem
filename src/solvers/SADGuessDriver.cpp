@@ -262,7 +262,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         errors::assertMsgCritical(
                 diagdrv.getState(),
-                "Matrix diagonalization failed in SAD initial guess!"
+                "SADGuessDriver - Matrix diagonalization failed"
                 );
 
         auto block_22_inv = diagdrv.getInvertedMatrix();
@@ -279,7 +279,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         errors::assertMsgCritical(
                 diagdrv.getState(),
-                "Matrix diagonalization failed in SAD initial guess!"
+                "SADGuessDriver - Matrix diagonalization failed"
                 );
 
         auto mat_m_invsqrt = diagdrv.getInvertedSqrtMatrix();

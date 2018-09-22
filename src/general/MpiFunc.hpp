@@ -33,7 +33,14 @@ inline int32_t master() { return 0;}
  */
 bool init(int    argc,
           char** argv);
-    
+
+/**
+ Check if MPI has been initialized.
+
+ @return true if MPI has been initialized, false otherwise.
+ */
+bool initialized();
+
 /**
  Exits parallel execution mode driven by MPI.
 
