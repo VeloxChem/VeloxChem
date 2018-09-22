@@ -198,16 +198,16 @@ CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
                                            const int32_t    nAtoms,
                                            const int32_t    angularMomentum) const
 {
-    int32_t nbfucs = 0;
+    int32_t nbfuncs = 0;
     
     for (size_t i = 0; i < _atomicBasisSets.size(); i++)
     {
-        nbfucs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
+        nbfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
         
                 * _atomicBasisSets[i].getNumberOfBasisFunctions(angularMomentum);
     }
     
-    return nbfucs;
+    return nbfuncs;
 }
 
 int32_t

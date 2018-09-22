@@ -180,11 +180,38 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     auto nao_2 = S12.getNumberOfColumns();
 
+    // sanity checks
+
+    std::string err_ovl_size("SADGuessDriver - Mismatch between overlap matrices");
+
+    errors::assertMsgCritical(nao_2 == S22.getNumberOfRows(), err_ovl_size);
+
+    errors::assertMsgCritical(nao_2 == S22.getNumberOfColumns(), err_ovl_size);
+
     // AO indices for atoms
 
     auto aoinds_atoms_1 = getAOIndicesOfAtoms(molecule, basis_1);
 
     auto aoinds_atoms_2 = getAOIndicesOfAtoms(molecule, basis_2);
+
+    // more sanity checks
+
+    int32_t count_ao_1 = 0;
+
+    int32_t count_ao_2 = 0;
+
+    for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+    {
+        count_ao_1 += static_cast<int32_t>(aoinds_atoms_1[atomidx].size());
+
+        count_ao_2 += static_cast<int32_t>(aoinds_atoms_2[atomidx].size());
+    }
+
+    std::string err_bas_size("SADGuessDriver - Mismatch between basis set & overlap matrix");
+
+    errors::assertMsgCritical(count_ao_1 == nao_1 && count_ao_2 == nao_2, err_bas_size);
+
+    errors::assertMsgCritical(count_ao_2 == S22.getNumberOfRows(), err_bas_size);
 
     // occupation numbers
 
@@ -197,7 +224,11 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
     csad.zero();
 
     #pragma omp parallel for schedule(dynamic)
-    for (int atomidx = 0; atomidx < natoms; atomidx++) {
+    for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+    {
+        // elemental index (nuclear charge) for this atom
+
+        const int32_t idelem = molecule.getIdsElemental()[atomidx];
 
         // AO indices for this atom
 
@@ -210,6 +241,12 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         auto naodim_1 = static_cast<int32_t>(aoinds_1.size());
         
         auto naodim_2 = static_cast<int32_t>(aoinds_2.size());
+
+        // size checking
+        
+        std::string err_ao_size("SADGuessDriver - Mismatch between basis set & occupation number");
+
+        errors::assertMsgCritical(qocc[idelem].size() == aoinds_1.size(), err_ao_size);
         
         // atomic block of AOs
 
@@ -260,10 +297,9 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         diagdrv.diagonalize(block_22);
 
-        errors::assertMsgCritical(
-                diagdrv.getState(),
-                "SADGuessDriver - Matrix diagonalization failed"
-                );
+        std::string err_diag("SADGuessDriver - Matrix diagonalization failed");
+
+        errors::assertMsgCritical(diagdrv.getState(), err_diag);
 
         auto block_22_inv = diagdrv.getInvertedMatrix();
 
@@ -277,10 +313,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         diagdrv.diagonalize(mat_m);
 
-        errors::assertMsgCritical(
-                diagdrv.getState(),
-                "SADGuessDriver - Matrix diagonalization failed"
-                );
+        errors::assertMsgCritical(diagdrv.getState(), err_diag);
 
         auto mat_m_invsqrt = diagdrv.getInvertedSqrtMatrix();
 
@@ -291,8 +324,6 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         auto mat_c2 = denblas::multAB(block_22_inv, prod);
 
         // update csad
-
-        const int32_t idelem = molecule.getIdsElemental()[atomidx];
 
         for (int32_t j = 0; j < naodim_2; j++)
         {
