@@ -49,7 +49,7 @@ initialized()
 
         MPI_Initialized(&minit);
 
-        if (minit == 1) return true;
+        if (minit) return true;
     }
 
     return false;

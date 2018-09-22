@@ -63,6 +63,7 @@ void export_moldata()
         .def("print_geometry", &CMolecule::printGeometry)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
         .def("broadcast", &CMolecule_broadcast)
+        .def(bp::self == bp::other<CMolecule>())
     ;
 }
 
