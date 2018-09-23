@@ -7,13 +7,7 @@ import unittest
 
 class TestSolvers(unittest.TestCase):
 
-    def print_title(self, label):
-
-        print("\n[ Running ] TestSolvers " + label)
-
     def test_sad_guess(self):
-
-        self.print_title("sad_guess")
 
         # mpi settings
 
@@ -97,3 +91,6 @@ class TestSolvers(unittest.TestCase):
             nelec *= 2.0
 
             self.assertAlmostEqual(nelec, 10., 13)
+
+if __name__ == "__main__":
+    unittest.main()

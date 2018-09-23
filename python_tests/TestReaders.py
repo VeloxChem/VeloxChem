@@ -7,13 +7,7 @@ import unittest
 
 class TestReaders(unittest.TestCase):
 
-    def print_title(self, label):
-
-        print("\n[ Running ] TestReaders " + label)
-
     def test_get_state(self):
-
-        self.print_title("get_state")
 
         task = Task("inputs/water.inp", "inputs/water.out")
 
@@ -22,3 +16,6 @@ class TestReaders(unittest.TestCase):
         self.assertTrue(task.env_reader.get_state())
 
         self.assertTrue(task.basis_reader.get_state())
+
+if __name__ == "__main__":
+    unittest.main()

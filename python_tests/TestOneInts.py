@@ -7,13 +7,7 @@ import unittest
 
 class TestOneInts(unittest.TestCase):
 
-    def print_title(self, label):
-
-        print("\n[ Running ] TestOneInts " + label)
-
     def test_overlap_matrix(self):
-
-        self.print_title("overlap_matrix")
 
         data = [[1., .2,], [.2, 1.,]]
 
@@ -31,8 +25,6 @@ class TestOneInts(unittest.TestCase):
 
     def test_kinetic_energy_matrix(self):
 
-        self.print_title("kinetic_energy_matrix")
-
         data = [[1., .2,], [.2, 1.,]]
 
         array = np.array(data)
@@ -49,8 +41,6 @@ class TestOneInts(unittest.TestCase):
 
     def test_nuclear_potential_matrix(self):
 
-        self.print_title("nuclear_potential_matrix")
-
         data = [[1., .2,], [.2, 1.,]]
 
         array = np.array(data)
@@ -64,3 +54,6 @@ class TestOneInts(unittest.TestCase):
         self.assertEqual(0, np.max(np.abs(array-array2)))
 
         self.assertEqual(matrix, matrix2)
+
+if __name__ == "__main__":
+    unittest.main()

@@ -72,7 +72,5 @@ run_test_python3:
     - cp ../config/Setup.Monkey.Python Makefile.setup
     - make -j 6 release
     - export OMP_NUM_THREADS=6
-    - cd ../integration_tests/
-    - python3 test.py
     - cd ../python_tests/
-    - python3 run_tests.py
+    - python3 run_tests.py -v

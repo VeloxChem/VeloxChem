@@ -7,13 +7,7 @@ import unittest
 
 class TestOrbData(unittest.TestCase):
 
-    def print_title(self, label):
-
-        print("\n[ Running ] TestOrbData " + label)
-
     def test_get_label(self):
-
-        self.print_title("get_label")
 
         task = Task("inputs/dimer.inp", "inputs/dimer.out")
 
@@ -22,8 +16,6 @@ class TestOrbData(unittest.TestCase):
         self.assertEqual(basis.get_label(), "DEF2-SVP")
 
     def test_density_matrix(self):
-
-        self.print_title("density_matrix")
 
         data_a = [[1., .2,], [.2, 1.,]]
 
@@ -48,3 +40,6 @@ class TestOrbData(unittest.TestCase):
         self.assertEqual(0, np.max(np.abs(data_a-den_a2)))
 
         self.assertEqual(0, np.max(np.abs(data_b-den_b1)))
+
+if __name__ == "__main__":
+    unittest.main()

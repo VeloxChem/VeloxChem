@@ -7,13 +7,7 @@ import unittest
 
 class TestExciton(unittest.TestCase):
 
-    def print_title(self, label):
-
-        print("\n[ Running ] TestExciton " + label)
-
     def test_assemble_matrices(self):
-
-        self.print_title("assemble_matrices")
 
         # set up MPI
 
@@ -123,3 +117,6 @@ class TestExciton(unittest.TestCase):
                                                           V12, V21)
 
             self.assertEqual(V, V_exmod)
+
+if __name__ == "__main__":
+    unittest.main()
