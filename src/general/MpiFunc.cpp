@@ -45,11 +45,11 @@ initialized()
 {
     if (ENABLE_MPI)
     {
-        int minit = 0;
+        int32_t minit = 0;
 
         MPI_Initialized(&minit);
-
-        if (minit) return true;
+        
+        if (minit == 1) return true;
     }
 
     return false;
