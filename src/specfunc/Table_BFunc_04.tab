@@ -1,12 +1,10 @@
 //
-//                     D.E.M.O.C.R.I.T.U.S
+//                     V.E.L.O.X. C.H.E.M. MP
 //      ---------------------------------------------------
-//           Electronic Structure Code For Nanoscale
+//           An Electronic Structure Code for Nanoscale
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2017 Zilvinas Rinkevicius. All rights reserved.
-//
-
+//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 CBFTable BFTable =
 {{
