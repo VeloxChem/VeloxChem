@@ -5662,3 +5662,39 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDDDForLiH)
 
     vlxtest::compare(r0312vals, fints.data());
 }
+
+TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeMaxQValues)
+{
+    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+    
+    auto mlih = vlxmol::getTestLiH();
+    
+    auto mbas = vlxbas::getTestBasisForLiH();
+    
+    CGtoBlock bgtos(mlih, mbas, 0);
+    
+    CGtoBlock kgtos(mlih, mbas, 1);
+    
+    CGtoPairsBlock bpairs(bgtos, 1.0e-13);
+    
+    CGtoPairsBlock kpairs(kgtos, 1.0e-13);
+    
+    CGtoPairsContainer bcont({bpairs.pick(0), bpairs.pick(1)});
+    
+    CGtoPairsContainer kcont({kpairs.pick(0), kpairs.pick(1)});
+    
+    CVecMemBlock<double> bvec({CMemBlock<double>(1), CMemBlock<double>(1)});
+    
+    CVecMemBlock<double> kvec({CMemBlock<double>(1), CMemBlock<double>(1)});
+    
+    eridrv.computeMaxQValues(&bvec, &kvec, &bcont, &kcont);
+    
+    vlxtest::compare({1.27641389857182689641}, bvec[0].data());
+    
+    vlxtest::compare({1.13863555260159077820}, bvec[1].data());
+    
+    vlxtest::compare({1.15070414827136605747}, kvec[0].data());
+    
+    vlxtest::compare({0.99288328066163043835}, kvec[1].data());
+}

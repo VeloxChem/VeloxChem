@@ -93,10 +93,6 @@ CElectronRepulsionIntegralsDriver::compute(const ericut           screeningSchem
     
     auto bbpairs = bgtopairs.split(500);
     
-    // initialize screening container
-    
-    CScreeningContainer qcont(bbpairs, bbpairs, screeningScheme, threshold);
-    
     // allocate temporary buffer for Q values on bra side
     
     auto bqbuff = _getQValuesBuffer(bbpairs);
@@ -105,11 +101,16 @@ CElectronRepulsionIntegralsDriver::compute(const ericut           screeningSchem
     
     // compute Q values on bra side
     
-    _compMaxQValues(&bqbuff, &kqbuff, &bbpairs, &bbpairs);
+    computeMaxQValues(&bqbuff, &kqbuff, &bbpairs, &bbpairs);
     
     // copy Q values from bra to ket side
     
     kqbuff = bqbuff;
+    
+    // initialize screening container
+    
+    CScreeningContainer qcont(bqbuff, kqbuff, bbpairs, bbpairs, screeningScheme,
+                              threshold);
     
     // print Q values computation timings
     
@@ -137,6 +138,58 @@ CElectronRepulsionIntegralsDriver::compute(      double*         intsBatch,
     
     _compElectronRepulsionForGtoPairsBlocks(&distpat, braGtoPairsBlock,
                                             ketGtoPairsBlock); 
+}
+
+void
+CElectronRepulsionIntegralsDriver::computeMaxQValues(      CVecMemBlock<double>* braQValuesBuffer,
+                                                           CVecMemBlock<double>* ketQValuesBuffer,
+                                                     const CGtoPairsContainer*   braGtoPairsContainer,
+                                                     const CGtoPairsContainer*   ketGtoPairsContainer) const
+{
+    // determine symmetry of GTOs pairs containers on bra and ket sides
+    
+    auto symbk = (*braGtoPairsContainer == *ketGtoPairsContainer);
+    
+    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer)
+    {
+        #pragma omp single nowait
+        {
+            // Q values for bra side
+            
+            auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                #pragma omp task firstprivate(i)
+                {
+                    auto bqprt = (*braQValuesBuffer)[i].data();
+                    
+                    auto bpairs = braGtoPairsContainer->getGtoPairsBlock(i);
+                    
+                    _compMaxQValuesForGtoPairsBlock(bqprt, bpairs);
+                }
+            }
+            
+            // Q values for ket side if needed
+            
+            if (!symbk)
+            {
+                auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
+                
+                for (int32_t i = 0; i < nket; i++)
+                {
+                    #pragma omp task firstprivate(i)
+                    {
+                        auto kqprt = (*ketQValuesBuffer)[i].data();
+                        
+                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(i);
+                        
+                        _compMaxQValuesForGtoPairsBlock(kqprt, kpairs);
+                    }
+                }
+            }
+        }
+    }
 }
 
 void
@@ -1594,58 +1647,6 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPai
     }
     
     delete distpat; 
-}
-
-void
-CElectronRepulsionIntegralsDriver::_compMaxQValues(      CVecMemBlock<double>* braQValuesBuffer,
-                                                         CVecMemBlock<double>* ketQValuesBuffer,
-                                                   const CGtoPairsContainer*   braGtoPairsContainer,
-                                                   const CGtoPairsContainer*   ketGtoPairsContainer) const
-{
-    // determine symmetry of GTOs pairs containers on bra and ket sides
-    
-    auto symbk = (*braGtoPairsContainer == *ketGtoPairsContainer);
-    
-    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer)
-    {
-        #pragma omp single nowait
-        {
-            // Q values for bra side
-            
-            auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
-            
-            for (int32_t i = 0; i < nbra; i++)
-            {
-                #pragma omp task firstprivate(i)
-                {
-                    auto bqprt = (*braQValuesBuffer)[i].data();
-                    
-                    auto bpairs = braGtoPairsContainer->getGtoPairsBlock(i);
-                    
-                    _compMaxQValuesForGtoPairsBlock(bqprt, bpairs);
-                }
-            }
-            
-            // Q values for ket side if needed
-            
-            if (!symbk)
-            {
-                auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
-                
-                for (int32_t i = 0; i < nket; i++)
-                {
-                    #pragma omp task firstprivate(i)
-                    {
-                        auto kqprt = (*ketQValuesBuffer)[i].data();
-                        
-                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(i);
-                        
-                        _compMaxQValuesForGtoPairsBlock(kqprt, kpairs);
-                    }
-                }
-            }
-        }
-    }
 }
 
 void

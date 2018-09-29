@@ -258,22 +258,7 @@ class CElectronRepulsionIntegralsDriver
      */
     void _compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
                                          const CGtoPairsContainer* ketGtoPairsContainer) const;
-    
-    /**
-     Comutes maximum Q values of electron repulsion integrals for two GTOs
-     pairs containers and store results in bra and ket Q values buffers.
-     
-     @param braQValuesBuffer the Q values buffer on bra side.
-     @param ketQValuesBuffer the Q values buffer on ket side.
-     @param braGtoPairsContainer the GTOs pairs container on bra side.
-     @param ketGtoPairsContainer the GTOs pairs container on ket side.
-     */
-    void _compMaxQValues(      CVecMemBlock<double>* braQValuesBuffer,
-                               CVecMemBlock<double>* ketQValuesBuffer,
-                         const CGtoPairsContainer*   braGtoPairsContainer,
-                         const CGtoPairsContainer*   ketGtoPairsContainer) const;
-    
-    
+
     /**
      Comutes maximum Q values of electron repulsion integrals for GTOs pairs
      block.
@@ -356,6 +341,20 @@ public:
     void compute(      double*         intsBatch,
                  const CGtoPairsBlock& braGtoPairsBlock,
                  const CGtoPairsBlock& ketGtoPairsBlock) const;
+    
+    /**
+     Comutes maximum Q values of electron repulsion integrals for two GTOs
+     pairs containers and store results in bra and ket Q values buffers.
+     
+     @param braQValuesBuffer the Q values buffer on bra side.
+     @param ketQValuesBuffer the Q values buffer on ket side.
+     @param braGtoPairsContainer the GTOs pairs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     */
+    void computeMaxQValues(      CVecMemBlock<double>* braQValuesBuffer,
+                                 CVecMemBlock<double>* ketQValuesBuffer,
+                           const CGtoPairsContainer*   braGtoPairsContainer,
+                           const CGtoPairsContainer*   ketGtoPairsContainer) const;
 };
 
 

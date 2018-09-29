@@ -15,23 +15,39 @@ CCauchySchwarzScreener::CCauchySchwarzScreener()
 
     : _screeningScheme(ericut::qq)
 
+    , _braQValues(CMemBlock<double>())
+
+    , _ketQValues(CMemBlock<double>())
+
+    , _braPairExtends(CMemBlock<double>())
+
+    , _ketPairExtends(CMemBlock<double>())
+
     , _threshold(1.0e-13)
 {
     
 }
 
-CCauchySchwarzScreener::CCauchySchwarzScreener(const CGtoPairsBlock& braGtoPairsBlock,
-                                               const CGtoPairsBlock& ketGtoPairsBlock,
-                                               const ericut          screeningScheme,
-                                               const double          threshold)
+CCauchySchwarzScreener::CCauchySchwarzScreener(const CMemBlock<double>& braQValues,
+                                               const CMemBlock<double>& ketQValues,
+                                               const CGtoPairsBlock&    braGtoPairsBlock,
+                                               const CGtoPairsBlock&    ketGtoPairsBlock,
+                                               const ericut             screeningScheme,
+                                               const double             threshold)
     : _screeningScheme(screeningScheme)
 
-    , _braQValues(CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedContrPairs()))
+    , _braQValues(braQValues)
 
-    , _ketQValues(CMemBlock<double>(ketGtoPairsBlock.getNumberOfScreenedContrPairs()))
+    , _ketQValues(ketQValues)
+
+    , _braPairExtends(CMemBlock<double>())
+
+    , _ketPairExtends(CMemBlock<double>())
 
     , _threshold(threshold)
 {
+    // FIX ME: Add stuff here...
+    
     if (_screeningScheme == ericut::qqr)
     {
         _braPairExtends = CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedContrPairs());
@@ -169,22 +185,10 @@ CCauchySchwarzScreener::getThreshold() const
     return _threshold; 
 }
 
-double*
-CCauchySchwarzScreener::getBraQValues()
-{
-    return _braQValues.data();
-}
-
 const double*
 CCauchySchwarzScreener::getBraQValues() const
 {
     return _braQValues.data();
-}
-
-double*
-CCauchySchwarzScreener::getKetQValues()
-{
-    return _ketQValues.data();
 }
 
 const double*
