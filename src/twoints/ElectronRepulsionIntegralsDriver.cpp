@@ -134,9 +134,13 @@ CElectronRepulsionIntegralsDriver::compute(      double*         intsBatch,
     
     CTwoIntsDistribution distpat(intsBatch, nrow, ncol, dist2e::batch);
     
+    // set up empty screener
+    
+    CCauchySchwarzScreener qqdat;
+    
     // compute batch of two electron integrals
     
-    _compElectronRepulsionForGtoPairsBlocks(&distpat, braGtoPairsBlock,
+    _compElectronRepulsionForGtoPairsBlocks(&distpat, qqdat, braGtoPairsBlock,
                                             ketGtoPairsBlock); 
 }
 
@@ -194,6 +198,7 @@ CElectronRepulsionIntegralsDriver::computeMaxQValues(      CVecMemBlock<double>*
 
 void
 CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution* distPattern,
+                                                                           const CCauchySchwarzScreener& intsScreener,
                                                                            const CGtoPairsBlock&       braGtoPairsBlock,
                                                                            const CGtoPairsBlock&       ketGtoPairsBlock) const
 {
@@ -1639,7 +1644,10 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPai
                     {
                         auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
                         
-                        _compElectronRepulsionForGtoPairsBlocks(distpat, bpairs, kpairs);
+                        CCauchySchwarzScreener qqdat;
+                        
+                        _compElectronRepulsionForGtoPairsBlocks(distpat, qqdat,
+                                                                bpairs, kpairs);
                     }
                 }
             }
@@ -1657,6 +1665,10 @@ CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*
     
     auto ngto = gtoPairsBlock.getNumberOfScreenedContrPairs();
     
+    // set up empty integrals screener
+    
+    CCauchySchwarzScreener qqdat;
+    
     // loop over contracted GTOs pairs
     
     for (int32_t i = 0; i < ngto; i++)
@@ -1665,7 +1677,7 @@ CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*
         
         CTwoIntsDistribution cdist(qValuesBuffer, 1, 1, i, dist2e::qvalues);
         
-        _compElectronRepulsionForGtoPairsBlocks(&cdist, cpair, cpair); 
+        _compElectronRepulsionForGtoPairsBlocks(&cdist, qqdat, cpair, cpair); 
     }
 }
 

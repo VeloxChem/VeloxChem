@@ -110,6 +110,12 @@ CScreeningContainer::operator!=(const CScreeningContainer& other) const
     return !(*this == other);
 }
 
+bool
+CScreeningContainer::isEmpty() const
+{
+    return _screeners.empty(); 
+}
+
 std::ostream&
 operator<<(      std::ostream&        output,
            const CScreeningContainer& source)

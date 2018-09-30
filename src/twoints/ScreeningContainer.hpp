@@ -111,6 +111,13 @@ public:
     bool operator!=(const CScreeningContainer& other) const;
     
     /**
+     Checks if screening container object is empty.
+
+     @return true if screening container object is empty, false - otherwise.
+     */
+    bool isEmpty() const;
+    
+    /**
      Converts screening container object to text output and insert it into
      output text stream.
      

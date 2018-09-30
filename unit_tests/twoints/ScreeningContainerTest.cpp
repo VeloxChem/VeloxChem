@@ -165,3 +165,39 @@ TEST_F(CScreeningContainerTest, MoveAssignment)
     
     ASSERT_EQ(qscra, qscrb);
 }
+
+TEST_F(CScreeningContainerTest, IsEmpty)
+{
+    auto mlih = vlxmol::getTestLiH();
+    
+    auto mbas = vlxbas::getTestBasisForLiH();
+    
+    CGtoBlock bgtos(mlih, mbas, 0);
+    
+    CGtoBlock kgtos(mlih, mbas, 1);
+    
+    CGtoPairsBlock bpairs(bgtos, kgtos, 1.0e-13);
+    
+    CGtoPairsBlock kpairs(bgtos, 1.0e-13);
+    
+    CMemBlock<double> bqvals({1.0, 2.0, 3.0, 4.0});
+    
+    CMemBlock<double> kqvals({0.0, 1.0, 2.0, 7.0, 7.0, 2.0});
+    
+    CVecMemBlock<double> bqvec{bqvals, kqvals};
+    
+    CVecMemBlock<double> kqvec{kqvals, kqvals};
+    
+    CGtoPairsContainer bppcont({bpairs, kpairs});
+    
+    CGtoPairsContainer kppcont({kpairs, kpairs});
+    
+    CScreeningContainer qscra(bqvec, kqvec, bppcont, kppcont, ericut::qq,
+                              1.0e-13);
+    
+    CScreeningContainer qscrb;
+    
+    ASSERT_FALSE(qscra.isEmpty());
+    
+    ASSERT_TRUE(qscrb.isEmpty());
+}

@@ -63,12 +63,14 @@ class CElectronRepulsionIntegralsDriver
      blocks.
      
      @param distPattern the ponter to integrals distribution pattern.
+     @param intsScreener the integrals screener object.
      @param braGtoPairsBlock the GTOs pairsblock on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      */
-    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution* distPattern,
-                                                 const CGtoPairsBlock&       braGtoPairsBlock,
-                                                 const CGtoPairsBlock&       ketGtoPairsBlock) const;
+    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution*   distPattern,
+                                                 const CCauchySchwarzScreener& intsScreener,
+                                                 const CGtoPairsBlock&         braGtoPairsBlock,
+                                                 const CGtoPairsBlock&         ketGtoPairsBlock) const;
     
     /**
      Gets Obara-Saika bra side horizontal recursion pattern for specific
