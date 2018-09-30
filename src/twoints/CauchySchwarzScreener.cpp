@@ -197,6 +197,12 @@ CCauchySchwarzScreener::getKetQValues() const
     return _ketQValues.data();
 }
 
+bool
+CCauchySchwarzScreener::isEmpty() const
+{
+    return ((_braQValues.size() == 0) || (_ketQValues.size() == 0)); 
+}
+
 std::ostream&
 operator<<(      std::ostream&           output,
            const CCauchySchwarzScreener& source)

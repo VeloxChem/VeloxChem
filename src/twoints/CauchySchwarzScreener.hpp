@@ -177,6 +177,13 @@ public:
     const double* getKetQValues() const;
     
     /**
+     Checks if Cauchy-Schwarz screener object is empty.
+
+     @return true if Cauchy-Schwarz screener object is empty, false - otherwise.
+     */
+    bool isEmpty() const;
+    
+    /**
      Converts Cauchy-Schwarz screener object to text output and insert it into
      output text stream.
      

@@ -240,3 +240,31 @@ TEST_F(CCauchySchwarzScreenerTest, GetKetQValues)
     
     vlxtest::compare({0.0, 1.0, 2.0, 7.0, 7.0, 2.0}, qscra.getKetQValues());
 }
+
+TEST_F(CCauchySchwarzScreenerTest, IsEmpty)
+{
+    auto mlih = vlxmol::getTestLiH();
+    
+    auto mbas = vlxbas::getTestBasisForLiH();
+    
+    CGtoBlock bgtos(mlih, mbas, 0);
+    
+    CGtoBlock kgtos(mlih, mbas, 1);
+    
+    CGtoPairsBlock bpairs(bgtos, kgtos, 1.0e-13);
+    
+    CGtoPairsBlock kpairs(bgtos, 1.0e-13);
+    
+    CMemBlock<double> bqvals({1.0, 2.0, 3.0, 4.0});
+    
+    CMemBlock<double> kqvals({0.0, 1.0, 2.0, 7.0, 7.0, 2.0});
+    
+    CCauchySchwarzScreener qscra(bqvals, kqvals, bpairs, kpairs, ericut::qq,
+                                 1.0e-13);
+    
+    CCauchySchwarzScreener qscrb;
+    
+    ASSERT_FALSE(qscra.isEmpty());
+    
+    ASSERT_TRUE(qscrb.isEmpty()); 
+}
