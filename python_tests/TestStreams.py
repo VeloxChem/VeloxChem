@@ -1,9 +1,11 @@
 from mpi4py import MPI
-from VeloxChemMP import *
-from HelperClass import *
+from HelperClass import Task
+from VeloxChemLib import OutputStream
+from VeloxChemLib import InputStream
 
 import numpy as np
 import unittest
+
 
 class TestStreams(unittest.TestCase):
 
@@ -14,6 +16,7 @@ class TestStreams(unittest.TestCase):
 
         self.assertTrue(istream.get_state())
         self.assertTrue(ostream.get_state())
+
 
 if __name__ == "__main__":
     unittest.main()

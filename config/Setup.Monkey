@@ -92,6 +92,7 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # Native shell commands
 
+CP := cp -f
 MV := mv -f
 RM := rm -f
 

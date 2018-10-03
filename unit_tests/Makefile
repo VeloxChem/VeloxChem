@@ -69,17 +69,17 @@ VLX_LIBS_LIST = $(foreach d,$(VLX_LIBS_DIR),$(addprefix -L$d -l,$d))
 debug: $(VLX_MAIN_OBJ) $(VLX_LIBS) $(VST_LIBS)
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) $(VLX_MAIN_OBJ) $(VLX_LIBS_OBJS) $(VST_LIBS_OBJS) $(LIB_LIST) $(GST_LIB)
-	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build directory...
-	mkdir -p ../build
-	$(MV) $(VLX_TARGET) $(CURDIR)/../build
+	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build/bin directory...
+	mkdir -p ../build/bin
+	$(MV) $(VLX_TARGET) $(CURDIR)/../build/bin
 
 # Release
 release: $(VLX_MAIN_OBJ) $(VLX_LIBS) $(VST_LIBS)
 	@echo ====== Linking release version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) $(VLX_MAIN_OBJ) $(VLX_LIBS_OBJS) $(VST_LIBS_OBJS) $(LIB_LIST) $(GST_LIB)
-	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build directory...
-	mkdir -p ../build
-	$(MV) $(VLX_TARGET) $(CURDIR)/../build
+	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build/bin directory...
+	mkdir -p ../build/bin
+	$(MV) $(VLX_TARGET) $(CURDIR)/../build/bin
 
 # Clean up
 clean:

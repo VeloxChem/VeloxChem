@@ -12,7 +12,8 @@ include Makefile.setup
 
 # Set TARGET and linker flags for VeloxChemMP shared library
 
-VLX_TARGET := VeloxChemMP.so
+VLX_TARGET := VeloxChemLib.so
+PY_TARGET  := VeloxChemMain.py
 
 LIB_LIST += -shared $(PYTHON_LD)
 
@@ -58,18 +59,22 @@ debug: $(VLX_LIBS)
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
-	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build directory...
-	mkdir -p ../build
-	$(MV) $(VLX_TARGET) $(CURDIR)/../build
+	@echo ====== Moving $(VLX_TARGET) and copying $(PY_TARGET)...
+	mkdir -p ../build/python
+	mkdir -p ../build/bin
+	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python
+	$(CP) $(PY_TARGET) $(CURDIR)/../build/bin
 
 # Release
 release: $(VLX_LIBS)
 	@echo ====== Linking release version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
-	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build directory...
-	mkdir -p ../build
-	$(MV) $(VLX_TARGET) $(CURDIR)/../build
+	@echo ====== Moving $(VLX_TARGET) and copying $(PY_TARGET)...
+	mkdir -p ../build/python
+	mkdir -p ../build/bin
+	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python
+	$(CP) $(PY_TARGET) $(CURDIR)/../build/bin
 
 # Clean up
 clean:

@@ -1,7 +1,13 @@
-from VeloxChemMP import *
+from VeloxChemLib import InputData
+from VeloxChemLib import MolXYZReader
+from VeloxChemLib import EnvironmentReader
+from VeloxChemLib import BasisReader
+from VeloxChemLib import Molecule
+from VeloxChemLib import OutputStream
+from VeloxChemLib import InputStream
+
 
 class Task(object):
-
     def __init__(self, input_file, output_file):
 
         # input/output filenames
@@ -11,16 +17,16 @@ class Task(object):
 
         # input data, readers, and molecule objects
 
-        self.input_data   = InputData()
-        self.xyz_reader   = MolXYZReader()
-        self.env_reader   = EnvironmentReader()
+        self.input_data = InputData()
+        self.xyz_reader = MolXYZReader()
+        self.env_reader = EnvironmentReader()
         self.basis_reader = BasisReader()
-        self.molecule     = Molecule()
+        self.molecule = Molecule()
 
         # input/output stream objects
 
         self.ostream = OutputStream(self.output_file)
-        self.input_stream  = InputStream(self.input_file, self.ostream)
+        self.input_stream = InputStream(self.input_file, self.ostream)
 
         # read input file and parse input data
 
@@ -38,10 +44,8 @@ class Task(object):
 
         self.path_to_basis_sets = self.env_reader.get_path_to_basis_sets()
 
-        self.ao_basis = self.basis_reader.get_ao_basis(self.path_to_basis_sets,
-                                                       self.molecule,
-                                                       self.ostream)
+        self.ao_basis = self.basis_reader.get_ao_basis(
+            self.path_to_basis_sets, self.molecule, self.ostream)
 
-        self.min_basis = self.basis_reader.get_min_basis(self.path_to_basis_sets,
-                                                         self.molecule,
-                                                         self.ostream)
+        self.min_basis = self.basis_reader.get_min_basis(
+            self.path_to_basis_sets, self.molecule, self.ostream)

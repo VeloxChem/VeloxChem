@@ -1,8 +1,11 @@
 from mpi4py import MPI
-from VeloxChemMP import *
+from VeloxChemLib import mpi_master
+from VeloxChemLib import mpi_initialized
+from VeloxChemLib import assert_msg_critical
 
 import numpy as np
 import unittest
+
 
 class TestGeneral(unittest.TestCase):
 
@@ -19,6 +22,7 @@ class TestGeneral(unittest.TestCase):
         assert_msg_critical(True, "")
 
         self.assertTrue(True)
+
 
 if __name__ == "__main__":
     unittest.main()
