@@ -46,7 +46,7 @@ CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 
 MKL_INCLUDES := $(MKLROOT)/include
 
-LIB_LIST := -L${MKLROOT}/lib -Wl,-rpath,${MKLROOT}/lib -lmkl_intel_lp64
+LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lmkl_intel_lp64
 LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx -liomp5 -lpthread -lm -ldl
 
 # Google Test root directory
@@ -58,7 +58,7 @@ GST_LIB := $(GST_ROOT)/lib/gtest_main.a
 # CUDA compiler & linker
 
 CUDA_ROOT := /usr/local/cuda
-NVCC := ${CUDA_ROOT}/bin/nvcc
+NVCC := $(CUDA_ROOT)/bin/nvcc
 
 ifeq ($(USE_GPU),true)
   NVCC_REL_FLG := -std=c++11 -O3 --compiler-options "-fopenmp" --compiler-options "-Wall"
@@ -68,7 +68,7 @@ ifeq ($(USE_GPU),true)
   NVCC_DEB_FLG += --compiler-options "-fPIC"
 
   ifdef CUDA_ROOT
-    LIB_LIST += -L${CUDA_ROOT}/lib64
+    LIB_LIST += -L$(CUDA_ROOT)/lib64
   endif
 
   LIB_LIST += -lcuda -lcudart
@@ -86,6 +86,9 @@ PYTHON_INC += -I$(BOOST_PATH)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
 PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python3 -lboost_numpy3
+
+CXX_REL_FLG += -fPIC $(PYTHON_INC)
+CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # Native shell commands
 

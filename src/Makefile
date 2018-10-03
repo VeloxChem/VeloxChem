@@ -10,9 +10,11 @@
 
 include Makefile.setup
 
-# Set TARGET for VeloxChemMP package
+# Set TARGET and linker flags for VeloxChemMP shared library
 
 VLX_TARGET := VeloxChemMP.so
+
+LIB_LIST += -shared $(PYTHON_LD)
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -36,11 +38,6 @@ vpath %.hpp $(VLX_INCLUDES)
 
 # Add MKL includes
 CXXFLAGS += -I $(MKL_INCLUDES)
-
-# Add includes/ldflags for Boost Python
-CXX_REL_FLG += -fPIC ${PYTHON_INC}
-CXX_DEB_FLG += -fPIC ${PYTHON_INC}
-LIB_LIST += -shared ${PYTHON_LD}
 
 # Add list of internal libraries
 ifeq ($(USE_GPU),true)
