@@ -4,5 +4,7 @@ bin
 *.o
 *.a
 *.optrpt
+*.out
+*.log
 *~
 __pycache__

@@ -8,7 +8,7 @@ class TestControllers(unittest.TestCase):
 
     def test_app_manager_0(self):
 
-        app = AppManager.create("dummy.inp", "")
+        app = AppManager("dummy.inp", "")
 
         app.execute()
 
@@ -16,7 +16,7 @@ class TestControllers(unittest.TestCase):
 
     def test_app_manager_1(self):
 
-        app = AppManager.create("inputs/test.inp", "inputs/test.out")
+        app = AppManager("inputs/test.inp", "inputs/test.out")
 
         app.execute()
 
