@@ -1,7 +1,7 @@
 from mpi4py import MPI
-from VeloxChemLib import mpi_master
-from VeloxChemLib import mpi_initialized
-from VeloxChemLib import assert_msg_critical
+from veloxchem.VeloxChemLib import mpi_master
+from veloxchem.VeloxChemLib import mpi_initialized
+from veloxchem.VeloxChemLib import assert_msg_critical
 
 import numpy as np
 import unittest

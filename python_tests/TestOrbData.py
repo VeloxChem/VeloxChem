@@ -1,6 +1,6 @@
 from mpi4py import MPI
 from HelperClass import Task
-from VeloxChemLib import AODensityMatrix
+from veloxchem.VeloxChemLib import AODensityMatrix
 
 import numpy as np
 import unittest

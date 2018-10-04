@@ -1,7 +1,7 @@
 from mpi4py import MPI
 from HelperClass import Task
-from VeloxChemLib import OutputStream
-from VeloxChemLib import InputStream
+from veloxchem.VeloxChemLib import OutputStream
+from veloxchem.VeloxChemLib import InputStream
 
 import numpy as np
 import unittest
