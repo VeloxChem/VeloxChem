@@ -53,9 +53,16 @@ VST_LIBS_LIST = $(foreach d,$(VST_LIBS_DIR),$(addprefix -L$d -l,$d))
 
 # Add list of internal libraries
 ifeq ($(USE_GPU),true)
-  VLX_LIBS_DIR := ${shell find ../src/* -maxdepth 0 -not -path ../src/python -type d -print}
+  VLX_LIBS_DIR := ${shell find ../src/*        \
+                    -not -path ../src/pymodule \
+                    -not -path ../src/python   \
+                    -type d -print}
 else
-  VLX_LIBS_DIR := ${shell find ../src/* -maxdepth 0 -not -path ../src/python -not -path ../src/gpu -type d -print}
+  VLX_LIBS_DIR := ${shell find ../src/*        \
+                    -not -path ../src/pymodule \
+                    -not -path ../src/python   \
+                    -not -path ../src/gpu      \
+                    -type d -print}
 endif
 
 # Generate all internal libraries related files
@@ -68,7 +75,8 @@ VLX_LIBS_LIST = $(foreach d,$(VLX_LIBS_DIR),$(addprefix -L$d -l,$d))
 # Debug
 debug: $(VLX_MAIN_OBJ) $(VLX_LIBS) $(VST_LIBS)
 	@echo ====== Linking debug version of $(VLX_TARGET)...
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) $(VLX_MAIN_OBJ) $(VLX_LIBS_OBJS) $(VST_LIBS_OBJS) $(LIB_LIST) $(GST_LIB)
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) $(VLX_MAIN_OBJ) \
+		$(VLX_LIBS_OBJS) $(VST_LIBS_OBJS) $(LIB_LIST) $(GST_LIB)
 	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build/bin directory...
 	mkdir -p ../build/bin
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/bin
@@ -76,7 +84,8 @@ debug: $(VLX_MAIN_OBJ) $(VLX_LIBS) $(VST_LIBS)
 # Release
 release: $(VLX_MAIN_OBJ) $(VLX_LIBS) $(VST_LIBS)
 	@echo ====== Linking release version of $(VLX_TARGET)...
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) $(VLX_MAIN_OBJ) $(VLX_LIBS_OBJS) $(VST_LIBS_OBJS) $(LIB_LIST) $(GST_LIB)
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) $(VLX_MAIN_OBJ) \
+		$(VLX_LIBS_OBJS) $(VST_LIBS_OBJS) $(LIB_LIST) $(GST_LIB)
 	@echo ====== Moving $(VLX_TARGET) into $(CURDIR)/../build/bin directory...
 	mkdir -p ../build/bin
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/bin

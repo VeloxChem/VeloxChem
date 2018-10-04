@@ -13,7 +13,7 @@ include Makefile.setup
 # Set TARGET and linker flags for VeloxChemMP shared library
 
 VLX_TARGET := VeloxChemLib.so
-VLX_MODULE := $(wildcard python/modules/*.py)
+VLX_MODULE := $(wildcard pymodule/*.py)
 PYVLX_MAIN := VeloxChemMain.py
 
 LIB_LIST += -shared $(PYTHON_LD)
@@ -29,9 +29,9 @@ endif
 
 # Add includes directories
 ifeq ($(USE_GPU),true)
-  VLX_INCLUDES := ${shell find * -maxdepth 0 -type d -print}
+  VLX_INCLUDES := ${shell find -not -path pymodule -type d -print}
 else
-  VLX_INCLUDES := ${shell find * -maxdepth 0 -not -path gpu -type d -print}
+  VLX_INCLUDES := ${shell find -not -path pymodule -not -path gpu -type d -print}
 endif
 
 # Update CXX flags & includes path
@@ -43,9 +43,9 @@ CXXFLAGS += -I $(MKL_INCLUDES)
 
 # Add list of internal libraries
 ifeq ($(USE_GPU),true)
-  VLX_LIBS_DIR := ${shell find * -maxdepth 0 -type d -print}
+  VLX_LIBS_DIR := ${shell find * -not -path pymodule -type d -print}
 else
-  VLX_LIBS_DIR := ${shell find * -maxdepth 0 -not -path gpu -type d -print}
+  VLX_LIBS_DIR := ${shell find * -not -path pymodule -not -path gpu -type d -print}
 endif
 
 # Generate all internal libraries related files
