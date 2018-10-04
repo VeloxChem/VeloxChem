@@ -637,6 +637,252 @@ CGtoPairsBlock::pick(const int32_t iGtoPair) const
 }
 
 int32_t
+CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
+                         const CMemBlock<int32_t>& screeningPattern,
+                         const int32_t             nElements)
+{
+    // clear contrated and primitive pairs data
+    
+    _contrPattern.zero();
+    
+    _pairFactors.zero();
+    
+    // set up pointers to source of primitive data
+    
+    auto sfx   = source.getFactorsXi();
+    
+    auto sfi   = source.getFactorsOneOverXi();
+    
+    auto sfz   = source.getFactorsZeta();
+    
+    auto sss   = source.getOverlaps();
+    
+    auto srpx  = source.getCoordinatesPX();
+    
+    auto srpy  = source.getCoordinatesPY();
+    
+    auto srpz  = source.getCoordinatesPZ();
+    
+    auto srpax = source.getDistancesPAX();
+    
+    auto srpay = source.getDistancesPAY();
+    
+    auto srpaz = source.getDistancesPAZ();
+    
+    auto srpbx = source.getDistancesPBX();
+    
+    auto srpby = source.getDistancesPBY();
+    
+    auto srpbz = source.getDistancesPBZ();
+    
+    auto srax  = source.getCoordinatesAX();
+    
+    auto sray  = source.getCoordinatesAY();
+    
+    auto sraz  = source.getCoordinatesAZ();
+    
+    auto srbx  = source.getCoordinatesBX();
+    
+    auto srby  = source.getCoordinatesBY();
+    
+    auto srbz  = source.getCoordinatesBZ();
+    
+    auto srabx = source.getDistancesABX();
+    
+    auto sraby = source.getDistancesABY();
+    
+    auto srabz = source.getDistancesABZ();
+    
+    // set up pointers to destination of primitive data
+    
+    auto dfx   = _pairFactors.data(0);
+    
+    auto dfi   = _pairFactors.data(1);
+    
+    auto dfz   = _pairFactors.data(2);
+    
+    auto dss   = _pairFactors.data(3);
+    
+    auto drpx  = _pairFactors.data(4);
+    
+    auto drpy  = _pairFactors.data(5);
+    
+    auto drpz  = _pairFactors.data(6);
+    
+    auto drpax = _pairFactors.data(7);
+    
+    auto drpay = _pairFactors.data(8);
+    
+    auto drpaz = _pairFactors.data(9);
+    
+    auto drpbx = _pairFactors.data(10);
+    
+    auto drpby = _pairFactors.data(11);
+    
+    auto drpbz = _pairFactors.data(12);
+    
+    auto drax  = _pairFactors.data(13);
+    
+    auto dray  = _pairFactors.data(14);
+    
+    auto draz  = _pairFactors.data(15);
+    
+    auto drbx  = _pairFactors.data(16);
+    
+    auto drby  = _pairFactors.data(17);
+    
+    auto drbz  = _pairFactors.data(18);
+    
+    auto drabx = _pairFactors.data(19);
+    
+    auto draby = _pairFactors.data(20);
+    
+    auto drabz = _pairFactors.data(21);
+    
+    // set up pointers to source contraction pattern
+    
+    auto sspos = source.getStartPositions();
+    
+    auto sepos = source.getEndPositions();
+    
+    // set up pointers to destination contraction pattern
+    
+    auto dspos = _contrPattern.data(0);
+    
+    auto depos = _contrPattern.data(1);
+    
+    // set up angular momentum data
+    
+    auto bang = source.getBraAngularMomentum();
+    
+    auto kang = source.getKetAngularMomentum();
+    
+    // set up pairs counters
+    
+    int32_t nppairs = 0;
+    
+    int32_t ncpairs = 0;
+    
+    // generate set of screened pairs
+    
+    for (int32_t i = 0; i < nElements; i++)
+    {
+        if (screeningPattern.at(i) == 1)
+        {
+            // set start position
+            
+            dspos[ncpairs] = nppairs;
+            
+            // copy primitive data
+            
+            for (int32_t j = sspos[i]; j < sepos[i]; j++)
+            {
+                // Obara-Saika factors
+                
+                dfx[nppairs] = sfx[j];
+                
+                dfi[nppairs] = sfi[j];
+                
+                dfz[nppairs] = sfz[j];
+                
+                dss[nppairs] = sss[j];
+                
+                // P center
+                
+                drpx[nppairs] = srpx[j];
+                
+                drpy[nppairs] = srpy[j];
+                
+                drpz[nppairs] = srpz[j];
+                
+                // R(PA) distances
+                
+                drpax[nppairs] = srpax[j];
+                
+                drpay[nppairs] = srpay[j];
+                
+                drpaz[nppairs] = srpaz[j];
+                
+                // R(PB) distances
+                
+                drpbx[nppairs] = srpbx[j];
+                
+                drpby[nppairs] = srpby[j];
+                
+                drpbz[nppairs] = srpbz[j];
+                
+                // A Center
+                
+                drax[nppairs] = srax[j];
+                
+                dray[nppairs] = sray[j];
+                
+                draz[nppairs] = sraz[j];
+                
+                // B Center
+                
+                drbx[nppairs] = srbx[j];
+                
+                drby[nppairs] = srby[j];
+                
+                drbz[nppairs] = srbz[j];
+                
+                // R(AB) distances
+                
+                drabx[nppairs] = srabx[j];
+                
+                draby[nppairs] = sraby[j];
+                
+                drabz[nppairs] = srabz[j];
+                
+                // update primitive pairs counter
+                
+                nppairs++;
+            }
+            
+            // set end position
+            
+            depos[ncpairs] = nppairs;
+            
+            // bra indexes of pair
+            
+            for (int32_t j = 0; j < bang; j++)
+            {
+                auto bidx = source.getBraIdentifiers(j);
+                
+                auto cidx = _contrPattern.data(2 +  j);
+                
+                cidx[ncpairs] = bidx[i];
+            }
+            
+            // ket indexes of pair
+            
+            for (int32_t j = 0; j < kang; j++)
+            {
+                auto kidx = source.getKetIdentifiers(j);
+                
+                auto cidx = _contrPattern.data(2 + bang + j);
+                
+                cidx[ncpairs] = kidx[i];
+            }
+            
+            // update contracted pairs counters
+            
+            ncpairs++;
+        }
+    }
+    
+    return 0;
+}
+
+int32_t
+CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
+                         const CMemBlock<int32_t>& screeningPattern)
+{
+    return compress(source, screeningPattern, screeningPattern.size());
+}
+
+int32_t
 CGtoPairsBlock::getBraAngularMomentum() const
 {
     return _braAngularMomentum;

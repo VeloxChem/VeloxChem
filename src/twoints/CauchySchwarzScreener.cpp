@@ -203,6 +203,49 @@ CCauchySchwarzScreener::isEmpty() const
     return ((_braQValues.size() == 0) || (_ketQValues.size() == 0)); 
 }
 
+void
+CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                                           const bool                isBraEqualKet,
+                                           const int32_t             iContrPair) const
+{
+    // all GTOs pairs are screened
+    
+    qqVector.zero();
+    
+    // set up pointer to screening vector
+    
+    auto qqvec = qqVector.data();
+    
+    // set up pointer to Q values on ket side
+    
+    auto kqvals = _ketQValues.data();
+    
+    // set up dimensions on ket side
+    
+    auto kdim = _ketQValues.size();
+    
+    if (isBraEqualKet) kdim = iContrPair + 1;
+    
+    // original Cauchy-Schwarz screening scheme
+    
+    if (_screeningScheme == ericut::qq)
+    {
+        auto fbq = _braQValues.at(iContrPair);
+        
+        for (int32_t i = 0; i < kdim; i++)
+        {
+            if ((fbq * kqvals[i]) >= _threshold) qqvec[i] = 1;
+        }
+    }
+    
+    // distance dependent Cauchy-Schwarz screening scheme
+    
+    if (_screeningScheme == ericut::qqr)
+    {
+        // FIX ME: Add QQR screening scheme
+    }
+}
+
 std::ostream&
 operator<<(      std::ostream&           output,
            const CCauchySchwarzScreener& source)

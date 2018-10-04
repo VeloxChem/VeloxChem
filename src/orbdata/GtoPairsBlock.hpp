@@ -182,6 +182,34 @@ public:
     CGtoPairsBlock pick(const int32_t iGtoPair) const;
     
     /**
+     Compresses other GTOs pairs block data into GTOs apirs block object without
+     changing dimensions of GTOs pairs block object. Compression is performed
+     using specified screening pattern.
+     
+     @param source the GTOs pairs block object.
+     @param screeningPattern the screening pattern.
+     @param nElements the number of elements in screening pattern.
+     @return the number of contracted GTOs pairs in compressed GTOs pairs block
+           object.
+     */
+    int32_t compress(const CGtoPairsBlock&     source,
+                     const CMemBlock<int32_t>& screeningPattern,
+                     const int32_t             nElements);
+    
+    /**
+     Compresses other GTOs pairs block data into GTOs apirs block object without
+     changing dimensions of GTOs pairs block object. Compression is performed
+     using specified screening pattern.
+
+     @param source the GTOs pairs block object.
+     @param screeningPattern the screening pattern.
+     @return the number of contracted GTOs pairs in compressed GTOs pairs block
+             object.
+     */
+    int32_t compress(const CGtoPairsBlock&     source,
+                     const CMemBlock<int32_t>& screeningPattern);
+    
+    /**
      Gets angular momentum of bra side in GTOs pairs block object.
      
      @return the angular momentum of bra side.

@@ -184,6 +184,19 @@ public:
     bool isEmpty() const;
     
     /**
+     Sets screening vector with elements 0 (exclude GTOs pair) or 1 (include
+     GTOs pair).
+
+     @param qqVector the screening vector.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+     blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                            const bool                isBraEqualKet,
+                            const int32_t             iContrPair) const;
+    
+    /**
      Converts Cauchy-Schwarz screener object to text output and insert it into
      output text stream.
      

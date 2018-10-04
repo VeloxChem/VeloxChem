@@ -323,6 +323,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     auto qqpairs = ketpairs;
     
+    CMemBlock<int32_t> qqvec(cdim);
+    
     // loop over contracted GTOs ob bra side
     
     for (int32_t i = 0; i < brapairs.getNumberOfScreenedContrPairs(); i++)
@@ -331,7 +333,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
         
         if (useqq)
         {
-            // FIX ME:
+            intsScreener.setScreeningVector(qqvec, symbk, i); 
         }
         
         // compute distances: R(PQ) = P - Q

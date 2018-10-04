@@ -268,3 +268,61 @@ TEST_F(CCauchySchwarzScreenerTest, IsEmpty)
     
     ASSERT_TRUE(qscrb.isEmpty()); 
 }
+
+TEST_F(CCauchySchwarzScreenerTest, SetScreeningVector)
+{
+    auto mlih = vlxmol::getTestLiH();
+    
+    auto mbas = vlxbas::getTestBasisForLiH();
+    
+    CGtoBlock bgtos(mlih, mbas, 0);
+    
+    CGtoBlock kgtos(mlih, mbas, 1);
+    
+    CGtoPairsBlock bpairs(bgtos, kgtos, 1.0e-13);
+    
+    CGtoPairsBlock kpairs(bgtos, 1.0e-13);
+    
+    CMemBlock<double> bqvals({1.0, 2.0, 3.0, 6.0});
+    
+    CMemBlock<double> kqvals({0.0, 1.0, 2.0, 7.0, 7.0, 2.0});
+    
+    CCauchySchwarzScreener qscra(bqvals, kqvals, bpairs, kpairs, ericut::qq,
+                                 5.0);
+    
+    CMemBlock<int32_t> qqvec(6);
+    
+    qscra.setScreeningVector(qqvec, false, 0);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 1, 1, 0}));
+    
+    qscra.setScreeningVector(qqvec, false, 1);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 1, 1, 0}));
+    
+    qscra.setScreeningVector(qqvec, false, 2);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 1, 1, 1}));
+    
+    qscra.setScreeningVector(qqvec, false, 3);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 1, 1}));
+    
+    qscra.setScreeningVector(qqvec, true, 0);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 0, 0, 0}));
+    
+    qscra.setScreeningVector(qqvec, true, 1);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 0, 0, 0}));
+    
+    qscra.setScreeningVector(qqvec, true, 2);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 0, 0, 0}));
+    
+    qscra.setScreeningVector(qqvec, true, 3);
+    
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 0, 0}));
+}
+
+
