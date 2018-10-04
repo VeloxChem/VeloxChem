@@ -753,9 +753,9 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     
     // set up angular momentum data
     
-    auto bang = source.getBraAngularMomentum();
+    auto bang = angmom::to_SphericalComponents(source.getBraAngularMomentum());
     
-    auto kang = source.getKetAngularMomentum();
+    auto kang = angmom::to_SphericalComponents(source.getKetAngularMomentum());
     
     // set up pairs counters
     
