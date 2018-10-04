@@ -1,13 +1,14 @@
-from VeloxChemLib import InputData
-from VeloxChemLib import MolXYZReader
-from VeloxChemLib import EnvironmentReader
-from VeloxChemLib import BasisReader
-from VeloxChemLib import Molecule
-from VeloxChemLib import OutputStream
-from VeloxChemLib import InputStream
+from veloxchem.VeloxChemLib import InputData
+from veloxchem.VeloxChemLib import MolXYZReader
+from veloxchem.VeloxChemLib import EnvironmentReader
+from veloxchem.VeloxChemLib import BasisReader
+from veloxchem.VeloxChemLib import Molecule
+from veloxchem.VeloxChemLib import OutputStream
+from veloxchem.VeloxChemLib import InputStream
 
 
 class Task(object):
+
     def __init__(self, input_file, output_file):
 
         # input/output filenames

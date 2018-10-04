@@ -1,11 +1,11 @@
 from mpi4py import MPI
 from HelperClass import Task
-from VeloxChemLib import Molecule
-from VeloxChemLib import MolecularBasis
-from VeloxChemLib import OutputStream
-from VeloxChemLib import OverlapIntegralsDriver
-from VeloxChemLib import SADGuessDriver
-from VeloxChemLib import mpi_master
+from veloxchem.VeloxChemLib import Molecule
+from veloxchem.VeloxChemLib import MolecularBasis
+from veloxchem.VeloxChemLib import OutputStream
+from veloxchem.VeloxChemLib import OverlapIntegralsDriver
+from veloxchem.VeloxChemLib import SADGuessDriver
+from veloxchem.VeloxChemLib import mpi_master
 
 import numpy as np
 import unittest

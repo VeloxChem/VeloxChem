@@ -1,14 +1,14 @@
 from mpi4py import MPI
 from HelperClass import Task
-from VeloxChemLib import Molecule
-from VeloxChemLib import MolecularBasis
-from VeloxChemLib import OverlapIntegralsDriver
-from VeloxChemLib import KineticEnergyIntegralsDriver
-from VeloxChemLib import NuclearPotentialIntegralsDriver
-from VeloxChemLib import mpi_master
-from VeloxChemLib import assemble_overlap_matrices
-from VeloxChemLib import assemble_kinetic_energy_matrices
-from VeloxChemLib import assemble_nuclear_potential_matrices
+from veloxchem.VeloxChemLib import Molecule
+from veloxchem.VeloxChemLib import MolecularBasis
+from veloxchem.VeloxChemLib import OverlapIntegralsDriver
+from veloxchem.VeloxChemLib import KineticEnergyIntegralsDriver
+from veloxchem.VeloxChemLib import NuclearPotentialIntegralsDriver
+from veloxchem.VeloxChemLib import mpi_master
+from veloxchem.VeloxChemLib import assemble_overlap_matrices
+from veloxchem.VeloxChemLib import assemble_kinetic_energy_matrices
+from veloxchem.VeloxChemLib import assemble_nuclear_potential_matrices
 
 import numpy as np
 import unittest

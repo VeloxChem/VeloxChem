@@ -1,8 +1,8 @@
 from mpi4py import MPI
 from HelperClass import Task
-from VeloxChemLib import OverlapMatrix
-from VeloxChemLib import KineticEnergyMatrix
-from VeloxChemLib import NuclearPotentialMatrix
+from veloxchem.VeloxChemLib import OverlapMatrix
+from veloxchem.VeloxChemLib import KineticEnergyMatrix
+from veloxchem.VeloxChemLib import NuclearPotentialMatrix
 
 import numpy as np
 import unittest

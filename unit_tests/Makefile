@@ -53,9 +53,9 @@ VST_LIBS_LIST = $(foreach d,$(VST_LIBS_DIR),$(addprefix -L$d -l,$d))
 
 # Add list of internal libraries
 ifeq ($(USE_GPU),true)
-  VLX_LIBS_DIR := ${shell find ../src/* -not -path ../src/python -type d -print}
+  VLX_LIBS_DIR := ${shell find ../src/* -maxdepth 0 -not -path ../src/python -type d -print}
 else
-  VLX_LIBS_DIR := ${shell find ../src/* -not -path ../src/python -not -path ../src/gpu -type d -print}
+  VLX_LIBS_DIR := ${shell find ../src/* -maxdepth 0 -not -path ../src/python -not -path ../src/gpu -type d -print}
 endif
 
 # Generate all internal libraries related files
