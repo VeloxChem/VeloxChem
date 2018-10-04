@@ -14,6 +14,7 @@ before_script:
   - export PYTHONPATH=/home/xinli/software/python/lib/python3.6/site-packages:$PYTHONPATH
   - export LD_LIBRARY_PATH=/home/xinli/software/python/lib:$LD_LIBRARY_PATH
   - export LD_LIBRARY_PATH=/home/xinli/software/boost/lib:$LD_LIBRARY_PATH
+  - export OMP_NUM_THREADS=6
 
 after_script:
   - echo "Done..."
@@ -50,7 +51,7 @@ run_unit_test:
     - cp ../config/Setup.Monkey Makefile.setup
     - cd ../unit_tests/
     - make -j 6 release
-    - cd ../build/
+    - cd ../build/bin
     - ./UnitTestVeloxChemMP.x
 
 run_test_python3: 
@@ -62,6 +63,5 @@ run_test_python3:
     - cp ../config/Setup.Monkey Makefile.setup
     - make -j 6 release
     - cd ../python_tests/
-    - export OMP_NUM_THREADS=6
-    - export PYTHONPATH=$(pwd)/../build:$PYTHONPATH
+    - export PYTHONPATH=$(pwd)/../build/python:$PYTHONPATH
     - python3 run_tests.py -v
