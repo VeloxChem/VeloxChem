@@ -199,7 +199,8 @@ contract(      CMemBlock2D<double>&  contrData,
          const std::vector<int32_t>& primIndexes,
          const CGtoPairsBlock&       braGtoPairsBlock,
          const CGtoPairsBlock&       ketGtoPairsBlock,
-         const bool                  isBraEqualKet,
+         const int32_t               nKetPrimPairs,
+         const int32_t               nKetContrPairs,
          const int32_t               iContrPair)
 {
     // set up pointers to primitives data on bra side
@@ -215,17 +216,6 @@ contract(      CMemBlock2D<double>&  contrData,
     auto kspos = ketGtoPairsBlock.getStartPositions();
     
     auto kepos = ketGtoPairsBlock.getEndPositions();
-    
-    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-    
-    auto nprim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-    
-    if (isBraEqualKet)
-    {
-        kdim  = iContrPair + 1;
-        
-        nprim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-    }
     
     // loop over set of data vectors
     
@@ -267,7 +257,7 @@ contract(      CMemBlock2D<double>&  contrData,
                 // loop over primitive GTOs on ket side
                 
                 #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
-                for (int32_t l = 0; l < nprim; l++)
+                for (int32_t l = 0; l < nKetPrimPairs; l++)
                 {
                     sumbuf[l] += srcbuf[l];
                 }
@@ -276,7 +266,8 @@ contract(      CMemBlock2D<double>&  contrData,
         
         // second step: direct contraction over ket side
         
-        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, kdim, ncomp);
+        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos,
+                          nKetContrPairs, ncomp);
     }
 }
     

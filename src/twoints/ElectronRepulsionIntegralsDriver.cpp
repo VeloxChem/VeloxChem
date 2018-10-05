@@ -381,7 +381,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
         // contract primitive electron repulsion integrals
         
         genfunc::contract(khrrbuffer, pbuffer, khrrvec, khrridx, vrrvec, vrridx,
-                          brapairs, qqpairs, symbk, i);
+                          brapairs, qqpairs, nqpdim, nqcdim, i);
         
         // apply horizontal recursion on ket side
         

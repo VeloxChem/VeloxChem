@@ -162,7 +162,7 @@ TEST_F(CGenFuncTest, ContractWithGtoPairsBlocks)
     CMemBlock2D<double> c2dat(2, 4);
     
     genfunc::contract(c2dat, p2dat, cvec, cidx, pvec, pidx, ppairs, ppairs,
-                      true, 1);
+                      6, 2, 1);
     
     CMemBlock2D<double> t2dat({11.0,  6.6,
                               10.5,  8.4,
@@ -175,7 +175,7 @@ TEST_F(CGenFuncTest, ContractWithGtoPairsBlocks)
     CMemBlock2D<double> cdat(6, 4);
     
     genfunc::contract(cdat, pdat, cvec, cidx, pvec, pidx, ppairs, ppairs,
-                      false, 1);
+                      11, 6, 1);
     
     CMemBlock2D<double> tdat({11.0,  6.6, 11.6, 2.2, 2.9, 3.1,
                               10.5,  8.4,  8.8, 5.0, 3.7, 2.8,

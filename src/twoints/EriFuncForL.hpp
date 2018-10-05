@@ -27,8 +27,7 @@ namespace erifunc { // erifunc namespace
      @param wqDistances the vector of distances R(WQ) = W - Q.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSSSL(      CMemBlock2D<double>&  primBuffer,
@@ -38,7 +37,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wqDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -52,8 +51,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSS(      CMemBlock2D<double>&  primBuffer,
@@ -63,7 +61,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -77,8 +75,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSPSL(      CMemBlock2D<double>&  primBuffer,
@@ -88,7 +85,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -102,8 +99,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSP(      CMemBlock2D<double>&  primBuffer,
@@ -113,7 +109,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -127,8 +123,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSDSL(      CMemBlock2D<double>&  primBuffer,
@@ -138,7 +133,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -152,8 +147,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSD(      CMemBlock2D<double>&  primBuffer,
@@ -163,7 +157,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -177,8 +171,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSFSL(      CMemBlock2D<double>&  primBuffer,
@@ -188,7 +181,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -202,8 +195,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSF(      CMemBlock2D<double>&  primBuffer,
@@ -213,7 +205,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -227,8 +219,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSGSL(      CMemBlock2D<double>&  primBuffer,
@@ -238,7 +229,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -252,8 +243,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSG(      CMemBlock2D<double>&  primBuffer,
@@ -263,7 +253,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -277,8 +267,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSHSL(      CMemBlock2D<double>&  primBuffer,
@@ -288,7 +277,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -302,8 +291,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSH(      CMemBlock2D<double>&  primBuffer,
@@ -313,7 +301,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -327,8 +315,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSISL(      CMemBlock2D<double>&  primBuffer,
@@ -338,7 +325,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -352,8 +339,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSI(      CMemBlock2D<double>&  primBuffer,
@@ -363,7 +349,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -377,8 +363,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSKSL(      CMemBlock2D<double>&  primBuffer,
@@ -388,7 +373,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -402,8 +387,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSK(      CMemBlock2D<double>&  primBuffer,
@@ -413,7 +397,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -427,8 +411,7 @@ namespace erifunc { // erifunc namespace
      @param wpDistances the vector of distances R(WP) = W - P.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void compElectronRepulsionForSLSL(      CMemBlock2D<double>&  primBuffer,
@@ -438,7 +421,7 @@ namespace erifunc { // erifunc namespace
                                       const CMemBlock2D<double>&  wpDistances,
                                       const CGtoPairsBlock&       braGtoPairsBlock,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetPrimPairs,
                                       const int32_t               iContrPair);
     
 } // erifunc namespace

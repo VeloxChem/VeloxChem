@@ -23,7 +23,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wqDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 0, 7);
@@ -49,15 +49,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fgb = ketGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -426,7 +417,7 @@ namespace erifunc { // erifunc namespace
                                          g_0_yyyyyyy, g_0_yyyyyyz, g_0_yyyyyzz,\
                                          g_0_yyyyzzz, g_0_yyyzzzz, g_0_yyzzzzz,\
                                          g_0_yzzzzzz, g_0_zzzzzzz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactors
 
@@ -535,7 +526,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 7, 0);
@@ -561,15 +552,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -947,7 +929,7 @@ namespace erifunc { // erifunc namespace
                                          g_xzzzzzz_0, g_yyyyyyy_0, g_yyyyyyz_0,\
                                          g_yyyyyzz_0, g_yyyyzzz_0, g_yyyzzzz_0,\
                                          g_yyzzzzz_0, g_yzzzzzz_0, g_zzzzzzz_0: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactors for bra
 
@@ -1049,7 +1031,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 1, 7);
@@ -1071,15 +1053,6 @@ namespace erifunc { // erifunc namespace
         auto rpby = braGtoPairsBlock.getDistancesPBY();
 
         auto rpbz = braGtoPairsBlock.getDistancesPBZ();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -1623,7 +1596,7 @@ namespace erifunc { // erifunc namespace
                                          g_z_yyyyyyy, g_z_yyyyyyz, g_z_yyyyyzz,\
                                          g_z_yyyyzzz, g_z_yyyzzzz, g_z_yyzzzzz,\
                                          g_z_yzzzzzz, g_z_zzzzzzz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -1871,7 +1844,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 7, 1);
@@ -1897,15 +1870,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -2981,7 +2945,7 @@ namespace erifunc { // erifunc namespace
                                          g_yyzzzzz_y, g_yyzzzzz_z, g_yzzzzzz_x,\
                                          g_yzzzzzz_y, g_yzzzzzz_z, g_zzzzzzz_x,\
                                          g_zzzzzzz_y, g_zzzzzzz_z: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -3233,7 +3197,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 2, 7);
@@ -3259,15 +3223,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -4712,7 +4667,7 @@ namespace erifunc { // erifunc namespace
                                          g_zz_yyyyyyz, g_zz_yyyyyzz, g_zz_yyyyzzz,\
                                          g_zz_yyyzzzz, g_zz_yyzzzzz, g_zz_yzzzzzz,\
                                          g_zz_zzzzzzz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -5180,7 +5135,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 7, 2);
@@ -5206,15 +5161,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -7359,7 +7305,7 @@ namespace erifunc { // erifunc namespace
                                          g_yzzzzzz_zz, g_zzzzzzz_xx, g_zzzzzzz_xy,\
                                          g_zzzzzzz_xz, g_zzzzzzz_yy, g_zzzzzzz_yz,\
                                          g_zzzzzzz_zz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -7827,7 +7773,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 3, 7);
@@ -7853,15 +7799,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -10678,7 +10615,7 @@ namespace erifunc { // erifunc namespace
                                          g_zzz_yyyyyyy, g_zzz_yyyyyyz, g_zzz_yyyyyzz,\
                                          g_zzz_yyyyzzz, g_zzz_yyyzzzz, g_zzz_yyzzzzz,\
                                          g_zzz_yzzzzzz, g_zzz_zzzzzzz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -11434,7 +11371,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 7, 3);
@@ -11460,15 +11397,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -15060,7 +14988,7 @@ namespace erifunc { // erifunc namespace
                                          g_zzzzzzz_xyy, g_zzzzzzz_xyz, g_zzzzzzz_xzz,\
                                          g_zzzzzzz_yyy, g_zzzzzzz_yyz, g_zzzzzzz_yzz,\
                                          g_zzzzzzz_zzz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -15816,7 +15744,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 4, 7);
@@ -15842,15 +15770,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -20524,7 +20443,7 @@ namespace erifunc { // erifunc namespace
                                          g_zzzz_xzzzzzz, g_zzzz_yyyyyyy, g_zzzz_yyyyyyz,\
                                          g_zzzz_yyyyyzz, g_zzzz_yyyyzzz, g_zzzz_yyyzzzz,\
                                          g_zzzz_yyzzzzz, g_zzzz_yzzzzzz, g_zzzz_zzzzzzz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -21640,7 +21559,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         auto bord = genfunc::maxOrderOfPair(recPattern, 7, 4);
@@ -21666,15 +21585,6 @@ namespace erifunc { // erifunc namespace
         // set up pointers to common Obara-Saika factor
 
         auto fga = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // determine dimensions of GTOs pairs batch
-
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
 
         // compute primitive integrals up to required order
 
@@ -27090,7 +27000,7 @@ namespace erifunc { // erifunc namespace
                                          g_zzzzzzz_xyyy, g_zzzzzzz_xyyz, g_zzzzzzz_xyzz,\
                                          g_zzzzzzz_xzzz, g_zzzzzzz_yyyy, g_zzzzzzz_yyyz,\
                                          g_zzzzzzz_yyzz, g_zzzzzzz_yzzz, g_zzzzzzz_zzzz: VLX_ALIGN)
-                for (int32_t k = 0; k < ndim; k++)
+                for (int32_t k = 0; k < nKetPrimPairs; k++)
                 {
                     // scaled prefactor for ket
 
@@ -28206,7 +28116,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         // FIX ME: Add split generation scheme
@@ -28220,7 +28130,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         // FIX ME: Add split generation scheme
@@ -28234,7 +28144,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         // FIX ME: Add split generation scheme
@@ -28248,7 +28158,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         // FIX ME: add split generation scheme
@@ -28262,7 +28172,7 @@ namespace erifunc { // erifunc namespace
                                  const CMemBlock2D<double>&  wpDistances,
                                  const CGtoPairsBlock&       braGtoPairsBlock,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetPrimPairs,
                                  const int32_t               iContrPair)
     {
         // FIX ME: add split generation scheme
