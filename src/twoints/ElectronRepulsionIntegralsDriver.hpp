@@ -158,8 +158,7 @@ class CElectronRepulsionIntegralsDriver
      @param wqDistances the vector of distances R(WQ) = W - Q.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _compPrimElectronRepulsionInts(      CMemBlock2D<double>&  primBuffer,
@@ -175,7 +174,7 @@ class CElectronRepulsionIntegralsDriver
                                         const CMemBlock2D<double>&  wqDistances,
                                         const CGtoPairsBlock&       braGtoPairsBlock,
                                         const CGtoPairsBlock&       ketGtoPairsBlock,
-                                        const bool                  isBraEqualKet,
+                                        const int32_t               nKetPrimPairs,
                                         const int32_t               iContrPair) const;
     
     /**

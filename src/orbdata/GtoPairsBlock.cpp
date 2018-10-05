@@ -872,7 +872,7 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
         }
     }
     
-    return 0;
+    return ncpairs;
 }
 
 int32_t

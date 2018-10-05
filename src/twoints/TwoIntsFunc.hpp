@@ -119,14 +119,13 @@ namespace twointsfunc { // twointsfunc namespace
      @param pqDistances the vector of Cartesian R(PQ) = P - Q distances.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compDistancesPQ(      CMemBlock2D<double>& pqDistances,
                          const CGtoPairsBlock&      braGtoPairsBlock,
                          const CGtoPairsBlock&      ketGtoPairsBlock,
-                         const bool                 isBraEqualKet,
+                         const int32_t              nKetPrimPairs,
                          const int32_t              iContrPair);
     
     /**
@@ -135,14 +134,13 @@ namespace twointsfunc { // twointsfunc namespace
      @param osFactors the vector of Obara-Saika factors.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compFactorsForElectronRepulsion(      CMemBlock2D<double>& osFactors,
                                          const CGtoPairsBlock&      braGtoPairsBlock,
                                          const CGtoPairsBlock&      ketGtoPairsBlock,
-                                         const bool                 isBraEqualKet,
+                                         const int32_t              nKetPrimPairs,
                                          const int32_t              iContrPair);
     
     /**
@@ -155,8 +153,7 @@ namespace twointsfunc { // twointsfunc namespace
      @param nFactors the fundamental dimension of Obara-Saika factors vectors.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-             blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compCoordinatesForW(      CMemBlock2D<double>& wCoordinates,
@@ -164,7 +161,7 @@ namespace twointsfunc { // twointsfunc namespace
                              const int32_t              nFactors,
                              const CGtoPairsBlock&      braGtoPairsBlock,
                              const CGtoPairsBlock&      ketGtoPairsBlock,
-                             const bool                 isBraEqualKet,
+                             const int32_t              nKetPrimPairs,
                              const int32_t              iContrPair);
     
    /**
@@ -176,15 +173,14 @@ namespace twointsfunc { // twointsfunc namespace
            functions.
     @param braGtoPairsBlock the GTOs pairs block on bra side.
     @param ketGtoPairsBlock the GTOs pairs block on ket side.
-    @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-           blocks.
+    @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTO pair on bra side.
     */
     void compDistancesWP(      CMemBlock2D<double>& wpDistances,
                          const CMemBlock2D<double>& wCoordinates,
                          const CGtoPairsBlock&      braGtoPairsBlock,
                          const CGtoPairsBlock&      ketGtoPairsBlock,
-                         const bool                 isBraEqualKet,
+                         const int32_t              nKetPrimPairs,
                          const int32_t              iContrPair);
     
     /**
@@ -196,15 +192,14 @@ namespace twointsfunc { // twointsfunc namespace
             functions.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compDistancesWQ(      CMemBlock2D<double>& wqDistances,
                          const CMemBlock2D<double>& wCoordinates,
                          const CGtoPairsBlock&      braGtoPairsBlock,
                          const CGtoPairsBlock&      ketGtoPairsBlock,
-                         const bool                 isBraEqualKet,
+                         const int32_t              nKetPrimPairs,
                          const int32_t              iContrPair);
     
 } // intsfunc namespace

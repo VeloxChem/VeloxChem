@@ -329,40 +329,54 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     for (int32_t i = 0; i < brapairs.getNumberOfScreenedContrPairs(); i++)
     {
-        // apply integrals screening
+        // determine GTOs pairs  effective dimensions on ket side
+        
+        auto nqpdim = (symbk) ? ketpairs.getNumberOfPrimPairs(i) : pdim;
+        
+        auto nqcdim = (symbk) ? i + 1 : cdim;
+        
+        // integrals screening: QQ or QQR scheme 
         
         if (useqq)
         {
-            intsScreener.setScreeningVector(qqvec, symbk, i); 
+            intsScreener.setScreeningVector(qqvec, symbk, i);
+            
+            nqcdim = qqpairs.compress(ketpairs, qqvec, nqcdim);
+            
+            if (nqcdim > 0) nqpdim = qqpairs.getNumberOfPrimPairs(nqcdim - 1);
         }
+        
+        // all integrals are vanishing in batch, skip computations
+        
+        if (nqcdim == 0) continue;
         
         // compute distances: R(PQ) = P - Q
         
-        twointsfunc::compDistancesPQ(rpq, brapairs, qqpairs, symbk, i);
+        twointsfunc::compDistancesPQ(rpq, brapairs, qqpairs, nqpdim, i);
         
         // compute Obara-Saika recursion factors
         
         twointsfunc::compFactorsForElectronRepulsion(rfacts, brapairs, qqpairs,
-                                                     symbk, i);
+                                                     nqpdim, i);
         
         // compute coordinates of center W
         
         twointsfunc::compCoordinatesForW(rw, rfacts, 4, brapairs, qqpairs,
-                                         symbk, i);
+                                         nqpdim, i);
         
         // compute distances: R(WP) = W - P
         
-        twointsfunc::compDistancesWP(rwp, rw, brapairs, qqpairs, symbk, i);
+        twointsfunc::compDistancesWP(rwp, rw, brapairs, qqpairs, nqpdim, i);
         
         // compute distances: R(WQ) = W - Q;
         
-        twointsfunc::compDistancesWQ(rwq, rw, brapairs, qqpairs, symbk, i);
+        twointsfunc::compDistancesWQ(rwq, rw, brapairs, qqpairs, nqpdim, i);
         
         // compute primitive electron repulsion integrals
         
         _compPrimElectronRepulsionInts(pbuffer, vrrvec, vrridx, bftab, bargs,
                                        bvals, bord, rfacts, rpq, rwp, rwq,
-                                       brapairs, qqpairs, symbk, i);
+                                       brapairs, qqpairs, nqpdim, i);
         
         // contract primitive electron repulsion integrals
         
@@ -735,7 +749,7 @@ CElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBloc
                                                                   const CMemBlock2D<double>&  wqDistances,
                                                                   const CGtoPairsBlock&       braGtoPairsBlock,
                                                                   const CGtoPairsBlock&       ketGtoPairsBlock,
-                                                                  const bool                  isBraEqualKet,
+                                                                  const int32_t               nKetPrimPairs,
                                                                   const int32_t               iContrPair) const
 {
     // compute (ss|g(r,r')|ss) integrals
@@ -743,567 +757,567 @@ CElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBloc
     erifunc::compElectronRepulsionForSSSS(primBuffer, recPattern, recIndexes,
                                           bfTable, bfArguments, bfValues, bfOrder,
                                           osFactors, pqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSSSP(primBuffer, recPattern, recIndexes,
                                           wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSPSS(primBuffer, recPattern, recIndexes,
                                           wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSPSP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSSSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSDSS(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSPSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSDSP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSDSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSSSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSFSS(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSPSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSFSP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSDSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSFSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSFSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSSSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSGSS(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSPSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSGSP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSDSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSGSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSFSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSGSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSGSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSSSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSHSS(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSPSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSHSP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSDSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSHSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSFSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSHSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSGSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSHSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSHSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSSSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSISS(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSPSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSISP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSDSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSISD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSFSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSISF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSGSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSISG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSHSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSISH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSISI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSSSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSKSS(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSPSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSKSP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSDSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSKSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSFSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSKSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSGSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSKSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSHSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSKSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSISK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSKSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSKSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (ss|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSSSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wqDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|ss) integrals
     
     erifunc::compElectronRepulsionForSLSS(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sp|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSPSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|sp) integrals
     
     erifunc::compElectronRepulsionForSLSP(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sd|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSDSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|sd) integrals
     
     erifunc::compElectronRepulsionForSLSD(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sf|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSFSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|sf) integrals
     
     erifunc::compElectronRepulsionForSLSF(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sg|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSGSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|sg) integrals
     
     erifunc::compElectronRepulsionForSLSG(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sh|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSHSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|sh) integrals
     
     erifunc::compElectronRepulsionForSLSH(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (si|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSISL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|si) integrals
     
     erifunc::compElectronRepulsionForSLSI(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sk|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSKSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|sk) integrals
     
     erifunc::compElectronRepulsionForSLSK(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // compute (sl|g(r,r')|sl) integrals
     
     erifunc::compElectronRepulsionForSLSL(primBuffer, recPattern, recIndexes,
                                           osFactors, wpDistances, braGtoPairsBlock,
-                                          ketGtoPairsBlock, isBraEqualKet,
+                                          ketGtoPairsBlock, nKetPrimPairs,
                                           iContrPair);
     
     // add other integrals 

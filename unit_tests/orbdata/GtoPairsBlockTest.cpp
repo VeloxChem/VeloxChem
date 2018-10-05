@@ -338,7 +338,9 @@ TEST_F(CGtoPairsBlockTest, Compress)
     
     CMemBlock<int32_t> scrpat({0, 1, 1, 0, 0, 1});
     
-    bpairs.compress(apairs, scrpat, 6);
+    auto npp = bpairs.compress(apairs, scrpat, 6);
+    
+    ASSERT_EQ(npp, 3);
     
     CMemBlock2D<int32_t> cpat({ 0,  2,  4, 0, 0, 0,
                                 2,  4,  5, 0, 0, 0,
@@ -405,7 +407,9 @@ TEST_F(CGtoPairsBlockTest, Compress)
     
     ASSERT_EQ(bpairs, CGtoPairsBlock(cpat, ppat, 1, 1, 1.0e-13));
     
-    bpairs.compress(apairs, scrpat, 3);
+    npp = bpairs.compress(apairs, scrpat, 3);
+    
+    ASSERT_EQ(npp, 2);
     
     CMemBlock2D<int32_t> cpat0({ 0,  2, 0, 0, 0, 0,
                                  2,  4, 0, 0, 0, 0,
@@ -472,7 +476,9 @@ TEST_F(CGtoPairsBlockTest, Compress)
     
     ASSERT_EQ(bpairs, CGtoPairsBlock(cpat0, ppat0, 1, 1, 1.0e-13));
     
-    bpairs.compress(apairs, scrpat, 5);
+    npp = bpairs.compress(apairs, scrpat, 5);
+    
+    ASSERT_EQ(npp, 2);
     
     ASSERT_EQ(bpairs, CGtoPairsBlock(cpat0, ppat0, 1, 1, 1.0e-13));
 }
