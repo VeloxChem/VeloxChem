@@ -23,10 +23,9 @@
 #include "ElectronicPotentialIntegralsDriver.hpp"
 #include "ThreeCenterElectronRepulsionIntegralsDriver.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
+#include "SADGuessDriver.hpp"
 
 #include "MemBlock2D.hpp"
-
-#include <iostream>
 
 CSinglePointEnergy::CSinglePointEnergy(const int32_t  globRank,
                                        const int32_t  globNodes,
@@ -179,22 +178,22 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     // compute overlap integrals
     
-    //COverlapIntegralsDriver ovldrv(_globRank, _globNodes, comm);
+    COverlapIntegralsDriver ovldrv(_globRank, _globNodes, comm);
     
-    //auto ovlmat = ovldrv.compute(_molecule, _aoBasis, oStream, comm);
-    
+    auto ovlmat = ovldrv.compute(_molecule, _aoBasis, oStream, comm);
+
     // compute kinetic energy integrals
     
-    //CKineticEnergyIntegralsDriver kindrv(_globRank, _globNodes, comm);
+    CKineticEnergyIntegralsDriver kindrv(_globRank, _globNodes, comm);
     
-    //auto kinmat = kindrv.compute(_molecule, _aoBasis, oStream, comm);
+    auto kinmat = kindrv.compute(_molecule, _aoBasis, oStream, comm);
     
     // compute nuclear potential integrals
     
-    //CNuclearPotentialIntegralsDriver npotdrv(_globRank, _globNodes, comm);
+    CNuclearPotentialIntegralsDriver npotdrv(_globRank, _globNodes, comm);
     
-    //auto npotmat = npotdrv.compute(_molecule, _aoBasis, oStream, comm);
-    
+    auto npotmat = npotdrv.compute(_molecule, _aoBasis, oStream, comm);
+
     // compute electronic potential integrals
     
     //CElectronicPotentialIntegralsDriver epotdrv(_globRank, _globNodes, comm);
@@ -207,6 +206,15 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     // ridrv.compute(_molecule, _aoBasis, _riBasis, 1.0e-13, oStream, comm);
     
+    // compute SAD initial guess
+    
+    CSADGuessDriver saddrv(_globRank, _globNodes, comm);
+
+    auto ovlmat_min_ao = ovldrv.compute(_molecule, _minBasis, _aoBasis, oStream, comm);
+    
+    auto dsad = saddrv.compute(_molecule, _minBasis, _aoBasis,
+                               ovlmat_min_ao, ovlmat, oStream, comm);
+
     // compute electron repulsion integrals
     
     CElectronRepulsionIntegralsDriver eridrv(_globRank, _globNodes, comm);
@@ -220,6 +228,9 @@ CSinglePointEnergy::run(COutputStream& oStream,
     //CGtoPairsBlock bpairs(bgtos, 1.0e-13);
     
     //CGtoPairsBlock kpairs(sgtos, pgtos, 1.0e-13);
+    
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-8, _molecule, _aoBasis,
+                                 oStream, comm);
 
     eridrv.compute(_molecule, _aoBasis, 1.0e-13, oStream, comm);
 }

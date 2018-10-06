@@ -406,7 +406,7 @@ namespace twointsfunc { // twointsfunc namespace
     compDistancesPQ(      CMemBlock2D<double>& pqDistances,
                     const CGtoPairsBlock&      braGtoPairsBlock,
                     const CGtoPairsBlock&      ketGtoPairsBlock,
-                    const bool                 isBraEqualKet,
+                    const int32_t              nKetPrimPairs,
                     const int32_t              iContrPair)
     {
         // set up pointers to primitive pairs data on bra side
@@ -420,15 +420,6 @@ namespace twointsfunc { // twointsfunc namespace
         auto spos = braGtoPairsBlock.getStartPositions();
         
         auto epos = braGtoPairsBlock.getEndPositions();
-        
-        // determine dimensions of GTOs pairs batch
-        
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-        
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
         
         // loop over componets of contracted GTOs pair
         
@@ -445,7 +436,7 @@ namespace twointsfunc { // twointsfunc namespace
                                 ketGtoPairsBlock.getCoordinatesPX(),
                                 ketGtoPairsBlock.getCoordinatesPY(),
                                 ketGtoPairsBlock.getCoordinatesPZ(),
-                                ndim);
+                                nKetPrimPairs);
             
             idx++; 
         }
@@ -455,7 +446,7 @@ namespace twointsfunc { // twointsfunc namespace
     compFactorsForElectronRepulsion(      CMemBlock2D<double>& osFactors,
                                     const CGtoPairsBlock&      braGtoPairsBlock,
                                     const CGtoPairsBlock&      ketGtoPairsBlock,
-                                    const bool                 isBraEqualKet,
+                                    const int32_t              nKetPrimPairs,
                                     const int32_t              iContrPair)
     {
         // set up angular momentum data
@@ -484,15 +475,6 @@ namespace twointsfunc { // twointsfunc namespace
         
         auto koxi = ketGtoPairsBlock.getFactorsOneOverXi();
         
-        // determine dimensions of GTOs pairs batch
-        
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-        
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
-        
         // loop over componets of contracted GTOs pair
         
         int32_t idx = 0;
@@ -508,7 +490,7 @@ namespace twointsfunc { // twointsfunc namespace
             auto fb = bfxi[i];
             
             #pragma omp simd aligned(fx, fz, kfxi: VLX_ALIGN)
-            for (int32_t j = 0; j < ndim; j++)
+            for (int32_t j = 0; j < nKetPrimPairs; j++)
             {
                 fx[j] = 1.0 / (fb + kfxi[j]);
                 
@@ -522,7 +504,7 @@ namespace twointsfunc { // twointsfunc namespace
                 auto fga = boxi[i];
                 
                 #pragma omp simd aligned(ta, fz: VLX_ALIGN)
-                for (int32_t j = 0; j < ndim; j++)
+                for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
                     ta[j] = fga * fz[j];
                 }
@@ -533,7 +515,7 @@ namespace twointsfunc { // twointsfunc namespace
                 auto td = osFactors.data(4 * idx + 3);
                 
                 #pragma omp simd aligned(td, koxi, fz: VLX_ALIGN)
-                for (int32_t j = 0; j < ndim; j++)
+                for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
                     td[j] = koxi[j] * fz[j];
                 }
@@ -549,7 +531,7 @@ namespace twointsfunc { // twointsfunc namespace
                         const int32_t              nFactors,
                         const CGtoPairsBlock&      braGtoPairsBlock,
                         const CGtoPairsBlock&      ketGtoPairsBlock,
-                        const bool                 isBraEqualKet,
+                        const int32_t              nKetPrimPairs,
                         const int32_t              iContrPair)
     {
         // set up pointers to primitives data on bra side
@@ -575,15 +557,6 @@ namespace twointsfunc { // twointsfunc namespace
         auto kqz = ketGtoPairsBlock.getCoordinatesPZ();
         
         auto kfxi = ketGtoPairsBlock.getFactorsXi();
-        
-        // determine dimensions of GTOs pairs batch
-        
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-        
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
         
         // loop over contracted GTO on bra side
         
@@ -613,7 +586,7 @@ namespace twointsfunc { // twointsfunc namespace
             
             #pragma omp simd aligned(fx, wx, wy, wz, kfxi, kqx, kqy,\
                                      kqz: VLX_ALIGN)
-            for (int32_t j = 0; j < ndim; j++)
+            for (int32_t j = 0; j < nKetPrimPairs; j++)
             {
                 double fact = fx[j];
                 
@@ -633,7 +606,7 @@ namespace twointsfunc { // twointsfunc namespace
                     const CMemBlock2D<double>& wCoordinates,
                     const CGtoPairsBlock&      braGtoPairsBlock,
                     const CGtoPairsBlock&      ketGtoPairsBlock,
-                    const bool                 isBraEqualKet,
+                    const int32_t              nKetPrimPairs,
                     const int32_t              iContrPair)
     {
         // skip computation for zero angular momentum on bra side
@@ -652,15 +625,6 @@ namespace twointsfunc { // twointsfunc namespace
         auto spos = braGtoPairsBlock.getStartPositions();
         
         auto epos = braGtoPairsBlock.getEndPositions();
-        
-        // determine dimensions of GTOs pairs batch
-        
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-        
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
         
         // loop over contracted GTO on bra side
         
@@ -693,7 +657,7 @@ namespace twointsfunc { // twointsfunc namespace
             auto cpz = rpz[i];
             
             #pragma omp simd aligned(wx, wy, wz, wpx, wpy, wpz: VLX_ALIGN)
-            for (int32_t j = 0; j < ndim; j++)
+            for (int32_t j = 0; j < nKetPrimPairs; j++)
             {
                 wpx[j] = wx[j] - cpx;
                 
@@ -711,7 +675,7 @@ namespace twointsfunc { // twointsfunc namespace
                     const CMemBlock2D<double>& wCoordinates,
                     const CGtoPairsBlock&      braGtoPairsBlock,
                     const CGtoPairsBlock&      ketGtoPairsBlock,
-                    const bool                 isBraEqualKet,
+                    const int32_t              nKetPrimPairs,
                     const int32_t              iContrPair)
     {
         // skip computation for zero angular momentum on ket side
@@ -732,15 +696,6 @@ namespace twointsfunc { // twointsfunc namespace
         auto rqy = ketGtoPairsBlock.getCoordinatesPY();
         
         auto rqz = ketGtoPairsBlock.getCoordinatesPZ();
-        
-        // determine dimensions of GTOs pairs batch
-        
-        auto ndim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-        
-        if (isBraEqualKet)
-        {
-            ndim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-        }
         
         // loop over contracted GTO on bra side
         
@@ -766,7 +721,7 @@ namespace twointsfunc { // twointsfunc namespace
             
             #pragma omp simd aligned(wx, wy, wz, wqx, wqy, wqz, rqx, rqy,\
                                      rqz: VLX_ALIGN)
-            for (int32_t j = 0; j < ndim; j++)
+            for (int32_t j = 0; j < nKetPrimPairs; j++)
             {
                 wqx[j] = wx[j] - rqx[j];
                 

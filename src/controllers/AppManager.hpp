@@ -92,11 +92,11 @@ public:
     /**
      Creates an application manager object.
      
-     @param argc the number of command line arguments.
-     @param argv the array of command line arguments.
+     @param inputFilename name of input file.
+     @param outputFilename name of output file.
      */
-    CAppManager(int    argc,
-                char** argv);
+    CAppManager(const std::string& inputFilename,
+                const std::string& outputFilename);
     
     /**
      Destroys an application manager object.

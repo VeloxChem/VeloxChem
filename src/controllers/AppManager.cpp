@@ -9,14 +9,13 @@
 #include "AppManager.hpp"
 
 #include "MpiFunc.hpp"
-#include "CommandLineReader.hpp"
 #include "InputStream.hpp"
 #include "EnvironmentReader.hpp"
 #include "JobsManager.hpp"
 #include "DeviceProp.hpp"
 
-CAppManager::CAppManager(int    argc,
-                         char** argv)
+CAppManager::CAppManager(const std::string& inputFilename,
+                         const std::string& outputFilename)
 
     : _state(true)
 
@@ -34,16 +33,9 @@ CAppManager::CAppManager(int    argc,
     
     if (_globRank == mpi::master())
     {
-        CCommandLineReader rdrcomline(argc, argv);
-        
-        updateState(rdrcomline.checkParameters());
-        
-        if (_state)
-        {
-            _iFilename.assign(rdrcomline.getInputFilename());
+        _iFilename.assign(inputFilename);
             
-            _oFilename.assign(rdrcomline.getOutputFilename());
-        }
+        _oFilename.assign(outputFilename);
     }
 
     // update state of application manager across MPI processes

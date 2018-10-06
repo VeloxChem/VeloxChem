@@ -65,15 +65,19 @@ public:
     /**
      Creates a Cauchy-Schwarz screener object.
      
+     @param braQValues the vector of maximum Q values on bra side.
+     @param ketQValues the vector of maximum Q values on ket side.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      @param screeningScheme the screening scheme.
-     
+     @param threshold the cut-off threshold of electron repulsion integrals.
      */
-    CCauchySchwarzScreener(const CGtoPairsBlock& braGtoPairsBlock,
-                           const CGtoPairsBlock& ketGtoPairsBlock,
-                           const ericut          screeningScheme,
-                           const double          threshold);
+    CCauchySchwarzScreener(const CMemBlock<double>& braQValues,
+                           const CMemBlock<double>& ketQValues,
+                           const CGtoPairsBlock&    braGtoPairsBlock,
+                           const CGtoPairsBlock&    ketGtoPairsBlock,
+                           const ericut             screeningScheme,
+                           const double             threshold);
     
     /**
      Creates a Cauchy-Schwarz screener object by copying other Cauchy-Schwarz
@@ -159,13 +163,6 @@ public:
     double getThreshold() const;
     
     /**
-     Gets pointer to first element of Q values vector on bra side.
-
-     @return the pointer to Q values vector.
-     */
-    double* getBraQValues();
-    
-    /**
      Gets constant pointer to first element of Q values vector on bra side.
      
      @return the constant pointer to Q values vector.
@@ -173,18 +170,31 @@ public:
     const double* getBraQValues() const;
     
     /**
-     Gets pointer to first element of Q values vector on ket side.
-     
-     @return the pointer to Q values vector.
-     */
-    double* getKetQValues();
-    
-    /**
      Gets constant pointer to first element of Q values vector on ket side.
      
      @return the constant pointer to Q values vector.
      */
     const double* getKetQValues() const;
+    
+    /**
+     Checks if Cauchy-Schwarz screener object is empty.
+
+     @return true if Cauchy-Schwarz screener object is empty, false - otherwise.
+     */
+    bool isEmpty() const;
+    
+    /**
+     Sets screening vector with elements 0 (exclude GTOs pair) or 1 (include
+     GTOs pair).
+
+     @param qqVector the screening vector.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+     blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                            const bool                isBraEqualKet,
+                            const int32_t             iContrPair) const;
     
     /**
      Converts Cauchy-Schwarz screener object to text output and insert it into

@@ -199,7 +199,8 @@ contract(      CMemBlock2D<double>&  contrData,
          const std::vector<int32_t>& primIndexes,
          const CGtoPairsBlock&       braGtoPairsBlock,
          const CGtoPairsBlock&       ketGtoPairsBlock,
-         const bool                  isBraEqualKet,
+         const int32_t               nKetPrimPairs,
+         const int32_t               nKetContrPairs,
          const int32_t               iContrPair)
 {
     // set up pointers to primitives data on bra side
@@ -215,17 +216,6 @@ contract(      CMemBlock2D<double>&  contrData,
     auto kspos = ketGtoPairsBlock.getStartPositions();
     
     auto kepos = ketGtoPairsBlock.getEndPositions();
-    
-    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-    
-    auto nprim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-    
-    if (isBraEqualKet)
-    {
-        kdim  = iContrPair + 1;
-        
-        nprim = ketGtoPairsBlock.getNumberOfPrimPairs(iContrPair);
-    }
     
     // loop over set of data vectors
     
@@ -267,7 +257,7 @@ contract(      CMemBlock2D<double>&  contrData,
                 // loop over primitive GTOs on ket side
                 
                 #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
-                for (int32_t l = 0; l < nprim; l++)
+                for (int32_t l = 0; l < nKetPrimPairs; l++)
                 {
                     sumbuf[l] += srcbuf[l];
                 }
@@ -276,7 +266,8 @@ contract(      CMemBlock2D<double>&  contrData,
         
         // second step: direct contraction over ket side
         
-        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, kdim, ncomp);
+        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos,
+                          nKetContrPairs, ncomp);
     }
 }
     
@@ -485,15 +476,9 @@ transform_ket(      CMemBlock2D<double>&  spherData,
               const CVecThreeIndexes&     cartPattern,
               const std::vector<int32_t>& cartIndexes,
               const CGtoPairsBlock&       ketGtoPairsBlock,
-              const bool                  isBraEqualKet,
+              const int32_t               nKetContrPairs,
               const int32_t               iContrPair)
 {
-    // set up dimensions on ket side
-    
-    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-    
-    if (isBraEqualKet) kdim  = iContrPair + 1;
-    
     // loop over set of data vectors
     
     for (size_t i = 0; i < spherPattern.size(); i++)
@@ -518,7 +503,7 @@ transform_ket(      CMemBlock2D<double>&  spherData,
         // transform ket side of integrals from Cartesian to spherical form
         
         transform(spherData, cartData, ketMomentumC, ketMomentumD, sidx, cidx,
-                  kdim, bcomp);
+                  nKetContrPairs, bcomp);
     }
 }
     
@@ -530,15 +515,9 @@ transform_bra(      CMemBlock2D<double>&  spherData,
               const CVecFourIndexes&      cartPattern,
               const std::vector<int32_t>& cartIndexes,
               const CGtoPairsBlock&       ketGtoPairsBlock,
-              const bool                  isBraEqualKet,
+              const int32_t               nKetContrPairs,
               const int32_t               iContrPair)
 {
-    // set up dimensions on ket side
-    
-    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-    
-    if (isBraEqualKet) kdim  = iContrPair + 1;
-    
     // set up angular momentum on ket side
     
     auto cang = ketGtoPairsBlock.getBraAngularMomentum();
@@ -602,7 +581,7 @@ transform_bra(      CMemBlock2D<double>&  spherData,
                 
                 // zero spherical integrals vector
                 
-                mathfunc::zero(sphervec, kdim);
+                mathfunc::zero(sphervec, nKetContrPairs);
                 
                 // apply Cartesian to spherical transformation
                 
@@ -619,7 +598,7 @@ transform_bra(      CMemBlock2D<double>&  spherData,
                         // loop over integrals
                         
                         #pragma omp simd aligned(sphervec, cartvec: VLX_ALIGN)
-                        for (int32_t n = 0; n < kdim; n++)
+                        for (int32_t n = 0; n < nKetContrPairs; n++)
                         {
                             sphervec[n] += cfact * cartvec[n];
                         }

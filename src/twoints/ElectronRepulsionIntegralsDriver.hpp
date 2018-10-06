@@ -22,6 +22,8 @@
 #include "GtoPairsContainer.hpp"
 #include "SystemClock.hpp"
 #include "TwoIntsDistributor.hpp"
+#include "ScreeningContainer.hpp"
+#include "VecMemBlocks.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -61,12 +63,14 @@ class CElectronRepulsionIntegralsDriver
      blocks.
      
      @param distPattern the ponter to integrals distribution pattern.
+     @param intsScreener the integrals screener object.
      @param braGtoPairsBlock the GTOs pairsblock on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      */
-    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution* distPattern,
-                                                 const CGtoPairsBlock&       braGtoPairsBlock,
-                                                 const CGtoPairsBlock&       ketGtoPairsBlock) const;
+    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution*   distPattern,
+                                                 const CCauchySchwarzScreener& intsScreener,
+                                                 const CGtoPairsBlock&         braGtoPairsBlock,
+                                                 const CGtoPairsBlock&         ketGtoPairsBlock) const;
     
     /**
      Gets Obara-Saika bra side horizontal recursion pattern for specific
@@ -154,8 +158,7 @@ class CElectronRepulsionIntegralsDriver
      @param wqDistances the vector of distances R(WQ) = W - Q.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _compPrimElectronRepulsionInts(      CMemBlock2D<double>&  primBuffer,
@@ -171,7 +174,7 @@ class CElectronRepulsionIntegralsDriver
                                         const CMemBlock2D<double>&  wqDistances,
                                         const CGtoPairsBlock&       braGtoPairsBlock,
                                         const CGtoPairsBlock&       ketGtoPairsBlock,
-                                        const bool                  isBraEqualKet,
+                                        const int32_t               nKetPrimPairs,
                                         const int32_t               iContrPair) const;
     
     /**
@@ -183,8 +186,7 @@ class CElectronRepulsionIntegralsDriver
             pattern on ket side.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _applyHRRonKet(      CMemBlock2D<double>&  ketBuffer,
@@ -192,7 +194,7 @@ class CElectronRepulsionIntegralsDriver
                         const std::vector<int32_t>& recIndexes,
                         const CMemBlock2D<double>&  cdDistances,
                         const CGtoPairsBlock&       ketGtoPairsBlock,
-                        const bool                  isBraEqualKet,
+                        const int32_t               nKetContrPairs,
                         const int32_t               iContrPair) const;
     
     /**
@@ -204,8 +206,7 @@ class CElectronRepulsionIntegralsDriver
             pattern on bra side.
      @param abDistances the vector of distances R(AB) = A - B.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _applyHRRonBra(      CMemBlock2D<double>&  braBuffer,
@@ -213,7 +214,7 @@ class CElectronRepulsionIntegralsDriver
                         const std::vector<int32_t>& recIndexes,
                         const CMemBlock2D<double>&  abDistances,
                         const CGtoPairsBlock&       ketGtoPairsBlock,
-                        const bool                  isBraEqualKet,
+                        const int32_t               nKetContrPairs,
                         const int32_t               iContrPair) const;
     
     /**
@@ -238,13 +239,42 @@ class CElectronRepulsionIntegralsDriver
                             COutputStream& oStream) const;
     
     /**
-     Comutes electronic repulsion integrals for two GTOs pairs containers.
+     Prints timing statistics for evaluation of Q values.
+     
+     @param molecule the molecule.
+     @param timer the timer.
+     @param oStream the output stream.
+     */
+    void _printQValuesTiming(const CMolecule&     molecule,
+                             const CSystemClock&  timer,
+                                   COutputStream& oStream) const;
+    
+    /**
+     Comutes electron repulsion integrals for two GTOs pairs containers.
      
      @param braGtoPairsContainer the GTOs pairs container on bra side.
      @param ketGtoPairsContainer the GTOs pairs container on ket side.
      */
     void _compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
                                          const CGtoPairsContainer* ketGtoPairsContainer) const;
+
+    /**
+     Comutes maximum Q values of electron repulsion integrals for GTOs pairs
+     block.
+
+     @param qValuesBuffer the Q values buffer.
+     @param gtoPairsBlock the GTOs pairs block.
+     */
+    void _compMaxQValuesForGtoPairsBlock(      double*         qValuesBuffer,
+                                         const CGtoPairsBlock& gtoPairsBlock) const;
+    
+    /**
+     Allocates Q values buffer for GTOs pair blocks container.
+
+     @param gtoPairsContainer the GTOs pair blocks container.
+     @return the Q values buffer as vector of mememory block objects.
+     */
+     CVecMemBlock<double> _getQValuesBuffer(const CGtoPairsContainer& gtoPairsContainer) const;
     
 public:
     
@@ -281,6 +311,25 @@ public:
                        MPI_Comm         comm) const;
     
     /**
+     Computes Q values for electron repulsion integrals for molecule with
+     specific AO basis set and stores results in screening container object.
+     
+     @param screeningScheme the screening scheme for screening container object.
+     @param threshold the screening threshold for screening container object.
+     @param molecule the molecule.
+     @param aoBasis the molecular AO basis.
+     @param oStream the output stream.
+     @param comm the MPI communicator.
+     @return the screening container with Q values.
+     */
+    CScreeningContainer compute(const ericut           screeningScheme,
+                                const double           threshold,
+                                const CMolecule&       molecule,
+                                const CMolecularBasis& aoBasis,
+                                      COutputStream&   oStream,
+                                      MPI_Comm         comm) const;
+    
+    /**
      Computes electron repulsion integrals blocks for pair of GTOs pairs blocks
      and stores them into integrals batch.
      
@@ -291,6 +340,20 @@ public:
     void compute(      double*         intsBatch,
                  const CGtoPairsBlock& braGtoPairsBlock,
                  const CGtoPairsBlock& ketGtoPairsBlock) const;
+    
+    /**
+     Comutes maximum Q values of electron repulsion integrals for two GTOs
+     pairs containers and store results in bra and ket Q values buffers.
+     
+     @param braQValuesBuffer the Q values buffer on bra side.
+     @param ketQValuesBuffer the Q values buffer on ket side.
+     @param braGtoPairsContainer the GTOs pairs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     */
+    void computeMaxQValues(      CVecMemBlock<double>* braQValuesBuffer,
+                                 CVecMemBlock<double>* ketQValuesBuffer,
+                           const CGtoPairsContainer*   braGtoPairsContainer,
+                           const CGtoPairsContainer*   ketGtoPairsContainer) const;
 };
 
 

@@ -14,34 +14,12 @@ CScreeningContainer::CScreeningContainer()
     
 }
 
-CScreeningContainer::CScreeningContainer(const CMolecule&       molecule,
-                                         const CMolecularBasis& aoBasis,
-                                         const ericut           screeningScheme,
-                                         const double           threshold)
-{
-    // generate GTOs pairs blocks for AO basis on bra side
-    
-    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-13);
-    
-    // split GTOs pairs into batches on bra side
-    
-    auto bbpairs = bgtopairs.split(500);
-    
-    // generate bra and ket sides screener objects
-    
-    _setScreeners(bbpairs, bbpairs, screeningScheme, threshold); 
-}
-
-CScreeningContainer::~CScreeningContainer()
-{
-    
-}
-
-void
-CScreeningContainer::_setScreeners(const CGtoPairsContainer& braGtoPairsContainer,
-                                   const CGtoPairsContainer& ketGtoPairsContainer,
-                                   const ericut              screeningScheme,
-                                   const double              threshold)
+CScreeningContainer::CScreeningContainer(const CVecMemBlock<double>& braQValues,
+                                         const CVecMemBlock<double>& ketQValues,
+                                         const CGtoPairsContainer&   braGtoPairsContainer,
+                                         const CGtoPairsContainer&   ketGtoPairsContainer,
+                                         const ericut                screeningScheme,
+                                         const double                threshold)
 {
     // determine symmetry of GTOs containers
     
@@ -65,11 +43,77 @@ CScreeningContainer::_setScreeners(const CGtoPairsContainer& braGtoPairsContaine
         {
             auto kpairs = ketGtoPairsContainer.getGtoPairsBlock(j);
             
-            _screeners.push_back(CCauchySchwarzScreener(bpairs, kpairs,
+            _screeners.push_back(CCauchySchwarzScreener(braQValues[i],
+                                                        ketQValues[j],
+                                                        bpairs, kpairs,
                                                         screeningScheme,
                                                         threshold));
         }
     }
+}
+
+CScreeningContainer::CScreeningContainer(const CScreeningContainer& source)
+
+    : _screeners(source._screeners)
+{
+    
+}
+
+CScreeningContainer::CScreeningContainer(CScreeningContainer&& source) noexcept
+
+    : _screeners(std::move(source._screeners))
+{
+    
+}
+
+CScreeningContainer::~CScreeningContainer()
+{
+    
+}
+
+CScreeningContainer&
+CScreeningContainer::operator=(const CScreeningContainer& source)
+{
+    if (this == &source) return *this;
+    
+    _screeners = source._screeners;
+    
+    return *this;
+}
+
+CScreeningContainer&
+CScreeningContainer::operator=(CScreeningContainer&& source) noexcept
+{
+    if (this == &source) return *this;
+    
+    _screeners = std::move(source._screeners);
+    
+    return *this;
+}
+
+bool
+CScreeningContainer::operator==(const CScreeningContainer& other) const
+{
+    if (_screeners.size() != other._screeners.size()) return false;
+    
+    for (size_t i = 0; i < _screeners.size(); i++)
+    {
+        if (_screeners[i] != other._screeners[i]) return false;
+    }
+    
+    return true;
+}
+
+bool
+CScreeningContainer::operator!=(const CScreeningContainer& other) const
+{
+    return !(*this == other);
+}
+
+bool
+CScreeningContainer::isEmpty() const
+{
+    return _screeners.empty(); 
 }
 
 std::ostream&
@@ -84,7 +128,7 @@ operator<<(      std::ostream&        output,
     
     for (size_t i = 0; i < source._screeners.size(); i++)
     {
-        output << "_braScreeners[" << i << "]: "<< std::endl;
+        output << "_screeners[" << i << "]: "<< std::endl;
         
         output << source._screeners[i] << std::endl;
     }

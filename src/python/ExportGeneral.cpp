@@ -13,6 +13,7 @@
 #include <mpi4py/mpi4py.h>
 
 #include "MpiFunc.hpp"
+#include "ErrorHandler.hpp"
 
 #include "ExportGeneral.hpp"
 
@@ -75,6 +76,10 @@ void export_general()
     // exposing functions
 
     bp::def("mpi_master", &mpi::master);
+
+    bp::def("mpi_initialized", &mpi::initialized);
+
+    bp::def("assert_msg_critical", &errors::assertMsgCritical);
 }
 
 } // bp_general namespace

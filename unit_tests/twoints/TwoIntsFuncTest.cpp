@@ -208,7 +208,7 @@ TEST_F(CTwoIntsFuncTest, CompDistancesForPQ)
     
     CMemBlock2D<double> t0rpq(4, 12);
     
-    twointsfunc::compDistancesPQ(t0rpq, ppairs, ppairs, true, 0);
+    twointsfunc::compDistancesPQ(t0rpq, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> ref0rpq(4, 12);
     
@@ -218,7 +218,7 @@ TEST_F(CTwoIntsFuncTest, CompDistancesForPQ)
     
     CMemBlock2D<double> t2rpq(8, 6);
     
-    twointsfunc::compDistancesPQ(t2rpq, ppairs, ppairs, true, 2);
+    twointsfunc::compDistancesPQ(t2rpq, ppairs, ppairs, 8, 2);
     
     CMemBlock2D<double> ref2rpq({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
                                  0.000,
@@ -240,7 +240,7 @@ TEST_F(CTwoIntsFuncTest, CompDistancesForPQ)
     
     CMemBlock2D<double> t4rpq(11, 3);
     
-    twointsfunc::compDistancesPQ(t4rpq, ppairs, ppairs, false, 4);
+    twointsfunc::compDistancesPQ(t4rpq, ppairs, ppairs, 11, 4);
     
     CMemBlock2D<double> ref4rpq({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
                                  0.000, 0.000, 0.000, 0.000,
@@ -267,7 +267,7 @@ TEST_F(CTwoIntsFuncTest, CompFactorsForElectronRepulsion)
     
     CMemBlock2D<double> r0facts(4, 16);
     
-    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> ref0facts({ 1.0 / 12.0,  1.0 / 11.0,  1.0 / 11.0,  1.0 / 10.0,
                                    36.0 / 12.0, 30.0 / 11.0, 30.0 / 11.0, 24.0 / 10.0,
@@ -291,7 +291,7 @@ TEST_F(CTwoIntsFuncTest, CompFactorsForElectronRepulsion)
     
     CMemBlock2D<double> r2facts(7, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r2facts, ppairs, ppairs, true, 2);
+    twointsfunc::compFactorsForElectronRepulsion(r2facts, ppairs, ppairs, 7, 2);
     
     CMemBlock2D<double> ref2facts({ 1.00 / 7.60, 1.00 / 6.60, 1.00 / 6.60, 1.00 / 5.60,
                                     1.00 / 5.40, 1.00 / 4.40, 1.00 / 3.20,
@@ -307,7 +307,7 @@ TEST_F(CTwoIntsFuncTest, CompFactorsForElectronRepulsion)
     
     CMemBlock2D<double> r3facts(7, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r3facts, ppairs, ppairs,false, 2);
+    twointsfunc::compFactorsForElectronRepulsion(r3facts, ppairs, ppairs, 7, 2);
     
     ASSERT_EQ(r3facts, ref2facts);
 }
@@ -324,11 +324,11 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWUsingPairs)
     
     CMemBlock2D<double> r0facts(4, 16);
     
-    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> r0w(4, 12);
     
-    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, true, 0);
+    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> refr0w(4, 12);
     
@@ -338,11 +338,11 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWUsingPairs)
     
     CMemBlock2D<double> r5facts(11, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, true, 5);
+    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r5w(11, 3);
     
-    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, true, 5);
+    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, 11, 5);
     
     
     CMemBlock2D<double> refr5w({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
@@ -358,11 +358,11 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWUsingPairs)
     
     CMemBlock2D<double> r6facts(11, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, false, 5);
+    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r6w(11, 3);
     
-    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, false, 5);
+    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, 11, 5);
     
     ASSERT_EQ(r6w, refr5w);
 }
@@ -379,15 +379,15 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWP)
     
     CMemBlock2D<double> r0facts(4, 16);
     
-    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> r0w(4, 12);
     
-    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, true, 0);
+    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> r0wp(4, 12);
     
-    twointsfunc::compDistancesWP(r0wp, r0w, ppairs, ppairs, true, 0);
+    twointsfunc::compDistancesWP(r0wp, r0w, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> refr0wp(4, 12);
     
@@ -397,15 +397,15 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWP)
     
     CMemBlock2D<double> r5facts(11, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, true, 5);
+    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r5w(11, 3);
     
-    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, true, 5);
+    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r5wp(11, 3);
     
-    twointsfunc::compDistancesWP(r5wp, r5w, ppairs, ppairs, true, 5);
+    twointsfunc::compDistancesWP(r5wp, r5w, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> refr5wp({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
                                  0.000, 0.000, 0.000,
@@ -420,15 +420,15 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWP)
     
     CMemBlock2D<double> r6facts(11, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, false, 5);
+    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r6w(11, 3);
     
-    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, false, 5);
+    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r6wp(11, 3);
     
-    twointsfunc::compDistancesWP(r6wp, r6w, ppairs, ppairs, false, 5);
+    twointsfunc::compDistancesWP(r6wp, r6w, ppairs, ppairs, 11, 5);
     
     ASSERT_EQ(r6wp, refr5wp);
 }
@@ -445,15 +445,15 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWQUsingPairs)
     
     CMemBlock2D<double> r0facts(4, 16);
     
-    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, true, 0);
+    twointsfunc::compFactorsForElectronRepulsion(r0facts, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> r0w(4, 12);
     
-    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, true, 0);
+    twointsfunc::compCoordinatesForW(r0w, r0facts, 4, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> r0wq(4, 12);
     
-    twointsfunc::compDistancesWQ(r0wq, r0w, ppairs, ppairs, true, 0);
+    twointsfunc::compDistancesWQ(r0wq, r0w, ppairs, ppairs, 4, 0);
     
     CMemBlock2D<double> refr0wq(4, 12);
     
@@ -463,15 +463,15 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWQUsingPairs)
     
     CMemBlock2D<double> r5facts(11, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, true, 5);
+    twointsfunc::compFactorsForElectronRepulsion(r5facts, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r5w(11, 3);
     
-    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, true, 5);
+    twointsfunc::compCoordinatesForW(r5w, r5facts, 4, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r5wq(11, 3);
     
-    twointsfunc::compDistancesWQ(r5wq, r5w, ppairs, ppairs, true, 5);
+    twointsfunc::compDistancesWQ(r5wq, r5w, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> refr5wq({0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
                                  0.000, 0.000, 0.000,
@@ -486,15 +486,15 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWQUsingPairs)
     
     CMemBlock2D<double> r6facts(11, 4);
     
-    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, false, 5);
+    twointsfunc::compFactorsForElectronRepulsion(r6facts, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r6w(11, 3);
     
-    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, false, 5);
+    twointsfunc::compCoordinatesForW(r6w, r6facts, 4, ppairs, ppairs, 11, 5);
     
     CMemBlock2D<double> r6wq(11, 3);
     
-    twointsfunc::compDistancesWQ(r6wq, r6w, ppairs, ppairs, false, 5);
+    twointsfunc::compDistancesWQ(r6wq, r6w, ppairs, ppairs, 11, 5);
     
     ASSERT_EQ(r6wq, refr5wq);
 }

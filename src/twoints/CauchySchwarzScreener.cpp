@@ -15,23 +15,39 @@ CCauchySchwarzScreener::CCauchySchwarzScreener()
 
     : _screeningScheme(ericut::qq)
 
+    , _braQValues(CMemBlock<double>())
+
+    , _ketQValues(CMemBlock<double>())
+
+    , _braPairExtends(CMemBlock<double>())
+
+    , _ketPairExtends(CMemBlock<double>())
+
     , _threshold(1.0e-13)
 {
     
 }
 
-CCauchySchwarzScreener::CCauchySchwarzScreener(const CGtoPairsBlock& braGtoPairsBlock,
-                                               const CGtoPairsBlock& ketGtoPairsBlock,
-                                               const ericut          screeningScheme,
-                                               const double          threshold)
+CCauchySchwarzScreener::CCauchySchwarzScreener(const CMemBlock<double>& braQValues,
+                                               const CMemBlock<double>& ketQValues,
+                                               const CGtoPairsBlock&    braGtoPairsBlock,
+                                               const CGtoPairsBlock&    ketGtoPairsBlock,
+                                               const ericut             screeningScheme,
+                                               const double             threshold)
     : _screeningScheme(screeningScheme)
 
-    , _braQValues(CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedContrPairs()))
+    , _braQValues(braQValues)
 
-    , _ketQValues(CMemBlock<double>(ketGtoPairsBlock.getNumberOfScreenedContrPairs()))
+    , _ketQValues(ketQValues)
+
+    , _braPairExtends(CMemBlock<double>())
+
+    , _ketPairExtends(CMemBlock<double>())
 
     , _threshold(threshold)
 {
+    // FIX ME: Add stuff here...
+    
     if (_screeningScheme == ericut::qqr)
     {
         _braPairExtends = CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedContrPairs());
@@ -169,28 +185,65 @@ CCauchySchwarzScreener::getThreshold() const
     return _threshold; 
 }
 
-double*
-CCauchySchwarzScreener::getBraQValues()
-{
-    return _braQValues.data();
-}
-
 const double*
 CCauchySchwarzScreener::getBraQValues() const
 {
     return _braQValues.data();
 }
 
-double*
-CCauchySchwarzScreener::getKetQValues()
-{
-    return _ketQValues.data();
-}
-
 const double*
 CCauchySchwarzScreener::getKetQValues() const
 {
     return _ketQValues.data();
+}
+
+bool
+CCauchySchwarzScreener::isEmpty() const
+{
+    return ((_braQValues.size() == 0) || (_ketQValues.size() == 0)); 
+}
+
+void
+CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                                           const bool                isBraEqualKet,
+                                           const int32_t             iContrPair) const
+{
+    // all GTOs pairs are screened
+    
+    qqVector.zero();
+    
+    // set up pointer to screening vector
+    
+    auto qqvec = qqVector.data();
+    
+    // set up pointer to Q values on ket side
+    
+    auto kqvals = _ketQValues.data();
+    
+    // set up dimensions on ket side
+    
+    auto kdim = _ketQValues.size();
+    
+    if (isBraEqualKet) kdim = iContrPair + 1;
+    
+    // original Cauchy-Schwarz screening scheme
+    
+    if (_screeningScheme == ericut::qq)
+    {
+        auto fbq = _braQValues.at(iContrPair);
+        
+        for (int32_t i = 0; i < kdim; i++)
+        {
+            if ((fbq * kqvals[i]) >= _threshold) qqvec[i] = 1;
+        }
+    }
+    
+    // distance dependent Cauchy-Schwarz screening scheme
+    
+    if (_screeningScheme == ericut::qqr)
+    {
+        // FIX ME: Add QQR screening scheme
+    }
 }
 
 std::ostream&

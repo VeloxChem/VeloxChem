@@ -1,7 +1,11 @@
 VeloxChemMP.xcodeproj
 bin
+build
 *.d
 *.o
 *.a
 *.optrpt
+*.out
+*.log
 *~
+__pycache__

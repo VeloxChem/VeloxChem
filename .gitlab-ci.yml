@@ -12,9 +12,9 @@ before_script:
   - export DYLD_LIBRARY_PATH=/usr/local/cuda/lib:$DYLD_LIBRARY_PATH
   - export PATH=/home/xinli/software/python/bin:$PATH
   - export PYTHONPATH=/home/xinli/software/python/lib/python3.6/site-packages:$PYTHONPATH
-  - export PYTHONPATH=/home/xinli/gitlab/VeloxChemMP/bin:$PYTHONPATH
   - export LD_LIBRARY_PATH=/home/xinli/software/python/lib:$LD_LIBRARY_PATH
   - export LD_LIBRARY_PATH=/home/xinli/software/boost/lib:$LD_LIBRARY_PATH
+  - export OMP_NUM_THREADS=6
 
 after_script:
   - echo "Done..."
@@ -23,15 +23,6 @@ stages:
   - build
   - test 
 
-build_veloxchem:
-  tags: 
-   - vlx-test
-  stage: build
-  script:
-    - cd src 
-    - cp ../config/Setup.Monkey Makefile.setup 
-    - make -j 6 release 
-   
 build_unit_test:
   tags: 
     - vlx-test
@@ -48,7 +39,7 @@ build_veloxchem_python3:
   stage: build
   script:
     - cd src 
-    - cp ../config/Setup.Monkey.Python Makefile.setup 
+    - cp ../config/Setup.Monkey Makefile.setup 
     - make -j 6 release 
 
 run_unit_test: 
@@ -60,7 +51,7 @@ run_unit_test:
     - cp ../config/Setup.Monkey Makefile.setup
     - cd ../unit_tests/
     - make -j 6 release
-    - cd ../bin/
+    - cd ../build/bin
     - ./UnitTestVeloxChemMP.x
 
 run_test_python3: 
@@ -69,7 +60,8 @@ run_test_python3:
   stage: test
   script: 
     - cd src
-    - cp ../config/Setup.Monkey.Python Makefile.setup
+    - cp ../config/Setup.Monkey Makefile.setup
     - make -j 6 release
-    - cd ../integration_tests/
-    - python3 test.py
+    - cd ../python_tests/
+    - export PYTHONPATH=$(pwd)/../build/python:$PYTHONPATH
+    - python3 run_tests.py -v
