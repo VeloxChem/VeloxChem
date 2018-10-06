@@ -65,7 +65,7 @@ TEST_F(CTwoIntsDistributionTest, DistributeWithBatchNoSym)
     
     CMemBlock2D<double> refvals({1.0, 3.0, 4.0, 5.0, 7.0, 3.0}, 2, 3);
     
-    dista.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0);
+    dista.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0, 0);
     
     ASSERT_EQ(fints, CMemBlock<double>({1.0, 4.0, 7.0}));
     
@@ -75,17 +75,17 @@ TEST_F(CTwoIntsDistributionTest, DistributeWithBatchNoSym)
     
     CTwoIntsDistribution distb(tints.data(), 1, 1, 0, dist2e::batch);
     
-    distb.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 1);
+    distb.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0, 1);
     
     ASSERT_EQ(tints, CMemBlock<double>({0.0, 0.0, 0.0, 1.0, 4.0, 7.0,
                                         0.0, 0.0, 0.0}));
     
-    distb.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 2);
+    distb.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0, 2);
     
     ASSERT_EQ(tints, CMemBlock<double>({0.0, 0.0, 0.0, 1.0, 4.0, 7.0,
                                         1.0, 4.0, 7.0}));
     
-    distb.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0);
+    distb.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0, 0);
     
     ASSERT_EQ(tints, CMemBlock<double>({1.0, 4.0, 7.0, 1.0, 4.0, 7.0,
                                         1.0, 4.0, 7.0}));
@@ -96,12 +96,12 @@ TEST_F(CTwoIntsDistributionTest, DistributeWithBatchNoSym)
     
     CTwoIntsDistribution distc(gints.data(), 1, 2, 0, dist2e::batch);
     
-    distc.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 1);
+    distc.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0, 1);
     
     ASSERT_EQ(gints, CMemBlock<double>({0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                         1.0, 4.0, 7.0, 0.0, 0.0, 0.0}));
     
-    distc.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0);
+    distc.distribute(refvals, bpairs.pick(2), kpairs.pick(3), false, 0, 0);
     
     ASSERT_EQ(gints, CMemBlock<double>({1.0, 4.0, 7.0, 0.0, 0.0, 0.0,
                                         1.0, 4.0, 7.0, 0.0, 0.0, 0.0}));
@@ -125,19 +125,19 @@ TEST_F(CTwoIntsDistributionTest, DistributeWithBatchSym)
     
     CMemBlock2D<double> ref0vals({2.0}, 1, 1);
     
-    dista.distribute(ref0vals, bpairs.pick(2), bpairs.pick(1), true, 0);
+    dista.distribute(ref0vals, bpairs.pick(2), bpairs.pick(1), true, 0, 0);
     
     ASSERT_EQ(fints, CMemBlock<double>({2.0, 0.0, 0.0, 0.0, 0.0, 0.0}));
     
     CMemBlock2D<double> ref1vals({4.0, 3.0}, 2, 1);
     
-    dista.distribute(ref1vals, bpairs.pick(2), bpairs.pick(1), true, 1);
+    dista.distribute(ref1vals, bpairs.pick(2), bpairs.pick(1), true, 0, 1);
     
     ASSERT_EQ(fints, CMemBlock<double>({2.0, 4.0, 3.0, 0.0, 0.0, 0.0}));
     
     CMemBlock2D<double> ref2vals({1.0, 2.0, 7.0}, 3, 1);
     
-    dista.distribute(ref2vals, bpairs.pick(2), bpairs.pick(1), true, 2);
+    dista.distribute(ref2vals, bpairs.pick(2), bpairs.pick(1), true, 0, 2);
     
     ASSERT_EQ(fints, CMemBlock<double>({2.0, 4.0, 3.0, 1.0, 2.0, 7.0}));
 }
@@ -164,7 +164,7 @@ TEST_F(CTwoIntsDistributionTest, DistributeWithQValues)
     
     CMemBlock2D<double> ref0vals({1.0, 3.0, 4.0}, 1, 3);
     
-    dista.distribute(ref0vals, bpairs.pick(0), kpairs.pick(1), false, 5);
+    dista.distribute(ref0vals, bpairs.pick(0), kpairs.pick(1), false, 0, 5);
     
     ASSERT_EQ(fints, CMemBlock<double>({0.0, 0.0, 2.0}));
     
@@ -172,7 +172,7 @@ TEST_F(CTwoIntsDistributionTest, DistributeWithQValues)
     
     CMemBlock2D<double> ref1vals({1.0, 9.0, 4.0}, 1, 3);
     
-    distb.distribute(ref1vals, bpairs.pick(0), kpairs.pick(1), false, 5);
+    distb.distribute(ref1vals, bpairs.pick(0), kpairs.pick(1), false, 0, 5);
     
     ASSERT_EQ(fints, CMemBlock<double>({3.0, 0.0, 2.0}));
     
@@ -180,7 +180,7 @@ TEST_F(CTwoIntsDistributionTest, DistributeWithQValues)
     
     CMemBlock2D<double> ref2vals({16.0, 9.0, 4.0}, 1, 3);
     
-    distc.distribute(ref2vals, bpairs.pick(0), kpairs.pick(1), true, 2);
+    distc.distribute(ref2vals, bpairs.pick(0), kpairs.pick(1), true, 0, 2);
     
     ASSERT_EQ(fints, CMemBlock<double>({3.0, 4.0, 2.0}));
 }

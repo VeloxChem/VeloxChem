@@ -1,5 +1,6 @@
 VeloxChemMP.xcodeproj
 bin
+build
 *.d
 *.o
 *.a

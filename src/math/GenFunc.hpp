@@ -214,8 +214,7 @@ namespace genfunc { // genfunc namespace
      @param cartPattern the Cartesian data vectors distribution pattern.
      @param cartIndexes the Cartesian data vectors indexing pattern.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void transform_ket(      CMemBlock2D<double>&  spherData,
@@ -227,7 +226,7 @@ namespace genfunc { // genfunc namespace
                        const CVecThreeIndexes&     cartPattern,
                        const std::vector<int32_t>& cartIndexes,
                        const CGtoPairsBlock&       ketGtoPairsBlock,
-                       const bool                  isBraEqualKet,
+                       const int32_t               nKetContrPairs,
                        const int32_t               iContrPair);
     
     /**
@@ -241,8 +240,7 @@ namespace genfunc { // genfunc namespace
      @param cartPattern the Cartesian data vectors distribution pattern.
      @param cartIndexes the Cartesian data vectors indexing pattern.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
     void transform_bra(      CMemBlock2D<double>&  spherData,
@@ -252,7 +250,7 @@ namespace genfunc { // genfunc namespace
                        const CVecFourIndexes&      cartPattern,
                        const std::vector<int32_t>& cartIndexes,
                        const CGtoPairsBlock&       ketGtoPairsBlock,
-                       const bool                  isBraEqualKet,
+                       const int32_t               nKetContrPairs,
                        const int32_t               iContrPair);
     
     /**

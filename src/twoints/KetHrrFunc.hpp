@@ -28,8 +28,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXPP(      CMemBlock2D<double>&  ketBuffer,
@@ -37,7 +36,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -49,8 +48,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXPD(      CMemBlock2D<double>&  ketBuffer,
@@ -58,7 +56,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -70,8 +68,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXPF(      CMemBlock2D<double>&  ketBuffer,
@@ -79,7 +76,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -91,8 +88,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXPG(      CMemBlock2D<double>&  ketBuffer,
@@ -100,7 +96,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -112,8 +108,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXPH(      CMemBlock2D<double>&  ketBuffer,
@@ -121,7 +116,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -133,8 +128,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXPI(      CMemBlock2D<double>&  ketBuffer,
@@ -142,7 +136,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -154,8 +148,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXPK(      CMemBlock2D<double>&  ketBuffer,
@@ -163,7 +156,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -175,8 +168,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXDD(      CMemBlock2D<double>&  ketBuffer,
@@ -184,7 +176,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -196,8 +188,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXDF(      CMemBlock2D<double>&  ketBuffer,
@@ -205,7 +196,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -217,8 +208,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXDG(      CMemBlock2D<double>&  ketBuffer,
@@ -226,7 +216,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -238,8 +228,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXDH(      CMemBlock2D<double>&  ketBuffer,
@@ -247,7 +236,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -259,8 +248,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXDI(      CMemBlock2D<double>&  ketBuffer,
@@ -268,7 +256,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -280,8 +268,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXFF(      CMemBlock2D<double>&  ketBuffer,
@@ -289,7 +276,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -301,8 +288,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXFG(      CMemBlock2D<double>&  ketBuffer,
@@ -310,7 +296,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -322,8 +308,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXFH(      CMemBlock2D<double>&  ketBuffer,
@@ -331,7 +316,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
     /**
@@ -343,8 +328,7 @@ namespace kethrrfunc { // kethrrfunc namespace
      @param recIndexes the indexes of data blocks in horizontal recursion pattern.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void compElectronRepulsionForSXGG(      CMemBlock2D<double>&  ketBuffer,
@@ -352,7 +336,7 @@ namespace kethrrfunc { // kethrrfunc namespace
                                       const std::vector<int32_t>& recIndexes,
                                       const CMemBlock2D<double>&  cdDistances,
                                       const CGtoPairsBlock&       ketGtoPairsBlock,
-                                      const bool                  isBraEqualKet,
+                                      const int32_t               nKetContrPairs,
                                       const int32_t               iContrPair);
     
 } // kethrrfunc namespace

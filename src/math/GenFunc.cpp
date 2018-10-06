@@ -476,15 +476,9 @@ transform_ket(      CMemBlock2D<double>&  spherData,
               const CVecThreeIndexes&     cartPattern,
               const std::vector<int32_t>& cartIndexes,
               const CGtoPairsBlock&       ketGtoPairsBlock,
-              const bool                  isBraEqualKet,
+              const int32_t               nKetContrPairs,
               const int32_t               iContrPair)
 {
-    // set up dimensions on ket side
-    
-    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-    
-    if (isBraEqualKet) kdim  = iContrPair + 1;
-    
     // loop over set of data vectors
     
     for (size_t i = 0; i < spherPattern.size(); i++)
@@ -509,7 +503,7 @@ transform_ket(      CMemBlock2D<double>&  spherData,
         // transform ket side of integrals from Cartesian to spherical form
         
         transform(spherData, cartData, ketMomentumC, ketMomentumD, sidx, cidx,
-                  kdim, bcomp);
+                  nKetContrPairs, bcomp);
     }
 }
     
@@ -521,15 +515,9 @@ transform_bra(      CMemBlock2D<double>&  spherData,
               const CVecFourIndexes&      cartPattern,
               const std::vector<int32_t>& cartIndexes,
               const CGtoPairsBlock&       ketGtoPairsBlock,
-              const bool                  isBraEqualKet,
+              const int32_t               nKetContrPairs,
               const int32_t               iContrPair)
 {
-    // set up dimensions on ket side
-    
-    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-    
-    if (isBraEqualKet) kdim  = iContrPair + 1;
-    
     // set up angular momentum on ket side
     
     auto cang = ketGtoPairsBlock.getBraAngularMomentum();
@@ -593,7 +581,7 @@ transform_bra(      CMemBlock2D<double>&  spherData,
                 
                 // zero spherical integrals vector
                 
-                mathfunc::zero(sphervec, kdim);
+                mathfunc::zero(sphervec, nKetContrPairs);
                 
                 // apply Cartesian to spherical transformation
                 
@@ -610,7 +598,7 @@ transform_bra(      CMemBlock2D<double>&  spherData,
                         // loop over integrals
                         
                         #pragma omp simd aligned(sphervec, cartvec: VLX_ALIGN)
-                        for (int32_t n = 0; n < kdim; n++)
+                        for (int32_t n = 0; n < nKetContrPairs; n++)
                         {
                             sphervec[n] += cfact * cartvec[n];
                         }

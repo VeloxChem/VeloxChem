@@ -19,15 +19,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-        
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-        
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-        
         // set up distances R(AB) = A - B
         
         auto abx = (abDistances.data(0))[iContrPair];
@@ -112,7 +106,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g1_0_zz, g_x_x, g_x_y, g_x_z, g_y_x,\
                                              g_y_y, g_y_z, g_z_x, g_z_y,\
                                              g_z_z: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
                         
@@ -149,15 +143,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -277,7 +265,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_x_zz, g_y_xx, g_y_xy, g_y_xz, g_y_yy,\
                                              g_y_yz, g_y_zz, g_z_xx, g_z_xy, g_z_xz,\
                                              g_z_yy, g_z_yz, g_z_zz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -332,15 +320,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -508,7 +490,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_y_zzz, g_z_xxx, g_z_xxy, g_z_xxz,\
                                              g_z_xyy, g_z_xyz, g_z_xzz, g_z_yyy,\
                                              g_z_yyz, g_z_yzz, g_z_zzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -587,15 +569,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -823,7 +799,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_z_xxyy, g_z_xxyz, g_z_xxzz, g_z_xyyy,\
                                              g_z_xyyz, g_z_xyzz, g_z_xzzz, g_z_yyyy,\
                                              g_z_yyyz, g_z_yyzz, g_z_yzzz, g_z_zzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -932,15 +908,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -1241,7 +1211,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_z_xyyzz, g_z_xyzzz, g_z_xzzzz, g_z_yyyyy,\
                                              g_z_yyyyz, g_z_yyyzz, g_z_yyzzz, g_z_yzzzz,\
                                              g_z_zzzzz: VLX_ALIGN)
-                     for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -1386,15 +1356,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -1784,7 +1748,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_z_yyyyyy, g_z_yyyyyz, g_z_yyyyzz,\
                                              g_z_yyyzzz, g_z_yyzzzz, g_z_yzzzzz,\
                                              g_z_zzzzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -1971,15 +1935,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -2464,7 +2422,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_z_xzzzzzz, g_z_yyyyyyy, g_z_yyyyyyz,\
                                              g_z_yyyyyzz, g_z_yyyyzzz, g_z_yyyzzzz,\
                                              g_z_yyzzzzz, g_z_yzzzzzz, g_z_zzzzzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -2699,15 +2657,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -2929,7 +2881,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_yz_xx, g_yz_xy, g_yz_xz, g_yz_yy,\
                                              g_yz_yz, g_yz_zz, g_zz_xx, g_zz_xy,\
                                              g_zz_xz, g_zz_yy, g_zz_yz, g_zz_zz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -3020,15 +2972,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -3363,7 +3309,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_yz_zzz, g_zz_xxx, g_zz_xxy, g_zz_xxz,\
                                              g_zz_xyy, g_zz_xyz, g_zz_xzz, g_zz_yyy,\
                                              g_zz_yyz, g_zz_yzz, g_zz_zzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -3502,15 +3448,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -3989,7 +3929,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_zz_xxyy, g_zz_xxyz, g_zz_xxzz, g_zz_xyyy,\
                                              g_zz_xyyz, g_zz_xyzz, g_zz_xzzz, g_zz_yyyy,\
                                              g_zz_yyyz, g_zz_yyzz, g_zz_yzzz, g_zz_zzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -4188,15 +4128,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -4859,7 +4793,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_zz_xyyzz, g_zz_xyzzz, g_zz_xzzzz,\
                                              g_zz_yyyyy, g_zz_yyyyz, g_zz_yyyzz,\
                                              g_zz_yyzzz, g_zz_yzzzz, g_zz_zzzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -5130,15 +5064,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -6002,7 +5930,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_zz_xyzzzz, g_zz_xzzzzz, g_zz_yyyyyy,\
                                              g_zz_yyyyyz, g_zz_yyyyzz, g_zz_yyyzzz,\
                                              g_zz_yyzzzz, g_zz_yzzzzz, g_zz_zzzzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -6357,15 +6285,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -6942,7 +6864,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_yzz_yzz, g_yzz_zzz, g_zzz_xxx, g_zzz_xxy,\
                                              g_zzz_xxz, g_zzz_xyy, g_zzz_xyz, g_zzz_xzz,\
                                              g_zzz_yyy, g_zzz_yyz, g_zzz_yzz, g_zzz_zzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -7161,15 +7083,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -8021,7 +7937,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_zzz_xyyy, g_zzz_xyyz, g_zzz_xyzz,\
                                              g_zzz_xzzz, g_zzz_yyyy, g_zzz_yyyz,\
                                              g_zzz_yyzz, g_zzz_yzzz, g_zzz_zzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -8340,15 +8256,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -9516,7 +9426,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_zzz_xyyzz, g_zzz_xyzzz, g_zzz_xzzzz,\
                                              g_zzz_yyyyy, g_zzz_yyyyz, g_zzz_yyyzz,\
                                              g_zzz_yyzzz, g_zzz_yzzzz, g_zzz_zzzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 
@@ -9955,15 +9865,9 @@ namespace brahrrfunc { // brahrrfunc namespace
                                  const std::vector<int32_t>& recIndexes,
                                  const CMemBlock2D<double>&  abDistances,
                                  const CGtoPairsBlock&       ketGtoPairsBlock,
-                                 const bool                  isBraEqualKet,
+                                 const int32_t               nKetContrPairs,
                                  const int32_t               iContrPair)
     {
-        // determine dimensions of ket side
-
-        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-        if (isBraEqualKet) kdim  = iContrPair + 1;
-
         // set distances R(AB) = A - B
 
         auto abx = (abDistances.data(0))[iContrPair];
@@ -11282,7 +11186,7 @@ namespace brahrrfunc { // brahrrfunc namespace
                                              g_zzzz_xyyy, g_zzzz_xyyz, g_zzzz_xyzz,\
                                              g_zzzz_xzzz, g_zzzz_yyyy, g_zzzz_yyyz,\
                                              g_zzzz_yyzz, g_zzzz_yzzz, g_zzzz_zzzz: VLX_ALIGN)
-                    for (int32_t k = 0; k < kdim; k++)
+                    for (int32_t k = 0; k < nKetContrPairs; k++)
                     {
                         // leading x component
 

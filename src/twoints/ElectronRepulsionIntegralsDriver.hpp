@@ -186,8 +186,7 @@ class CElectronRepulsionIntegralsDriver
             pattern on ket side.
      @param cdDistances the vector of distances R(CD) = C - D.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _applyHRRonKet(      CMemBlock2D<double>&  ketBuffer,
@@ -195,7 +194,7 @@ class CElectronRepulsionIntegralsDriver
                         const std::vector<int32_t>& recIndexes,
                         const CMemBlock2D<double>&  cdDistances,
                         const CGtoPairsBlock&       ketGtoPairsBlock,
-                        const bool                  isBraEqualKet,
+                        const int32_t               nKetContrPairs,
                         const int32_t               iContrPair) const;
     
     /**
@@ -207,8 +206,7 @@ class CElectronRepulsionIntegralsDriver
             pattern on bra side.
      @param abDistances the vector of distances R(AB) = A - B.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-            blocks.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _applyHRRonBra(      CMemBlock2D<double>&  braBuffer,
@@ -216,7 +214,7 @@ class CElectronRepulsionIntegralsDriver
                         const std::vector<int32_t>& recIndexes,
                         const CMemBlock2D<double>&  abDistances,
                         const CGtoPairsBlock&       ketGtoPairsBlock,
-                        const bool                  isBraEqualKet,
+                        const int32_t               nKetContrPairs,
                         const int32_t               iContrPair) const;
     
     /**

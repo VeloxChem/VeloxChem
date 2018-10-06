@@ -192,14 +192,14 @@ public:
      @param spherInts the spherical two electron integrals buffer.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
-            bra and ket sides.
+     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void distribute(const CMemBlock2D<double>& spherInts,
                     const CGtoPairsBlock&      braGtoPairsBlock,
                     const CGtoPairsBlock&      ketGtoPairsBlock,
                     const bool                 isBraEqualKet,
+                    const int32_t              nKetContrPairs,
                     const int32_t              iContrPair);
     
     /**

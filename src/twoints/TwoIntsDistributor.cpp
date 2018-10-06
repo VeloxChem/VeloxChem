@@ -148,6 +148,7 @@ CTwoIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
                                  const CGtoPairsBlock&      braGtoPairsBlock,
                                  const CGtoPairsBlock&      ketGtoPairsBlock,
                                  const bool                 isBraEqualKet,
+                                 const int32_t              nKetContrPairs,
                                  const int32_t              iContrPair)
 {
     // distribute two electron integrals into data batch
