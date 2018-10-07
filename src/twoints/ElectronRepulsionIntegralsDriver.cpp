@@ -46,11 +46,11 @@ CElectronRepulsionIntegralsDriver::~CElectronRepulsionIntegralsDriver()
 }
 
 void
-CElectronRepulsionIntegralsDriver::compute(const CMolecule&       molecule,
-                                           const CMolecularBasis& aoBasis,
-                                           const double           threshold,
-                                                 COutputStream&   oStream,
-                                                 MPI_Comm         comm) const
+CElectronRepulsionIntegralsDriver::compute(const CMolecule&           molecule,
+                                           const CMolecularBasis&     aoBasis,
+                                           const CScreeningContainer& screeningContainer,
+                                                 COutputStream&       oStream,
+                                                 MPI_Comm             comm) const
 {
     CSystemClock eritim;
     
@@ -68,7 +68,7 @@ CElectronRepulsionIntegralsDriver::compute(const CMolecule&       molecule,
     
     // compute repulsion integrals
     
-    _compElectronRepulsionIntegrals(&bbpairs, &bbpairs); 
+    _compElectronRepulsionIntegrals(&bbpairs, &bbpairs, &screeningContainer); 
     
     // print evaluation timing statistics
     
@@ -1641,7 +1641,8 @@ CElectronRepulsionIntegralsDriver::_printQValuesTiming(const CMolecule&     mole
 
 void
 CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
-                                                                   const CGtoPairsContainer* ketGtoPairsContainer) const
+                                                                   const CGtoPairsContainer* ketGtoPairsContainer,
+                                                                   const CScreeningContainer*  screeningContainer) const
 {
     CTwoIntsDistribution* distpat = new CTwoIntsDistribution(nullptr, 0, 0, dist2e::rfock);
     
@@ -1659,6 +1660,10 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPai
             
             auto symbk = ((*braGtoPairsContainer) == (*ketGtoPairsContainer));
             
+            // screeners counter
+            
+            int32_t idx = 0;
+            
             // loop over pairs of GTOs blocks
             
             for (int32_t i = 0; i < nbra; i++)
@@ -1669,15 +1674,19 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPai
                 
                 for (int32_t j = joff; j < nket; j++)
                 {
-                    #pragma omp task firstprivate(j)
+                    #pragma omp task firstprivate(j, idx)
                     {
                         auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
                         
-                        CCauchySchwarzScreener qqdat;
+                        auto qqdat = screeningContainer->getScreener(idx);
                         
                         _compElectronRepulsionForGtoPairsBlocks(distpat, qqdat,
                                                                 bpairs, kpairs);
                     }
+                    
+                    // update screeners counter
+                    
+                    idx++; 
                 }
             }
         }

@@ -116,6 +116,23 @@ CScreeningContainer::isEmpty() const
     return _screeners.empty(); 
 }
 
+int32_t
+CScreeningContainer::getNumberOfScreeners() const
+{
+    return static_cast<int32_t>(_screeners.size());
+}
+
+CCauchySchwarzScreener
+CScreeningContainer::getScreener(const int32_t iScreener) const
+{
+    if (iScreener < getNumberOfScreeners())
+    {
+        return _screeners[iScreener];
+    }
+    
+    return CCauchySchwarzScreener();
+}
+
 std::ostream&
 operator<<(      std::ostream&        output,
            const CScreeningContainer& source)

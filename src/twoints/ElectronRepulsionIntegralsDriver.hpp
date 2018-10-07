@@ -254,9 +254,11 @@ class CElectronRepulsionIntegralsDriver
      
      @param braGtoPairsContainer the GTOs pairs container on bra side.
      @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     @param screeningContainer the screening container object. 
      */
-    void _compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
-                                         const CGtoPairsContainer* ketGtoPairsContainer) const;
+    void _compElectronRepulsionIntegrals(const CGtoPairsContainer*  braGtoPairsContainer,
+                                         const CGtoPairsContainer*  ketGtoPairsContainer,
+                                         const CScreeningContainer* screeningContainer) const;
 
     /**
      Comutes maximum Q values of electron repulsion integrals for GTOs pairs
@@ -300,15 +302,15 @@ public:
      
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
-     @param threshold the integrals cut-off threshold.
+     @param screeningContainer the screening container object.
      @param oStream the output stream.
      @param comm the MPI communicator.
      */
-    void compute(const CMolecule&       molecule,
-                 const CMolecularBasis& aoBasis,
-                 const double           threshold,
-                       COutputStream&   oStream,
-                       MPI_Comm         comm) const;
+    void compute(const CMolecule&           molecule,
+                 const CMolecularBasis&     aoBasis,
+                 const CScreeningContainer& screeningContainer,
+                       COutputStream&       oStream,
+                       MPI_Comm             comm) const;
     
     /**
      Computes Q values for electron repulsion integrals for molecule with

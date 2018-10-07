@@ -229,10 +229,10 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     //CGtoPairsBlock kpairs(sgtos, pgtos, 1.0e-13);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-8, _molecule, _aoBasis,
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, _molecule, _aoBasis,
                                  oStream, comm);
 
-    eridrv.compute(_molecule, _aoBasis, 1.0e-13, oStream, comm);
+    eridrv.compute(_molecule, _aoBasis, qqdata, oStream, comm);
 }
 
 void
