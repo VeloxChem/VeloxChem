@@ -40,6 +40,11 @@ class CGtoPairsBlock
     CMemBlock2D<int32_t> _contrPattern;
     
     /**
+     The contracted Gaussian function pair factors data (effective P coordinates).
+     */
+    CMemBlock2D<double> _contrFactors;
+    
+    /**
      The primitives Gaussian function pair factors data (overlap, P coordinates,
      PA and PB distances, etc).
      */
@@ -83,13 +88,16 @@ public:
      @param contrPattern the contraction pattern (contracted basis functions
             start/end position in primitive Gaussian functions
             vector, basis functions indexes).
-     @param pairFactors the various pair factors (overlap, P coordinates,
-            PA and PB distances, etc)
+     @param contrFactors the various contracted pair factors (effective P
+            coordintes)
+     @param pairFactors the various primitive pair factors (overlap,
+            P coordinates, PA and PB distances, etc)
      @param braAngularMomentum the angular momentum on bra side.
      @param ketAngularMomentum the angular momentum on ket side.
      @param threshold the primitive pairs screening threshold.
      */
     CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
+                   const CMemBlock2D<double>&  contrFactors,
                    const CMemBlock2D<double>&  pairFactors,
                    const int32_t               braAngularMomentum,
                    const int32_t               ketAngularMomentum,
@@ -425,6 +433,30 @@ public:
      @return vector of R(AB) distances.
      */
     CMemBlock2D<double> getDistancesAB() const;
+    
+    /**
+     Gets contants vector to Cartesian X coordinates of effective P center of
+     contracted GTOs pairs.
+
+     @return the vector of effective PX coordinates.
+     */
+    const double* getEffectiveCoordinatesPX() const;
+    
+    /**
+     Gets contants vector to Cartesian Y coordinates of effective P center of
+     contracted GTOs pairs.
+     
+     @return the vector of effective PY coordinates.
+     */
+    const double* getEffectiveCoordinatesPY() const;
+    
+    /**
+     Gets contants vector to Cartesian Z coordinates of effective P center of
+     contracted GTOs pairs.
+     
+     @return the vector of effective PZ coordinates.
+     */
+    const double* getEffectiveCoordinatesPZ() const;
     
     /**
      Gets number of initial primitive pairs generated from input data.
