@@ -734,4 +734,50 @@ namespace twointsfunc { // twointsfunc namespace
         }
     }
     
+    void
+    compEffectiveDistancesPQ(      CMemBlock<double>& pqDistances,
+                             const CGtoPairsBlock&    braGtoPairsBlock,
+                             const CGtoPairsBlock&    ketGtoPairsBlock,
+                             const bool               isBraEqualKet,
+                             const int32_t            iContrPair)
+    {
+        // set up dimensions on ket side
+        
+        auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+        
+        if (isBraEqualKet) kdim = iContrPair + 1;
+        
+        // set up pointer to effective P coordinates on ket side
+        
+        auto krpx = ketGtoPairsBlock.getEffectiveCoordinatesPX();
+        
+        auto krpy = ketGtoPairsBlock.getEffectiveCoordinatesPY();
+        
+        auto krpz = ketGtoPairsBlock.getEffectiveCoordinatesPZ();
+        
+        // set up selected effective P coordinates on bra side
+        
+        auto bpx = (braGtoPairsBlock.getEffectiveCoordinatesPX())[iContrPair];
+        
+        auto bpy = (braGtoPairsBlock.getEffectiveCoordinatesPY())[iContrPair];
+        
+        auto bpz = (braGtoPairsBlock.getEffectiveCoordinatesPZ())[iContrPair];
+        
+        // set up pointer to effecttive PQ distances
+        
+        auto rpq = pqDistances.data();
+        
+        #pragma omp simd aligned(rpq, krpx, krpy, krpz)
+        for (int32_t i = 0; i < kdim; i++)
+        {
+            double pqx = bpx - krpx[i];
+            
+            double pqy = bpy - krpy[i];
+            
+            double pqz = bpz - krpz[i];
+            
+            rpq[i] = std::sqrt(pqx * pqx + pqy * pqy + pqz * pqz); 
+        }
+    }
+    
 } // twointsfunc namespace

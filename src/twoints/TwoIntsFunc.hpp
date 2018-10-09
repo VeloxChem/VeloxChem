@@ -10,6 +10,7 @@
 #define TwoIntsFunc_hpp
 
 #include "MemBlock2D.hpp"
+#include "MemBlock.hpp"
 #include "GtoBlock.hpp"
 #include "GtoPairsBlock.hpp"
 
@@ -185,7 +186,7 @@ namespace twointsfunc { // twointsfunc namespace
     
     /**
      Computes vector of distances between center W of combined primitive GTOs
-     and combined center Q of primitive GTOs pair on kwt side.
+     and combined center Q of primitive GTOs pair on ket side.
      
      @param wqDistances the vector of Cartesian R(WQ) = W - Q distances.
      @param wCoordinates the vector of coordinates for combined Gaussian
@@ -201,6 +202,23 @@ namespace twointsfunc { // twointsfunc namespace
                          const CGtoPairsBlock&      ketGtoPairsBlock,
                          const int32_t              nKetPrimPairs,
                          const int32_t              iContrPair);
+    
+    /**
+     Computes vector of effective distances between contracted GTOs pairs center
+     center on bra side and combined GTOs pairs centers on ket side.
+
+     @param pqDistances the vector of effective distances.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+            blocks.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void compEffectiveDistancesPQ(      CMemBlock<double>& pqDistances,
+                                  const CGtoPairsBlock&    braGtoPairsBlock,
+                                  const CGtoPairsBlock&    ketGtoPairsBlock,
+                                  const bool               isBraEqualKet,
+                                  const int32_t            iContrPair);
     
 } // intsfunc namespace
 

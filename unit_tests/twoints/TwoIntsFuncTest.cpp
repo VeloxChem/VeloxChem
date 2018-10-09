@@ -498,3 +498,50 @@ TEST_F(CTwoIntsFuncTest, CompCoordinatesForWQUsingPairs)
     
     ASSERT_EQ(r6wq, refr5wq);
 }
+
+TEST_F(CTwoIntsFuncTest, CompEffectiveDistancesForPQ)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoPairsBlock ppairs(pbra, 1.0e-13);
+    
+    CMemBlock<double> t0rpq(6);
+    
+    t0rpq.zero();
+   
+    twointsfunc::compEffectiveDistancesPQ(t0rpq, ppairs, ppairs, true, 0);
+    
+    CMemBlock<double> ref00pq({0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    
+    ASSERT_EQ(t0rpq, ref00pq);
+    
+    twointsfunc::compEffectiveDistancesPQ(t0rpq, ppairs, ppairs, false, 0);
+    
+    CMemBlock<double> ref01pq({0.0000, 0.0000, 0.781076809730870, 0.0000,
+                               1.08843537414966, 1.2000});
+    
+    ASSERT_EQ(t0rpq, ref01pq);
+    
+    CMemBlock<double> t2rpq(6);
+    
+    t2rpq.zero();
+    
+    twointsfunc::compEffectiveDistancesPQ(t2rpq, ppairs, ppairs, true, 2);
+    
+    CMemBlock<double> ref20pq({0.781076809730870, 0.781076809730870, 0.0,
+                               0.0, 0.0, 0.0});
+    
+    ASSERT_EQ(t2rpq, ref20pq);
+    
+    twointsfunc::compEffectiveDistancesPQ(t2rpq, ppairs, ppairs, false, 2);
+    
+    CMemBlock<double> ref21pq({0.781076809730870, 0.781076809730870, 0.0,
+                               0.781076809730870, .307358564418790,
+                               0.418923190269130});
+    
+    ASSERT_EQ(t2rpq, ref21pq);
+}
