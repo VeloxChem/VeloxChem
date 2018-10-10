@@ -103,6 +103,9 @@ void export_twoints()
         .def("to_numpy", &CAOFockMatrix_to_numpy)
         .def("from_numpy_list", &CAOFockMatrix_from_numpy_list)
         .staticmethod("from_numpy_list")
+        .def("get_fock_type", &CAOFockMatrix::getFockType)
+        .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
+        .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
         .def(bp::self == bp::other<CAOFockMatrix>())
         ;
 }

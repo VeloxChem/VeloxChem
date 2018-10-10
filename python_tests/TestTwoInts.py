@@ -36,6 +36,10 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(0, np.max(np.abs(arr_k - np_k)))
         self.assertEqual(0, np.max(np.abs(arr_jkx - np_jkx)))
 
+        self.assertEqual(fockmat.restjk, fock.get_fock_type(0))
+        self.assertEqual(x, fock.get_scale_factor(1))
+        self.assertEqual(0, fock.get_density_identifier(2))
+
 
 if __name__ == "__main__":
     unittest.main()
