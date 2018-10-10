@@ -6,6 +6,7 @@ from TestGeneral import TestGeneral
 from TestMath import TestMath
 from TestMolData import TestMolData
 from TestOneInts import TestOneInts
+from TestTwoInts import TestTwoInts
 from TestOrbData import TestOrbData
 from TestReaders import TestReaders
 from TestSolvers import TestSolvers

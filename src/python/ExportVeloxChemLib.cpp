@@ -14,6 +14,7 @@
 #include "ExportMolData.hpp"
 #include "ExportOrbData.hpp"
 #include "ExportOneInts.hpp"
+#include "ExportTwoInts.hpp"
 #include "ExportMath.hpp"
 #include "ExportSolvers.hpp"
 #include "ExportExciton.hpp"
@@ -32,6 +33,8 @@ BOOST_PYTHON_MODULE(VeloxChemLib)
     bp_orbdata::export_orbdata();
 
     bp_oneints::export_oneints();
+
+    bp_twoints::export_twoints();
 
     bp_math::export_math();
 
