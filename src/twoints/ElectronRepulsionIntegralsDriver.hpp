@@ -13,6 +13,12 @@
 
 #include "mpi.h"
 
+#ifdef MAC_OS_OMP
+#include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
+#else
+#include "omp.h"
+#endif
+
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "OutputStream.hpp"
@@ -66,11 +72,13 @@ class CElectronRepulsionIntegralsDriver
      @param intsScreener the integrals screener object.
      @param braGtoPairsBlock the GTOs pairsblock on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param taskLock the pointer to OMP lock.
      */
     void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution*   distPattern,
                                                  const CCauchySchwarzScreener& intsScreener,
                                                  const CGtoPairsBlock&         braGtoPairsBlock,
-                                                 const CGtoPairsBlock&         ketGtoPairsBlock) const;
+                                                 const CGtoPairsBlock&         ketGtoPairsBlock,
+                                                       omp_lock_t*             taskLock) const;
     
     /**
      Gets Obara-Saika bra side horizontal recursion pattern for specific
