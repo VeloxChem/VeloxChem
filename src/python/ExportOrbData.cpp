@@ -76,7 +76,7 @@ CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self,
 
 CAODensityMatrix
 CAODensityMatrix_from_numpy_list(const bp::list& arr_list,
-                                 const bool      isRestricted)
+                                 const denmat    den_type)
 {
     std::vector<CDenseMatrix> dmat;
 
@@ -87,7 +87,7 @@ CAODensityMatrix_from_numpy_list(const bp::list& arr_list,
         dmat.push_back(bp_math::CDenseMatrix_from_numpy(arr));
     }
 
-    return CAODensityMatrix(dmat, isRestricted ? denmat::rest : denmat::unrest);
+    return CAODensityMatrix(dmat, den_type);
 }
 
 // Exports classes/functions in src/orbdata to python
@@ -109,6 +109,13 @@ void export_orbdata()
         .def("broadcast", &CMolecularBasis_broadcast)
     ;
 
+    // denmat enum class
+
+    bp::enum_<denmat> ("denmat")
+        .value("rest",   denmat::rest  )
+        .value("unrest", denmat::unrest)
+    ;
+
     // CAODensityMatrix class
 
     bp::class_< CAODensityMatrix >
@@ -127,6 +134,7 @@ void export_orbdata()
         .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy)
         .def("from_numpy_list", &CAODensityMatrix_from_numpy_list)
         .staticmethod("from_numpy_list")
+        .def("get_density_type", &CAODensityMatrix::getDensityType)
         .def(bp::self == bp::other<CAODensityMatrix>())
     ;
 }
