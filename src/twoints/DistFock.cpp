@@ -48,67 +48,110 @@ namespace distfock { // distfock namespace
         
         auto dcomp = angmom::to_SphericalComponents(dang);
         
-        // set up symmetry on bra side
-        
-        auto idzi = braGtoPairsBlock.getBraIdentifiers(0);
-        
-        auto idzj = braGtoPairsBlock.getKetIdentifiers(0);
-        
-        bool symbra = idzi[iContrPair] == idzj[iContrPair];
-        
-        // set up pointers to zero identifiers on ket side
-        
-        auto idzk = braGtoPairsBlock.getBraIdentifiers(0);
-        
-        auto idzl = braGtoPairsBlock.getKetIdentifiers(0);
-        
         // loop over angular components on bra side
-        
-        int32_t bracomp = 0;
         
         for (int32_t i = 0; i < acomp; i++)
         {
             // apply symmetry on bra side
             
-            auto joff = symbra ? i : 0;
+            //auto joff = symbra ? i : 0;
             
-            // set up index
+            // set up index P for bra side
             
-            for (int32_t j = joff; j < bcomp; j++)
+            int32_t idp = (braGtoPairsBlock.getBraIdentifiers(i))[iContrPair];
+            
+            for (int32_t j = 0; j < bcomp; j++)
             {
-                // loop over angular components on ket side
+                // set up index Q for bra side
                 
-                int32_t ketcomp = 0;
+                int32_t idq = (braGtoPairsBlock.getKetIdentifiers(j))[iContrPair];
+                
+                // angular offset from bra side
+                
+                auto braoff = (i * bcomp + j) * ccomp * dcomp;
+                
+                // loop over angular components on ket side
                 
                 for (int32_t k = 0; k < ccomp; k++)
                 {
+                    // set up pointer to R indexes on ket side
+                    
+                    auto idxk = ketGtoPairsBlock.getBraIdentifiers(k);
+                    
                     for (int32_t l = 0; l < dcomp; l++)
                     {
+                        // set up pointer to S indexes on ket side
+                        
+                        auto idxl = ketGtoPairsBlock.getKetIdentifiers(l);
+                        
+                        // set up pointer to integrals
+                        
+                        auto pints = spherInts.data(braoff + k * dcomp + l);
+                        
                         // loop over pairs on ket side
                         
                         for (int32_t m = 0; m < nKetContrPairs; m++)
                         {
-                            // apply symmetry of ket side
+                            // set up S and R indexes
                             
-                            if ((idzk[m] == idzl[m]) && (l < k)) continue;
+                            auto idr = idxk[m];
                             
-                            // set up indexes on ket side
+                            auto ids = idxl[m];
                             
-                            // scale integral values
+                            // scale integral value
+                            
+                            auto fval = pints[m];
+                            
+                            if (idp == idq) fval *= 0.5;
+                            
+                            if (idr == ids) fval *= 0.5;
+                            
+                            if ((idp == idr) && (idq == ids)) fval *= 0.5;
+                            
+                            // Coulomb contribution
+                            
+                            auto fpq = 2.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                            
+                            fockMatrix[idp * nFockColumns + idq] += fpq;
+                            
+                            fockMatrix[idq * nFockColumns + idp] += fpq;
+                            
+                            auto frs = 2.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                            
+                            fockMatrix[idr * nFockColumns + ids] += frs;
+                            
+                            fockMatrix[ids * nFockColumns + idr] += frs;
+                            
+                            // exchange contribution
+                            
+                            auto fpr = 0.5 * fval * densityMatrix[idq * nDensityColumns + ids];
+                            
+                            fockMatrix[idp * nFockColumns + idr] -= fpr;
+                            
+                            fockMatrix[idr * nFockColumns + idp] -= fpr;
+                            
+                            auto fps = 0.5 * fval * densityMatrix[idq * nDensityColumns + idr];
+                            
+                            fockMatrix[idp * nFockColumns + ids] -= fps;
+                            
+                            fockMatrix[ids * nFockColumns + idp] -= fps;
+                            
+                            auto fqr = 0.5 * fval * densityMatrix[idp * nDensityColumns + ids];
+                            
+                            fockMatrix[idq * nFockColumns + idr] -= fqr;
+                            
+                            fockMatrix[idr * nFockColumns + idq] -= fqr;
+                            
+                            auto fqs = 0.5 * fval * densityMatrix[idp * nDensityColumns + idr];
+                            
+                            fockMatrix[idq * nFockColumns + ids] -= fqs;
+                            
+                            fockMatrix[ids * nFockColumns + idq] -= fqs;
                         }
-                        
-                        // update ket componets counter
-                        
-                        ketcomp++;
                     }
                 }
-                
-                // update bra components counter
-                
-                bracomp++;
             }
         }
-        
     }
     
     
