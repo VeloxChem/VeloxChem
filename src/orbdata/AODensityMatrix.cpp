@@ -120,6 +120,11 @@ CAODensityMatrix::getNumberOfDensityMatrices() const
     return 0;
 }
 
+denmat
+CAODensityMatrix::getDensityType() const
+{
+    return _denType;
+}
 
 int32_t
 CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const

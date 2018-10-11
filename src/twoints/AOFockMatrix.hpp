@@ -14,6 +14,7 @@
 
 #include "DenseMatrix.hpp"
 #include "FockMatrixType.hpp"
+#include "AODensityMatrix.hpp"
 
 /**
  Class CAOFockMatrix stores set of AO Fock matrices and provides set of methods
@@ -65,6 +66,13 @@ public:
                   const std::vector<int32_t>&      idDensityMatrices);
     
     /**
+     Creates a AO Fock matrix object.
+     
+     @param aoDensityMatrix the AO density matrix.
+     */
+    CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix);
+    
+    /**
      Creates a AO Fock matrix object by copying other AO Fock matrix object.
      
      @param source the AO Fock matrix object.
@@ -112,6 +120,12 @@ public:
      @return true if AO Fock matrix objects are not equal, false otherwise.
      */
     bool operator!=(const CAOFockMatrix& other) const;
+    
+    
+    /**
+     Resets all elements of AO Fock matrix to zero.
+     */
+    void zero();
     
     /**
      Gets number of Fock matrices.

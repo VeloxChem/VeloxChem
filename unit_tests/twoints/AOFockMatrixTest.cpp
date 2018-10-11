@@ -20,6 +20,35 @@ TEST_F(CAOFockMatrixTest, DefaultConstructor)
     ASSERT_EQ(fmata, fmatb);
 }
 
+TEST_F(CAOFockMatrixTest, ConstructorWithDensity)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAODensityMatrix dmat({ma, mb}, denmat::rest);
+    
+    CAOFockMatrix fmata(dmat);
+    
+    ASSERT_EQ(2, fmata.getNumberOfFockMatrices());
+
+    ASSERT_EQ(3, fmata.getNumberOfRows(0));
+    
+    ASSERT_EQ(3, fmata.getNumberOfRows(1));
+    
+    ASSERT_EQ(3, fmata.getNumberOfColumns(0));
+    
+    ASSERT_EQ(2, fmata.getNumberOfColumns(1));
+    
+    ASSERT_EQ(0, fmata.getDensityIdentifier(0));
+    
+    ASSERT_EQ(1, fmata.getDensityIdentifier(1));
+    
+    ASSERT_TRUE(fockmat::restjk == fmata.getFockType(0));
+    
+    ASSERT_TRUE(fockmat::restjk == fmata.getFockType(1));
+}
+
 TEST_F(CAOFockMatrixTest, CopyConstructor)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
@@ -82,6 +111,29 @@ TEST_F(CAOFockMatrixTest, MoveAssignment)
                                         fockmat::restk, fockmat::restj,
                                         fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
                                         {0, 2, 3, 6});
+    
+    ASSERT_EQ(fmata, fmatb);
+}
+
+TEST_F(CAOFockMatrixTest, Zero)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAOFockMatrix fmata({ma, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                        fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
+    
+    fmata.zero();
+    
+    ma.zero();
+    
+    mb.zero();
+    
+    CAOFockMatrix fmatb({ma, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                        fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
     
     ASSERT_EQ(fmata, fmatb);
 }

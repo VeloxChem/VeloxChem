@@ -31,6 +31,35 @@ CAOFockMatrix::CAOFockMatrix(const std::vector<CDenseMatrix>& fockMatrices,
     
 }
 
+CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
+{
+    auto dmtyp = aoDensityMatrix.getDensityType();
+    
+    for (int32_t i = 0; i < aoDensityMatrix.getNumberOfDensityMatrices(); i++)
+    {
+        // set up dimensions of Fock matrix
+        
+        auto nrow = aoDensityMatrix.getNumberOfRows(i);
+        
+        auto ncol = aoDensityMatrix.getNumberOfColumns(i);
+        
+        // spin restricted closed-shell Hatree-Fock
+        
+        if (dmtyp == denmat::rest)
+        {
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
+            
+            _fockTypes.push_back(fockmat::restjk);
+            
+            _scaleFactors.push_back(1.0);
+            
+            _idDensityMatrices.push_back(i);
+        }
+        
+        // FIX ME: Add unrestricted open-shell Hatree-Fock
+    }
+}
+
 CAOFockMatrix::CAOFockMatrix(const CAOFockMatrix& source)
 
     : _fockMatrices(source._fockMatrices)
@@ -132,6 +161,15 @@ bool
 CAOFockMatrix::operator!=(const CAOFockMatrix& other) const
 {
     return !(*this == other);
+}
+
+void
+CAOFockMatrix::zero()
+{
+    for (size_t i = 0; i < _fockMatrices.size(); i++)
+    {
+        _fockMatrices[i].zero(); 
+    }
 }
 
 int32_t

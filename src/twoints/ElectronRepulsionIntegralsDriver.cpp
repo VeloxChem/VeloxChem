@@ -46,7 +46,9 @@ CElectronRepulsionIntegralsDriver::~CElectronRepulsionIntegralsDriver()
 }
 
 void
-CElectronRepulsionIntegralsDriver::compute(const CMolecule&           molecule,
+CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatrix,
+                                           const CAODensityMatrix&    aoDensityMatrix,
+                                           const CMolecule&           molecule,
                                            const CMolecularBasis&     aoBasis,
                                            const CScreeningContainer& screeningContainer,
                                                  COutputStream&       oStream,
@@ -68,7 +70,8 @@ CElectronRepulsionIntegralsDriver::compute(const CMolecule&           molecule,
     
     // compute repulsion integrals
     
-    _compElectronRepulsionIntegrals(&bbpairs, &bbpairs, &screeningContainer); 
+    _compElectronRepulsionIntegrals(aoFockMatrix, aoDensityMatrix, &bbpairs,
+                                    &bbpairs, &screeningContainer);
     
     // print evaluation timing statistics
     
@@ -1655,13 +1658,15 @@ CElectronRepulsionIntegralsDriver::_printQValuesTiming(const CMolecule&     mole
 }
 
 void
-CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(const CGtoPairsContainer*   braGtoPairsContainer,
-                                                                   const CGtoPairsContainer*   ketGtoPairsContainer,
-                                                                   const CScreeningContainer*  screeningContainer) const
+CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFockMatrix&       aoFockMatrix,
+                                                                   const CAODensityMatrix&    aoDensityMatrix,
+                                                                   const CGtoPairsContainer*  braGtoPairsContainer,
+                                                                   const CGtoPairsContainer*  ketGtoPairsContainer,
+                                                                   const CScreeningContainer* screeningContainer) const
 {
     // allocate integrals distributor
     
-    CTwoIntsDistribution* distpat = new CTwoIntsDistribution(nullptr, 0, 0, dist2e::rfock);
+    CTwoIntsDistribution* distpat = new CTwoIntsDistribution(&aoFockMatrix, &aoDensityMatrix); 
     
     // set up OMP locking
     

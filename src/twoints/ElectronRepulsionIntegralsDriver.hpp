@@ -30,6 +30,8 @@
 #include "TwoIntsDistributor.hpp"
 #include "ScreeningContainer.hpp"
 #include "VecMemBlocks.hpp"
+#include "AODensityMatrix.hpp"
+#include "AOFockMatrix.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -258,13 +260,18 @@ class CElectronRepulsionIntegralsDriver
                                    COutputStream& oStream) const;
     
     /**
-     Comutes electron repulsion integrals for two GTOs pairs containers.
+     Comutes electron repulsion integrals and stores them into AO Fock matrix
+     for two GTOs pairs containers.
      
+     @param aoFockMatrix the AO Fock matrix.
+     @param aoDensityMatrix the AO density matrix.
      @param braGtoPairsContainer the GTOs pairs container on bra side.
      @param ketGtoPairsContainer the GTOs pairs container on ket side.
      @param screeningContainer the screening container object. 
      */
-    void _compElectronRepulsionIntegrals(const CGtoPairsContainer*  braGtoPairsContainer,
+    void _compElectronRepulsionIntegrals(      CAOFockMatrix&       aoFockMatrix,
+                                         const CAODensityMatrix&    aoDensityMatrix,
+                                         const CGtoPairsContainer*  braGtoPairsContainer,
                                          const CGtoPairsContainer*  ketGtoPairsContainer,
                                          const CScreeningContainer* screeningContainer) const;
 
@@ -305,16 +312,20 @@ public:
     ~CElectronRepulsionIntegralsDriver();
     
     /**
-     Computes electron repulsion integrals for molecule with specific AO basis
-     set and process results according to provided distribution function.
+     Computes electron repulsion integrals and stores them in AO Fock matrix
+     for molecule with specific AO basis set.
      
+     @param aoFockMatrix the AO Fock matrix.
+     @param aoDensityMatrix the AO density matrix.
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
      @param screeningContainer the screening container object.
      @param oStream the output stream.
      @param comm the MPI communicator.
      */
-    void compute(const CMolecule&           molecule,
+    void compute(      CAOFockMatrix&       aoFockMatrix,
+                 const CAODensityMatrix&    aoDensityMatrix,
+                 const CMolecule&           molecule,
                  const CMolecularBasis&     aoBasis,
                  const CScreeningContainer& screeningContainer,
                        COutputStream&       oStream,

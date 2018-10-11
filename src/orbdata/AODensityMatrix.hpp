@@ -110,6 +110,13 @@ public:
     int32_t getNumberOfDensityMatrices() const;
     
     /**
+     Gets type of density matrix.
+
+     @return the type of density matrix.
+     */
+    denmat getDensityType() const;
+    
+    /**
      Gets number of rows in specific density matrix.
      
      @param iDensityMatrix the index of density matrix.

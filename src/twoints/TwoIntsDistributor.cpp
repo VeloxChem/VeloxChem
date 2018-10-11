@@ -12,6 +12,7 @@
 
 #include "StringFormat.hpp"
 #include "AngularMomentum.hpp"
+#include "DistFock.hpp"
 
 CTwoIntsDistribution::CTwoIntsDistribution()
 
@@ -26,6 +27,10 @@ CTwoIntsDistribution::CTwoIntsDistribution()
     , _idGtoPair(-1)
 
     , _intsData(nullptr)
+
+    , _aoDensity(nullptr)
+
+    , _aoFock(nullptr)
 {
     
 }
@@ -35,17 +40,7 @@ CTwoIntsDistribution::CTwoIntsDistribution(      double* intsData,
                                            const int32_t nColumns,
                                            const dist2e  distPattern)
 
-    : _distPattern(distPattern)
-
-    , _needSyncLock(false)
-
-    , _nRows(nRows)
-
-    , _nColumns(nColumns)
-
-    , _idGtoPair(-1)
-
-    , _intsData(intsData)
+    : CTwoIntsDistribution(intsData, nRows, nColumns, -1, distPattern)
 {
     
 }
@@ -66,12 +61,37 @@ CTwoIntsDistribution::CTwoIntsDistribution(      double* intsData,
     , _idGtoPair(idGtoPair)
 
     , _intsData(intsData)
+
+    , _aoDensity(nullptr)
+
+    , _aoFock(nullptr)
 {
     // override identifier of GTOs pair if not used in distributing integrals
     
     if (_distPattern != dist2e::qvalues) _idGtoPair = -1;
 }
 
+CTwoIntsDistribution::CTwoIntsDistribution(      CAOFockMatrix*    aoFock,
+                                           const CAODensityMatrix* aoDensity)
+
+    : _distPattern(dist2e::fock)
+
+    , _needSyncLock(true)
+
+    , _nRows(0)
+
+    , _nColumns(0)
+
+    , _idGtoPair(-1)
+
+    , _intsData(nullptr)
+
+    , _aoDensity(aoDensity)
+
+    , _aoFock(aoFock)
+{
+    
+}
 
 CTwoIntsDistribution::CTwoIntsDistribution(const CTwoIntsDistribution& source)
 
@@ -84,8 +104,13 @@ CTwoIntsDistribution::CTwoIntsDistribution(const CTwoIntsDistribution& source)
     , _nColumns(source._nColumns)
 
     , _idGtoPair(source._idGtoPair)
+
+    , _intsData(source._intsData)
+
+    , _aoDensity(source._aoDensity)
+
+    , _aoFock(source._aoFock)
 {
-    _intsData = source._intsData;
 }
 
 CTwoIntsDistribution::~CTwoIntsDistribution()
@@ -110,6 +135,10 @@ CTwoIntsDistribution::operator=(const CTwoIntsDistribution& source)
     
     _intsData = source._intsData;
     
+    _aoDensity = source._aoDensity;
+    
+    _aoFock = source._aoFock;
+    
     return *this;
 }
 
@@ -127,6 +156,10 @@ CTwoIntsDistribution::operator==(const CTwoIntsDistribution& other) const
     if (_idGtoPair != other._idGtoPair) return false;
     
     if (_intsData != other._intsData) return false;
+    
+    if (_aoDensity != other._aoDensity) return false;
+    
+    if (_aoFock != other._aoFock) return false;
     
     return true;
 }
@@ -167,6 +200,14 @@ CTwoIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
     {
         _distSpherIntsIntoQValues(spherInts, braGtoPairsBlock, ketGtoPairsBlock,
                                   isBraEqualKet, iContrPair);
+        
+        return;
+    }
+    
+    if (_distPattern == dist2e::fock)
+    {
+        _distSpherIntsIntoFock(spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                               isBraEqualKet, nKetContrPairs, iContrPair);
         
         return;
     }
@@ -251,6 +292,40 @@ CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spher
     _intsData[_idGtoPair] = std::sqrt(mval);
 }
 
+void
+CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInts,
+                                             const CGtoPairsBlock&      braGtoPairsBlock,
+                                             const CGtoPairsBlock&      ketGtoPairsBlock,
+                                             const bool                 isBraEqualKet,
+                                             const int32_t              nKetContrPairs,
+                                             const int32_t              iContrPair)
+{
+    // set up number of AO Fock matrices
+    
+    auto nfock = _aoFock->getNumberOfFockMatrices();
+    
+    for (int32_t i = 0; i < nfock; i++)
+    {
+        // set up fock matrix type and origin 
+        
+        auto fcktyp = _aoFock->getFockType(i);
+        
+        auto idden = _aoFock->getDensityIdentifier(i);
+        
+        // closed shell restricted Hatree-Fock: J + K
+        
+        if (fcktyp == fockmat::restjk)
+        {
+            distfock::distRestJK(_aoFock->getFock(i),
+                                 _aoFock->getNumberOfColumns(i),
+                                 _aoDensity->totalDensity(idden),
+                                 _aoDensity->getNumberOfColumns(idden),
+                                 spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                 isBraEqualKet, nKetContrPairs, iContrPair);
+        }
+    }
+}
+
 int32_t
 CTwoIntsDistribution::_getStartIndexForBatch(const int32_t nShellComponents,
                                              const int32_t iContrPair,
@@ -289,6 +364,10 @@ operator<<(      std::ostream&         output,
     output << "_idGtoPair: " << source._idGtoPair << std::endl;
     
     output << "_intsData: " << source._intsData << std::endl;
+    
+    output << "_aoDensity: " << source._aoDensity << std::endl;
+    
+    output << "_aoFock: " << source._aoFock << std::endl;
     
     return output;
 }
