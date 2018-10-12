@@ -83,6 +83,28 @@ getMoleculeLiHCation()
 }
 
 CMolecule
+getMoleculeHeAtom()
+{
+    std::vector<double> coords({0.0, 0.0, 0.0});
+    
+    std::vector<double> charges({2.0});
+    
+    std::vector<double> masses({4.0026});
+    
+    std::vector<std::string> labels({{"He"}});
+    
+    std::vector<int32_t> idselem({2});
+    
+    CMolecule mol(coords, charges, masses, labels, idselem);
+    
+    mol.setCharge(0.0);
+
+    mol.setMultiplicity(1);
+
+    return mol;
+}
+
+CMolecule
 getMoleculeH2O()
 {
     std::vector<double> coords({0.0, 0.0,  0.0,

@@ -20,6 +20,8 @@ namespace vlxmol { // vlxmol namespace
     CMolecule getTestLiH();
     
     CMolecule getMoleculeLiHCation();
+
+    CMolecule getMoleculeHeAtom();
     
     CMolecule getMoleculeH2O();
 
