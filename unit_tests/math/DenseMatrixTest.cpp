@@ -173,3 +173,27 @@ TEST_F(CDenseMatrixTest, Symmetrize)
     
     ASSERT_EQ(ma, mb);
 }
+
+TEST_F(CDenseMatrixTest, Slice)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0,
+                    -2.0,  5.0,  4.0,
+                     1.0,  2.0,  3.0,
+                     2.0,  1.0,  4.0},
+                    4, 3);
+    
+    CDenseMatrix refm14({-1.0, 5.0, 2.0, 1.0}, 4, 1);
+    
+    ASSERT_EQ(refm14, ma.slice(0, 1, 4, 1));
+    
+    CDenseMatrix refm32({ 5.0,  4.0,
+                          2.0,  3.0,
+                          1.0,  4.0},
+                        3, 2);
+    
+    ASSERT_EQ(refm32, ma.slice(1, 1, 3, 2));
+    
+    CDenseMatrix refm21({1.0, -2.0}, 2, 1);
+    
+    ASSERT_EQ(refm21, ma.slice(0, 0, 2, 1));
+}
