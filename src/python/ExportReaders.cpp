@@ -40,7 +40,7 @@ void export_readers()
                                          COutputStream& oStream)
         = &CMolXYZReader::parse;
 
-    bp::class_< CMolXYZReader >
+    bp::class_< CMolXYZReader, std::shared_ptr<CMolXYZReader> >
         (
             "MolXYZReader",
             bp::init<>()
@@ -52,7 +52,7 @@ void export_readers()
 
     // CEnvironmentReader class
 
-    bp::class_< CEnvironmentReader >
+    bp::class_< CEnvironmentReader, std::shared_ptr<CEnvironmentReader> >
         (
             "EnvironmentReader",
             bp::init<>()
@@ -64,7 +64,7 @@ void export_readers()
 
     // CBasisReader class
 
-    bp::class_< CBasisReader >
+    bp::class_< CBasisReader, std::shared_ptr<CBasisReader> >
         (
             "BasisReader",
             bp::init<>()

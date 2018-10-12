@@ -12,6 +12,9 @@
 #include "DenseMatrix.hpp"
 #include "AOFockMatrix.hpp"
 #include "FockMatrixType.hpp"
+#include "EriScreenerType.hpp"
+#include "ScreeningContainer.hpp"
+#include "ElectronRepulsionIntegralsDriver.hpp"
 
 #include "ExportMath.hpp"
 #include "ExportGeneral.hpp"
@@ -71,6 +74,57 @@ CAOFockMatrix_from_numpy_list(const bp::list& arr_list,
     return CAOFockMatrix(fmat, types, factors, ids);
 }
 
+// Helper function for creating a CElectronRepulsionIntegralsDriver object
+
+static std::shared_ptr<CElectronRepulsionIntegralsDriver>
+CElectronRepulsionIntegralsDriver_create(int32_t    globRank,
+                                         int32_t    globNodes,
+                                         bp::object py_comm)
+{
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CElectronRepulsionIntegralsDriver>(
+        new CElectronRepulsionIntegralsDriver(globRank, globNodes, *comm_ptr)
+        );
+}
+
+// Helper functions for overloading CElectronRepulsionIntegralsDriver::compute
+
+void
+CElectronRepulsionIntegralsDriver_compute_1(
+          CElectronRepulsionIntegralsDriver& self,
+          CAOFockMatrix&                     aoFockMatrix,
+    const CAODensityMatrix&                  aoDensityMatrix,
+    const CMolecule&                         molecule,
+    const CMolecularBasis&                   aoBasis,
+    const CScreeningContainer&               screeningContainer,
+          COutputStream&                     oStream,
+          bp::object                         py_comm)
+{
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+
+    self.compute(aoFockMatrix, aoDensityMatrix,
+                 molecule, aoBasis, screeningContainer,
+                 oStream, *comm_ptr);
+}
+
+CScreeningContainer
+CElectronRepulsionIntegralsDriver_compute_2(
+          CElectronRepulsionIntegralsDriver& self,
+    const ericut                             screeningScheme,
+    const double                             threshold,
+    const CMolecule&                         molecule,
+    const CMolecularBasis&                   aoBasis,
+          COutputStream&                     oStream,
+          bp::object                         py_comm)
+{
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+
+    return self.compute(screeningScheme, threshold,
+                        molecule, aoBasis,
+                        oStream, *comm_ptr);
+}
+
 // Exports classes/functions in src/twoints to python
 
 void export_twoints()
@@ -85,9 +139,16 @@ void export_twoints()
         .value("restkx",  fockmat::restkx )
     ;
 
+    // ericut enum class
+
+    bp::enum_<ericut> ("ericut")
+        .value("qq",  ericut::qq )
+        .value("qqr", ericut::qqr)
+    ;
+
     // CAOFockMatrix class
 
-    bp::class_< CAOFockMatrix >
+    bp::class_< CAOFockMatrix, std::shared_ptr<CAOFockMatrix> >
         (
             "AOFockMatrix",
             bp::init<
@@ -104,10 +165,46 @@ void export_twoints()
         .def("to_numpy", &CAOFockMatrix_to_numpy)
         .def("from_numpy_list", &CAOFockMatrix_from_numpy_list)
         .staticmethod("from_numpy_list")
+        .def("zero", &CAOFockMatrix::zero)
         .def("get_fock_type", &CAOFockMatrix::getFockType)
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
         .def(bp::self == bp::other<CAOFockMatrix>())
+    ;
+
+    // CScreeningContainer class
+
+    bp::class_< CScreeningContainer, std::shared_ptr<CScreeningContainer> >
+        (
+            "ScreeningContainer",
+            bp::init<
+                const CVecMemBlock<double>&,
+                const CVecMemBlock<double>&,
+                const CGtoPairsContainer&,
+                const CGtoPairsContainer&,
+                const ericut,
+                const double
+                >()
+        )
+        .def(bp::init<>())
+        .def(bp::init<const CScreeningContainer&>())
+        .def("is_empty", &CScreeningContainer::isEmpty)
+        .def("get_number_of_screeners", &CScreeningContainer::getNumberOfScreeners)
+        .def(bp::self == bp::other<CScreeningContainer>())
+    ;
+
+    // CElectronRepulsionIntegralsDriver class
+
+    bp::class_< CElectronRepulsionIntegralsDriver,
+                std::shared_ptr<CElectronRepulsionIntegralsDriver> >
+        (
+            "ElectronRepulsionIntegralsDriver",
+            bp::init<const int32_t, const int32_t, MPI_Comm>()
+        )
+        .def("create", &CElectronRepulsionIntegralsDriver_create)
+        .staticmethod("create")
+        .def("compute", &CElectronRepulsionIntegralsDriver_compute_1)
+        .def("compute", &CElectronRepulsionIntegralsDriver_compute_2)
     ;
 }
 

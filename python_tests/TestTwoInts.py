@@ -1,8 +1,14 @@
 from mpi4py import MPI
+from HelperClass import Task
+from veloxchem.VeloxChemLib import ElectronRepulsionIntegralsDriver
+from veloxchem.VeloxChemLib import OverlapIntegralsDriver
+from veloxchem.VeloxChemLib import SADGuessDriver
 from veloxchem.VeloxChemLib import AODensityMatrix
 from veloxchem.VeloxChemLib import AOFockMatrix
 from veloxchem.VeloxChemLib import denmat
 from veloxchem.VeloxChemLib import fockmat
+from veloxchem.VeloxChemLib import ericut
+from veloxchem.VeloxChemLib import mpi_master
 
 import numpy as np
 import unittest
@@ -53,6 +59,66 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(fockmat.restjk, f_rest.get_fock_type(0))
         self.assertEqual(1.0, f_rest.get_scale_factor(0))
         self.assertEqual(0, f_rest.get_density_identifier(0))
+
+    def test_fock_rest_build(self):
+
+        # mpi settings
+
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        size = comm.Get_size()
+
+        # process input file on master node
+
+        if (rank == mpi_master()):
+
+            task = Task("inputs/water.inp", "inputs/water.out")
+            molecule = task.molecule
+            ao_basis = task.ao_basis
+            min_basis = task.min_basis
+            ostream = task.ostream
+
+        else:
+
+            molecule = Molecule()
+            ao_basis = MolecularBasis()
+            min_basis = MolecularBasis()
+            ostream = OutputStream("")
+
+        # broadcast molecule and basis
+
+        molecule.broadcast(rank, comm)
+        ao_basis.broadcast(rank, comm)
+        min_basis.broadcast(rank, comm)
+
+        # compute overlap
+
+        ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
+        S12 = ovldrv.compute(molecule, min_basis, ao_basis, ostream, comm)
+        S22 = ovldrv.compute(molecule, ao_basis, ostream, comm)
+
+        # compute initial guess
+
+        saddrv = SADGuessDriver.create(rank, size, comm)
+        dsad = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
+                              comm)
+
+        # compute Fock
+
+        eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
+
+        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
+                                comm)
+
+        fock = AOFockMatrix(dsad)
+
+        fock.zero()
+
+        eridrv.compute(fock, dsad, molecule, ao_basis, qqdata, ostream, comm)
+
+        self.assertEqual(fockmat.restjk, fock.get_fock_type(0))
+        self.assertEqual(1.0, fock.get_scale_factor(0))
+        self.assertEqual(0, fock.get_density_identifier(0))
 
 
 if __name__ == "__main__":

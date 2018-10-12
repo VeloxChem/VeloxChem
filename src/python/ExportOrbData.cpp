@@ -100,7 +100,7 @@ void export_orbdata()
 
     // CMolecularBasis class
 
-    bp::class_< CMolecularBasis >
+    bp::class_< CMolecularBasis, std::shared_ptr<CMolecularBasis> >
         (
             "MolecularBasis",
             bp::init<>()
@@ -118,7 +118,7 @@ void export_orbdata()
 
     // CAODensityMatrix class
 
-    bp::class_< CAODensityMatrix >
+    bp::class_< CAODensityMatrix, std::shared_ptr<CAODensityMatrix> >
         (
             "AODensityMatrix",
             bp::init<
