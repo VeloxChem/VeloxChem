@@ -1,5 +1,7 @@
 from mpi4py import MPI
+from veloxchem.VeloxChemLib import AODensityMatrix
 from veloxchem.VeloxChemLib import AOFockMatrix
+from veloxchem.VeloxChemLib import denmat
 from veloxchem.VeloxChemLib import fockmat
 
 import numpy as np
@@ -39,6 +41,18 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(fockmat.restjk, fock.get_fock_type(0))
         self.assertEqual(x, fock.get_scale_factor(1))
         self.assertEqual(0, fock.get_density_identifier(2))
+
+    def test_fock_rest_density(self):
+
+        data_a = [[ 1., .2, ], [ .2, 1., ]]
+
+        d_rest = AODensityMatrix.from_numpy_list([data_a], denmat.rest)
+
+        f_rest = AOFockMatrix(d_rest)
+
+        self.assertEqual(fockmat.restjk, f_rest.get_fock_type(0))
+        self.assertEqual(1.0, f_rest.get_scale_factor(0))
+        self.assertEqual(0, f_rest.get_density_identifier(0))
 
 
 if __name__ == "__main__":

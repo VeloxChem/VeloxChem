@@ -83,7 +83,7 @@ void export_twoints()
         .value("restj",   fockmat::restj  )
         .value("restk",   fockmat::restk  )
         .value("restkx",  fockmat::restkx )
-        ;
+    ;
 
     // CAOFockMatrix class
 
@@ -98,6 +98,7 @@ void export_twoints()
                 >()
         )
         .def(bp::init<>())
+        .def(bp::init<const CAODensityMatrix&>())
         .def(bp::init<const CAOFockMatrix&>())
         .def("__str__", &CAOFockMatrix_str)
         .def("to_numpy", &CAOFockMatrix_to_numpy)
@@ -107,7 +108,7 @@ void export_twoints()
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
         .def(bp::self == bp::other<CAOFockMatrix>())
-        ;
+    ;
 }
 
 } // bp_twoints namespace

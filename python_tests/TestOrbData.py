@@ -1,13 +1,13 @@
 from mpi4py import MPI
 from HelperClass import Task
 from veloxchem.VeloxChemLib import AODensityMatrix
+from veloxchem.VeloxChemLib import denmat
 
 import numpy as np
 import unittest
 
 
 class TestOrbData(unittest.TestCase):
-
     def test_get_label(self):
 
         task = Task("inputs/dimer.inp", "inputs/dimer.out")
@@ -20,11 +20,9 @@ class TestOrbData(unittest.TestCase):
         data_a = [[ 1., .2, ], [ .2, 1., ]]
         data_b = [[ .9, .5, ], [ .5, .9, ]]
 
-        array_a = np.array(data_a)
-        array_b = np.array(data_b)
-
-        d_rest = AODensityMatrix.from_numpy_list([data_a], True)
-        d_unrest = AODensityMatrix.from_numpy_list([data_a, data_b], False)
+        d_rest = AODensityMatrix.from_numpy_list([data_a], denmat.rest)
+        d_unrest = AODensityMatrix.from_numpy_list([data_a, data_b],
+                                                   denmat.unrest)
 
         den_a1 = d_rest.total_to_numpy(0)
         den_a2 = d_unrest.alpha_to_numpy(0)
@@ -33,6 +31,9 @@ class TestOrbData(unittest.TestCase):
         self.assertEqual(0, np.max(np.abs(data_a - den_a1)))
         self.assertEqual(0, np.max(np.abs(data_a - den_a2)))
         self.assertEqual(0, np.max(np.abs(data_b - den_b1)))
+
+        self.assertEqual(denmat.rest, d_rest.get_density_type())
+        self.assertEqual(denmat.unrest, d_unrest.get_density_type())
 
 
 if __name__ == "__main__":
