@@ -129,6 +129,30 @@ getMoleculeH2O()
 }
 
 CMolecule
+getMoleculeH2Se()
+{
+    std::vector<double> coords({0.0, 0.0, 0.0,
+                                0.0, 0.0, 2.8,
+                                0.0, 2.8, 0.0});
+    
+    std::vector<double> charges({34.0, 1.0, 1.0});
+    
+    std::vector<double> masses({78.971, 1.008, 1.008});
+    
+    std::vector<std::string> labels({{"Se"}, {"H"}, {"H"}});
+    
+    std::vector<int32_t> idselem({34, 1, 1});
+    
+    CMolecule mol(coords, charges, masses, labels, idselem);
+    
+    mol.setCharge(0.0);
+
+    mol.setMultiplicity(1);
+
+    return mol;
+}
+
+CMolecule
 getMoleculeH2ODimer()
 {
     std::vector<double> coords({0.0, 0.0,  0.0, 3.0, 3.0,  3.0,

@@ -25,6 +25,8 @@ namespace vlxmol { // vlxmol namespace
     
     CMolecule getMoleculeH2O();
 
+    CMolecule getMoleculeH2Se();
+
     CMolecule getMoleculeH2ODimer();
 
     CMolecule getMoleculeNH3CH4();

@@ -21,6 +21,8 @@ CMolecularBasis getMolecularBasisForHeAtom();
 
 CMolecularBasis getMolecularBasisForH2O();
 
+CMolecularBasis getMolecularBasisForH2Se();
+
 CMolecularBasis getMinimalBasisForH2O();
 
 CMolecularBasis getMinimalBasisForNH3CH4();

@@ -63,6 +63,20 @@ getMolecularBasisForH2O()
 }
 
 CMolecularBasis
+getMolecularBasisForH2Se()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"def2-SVP"});
+
+    mbas.addAtomBasis(getNormalizedAtomBasisForSe());
+
+    mbas.addAtomBasis(getNormalizedAtomBasisForH());
+
+    return mbas;
+}
+
+CMolecularBasis
 getMinimalBasisForH2O()
 {
     CMolecularBasis mbas;
