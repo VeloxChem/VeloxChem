@@ -90,6 +90,9 @@ void export_math()
         .def("to_numpy", &CDenseMatrix_to_numpy)
         .def("from_numpy", &CDenseMatrix_from_numpy)
         .staticmethod("from_numpy")
+        .def("zero", &CDenseMatrix::zero)
+        .def("symmetrize", &CDenseMatrix::symmetrize)
+        .def("slice", &CDenseMatrix::slice)
         .def(bp::self == bp::other<CDenseMatrix>())
     ;
 }
