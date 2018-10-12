@@ -235,6 +235,16 @@ CSinglePointEnergy::run(COutputStream& oStream,
     CAOFockMatrix fock(dsad);
     
     eridrv.compute(fock, dsad, _molecule, _aoBasis, qqdata, oStream, comm);
+    
+    //fock.addCoreHamiltonian(kinmat, npotmat, 0);
+    
+    //std::cout << kinmat.getString();
+    
+    //std::cout << npotmat.getString();
+    
+    std::cout << dsad.getString();
+    
+    std::cout << fock.getString();
 }
 
 void

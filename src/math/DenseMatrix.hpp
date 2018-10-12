@@ -186,6 +186,11 @@ public:
     void zero();
     
     /**
+     Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).
+     */
+    void symmetrize();
+    
+    /**
      Converts dense matrix object to text output and insert it into output
      text stream.
      

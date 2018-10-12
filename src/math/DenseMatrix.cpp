@@ -211,6 +211,31 @@ CDenseMatrix::zero()
     mathfunc::zero(_values.data(), _nRows * _nColumns); 
 }
 
+void
+CDenseMatrix::symmetrize()
+{
+    if (_nRows == _nColumns)
+    {
+        auto fmat = _values.data();
+        
+        for (int32_t i = 0; i < _nRows; i++)
+        {
+            for (int32_t j = i; j < _nRows; j++)
+            {
+                auto ijoff = i * _nColumns + j;
+            
+                auto jioff = j * _nColumns + i;
+            
+                auto fval = fmat[ijoff] + fmat[jioff];
+                
+                fmat[ijoff] = fval;
+                
+                fmat[jioff] = fval; 
+            }
+        }
+    }
+}
+
 std::ostream&
 operator<<(      std::ostream&  output,
            const CDenseMatrix& source)

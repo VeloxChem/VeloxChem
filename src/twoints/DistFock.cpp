@@ -110,43 +110,43 @@ namespace distfock { // distfock namespace
                             
                             // Coulomb contribution
                             
-                            auto fpq = 2.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                            auto fpq = 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
                             
                             fockMatrix[idp * nFockColumns + idq] += fpq;
                             
-                            fockMatrix[idq * nFockColumns + idp] += fpq;
+                            //fockMatrix[idq * nFockColumns + idp] += fpq;
                             
-                            auto frs = 2.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                            auto frs = 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
                             
                             fockMatrix[idr * nFockColumns + ids] += frs;
                             
-                            fockMatrix[ids * nFockColumns + idr] += frs;
+                            //fockMatrix[ids * nFockColumns + idr] += frs;
                             
                             // exchange contribution
                             
-                            auto fpr = 0.5 * fval * densityMatrix[idq * nDensityColumns + ids];
+                            auto fpr = fval * densityMatrix[idq * nDensityColumns + ids];
                             
                             fockMatrix[idp * nFockColumns + idr] -= fpr;
                             
-                            fockMatrix[idr * nFockColumns + idp] -= fpr;
+                            //fockMatrix[idr * nFockColumns + idp] -= fpr;
                             
-                            auto fps = 0.5 * fval * densityMatrix[idq * nDensityColumns + idr];
+                            auto fps = fval * densityMatrix[idq * nDensityColumns + idr];
                             
                             fockMatrix[idp * nFockColumns + ids] -= fps;
                             
-                            fockMatrix[ids * nFockColumns + idp] -= fps;
+                            //fockMatrix[ids * nFockColumns + idp] -= fps;
                             
-                            auto fqr = 0.5 * fval * densityMatrix[idp * nDensityColumns + ids];
+                            auto fqr = fval * densityMatrix[idp * nDensityColumns + ids];
                             
                             fockMatrix[idq * nFockColumns + idr] -= fqr;
                             
-                            fockMatrix[idr * nFockColumns + idq] -= fqr;
+                            //fockMatrix[idr * nFockColumns + idq] -= fqr;
                             
-                            auto fqs = 0.5 * fval * densityMatrix[idp * nDensityColumns + idr];
+                            auto fqs = fval * densityMatrix[idp * nDensityColumns + idr];
                             
                             fockMatrix[idq * nFockColumns + ids] -= fqs;
                             
-                            fockMatrix[ids * nFockColumns + idq] -= fqs;
+                            //fockMatrix[ids * nFockColumns + idq] -= fqs;
                         }
                     }
                 }

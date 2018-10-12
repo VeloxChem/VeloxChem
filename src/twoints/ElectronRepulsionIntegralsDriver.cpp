@@ -70,8 +70,12 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
     
     // compute repulsion integrals
     
+    aoFockMatrix.zero(); 
+    
     _compElectronRepulsionIntegrals(aoFockMatrix, aoDensityMatrix, &bbpairs,
                                     &bbpairs, &screeningContainer);
+    
+    aoFockMatrix.symmetrize(); 
     
     // print evaluation timing statistics
     

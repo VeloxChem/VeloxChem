@@ -172,6 +172,47 @@ CAOFockMatrix::zero()
     }
 }
 
+void
+CAOFockMatrix::symmetrize()
+{
+    for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+    {
+        if (isSymmetric(i)) _fockMatrices[i].symmetrize();
+        
+        // FIX ME: Add antisymmetric matrices
+    }
+}
+
+void
+CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMatrix,
+                                  const CNuclearPotentialMatrix& nuclearPotentialMatrix,
+                                  const int32_t                  iFockMatrix)
+{
+    // set up pointer to kinetic energy matrix
+    
+    auto pkin = kineticEnergyMatrix.values();
+    
+    // set up pointer to nuclear potential matrix
+    
+    auto pnucpot = nuclearPotentialMatrix.values();
+    
+    // set up pointer to Fock matrix
+    
+    auto pfock = _fockMatrices[iFockMatrix].values();
+    
+    // add core Hamiltonian contributions
+    
+    auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
+    
+    printf("ndim: %i\n", ndim); 
+    
+    #pragma omp simd aligned(pfock, pkin, pnucpot: VLX_ALIGN)
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        pfock[i] += pkin[i] - pnucpot[i];
+    }
+}
+
 int32_t
 CAOFockMatrix::getNumberOfFockMatrices() const
 {
@@ -260,6 +301,24 @@ CAOFockMatrix::getDensityIdentifier(const int32_t iFockMatrix) const
     }
     
     return -1;
+}
+
+bool
+CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
+{
+    auto fcktyp = _fockTypes[iFockMatrix];
+    
+    if (fcktyp == fockmat::restjk) return true;
+    
+    if (fcktyp == fockmat::restjkx) return true;
+    
+    if (fcktyp == fockmat::restj) return true;
+    
+    if (fcktyp == fockmat::restk) return true;
+    
+    if (fcktyp == fockmat::restkx) return true;
+    
+    return false;
 }
 
 std::string

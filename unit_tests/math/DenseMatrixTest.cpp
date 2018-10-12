@@ -156,3 +156,20 @@ TEST_F(CDenseMatrixTest, Zero)
     
     ASSERT_EQ(ma, mb);
 }
+
+TEST_F(CDenseMatrixTest, Symmetrize)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0,
+                    -2.0,  5.0,  4.0,
+                     1.0,  2.0,  3.0},
+                    3, 3);
+    
+    ma.symmetrize();
+    
+    CDenseMatrix mb({2.0, -3.0, -2.0,
+                    -3.0, 10.0,  6.0,
+                    -2.0,  6.0,  6.0},
+                    3, 3);
+    
+    ASSERT_EQ(ma, mb);
+}

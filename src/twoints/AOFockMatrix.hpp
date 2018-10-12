@@ -15,6 +15,8 @@
 #include "DenseMatrix.hpp"
 #include "FockMatrixType.hpp"
 #include "AODensityMatrix.hpp"
+#include "KineticEnergyMatrix.hpp"
+#include "NuclearPotentialMatrix.hpp"
 
 /**
  Class CAOFockMatrix stores set of AO Fock matrices and provides set of methods
@@ -128,6 +130,23 @@ public:
     void zero();
     
     /**
+     Symmetrizes AO Fock matrix according to it's type.
+     */
+    void symmetrize();
+    
+    /**
+     Adds core Hamiltonian, kinetic energy and nuclear potential matrices, to
+     specific Fock matrix.
+
+     @param kineticEnergyMatrix the kinetic energy matrix.
+     @param nuclearPotentialMatrix the nuclear potential
+     @param iFockMatrix the index of Fock matrix.
+     */
+    void addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMatrix,
+                            const CNuclearPotentialMatrix& nuclearPotentialMatrix,
+                            const int32_t                  iFockMatrix);
+    
+    /**
      Gets number of Fock matrices.
      
      @return the number of Fock matrices.
@@ -197,6 +216,14 @@ public:
      @return the identifier of density matrix.
      */
     int32_t getDensityIdentifier(const int32_t iFockMatrix) const;
+    
+    /**
+     Checks if specific Fock matrix is symmetric.
+
+     @param iFockMatrix the index of Fock matrix.
+     @return true if Fock matrix is symmetric, false otherwise.
+     */
+    bool isSymmetric(const int32_t iFockMatrix) const;
     
     /**
      Gets string representation of density matrix object.
