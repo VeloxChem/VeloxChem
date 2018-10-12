@@ -204,8 +204,6 @@ CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMa
     
     auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
     
-    printf("ndim: %i\n", ndim); 
-    
     #pragma omp simd aligned(pfock, pkin, pnucpot: VLX_ALIGN)
     for (int32_t i = 0; i < ndim; i++)
     {
@@ -306,17 +304,25 @@ CAOFockMatrix::getDensityIdentifier(const int32_t iFockMatrix) const
 bool
 CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
 {
-    auto fcktyp = _fockTypes[iFockMatrix];
+    if (iFockMatrix < getNumberOfFockMatrices())
+    {
+        if (_fockMatrices[iFockMatrix].getNumberOfRows() != _fockMatrices[iFockMatrix].getNumberOfColumns())
+        {
+            return false;
+        }
     
-    if (fcktyp == fockmat::restjk) return true;
+        auto fcktyp = _fockTypes[iFockMatrix];
     
-    if (fcktyp == fockmat::restjkx) return true;
+        if (fcktyp == fockmat::restjk) return true;
     
-    if (fcktyp == fockmat::restj) return true;
+        if (fcktyp == fockmat::restjkx) return true;
     
-    if (fcktyp == fockmat::restk) return true;
+        if (fcktyp == fockmat::restj) return true;
     
-    if (fcktyp == fockmat::restkx) return true;
+        if (fcktyp == fockmat::restk) return true;
+    
+        if (fcktyp == fockmat::restkx) return true;
+    }
     
     return false;
 }

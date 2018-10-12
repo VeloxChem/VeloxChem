@@ -52,10 +52,6 @@ namespace distfock { // distfock namespace
         
         for (int32_t i = 0; i < acomp; i++)
         {
-            // apply symmetry on bra side
-            
-            //auto joff = symbra ? i : 0;
-            
             // set up index P for bra side
             
             int32_t idp = (braGtoPairsBlock.getBraIdentifiers(i))[iContrPair];
@@ -108,45 +104,21 @@ namespace distfock { // distfock namespace
                             
                             if ((idp == idr) && (idq == ids)) fval *= 0.5;
                             
-                            // Coulomb contribution
+                            // Coulomb contributions
                             
-                            auto fpq = 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                            fockMatrix[idp * nFockColumns + idq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
                             
-                            fockMatrix[idp * nFockColumns + idq] += fpq;
+                            fockMatrix[idr * nFockColumns + ids] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
                             
-                            //fockMatrix[idq * nFockColumns + idp] += fpq;
+                            // exchange contributions
                             
-                            auto frs = 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                            fockMatrix[idp * nFockColumns + idr] -= fval * densityMatrix[idq * nDensityColumns + ids];
                             
-                            fockMatrix[idr * nFockColumns + ids] += frs;
+                            fockMatrix[idp * nFockColumns + ids] -= fval * densityMatrix[idq * nDensityColumns + idr];
                             
-                            //fockMatrix[ids * nFockColumns + idr] += frs;
+                            fockMatrix[idq * nFockColumns + idr] -= fval * densityMatrix[idp * nDensityColumns + ids];
                             
-                            // exchange contribution
-                            
-                            auto fpr = fval * densityMatrix[idq * nDensityColumns + ids];
-                            
-                            fockMatrix[idp * nFockColumns + idr] -= fpr;
-                            
-                            //fockMatrix[idr * nFockColumns + idp] -= fpr;
-                            
-                            auto fps = fval * densityMatrix[idq * nDensityColumns + idr];
-                            
-                            fockMatrix[idp * nFockColumns + ids] -= fps;
-                            
-                            //fockMatrix[ids * nFockColumns + idp] -= fps;
-                            
-                            auto fqr = fval * densityMatrix[idp * nDensityColumns + ids];
-                            
-                            fockMatrix[idq * nFockColumns + idr] -= fqr;
-                            
-                            //fockMatrix[idr * nFockColumns + idq] -= fqr;
-                            
-                            auto fqs = fval * densityMatrix[idp * nDensityColumns + idr];
-                            
-                            fockMatrix[idq * nFockColumns + ids] -= fqs;
-                            
-                            //fockMatrix[ids * nFockColumns + idq] -= fqs;
+                            fockMatrix[idq * nFockColumns + ids] -= fval * densityMatrix[idp * nDensityColumns + idr];
                         }
                     }
                 }

@@ -96,3 +96,25 @@ TEST_F(CDenseDiagonalizerTest, GetInvertedMatrix)
     
     ASSERT_EQ(refmat, diagdrv.getInvertedMatrix());
 }
+
+TEST_F(CDenseDiagonalizerTest, GetNumberOfEigenValues)
+{
+    CDenseMatrix mata({10.0, 3.0, 4.0,
+                        3.0, 1.2, 1.0,
+                        4.0, 1.0, 4.0},
+                      3, 3);
+    
+    CDenseDiagonalizer diagdrv;
+    
+    diagdrv.diagonalize(mata);
+    
+    ASSERT_TRUE(diagdrv.getState());
+    
+    ASSERT_EQ(3, diagdrv.getNumberOfEigenValues(0.0));
+    
+    ASSERT_EQ(2, diagdrv.getNumberOfEigenValues(0.5));
+    
+    ASSERT_EQ(1, diagdrv.getNumberOfEigenValues(3.0));
+
+    ASSERT_EQ(0, diagdrv.getNumberOfEigenValues(20.0));
+}

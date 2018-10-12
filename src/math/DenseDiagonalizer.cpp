@@ -98,55 +98,90 @@ CDenseDiagonalizer::getEigenValues() const
 CDenseMatrix
 CDenseDiagonalizer::getInvertedSqrtMatrix() const
 {
-    // set up temporary e^-1/2 vector
-    
-    auto evec = _eigenValues;
-    
-    // set up pointers and dimensions of e^-1/2 vector
-    
-    auto fvals = evec.data();
-    
-    auto ndim = evec.size();
-    
-    // compute e^-1/2 vector
-    
-    #pragma omp simd aligned(fvals: VLX_ALIGN)
-    for (int32_t i = 0; i < ndim; i++)
+    if (_isSolved)
     {
-        fvals[i] = 1.0 / std::sqrt(fvals[i]);
+        // set up temporary e^-1/2 vector
+    
+        auto evec = _eigenValues;
+    
+        // set up pointers and dimensions of e^-1/2 vector
+    
+        auto fvals = evec.data();
+    
+        auto ndim = evec.size();
+    
+        // compute e^-1/2 vector
+    
+        #pragma omp simd aligned(fvals: VLX_ALIGN)
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            fvals[i] = 1.0 / std::sqrt(fvals[i]);
+        }
+    
+        // construct A^-1/2 matrix
+    
+        auto mat = denblas::multDiagByAt(evec, _eigenVectors);
+    
+        return denblas::multAB(_eigenVectors, mat);
     }
     
-    // construct A^-1/2 matrix
-    
-    auto mat = denblas::multDiagByAt(evec, _eigenVectors);
-    
-    return denblas::multAB(_eigenVectors, mat);
+    return CDenseMatrix(); 
 }
 
 CDenseMatrix
 CDenseDiagonalizer::getInvertedMatrix() const
 {
-    // set up temporary e^-1 vector
-    
-    auto evec = _eigenValues;
-    
-    // set up pointers and dimensions of e^-1 vector
-    
-    auto fvals = evec.data();
-    
-    auto ndim = evec.size();
-    
-    // compute e^-1 vector
-    
-    #pragma omp simd aligned(fvals: VLX_ALIGN)
-    for (int32_t i = 0; i < ndim; i++)
+    if (_isSolved)
     {
-        fvals[i] = 1.0 / fvals[i];
+        // set up temporary e^-1 vector
+    
+        auto evec = _eigenValues;
+    
+        // set up pointers and dimensions of e^-1 vector
+    
+        auto fvals = evec.data();
+    
+        auto ndim = evec.size();
+    
+        // compute e^-1 vector
+    
+        #pragma omp simd aligned(fvals: VLX_ALIGN)
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            fvals[i] = 1.0 / fvals[i];
+        }
+    
+        // construct A^-1 matrix
+    
+        auto mat = denblas::multDiagByAt(evec, _eigenVectors);
+    
+        return denblas::multAB(_eigenVectors, mat);
     }
     
-    // construct A^-1 matrix
+    return CDenseMatrix();
+}
+
+CDenseMatrix
+CDenseDiagonalizer::getInvertedSqrtMatrix(const double threshold) const
+{
+    return CDenseMatrix();
+}
+
+int32_t
+CDenseDiagonalizer::getNumberOfEigenValues(const double threshold) const
+{
+    // NOTE: dserv stores eigenvalues in ascending order
     
-    auto mat = denblas::multDiagByAt(evec, _eigenVectors);
+    if (_isSolved)
+    {
+        for (int32_t i = 0; i < _eigenValues.size(); i++)
+        {
+            if (_eigenValues.at(i) > threshold)
+            {
+                return _eigenValues.size() - i;
+            }
+        }
+    }
     
-    return denblas::multAB(_eigenVectors, mat);
+    return 0;
 }

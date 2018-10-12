@@ -102,6 +102,23 @@ public:
      @return the A^-1 matrix.
      */
     CDenseMatrix getInvertedMatrix() const;
+    
+    /**
+     Computes reduced A^-1/2 matrix using eigenvalues of matrix A, which are
+     above given threshold.
+     
+     @param threshold the eigenvalues cutt-off threshold.
+     @return the A^-1/2 matrix.
+     */
+    CDenseMatrix getInvertedSqrtMatrix(const double threshold) const;
+    
+    /**
+     Gets number of eigenvalues bellow given threshold.
+
+     @param threshold the eigenvalues cut-off threshold.
+     @return the number of eigenvalues.
+     */
+    int32_t getNumberOfEigenValues(const double threshold) const;
 };
 
 #endif /* DenseDiagonalizer_hpp */
