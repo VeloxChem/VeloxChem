@@ -48,15 +48,35 @@ namespace distfock { // distfock namespace
         
         auto dcomp = angmom::to_SphericalComponents(dang);
         
+        // determine symmetry of angular components on bra side
+        
+        auto refp = (braGtoPairsBlock.getBraIdentifiers(0))[iContrPair];
+        
+        auto refq = (braGtoPairsBlock.getKetIdentifiers(0))[iContrPair];
+        
+        bool symbra = (refp == refq);
+        
+        // set up pointers to reference indexes on ket side
+        
+        auto prefk = ketGtoPairsBlock.getBraIdentifiers(0);
+        
+        auto prefl = ketGtoPairsBlock.getKetIdentifiers(0);
+        
         // loop over angular components on bra side
+        
+        int32_t bracomp = 0;
         
         for (int32_t i = 0; i < acomp; i++)
         {
             // set up index P for bra side
             
             int32_t idp = (braGtoPairsBlock.getBraIdentifiers(i))[iContrPair];
+         
+            // starting angular index of Q
             
-            for (int32_t j = 0; j < bcomp; j++)
+            auto jstart = (symbra) ? i : 0;
+            
+            for (int32_t j = jstart; j < bcomp; j++)
             {
                 // set up index Q for bra side
                 
@@ -67,6 +87,8 @@ namespace distfock { // distfock namespace
                 auto braoff = (i * bcomp + j) * ccomp * dcomp;
                 
                 // loop over angular components on ket side
+                
+                int32_t ketcomp = 0;
                 
                 for (int32_t k = 0; k < ccomp; k++)
                 {
@@ -88,40 +110,65 @@ namespace distfock { // distfock namespace
                         
                         for (int32_t m = 0; m < nKetContrPairs; m++)
                         {
-                            // set up S and R indexes
+                            // symmetry restriction for ket angular components
                             
-                            auto idr = idxk[m];
+                            auto refr = prefk[m];
                             
-                            auto ids = idxl[m];
+                            auto refs = prefl[m];
                             
-                            // scale integral value
+                            if ((refr == refs) && (l < k)) continue;
                             
-                            auto fval = pints[m];
+                            // semmetry restriction for bra/ket angular componets
                             
-                            if (idp == idq) fval *= 0.5;
+                            bool braeqket = (refp == refr) && (refq == refs);
                             
-                            if (idr == ids) fval *= 0.5;
+                            bool redbraket = (braeqket) ? (bracomp <= ketcomp) : true;
                             
-                            if ((idp == idr) && (idq == ids)) fval *= 0.5;
+                            if (redbraket)
+                            {
+                                // set up S and R indexes
                             
-                            // Coulomb contributions
+                                auto idr = idxk[m];
                             
-                            fockMatrix[idp * nFockColumns + idq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                                auto ids = idxl[m];
                             
-                            fockMatrix[idr * nFockColumns + ids] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                                // scale integral value
                             
-                            // exchange contributions
+                                auto fval = pints[m];
                             
-                            fockMatrix[idp * nFockColumns + idr] -= fval * densityMatrix[idq * nDensityColumns + ids];
+                                if (idp == idq) fval *= 0.5;
                             
-                            fockMatrix[idp * nFockColumns + ids] -= fval * densityMatrix[idq * nDensityColumns + idr];
+                                if (idr == ids) fval *= 0.5;
                             
-                            fockMatrix[idq * nFockColumns + idr] -= fval * densityMatrix[idp * nDensityColumns + ids];
+                                if ((idp == idr) && (idq == ids)) fval *= 0.5;
                             
-                            fockMatrix[idq * nFockColumns + ids] -= fval * densityMatrix[idp * nDensityColumns + idr];
+                                // Coulomb contributions
+                            
+                                fockMatrix[idp * nFockColumns + idq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                            
+                                fockMatrix[idr * nFockColumns + ids] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                            
+                                // exchange contributions
+                            
+                                fockMatrix[idp * nFockColumns + idr] -= fval * densityMatrix[idq * nDensityColumns + ids];
+                            
+                                fockMatrix[idp * nFockColumns + ids] -= fval * densityMatrix[idq * nDensityColumns + idr];
+                            
+                                fockMatrix[idq * nFockColumns + idr] -= fval * densityMatrix[idp * nDensityColumns + ids];
+                            
+                                fockMatrix[idq * nFockColumns + ids] -= fval * densityMatrix[idp * nDensityColumns + idr];
+                            }
                         }
+                        
+                        // update angular components counter for ket
+                        
+                        ketcomp++;
                     }
                 }
+                
+                // update angular components counter for bra
+                
+                bracomp++;
             }
         }
     }
