@@ -125,6 +125,31 @@ public:
     bool operator!=(const CDenseMatrix& other) const;
     
     /**
+     Sets all values in dense matrix to zero.
+     */
+    void zero();
+    
+    /**
+     Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).
+     */
+    void symmetrize();
+    
+    /**
+     Creates dense matrix object by slicing specified size submatrix at
+     selected position from this dense matrix object.
+
+     @param iRow the starting row of submatrix.
+     @param iColumn the starting column of submatrix.
+     @param nRows the number of rows in submatrix.
+     @param nColumns the number of columns in submatrix.
+     @return the dense matrix object.
+     */
+    CDenseMatrix slice(const int32_t iRow,
+                       const int32_t iColumn,
+                       const int32_t nRows,
+                       const int32_t nColumns);
+    
+    /**
      Gets number of rows in dense matrix.
 
      @return the number of rows.
@@ -179,16 +204,6 @@ public:
      @return the string representation.
      */
     std::string getString() const;
-    
-    /**
-     Sets all values in dense matrix to zero.
-     */
-    void zero();
-    
-    /**
-     Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).
-     */
-    void symmetrize();
     
     /**
      Converts dense matrix object to text output and insert it into output
