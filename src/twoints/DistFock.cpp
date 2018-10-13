@@ -64,8 +64,6 @@ namespace distfock { // distfock namespace
         
         // loop over angular components on bra side
         
-        int32_t bracomp = 0;
-        
         for (int32_t i = 0; i < acomp; i++)
         {
             // set up index P for bra side
@@ -87,8 +85,6 @@ namespace distfock { // distfock namespace
                 auto braoff = (i * bcomp + j) * ccomp * dcomp;
                 
                 // loop over angular components on ket side
-                
-                int32_t ketcomp = 0;
                 
                 for (int32_t k = 0; k < ccomp; k++)
                 {
@@ -118,60 +114,48 @@ namespace distfock { // distfock namespace
                             
                             if ((refr == refs) && (l < k)) continue;
                             
-                            // semmetry restriction for bra/ket angular componets
+                            // symmetry restriction for bra/ket angular componets
                             
                             bool braeqket = (refp == refr) && (refq == refs);
                             
-                            bool redbraket = (braeqket) ? (bracomp <= ketcomp) : true;
+                            if  (((k * dcomp + l) < (i * bcomp + j)) && braeqket) continue;
+                
+                            // set up S and R indexes
                             
-                            if (redbraket)
-                            {
-                                // set up S and R indexes
+                            auto idr = idxk[m];
                             
-                                auto idr = idxk[m];
+                            auto ids = idxl[m];
                             
-                                auto ids = idxl[m];
+                            // scale integral value
                             
-                                // scale integral value
+                            auto fval = pints[m];
+                                
+                            if (idp == idq) fval *= 0.5;
                             
-                                auto fval = pints[m];
+                            if (idr == ids) fval *= 0.5;
                             
-                                if (idp == idq) fval *= 0.5;
+                            if ((idp == idr) && (idq == ids)) fval *= 0.5;
                             
-                                if (idr == ids) fval *= 0.5;
+                            // Coulomb contributions
                             
-                                if ((idp == idr) && (idq == ids)) fval *= 0.5;
+                            fockMatrix[idp * nFockColumns + idq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                                
+                            fockMatrix[idr * nFockColumns + ids] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
                             
-                                // Coulomb contributions
+                            // exchange contributions
                             
-                                fockMatrix[idp * nFockColumns + idq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                            fockMatrix[idp * nFockColumns + idr] -= fval * densityMatrix[idq * nDensityColumns + ids];
                             
-                                fockMatrix[idr * nFockColumns + ids] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                            fockMatrix[idp * nFockColumns + ids] -= fval * densityMatrix[idq * nDensityColumns + idr];
                             
-                                // exchange contributions
-                            
-                                fockMatrix[idp * nFockColumns + idr] -= fval * densityMatrix[idq * nDensityColumns + ids];
-                            
-                                fockMatrix[idp * nFockColumns + ids] -= fval * densityMatrix[idq * nDensityColumns + idr];
-                            
-                                fockMatrix[idq * nFockColumns + idr] -= fval * densityMatrix[idp * nDensityColumns + ids];
-                            
-                                fockMatrix[idq * nFockColumns + ids] -= fval * densityMatrix[idp * nDensityColumns + idr];
-                            }
+                            fockMatrix[idq * nFockColumns + idr] -= fval * densityMatrix[idp * nDensityColumns + ids];
+                                
+                            fockMatrix[idq * nFockColumns + ids] -= fval * densityMatrix[idp * nDensityColumns + idr];
                         }
-                        
-                        // update angular components counter for ket
-                        
-                        ketcomp++;
                     }
                 }
-                
-                // update angular components counter for bra
-                
-                bracomp++;
             }
         }
     }
-    
     
 } // distfock namespace

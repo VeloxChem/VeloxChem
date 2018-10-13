@@ -137,6 +137,37 @@ getNormalizedAtomBasisForHe()
 
     return bas;
 }
+    
+CAtomBasis
+getAtomBasisSPDForHe()
+{
+    CAtomBasis bas;
+
+    bas.setIdElemental(2);
+
+    std::vector<CBasisFunction> bf;
+
+    bf.push_back(CBasisFunction({2.2000000000000000},
+                                {1.0000000000000000},
+                                0));
+    
+    bf.push_back(CBasisFunction({1.3000000000000000},
+                                {1.0000000000000000},
+                                1));
+    
+    bf.push_back(CBasisFunction({0.8000000000000000},
+                                {1.0000000000000000},
+                                2));
+
+    for (size_t i = 0; i < bf.size(); i++)
+    {
+        bf[i].normalize();
+
+        bas.addBasisFunction(bf[i]);
+    }
+
+    return bas;
+}
   
 CAtomBasis
 getNormalizedAtomBasisForO()

@@ -47,6 +47,18 @@ getMolecularBasisForHeAtom()
 
     return mbas;
 }
+    
+CMolecularBasis
+getMolecularBasisSPDForHeAtom()
+{
+    CMolecularBasis mbas;
+        
+    mbas.setLabel({"XTEST-SPD"});
+        
+    mbas.addAtomBasis(getAtomBasisSPDForHe());
+        
+    return mbas;
+}
 
 CMolecularBasis
 getMolecularBasisForH2O()
