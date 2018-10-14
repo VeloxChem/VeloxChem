@@ -17,6 +17,11 @@ namespace vlxtest {
     void compare(const std::vector<double>& aVector,
                  const double*              bVector);
     
+    void compare(const std::vector<double>& aVector,
+                 const double*              bVector,
+                 const double               threshod);
+    
+    
     void compare(const std::vector<int32_t>& aVector,
                  const int32_t*              bVector);
 

@@ -15,9 +15,16 @@ namespace vlxtest { // namespace
 void compare(const std::vector<double>& aVector,
              const double*              bVector)
 {
+    vlxtest::compare(aVector, bVector, 1.0e-13);
+}
+
+void compare(const std::vector<double>& aVector,
+             const double*              bVector,
+             const double               threshod)
+{
     for (size_t i = 0; i < aVector.size(); i++)
     {
-        ASSERT_NEAR(aVector[i], bVector[i], 1.0e-13);
+        ASSERT_NEAR(aVector[i], bVector[i], threshod);
     }
 }
     

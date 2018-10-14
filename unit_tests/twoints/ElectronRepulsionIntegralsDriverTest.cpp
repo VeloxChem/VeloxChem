@@ -5702,7 +5702,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeMaxQValues)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAtom)
 {
-    auto mh2o = vlxmol::getMoleculeHeAtom();
+    auto mhe = vlxmol::getMoleculeHeAtom();
 
     auto mbas = vlxbas::getMolecularBasisForHeAtom();
 
@@ -5726,12 +5726,12 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAtom)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
 
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas, ost,
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost,
                                  MPI_COMM_WORLD);
 
     CAOFockMatrix fock(dmat);
 
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, ost, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mhe, mbas, qqdata, ost, MPI_COMM_WORLD);
 
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
 
@@ -5756,7 +5756,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAtom)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAnionWithSPD)
 {
-    auto mh2o = vlxmol::getMoleculeHeAtom();
+    auto mhe = vlxmol::getMoleculeHeAtom();
     
     auto mbas = vlxbas::getMolecularBasisSPDForHeAtom();
     
@@ -5780,12 +5780,12 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAnionWithSPD)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas, ost,
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost,
                                  MPI_COMM_WORLD);
     
     CAOFockMatrix fock(dmat);
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, ost, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mhe, mbas, qqdata, ost, MPI_COMM_WORLD);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -6241,24 +6241,9 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2O)
     
     ASSERT_EQ(fock.getNumberOfElements(0), static_cast<int32_t>(jkvals.size()));
     
-    CAOFockMatrix jk ({CDenseMatrix(jkvals, nrows, ncols)}, {fockmat::restjk}, {1.0}, {0});
-
-    double maxdiff = 0.0;
-
-    for (int32_t i = 0, row = 0; row < fock.getNumberOfRows(0); row++)
-    {
-        for (int32_t col = 0; col < fock.getNumberOfColumns(0); col++, i++)
-        {
-            double diff = fabs(fock.getFock(0)[i] - jk.getFock(0)[i]);
-
-            if (maxdiff < diff) maxdiff = diff;
-        }
-    }
-
     // Maximum element is 12.5 and we compare up to its 14-th significant digit.
-    // This can be improved when we move the test to python with hdf5 file.
 
-    ASSERT_NEAR(0.0, maxdiff, 1.0e-12);
+    vlxtest::compare(jkvals, fock.getFock(0), 1.0e-12);
 }
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
@@ -7468,28 +7453,11 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
 
     ASSERT_EQ(fock.getNumberOfElements(0), static_cast<int32_t>(jkvals.size()));
     
-    CAOFockMatrix jk ({CDenseMatrix(jkvals, nrows, ncols)}, {fockmat::restjk}, {1.0}, {0});
-
-    double maxdiff = 0.0;
-
-    for (int32_t i = 0, row = 0; row < fock.getNumberOfRows(0); row++)
-    {
-        for (int32_t col = 0; col < fock.getNumberOfColumns(0); col++, i++)
-        {
-            double diff = fabs(fock.getFock(0)[i] - jk.getFock(0)[i]);
-
-            if (maxdiff < diff) maxdiff = diff;
-        }
-    }
-
     // Maximum element is 117.9 and we compare up to its 14-th significant digit.
-    // This can be improved when we move the test to python with hdf5 file.
 
-    ASSERT_NEAR(0.0, maxdiff, 1.0e-11);
-    
-    // Need small fix for few elements (we need to generate integrals with same
-    // settings: prescreening 1.0e-13, etc)
-    // Failing lines:
+    vlxtest::compare(jkvals, fock.getFock(0), 1.0e-11);
+
+    // Small deviations:
     //Row 0 Col 0 Diff= 5.40012e-13
     //Row 0 Col 5 Diff= 8.86653e-12
     //Row 0 Col 7 Diff= 8.86623e-12
