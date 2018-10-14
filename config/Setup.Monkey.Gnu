@@ -10,6 +10,7 @@
 
 USE_MPI := true
 USE_GPU := true
+USE_MKL := false
 
 # C++ compiler & linker
 
@@ -38,15 +39,21 @@ ifeq ($(USE_GPU),true)
   CPP_DEB_FLG += -DENABLE_GPU
 endif
 
+ifeq ($(USE_MKL),true)
+  CPP_REL_FLG += -DENABLE_MKL
+  CPP_DEB_FLG += -DENABLE_MKL
+endif
+
 CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 
 # MKL header and library
 
+MKLROOT := /home/xinli/software/openblas
 MKL_INCLUDES := $(MKLROOT)/include
 
-LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lmkl_intel_lp64
-LIB_LIST += -lmkl_gnu_thread -lmkl_core -lmkl_avx -lgomp -lpthread -lm -ldl
+LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas
+LIB_LIST += -lgomp -lpthread -lm -ldl
 
 # Google Test root directory
 
