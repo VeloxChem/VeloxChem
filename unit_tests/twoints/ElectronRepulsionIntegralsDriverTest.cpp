@@ -6243,20 +6243,22 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2O)
     
     CAOFockMatrix jk ({CDenseMatrix(jkvals, nrows, ncols)}, {fockmat::restjk}, {1.0}, {0});
 
+    double maxdiff = 0.0;
+
     for (int32_t i = 0, row = 0; row < fock.getNumberOfRows(0); row++)
     {
         for (int32_t col = 0; col < fock.getNumberOfColumns(0); col++, i++)
         {
             double diff = fabs(fock.getFock(0)[i] - jk.getFock(0)[i]);
 
-            if (diff > 1.0e-10)
-            {
-                std::cout << "Row " << row << " Col " << col << " Diff= " << diff << std::endl;
-            }
+            if (maxdiff < diff) maxdiff = diff;
         }
     }
-    
-    ASSERT_EQ(jk, fock);
+
+    // Maximum element is 12.5 and we compare up to its 14-th significant digit.
+    // This can be improved when we move the test to python with hdf5 file.
+
+    ASSERT_NEAR(0.0, maxdiff, 1.0e-12);
 }
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
@@ -7468,18 +7470,22 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
     
     CAOFockMatrix jk ({CDenseMatrix(jkvals, nrows, ncols)}, {fockmat::restjk}, {1.0}, {0});
 
+    double maxdiff = 0.0;
+
     for (int32_t i = 0, row = 0; row < fock.getNumberOfRows(0); row++)
     {
         for (int32_t col = 0; col < fock.getNumberOfColumns(0); col++, i++)
         {
             double diff = fabs(fock.getFock(0)[i] - jk.getFock(0)[i]);
 
-            if (diff > 1.0e-13)
-            {
-                std::cout << "Row " << row << " Col " << col << " Diff= " << diff << std::endl;
-            }
+            if (maxdiff < diff) maxdiff = diff;
         }
     }
+
+    // Maximum element is 117.9 and we compare up to its 14-th significant digit.
+    // This can be improved when we move the test to python with hdf5 file.
+
+    ASSERT_NEAR(0.0, maxdiff, 1.0e-11);
     
     // Need small fix for few elements (we need to generate integrals with same
     // settings: prescreening 1.0e-13, etc)
@@ -7512,6 +7518,4 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
     //Row 36 Col 36 Diff= 1.7053e-13
     //Row 37 Col 37 Diff= 1.13687e-13
     //Row 39 Col 39 Diff= 1.42109e-13
-    // ASSERT_EQ(jk, fock);
 }
-
