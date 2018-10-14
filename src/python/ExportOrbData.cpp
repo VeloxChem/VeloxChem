@@ -34,7 +34,7 @@ CMolecularBasis_broadcast(CMolecularBasis& self,
 
     self.broadcast(rank, *comm_ptr);
 }
-
+    
 // Helper function for printing CAODensityMatrix
 
 std::string
@@ -107,6 +107,7 @@ void export_orbdata()
         )
         .def("get_label", &CMolecularBasis::getLabel)
         .def("broadcast", &CMolecularBasis_broadcast)
+        .def("print_basis", &CMolecularBasis::printBasis)
     ;
 
     // denmat enum class
