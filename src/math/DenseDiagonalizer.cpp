@@ -164,6 +164,26 @@ CDenseDiagonalizer::getInvertedMatrix() const
 CDenseMatrix
 CDenseDiagonalizer::getInvertedSqrtMatrix(const double threshold) const
 {
+    if (_isSolved)
+    {
+        // set up dimensions
+        
+        auto ndim = _eigenValues.size();
+        
+        auto rdim = getNumberOfEigenValues(threshold);
+        
+        if (rdim > 0)
+        {
+            // set up shift position
+            
+            auto spos = ndim - rdim;
+            
+            auto mat = getInvertedSqrtMatrix();
+            
+            return mat.slice(0, spos, ndim, rdim);
+        }
+    }
+    
     return CDenseMatrix();
 }
 

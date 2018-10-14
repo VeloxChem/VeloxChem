@@ -166,7 +166,7 @@ CDenseMatrix
 CDenseMatrix::slice(const int32_t iRow,
                     const int32_t iColumn,
                     const int32_t nRows,
-                    const int32_t nColumns)
+                    const int32_t nColumns) const
 {
     if (((iRow    + nRows)    <= _nRows) &&
         ((iColumn + nColumns) <= _nColumns))

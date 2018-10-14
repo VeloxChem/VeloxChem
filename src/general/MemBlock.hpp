@@ -212,6 +212,17 @@ public:
     void shrink(const int32_t nElements);
     
     /**
+     Creates memory block object by slicing given number of elements at specific
+     position from memory block object.
+
+     @param iPosition the position of first sliced element.
+     @param nElements the number of sliced elements.
+     @return the memory block object with sliced elements.
+     */
+    CMemBlock<T> slice(const int32_t iPosition,
+                       const int32_t nElements) const;
+    
+    /**
      Broadcasts memory block object within domain of MPI communicator.
 
      @param rank the rank of MPI process.
@@ -503,6 +514,28 @@ CMemBlock<T>::shrink(const int32_t nElements)
         
         _data = tvals;
     }
+}
+
+template <class T>
+CMemBlock<T>
+CMemBlock<T>::slice(const int32_t iPosition,
+                    const int32_t nElements) const
+{
+    if ((iPosition + nElements) <= _nElements)
+    {
+        CMemBlock<T> mblock(nElements);
+        
+        auto pdat = mblock.data();
+        
+        for (int32_t i = 0; i < nElements; i++)
+        {
+            pdat[i] = _data[iPosition + i]; 
+        }
+        
+        return mblock;
+    }
+    
+    return CMemBlock<T>();
 }
 
 template <>
