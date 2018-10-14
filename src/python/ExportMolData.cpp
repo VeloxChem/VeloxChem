@@ -35,6 +35,12 @@ CMolecule_broadcast(CMolecule& self,
     self.broadcast(rank, *comm_ptr);
 }
 
+int32_t
+CMolecule_getNumberOfAtoms(const CMolecule& self)
+{
+    return self.getNumberOfAtoms();
+}
+    
 // Exports classes/functions in src/moldata to python
 
 void export_moldata()
@@ -64,6 +70,7 @@ void export_moldata()
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
+        .def("number_of_atoms", &CMolecule_getNumberOfAtoms)
     ;
 }
 

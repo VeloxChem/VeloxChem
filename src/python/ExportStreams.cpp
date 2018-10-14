@@ -28,7 +28,18 @@ void COutputStream_put_info(      COutputStream& self,
 {
     self << fmt::info << source.c_str() << fmt::end;
 }
+    
+void COutputStream_put_title(      COutputStream& self,
+                             const std::string&   source)
+{
+    self << fmt::title << source.c_str() << fmt::end;
+}
 
+void COutputStream_put_separator(COutputStream& self)
+{
+    self << fmt::title << fmt::tsep;
+}
+    
 void COutputStream_new_line(COutputStream& self)
 {
     self << fmt::blank;
@@ -50,6 +61,8 @@ void export_streams()
         .def("get_state", &COutputStream::getState)
         .def("flush", &COutputStream::flush)
         .def("put_info", &COutputStream_put_info)
+        .def("put_title", &COutputStream_put_title)
+        .def("put_separator", &COutputStream_put_separator)
         .def("new_line", &COutputStream_new_line)
     ;
 
