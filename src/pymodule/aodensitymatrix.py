@@ -9,21 +9,26 @@ def _write_hdf5(self, fname):
 
     hf = h5py.File(fname, 'w')
 
-    for i in range(self.get_number_of_density_matrices()):
+    count = 0
+
+    for index in range(self.get_number_of_density_matrices()):
 
         if self.get_density_type() == denmat.rest:
-            name = "total_" + str(i)
-            array = self.total_to_numpy(i)
+            name = str(count) + "_total_" + str(index)
+            array = self.total_to_numpy(index)
             hf.create_dataset(name, data=array, compression="gzip")
+            count += 1
 
         else:
-            name = "alpha_" + str(i)
-            array = self.alpha_to_numpy(i)
+            name = str(count) + "_alpha_" + str(index)
+            array = self.alpha_to_numpy(index)
             hf.create_dataset(name, data=array, compression="gzip")
+            count += 1
 
-            name = "beta_" + str(i)
-            array = self.beta_to_numpy(i)
+            name = str(count) + "_beta_" + str(index)
+            array = self.beta_to_numpy(index)
             hf.create_dataset(name, data=array, compression="gzip")
+            count += 1
 
     hf.close()
 
@@ -42,8 +47,14 @@ def _read_hdf5(fname):
     dens = []
     types = []
 
+    ordered_keys = []
     for key in list(hf.keys()):
-        type_str, id_str = key.split("_")
+        i = int(key.split("_")[0])
+        ordered_keys.append((i, key))
+    ordered_keys.sort()
+
+    for i, key in ordered_keys:
+        type_str = key.split("_")[1]
         dens.append(np.array(hf.get(key)))
         types.append(dentype[type_str])
 

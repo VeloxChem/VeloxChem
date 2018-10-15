@@ -24,7 +24,7 @@ def _write_hdf5(self, fname):
 
     for i in range(self.get_number_of_fock_matrices()):
         index = self.get_density_identifier(i)
-        name = focktype[self.get_fock_type(i)] + "_" + str(index)
+        name = str(i) + "_" + focktype[self.get_fock_type(i)] + "_" + str(index)
         array = self.to_numpy(i)
         hf.create_dataset(name, data=array, compression="gzip")
 
@@ -49,13 +49,19 @@ def _read_hdf5(fname):
     factors = list(hf.get("factors"))
     indices = []
 
-    keys = list(hf.keys())
-    for key in keys:
-        if key != "factors":
-            type_str, id_str = key.split("_")
-            focks.append(np.array(hf.get(key)))
-            types.append(focktype[type_str])
-            indices.append(int(id_str))
+    ordered_keys = []
+    for key in list(hf.keys()):
+        if key == "factors":
+            continue
+        i = int(key.split("_")[0])
+        ordered_keys.append((i, key))
+    ordered_keys.sort()
+
+    for i, key in ordered_keys:
+        type_str, index_str = key.split("_")[1:]
+        focks.append(np.array(hf.get(key)))
+        types.append(focktype[type_str])
+        indices.append(int(index_str))
 
     hf.close()
 

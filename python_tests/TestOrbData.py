@@ -37,6 +37,19 @@ class TestOrbData(unittest.TestCase):
         self.assertEqual(denmat.rest, d_rest.get_density_type())
         self.assertEqual(denmat.unrest, d_unrest.get_density_type())
 
+    def test_density_hdf5(self):
+
+        data_a = [[ 1., .2, ], [ .2, 1., ]]
+        data_b = [[ .9, .5, ], [ .5, .9, ]]
+        data_c = [[ .8, .6, ], [ .6, .8, ]]
+        data_d = [[ .7, .5, ], [ .5, .7, ]]
+
+        d_rest = AODensityMatrix.from_numpy_list(
+            [data_a, data_b], denmat.rest)
+
+        d_unrest = AODensityMatrix.from_numpy_list(
+            [data_a, data_b, data_c, data_d], denmat.unrest)
+
         d_rest.write_hdf5("inputs/dummy.h5")
         dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
         self.assertEqual(d_rest, dummy)

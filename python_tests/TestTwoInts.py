@@ -61,6 +61,28 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(1.0, f_rest.get_scale_factor(0))
         self.assertEqual(0, f_rest.get_density_identifier(0))
 
+    def test_fock_hdf5(self):
+
+        data_a = [[ 1., .2, ], [ .2, 1., ]]
+        data_b = [[ .9, .5, ], [ .5, .9, ]]
+        data_c = [[ .8, .6, ], [ .6, .8, ]]
+        data_d = [[ .7, .5, ], [ .5, .7, ]]
+
+        types = [fockmat.restk, fockmat.restjkx, fockmat.restk, fockmat.restjk]
+
+        factors = [1.0, 0.2, 1.0, 1.0]
+
+        indices = [0, 0, 1, 0]
+
+        f_rest = AOFockMatrix.from_numpy_list([data_a, data_b, data_c, data_d],
+                                              types, factors, indices)
+
+        f_rest.write_hdf5("inputs/dummy.h5")
+
+        f2 = AOFockMatrix.read_hdf5("inputs/dummy.h5")
+
+        self.assertEqual(f_rest, f2)
+
     def test_fock_build(self):
 
         # mpi settings
