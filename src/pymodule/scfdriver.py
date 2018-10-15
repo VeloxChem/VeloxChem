@@ -1,30 +1,31 @@
 
 class ScfDriver:
+
     def __init__(self):
         # scf type
-        
+
         self.scf_type = "RHF"
-        
+
         # initial guess
-        
+
         self.gues_type = "SAD"
-        
+
         # scf accelerator
         
         self.acc_type = "L2DIIS"
         self.max_vecs = 10
-        
+
         # convergence
-        
+
         self.max_iter = 50
         
         # screening scheme
         
         self.qq_type = "QQRDEN"
         self.qq_dyn = True
-        
+
         # thresholds
-        
+
         self.conv_thresh = 1.0e-6
         self.eri_thresh = 1.0e-12
         self.ovl_thresh = 1.0e-12
@@ -35,10 +36,8 @@ class ScfDriver:
         loc_rank = comm.Get_rank()
         loc_nodes = comm.Get_size()
         
-        # print scf driver setup header to output stream
-        
-        #if loc_rank == mpi_master():
-        #    self.print_header(ostream)
+        self.print_header(ostream)
+
 
     def print_header(self, ostream):
         ostream.new_line()
@@ -56,15 +55,18 @@ class ScfDriver:
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Error Vectors : " + str(self.max_vecs)
         ostream.put_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold        : " + "{:.1e}".format(self.conv_thresh)
+        cur_str = "Convergence Threshold        : " + \
+            "{:.1e}".format(self.conv_thresh)
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "ERI screening scheme         : " + self.get_qq_type()
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "ERI screening mode           : " + self.get_qq_dyn()
         ostream.put_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold      : " + "{:.1e}".format(self.eri_thresh)
+        cur_str = "ERI Screening Threshold      : " + \
+            "{:.1e}".format(self.eri_thresh)
         ostream.put_header(cur_str.ljust(str_width))
-        cur_str = "Linear Dependence Threshold  : " + "{:.1e}".format(self.ovl_thresh)
+        cur_str = "Linear Dependence Threshold  : " + \
+            "{:.1e}".format(self.ovl_thresh)
         ostream.put_header(cur_str.ljust(str_width))
         ostream.new_line()
 
@@ -102,4 +104,3 @@ class ScfDriver:
         if self.qq_dyn:
             return "Dynamic"
         return "Static"
-

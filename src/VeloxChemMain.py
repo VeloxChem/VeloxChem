@@ -7,56 +7,6 @@ import sys
 import os.path
 import time
 
-def print_start_header(glob_nodes, ostream):
-    """
-    Prints start header to output stream.
-    """
-    # get start time
-    
-    start_time = time.time()
-    
-    # print start header
-    
-    ostream.put_separator()
-    ostream.put_title("")
-    ostream.put_title("VELOX CHEM MP (V.0.0 2018)")
-    ostream.put_title("AN ELECTRONIC STRUCTURE CODE FOR NANOSCALE")
-    ostream.put_title("")
-    ostream.put_title("Copyright (c) 2018 Velox Chem MP developers.")
-    ostream.put_title("All rights reserved.")
-    ostream.put_separator()
-    exec_str = "VeloxChem MP execution started"
-    if glob_nodes > 1:
-        exec_str += " on " + str(glob_nodes) + " compute nodes"
-    exec_str += " at " + time.asctime( time.localtime(start_time) ) + "."
-    ostream.put_title(exec_str)
-    ostream.put_separator()
-    ostream.new_line()
-
-    # return start time
-
-    return start_time
-
-def print_finish_header(start_time, ostream):
-    """
-    Prints start header to output stream.
-    """
-    # get end time
-    
-    end_time = time.time()
-    
-    # print finish header
-    
-    ostream.put_separator()
-    exec_str = "VeloxChem MP execution completed at ";
-    exec_str += time.asctime( time.localtime(end_time) ) + "."
-    ostream.put_title(exec_str)
-    ostream.put_separator()
-    exec_str = "Total execution time is "
-    exec_str += str(int(end_time - start_time)) + " sec."
-    ostream.put_title(exec_str)
-    ostream.put_separator()
-
 def main():
 
     vlx.assert_msg_critical(vlx.mpi_initialized(), "MPI: Initialized")
@@ -108,7 +58,7 @@ def main():
     start_time = None
     
     if glob_rank == vlx.mpi_master():
-        start_time = print_start_header(glob_nodes, ostream)
+        start_time = ostream.print_start_header(glob_nodes)
 
     # read input data from input file on master node
     
@@ -169,8 +119,7 @@ def main():
     # all done, print finish header to output stream
 
     if glob_rank == vlx.mpi_master():
-        print_finish_header(start_time, ostream)
-        ostream.flush()
+        ostream.print_finish_header(start_time)
 
 if __name__ == "__main__":
     main()
