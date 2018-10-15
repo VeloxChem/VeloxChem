@@ -135,6 +135,7 @@ void export_orbdata()
         .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy)
         .def("from_numpy_list", &CAODensityMatrix_from_numpy_list)
         .staticmethod("from_numpy_list")
+        .def("get_number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices)
         .def("get_density_type", &CAODensityMatrix::getDensityType)
         .def(bp::self == bp::other<CAODensityMatrix>())
     ;

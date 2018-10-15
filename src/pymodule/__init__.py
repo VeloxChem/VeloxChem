@@ -15,4 +15,6 @@ from .VeloxChemLib import assert_msg_critical
 
 # Python classes
 from .outputstream import OutputStream
+from .aodensitymatrix import AODensityMatrix
+from .aofockmatrix import AOFockMatrix
 from .scfdriver import ScfDriver

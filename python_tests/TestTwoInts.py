@@ -3,12 +3,13 @@ from HelperClass import Task
 from veloxchem.VeloxChemLib import ElectronRepulsionIntegralsDriver
 from veloxchem.VeloxChemLib import OverlapIntegralsDriver
 from veloxchem.VeloxChemLib import SADGuessDriver
-from veloxchem.VeloxChemLib import AODensityMatrix
-from veloxchem.VeloxChemLib import AOFockMatrix
 from veloxchem.VeloxChemLib import denmat
 from veloxchem.VeloxChemLib import fockmat
 from veloxchem.VeloxChemLib import ericut
 from veloxchem.VeloxChemLib import mpi_master
+
+from veloxchem.aodensitymatrix import AODensityMatrix
+from veloxchem.aofockmatrix import AOFockMatrix
 
 import numpy as np
 import unittest
@@ -48,7 +49,7 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(x, fock.get_scale_factor(1))
         self.assertEqual(0, fock.get_density_identifier(2))
 
-    def test_fock_rest_density(self):
+    def test_fock_density(self):
 
         data_a = [[ 1., .2, ], [ .2, 1., ]]
 
@@ -60,7 +61,7 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(1.0, f_rest.get_scale_factor(0))
         self.assertEqual(0, f_rest.get_density_identifier(0))
 
-    def test_fock_rest_build(self):
+    def test_fock_build(self):
 
         # mpi settings
 
@@ -72,7 +73,7 @@ class TestTwoInts(unittest.TestCase):
 
         if (rank == mpi_master()):
 
-            task = Task("inputs/water.inp", "inputs/water.out")
+            task = Task("inputs/h2se.inp", "inputs/h2se.out")
             molecule = task.molecule
             ao_basis = task.ao_basis
             min_basis = task.min_basis
@@ -91,17 +92,9 @@ class TestTwoInts(unittest.TestCase):
         ao_basis.broadcast(rank, comm)
         min_basis.broadcast(rank, comm)
 
-        # compute overlap
+        # read density
 
-        ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
-        S12 = ovldrv.compute(molecule, min_basis, ao_basis, ostream, comm)
-        S22 = ovldrv.compute(molecule, ao_basis, ostream, comm)
-
-        # compute initial guess
-
-        saddrv = SADGuessDriver.create(rank, size, comm)
-        dsad = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
-                              comm)
+        dmat = AODensityMatrix.read_hdf5("inputs/h2se.dens.h5")
 
         # compute Fock
 
@@ -110,15 +103,16 @@ class TestTwoInts(unittest.TestCase):
         qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
                                 comm)
 
-        fock = AOFockMatrix(dsad)
+        fock = AOFockMatrix(dmat)
 
-        fock.zero()
+        eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, ostream, comm)
 
-        eridrv.compute(fock, dsad, molecule, ao_basis, qqdata, ostream, comm)
+        # compare with reference
 
-        self.assertEqual(fockmat.restjk, fock.get_fock_type(0))
-        self.assertEqual(1.0, fock.get_scale_factor(0))
-        self.assertEqual(0, fock.get_density_identifier(0))
+        f2 = AOFockMatrix.read_hdf5("inputs/h2se.twoe.h5")
+
+        maxdiff = np.max(np.abs(fock.to_numpy(0) - f2.to_numpy(0)))
+        self.assertTrue(maxdiff < 1.0e-11)
 
 
 if __name__ == "__main__":

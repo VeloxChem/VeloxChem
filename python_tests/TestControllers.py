@@ -9,7 +9,7 @@ class TestControllers(unittest.TestCase):
 
     def test_app_manager_0(self):
 
-        app = AppManager("dummy.inp", "")
+        app = AppManager("inputs/dummy.inp", "")
         app.execute()
 
         self.assertFalse(app.get_state())

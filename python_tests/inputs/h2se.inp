@@ -1,0 +1,19 @@
+@jobs
+!RunMode: cpu/gpu
+SinglePoint: energy
+@end
+
+@basis
+DEF2-SVP
+@end 
+
+@molxyz 
+0 1 Au  
+Se  0.0   0.0   0.0
+H   0.0   0.0   2.8
+H   0.0   2.8   0.0
+@end 
+
+@progenv 
+BasisLibrary: /home/xinli/gitlab/VeloxChemMP/basis/
+@end

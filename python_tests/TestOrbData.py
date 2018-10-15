@@ -1,13 +1,15 @@
 from mpi4py import MPI
 from HelperClass import Task
-from veloxchem.VeloxChemLib import AODensityMatrix
 from veloxchem.VeloxChemLib import denmat
+
+from veloxchem.aodensitymatrix import AODensityMatrix
 
 import numpy as np
 import unittest
 
 
 class TestOrbData(unittest.TestCase):
+
     def test_get_label(self):
 
         task = Task("inputs/dimer.inp", "inputs/dimer.out")
@@ -34,6 +36,14 @@ class TestOrbData(unittest.TestCase):
 
         self.assertEqual(denmat.rest, d_rest.get_density_type())
         self.assertEqual(denmat.unrest, d_unrest.get_density_type())
+
+        d_rest.write_hdf5("inputs/dummy.h5")
+        dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
+        self.assertEqual(d_rest, dummy)
+
+        d_unrest.write_hdf5("inputs/dummy.h5")
+        dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
+        self.assertEqual(d_unrest, dummy)
 
 
 if __name__ == "__main__":
