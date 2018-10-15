@@ -55,8 +55,6 @@ def main():
 
     # print start header and set up start time
     
-    start_time = None
-    
     if glob_rank == vlx.mpi_master():
         start_time = ostream.print_start_header(glob_nodes)
 
@@ -81,16 +79,12 @@ def main():
 
     # read environment variables on master node
 
-    path_to_basis_lib = None
-
     if glob_rank == vlx.mpi_master():
         env_reader = vlx.EnvironmentReader()
         env_reader.parse(input_data, ostream)
         path_to_basis_lib = env_reader.get_path_to_basis_sets()
 
     # set up molecular basis reader on master node
-
-    molbas_reader = None
 
     if glob_rank == vlx.mpi_master():
         molbas_reader = vlx.BasisReader()
