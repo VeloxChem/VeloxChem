@@ -52,6 +52,7 @@ def _print_finish_header(self, start_time):
     exec_str += str(int(end_time - start_time)) + " sec."
     self.put_title(exec_str)
     self.put_separator()
+    self.flush()
 
 
 OutputStream.print_start_header = _print_start_header

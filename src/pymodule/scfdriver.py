@@ -1,3 +1,4 @@
+from .VeloxChemLib import mpi_master
 
 class ScfDriver:
 
@@ -36,7 +37,8 @@ class ScfDriver:
         loc_rank = comm.Get_rank()
         loc_nodes = comm.Get_size()
         
-        self.print_header(ostream)
+        if loc_rank == mpi_master():
+            self.print_header(ostream)
 
 
     def print_header(self, ostream):

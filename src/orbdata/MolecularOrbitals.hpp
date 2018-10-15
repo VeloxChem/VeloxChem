@@ -43,11 +43,11 @@ public:
     /**
      Creates a molecular orbitals object.
      
+     @param orbitals the vector of dense matrices with molecular orbitals.
      @param orbitalsType the type of molecular orbitals.
-     @param orbitals the vector of dense matrices with molecular orbitals. 
      */
-    CMolecularOrbitals(const morb                       orbitalsType,
-                       const std::vector<CDenseMatrix>& orbitals);
+    CMolecularOrbitals(const std::vector<CDenseMatrix>& orbitals,
+                       const morb                       orbitalsType);
     
     /**
      Creates a molecular orbitals object by copying other molecular orbitals object.
