@@ -7,12 +7,15 @@
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "DenseDiagonalizer.hpp"
+#include "DenseLinearAlgebra.hpp"
 
 #include <cmath>
 
+#ifdef ENABLE_MKL
 #include "mkl.h"
-
-#include "DenseLinearAlgebra.hpp"
+#else
+#include "lapacke.h"
+#endif
 
 CDenseDiagonalizer::CDenseDiagonalizer()
 

@@ -242,9 +242,9 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     //std::cout << npotmat.getString();
     
-    std::cout << dsad.getString();
+    //std::cout << dsad.getString();
     
-    std::cout << fock.getString();
+    //std::cout << fock.getString();
 }
 
 void

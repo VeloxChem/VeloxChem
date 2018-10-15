@@ -10,6 +10,7 @@
 
 USE_MPI := true
 USE_GPU := true
+USE_MKL := true
 
 # C++ compiler & linker
 
@@ -37,6 +38,11 @@ endif
 ifeq ($(USE_GPU),true)
   CPP_REL_FLG += -DENABLE_GPU
   CPP_DEB_FLG += -DENABLE_GPU
+endif
+
+ifeq ($(USE_MKL),true)
+  CPP_REL_FLG += -DENABLE_MKL
+  CPP_DEB_FLG += -DENABLE_MKL
 endif
 
 CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR

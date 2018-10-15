@@ -6241,20 +6241,9 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2O)
     
     ASSERT_EQ(fock.getNumberOfElements(0), static_cast<int32_t>(jkvals.size()));
     
-    vlxtest::compare(jkvals, fock.getFock(0), 1.0e-12);
+    // Maximum element is 12.5 and we compare up to its 14-th significant digit.
 
-    //for (int32_t i = 0, row = 0; row < fock.getNumberOfRows(0); row++)
-    //{
-    //    for (int32_t col = 0; col < fock.getNumberOfColumns(0); col++, i++)
-    //    {
-    //        double diff = fabs(fock.getFock(0)[i] - jk.getFock(0)[i]);
-    //
-    //        if (diff > 1.0e-13)
-    //        {
-    //            std::cout << "Row " << row << " Col " << col << " Diff= " << diff << std::endl;
-    //        }
-    //    }
-    //}
+    vlxtest::compare(jkvals, fock.getFock(0), 1.0e-12);
 }
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
@@ -7464,21 +7453,10 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
 
     ASSERT_EQ(fock.getNumberOfElements(0), static_cast<int32_t>(jkvals.size()));
     
+    // Maximum element is 117.9 and we compare up to its 14-th significant digit.
+
     vlxtest::compare(jkvals, fock.getFock(0), 1.0e-11);
 
-    //for (int32_t i = 0, row = 0; row < fock.getNumberOfRows(0); row++)
-    //{
-    //    for (int32_t col = 0; col < fock.getNumberOfColumns(0); col++, i++)
-    //    {
-    //        double diff = fabs(fock.getFock(0)[i] - jk.getFock(0)[i]);
-    //
-    //        if (diff > 1.0e-13)
-    //        {
-    //            std::cout << "Row " << row << " Col " << col << " Diff= " << diff << std::endl;
-    //        }
-    //    }
-    //}
-   
     // Small deviations:
     //Row 0 Col 0 Diff= 5.40012e-13
     //Row 0 Col 5 Diff= 8.86653e-12
@@ -7509,4 +7487,3 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
     //Row 37 Col 37 Diff= 1.13687e-13
     //Row 39 Col 39 Diff= 1.42109e-13
 }
-
