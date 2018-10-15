@@ -7,15 +7,6 @@ import sys
 import os.path
 import time
 
-from veloxchem.VeloxChemLib import OutputStream
-from veloxchem.VeloxChemLib import InputStream
-from veloxchem.VeloxChemLib import InputData
-from veloxchem.VeloxChemLib import MolXYZReader
-from veloxchem.VeloxChemLib import EnvironmentReader
-from veloxchem.VeloxChemLib import BasisReader
-from veloxchem.VeloxChemLib import Molecule
-from veloxchem.VeloxChemLib import MolecularBasis
-
 def print_start_header(num_nodes, ostream):
     """
     Prints start header to output stream.
@@ -109,8 +100,8 @@ def main():
 
     # set up input/output streams
     
-    ostream = OutputStream(output_fname)
-    istream = InputStream(input_fname, ostream)
+    ostream = vlx.OutputStream(output_fname)
+    istream = vlx.InputStream(input_fname, ostream)
 
     # print start header and set up start time
     
@@ -121,17 +112,17 @@ def main():
 
     # read input data from input file on master node
     
-    input_data = InputData()
+    input_data = vlx.InputData()
     
     if node_rank == vlx.mpi_master():
         istream.read(input_data, ostream)
     
     # read molecular geometry
     
-    mol_geom = Molecule()
+    mol_geom = vlx.Molecule()
     
     if node_rank == vlx.mpi_master():
-        molxyz_reader = MolXYZReader()
+        molxyz_reader = vlx.MolXYZReader()
         molxyz_reader.parse(mol_geom, input_data, ostream)
         mol_geom.print_geometry(ostream)
         ostream.flush()
@@ -143,7 +134,7 @@ def main():
     path_to_basis_lib = None
 
     if node_rank == vlx.mpi_master():
-        env_reader = EnvironmentReader()
+        env_reader = vlx.EnvironmentReader()
         env_reader.parse(input_data, ostream)
         path_to_basis_lib = env_reader.get_path_to_basis_sets()
 
@@ -152,12 +143,12 @@ def main():
     molbas_reader = None
 
     if node_rank == vlx.mpi_master():
-        molbas_reader = BasisReader()
+        molbas_reader = vlx.BasisReader()
         molbas_reader.parse(input_data, ostream)
 
     # read molecular basis
 
-    mol_basis = MolecularBasis()
+    mol_basis = vlx.MolecularBasis()
 
     if node_rank == vlx.mpi_master():
         mol_basis = molbas_reader.get_ao_basis(path_to_basis_lib, mol_geom, ostream)
