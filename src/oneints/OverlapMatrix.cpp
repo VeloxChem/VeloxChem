@@ -8,6 +8,8 @@
 
 #include "OverlapMatrix.hpp"
 
+#include "DenseDiagonalizer.hpp"
+
 COverlapMatrix::COverlapMatrix()
 {
     
@@ -101,6 +103,16 @@ const double*
 COverlapMatrix::values() const
 {
     return _matrix.values();
+}
+
+CDenseMatrix
+COverlapMatrix::getOrthogonalizationMatrix(const double threshold) const
+{
+    CDenseDiagonalizer diagdrv;
+    
+    diagdrv.diagonalize(_matrix);
+    
+    return diagdrv.getInvertedSqrtMatrix(threshold);
 }
 
 std::ostream&

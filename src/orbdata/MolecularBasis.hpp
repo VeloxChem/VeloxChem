@@ -21,7 +21,7 @@
 
 /**
 Class CMolecularBasis stores data about molecular basis set and provides set of
-methods for handling of moelcular basis set data.
+methods for handling of molecular basis set data.
 
 @author Z. Rinkevicius
 */

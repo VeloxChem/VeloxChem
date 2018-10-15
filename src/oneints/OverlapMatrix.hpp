@@ -125,6 +125,14 @@ public:
     const double* values() const;
     
     /**
+     Gets Löwdin symmetric orthogonalization matrix for this overlap matrix.
+
+     @param threshold the linear dependence threshold.
+     @return the orthogonalization matrix.
+     */
+    CDenseMatrix getOrthogonalizationMatrix(const double threshold) const;
+    
+    /**
      Converts overlap matrix object to text output and insert it into output
      text stream.
      

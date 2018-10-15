@@ -7,7 +7,7 @@ import sys
 import os.path
 import time
 
-def print_start_header(num_nodes, ostream):
+def print_start_header(glob_nodes, ostream):
     """
     Prints start header to output stream.
     """
@@ -26,8 +26,8 @@ def print_start_header(num_nodes, ostream):
     ostream.put_title("All rights reserved.")
     ostream.put_separator()
     exec_str = "VeloxChem MP execution started"
-    if num_nodes > 1:
-        exec_str += " on " + str(num_nodes) + " compute nodes"
+    if glob_nodes > 1:
+        exec_str += " on " + str(glob_nodes) + " compute nodes"
     exec_str += " at " + time.asctime( time.localtime(start_time) ) + "."
     ostream.put_title(exec_str)
     ostream.put_separator()
@@ -64,15 +64,15 @@ def main():
     # set up MPI communicator data
     
     comm = MPI.COMM_WORLD
-    node_rank = comm.Get_rank()
-    num_nodes = comm.Get_size()
+    glob_rank = comm.Get_rank()
+    glob_nodes = comm.Get_size()
 
     # read command line parameters on master node
     
     input_fname = ""
     output_fname = ""
     
-    if node_rank == vlx.mpi_master():
+    if glob_rank == vlx.mpi_master():
         # input syntax error
         
         if len(sys.argv) <= 2:
@@ -107,33 +107,33 @@ def main():
     
     start_time = None
     
-    if node_rank == vlx.mpi_master():
-        start_time = print_start_header(num_nodes, ostream)
+    if glob_rank == vlx.mpi_master():
+        start_time = print_start_header(glob_nodes, ostream)
 
     # read input data from input file on master node
     
     input_data = vlx.InputData()
     
-    if node_rank == vlx.mpi_master():
+    if glob_rank == vlx.mpi_master():
         istream.read(input_data, ostream)
     
     # read molecular geometry
     
     mol_geom = vlx.Molecule()
     
-    if node_rank == vlx.mpi_master():
+    if glob_rank == vlx.mpi_master():
         molxyz_reader = vlx.MolXYZReader()
         molxyz_reader.parse(mol_geom, input_data, ostream)
         mol_geom.print_geometry(ostream)
         ostream.flush()
     
-    mol_geom.broadcast(node_rank, comm)
+    mol_geom.broadcast(glob_rank, comm)
 
     # read environment variables on master node
 
     path_to_basis_lib = None
 
-    if node_rank == vlx.mpi_master():
+    if glob_rank == vlx.mpi_master():
         env_reader = vlx.EnvironmentReader()
         env_reader.parse(input_data, ostream)
         path_to_basis_lib = env_reader.get_path_to_basis_sets()
@@ -142,7 +142,7 @@ def main():
 
     molbas_reader = None
 
-    if node_rank == vlx.mpi_master():
+    if glob_rank == vlx.mpi_master():
         molbas_reader = vlx.BasisReader()
         molbas_reader.parse(input_data, ostream)
 
@@ -150,23 +150,25 @@ def main():
 
     mol_basis = vlx.MolecularBasis()
 
-    if node_rank == vlx.mpi_master():
+    if glob_rank == vlx.mpi_master():
         mol_basis = molbas_reader.get_ao_basis(path_to_basis_lib, mol_geom,
                                                ostream)
         mol_basis.print_basis("Atomic Basis", mol_geom, ostream)
         ostream.flush()
 
-    mol_basis.broadcast(node_rank, comm)
+    mol_basis.broadcast(glob_rank, comm)
 
     # compute SCF energy, molecular orbitals
 
     scf_drv = vlx.ScfDriver()
 
-    scf_drv.compute(ostream)
+    #scf_drv.acc_type = "DIIS"
+
+    scf_drv.compute(comm, ostream)
 
     # all done, print finish header to output stream
 
-    if node_rank == vlx.mpi_master():
+    if glob_rank == vlx.mpi_master():
         print_finish_header(start_time, ostream)
         ostream.flush()
 
