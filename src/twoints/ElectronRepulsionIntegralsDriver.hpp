@@ -249,6 +249,17 @@ class CElectronRepulsionIntegralsDriver
                             COutputStream& oStream) const;
     
     /**
+     Prints timing statistics for evaluation of AO Fock matrix.
+     
+     @param fockMatrix the AO Fock matrix.
+     @param timer the timer.
+     @param oStream the output stream.
+     */
+    void _printFockTiming(const CAOFockMatrix& fockMatrix,
+                          const CSystemClock&  timer,
+                                COutputStream& oStream) const;
+    
+    /**
      Prints timing statistics for evaluation of Q values.
      
      @param molecule the molecule.

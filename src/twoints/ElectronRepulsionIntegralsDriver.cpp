@@ -64,10 +64,6 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
     
     auto bbpairs = bgtopairs.split(500);
     
-    // print start header
-    
-    if (_globRank == mpi::master()) _startHeader(bgtopairs, oStream);
-    
     // compute repulsion integrals
     
     aoFockMatrix.zero(); 
@@ -79,7 +75,7 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
     
     // print evaluation timing statistics
     
-    _printTiming(molecule, eritim, oStream);
+    _printFockTiming(aoFockMatrix, eritim, oStream);
 }
 
 CScreeningContainer
@@ -1639,6 +1635,48 @@ CElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
 }
 
 void
+CElectronRepulsionIntegralsDriver::_printFockTiming(const CAOFockMatrix& fockMatrix,
+                                                    const CSystemClock&  timer,
+                                                          COutputStream& oStream) const
+{
+    // NOTE: Silent for local execution mode
+    
+    if (_isLocalMode) return;
+    
+    // collect timing data from MPI nodes
+    
+    auto tsec = timer.getElapsedTimeInSeconds();
+    
+    // print timing data
+    
+    if (_globRank == mpi::master())
+    {
+        std::string str("AO Fock timing: ");
+        
+        auto nfock = fockMatrix.getNumberOfFockMatrices();
+        
+        str.append(std::to_string(nfock));
+        
+        if (nfock == 1)
+        {
+            str.append(" matrix ");
+        }
+        else
+        {
+            str.append(" matrices ");
+        }
+        
+        str.append("computed in ");
+        
+        str.append(fstr::to_string(tsec, 2));
+        
+        str.append(" sec.");
+        
+        oStream << fstr::format(str, 80, fmt::left) << fmt::end;
+    }
+}
+
+void
 CElectronRepulsionIntegralsDriver::_printQValuesTiming(const CMolecule&     molecule,
                                                        const CSystemClock&  timer,
                                                              COutputStream& oStream) const
@@ -1653,7 +1691,7 @@ CElectronRepulsionIntegralsDriver::_printQValuesTiming(const CMolecule&     mole
     {
         auto tsec = timer.getElapsedTimeInSeconds();
         
-        oStream << fmt::info << "Q values for ERIs is computed in ";
+        oStream << fmt::info << "ERIs screening factors computed in ";
         
         oStream << fstr::to_string(tsec, 2) << " sec.";
         

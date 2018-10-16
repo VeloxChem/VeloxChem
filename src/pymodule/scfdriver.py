@@ -1,5 +1,4 @@
-import numpy as np
-
+from .VeloxChemLib import ElectronRepulsionIntegralsDriver
 from .VeloxChemLib import OverlapMatrix
 from .VeloxChemLib import KineticEnergyMatrix
 from .VeloxChemLib import NuclearPotentialMatrix
@@ -8,7 +7,12 @@ from .VeloxChemLib import KineticEnergyIntegralsDriver
 from .VeloxChemLib import NuclearPotentialIntegralsDriver
 from .VeloxChemLib import SADGuessDriver
 from .VeloxChemLib import mpi_master
+from .VeloxChemLib import ericut
+
+from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
+
+import numpy as np
 
 class ScfDriver:
 
@@ -24,7 +28,7 @@ class ScfDriver:
         
         # screeninf scheme
         
-        self.qq_type = "QQR_DEN"
+        self.qq_type = "QQR"
         self.qq_dyn = True
 
         # thresholds
@@ -32,6 +36,10 @@ class ScfDriver:
         self.conv_thresh = 1.0e-6
         self.eri_thresh = 1.0e-12
         self.ovl_thresh = 1.0e-12
+    
+        # iterations data
+        
+        self.iter_data = []
     
     def compute(self, molecule, ao_basis, min_basis, comm, ostream):
 
@@ -65,19 +73,43 @@ class ScfDriver:
                                             ovlmat, ovldrv, loc_rank, loc_nodes,
                                             comm, ostream)
             
-            
             if loc_rank == mpi_master():
                 oaomat = ovlmat.get_ortho_matrix(self.ovl_thresh, ostream)
-
-            # matrix to numpy
-
-            smat = ovlmat.to_numpy()
-            dmat = denmat.total_to_numpy(0)
-                
-            dsmat = dmat.dot(smat)
-            print(dsmat.trace())
             
-        # fix other stuff here...
+            eridrv = ElectronRepulsionIntegralsDriver.create(loc_rank,
+                                                             loc_nodes,
+                                                             comm)
+        
+            qqdata = eridrv.compute(self.get_qq_scheme(), self.eri_thresh,
+                                    molecule, ao_basis, ostream, comm)
+            
+            # set up scf data
+        
+            refden = AODensityMatrix(denmat)
+            
+            fockmat = AOFockMatrix(denmat)
+            
+            # scf iterations
+            
+            self.print_scf_title(ostream)
+            
+            for i in range(self.max_iter):
+                eridrv.compute(fockmat, denmat, molecule, ao_basis, qqdata,
+                               ostream, comm)
+            
+                eelec, ekin, enpot = self.comp_energy(fockmat, kinmat, npotmat,
+                                                      denmat)
+            
+                egrad = self.comp_gradient(fockmat, denmat)
+                    
+                dden = self.comp_density_change(denmat, refden)
+                
+                self.add_iter_data(i, eelec, ekin, enpot, egrad, dden)
+                
+                self.print_iter_data(i, ostream)
+            
+                if dden < self.conv_thresh:
+                    break
             
     def gen_guess_density(self, molecule, ao_basis, min_basis, ovlmat,
                           ovl_driver, loc_rank, loc_nodes, comm, ostream):
@@ -95,6 +127,23 @@ class ScfDriver:
         # TODO: implemet restart or other types of density matrices
         
         return AODensityMatrix()
+
+    def comp_energy(self, fockmat, kinmat, npotmat, denmat):
+        return (0.0, 0.0, 0.0)
+
+    def comp_gradient(self, fockmat, denmat):
+        return 0.0
+
+    def comp_density_change(self, newden, oldden):
+        return 0.0
+    
+    def add_iter_data(self, iterscf, eelec, ekin, enpot, egrad, dden):
+        energy = eelec + ekin + enpot
+        if iterscf == 0:
+            self.iter_data.append((iterscf, energy, 0.0, egrad, dden))
+        else:
+            denergy = energy- self.iter_data[iterscf - 1][1]
+            self.iter_data.append((iterscf, energy, denergy, egrad, dden))
 
     def print_header(self, ostream):
         ostream.new_line()
@@ -126,6 +175,22 @@ class ScfDriver:
             "{:.1e}".format(self.ovl_thresh)
         ostream.put_header(cur_str.ljust(str_width))
         ostream.new_line()
+
+    def print_scf_title(self, ostream):
+        ostream.new_line()
+        ostream.put_header("Iter. |   Hartree-Fock Energy, au   | "
+                           "Energy Change, au |  Gradient Norm  | "
+                           "Density Change |")
+        ostream.put_header(92 * "-")
+
+    def print_iter_data(self, iterscf, ostream):
+        i, energy, denergy, egrad, dden = self.iter_data[iterscf]
+        exec_str =  " " + (str(i)).rjust(3) + 4 * " "
+        exec_str += ("{:7.12f}".format(energy)).center(27) + 3 * " "
+        exec_str += ("{:5.10f}".format(denergy)).center(17) + 3 * " "
+        exec_str += ("{:5.8f}".format(egrad)).center(15) + 3 * " "
+        exec_str += ("{:5.8f}".format(dden)).center(15) + " "
+        ostream.put_header(exec_str)
 
     def get_scf_type(self):
         return "Undefined"
@@ -165,3 +230,9 @@ class ScfDriver:
             return True
         return False
 
+    def get_qq_scheme(self):
+        if self.qq_type == "QQ":
+            return ericut.qq
+        if self.qq_type == "QQR":
+            return ericut.qqr
+        return None;
