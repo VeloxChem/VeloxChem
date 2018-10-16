@@ -102,11 +102,21 @@ def main():
 
     mol_basis.broadcast(glob_rank, comm)
 
-    # compute SCF energy, molecular orbitals
+    # initialize scf driver
 
     scf_drv = vlx.ScfDriver()
 
-    scf_drv.compute(comm, ostream)
+    # read minimal basis if needed
+
+    min_basis = vlx.MolecularBasis()
+
+    if scf_drv.need_min_basis():
+        if glob_rank == vlx.mpi_master():
+            min_basis = molbas_reader.get_min_basis(path_to_basis_lib, mol_geom,
+                                                    ostream)
+        min_basis.broadcast(glob_rank, comm)
+
+    scf_drv.compute(mol_geom, mol_basis, min_basis, comm, ostream)
 
     # all done, print finish header to output stream
 

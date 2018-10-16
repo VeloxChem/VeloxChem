@@ -385,6 +385,7 @@ void export_oneints()
         .def("from_numpy", &COverlapMatrix_from_numpy)
         .staticmethod("from_numpy")
         .def(bp::self == bp::other<COverlapMatrix>())
+        .def("get_ortho_matrix", &COverlapMatrix::getOrthogonalizationMatrix)
     ;
 
     // COverlapIntegralsDriver class

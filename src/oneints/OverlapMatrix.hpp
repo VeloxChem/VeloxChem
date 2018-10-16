@@ -12,6 +12,8 @@
 #include <string>
 
 #include "DenseMatrix.hpp"
+#include "SystemClock.hpp"
+#include "OutputStream.hpp"
 
 /**
  Class COverlapMatrix stores general one electron overlap matrix and provides
@@ -25,6 +27,18 @@ class COverlapMatrix
      The generic dense overlap matrix (rectangular or square).
      */
     CDenseMatrix _matrix;
+    
+    /**
+     Prints symmetric orthogonalization matrix computation time to output
+     stream.
+
+     @param timer the system clock timer.
+     @param orthoMatrix the computed orthogonalization matrix.
+     @param oStream the output stream
+     */
+    void _printComputationTime(const CSystemClock&  timer,
+                               const CDenseMatrix&  orthoMatrix,
+                               COutputStream& oStream) const;
     
 public:
     
@@ -128,9 +142,11 @@ public:
      Gets Löwdin symmetric orthogonalization matrix for this overlap matrix.
 
      @param threshold the linear dependence threshold.
+     @param oStream the output stream.
      @return the orthogonalization matrix.
      */
-    CDenseMatrix getOrthogonalizationMatrix(const double threshold) const;
+    CDenseMatrix getOrthogonalizationMatrix(const double         threshold,
+                                                  COutputStream& oStream) const;
     
     /**
      Converts overlap matrix object to text output and insert it into output

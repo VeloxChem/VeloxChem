@@ -1,4 +1,14 @@
+import numpy as np
+
+from .VeloxChemLib import OverlapMatrix
+from .VeloxChemLib import KineticEnergyMatrix
+from .VeloxChemLib import NuclearPotentialMatrix
+from .VeloxChemLib import OverlapIntegralsDriver
+from .VeloxChemLib import KineticEnergyIntegralsDriver
+from .VeloxChemLib import NuclearPotentialIntegralsDriver
+from .VeloxChemLib import SADGuessDriver
 from .VeloxChemLib import mpi_master
+from .aodensitymatrix import AODensityMatrix
 
 class ScfDriver:
 
@@ -8,7 +18,7 @@ class ScfDriver:
         
         # scf accelerator
         
-        self.acc_type = "L2_DIIS"
+        self.acc_type = "DIIS"
         self.max_err_vecs = 10
         self.max_iter = 50
         
@@ -23,14 +33,68 @@ class ScfDriver:
         self.eri_thresh = 1.0e-12
         self.ovl_thresh = 1.0e-12
     
-    def compute(self, comm, ostream):
+    def compute(self, molecule, ao_basis, min_basis, comm, ostream):
 
+        # MPI communicator data
+        
         loc_rank = comm.Get_rank()
         loc_nodes = comm.Get_size()
+        
+        # print scf driver setup
         
         if loc_rank == mpi_master():
             self.print_header(ostream)
 
+        # compute one-electron integrals
+
+        ovldrv = OverlapIntegralsDriver.create(loc_rank, loc_nodes, comm)
+        ovlmat = ovldrv.compute(molecule, ao_basis, ostream, comm)
+    
+        kindrv = KineticEnergyIntegralsDriver.create(loc_rank, loc_nodes, comm)
+        kinmat = kindrv.compute(molecule, ao_basis, ostream, comm)
+        
+        npotdrv = NuclearPotentialIntegralsDriver.create(loc_rank, loc_nodes,
+                                                         comm)
+        npotmat = npotdrv.compute(molecule, ao_basis, ostream, comm)
+        
+        # DIIS method
+
+        if self.acc_type == "DIIS":
+
+            denmat = self.gen_guess_density(molecule, ao_basis, min_basis,
+                                            ovlmat, ovldrv, loc_rank, loc_nodes,
+                                            comm, ostream)
+            
+            
+            if loc_rank == mpi_master():
+                oaomat = ovlmat.get_ortho_matrix(self.ovl_thresh, ostream)
+
+            # matrix to numpy
+
+            smat = ovlmat.to_numpy()
+            dmat = denmat.total_to_numpy(0)
+                
+            dsmat = dmat.dot(smat)
+            print(dsmat.trace())
+            
+        # fix other stuff here...
+            
+    def gen_guess_density(self, molecule, ao_basis, min_basis, ovlmat,
+                          ovl_driver, loc_rank, loc_nodes, comm, ostream):
+        # Superposition of atomic densities
+        
+        if self.guess_type == "SAD":
+            ovlmat_sb = ovl_driver.compute(molecule, min_basis, ao_basis,
+                                           ostream, comm)
+                
+            saddrv = SADGuessDriver.create(loc_rank, loc_nodes, comm)
+            denmat = saddrv.compute(molecule, min_basis, ao_basis, ovlmat_sb,
+                                    ovlmat, ostream, comm)
+            return denmat
+    
+        # TODO: implemet restart or other types of density matrices
+        
+        return AODensityMatrix()
 
     def print_header(self, ostream):
         ostream.new_line()
@@ -93,3 +157,11 @@ class ScfDriver:
         if self.qq_dyn:
             return "Dynamic"
         return "Static"
+
+    def need_min_basis(self):
+        if self.acc_type == "L2_DIIS":
+            return True
+        if self.guess_type == "SAD":
+            return True
+        return False
+
