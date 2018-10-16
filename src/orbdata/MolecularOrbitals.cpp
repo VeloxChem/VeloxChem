@@ -12,7 +12,7 @@
 
 CMolecularOrbitals::CMolecularOrbitals()
 
-    : _orbitalsType(morb::rest)
+    : _orbitalsType(molorb::rest)
 
     , _orbitals(std::vector<CDenseMatrix>())
 {
@@ -20,19 +20,13 @@ CMolecularOrbitals::CMolecularOrbitals()
 }
 
 CMolecularOrbitals::CMolecularOrbitals(const std::vector<CDenseMatrix>& orbitals,
-                                       const morb                       orbitalsType)
+                                       const molorb                     orbitalsType)
 
     : _orbitalsType(orbitalsType)
 
     , _orbitals(orbitals)
 {
-    if (orbitalsType == morb::unrest)
-    {
-        errors::assertMsgCritical(
-                                  orbitals.size() % 2 == 0,
-                                  "MolecularOrbitals - Odd number of matrices for unrestricted molecular orbitals"
-                                  );
-    }
+    
 }
 
 CMolecularOrbitals::CMolecularOrbitals(const CMolecularOrbitals& source)

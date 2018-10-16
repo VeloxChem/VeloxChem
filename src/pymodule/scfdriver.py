@@ -3,36 +3,27 @@ from .VeloxChemLib import mpi_master
 class ScfDriver:
 
     def __init__(self):
-        # scf type
 
-        self.scf_type = "RHF"
-
-        # initial guess
-
-        self.gues_type = "SAD"
-
+        self.guess_type = "SAD"
+        
         # scf accelerator
         
-        self.acc_type = "L2DIIS"
-        self.max_vecs = 10
-
-        # convergence
-
+        self.acc_type = "L2_DIIS"
+        self.max_err_vecs = 10
         self.max_iter = 50
         
-        # screening scheme
+        # screeninf scheme
         
-        self.qq_type = "QQRDEN"
+        self.qq_type = "QQR_DEN"
         self.qq_dyn = True
 
         # thresholds
-
+        
         self.conv_thresh = 1.0e-6
         self.eri_thresh = 1.0e-12
         self.ovl_thresh = 1.0e-12
     
     def compute(self, comm, ostream):
-        # set up MPI communicator data
 
         loc_rank = comm.Get_rank()
         loc_nodes = comm.Get_size()
@@ -55,7 +46,7 @@ class ScfDriver:
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
         ostream.put_header(cur_str.ljust(str_width))
-        cur_str = "Max. Number Of Error Vectors : " + str(self.max_vecs)
+        cur_str = "Max. Number Of Error Vectors : " + str(self.max_err_vecs)
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold        : " + \
             "{:.1e}".format(self.conv_thresh)
@@ -73,34 +64,30 @@ class ScfDriver:
         ostream.new_line()
 
     def get_scf_type(self):
-        if self.scf_type == "RHF":
-            return "Spin Restricted Hatree-Fock"
-        if self.scf_type == "UHF":
-            return "Spin Unrestricted Hatree-Fock"
-        return "Unknown Type"
+        return "Undefined"
 
     def get_guess_type(self):
-        if self.gues_type == "SAD":
+        if self.guess_type == "SAD":
             return "Superposition of Atomic Densities"
-        return "Unknown Type"
+        return "Undefined"
 
     def get_acc_type(self):
         if self.acc_type == "DIIS":
             return "Direct Inversion of Iterative Subspace"
-        if self.acc_type == "L2DIIS":
+        if self.acc_type == "L2_DIIS":
             return "Two Level Direct Inversion of Iterative Subspace"
-        return "Unknown Type"
+        return "Undefined"
 
     def get_qq_type(self):
         if self.qq_type == "QQ":
             return "Cauchy–Schwarz"
         if self.qq_type == "QQR":
             return "Distance Dependent Cauchy Schwarz"
-        if self.qq_type == "QQDEN":
+        if self.qq_type == "QQ_DEN":
             return "Cauchy–Schwarz and Density"
-        if self.qq_type == "QQRDEN":
+        if self.qq_type == "QQR_DEN":
             return "Distance Dependent Cauchy Schwarz and Density"
-        return "Unknown Type"
+        return "Undefined"
 
     def get_qq_dyn(self):
         if self.qq_dyn:

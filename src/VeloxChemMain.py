@@ -106,8 +106,6 @@ def main():
 
     scf_drv = vlx.ScfDriver()
 
-    #scf_drv.acc_type = "DIIS"
-
     scf_drv.compute(comm, ostream)
 
     # all done, print finish header to output stream

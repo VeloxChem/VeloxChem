@@ -26,7 +26,7 @@ class CMolecularOrbitals
     /**
      The type of molecular orbitals.
      */
-    morb _orbitalsType;
+    molorb _orbitalsType;
     
     /**
      The vector of dense matrices for storing molecular orbitals.
@@ -47,7 +47,7 @@ public:
      @param orbitalsType the type of molecular orbitals.
      */
     CMolecularOrbitals(const std::vector<CDenseMatrix>& orbitals,
-                       const morb                       orbitalsType);
+                       const molorb                     orbitalsType);
     
     /**
      Creates a molecular orbitals object by copying other molecular orbitals object.
