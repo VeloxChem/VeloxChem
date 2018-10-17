@@ -75,7 +75,7 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
     
     // print evaluation timing statistics
     
-    _printFockTiming(aoFockMatrix, eritim, oStream);
+    // _printFockTiming(aoFockMatrix, eritim, oStream);
 }
 
 CScreeningContainer
