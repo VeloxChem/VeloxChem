@@ -22,18 +22,17 @@ CMolecularOrbitals::CMolecularOrbitals()
     
 }
 
-CMolecularOrbitals::CMolecularOrbitals(const std::vector<CDenseMatrix>&        orbitals,
-                                       const std::vector<std::vector<double>>& energies,
-                                       const molorb                            orbitalsType)
+CMolecularOrbitals::CMolecularOrbitals(const std::vector<CDenseMatrix>&      orbitals,
+                                       const std::vector<CMemBlock<double>>& energies,
+                                       const molorb                          orbitalsType)
+
+    : _orbitalsType(orbitalsType)
+
+    , _orbitals(orbitals)
+
+    , _energies(energies)
 {
-    _orbitalsType = orbitalsType;
-    
-    _orbitals = orbitals;
-    
-    for (size_t i = 0; i < energies.size(); i++)
-    {
-        _energies.push_back(CMemBlock<double>(energies[i]));
-    }
+
 }
 
 CMolecularOrbitals::CMolecularOrbitals(const CMolecularOrbitals& source)
@@ -91,26 +90,6 @@ CMolecularOrbitals::operator=(CMolecularOrbitals&& source) noexcept
     return *this;
 }
 
-int32_t
-CMolecularOrbitals::getNumberOfOrbitalsMatrices() const
-{
-    // restricted molecular orbital matrix
-    
-    if (_orbitalsType == molorb::rest)
-    {
-        return static_cast<int32_t>(_orbitals.size());
-    }
-    
-    // unrestricted molecular orbital matrix
-    
-    if (_orbitalsType == molorb::unrest)
-    {
-        return static_cast<int32_t>(_orbitals.size()) / 2;
-    }
-    
-    return 0;
-}
-
 molorb
 CMolecularOrbitals::getOrbitalsType() const
 {
@@ -118,73 +97,46 @@ CMolecularOrbitals::getOrbitalsType() const
 }
 
 int32_t
-CMolecularOrbitals::getNumberOfRows(const int32_t iOrbitalsMatrix) const
+CMolecularOrbitals::getNumberOfRows() const
 {
-    // restricted molecular orbital matrix
-    
-    if (_orbitalsType == molorb::rest && iOrbitalsMatrix < getNumberOfOrbitalsMatrices())
-    {
-        return _orbitals[iOrbitalsMatrix].getNumberOfRows();
-    }
-    
-    // unrestricted molecular orbital matrix
-    
-    if (_orbitalsType == molorb::unrest && iOrbitalsMatrix < getNumberOfOrbitalsMatrices())
-    {
-        return _orbitals[2 * iOrbitalsMatrix].getNumberOfRows();
-    }
-    
-    return 0;
+    return _orbitals[0].getNumberOfRows();
 }
 
 int32_t
-CMolecularOrbitals::getNumberOfColumns(const int32_t iOrbitalsMatrix) const
+CMolecularOrbitals::getNumberOfColumns() const
 {
-    // restricted molecular orbital matrix
-    
-    if (_orbitalsType == molorb::rest && iOrbitalsMatrix < getNumberOfOrbitalsMatrices())
-    {
-        return _orbitals[iOrbitalsMatrix].getNumberOfColumns();
-    }
-    
-    // unrestricted molecular orbital matrix
-    
-    if (_orbitalsType == molorb::unrest && iOrbitalsMatrix < getNumberOfOrbitalsMatrices())
-    {
-        return _orbitals[2 * iOrbitalsMatrix].getNumberOfColumns();
-    }
-    
-    return 0;
+    return _orbitals[0].getNumberOfColumns();
 }
 
 const double*
-CMolecularOrbitals::totalOrbitals(const int32_t iOrbitalsMatrix) const
+CMolecularOrbitals::alphaOrbitals() const
 {
-    if (_orbitalsType == molorb::rest && iOrbitalsMatrix < getNumberOfOrbitalsMatrices())
+    return _orbitals[0].values();
+}
+
+const double*
+CMolecularOrbitals::betaOrbitals() const
+{
+    if (_orbitalsType == molorb::unrest)
     {
-        return _orbitals[iOrbitalsMatrix].values();
+        return _orbitals[1].values();
     }
     
     return nullptr;
 }
 
 const double*
-CMolecularOrbitals::alphaOrbitals(const int32_t iOrbitalsMatrix) const
+CMolecularOrbitals::alphaEnergies() const
 {
-    if (_orbitalsType == molorb::unrest && iOrbitalsMatrix < getNumberOfOrbitalsMatrices())
-    {
-        return _orbitals[2 * iOrbitalsMatrix].values();
-    }
-    
-    return nullptr;
+    return _energies[0].data();
 }
 
 const double*
-CMolecularOrbitals::betaOrbitals(const int32_t iOrbitalsMatrix) const
+CMolecularOrbitals::betaEnergies() const
 {
-    if (_orbitalsType == molorb::unrest && iOrbitalsMatrix < getNumberOfOrbitalsMatrices())
+    if (_orbitalsType == molorb::unrest)
     {
-        return _orbitals[2 * iOrbitalsMatrix + 1].values();
+        return _energies[1].data();
     }
     
     return nullptr;
@@ -209,7 +161,7 @@ bool
 CMolecularOrbitals::operator==(const CMolecularOrbitals& other) const
 {
     if (_orbitalsType != other._orbitalsType) return false;
-    
+
     if (_orbitals.size() != other._orbitals.size()) return false;
     
     for (size_t i = 0; i < _orbitals.size(); i++)
@@ -218,12 +170,12 @@ CMolecularOrbitals::operator==(const CMolecularOrbitals& other) const
     }
     
     if (_energies.size() != other._energies.size()) return false;
-    
+
     for (size_t i = 0; i < _energies.size(); i++)
     {
         if (_energies[i] != other._energies[i]) return false;
     }
-    
+
     return true;
 }
 

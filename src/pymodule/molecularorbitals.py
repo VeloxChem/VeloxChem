@@ -9,26 +9,23 @@ def _write_hdf5(self, fname):
 
     hf = h5py.File(fname, 'w')
 
-    count = 0
+    name = "alpha_orbitals"
+    array = self.alpha_to_numpy()
+    hf.create_dataset(name, data=array, compression="gzip")
 
-    for index in range(self.get_number_of_orbitals_matrices()):
+    name = "alpha_energies"
+    array = self.ea_to_numpy()
+    hf.create_dataset(name, data=array, compression="gzip")
 
-        if self.get_orbitals_type() == molorb.rest:
-            name = str(count) + "_total_" + str(index)
-            array = self.total_to_numpy(index)
-            hf.create_dataset(name, data=array, compression="gzip")
-            count += 1
+    if self.get_orbitals_type() == molorb.unrest:
 
-        else:
-            name = str(count) + "_alpha_" + str(index)
-            array = self.alpha_to_numpy(index)
-            hf.create_dataset(name, data=array, compression="gzip")
-            count += 1
+        name = "beta_orbitals"
+        array = self.beta_to_numpy()
+        hf.create_dataset(name, data=array, compression="gzip")
 
-            name = str(count) + "_beta_" + str(index)
-            array = self.beta_to_numpy(index)
-            hf.create_dataset(name, data=array, compression="gzip")
-            count += 1
+        name = "beta_energies"
+        array = self.eb_to_numpy()
+        hf.create_dataset(name, data=array, compression="gzip")
 
     hf.close()
 
@@ -36,39 +33,30 @@ def _write_hdf5(self, fname):
 @staticmethod
 def _read_hdf5(fname):
 
-    orbtype = {
-        "total": molorb.rest,
-        "alpha": molorb.unrest,
-        "beta": molorb.unrest
-    }
-
     hf = h5py.File(fname, 'r')
 
-    dens = []
-    types = []
+    assert_msg_critical(
+        len(list(hf.keys())) == 2 or len(list(hf.keys())) == 4,
+        "MolecularOrbitals.read_hdf5: Incorrect number of datasets!")
 
-    ordered_keys = []
-    for key in list(hf.keys()):
-        i = int(key.split("_")[0])
-        ordered_keys.append((i, key))
-    ordered_keys.sort()
+    if len(list(hf.keys())) == 2:
+        orbs_type = molorb.rest
+    elif len(list(hf.keys())) == 4:
+        orbs_type = molorb.unrest
 
-    for i, key in ordered_keys:
-        type_str = key.split("_")[1]
-        dens.append(np.array(hf.get(key)))
-        types.append(orbtype[type_str])
+    orbs = []
+    enes = []
+
+    orbs.append(np.array(hf.get("alpha_orbitals")))
+    enes.append(np.array(hf.get("alpha_energies")))
+
+    if orbs_type == molorb.unrest:
+        orbs.append(np.array(hf.get("beta_orbitals")))
+        enes.append(np.array(hf.get("beta_energies")))
 
     hf.close()
 
-    assert_msg_critical(
-        len(set(types)) == 1,
-        "MolecularOrbitals.read_hdf5: inconsistent orbital type!")
-
-    assert_msg_critical(
-        types[0] in list(orbtype.values()),
-        "MolecularOrbitals.read_hdf5: invalid orbital type!")
-
-    return MolecularOrbitals.from_numpy_list(dens, types[0])
+    return MolecularOrbitals.from_numpy_list(orbs, enes, orbs_type)
 
 
 MolecularOrbitals.write_hdf5 = _write_hdf5
