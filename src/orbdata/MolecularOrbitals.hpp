@@ -54,17 +54,6 @@ public:
      @param energies the vector of orbital energies vectors.
      @param orbitalsType the type of molecular orbitals.
      */
-    CMolecularOrbitals(const std::vector<CDenseMatrix>&      orbitals,
-                       const std::vector<CMemBlock<double>>& energies,
-                       const molorb                          orbitalsType);
-    
-    /**
-     Creates a molecular orbitals object.
-     
-     @param orbitals the vector of dense matrices with molecular orbitals.
-     @param energies the vector of orbital energies vectors.
-     @param orbitalsType the type of molecular orbitals.
-     */
     CMolecularOrbitals(const std::vector<CDenseMatrix>&        orbitals,
                        const std::vector<std::vector<double>>& energies,
                        const molorb                            orbitalsType);
@@ -102,6 +91,73 @@ public:
      */
     CMolecularOrbitals& operator=(CMolecularOrbitals&& source) noexcept;
     
+    /**
+     Gets number of molecular orbital matrices.
+     
+     @return the number of molecular orbital matrices.
+     */
+    int32_t getNumberOfOrbitalsMatrices() const;
+    
+    /**
+     Gets type of molecular orbital matrix.
+
+     @return the type of molecular orbital matrix.
+     */
+    molorb getOrbitalsType() const;
+    
+    /**
+     Gets number of rows in specific molecular orbital matrix.
+     
+     @param iOrbitalsMatrix the index of molecular orbital matrix.
+     @return the number of rows.
+     */
+    int32_t getNumberOfRows(const int32_t iOrbitalsMatrix) const;
+    
+    /**
+     Gets number of columns in specific molecular orbital matrix.
+     
+     @param iOrbitalsMatrix the index of molecular orbital matrix.
+     @return the number of columns.
+     */
+    int32_t getNumberOfColumns(const int32_t iOrbitalsMatrix) const;
+    
+    /**
+     Gets constant pointer to first element of specific restricted molecular
+     orbital matrix.
+     
+     @param iOrbitalsMatrix the index of molecular orbital matrix.
+     @return the constant pointer to first element of restricted molecular
+     orbital matrix.
+     */
+    const double* totalOrbitals(const int32_t iOrbitalsMatrix) const;
+    
+    /**
+     Gets constant pointer to first element of specific unrestricted alpha
+     molecular orbital matrix.
+     
+     @param iOrbitalsMatrix the index of molecular orbital matrix.
+     @return the constant pointer to first element of unrestricted alpha
+     molecular orbital matrix.
+     */
+    const double* alphaOrbitals(const int32_t iOrbitalsMatrix) const;
+    
+    /**
+     Gets constant pointer to first element of specific unrestricted beta
+     molecular orbital matrix.
+     
+     @param iOrbitalsMatrix the index of molecular orbital matrix.
+     @return the constant pointer to first element of unrestricted beta
+     molecular orbital matrix.
+     */
+    const double* betaOrbitals(const int32_t iOrbitalsMatrix) const;
+    
+    /**
+     Gets string representation of density matrix object.
+
+     @return the string representation.
+     */
+    std::string getString() const;
+
     /**
      Compares molecular orbitals object with other molecular orbitals object.
      

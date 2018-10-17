@@ -174,6 +174,8 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                                const COverlapMatrix&  S12,
                                const COverlapMatrix&  S22) const
 {
+    const bool closed_shell = (molecule.getMultiplicity() == 1);
+
     auto natoms = molecule.getNumberOfAtoms();
 
     auto nao_1 = S12.getNumberOfRows();
@@ -217,11 +219,29 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     auto qocc = _buildQocc();
 
+    // take care of electrons from net charge and/or multiplicity
+
+    double charge = molecule.getCharge();
+
+    double mult_1 = (double)(molecule.getMultiplicity() - 1);
+
+    double alpha_elec = 0.5 * (-charge + mult_1);
+
+    double beta_elec  = 0.5 * (-charge - mult_1);
+
+    alpha_elec *= 0.5 / (double)nao_1;
+
+    beta_elec  *= 0.5 / (double)nao_1;
+
     // C_SAD matrix
 
-    CDenseMatrix csad (nao_2, nao_1);
+    CDenseMatrix csad_alpha (nao_2, nao_1);
 
-    csad.zero();
+    CDenseMatrix csad_beta  (nao_2, nao_1);
+
+    csad_alpha.zero();
+
+    csad_beta.zero();
 
     #pragma omp parallel for schedule(dynamic)
     for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
@@ -323,15 +343,30 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         auto mat_c2 = denblas::multAB(block_22_inv, prod);
 
-        // update csad
+        // update csad_alpha
 
         for (int32_t j = 0; j < naodim_2; j++)
         {
             for (int32_t i = 0; i < naodim_1; i++)
             {
-                csad.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
+                csad_alpha.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
 
-                    mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i]);
+                    mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + alpha_elec);
+            }
+        }
+
+        // update csad_beta
+
+        if (! closed_shell)
+        {
+            for (int32_t j = 0; j < naodim_2; j++)
+            {
+                for (int32_t i = 0; i < naodim_1; i++)
+                {
+                    csad_beta.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
+
+                        mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + beta_elec);
+                }
             }
         }
     }
@@ -339,10 +374,21 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
     // D_SAD density matrix
 
     std::vector<CDenseMatrix> dsad;
-    
-    dsad.push_back(denblas::multABt(csad, csad));
 
-    return CAODensityMatrix(dsad, denmat::rest);
+    if (closed_shell)
+    {
+        dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
+
+        return CAODensityMatrix(dsad, denmat::rest);
+    }
+    else
+    {
+        dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
+
+        dsad.push_back(denblas::multABt(csad_beta,  csad_beta));
+
+        return CAODensityMatrix(dsad, denmat::unrest);
+    }
 }
 
 void

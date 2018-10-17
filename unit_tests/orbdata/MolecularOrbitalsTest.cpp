@@ -25,9 +25,9 @@ TEST_F(CMolecularOrbitalsTest, CopyConstructor)
     
     CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
     
-    CMemBlock<double> ea({1.0, 2.0, 4.0});
+    std::vector<double> ea({1.0, 2.0, 4.0});
     
-    CMemBlock<double> eb({3.0, 5.0});
+    std::vector<double> eb({3.0, 5.0});
     
     CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
     
@@ -42,9 +42,9 @@ TEST_F(CMolecularOrbitalsTest, MoveConstructor)
     
     CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
     
-    CMemBlock<double> ea({1.0, 2.0, 4.0});
+    std::vector<double> ea({1.0, 2.0, 4.0});
     
-    CMemBlock<double> eb({3.0, 5.0});
+    std::vector<double> eb({3.0, 5.0});
     
     CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
     
@@ -57,7 +57,7 @@ TEST_F(CMolecularOrbitalsTest, CopyAssignment)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
-    CMemBlock<double> ea({1.0, 2.0, 4.0});
+    std::vector<double> ea({1.0, 2.0, 4.0});
     
     CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
     
@@ -70,7 +70,7 @@ TEST_F(CMolecularOrbitalsTest, MoveAssignment)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
-    CMemBlock<double> ea({1.0, 2.0, 4.0});
+    std::vector<double> ea({1.0, 2.0, 4.0});
     
     CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
     
@@ -83,7 +83,7 @@ TEST_F(CMolecularOrbitalsTest, GetAODensityForRestrictedCase)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
-    CMemBlock<double> ea({1.0, 2.0, 4.0});
+    std::vector<double> ea({1.0, 2.0, 4.0});
     
     CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
     
@@ -109,9 +109,9 @@ TEST_F(CMolecularOrbitalsTest, GetAODensityForUnrestrictedCase)
     
     CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
     
-    CMemBlock<double> ea({1.0, 2.0, 4.0});
+    std::vector<double> ea({1.0, 2.0, 4.0});
     
-    CMemBlock<double> eb({3.0, 5.0});
+    std::vector<double> eb({3.0, 5.0});
     
     CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
     

@@ -1,8 +1,10 @@
 from mpi4py import MPI
 from HelperClass import Task
 from veloxchem.VeloxChemLib import denmat
+from veloxchem.VeloxChemLib import molorb
 
 from veloxchem.aodensitymatrix import AODensityMatrix
+from veloxchem.molecularorbitals import MolecularOrbitals
 
 import numpy as np
 import unittest
@@ -56,6 +58,47 @@ class TestOrbData(unittest.TestCase):
 
         d_unrest.write_hdf5("inputs/dummy.h5")
         dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
+        self.assertEqual(d_unrest, dummy)
+
+    def test_orbitals_matrix(self):
+
+        data_a = [[ .9, .2, ], [ .1, .3, ], [ .4, .9, ]]
+        data_b = [[ .8, .3, ], [ .2, .4, ], [ .5, .8, ]]
+
+        d_rest = MolecularOrbitals.from_numpy_list([data_a], molorb.rest)
+        d_unrest = MolecularOrbitals.from_numpy_list([data_a, data_b],
+                                                     molorb.unrest)
+
+        den_a1 = d_rest.total_to_numpy(0)
+        den_a2 = d_unrest.alpha_to_numpy(0)
+        den_b1 = d_unrest.beta_to_numpy(0)
+
+        self.assertEqual(0, np.max(np.abs(data_a - den_a1)))
+        self.assertEqual(0, np.max(np.abs(data_a - den_a2)))
+        self.assertEqual(0, np.max(np.abs(data_b - den_b1)))
+
+        self.assertEqual(molorb.rest, d_rest.get_orbitals_type())
+        self.assertEqual(molorb.unrest, d_unrest.get_orbitals_type())
+
+    def test_orbitals_hdf5(self):
+
+        data_a = [[ .9, .2, ], [ .1, .3, ], [ .4, .9, ]]
+        data_b = [[ .8, .3, ], [ .2, .4, ], [ .5, .8, ]]
+        data_c = [[ .4, .9, ], [ .8, .2, ], [ .2, .3, ]]
+        data_d = [[ .5, .7, ], [ .6, .3, ], [ .3, .4, ]]
+
+        d_rest = MolecularOrbitals.from_numpy_list(
+            [data_a, data_b], molorb.rest)
+
+        d_unrest = MolecularOrbitals.from_numpy_list(
+            [data_a, data_b, data_c, data_d], molorb.unrest)
+
+        d_rest.write_hdf5("inputs/dummy.h5")
+        dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
+        self.assertEqual(d_rest, dummy)
+
+        d_unrest.write_hdf5("inputs/dummy.h5")
+        dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
         self.assertEqual(d_unrest, dummy)
 
 
