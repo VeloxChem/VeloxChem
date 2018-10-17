@@ -69,14 +69,88 @@ class TestSolvers(unittest.TestCase):
 
             # number of electrons
 
-            DS = density.dot(overlap)
+            self.assertAlmostEqual(2.0 * np.sum(density * overlap), 10., 13)
 
-            nelec = 0.0
-            for i in range(DS.shape[0]):
-                nelec += DS[i][i]
-            nelec *= 2.0
+        # compute other initial guess
 
-            self.assertAlmostEqual(nelec, 10., 13)
+        charge = molecule.get_charge()
+        multiplicity = molecule.get_multiplicity()
+
+        # closed-shell cation initial guess
+
+        molecule.set_charge(charge + 2)
+        molecule.set_multiplicity(multiplicity)
+
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
+                           comm)
+
+        density_a = D.total_to_numpy(0)
+
+        if (rank == mpi_master()):
+
+            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 9., 13)
+
+        # closed-shell anion initial guess
+
+        molecule.set_charge(charge - 2)
+        molecule.set_multiplicity(multiplicity)
+
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
+                           comm)
+
+        density_a = D.total_to_numpy(0)
+
+        if (rank == mpi_master()):
+
+            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 11., 13)
+
+        # open-shell cation initial guess
+
+        molecule.set_charge(charge + 1)
+        molecule.set_multiplicity(multiplicity + 1)
+
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
+                           comm)
+
+        density_a = D.alpha_to_numpy(0)
+        density_b = D.beta_to_numpy(0)
+
+        if (rank == mpi_master()):
+
+            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 10., 13)
+            self.assertAlmostEqual(2.0 * np.sum(density_b * overlap), 9., 13)
+
+        # open-shell anion initial guess
+
+        molecule.set_charge(charge - 1)
+        molecule.set_multiplicity(multiplicity + 1)
+
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
+                           comm)
+
+        density_a = D.alpha_to_numpy(0)
+        density_b = D.beta_to_numpy(0)
+
+        if (rank == mpi_master()):
+
+            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 11., 13)
+            self.assertAlmostEqual(2.0 * np.sum(density_b * overlap), 10., 13)
+
+        # open-shell triplet initial guess
+
+        molecule.set_charge(charge)
+        molecule.set_multiplicity(multiplicity + 2)
+
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
+                           comm)
+
+        density_a = D.alpha_to_numpy(0)
+        density_b = D.beta_to_numpy(0)
+
+        if (rank == mpi_master()):
+
+            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 11., 13)
+            self.assertAlmostEqual(2.0 * np.sum(density_b * overlap), 9., 13)
 
 
 if __name__ == "__main__":
