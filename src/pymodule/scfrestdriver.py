@@ -12,38 +12,38 @@ class ScfRestrictedDriver(ScfDriver):
     def __init__(self):
         super().__init__()
     
-    def comp_energy(self, fockmat, kinmat, npotmat, denmat):
+    def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         
-        dmat = denmat.total_to_numpy(0)
+        dmat = den_mat.total_to_numpy(0)
         
         # electronic energy
         
-        gmat = fockmat.to_numpy(0)
+        gmat = fock_mat.to_numpy(0)
         gd = np.matmul(gmat, dmat)
-        eelec = gd.trace()
+        e_ee = gd.trace()
         
         # kinetic energy
         
-        kmat = kinmat.to_numpy()
+        kmat = kin_mat.to_numpy()
         kd = np.matmul(kmat, dmat)
-        ekin = 2.0 * kd.trace()
+        e_kin = 2.0 * kd.trace()
         
         # nuclear potential energy
         
-        npmat = npotmat.to_numpy()
+        npmat = npot_mat.to_numpy()
         npd = np.matmul(npmat, dmat)
-        enpot = -2.0 * npd.trace()
+        e_en = -2.0 * npd.trace()
         
-        return (eelec, ekin, enpot)
+        return (e_ee, e_kin, e_en)
     
-    def comp_full_fock(self, fockmat, kinmat, npotmat):
-        fockmat.add_hcore(kinmat, npotmat, 0)
+    def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
+        fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
-    def comp_gradient(self, fockmat, ovlmat, denmat):
+    def comp_gradient(self, fock_mat, ovl_mat, den_mat):
         
-        dmat = denmat.total_to_numpy(0)
-        smat = ovlmat.to_numpy()
-        fmat = fockmat.to_numpy(0)
+        dmat = den_mat.total_to_numpy(0)
+        smat = ovl_mat.to_numpy()
+        fmat = fock_mat.to_numpy(0)
         
         # compute SDF and FDS matrices
         
@@ -52,29 +52,29 @@ class ScfRestrictedDriver(ScfDriver):
         
         return 2.0 * np.linalg.norm(fa - fb)
 
-    def comp_density_change(self, newden, oldden):
+    def comp_density_change(self, den_mat, old_den_mat):
         
-        ndmat = newden.total_to_numpy(0)
-        odmat = oldden.total_to_numpy(0)
+        ndmat = den_mat.total_to_numpy(0)
+        odmat = old_den_mat.total_to_numpy(0)
         
         return np.linalg.norm(ndmat - odmat)
     
-    def gen_molecular_orbitals(self, fockmat, oaomat, ostream):
+    def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
     
-        fmat = fockmat.to_numpy(0)
-        smat = oaomat.to_numpy()
+        fmat = fock_mat.to_numpy(0)
+        smat = oao_mat.to_numpy()
     
-        fmat_mo = np.matmul(smat.transpose(), np.matmul(fmat, smat))
+        fmo = np.matmul(smat.transpose(), np.matmul(fmat, smat))
     
-        evals, evecs = np.linalg.eigh(fmat_mo)
+        eigs, evecs = np.linalg.eigh(fmo)
     
-        morbs = np.matmul(smat, evecs)
+        orb_coefs = np.matmul(smat, evecs)
         
-        print(morbs); 
+        print(orb_coefs);
         
-        cmo = MolecularOrbitals()
+        mol_orbs = MolecularOrbitals()
         
-        return cmo.from_numpy_list([morbs], [evals], molorb.rest)
+        return mol_orbs.from_numpy_list([orb_coefs], [eigs], molorb.rest)
     
     def gen_new_density(self, mol_orbs, molecule):
         return mol_orbs.get_rest_density(molecule)
