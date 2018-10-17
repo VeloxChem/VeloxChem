@@ -229,9 +229,9 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     double beta_elec  = 0.5 * (-charge - mult_1);
 
-    alpha_elec *= 0.5 / (double)nao_1;
+    alpha_elec /= (double)nao_1;
 
-    beta_elec  *= 0.5 / (double)nao_1;
+    beta_elec  /= (double)nao_1;
 
     // C_SAD matrix
 
