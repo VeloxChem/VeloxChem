@@ -24,9 +24,9 @@ class ScfDriver:
         
         self.acc_type = "DIIS"
         self.max_err_vecs = 10
-        self.max_iter = 50
+        self.max_iter = 1
         
-        # screeninf scheme
+        # screening scheme
         
         self.qq_type = "QQR"
         self.qq_dyn = True
@@ -40,6 +40,7 @@ class ScfDriver:
         # iterations data
         
         self.iter_data = []
+        self.is_converged = False
     
     def compute(self, molecule, ao_basis, min_basis, comm, ostream):
 
@@ -68,13 +69,8 @@ class ScfDriver:
         # DIIS method
 
         if self.acc_type == "DIIS":
-
-            denmat = self.gen_guess_density(molecule, ao_basis, min_basis,
-                                            ovlmat, ovldrv, loc_rank, loc_nodes,
-                                            comm, ostream)
             
-            if loc_rank == mpi_master():
-                oaomat = ovlmat.get_ortho_matrix(self.ovl_thresh, ostream)
+            # initialize ERI driver
             
             eridrv = ElectronRepulsionIntegralsDriver.create(loc_rank,
                                                              loc_nodes,
@@ -83,9 +79,20 @@ class ScfDriver:
             qqdata = eridrv.compute(self.get_qq_scheme(), self.eri_thresh,
                                     molecule, ao_basis, ostream, comm)
             
+            # generate initial density
+            
+            denmat = self.gen_guess_density(molecule, ao_basis, min_basis,
+                                            ovlmat, ovldrv, loc_rank, loc_nodes,
+                                            comm, ostream)
+            
+            # compute orthogonalization matrix
+            
+            if loc_rank == mpi_master():
+                oaomat = ovlmat.get_ortho_matrix(self.ovl_thresh, ostream)
+            
             # set up scf data
         
-            refden = AODensityMatrix(denmat)
+            old_denmat = AODensityMatrix(denmat)
             
             fockmat = AOFockMatrix(denmat)
             
@@ -94,26 +101,47 @@ class ScfDriver:
             self.print_scf_title(ostream)
             
             for i in range(self.max_iter):
+                
+                # compute 2e part of AO fock matrix
+                
                 eridrv.compute(fockmat, denmat, molecule, ao_basis, qqdata,
                                ostream, comm)
             
-                eelec, ekin, enpot = self.comp_energy(fockmat, kinmat, npotmat,
-                                                      denmat)
             
-                egrad = self.comp_gradient(fockmat, denmat)
-                    
-                dden = self.comp_density_change(denmat, refden)
+                # compute electronic energy components
+            
+                te_ee, te_kin, te_en = self.comp_energy(fockmat, kinmat, npotmat,
+                                                        denmat)
+                 
+                # construct full AO Fock matrix
                 
-                self.add_iter_data(i, eelec, ekin, enpot, egrad, dden)
-                
+                self.comp_full_fock(fockmat, kinmat, npotmat)
+
+                # compute electronic gradient
+
+                egrad = self.comp_gradient(fockmat, ovlmat, denmat)
+
+                # compute density change from last iteration
+
+                dden = self.comp_density_change(denmat, old_denmat)
+
+                # process scf cycle data
+
+                self.add_iter_data(i, te_ee, te_kin, te_en, egrad, dden)
+                self.check_convergence(i)
                 self.print_iter_data(i, ostream)
+
+                # generate new molecular orbitals
+                
+                self.gen_molecular_orbitals(fockmat, oaomat, ostream)
             
-                if dden < self.conv_thresh:
+                if self.is_converged:
                     break
             
     def gen_guess_density(self, molecule, ao_basis, min_basis, ovlmat,
                           ovl_driver, loc_rank, loc_nodes, comm, ostream):
-        # Superposition of atomic densities
+        
+        # guess: superposition of atomic densities
         
         if self.guess_type == "SAD":
             ovlmat_sb = ovl_driver.compute(molecule, min_basis, ao_basis,
@@ -131,19 +159,43 @@ class ScfDriver:
     def comp_energy(self, fockmat, kinmat, npotmat, denmat):
         return (0.0, 0.0, 0.0)
 
-    def comp_gradient(self, fockmat, denmat):
+    def comp_full_fock(self, fockmat, kinmat, npotmat):
+        return
+
+    def comp_gradient(self, fockmat, ovlmat, denmat):
         return 0.0
 
     def comp_density_change(self, newden, oldden):
         return 0.0
     
-    def add_iter_data(self, iterscf, eelec, ekin, enpot, egrad, dden):
-        energy = eelec + ekin + enpot
+    def gen_molecular_orbitals(self, fockmat, oaomat, ostream):
+        return
+    
+    def add_iter_data(self, iterscf, te_ee, te_kin, te_en, egrad, dden):
+        # electronic energy
+
+        te_elec = te_ee + te_kin + te_en
+        
+        # store scf cycle data
+        
         if iterscf == 0:
-            self.iter_data.append((iterscf, energy, 0.0, egrad, dden))
+            self.iter_data.append((iterscf, te_elec, 0.0, egrad, dden))
         else:
-            denergy = energy- self.iter_data[iterscf - 1][1]
-            self.iter_data.append((iterscf, energy, denergy, egrad, dden))
+            de_elec = te_elec - self.iter_data[iterscf - 1][1]
+            self.iter_data.append((iterscf, te_elec, de_elec, egrad, dden))
+
+    def check_convergence(self, iterscf):
+        # unpack scf cycle data
+        
+        i, te_elec, de_elec, egrad, dden = self.iter_data[iterscf]
+
+        # check scf convergence
+        
+        self.is_converged = False
+        if (abs(de_elec) < self.conv_thresh and
+            abs(egrad)   < self.conv_thresh and
+            abs(dden)    < self.conv_thresh):
+            self.is_converged = True
 
     def print_header(self, ostream):
         ostream.new_line()
@@ -185,6 +237,7 @@ class ScfDriver:
 
     def print_iter_data(self, iterscf, ostream):
         i, energy, denergy, egrad, dden = self.iter_data[iterscf]
+        
         exec_str =  " " + (str(i)).rjust(3) + 4 * " "
         exec_str += ("{:7.12f}".format(energy)).center(27) + 3 * " "
         exec_str += ("{:5.10f}".format(denergy)).center(17) + 3 * " "
