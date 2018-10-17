@@ -14,6 +14,9 @@
 #include "DenseMatrix.hpp"
 #include "AODensityMatrix.hpp"
 #include "DensityMatrixType.hpp"
+#include "MolecularOrbitalsType.hpp"
+#include "MolecularOrbitals.hpp"
+#include "Molecule.hpp"
 
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
@@ -89,6 +92,54 @@ CAODensityMatrix_from_numpy_list(const bp::list& arr_list,
 
     return CAODensityMatrix(dmat, den_type);
 }
+    
+// Helper function for converting a list of numpy array to CMolecularOrbitals
+    
+CMolecularOrbitals
+CMolecularOrbitals_from_numpy_list(const bp::list& evecs_list,
+                                   const bp::list& evals_list,
+                                   const molorb    mo_type)
+    {
+        std::vector<CDenseMatrix> orbs;
+        
+        
+        for (int i = 0; i < bp::len(evecs_list); i++)
+        {
+            np::ndarray arr = np::array(evecs_list[i]);
+            
+            orbs.push_back(bp_math::CDenseMatrix_from_numpy(arr));
+        }
+        
+        std::vector<std::vector<double>> eigs;
+        
+        for (int i = 0; i < bp::len(evals_list); i++)
+        {
+            np::ndarray arr = np::array(evals_list[i]);
+            
+            const double* data = reinterpret_cast<double*>(arr.get_data());
+            
+            if (data == nullptr) return CMolecularOrbitals();
+            
+            auto size = static_cast<int32_t>(arr.shape(0));
+            
+            if (size == 0) return CMolecularOrbitals();
+            
+            std::vector<double> vec (data, data + size);
+            
+            eigs.push_back(vec);
+        }
+        
+        return CMolecularOrbitals(orbs, eigs, mo_type);
+    }
+    
+CAODensityMatrix
+CMolecularOrbitals_get_rest_density(const CMolecularOrbitals& self,
+                                    const CMolecule& molecule)
+{
+    auto nelec = molecule.getNumberOfElectrons();
+    
+    return self.getAODensity(nelec);
+}
 
 // Exports classes/functions in src/orbdata to python
 
@@ -138,6 +189,31 @@ void export_orbdata()
         .def("get_number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices)
         .def("get_density_type", &CAODensityMatrix::getDensityType)
         .def(bp::self == bp::other<CAODensityMatrix>())
+    ;
+    
+    // molorb enum class
+    
+    bp::enum_<molorb> ("molorb")
+        .value("rest",   molorb::rest  )
+        .value("unrest", molorb::unrest)
+    ;
+    
+    // CMolecularOrbitals class
+    
+    bp::class_< CMolecularOrbitals, std::shared_ptr<CMolecularOrbitals> >
+        (
+            "MolecularOrbitals",
+            bp::init<
+                const std::vector<CDenseMatrix>&,
+                const std::vector<std::vector<double>>&,
+                const molorb
+                >()
+         )
+        .def(bp::init<>())
+        .def(bp::init<const CMolecularOrbitals&>())
+        .def("from_numpy_list", &CMolecularOrbitals_from_numpy_list)
+        .staticmethod("from_numpy_list")
+        .def("get_rest_density", &CMolecularOrbitals_get_rest_density)
     ;
 }
 

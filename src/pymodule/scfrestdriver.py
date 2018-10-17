@@ -1,4 +1,7 @@
 from .VeloxChemLib import mpi_master
+from .VeloxChemLib import MolecularOrbitals
+
+from .VeloxChemLib import molorb
 
 from .scfdriver import ScfDriver
 
@@ -66,10 +69,15 @@ class ScfRestrictedDriver(ScfDriver):
         evals, evecs = np.linalg.eigh(fmat_mo)
     
         morbs = np.matmul(smat, evecs)
+        
+        print(morbs); 
+        
+        cmo = MolecularOrbitals()
+        
+        return cmo.from_numpy_list([morbs], [evals], molorb.rest)
     
-        #print(evals)
-    
-        #print(morbs)
+    def gen_new_density(self, mol_orbs, molecule):
+        return mol_orbs.get_rest_density(molecule)
     
     def get_scf_type(self):
         return "Spin-Restricted Hatree-Fock"

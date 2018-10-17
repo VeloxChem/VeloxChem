@@ -14,6 +14,8 @@
 
 #include "MolecularOrbitalsType.hpp"
 #include "DenseMatrix.hpp"
+#include "MemBlock.hpp"
+#include "AODensityMatrix.hpp"
 
 /**
  Class CMolecularOrbitals stores data about molecular orbitals and provides set
@@ -33,6 +35,11 @@ class CMolecularOrbitals
      */
     std::vector<CDenseMatrix> _orbitals;
     
+    /**
+     The vector of vectors for storing molecular orbital energies.
+     */
+    std::vector<CMemBlock<double>> _energies;
+    
 public:
     
     /**
@@ -44,10 +51,23 @@ public:
      Creates a molecular orbitals object.
      
      @param orbitals the vector of dense matrices with molecular orbitals.
+     @param energies the vector of orbital energies vectors.
      @param orbitalsType the type of molecular orbitals.
      */
-    CMolecularOrbitals(const std::vector<CDenseMatrix>& orbitals,
-                       const molorb                     orbitalsType);
+    CMolecularOrbitals(const std::vector<CDenseMatrix>&      orbitals,
+                       const std::vector<CMemBlock<double>>& energies,
+                       const molorb                          orbitalsType);
+    
+    /**
+     Creates a molecular orbitals object.
+     
+     @param orbitals the vector of dense matrices with molecular orbitals.
+     @param energies the vector of orbital energies vectors.
+     @param orbitalsType the type of molecular orbitals.
+     */
+    CMolecularOrbitals(const std::vector<CDenseMatrix>&        orbitals,
+                       const std::vector<std::vector<double>>& energies,
+                       const molorb                            orbitalsType);
     
     /**
      Creates a molecular orbitals object by copying other molecular orbitals object.
@@ -97,6 +117,26 @@ public:
      @return true if molecular orbitals objects are not equal, false otherwise.
      */
     bool operator!=(const CMolecularOrbitals& other) const;
+    
+    /**
+     Computes spin restricted electron density matrix in AO basis for specific
+     number of electrons.
+
+     @param nElectrons the total number of electrons.
+     @return the AO density matrix.
+     */
+    CAODensityMatrix getAODensity(const int32_t nElectrons) const;
+    
+    /**
+     Computes spin unrestricted electron density matrix in AO basis for specific
+     number of alpha and beta electrons.
+     
+     @param nAlphaElectrons the number of alpha electrons.
+     @param nBetaElectrons the number of beta electrons.
+     @return the AO density matrix.
+     */
+    CAODensityMatrix getAODensity(const int32_t nAlphaElectrons,
+                                  const int32_t nBetaElectrons) const;
     
     /**
      Converts molecular orbitals object to text output and insert it into output

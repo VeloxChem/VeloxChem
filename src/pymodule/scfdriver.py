@@ -6,8 +6,10 @@ from .VeloxChemLib import OverlapIntegralsDriver
 from .VeloxChemLib import KineticEnergyIntegralsDriver
 from .VeloxChemLib import NuclearPotentialIntegralsDriver
 from .VeloxChemLib import SADGuessDriver
+from .VeloxChemLib import MolecularOrbitals
 from .VeloxChemLib import mpi_master
 from .VeloxChemLib import ericut
+from .VeloxChemLib import molorb
 
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
@@ -96,6 +98,8 @@ class ScfDriver:
             
             fockmat = AOFockMatrix(denmat)
             
+            mol_orbs = MolecularOrbitals()
+            
             # scf iterations
             
             self.print_scf_title(ostream)
@@ -130,10 +134,16 @@ class ScfDriver:
                 self.add_iter_data(i, te_ee, te_kin, te_en, egrad, dden)
                 self.check_convergence(i)
                 self.print_iter_data(i, ostream)
-
-                # generate new molecular orbitals
                 
-                self.gen_molecular_orbitals(fockmat, oaomat, ostream)
+                # compute molecular orbitals
+                
+                mol_orbs = self.gen_molecular_orbitals(fockmat, oaomat, ostream)
+            
+                # update density matrix
+            
+                oldden = AODensityMatrix(denmat)
+                
+                denmat = self.gen_new_density(mol_orbs, molecule)
             
                 if self.is_converged:
                     break
@@ -169,7 +179,10 @@ class ScfDriver:
         return 0.0
     
     def gen_molecular_orbitals(self, fockmat, oaomat, ostream):
-        return
+        return MolecularOrbitals()
+
+    def gen_new_density(self, mol_orbs, molecule):
+        return AODensityMatrix()
     
     def add_iter_data(self, iterscf, te_ee, te_kin, te_en, egrad, dden):
         # electronic energy

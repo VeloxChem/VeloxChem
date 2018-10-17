@@ -47,7 +47,7 @@ CDenseMatrix_from_numpy(const np::ndarray& arr)
 
     if (data == nullptr) return CDenseMatrix();
 
-    int size = arr.shape(0) * arr.shape(1);
+    auto size = static_cast<int32_t> (arr.shape(0) * arr.shape(1));
 
     if (size == 0) return CDenseMatrix();
 
