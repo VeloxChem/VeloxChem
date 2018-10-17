@@ -88,7 +88,7 @@ class TestSolvers(unittest.TestCase):
 
         if (rank == mpi_master()):
 
-            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 9., 13)
+            self.assertAlmostEqual(np.sum(density_a * overlap), 4., 13)
 
         # closed-shell anion initial guess
 
@@ -102,7 +102,7 @@ class TestSolvers(unittest.TestCase):
 
         if (rank == mpi_master()):
 
-            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 11., 13)
+            self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
 
         # open-shell cation initial guess
 
@@ -117,8 +117,8 @@ class TestSolvers(unittest.TestCase):
 
         if (rank == mpi_master()):
 
-            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 10., 13)
-            self.assertAlmostEqual(2.0 * np.sum(density_b * overlap), 9., 13)
+            self.assertAlmostEqual(np.sum(density_a * overlap), 5., 13)
+            self.assertAlmostEqual(np.sum(density_b * overlap), 4., 13)
 
         # open-shell anion initial guess
 
@@ -133,8 +133,8 @@ class TestSolvers(unittest.TestCase):
 
         if (rank == mpi_master()):
 
-            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 11., 13)
-            self.assertAlmostEqual(2.0 * np.sum(density_b * overlap), 10., 13)
+            self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
+            self.assertAlmostEqual(np.sum(density_b * overlap), 5., 13)
 
         # open-shell triplet initial guess
 
@@ -149,8 +149,8 @@ class TestSolvers(unittest.TestCase):
 
         if (rank == mpi_master()):
 
-            self.assertAlmostEqual(2.0 * np.sum(density_a * overlap), 11., 13)
-            self.assertAlmostEqual(2.0 * np.sum(density_b * overlap), 9., 13)
+            self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
+            self.assertAlmostEqual(np.sum(density_b * overlap), 4., 13)
 
 
 if __name__ == "__main__":
