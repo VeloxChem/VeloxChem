@@ -171,6 +171,7 @@ void export_twoints()
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
         .def(bp::self == bp::other<CAOFockMatrix>())
+        .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
     ;
 
     // CScreeningContainer class

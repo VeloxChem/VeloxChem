@@ -17,4 +17,4 @@ from .VeloxChemLib import assert_msg_critical
 from .outputstream import OutputStream
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
-from .scfdriver import ScfDriver
+from .scfrestdriver import ScfRestrictedDriver

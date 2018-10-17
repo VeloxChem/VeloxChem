@@ -104,7 +104,7 @@ def main():
 
     # initialize scf driver
 
-    scf_drv = vlx.ScfDriver()
+    scf_drv = vlx.ScfRestrictedDriver()
 
     # read minimal basis if needed
 
