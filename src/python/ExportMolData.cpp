@@ -75,6 +75,7 @@ void export_moldata()
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
         .def("number_of_atoms", &CMolecule_getNumberOfAtoms)
+        .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
     ;
 }
 

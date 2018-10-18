@@ -16,6 +16,8 @@ from .aodensitymatrix import AODensityMatrix
 
 import numpy as np
 
+from collections import deque
+
 class ScfDriver:
 
     def __init__(self):
@@ -44,6 +46,11 @@ class ScfDriver:
         self.iter_data = []
         self.is_converged = False
     
+        # DIIS data lists
+        
+        self.fock_mat_list = deque()
+        self.den_mat_list = deque()
+    
     def compute(self, molecule, ao_basis, min_basis, comm, ostream):
 
         # MPI communicator data
@@ -55,6 +62,11 @@ class ScfDriver:
         
         if loc_rank == mpi_master():
             self.print_header(ostream)
+        
+        # clear DIIS data
+        
+        self.fock_mat_list.clear()
+        self.den_mat_list.clear()
 
         # compute one-electron integrals
 
@@ -135,9 +147,21 @@ class ScfDriver:
                 self.check_convergence(i)
                 self.print_iter_data(i, ostream)
                 
+                # store DIIS data
+                
+                self.store_diis_data(i, fock_mat, den_mat)
+                
+                #print(self.fock_mat_list)
+                #print(self.den_mat_list)
+                
                 # compute molecular orbitals
                 
-                mol_orbs = self.gen_molecular_orbitals(fock_mat, oao_mat,
+                eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat,
+                                                       oao_mat)
+                
+                self.apply_level_shift(eff_fock_mat, oao_mat, molecule)
+                
+                mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                        ostream)
             
                 # update density matrix
@@ -180,6 +204,15 @@ class ScfDriver:
     def comp_density_change(self, den_mat, old_den_mat):
         return 0.0
     
+    def store_diis_data(self, i, fock_mat, den_mat):
+        return
+
+    def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
+        return None
+
+    def apply_level_shift(self, fock_mat, oao_mat, molecule):
+        return
+
     def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
         return MolecularOrbitals()
 
