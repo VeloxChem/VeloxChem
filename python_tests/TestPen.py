@@ -8,6 +8,7 @@ from veloxchem.VeloxChemLib import KineticEnergyIntegralsDriver
 from veloxchem.VeloxChemLib import NuclearPotentialIntegralsDriver
 from veloxchem.VeloxChemLib import SADGuessDriver
 from veloxchem.VeloxChemLib import ElectronRepulsionIntegralsDriver
+from veloxchem.VeloxChemLib import ScreeningContainer
 from veloxchem.VeloxChemLib import denmat
 from veloxchem.VeloxChemLib import fockmat
 from veloxchem.VeloxChemLib import ericut
@@ -92,8 +93,12 @@ class TestPen(unittest.TestCase):
 
         eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
 
+        """
         qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
                                 comm)
+        """
+
+        qqdata = ScreeningContainer()
 
         fock = AOFockMatrix(dmat)
 
@@ -105,18 +110,11 @@ class TestPen(unittest.TestCase):
 
         F2 = AOFockMatrix.read_hdf5("inputs/pen.twoe.h5").to_numpy(0)
 
-        print()
-        for i in range(F1.shape[0]):
-            for j in range(F1.shape[1]):
-                diff = abs(F1[i][j] - F2[i][j])
-                if diff > 1.0:
-                    print(i, j, diff)
+        maxelem = max(np.max(np.abs(F1)), np.max(np.abs(F2)))
 
         maxdiff = np.max(np.abs(F1 - F2))
 
-        print()
-        print("Max diff =", maxdiff)
-        self.assertTrue(maxdiff < 1.0e-11)
+        self.assertTrue(maxdiff / maxelem < 1.0e-11)
 
 
 if __name__ == "__main__":
