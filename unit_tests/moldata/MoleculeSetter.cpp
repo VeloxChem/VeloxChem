@@ -89,7 +89,7 @@ getMoleculeHeAtom()
     
     std::vector<double> charges({2.0});
     
-    std::vector<double> masses({4.0026});
+    std::vector<double> masses({4.002603});
     
     std::vector<std::string> labels({{"He"}});
     
@@ -137,7 +137,7 @@ getMoleculeH2Se()
     
     std::vector<double> charges({34.0, 1.0, 1.0});
     
-    std::vector<double> masses({78.971, 1.008, 1.008});
+    std::vector<double> masses({78.918337, 1.007825, 1.007825});
     
     std::vector<std::string> labels({{"Se"}, {"H"}, {"H"}});
     
@@ -190,8 +190,8 @@ getMoleculeNH3CH4()
     std::vector<double> charges({7.0, 1.0, 1.0, 1.0,
                                  6.0, 1.0, 1.0, 1.0, 1.0});
     
-    std::vector<double> masses({14.007, 1.008, 1.008, 1.008,
-                                12.011, 1.008, 1.008, 1.008, 1.008});
+    std::vector<double> masses({14.003074, 1.007825, 1.007825, 1.007825,
+                                12.000000, 1.007825, 1.007825, 1.007825, 1.007825});
     
     std::vector<std::string> labels({"N", "H", "H", "H",
                                      "C", "H", "H", "H", "H"});

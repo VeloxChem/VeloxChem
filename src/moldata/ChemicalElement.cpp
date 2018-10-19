@@ -2265,7 +2265,7 @@ CChemicalElement::_selectSeleniumAtom()
 
     _atomicCharge = 34.0;
 
-    _atomicMass = 79.916521;
+    _atomicMass = 78.918337;
 }
 
 void
@@ -2277,7 +2277,7 @@ CChemicalElement::_selectBromineAtom()
 
     _atomicCharge = 35.0;
 
-    _atomicMass = 78.918337;
+    _atomicMass = 79.916521;
 }
 
 void
