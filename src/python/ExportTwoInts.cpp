@@ -8,6 +8,7 @@
 
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
+#include <mpi.h>
 
 #include "DenseMatrix.hpp"
 #include "AOFockMatrix.hpp"
@@ -15,7 +16,6 @@
 #include "EriScreenerType.hpp"
 #include "ScreeningContainer.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
-
 #include "ExportMath.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportTwoInts.hpp"
@@ -28,7 +28,7 @@ namespace bp_twoints { // bp_twoints namespace
 
 // Helper function for printing CAOFockMatrix
 
-std::string
+static std::string
 CAOFockMatrix_str (const CAOFockMatrix& self)
 {
     return self.getString();
@@ -36,7 +36,7 @@ CAOFockMatrix_str (const CAOFockMatrix& self)
 
 // Helper function for converting CAOFockMatrix to numpy array
 
-np::ndarray
+static np::ndarray
 CAOFockMatrix_to_numpy(const CAOFockMatrix& self,
                        const int32_t iFockMatrix)
 {
@@ -45,9 +45,9 @@ CAOFockMatrix_to_numpy(const CAOFockMatrix& self,
                                         self.getNumberOfColumns(iFockMatrix));
 }
 
-// Helper function for converting a list of numpy array to CAOFockMatrix
+// Helper function for CAOFockMatrix constructor
 
-CAOFockMatrix
+static std::shared_ptr<CAOFockMatrix>
 CAOFockMatrix_from_numpy_list(const bp::list& arr_list,
                               const bp::list& fock_type_list,
                               const bp::list& scale_fac_list,
@@ -65,16 +65,20 @@ CAOFockMatrix_from_numpy_list(const bp::list& arr_list,
         double      factor = bp::extract<double>(scale_fac_list[i]);
         int         id     = bp::extract<int>(id_dmat_list[i]);
 
-        fmat.push_back(bp_math::CDenseMatrix_from_numpy(arr));
+        std::shared_ptr<CDenseMatrix> mp = bp_math::CDenseMatrix_from_numpy(arr);
+
+        fmat.push_back(*mp);
         types.push_back(type);
         factors.push_back(factor);
         ids.push_back(id);
     }
 
-    return CAOFockMatrix(fmat, types, factors, ids);
+    return std::shared_ptr<CAOFockMatrix>(
+            new CAOFockMatrix(fmat, types, factors, ids)
+            );
 }
 
-// Helper function for creating a CElectronRepulsionIntegralsDriver object
+// Helper function for CElectronRepulsionIntegralsDriver constructor
 
 static std::shared_ptr<CElectronRepulsionIntegralsDriver>
 CElectronRepulsionIntegralsDriver_create(int32_t    globRank,
@@ -90,7 +94,7 @@ CElectronRepulsionIntegralsDriver_create(int32_t    globRank,
 
 // Helper functions for overloading CElectronRepulsionIntegralsDriver::compute
 
-void
+static void
 CElectronRepulsionIntegralsDriver_compute_1(
           CElectronRepulsionIntegralsDriver& self,
           CAOFockMatrix&                     aoFockMatrix,
@@ -108,7 +112,7 @@ CElectronRepulsionIntegralsDriver_compute_1(
                  oStream, *comm_ptr);
 }
 
-CScreeningContainer
+static CScreeningContainer
 CElectronRepulsionIntegralsDriver_compute_2(
           CElectronRepulsionIntegralsDriver& self,
     const ericut                             screeningScheme,
@@ -129,6 +133,12 @@ CElectronRepulsionIntegralsDriver_compute_2(
 
 void export_twoints()
 {
+    // initialize numpy
+
+    Py_Initialize();
+
+    np::initialize();
+
     // fockmat enum class
 
     bp::enum_<fockmat> ("fockmat")
@@ -151,14 +161,8 @@ void export_twoints()
     bp::class_< CAOFockMatrix, std::shared_ptr<CAOFockMatrix> >
         (
             "AOFockMatrix",
-            bp::init<
-                const std::vector<CDenseMatrix>&,
-                const std::vector<fockmat>&,
-                const std::vector<double>&,
-                const std::vector<int32_t>&
-                >()
+            bp::init<>()
         )
-        .def(bp::init<>())
         .def(bp::init<const CAODensityMatrix&>())
         .def(bp::init<const CAOFockMatrix&>())
         .def("__str__", &CAOFockMatrix_str)
@@ -170,8 +174,8 @@ void export_twoints()
         .def("get_fock_type", &CAOFockMatrix::getFockType)
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
-        .def(bp::self == bp::other<CAOFockMatrix>())
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
+        .def(bp::self == bp::other<CAOFockMatrix>())
     ;
 
     // CScreeningContainer class
@@ -179,16 +183,8 @@ void export_twoints()
     bp::class_< CScreeningContainer, std::shared_ptr<CScreeningContainer> >
         (
             "ScreeningContainer",
-            bp::init<
-                const CVecMemBlock<double>&,
-                const CVecMemBlock<double>&,
-                const CGtoPairsContainer&,
-                const CGtoPairsContainer&,
-                const ericut,
-                const double
-                >()
+            bp::init<>()
         )
-        .def(bp::init<>())
         .def(bp::init<const CScreeningContainer&>())
         .def("is_empty", &CScreeningContainer::isEmpty)
         .def("get_number_of_screeners", &CScreeningContainer::getNumberOfScreeners)

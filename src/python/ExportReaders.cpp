@@ -15,7 +15,6 @@
 #include "BasisReader.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
-
 #include "ExportReaders.hpp"
 
 namespace bp = boost::python;

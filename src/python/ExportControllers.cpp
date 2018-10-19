@@ -7,14 +7,10 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <boost/python.hpp>
-
 #include <memory>
-#include <vector>
 #include <string>
 
-#include "MpiFunc.hpp"
 #include "AppManager.hpp"
-
 #include "ExportControllers.hpp"
 
 namespace bp = boost::python;
@@ -26,7 +22,6 @@ namespace bp_controllers { // bp_controllers namespace
 void export_controllers()
 {
     // CAppManager class
-    // Note: "create" is a static method that returns a CAppManager object
 
     bp::class_< CAppManager, std::shared_ptr<CAppManager> >
         (

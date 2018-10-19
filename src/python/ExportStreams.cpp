@@ -7,14 +7,12 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <boost/python.hpp>
-
 #include <memory>
 #include <string>
 #include <iostream>
 
 #include "InputStream.hpp"
 #include "OutputStream.hpp"
-
 #include "ExportStreams.hpp"
 
 namespace bp = boost::python;
@@ -23,30 +21,35 @@ namespace bp_streams { // bp_streams namespace
 
 // Helper function for writing to output stream
 
-void COutputStream_put_info(      COutputStream& self,
-                            const std::string&   source)
+static void
+COutputStream_put_info(      COutputStream& self,
+                       const std::string&   source)
 {
     self << fmt::info << source.c_str() << fmt::end;
 }
     
-void COutputStream_put_title(      COutputStream& self,
-                             const std::string&   source)
+static void
+COutputStream_put_title(      COutputStream& self,
+                        const std::string&   source)
 {
     self << fmt::title << source.c_str() << fmt::end;
 }
     
-void COutputStream_put_header(      COutputStream& self,
-                              const std::string&   source)
+static void
+COutputStream_put_header(      COutputStream& self,
+                         const std::string&   source)
 {
     self << fmt::header << source.c_str() << fmt::end;
 }
 
-void COutputStream_put_separator(COutputStream& self)
+static void
+COutputStream_put_separator(COutputStream& self)
 {
     self << fmt::title << fmt::tsep;
 }
     
-void COutputStream_new_line(COutputStream& self)
+static void
+COutputStream_new_line(COutputStream& self)
 {
     self << fmt::blank;
 
