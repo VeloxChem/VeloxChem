@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from HelperClass import Task
+from veloxchem.taskparser import LocalTask
 from veloxchem.VeloxChemLib import Molecule
 
 import numpy as np
@@ -10,7 +10,7 @@ class TestMolData(unittest.TestCase):
 
     def test_get_sub_molecule(self):
 
-        task = Task("inputs/dimer.inp", "inputs/dimer.out")
+        task = LocalTask("inputs/dimer.inp", "inputs/dimer.out")
         molecule = task.molecule
 
         mol_1 = molecule.get_sub_molecule(0, 4)

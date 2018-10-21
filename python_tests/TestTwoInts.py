@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from HelperClass import Task
+from veloxchem.taskparser import GlobalTask
 from veloxchem.VeloxChemLib import ElectronRepulsionIntegralsDriver
 from veloxchem.VeloxChemLib import OverlapIntegralsDriver
 from veloxchem.VeloxChemLib import SADGuessDriver
@@ -77,42 +77,28 @@ class TestTwoInts(unittest.TestCase):
         f_rest = AOFockMatrix.from_numpy_list([data_a, data_b, data_c, data_d],
                                               types, factors, indices)
 
-        f_rest.write_hdf5("inputs/dummy.h5")
+        # hdf5 read/write tests
 
-        f2 = AOFockMatrix.read_hdf5("inputs/dummy.h5")
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-        self.assertEqual(f_rest, f2)
+            f_rest.write_hdf5("inputs/dummy.h5")
+
+            f2 = AOFockMatrix.read_hdf5("inputs/dummy.h5")
+
+            self.assertEqual(f_rest, f2)
 
     def test_fock_build(self):
 
-        # mpi settings
+        task = GlobalTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
 
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+        molecule = task.molecule
+        ao_basis = task.ao_basis
+        min_basis = task.min_basis
+        ostream = task.ostream
 
-        # process input file on master node
-
-        if (rank == mpi_master()):
-
-            task = Task("inputs/h2se.inp", "inputs/h2se.out")
-            molecule = task.molecule
-            ao_basis = task.ao_basis
-            min_basis = task.min_basis
-            ostream = task.ostream
-
-        else:
-
-            molecule = Molecule()
-            ao_basis = MolecularBasis()
-            min_basis = MolecularBasis()
-            ostream = OutputStream("")
-
-        # broadcast molecule and basis
-
-        molecule.broadcast(rank, comm)
-        ao_basis.broadcast(rank, comm)
-        min_basis.broadcast(rank, comm)
+        comm = task.mpi_comm
+        rank = task.mpi_rank
+        size = task.mpi_size
 
         # read density
 
@@ -131,10 +117,13 @@ class TestTwoInts(unittest.TestCase):
 
         # compare with reference
 
-        f2 = AOFockMatrix.read_hdf5("inputs/h2se.twoe.h5")
+        F1 = fock.to_numpy(0)
+        F2 = AOFockMatrix.read_hdf5("inputs/h2se.twoe.h5").to_numpy(0)
 
-        maxdiff = np.max(np.abs(fock.to_numpy(0) - f2.to_numpy(0)))
-        self.assertTrue(maxdiff < 1.0e-11)
+        if rank == mpi_master():
+
+            dF = np.max(np.abs(F1 - F2))
+            self.assertTrue(dF < 1.0e-11)
 
 
 if __name__ == "__main__":

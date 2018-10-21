@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from HelperClass import Task
+from veloxchem.taskparser import GlobalTask
 from veloxchem.VeloxChemLib import Molecule
 from veloxchem.VeloxChemLib import MolecularBasis
 from veloxchem.VeloxChemLib import OutputStream
@@ -15,34 +15,17 @@ class TestSolvers(unittest.TestCase):
 
     def test_sad_guess(self):
 
-        # mpi settings
+        task = GlobalTask("inputs/water.inp", "inputs/water.out",
+                          MPI.COMM_WORLD)
 
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+        molecule = task.molecule
+        ao_basis = task.ao_basis
+        min_basis = task.min_basis
+        ostream = task.ostream
 
-        # process input file on master node
-
-        if (rank == mpi_master()):
-
-            task = Task("inputs/water.inp", "inputs/water.out")
-            molecule = task.molecule
-            ao_basis = task.ao_basis
-            min_basis = task.min_basis
-            ostream = task.ostream
-
-        else:
-
-            molecule = Molecule()
-            ao_basis = MolecularBasis()
-            min_basis = MolecularBasis()
-            ostream = OutputStream("")
-
-        # broadcast molecule and basis
-
-        molecule.broadcast(rank, comm)
-        ao_basis.broadcast(rank, comm)
-        min_basis.broadcast(rank, comm)
+        comm = task.mpi_comm
+        rank = task.mpi_rank
+        size = task.mpi_size
 
         # compute overlap
 

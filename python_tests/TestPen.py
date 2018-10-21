@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from HelperClass import Task
+from veloxchem.taskparser import GlobalTask
 from veloxchem.VeloxChemLib import OverlapMatrix
 from veloxchem.VeloxChemLib import KineticEnergyMatrix
 from veloxchem.VeloxChemLib import NuclearPotentialMatrix
@@ -26,34 +26,16 @@ class TestPen(unittest.TestCase):
 
     def test_penicillin(self):
 
-        # mpi settings
+        task = GlobalTask("inputs/pen.inp", "inputs/pen.out", MPI.COMM_WORLD)
 
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+        molecule = task.molecule
+        ao_basis = task.ao_basis
+        min_basis = task.min_basis
+        ostream = task.ostream
 
-        # process input file on master node
-
-        if (rank == mpi_master()):
-
-            task = Task("inputs/pen.inp", "inputs/pen.out")
-            molecule = task.molecule
-            ao_basis = task.ao_basis
-            min_basis = task.min_basis
-            ostream = task.ostream
-
-        else:
-
-            molecule = Molecule()
-            ao_basis = MolecularBasis()
-            min_basis = MolecularBasis()
-            ostream = OutputStream("")
-
-        # broadcast molecule and basis
-
-        molecule.broadcast(rank, comm)
-        ao_basis.broadcast(rank, comm)
-        min_basis.broadcast(rank, comm)
+        comm = task.mpi_comm
+        rank = task.mpi_rank
+        size = task.mpi_size
 
         # compute 1e integrals
 
@@ -77,13 +59,15 @@ class TestPen(unittest.TestCase):
         V2 = np.array(hf.get("nuclear_potential"))
         hf.close()
 
-        S_diff = np.max(np.abs(S1 - S2))
-        T_diff = np.max(np.abs(T1 - T2))
-        V_diff = np.max(np.abs(V1 - V2))
+        if rank == mpi_master():
 
-        self.assertTrue(S_diff < 1.0e-13)
-        self.assertTrue(T_diff < 1.0e-11)
-        self.assertTrue(V_diff < 1.0e-11)
+            dS = np.max(np.abs(S1 - S2))
+            dT = np.max(np.abs(T1 - T2))
+            dV = np.max(np.abs(V1 - V2))
+
+            self.assertTrue(dS < 1.0e-13)
+            self.assertTrue(dT < 1.0e-11)
+            self.assertTrue(dV < 1.0e-11)
 
         # read density
 
@@ -104,17 +88,20 @@ class TestPen(unittest.TestCase):
 
         eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, ostream, comm)
 
-        F1 = fock.to_numpy(0)
-
         # compare with reference
 
+        F1 = fock.to_numpy(0)
         F2 = AOFockMatrix.read_hdf5("inputs/pen.twoe.h5").to_numpy(0)
 
-        maxelem = max(np.max(np.abs(F1)), np.max(np.abs(F2)))
+        if rank == mpi_master():
 
-        maxdiff = np.max(np.abs(F1 - F2))
+            maxelem = max(np.max(np.abs(F1)), np.max(np.abs(F2)))
 
-        self.assertTrue(maxdiff / maxelem < 1.0e-11)
+            maxdiff = np.max(np.abs(F1 - F2))
+
+            print(maxelem, maxdiff, maxdiff/maxelem)
+
+            self.assertTrue(maxdiff / maxelem < 1.0e-11)
 
 
 if __name__ == "__main__":

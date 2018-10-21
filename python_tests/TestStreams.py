@@ -1,5 +1,4 @@
 from mpi4py import MPI
-from HelperClass import Task
 from veloxchem.VeloxChemLib import OutputStream
 from veloxchem.VeloxChemLib import InputStream
 

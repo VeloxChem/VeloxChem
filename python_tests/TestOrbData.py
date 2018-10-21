@@ -1,7 +1,8 @@
 from mpi4py import MPI
-from HelperClass import Task
+from veloxchem.taskparser import LocalTask
 from veloxchem.VeloxChemLib import denmat
 from veloxchem.VeloxChemLib import molorb
+from veloxchem.VeloxChemLib import mpi_master
 
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.molecularorbitals import MolecularOrbitals
@@ -14,7 +15,7 @@ class TestOrbData(unittest.TestCase):
 
     def test_get_label(self):
 
-        task = Task("inputs/dimer.inp", "inputs/dimer.out")
+        task = LocalTask("inputs/dimer.inp", "inputs/dimer.out")
         basis = task.ao_basis
 
         self.assertEqual(basis.get_label(), "DEF2-SVP")
@@ -52,13 +53,17 @@ class TestOrbData(unittest.TestCase):
         d_unrest = AODensityMatrix.from_numpy_list(
             [data_a, data_b, data_c, data_d], denmat.unrest)
 
-        d_rest.write_hdf5("inputs/dummy.h5")
-        dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
-        self.assertEqual(d_rest, dummy)
+        # hdf5 read/write tests
 
-        d_unrest.write_hdf5("inputs/dummy.h5")
-        dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
-        self.assertEqual(d_unrest, dummy)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            d_rest.write_hdf5("inputs/dummy.h5")
+            dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
+            self.assertEqual(d_rest, dummy)
+
+            d_unrest.write_hdf5("inputs/dummy.h5")
+            dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
+            self.assertEqual(d_unrest, dummy)
 
     def test_orbitals_matrix(self):
 
@@ -95,13 +100,15 @@ class TestOrbData(unittest.TestCase):
 
         # hdf5 read/write tests
 
-        d_rest.write_hdf5("inputs/dummy.h5")
-        dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
-        self.assertEqual(d_rest, dummy)
-        
-        d_unrest.write_hdf5("inputs/dummy.h5")
-        dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
-        self.assertEqual(d_unrest, dummy)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            d_rest.write_hdf5("inputs/dummy.h5")
+            dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
+            self.assertEqual(d_rest, dummy)
+
+            d_unrest.write_hdf5("inputs/dummy.h5")
+            dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
+            self.assertEqual(d_unrest, dummy)
 
 
 if __name__ == "__main__":

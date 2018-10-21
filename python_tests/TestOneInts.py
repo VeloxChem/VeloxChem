@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from HelperClass import Task
+from veloxchem.taskparser import GlobalTask
 from veloxchem.VeloxChemLib import OverlapMatrix
 from veloxchem.VeloxChemLib import KineticEnergyMatrix
 from veloxchem.VeloxChemLib import NuclearPotentialMatrix
@@ -53,31 +53,15 @@ class TestOneInts(unittest.TestCase):
 
     def test_1e_integrals(self):
 
-        # mpi settings
+        task = GlobalTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
 
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+        molecule = task.molecule
+        basis = task.ao_basis
+        ostream = task.ostream
 
-        # process input file on master node
-
-        if (rank == mpi_master()):
-
-            task = Task("inputs/h2se.inp", "inputs/h2se.out")
-            molecule = task.molecule
-            basis = task.ao_basis
-            ostream = task.ostream
-
-        else:
-
-            molecule = Molecule()
-            basis = MolecularBasis()
-            ostream = OutputStream("")
-
-        # broadcast molecule and basis
-
-        molecule.broadcast(rank, comm)
-        basis.broadcast(rank, comm)
+        comm = task.mpi_comm
+        rank = task.mpi_rank
+        size = task.mpi_size
 
         # compute 1e integrals
 
@@ -101,13 +85,15 @@ class TestOneInts(unittest.TestCase):
         V2 = np.array(hf.get("nuclear_potential"))
         hf.close()
 
-        S_diff = np.max(np.abs(S1 - S2))
-        T_diff = np.max(np.abs(T1 - T2))
-        V_diff = np.max(np.abs(V1 - V2))
+        if rank == mpi_master():
 
-        self.assertTrue(S_diff < 1.0e-13)
-        self.assertTrue(T_diff < 1.0e-11)
-        self.assertTrue(V_diff < 1.0e-11)
+            dS = np.max(np.abs(S1 - S2))
+            dT = np.max(np.abs(T1 - T2))
+            dV = np.max(np.abs(V1 - V2))
+
+            self.assertTrue(dS < 1.0e-13)
+            self.assertTrue(dT < 1.0e-11)
+            self.assertTrue(dV < 1.0e-11)
 
 
 if __name__ == "__main__":
