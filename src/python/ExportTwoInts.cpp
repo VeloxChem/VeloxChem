@@ -178,6 +178,19 @@ void export_twoints()
         .def(bp::self == bp::other<CAOFockMatrix>())
     ;
 
+    // CCauchySchwarzScreener class
+
+    bp::class_< CCauchySchwarzScreener, std::shared_ptr<CCauchySchwarzScreener> >
+        (
+            "CauchySchwarzScreener",
+            bp::init<>()
+        )
+        .def(bp::init<const CCauchySchwarzScreener&>())
+        .def("get_threshold", &CCauchySchwarzScreener::getThreshold)
+        .def("get_screening_scheme", &CCauchySchwarzScreener::getScreeningScheme)
+        .def(bp::self == bp::other<CCauchySchwarzScreener>())
+    ;
+
     // CScreeningContainer class
 
     bp::class_< CScreeningContainer, std::shared_ptr<CScreeningContainer> >
