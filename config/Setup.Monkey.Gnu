@@ -83,7 +83,9 @@ endif
 # Boost header and library
 
 PYTHON := python3
-BOOST_PATH := /home/xinli/software/boost
+BOOST_PATH := /home/xinli/software/boost/1.68.0
+
+PYTHON_VER := $(shell $(PYTHON) -c "import sys; print(sys.version_info.major, sys.version_info.minor, sep='')")
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
@@ -91,7 +93,7 @@ PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
 PYTHON_INC += -I$(BOOST_PATH)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
-PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python3 -lboost_numpy3
+PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python$(PYTHON_VER) -lboost_numpy$(PYTHON_VER)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
