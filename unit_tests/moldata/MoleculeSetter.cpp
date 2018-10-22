@@ -137,7 +137,7 @@ getMoleculeH2Se()
     
     std::vector<double> charges({34.0, 1.0, 1.0});
     
-    std::vector<double> masses({78.918337, 1.007825, 1.007825});
+    std::vector<double> masses({79.916521, 1.007825, 1.007825});
     
     std::vector<std::string> labels({{"Se"}, {"H"}, {"H"}});
     

@@ -1,8 +1,9 @@
 from mpi4py import MPI
 from veloxchem.taskparser import GlobalTask
-from veloxchem.VeloxChemLib import ElectronRepulsionIntegralsDriver
 from veloxchem.VeloxChemLib import OverlapIntegralsDriver
 from veloxchem.VeloxChemLib import SADGuessDriver
+from veloxchem.VeloxChemLib import ElectronRepulsionIntegralsDriver
+from veloxchem.VeloxChemLib import ScreeningContainer
 from veloxchem.VeloxChemLib import denmat
 from veloxchem.VeloxChemLib import fockmat
 from veloxchem.VeloxChemLib import ericut
@@ -108,8 +109,12 @@ class TestTwoInts(unittest.TestCase):
 
         eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
 
+        """
         qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
                                 comm)
+        """
+
+        qqdata = ScreeningContainer()
 
         fock = AOFockMatrix(dmat)
 
