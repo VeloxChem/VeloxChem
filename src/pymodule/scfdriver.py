@@ -29,7 +29,7 @@ class ScfDriver:
         
         self.acc_type = "DIIS"
         self.max_err_vecs = 10
-        self.max_iter = 1
+        self.max_iter = 50
         
         # screening scheme
         
@@ -91,7 +91,6 @@ class ScfDriver:
                                                               loc_nodes,
                                                               comm)
         
-            #qq_data= ScreeningContainer()
             qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
                                       molecule, ao_basis, ostream, comm)
             
@@ -165,7 +164,9 @@ class ScfDriver:
                 
                 mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                        ostream)
-            
+
+                #print(mol_orbs)
+
                 # update density matrix
             
                 old_den_mat = AODensityMatrix(den_mat)
@@ -320,6 +321,7 @@ class ScfDriver:
         exec_str += ("{:5.8f}".format(egrad)).center(15) + 3 * " "
         exec_str += ("{:5.8f}".format(dden)).center(15) + " "
         ostream.put_header(exec_str)
+        ostream.flush()
 
     def get_scf_type(self):
         return "Undefined"

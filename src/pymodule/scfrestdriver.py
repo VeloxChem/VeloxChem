@@ -227,9 +227,8 @@ class ScfRestrictedDriver(ScfDriver):
     
         orb_coefs = np.matmul(smat, evecs)
         
-        mol_orbs = MolecularOrbitals()
-        
-        return mol_orbs.from_numpy_list([orb_coefs], [eigs], molorb.rest)
+        return MolecularOrbitals.from_numpy_list([orb_coefs], [eigs],
+                                                 molorb.rest)
     
     def gen_new_density(self, mol_orbs, molecule):
         
