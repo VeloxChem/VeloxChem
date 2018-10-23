@@ -288,7 +288,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     // initialize R(CD) = C - D distance for horizontal recursion
     
-    auto rcd = ketpairs.getDistancesAB();
+    CMemBlock2D<double> rcd(cdim, 3);
     
     // set up horizontal recursion buffer for bra side
     
@@ -398,6 +398,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
                           brapairs, qqpairs, nqpdim, nqcdim, i);
         
         // apply horizontal recursion on ket side
+        
+        qqpairs.getDistancesAB(rcd, nqcdim); 
         
         _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, qqpairs, nqcdim, i);
         

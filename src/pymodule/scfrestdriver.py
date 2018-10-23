@@ -93,11 +93,8 @@ class ScfRestrictedDriver(ScfDriver):
         need_weights = True
     
         while need_weights:
-            
             bmat = self.comp_diis_matrix(ovl_mat, oao_mat)
-    
             weights = self.solve_diis_weigts(bmat)
-        
             need_weights = self.check_diis_weights(weights)
         
         return weights

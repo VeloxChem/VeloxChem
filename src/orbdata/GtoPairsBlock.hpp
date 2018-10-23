@@ -435,6 +435,16 @@ public:
     CMemBlock2D<double> getDistancesAB() const;
     
     /**
+     Gets vector with Cartesian R(AB) = A - B distances for specific set of
+     contracted GTOs pairs.
+
+     @param abDistances the vector of Cartesian distances.
+     @param nContrPairs the number of contracted pairs. 
+     */
+    void getDistancesAB(      CMemBlock2D<double>& abDistances,
+                        const int32_t              nContrPairs) const;
+    
+    /**
      Gets contants vector to Cartesian X coordinates of effective P center of
      contracted GTOs pairs.
 

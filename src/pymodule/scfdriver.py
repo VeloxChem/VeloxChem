@@ -7,6 +7,7 @@ from .VeloxChemLib import KineticEnergyIntegralsDriver
 from .VeloxChemLib import NuclearPotentialIntegralsDriver
 from .VeloxChemLib import SADGuessDriver
 from .VeloxChemLib import MolecularOrbitals
+from .VeloxChemLib import ScreeningContainer
 from .VeloxChemLib import mpi_master
 from .VeloxChemLib import ericut
 from .VeloxChemLib import molorb
@@ -28,11 +29,11 @@ class ScfDriver:
         
         self.acc_type = "DIIS"
         self.max_err_vecs = 10
-        self.max_iter = 50
+        self.max_iter = 1
         
         # screening scheme
         
-        self.qq_type = "QQR"
+        self.qq_type = "QQ"
         self.qq_dyn = True
 
         # thresholds
@@ -90,6 +91,7 @@ class ScfDriver:
                                                               loc_nodes,
                                                               comm)
         
+            #qq_data= ScreeningContainer()
             qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
                                       molecule, ao_basis, ostream, comm)
             

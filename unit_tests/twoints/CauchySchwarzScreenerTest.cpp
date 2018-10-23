@@ -312,19 +312,19 @@ TEST_F(CCauchySchwarzScreenerTest, SetScreeningVectorForQQ)
     
     qscra.setScreeningVector(qqvec, distpq, true, 0);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 1, 1}));
     
     qscra.setScreeningVector(qqvec, distpq, true, 1);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 1, 1, 1}));
     
     qscra.setScreeningVector(qqvec, distpq, true, 2);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 0, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 1, 1, 1}));
     
     qscra.setScreeningVector(qqvec, distpq, true, 3);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 1, 1}));
 }
 
 

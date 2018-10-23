@@ -1213,6 +1213,42 @@ CGtoPairsBlock::getDistancesAB() const
     return rab;
 }
 
+void
+CGtoPairsBlock::getDistancesAB(      CMemBlock2D<double>& abDistances,
+                               const int32_t              nContrPairs) const
+{
+    // set up pointers to R(AB) distances in primitives data
+    
+    auto abx = getDistancesABX();
+    
+    auto aby = getDistancesABY();
+    
+    auto abz = getDistancesABZ();
+    
+    // set up pointers to R(AB) distances
+    
+    auto rabx = abDistances.data(0);
+    
+    auto raby = abDistances.data(1);
+    
+    auto rabz = abDistances.data(2);
+    
+    // set up pointer to starting positions
+    
+    auto spos = getStartPositions();
+    
+    for (int32_t i = 0; i < nContrPairs; i++)
+    {
+        auto ppidx = spos[i];
+        
+        rabx[i] = abx[ppidx];
+        
+        raby[i] = aby[ppidx];
+        
+        rabz[i] = abz[ppidx];
+    }
+}
+
 const double*
 CGtoPairsBlock::getEffectiveCoordinatesPX() const
 {

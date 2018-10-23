@@ -211,9 +211,9 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
                                            const bool                isBraEqualKet,
                                            const int32_t             iContrPair) const
 {
-    // all GTOs pairs are screened
+    // initialize vector
     
-    qqVector.zero();
+    mathfunc::set_to(qqVector.data(), 1, qqVector.size());
     
     // set up pointer to screening vector
     
@@ -237,7 +237,7 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
         
         for (int32_t i = 0; i < kdim; i++)
         {
-            if ((fbq * kqvals[i]) >= _threshold) qqvec[i] = 1;
+            if ((fbq * kqvals[i]) < _threshold) qqvec[i] = 0;
         }
     }
     
@@ -265,7 +265,7 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
             
             double fact = (r > 1.0) ? 1.0 / r : 1.0;
             
-            if ((fbq * kqvals[i] * fact) >= _threshold) qqvec[i] = 1;
+            if ((fbq * kqvals[i] * fact) < _threshold) qqvec[i] = 0;
         }
     }
 }

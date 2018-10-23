@@ -960,6 +960,28 @@ TEST_F(CGtoPairsBlockTest, GetDistancesAB)
     ASSERT_EQ(apairs.getDistancesAB(), rab); 
 }
 
+TEST_F(CGtoPairsBlockTest, GetDistancesABWithNumberOfPairs)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    CMemBlock2D<double> rab(4, 3);
+    
+    apairs.getDistancesAB(rab, 4);
+    
+    CMemBlock2D<double> refab({0.0, 0.0,  0.0, 0.0,
+                               0.0, 0.0,  0.0, 0.0,
+                               0.0, 0.0, -1.2, 0.0},
+                               4, 3);
+    
+    ASSERT_EQ(refab, rab);
+}
+
 TEST_F(CGtoPairsBlockTest, GetEffectiveCoordinatesPX)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
