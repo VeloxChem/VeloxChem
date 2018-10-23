@@ -55,13 +55,76 @@ class CSADGuessDriver
     bool _isLocalMode;
 
     /**
+     Gets occupation numbers for 1s elements.
+
+     @param occupation number of 1s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc1s(double occ) const;
+
+    /**
+     Gets occupation numbers for 2s elements.
+
+     @param occupation number of 2s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc2s(double occ) const;
+
+    /**
+     Gets occupation numbers for 2p elements.
+
+     @param occupation number of 2s2p orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc2s2p(double occ) const;
+
+    /**
+     Gets occupation numbers for 3s elements.
+
+     @param occupation number of 3s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc3s(double occ) const;
+
+    /**
+     Gets occupation numbers for 3p elements.
+
+     @param occupation number of 3s3p orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc3s3p(double occ) const;
+
+    /**
+     Gets occupation numbers for 4s elements.
+
+     @param occupation number of 4s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc4s(double occ) const;
+
+    /**
+     Gets occupation numbers for 3d elements.
+
+     @param occupation number of 3d orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc3d(double occ) const;
+
+    /**
+     Gets occupation numbers for 4p elements.
+
+     @param occupation number of 4s4p orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc4s4p(double occ) const;
+
+    /**
      Sets occupation numbers.
 
      @return a vector of vector with the first dimension for nuclear charge and
              the second dimension for occupation numbers.
      */
-    std::vector< std::vector<double> >
-    _buildQocc() const;
+    std::vector<std::vector<double>> _buildQocc() const;
     
     /**
      Computes SAD initial guess.
