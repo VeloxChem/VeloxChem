@@ -92,13 +92,14 @@ class ScfRestrictedDriver(ScfDriver):
     
         need_weights = True
     
-        while need_weights:
+        #while need_weights:
+        if need_weights:
             
             bmat = self.comp_diis_matrix(ovl_mat, oao_mat)
     
             weights = self.solve_diis_weigts(bmat)
         
-            need_weights = self.check_diis_weights(weights)
+            #need_weights = self.check_diis_weights(weights)
         
         return weights
     
@@ -230,9 +231,8 @@ class ScfRestrictedDriver(ScfDriver):
     
         orb_coefs = np.matmul(smat, evecs)
         
-        mol_orbs = MolecularOrbitals()
-        
-        return mol_orbs.from_numpy_list([orb_coefs], [eigs], molorb.rest)
+        return MolecularOrbitals.from_numpy_list([orb_coefs], [eigs],
+                                                 molorb.rest)
     
     def gen_new_density(self, mol_orbs, molecule):
         

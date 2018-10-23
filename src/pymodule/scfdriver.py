@@ -38,7 +38,8 @@ class ScfDriver:
         # thresholds
         
         self.conv_thresh = 1.0e-6
-        self.eri_thresh = 1.0e-12
+        #self.eri_thresh = 1.0e-12
+        self.eri_thresh = 0.0
         self.ovl_thresh = 1.0e-12
     
         # iterations data
@@ -163,7 +164,9 @@ class ScfDriver:
                 
                 mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                        ostream)
-            
+
+                #print(mol_orbs)
+
                 # update density matrix
             
                 old_den_mat = AODensityMatrix(den_mat)
@@ -318,6 +321,7 @@ class ScfDriver:
         exec_str += ("{:5.8f}".format(egrad)).center(15) + 3 * " "
         exec_str += ("{:5.8f}".format(dden)).center(15) + " "
         ostream.put_header(exec_str)
+        ostream.flush()
 
     def get_scf_type(self):
         return "Undefined"
