@@ -1848,6 +1848,20 @@ CChemicalElement::getAtomicMass() const
     return _atomicMass;
 }
 
+int32_t
+CChemicalElement::getMaxAngularMomentum() const
+{
+    if ((_atomicNumber > 0) && (_atomicNumber< 5)) return 0;
+    
+    if ((_atomicNumber> 4) && (_atomicNumber < 21)) return 1;
+    
+    if ((_atomicNumber > 20) && (_atomicNumber < 57)) return 2;
+    
+    if ((_atomicNumber > 56) && (_atomicNumber < 87)) return 3;
+    
+    return -1;
+}
+
 void
 CChemicalElement::_selectDummyAtom()
 {

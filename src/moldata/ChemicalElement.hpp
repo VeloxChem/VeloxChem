@@ -1799,6 +1799,14 @@ public:
      @return the charge of chemical element.
      */
     double getAtomicCharge() const;
+    
+    /**
+     Gets maximum angular momentum of occupied atomic shells in chemical
+     element.
+
+     @return the maximum angular momentum.
+     */
+    int32_t getMaxAngularMomentum() const;
 
     /**
      Converts chemical element object to text output and insert it into output

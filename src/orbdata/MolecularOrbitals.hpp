@@ -16,6 +16,7 @@
 #include "DenseMatrix.hpp"
 #include "MemBlock.hpp"
 #include "AODensityMatrix.hpp"
+#include "MolecularBasis.hpp"
 
 /**
  Class CMolecularOrbitals stores data about molecular orbitals and provides set
@@ -92,6 +93,35 @@ public:
     CMolecularOrbitals& operator=(CMolecularOrbitals&& source) noexcept;
     
     /**
+     Compares molecular orbitals object with other molecular orbitals object.
+     
+     @param other the molecular orbitals object.
+     @return true if molecular orbitals objects are equal, false otherwise.
+     */
+    bool operator==(const CMolecularOrbitals& other) const;
+    
+    /**
+     Compares molecular orbitals object with other molecular orbitals object.
+     
+     @param other the molecular orbitals object.
+     @return true if molecular orbitals objects are not equal, false otherwise.
+     */
+    bool operator!=(const CMolecularOrbitals& other) const;
+    
+    /**
+     Creates molecular orbitals objects from this molecular orbitals object
+     according to given basis sets pair.
+
+     @param molecule the molecule.
+     @param aoBasis the molecular basis for created orbitals.
+     @param minBasis the molecular basis for this orbitals.
+     @return the molecular orbitals.
+     */
+    CMolecularOrbitals insert(const CMolecule&       molecule,
+                              const CMolecularBasis& aoBasis,
+                              const CMolecularBasis& minBasis) const;
+    
+    /**
      Gets type of molecular orbital matrix.
 
      @return the type of molecular orbital matrix.
@@ -154,22 +184,6 @@ public:
      @return the string representation.
      */
     std::string getString() const;
-
-    /**
-     Compares molecular orbitals object with other molecular orbitals object.
-     
-     @param other the molecular orbitals object.
-     @return true if molecular orbitals objects are equal, false otherwise.
-     */
-    bool operator==(const CMolecularOrbitals& other) const;
-    
-    /**
-     Compares molecular orbitals object with other molecular orbitals object.
-     
-     @param other the molecular orbitals object.
-     @return true if molecular orbitals objects are not equal, false otherwise.
-     */
-    bool operator!=(const CMolecularOrbitals& other) const;
     
     /**
      Computes spin restricted electron density matrix in AO basis for specific

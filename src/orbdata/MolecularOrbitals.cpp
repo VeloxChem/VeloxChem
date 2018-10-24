@@ -10,6 +10,7 @@
 
 #include "ErrorHandler.hpp"
 #include "DenseLinearAlgebra.hpp"
+#include "AngularMomentum.hpp"
 
 CMolecularOrbitals::CMolecularOrbitals()
 
@@ -88,6 +89,82 @@ CMolecularOrbitals::operator=(CMolecularOrbitals&& source) noexcept
     _energies = std::move(source._energies);
     
     return *this;
+}
+
+CMolecularOrbitals
+CMolecularOrbitals::insert(const CMolecule&       molecule,
+                           const CMolecularBasis& aoBasis,
+                           const CMolecularBasis& minBasis) const
+{
+    std::vector<CDenseMatrix> orbvec;
+    
+    // create orbital coeficients vector
+    
+    auto naos = aoBasis.getDimensionsOfBasis(molecule);
+    
+    for (size_t i = 0; i < _orbitals.size(); i++)
+    {
+        CDenseMatrix cmat(naos, _orbitals[i].getNumberOfColumns());
+        
+        cmat.zero();
+        
+        orbvec.push_back(cmat);
+    }
+    
+    // set up pointer to chemical elements data
+    
+    auto idselm = molecule.getIdsElemental();
+    
+    // insert molecular orbitals coeficients
+    
+    int32_t midx = 0;
+    
+    int32_t cidx = 0;
+    
+    for (int32_t i = 0; i <= minBasis.getMaxAngularMomentum(); i++)
+    {
+        for (int32_t j = 0; j < angmom::to_SphericalComponents(i); j++)
+        {
+            for (int32_t k = 0; k < molecule.getNumberOfAtoms(); k++)
+            {
+                auto mbfs = minBasis.getNumberOfBasisFunctions(idselm[k], i);
+                
+                auto cbfs = aoBasis.getNumberOfBasisFunctions(idselm[k], i);
+                
+                // copy orbital coeficients
+                
+                if (mbfs > 0)
+                {
+                    for (size_t l = 0; l < _orbitals.size(); l++)
+                    {
+                        auto morbs = _orbitals[l].values();
+                        
+                        auto corbs = orbvec[l].values();
+                        
+                        auto mdim = _orbitals[l].getNumberOfColumns();
+                        
+                        for (int32_t m = 0; m < mbfs; m++)
+                        {
+                            auto moff = (midx + m) * mdim;
+                            
+                            auto coff = (cidx + m) * mdim;
+                            
+                            for (int32_t n = 0; n < mdim; n++)
+                            {
+                                corbs[coff + n] = morbs[moff + n];
+                            }
+                        }
+                    }
+                    
+                    midx += mbfs;
+                }
+                
+                cidx += cbfs;
+            }
+        }
+    }
+
+    return CMolecularOrbitals(orbvec, _energies, _orbitalsType);
 }
 
 molorb

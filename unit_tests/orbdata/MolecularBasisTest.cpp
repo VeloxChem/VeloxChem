@@ -82,6 +82,25 @@ TEST_F(CMolecularBasisTest, AddAtomBasis)
     ASSERT_EQ(ambas, vlxbas::getMolecularBasisForLiH());
 }
 
+TEST_F(CMolecularBasisTest, ReduceToValenceBasis)
+{
+    CMolecularBasis ambas;
+    
+    ambas.setLabel({"def2-SVP(VAL)"});
+    
+    auto libas = vlxbas::getAtomBasisForLi();
+    
+    auto hbas = vlxbas::getAtomBasisForH();
+    
+    ambas.addAtomBasis(libas.reduceToValenceBasis());
+    
+    ambas.addAtomBasis(hbas.reduceToValenceBasis());
+    
+    auto bmbas = vlxbas::getMolecularBasisForLiH();
+    
+    ASSERT_EQ(ambas, bmbas.reduceToValenceBasis());
+}
+
 TEST_F(CMolecularBasisTest, SetAndGetLabel)
 {
     CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();

@@ -171,3 +171,29 @@ TEST_F(CAtomBasisTest, GetBasisFunctions)
 
     ASSERT_EQ(0u, dbfs.size());
 }
+
+TEST_F(CAtomBasisTest, ReduceToValenceBasis)
+{
+    CAtomBasis abas = vlxbas::getAtomBasisForLi();
+    
+    CAtomBasis bbas = abas.reduceToValenceBasis();
+    
+    CAtomBasis cbas;
+    
+    cbas.setIdElemental(3);
+    
+    cbas.addBasisFunction(CBasisFunction({2.662778551600e+02, 4.006978344700e+01,
+                                          9.055994438900e+00, 2.450300905100e+00,
+                                          7.220957185500e-01},
+                                         {6.492015032500e-03, 4.774786321500e-02,
+                                          2.026879611100e-01, 4.860657481700e-01,
+                                          4.362697795500e-01}, 0));
+    
+    cbas.addBasisFunction(CBasisFunction({5.281088472100e-02},
+                                         {1.000000000000e+00}, 0));
+    
+    cbas.addBasisFunction(CBasisFunction({2.096094879800e-02},
+                                         {1.000000000000e+00}, 0));
+    
+    ASSERT_EQ(bbas, cbas);
+}

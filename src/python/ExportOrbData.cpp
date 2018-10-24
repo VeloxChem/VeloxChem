@@ -226,6 +226,7 @@ void export_orbdata()
         .def("get_label", &CMolecularBasis::getLabel)
         .def("broadcast", &CMolecularBasis_broadcast)
         .def("print_basis", &CMolecularBasis::printBasis)
+        .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis)
     ;
 
     // denmat enum class
@@ -280,6 +281,7 @@ void export_orbdata()
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType)
         .def(bp::self == bp::other<CMolecularOrbitals>())
         .def("get_rest_density", &CMolecularOrbitals_get_rest_density)
+        .def("insert", &CMolecularOrbitals::insert)
     ;
 }
 

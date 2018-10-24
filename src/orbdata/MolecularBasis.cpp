@@ -123,6 +123,25 @@ CMolecularBasis::addAtomBasis(const CAtomBasis& atomBasis)
     }
 }
 
+CMolecularBasis
+CMolecularBasis::reduceToValenceBasis() const
+{
+    CMolecularBasis molbas;
+    
+    auto strlbl = _label;
+    
+    strlbl.append("(VAL)");
+    
+    molbas.setLabel(strlbl);
+    
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    {
+        molbas.addAtomBasis(_atomicBasisSets[i].reduceToValenceBasis());
+    }
+    
+    return molbas; 
+}
+
 int32_t
 CMolecularBasis::getMaxAngularMomentum() const
 {

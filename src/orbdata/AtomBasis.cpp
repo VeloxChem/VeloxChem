@@ -8,6 +8,7 @@
 
 #include "AtomBasis.hpp"
 
+#include "ChemicalElement.hpp"
 #include "StringFormat.hpp"
 #include "MpiFunc.hpp"
 
@@ -223,6 +224,34 @@ CAtomBasis::getBasisFunctions(const int32_t angularMomentum) const
     }
 
     return basvector;
+}
+
+CAtomBasis
+CAtomBasis::reduceToValenceBasis() const
+{
+    // set atomic shell max. angular momentum
+    
+    CChemicalElement chemele;
+    
+    chemele.setAtomType(_idElemental);
+    
+    auto mang = chemele.getMaxAngularMomentum();
+    
+    // generate valence basis
+    
+    CAtomBasis valbas;
+    
+    valbas.setIdElemental(_idElemental);
+    
+    for (size_t i = 0; i < _basisFunctions.size(); i++)
+    {
+        if (_basisFunctions[i].getAngularMomentum() <= mang)
+        {
+            valbas.addBasisFunction(_basisFunctions[i]);
+        }
+    }
+    
+    return valbas;
 }
 
 void
