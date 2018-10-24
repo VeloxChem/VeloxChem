@@ -77,21 +77,20 @@ class TestPen(unittest.TestCase):
 
         eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
 
-        """
         qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
                                 comm)
-        """
-
-        qqdata = ScreeningContainer()
 
         fock = AOFockMatrix(dmat)
 
         eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, ostream, comm)
 
+        F1 = fock.to_numpy(0)
+
         # compare with reference
 
-        F1 = fock.to_numpy(0)
-        F2 = AOFockMatrix.read_hdf5("inputs/pen.twoe.h5").to_numpy(0)
+        fock_ref = AOFockMatrix.read_hdf5("inputs/pen.twoe.h5")
+
+        F2 = fock_ref.to_numpy(0)
 
         if rank == mpi_master():
 
