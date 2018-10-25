@@ -111,6 +111,7 @@ void export_moldata()
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
         .def("number_of_atoms", &CMolecule_number_of_atoms)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
+        .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
     ;

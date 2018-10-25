@@ -18,3 +18,4 @@ from .outputstream import OutputStream
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
+from .taskparser import GlobalTask
