@@ -1,12 +1,12 @@
-from .VeloxChemLib import InputData
-from .VeloxChemLib import InputStream
-from .VeloxChemLib import OutputStream
-from .VeloxChemLib import MolXYZReader
-from .VeloxChemLib import EnvironmentReader
-from .VeloxChemLib import BasisReader
-from .VeloxChemLib import Molecule
-from .VeloxChemLib import MolecularBasis
-from .VeloxChemLib import mpi_master
+from .veloxchemlib import InputData
+from .veloxchemlib import InputStream
+from .veloxchemlib import OutputStream
+from .veloxchemlib import MolXYZReader
+from .veloxchemlib import EnvironmentReader
+from .veloxchemlib import BasisReader
+from .veloxchemlib import Molecule
+from .veloxchemlib import MolecularBasis
+from .veloxchemlib import mpi_master
 
 
 class LocalTask:

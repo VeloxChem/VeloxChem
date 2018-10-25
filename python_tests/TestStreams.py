@@ -1,6 +1,6 @@
 from mpi4py import MPI
-from veloxchem.VeloxChemLib import OutputStream
-from veloxchem.VeloxChemLib import InputStream
+from veloxchem.veloxchemlib import OutputStream
+from veloxchem.veloxchemlib import InputStream
 
 import numpy as np
 import unittest

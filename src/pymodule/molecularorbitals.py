@@ -1,6 +1,6 @@
-from .VeloxChemLib import MolecularOrbitals
-from .VeloxChemLib import molorb
-from .VeloxChemLib import assert_msg_critical
+from .veloxchemlib import MolecularOrbitals
+from .veloxchemlib import molorb
+from .veloxchemlib import assert_msg_critical
 import h5py
 import numpy as np
 

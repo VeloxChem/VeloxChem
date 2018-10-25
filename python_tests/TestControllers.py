@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from veloxchem.VeloxChemLib import AppManager
+from veloxchem.veloxchemlib import AppManager
 
 import numpy as np
 import unittest

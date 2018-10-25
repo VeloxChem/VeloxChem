@@ -1,6 +1,6 @@
 from mpi4py import MPI
 from veloxchem.taskparser import LocalTask
-from veloxchem.VeloxChemLib import Molecule
+from veloxchem.veloxchemlib import Molecule
 
 import numpy as np
 import unittest

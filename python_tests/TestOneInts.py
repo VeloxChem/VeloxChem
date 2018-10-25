@@ -1,12 +1,12 @@
 from mpi4py import MPI
 from veloxchem.taskparser import GlobalTask
-from veloxchem.VeloxChemLib import OverlapMatrix
-from veloxchem.VeloxChemLib import KineticEnergyMatrix
-from veloxchem.VeloxChemLib import NuclearPotentialMatrix
-from veloxchem.VeloxChemLib import OverlapIntegralsDriver
-from veloxchem.VeloxChemLib import KineticEnergyIntegralsDriver
-from veloxchem.VeloxChemLib import NuclearPotentialIntegralsDriver
-from veloxchem.VeloxChemLib import mpi_master
+from veloxchem.veloxchemlib import OverlapMatrix
+from veloxchem.veloxchemlib import KineticEnergyMatrix
+from veloxchem.veloxchemlib import NuclearPotentialMatrix
+from veloxchem.veloxchemlib import OverlapIntegralsDriver
+from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
+from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
+from veloxchem.veloxchemlib import mpi_master
 
 import h5py
 import numpy as np

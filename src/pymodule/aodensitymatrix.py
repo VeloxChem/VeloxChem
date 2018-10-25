@@ -1,6 +1,6 @@
-from .VeloxChemLib import AODensityMatrix
-from .VeloxChemLib import denmat
-from .VeloxChemLib import assert_msg_critical
+from .veloxchemlib import AODensityMatrix
+from .veloxchemlib import denmat
+from .veloxchemlib import assert_msg_critical
 import h5py
 import numpy as np
 

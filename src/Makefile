@@ -12,7 +12,7 @@ include Makefile.setup
 
 # Set TARGET and linker flags for VeloxChemMP shared library
 
-VLX_TARGET := VeloxChemLib.so
+VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 PYVLX_MAIN := VeloxChemMain.py
 

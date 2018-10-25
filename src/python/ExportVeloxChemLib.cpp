@@ -20,7 +20,7 @@
 #include "ExportExciton.hpp"
 #include "ExportControllers.hpp"
 
-BOOST_PYTHON_MODULE(VeloxChemLib)
+BOOST_PYTHON_MODULE(veloxchemlib)
 {
     bp_general::export_general();
 

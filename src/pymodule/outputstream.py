@@ -1,4 +1,4 @@
-from .VeloxChemLib import OutputStream
+from .veloxchemlib import OutputStream
 import time as tm
 
 

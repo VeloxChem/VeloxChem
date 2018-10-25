@@ -1,7 +1,7 @@
-from .VeloxChemLib import mpi_master
-from .VeloxChemLib import MolecularOrbitals
+from .veloxchemlib import mpi_master
+from .veloxchemlib import MolecularOrbitals
 
-from .VeloxChemLib import molorb
+from .veloxchemlib import molorb
 
 from .scfdriver import ScfDriver
 

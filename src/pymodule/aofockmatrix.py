@@ -1,6 +1,6 @@
-from .VeloxChemLib import AOFockMatrix
-from .VeloxChemLib import fockmat
-from .VeloxChemLib import assert_msg_critical
+from .veloxchemlib import AOFockMatrix
+from .veloxchemlib import fockmat
+from .veloxchemlib import assert_msg_critical
 import h5py
 import numpy as np
 

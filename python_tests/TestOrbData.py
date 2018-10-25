@@ -1,8 +1,8 @@
 from mpi4py import MPI
 from veloxchem.taskparser import LocalTask
-from veloxchem.VeloxChemLib import denmat
-from veloxchem.VeloxChemLib import molorb
-from veloxchem.VeloxChemLib import mpi_master
+from veloxchem.veloxchemlib import denmat
+from veloxchem.veloxchemlib import molorb
+from veloxchem.veloxchemlib import mpi_master
 
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.molecularorbitals import MolecularOrbitals
