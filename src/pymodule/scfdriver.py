@@ -211,7 +211,10 @@ class ScfDriver:
     def set_skip_iter_flag(self, i, e_grad):
         
         if self.acc_type == "L2_DIIS":
-            self.skip_iter = False
+            if i == 0:
+                self.skip_iter = True
+            else:
+                self.skip_iter = False
             self.use_level_shift = False
             return
         
@@ -286,11 +289,13 @@ class ScfDriver:
         ostream.put_header("Self Consistent Field Driver Setup")
         ostream.put_header(36 * "=")
         ostream.new_line()
+        
         str_width = 80
         cur_str = "WaveFunction Model           : " + self.get_scf_type()
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "Initial Guess Model          : " + self.get_guess_type()
         ostream.put_header(cur_str.ljust(str_width))
+        
         cur_str = "Convergence Accelerator      : " + self.get_acc_type()
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
@@ -300,6 +305,7 @@ class ScfDriver:
         cur_str = "Convergence Threshold        : " + \
             "{:.1e}".format(self.conv_thresh)
         ostream.put_header(cur_str.ljust(str_width))
+        
         cur_str = "ERI screening scheme         : " + self.get_qq_type()
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "ERI screening mode           : " + self.get_qq_dyn()
@@ -331,6 +337,7 @@ class ScfDriver:
             if self.guess_type == "SAD" and i == 1:
                 denergy = 0.0
                 dden = 0.0
+            
             exec_str =  " " + (str(i)).rjust(3) + 4 * " "
             exec_str += ("{:7.12f}".format(energy)).center(27) + 3 * " "
             exec_str += ("{:5.10f}".format(denergy)).center(17) + 3 * " "
