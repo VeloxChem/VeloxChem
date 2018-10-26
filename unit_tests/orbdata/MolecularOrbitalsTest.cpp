@@ -9,6 +9,8 @@
 #include "MolecularOrbitalsTest.hpp"
 
 #include "MolecularOrbitals.hpp"
+#include "MolecularBasisSetter.hpp"
+#include "MoleculeSetter.hpp"
 
 TEST_F(CMolecularOrbitalsTest, DefaultConstructor)
 {
@@ -137,4 +139,49 @@ TEST_F(CMolecularOrbitalsTest, GetAODensityForUnrestrictedCase)
     ASSERT_EQ(moa.getAODensity(2, 2), CAODensityMatrix({ref02mata, ref02matb}, denmat::unrest));
     
     ASSERT_EQ(moa.getAODensity(3, 2), CAODensityMatrix({ref03mata, ref02matb}, denmat::unrest));
+}
+
+TEST_F(CMolecularOrbitalsTest, Insert)
+{
+    auto mbas = vlxbas::getMolecularBasisForLiH();
+    
+    auto vbas = mbas.reduceToValenceBasis();
+    
+    auto mlih = vlxmol::getTestLiH();
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0,
+                     -2.0,  5.0,  4.0,
+                      6.0,  4.0, -4.0,
+                      2.0,  3.0,  1.0,
+                      3.0, -6.0, -8.0},
+                    5, 3);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    
+    auto xbas = vlxbas::getMolecularBasisForLiHX();
+    
+    auto mob = moa.insert(mlih, xbas, vbas);
+    
+    CDenseMatrix mc({ 1.0, -1.0, -3.0,
+                     -2.0,  5.0,  4.0,
+                      6.0,  4.0, -4.0,
+                      0.0,  0.0,  0.0,
+                      2.0,  3.0,  1.0,
+                      3.0, -6.0, -8.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0},
+                    15, 3);
+    
+    CMolecularOrbitals moc({mc}, {ea}, molorb::rest);
+    
+    ASSERT_EQ(moc, mob); 
 }

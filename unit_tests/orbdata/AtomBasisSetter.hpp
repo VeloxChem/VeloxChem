@@ -20,6 +20,8 @@ CAtomBasis getAtomBasisEmpty();
 CAtomBasis getAtomBasisForH();
 
 CAtomBasis getAtomBasisForLi();
+    
+CAtomBasis getAtomBasisForLiX();
 
 CAtomBasis getNormalizedAtomBasisForH();
 

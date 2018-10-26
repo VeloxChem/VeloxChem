@@ -1322,6 +1322,22 @@ CGtoPairsBlock::getNumberOfScreenedContrPairs() const
     return _nScreenedContrPairs; 
 }
 
+int32_t
+CGtoPairsBlock::getBraMatrixPosition(const int32_t iComponent) const
+{
+    auto bidx = getBraIdentifiers(iComponent);
+    
+    return bidx[0];
+}
+
+int32_t
+CGtoPairsBlock::getKetMatrixPosition(const int32_t iComponent) const
+{
+    auto kidx = getKetIdentifiers(iComponent);
+    
+    return kidx[0];
+}
+
 std::string
 CGtoPairsBlock::getPairType() const
 {
