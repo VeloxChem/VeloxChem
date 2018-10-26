@@ -20,7 +20,7 @@ import time as tm
 
 from collections import deque
 
-class ScfDriver:
+class ScfDriver(object):
 
     def __init__(self):
         
