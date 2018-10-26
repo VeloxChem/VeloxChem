@@ -52,12 +52,12 @@ CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 
 MKL_INCLUDES := $(MKLROOT)/include
 
-LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_intel_lp64
+LIB_LIST := -L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64
 LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx512 -liomp5 -lpthread -lm -ldl
 
 # Google Test root directory
 
-GST_ROOT := /home/x_lixin/gitlab/googletest/googletest
+GST_ROOT := /home/x_lixin/Public/tetralith/googletest/googletest
 
 GST_LIB := $(GST_ROOT)/lib/libgtest.a
 
@@ -82,16 +82,18 @@ endif
 
 # Boost header and library
 
-PYTHON := python
-BOOST_PATH := /software/sse/easybuild/prefix/software/Boost/1.66.0-intel-2018a-Python-2.7.14-nsc1
+PYTHON := python3
+BOOST_PATH := /home/x_lixin/Public/tetralith/boost
+
+PYTHON_VER := $(shell $(PYTHON) -c "import sys; print(sys.version_info.major, sys.version_info.minor, sep='')")
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
 PYTHON_INC += -I$(BOOST_PATH)/include
 
-PYTHON_LD  := -L/software/sse/easybuild/prefix/software/Python/2.7.14-intel-2018a-nsc1/lib $(shell $(PYTHON)-config --ldflags)
-PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python -lboost_numpy
+PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
+PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python$(PYTHON_VER) -lboost_numpy$(PYTHON_VER)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
