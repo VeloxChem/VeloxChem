@@ -37,6 +37,20 @@ getMolecularBasisForLiH()
 }
 
 CMolecularBasis
+getMolecularBasisForLiHX()
+{
+    CMolecularBasis mbas;
+        
+    mbas.setLabel({"def2-SVP-X"});
+        
+    mbas.addAtomBasis(getAtomBasisForLiX());
+        
+    mbas.addAtomBasis(getAtomBasisForH());
+        
+    return mbas;
+}
+
+CMolecularBasis
 getMolecularBasisForHeAtom()
 {
     CMolecularBasis mbas;

@@ -73,6 +73,17 @@ getAtomBasisForLi()
 
     return bas;
 }
+    
+CAtomBasis
+getAtomBasisForLiX()
+{
+    CAtomBasis bas = vlxbas::getAtomBasisForLi();
+    
+    bas.addBasisFunction(CBasisFunction({3.000000000000e-02},
+                                        {1.000000000000e+00}, 0));
+    
+    return bas;
+}
 
 CAtomBasis
 getNormalizedAtomBasisForH()

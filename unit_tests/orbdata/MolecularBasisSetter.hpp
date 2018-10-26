@@ -17,6 +17,8 @@ CMolecularBasis getMolecularBasisEmpty();
 
 CMolecularBasis getMolecularBasisForLiH();
     
+CMolecularBasis getMolecularBasisForLiHX();
+    
 CMolecularBasis getMolecularBasisForHeAtom();
     
 CMolecularBasis getMolecularBasisSPDForHeAtom();

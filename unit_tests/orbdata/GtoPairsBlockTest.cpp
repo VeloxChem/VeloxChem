@@ -1127,6 +1127,40 @@ TEST_F(CGtoPairsBlockTest, GetNumberOfScreenedContrPairs)
     ASSERT_EQ(3, bpairs.getNumberOfScreenedContrPairs());
 }
 
+TEST_F(CGtoPairsBlockTest, GetBraMatrixPosition)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(0, apairs.getBraMatrixPosition(0));
+}
+
+TEST_F(CGtoPairsBlockTest, GetKetMatrixPosition)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(5, apairs.getKetMatrixPosition(0));
+    
+    ASSERT_EQ(8, apairs.getKetMatrixPosition(1));
+    
+    ASSERT_EQ(11, apairs.getKetMatrixPosition(2));
+}
+
 TEST_F(CGtoPairsBlockTest, GetPairType)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

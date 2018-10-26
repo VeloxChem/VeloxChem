@@ -11,7 +11,7 @@ class ScfRestrictedDriver(ScfDriver):
 
     def __init__(self):
         
-        super(ScfRestrictedDriver, self).__init__()
+        super().__init__()
     
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         

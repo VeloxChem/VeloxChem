@@ -512,6 +512,24 @@ public:
     int32_t getNumberOfScreenedContrPairs() const;
     
     /**
+     Gets starting position of submatrix along bra side of full matrix for
+     specific angular component of bra angular momentum.
+
+     @param iComponent the angular momentum component.
+     @return the starting position of submatrix.
+     */
+    int32_t getBraMatrixPosition(const int32_t iComponent) const;
+    
+    /**
+     Gets starting position of submatrix along ket side of full matrix for
+     specific angular component of ket angular momentum.
+     
+     @param iComponent the angular momentum component.
+     @return the starting position of submatrix.
+     */
+    int32_t getKetMatrixPosition(const int32_t iComponent) const;
+    
+    /**
      Gets pair type string for GTOs pairs object.
 
      @return the pair type string.
