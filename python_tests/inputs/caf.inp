@@ -36,5 +36,5 @@ DEF2-SVP
 @end 
 
 @progenv 
-BasisLibrary: /home/xinli/gitlab/VeloxChemMP/basis/
+BasisLibrary: ../basis/
 @end

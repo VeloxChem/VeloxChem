@@ -15,5 +15,5 @@ H   0.0   2.8   0.0
 @end 
 
 @progenv 
-BasisLibrary: /home/xinli/gitlab/VeloxChemMP/basis/
+BasisLibrary: ../basis/
 @end

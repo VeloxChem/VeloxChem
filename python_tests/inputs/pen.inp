@@ -53,5 +53,5 @@ MIN-CC-PVDZ
 @end 
 
 @progenv 
-BasisLibrary: /home/xinli/gitlab/VeloxChemMP/basis/
+BasisLibrary: ../basis/
 @end
