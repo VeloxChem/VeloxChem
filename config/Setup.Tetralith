@@ -52,7 +52,7 @@ CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 
 MKL_INCLUDES := $(MKLROOT)/include
 
-LIB_LIST := -L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64
+LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_intel_lp64
 LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx512 -liomp5 -lpthread -lm -ldl
 
 # Google Test root directory
