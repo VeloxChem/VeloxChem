@@ -1161,6 +1161,36 @@ TEST_F(CGtoPairsBlockTest, GetKetMatrixPosition)
     ASSERT_EQ(11, apairs.getKetMatrixPosition(2));
 }
 
+TEST_F(CGtoPairsBlockTest, GetNumberOfRowsInBraMatrix)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(5, apairs.getNumberOfRowsInBraMatrix());
+}
+
+TEST_F(CGtoPairsBlockTest, GetNumberOfRowsInKetMatrix)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(3, apairs.getNumberOfRowsInKetMatrix());
+}
+
 TEST_F(CGtoPairsBlockTest, GetPairType)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

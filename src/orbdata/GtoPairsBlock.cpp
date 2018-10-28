@@ -1338,6 +1338,32 @@ CGtoPairsBlock::getKetMatrixPosition(const int32_t iComponent) const
     return kidx[0];
 }
 
+int32_t
+CGtoPairsBlock::getNumberOfRowsInBraMatrix() const
+{
+    auto bidx = getBraIdentifiers(0);
+    
+    if (_nScreenedContrPairs > 0)
+    {
+        return bidx[_nScreenedContrPairs - 1] - bidx[0] + 1;
+    }
+    
+    return 0;
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfRowsInKetMatrix() const
+{
+    auto kidx = getKetIdentifiers(0);
+    
+    if (_nScreenedContrPairs > 0)
+    {
+        return kidx[_nScreenedContrPairs - 1] - kidx[0] + 1;
+    }
+    
+    return 0;
+}
+
 std::string
 CGtoPairsBlock::getPairType() const
 {

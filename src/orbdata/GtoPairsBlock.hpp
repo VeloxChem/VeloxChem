@@ -530,6 +530,20 @@ public:
     int32_t getKetMatrixPosition(const int32_t iComponent) const;
     
     /**
+     Gets number of rows in submatrix along bra side of full matrix.
+     
+     @return the number of rows in submatrix.
+     */
+    int32_t getNumberOfRowsInBraMatrix() const;
+    
+    /**
+     Gets number of rows in submatrix along ket side of full matrix.
+     
+     @return the number of rows in submatrix.
+     */
+    int32_t getNumberOfRowsInKetMatrix() const;
+    
+    /**
      Gets pair type string for GTOs pairs object.
 
      @return the pair type string.
