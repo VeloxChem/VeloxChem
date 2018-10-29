@@ -26,7 +26,14 @@ CFockContainer::CFockContainer(const CAOFockMatrix*  fockMatrix,
                                const CGtoPairsBlock& braGtoPairsBlock,
                                const CGtoPairsBlock& ketGtoPairsBlock)
 {
+    auto nfock = fockMatrix->getNumberOfFockMatrices();
     
+    for (int32_t i = 0; i < nfock; i++)
+    {
+        _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
+                                                  ketGtoPairsBlock,
+                                                  fockMatrix->getFockType(i)));
+    }
 }
 
 CFockContainer::CFockContainer(const CFockContainer& source)
@@ -88,6 +95,63 @@ bool
 CFockContainer::operator!=(const CFockContainer& other) const
 {
     return !(*this == other);
+}
+
+double*
+CFockContainer::getSubMatrixData(const int32_t iFockMatrix,
+                                 const int32_t iSubMatrix,
+                                 const int32_t iComponent)
+{
+    return _subFockMatrices[iFockMatrix].getSubMatrixData(iSubMatrix,
+                                                          iComponent);
+}
+
+const int32_t*
+CFockContainer::getStartPositionsA(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getStartPositionsA();
+}
+
+const int32_t*
+CFockContainer::getStartPositionsB(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getStartPositionsB();
+}
+
+const int32_t*
+CFockContainer::getStartPositionsC(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getStartPositionsC();
+}
+
+const int32_t*
+CFockContainer::getStartPositionsD(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getStartPositionsD();
+}
+
+int32_t
+CFockContainer::getDimensionsA(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getDimensionsA();
+}
+
+int32_t
+CFockContainer::getDimensionsB(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getDimensionsB();
+}
+
+int32_t
+CFockContainer::getDimensionsC(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getDimensionsC();
+}
+
+int32_t
+CFockContainer::getDimensionsD(const int32_t iFockMatrix) const
+{
+    return _subFockMatrices[iFockMatrix].getDimensionsD();
 }
 
 std::ostream&

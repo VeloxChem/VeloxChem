@@ -103,6 +103,91 @@ public:
     bool operator!=(const CFockContainer& other) const;
     
     /**
+     Gets pointer to partial data of specific submatrix with requested angular
+     component for requested AO Fock matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @param iSubMatrix the index of submatrix.
+     @param iComponent the angular component of submatrix.
+     @return the pointer to partial submatrix data.
+     */
+    double* getSubMatrixData(const int32_t iFockMatrix,
+                             const int32_t iSubMatrix,
+                             const int32_t iComponent);
+    
+    /**
+     Get constant pointer to starting positions of submatrices data along
+     center A on bra side for requested AO Fock matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the pointer to starting positions.
+     */
+    const int32_t* getStartPositionsA(const int32_t iFockMatrix) const;
+    
+    /**
+     Get constant pointer to starting positions of submatrices data along
+     center B on bra side for requested AO Fock matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the pointer to starting positions.
+     */
+    const int32_t* getStartPositionsB(const int32_t iFockMatrix) const;
+    
+    /**
+     Get constant pointer to starting positions of submatrices data along
+     center C on ket side for requested AO Fock matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the pointer to starting positions.
+     */
+    const int32_t* getStartPositionsC(const int32_t iFockMatrix) const;
+    
+    /**
+     Get constant pointer to starting positions of submatrices data along
+     center D on ket side for requested AO Fock matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the pointer to starting positions.
+     */
+    const int32_t* getStartPositionsD(const int32_t iFockMatrix) const;
+    
+    /**
+     Gets submatrix dimensions along center A on bra side for requested AO Fock
+     matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the dimensions of submatrix.
+     */
+    int32_t getDimensionsA(const int32_t iFockMatrix) const;
+    
+    /**
+     Gets submatrix dimensions along center B on bra side for requested AO Fock
+     matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the dimensions of submatrix.
+     */
+    int32_t getDimensionsB(const int32_t iFockMatrix) const;
+    
+    /**
+     Gets submatrix dimensions along center C on ket side for requested AO Fock
+     matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the dimensions of submatrix.
+     */
+    int32_t getDimensionsC(const int32_t iFockMatrix) const;
+    
+    /**
+     Gets submatrix dimensions along center D on ket side for requested AO Fock
+     matrix.
+     
+     @param iFockMatrix the index of AO Fock matrix.
+     @return the dimensions of submatrix.
+     */
+    int32_t getDimensionsD(const int32_t iFockMatrix) const;
+    
+    /**
      Converts Fock container object to text output and insert it into output
      text stream.
      
