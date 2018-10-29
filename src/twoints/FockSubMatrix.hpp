@@ -6,8 +6,8 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef FockSubmatrix_hpp
-#define FockSubmatrix_hpp
+#ifndef FockSubMatrix_hpp
+#define FockSubMatrix_hpp
 
 #include <cstdint>
 #include <vector>
@@ -262,4 +262,4 @@ public:
                                     const CFockSubMatrix& source);
 };
 
-#endif /* FockSubmatrix_hpp */
+#endif /* FockSubMatrix_hpp */

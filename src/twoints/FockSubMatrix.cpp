@@ -6,7 +6,7 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "FockSubmatrix.hpp"
+#include "FockSubMatrix.hpp"
 
 #include "AngularMomentum.hpp"
 
