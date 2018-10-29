@@ -143,8 +143,8 @@ CElectronRepulsionIntegralsDriver::compute(      double*         intsBatch,
     
     // compute batch of two electron integrals
     
-    _compElectronRepulsionForGtoPairsBlocks(&distpat, qqdat, braGtoPairsBlock,
-                                            ketGtoPairsBlock, nullptr);
+    _compElectronRepulsionForGtoPairsBlocks(distpat, qqdat, braGtoPairsBlock,
+                                            ketGtoPairsBlock);
 }
 
 void
@@ -200,21 +200,16 @@ CElectronRepulsionIntegralsDriver::computeMaxQValues(      CVecMemBlock<double>*
 }
 
 void
-CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution*   distPattern,
+CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution&   distPattern,
                                                                            const CCauchySchwarzScreener& intsScreener,
                                                                            const CGtoPairsBlock&         braGtoPairsBlock,
-                                                                           const CGtoPairsBlock&         ketGtoPairsBlock,
-                                                                                 omp_lock_t*             taskLock) const
+                                                                           const CGtoPairsBlock&         ketGtoPairsBlock) const
 {
     // copy GTOs pairs blocks for bra and ket sides
     
     auto brapairs = braGtoPairsBlock;
     
     auto ketpairs = ketGtoPairsBlock;
-    
-    // copy distribution pattern
-    
-    auto distpat = *distPattern;
     
     // determine symmetry of bra and ket sides
     
@@ -420,11 +415,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
         
         // distribute integrals: add distribution or Fock formation code
         
-        if (distpat.needSyncLock()) omp_set_lock(taskLock);
-        
-        distpat.distribute(spherbuffer, brapairs, qqpairs, symbk, nqcdim, i);
-        
-        if (distpat.needSyncLock()) omp_unset_lock(taskLock);
+        distPattern.distribute(spherbuffer, brapairs, qqpairs, symbk, nqcdim, i);
     }
 }
 
@@ -1708,19 +1699,21 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
                                                                    const CGtoPairsContainer*  ketGtoPairsContainer,
                                                                    const CScreeningContainer* screeningContainer) const
 {
-    // allocate integrals distributor
+    // set up pointers to AO Fock and AO density matrices
     
-    CTwoIntsDistribution* distpat = new CTwoIntsDistribution(&aoFockMatrix, &aoDensityMatrix); 
+    auto pfock = &aoFockMatrix;
+    
+    auto pden = &aoDensityMatrix;
     
     // set up OMP locking
     
     omp_lock_t tsklock;
     
-    omp_lock_t* ptrlock = distpat->needSyncLock() ? &tsklock : nullptr;
+    omp_lock_t* ptrlock = &tsklock;
    
-    if (distpat->needSyncLock()) omp_init_lock(ptrlock);
+    omp_init_lock(ptrlock);
     
-    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer, distpat, ptrlock)
+    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer, pfock, pden, ptrlock)
     {
         #pragma omp single nowait
         {
@@ -1754,9 +1747,20 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
                         
                         auto qqdat = screeningContainer->getScreener(idx);
                         
+                        CTwoIntsDistribution distpat(pfock, pden);
+                        
+                        distpat.setFockContainer(bpairs, kpairs);
+                        
                         _compElectronRepulsionForGtoPairsBlocks(distpat, qqdat,
-                                                                bpairs, kpairs,
-                                                                ptrlock);
+                                                                bpairs, kpairs);
+                        
+                        // accumulate AO Fock matrix
+                        
+                        omp_set_lock(ptrlock);
+                        
+                        distpat.accumulate();
+                        
+                        omp_unset_lock(ptrlock); 
                     }
                     
                     // update screeners counter
@@ -1769,11 +1773,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
     
     // clean up OMP locking
     
-    if (distpat->needSyncLock()) omp_destroy_lock(ptrlock);
-    
-    // deallocate integrals distributor
-    
-    delete distpat; 
+    omp_destroy_lock(ptrlock);
 }
 
 void
@@ -1796,8 +1796,7 @@ CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*
         
         CTwoIntsDistribution cdist(qValuesBuffer, 1, 1, i, dist2e::qvalues);
         
-        _compElectronRepulsionForGtoPairsBlocks(&cdist, qqdat, cpair, cpair,
-                                                nullptr);
+        _compElectronRepulsionForGtoPairsBlocks(cdist, qqdat, cpair, cpair);
     }
 }
 

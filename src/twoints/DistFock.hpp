@@ -14,6 +14,7 @@
 
 #include "MemBlock2D.hpp"
 #include "GtoPairsBlock.hpp"
+#include "FockContainer.hpp"
 
 namespace distfock { // distfock namespace
     
@@ -21,8 +22,8 @@ namespace distfock { // distfock namespace
      Distributes vector of spherical integrals into spin restricted closed shell
      Hatree-Fock matrix (J + K)
 
-     @param fockMatrix the pointer to AO Fock matrix.
-     @param nFockColumns the number of columns in AO Fock matrix.
+     @param fockContainer the Fock container.
+     @param iFockMatrix the index of Fock submatrix in Fock container.
      @param densityMatrix the constant pointer to AO density matrix.
      @param nDensityColumns the number of columns in AO Fock matrix.
      @param spherInts the spherical integrals buffer.
@@ -31,8 +32,8 @@ namespace distfock { // distfock namespace
      @param nKetContrPairs the number of contracted GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
-    void distRestJK(      double*              fockMatrix,
-                    const int32_t              nFockColumns,
+    void distRestJK(      CFockContainer&      fockContainer,
+                    const int32_t              iFockMatrix,
                     const double*              densityMatrix,
                     const int32_t              nDensityColumns,
                     const CMemBlock2D<double>& spherInts,

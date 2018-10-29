@@ -74,13 +74,11 @@ class CElectronRepulsionIntegralsDriver
      @param intsScreener the integrals screener object.
      @param braGtoPairsBlock the GTOs pairsblock on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param taskLock the pointer to OMP lock.
      */
-    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution*   distPattern,
+    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution&   distPattern,
                                                  const CCauchySchwarzScreener& intsScreener,
                                                  const CGtoPairsBlock&         braGtoPairsBlock,
-                                                 const CGtoPairsBlock&         ketGtoPairsBlock,
-                                                       omp_lock_t*             taskLock) const;
+                                                 const CGtoPairsBlock&         ketGtoPairsBlock) const;
     
     /**
      Gets Obara-Saika bra side horizontal recursion pattern for specific

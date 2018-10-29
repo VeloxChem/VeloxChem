@@ -274,6 +274,39 @@ CFockSubMatrix::operator!=(const CFockSubMatrix& other) const
     return !(*this == other);
 }
 
+void
+CFockSubMatrix::accumulate(      double* aoFockMatrix,
+                           const int32_t nColumns,
+                           const fockmat fockType) const
+{
+    if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx))
+    {
+        _addContribution(aoFockMatrix, nColumns, 0,
+                         _startPositionsA, _startPositionsB,
+                         _dimSubMatrixA, _dimSubMatrixB);
+        
+        _addContribution(aoFockMatrix, nColumns, 1,
+                         _startPositionsC, _startPositionsD,
+                         _dimSubMatrixC, _dimSubMatrixD);
+        
+        _addContribution(aoFockMatrix, nColumns, 2,
+                         _startPositionsA, _startPositionsC,
+                         _dimSubMatrixA, _dimSubMatrixC);
+        
+        _addContribution(aoFockMatrix, nColumns, 3,
+                         _startPositionsA, _startPositionsD,
+                         _dimSubMatrixA, _dimSubMatrixD);
+        
+        _addContribution(aoFockMatrix, nColumns, 4,
+                         _startPositionsB, _startPositionsC,
+                         _dimSubMatrixB, _dimSubMatrixC);
+        
+        _addContribution(aoFockMatrix, nColumns, 5,
+                         _startPositionsB, _startPositionsD,
+                         _dimSubMatrixB, _dimSubMatrixD);
+    }
+}
+
 double*
 CFockSubMatrix::getSubMatrixData(const int32_t iMatrix,
                                  const int32_t iComponent)
@@ -428,6 +461,44 @@ CFockSubMatrix::_allocSubMatrices(const fockmat fockType,
     for (size_t i = 0; i < _subFockMatrices.size(); i++)
     {
         _subFockMatrices[i].zero(); 
+    }
+}
+
+void
+CFockSubMatrix::_addContribution(      double*             aoFockMatrix,
+                                 const int32_t             nColumns,
+                                 const int32_t             iMatrix,
+                                 const CMemBlock<int32_t>& braComponents,
+                                 const CMemBlock<int32_t>& ketComponents,
+                                 const int32_t             braDimensions,
+                                 const int32_t             ketDimensions) const
+{
+    auto bcomp = braComponents.size();
+    
+    auto kcomp = ketComponents.size();
+ 
+    for (int32_t i = 0; i < bcomp; i++)
+    {
+        auto istart = braComponents.at(i);
+        
+        for(int32_t j = 0; j < kcomp; j++)
+        {
+            auto jstart = ketComponents.at(j);
+            
+            auto pdat = _subFockMatrices[iMatrix].data(i * kcomp + j);
+            
+            for (int32_t k = 0; k < braDimensions; k++)
+            {
+                auto koff = (istart + k) * nColumns;
+                
+                for (int32_t l = 0; l < ketDimensions; l++)
+                {
+                    auto loff = koff + jstart + l;
+                    
+                    aoFockMatrix[loff] += pdat[k * ketDimensions + l];
+                }
+            }
+        }
     }
 }
 

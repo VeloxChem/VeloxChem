@@ -45,11 +45,11 @@ public:
     /**
      Creates a Fock container object.
      
-     @param fockMatrix the pointer to AO Fock matrix.
+     @param aoFockMatrix the pointer to AO Fock matrix.
      @param braGtoPairsBlock the GTOs pairsblock on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      */
-    CFockContainer(const CAOFockMatrix*  fockMatrix,
+    CFockContainer(const CAOFockMatrix*  aoFockMatrix,
                    const CGtoPairsBlock& braGtoPairsBlock,
                    const CGtoPairsBlock& ketGtoPairsBlock);
     
@@ -101,6 +101,14 @@ public:
      @return true if Fock container objects are not equal, false otherwise.
      */
     bool operator!=(const CFockContainer& other) const;
+    
+    /**
+     Accumulates partial Fock matrices data stored in Fock container into AO
+     Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     */
+    void accumulate(CAOFockMatrix* aoFockMatrix);
     
     /**
      Gets pointer to partial data of specific submatrix with requested angular

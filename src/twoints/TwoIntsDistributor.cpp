@@ -18,8 +18,6 @@ CTwoIntsDistribution::CTwoIntsDistribution()
 
     : _distPattern(dist2e::batch)
 
-    , _needSyncLock(false)
-
     , _nRows(0)
 
     , _nColumns(0)
@@ -52,8 +50,6 @@ CTwoIntsDistribution::CTwoIntsDistribution(      double* intsData,
                                            const dist2e  distPattern)
     : _distPattern(distPattern)
 
-    , _needSyncLock(false)
-
     , _nRows(nRows)
 
     , _nColumns(nColumns)
@@ -76,8 +72,6 @@ CTwoIntsDistribution::CTwoIntsDistribution(      CAOFockMatrix*    aoFock,
 
     : _distPattern(dist2e::fock)
 
-    , _needSyncLock(true)
-
     , _nRows(0)
 
     , _nColumns(0)
@@ -96,8 +90,6 @@ CTwoIntsDistribution::CTwoIntsDistribution(      CAOFockMatrix*    aoFock,
 CTwoIntsDistribution::CTwoIntsDistribution(const CTwoIntsDistribution& source)
 
     : _distPattern(source._distPattern)
-
-    , _needSyncLock(source._needSyncLock)
 
     , _nRows(source._nRows)
 
@@ -125,8 +117,6 @@ CTwoIntsDistribution::operator=(const CTwoIntsDistribution& source)
     
     _distPattern = source._distPattern;
     
-    _needSyncLock = source._needSyncLock;
-    
     _nRows = source._nRows;
     
     _nColumns = source._nColumns;
@@ -139,6 +129,8 @@ CTwoIntsDistribution::operator=(const CTwoIntsDistribution& source)
     
     _aoFock = source._aoFock;
     
+    _fockContainer = source._fockContainer;
+    
     return *this;
 }
 
@@ -146,8 +138,6 @@ bool
 CTwoIntsDistribution::operator==(const CTwoIntsDistribution& other) const
 {
     if (_distPattern != other._distPattern) return false;
-    
-    if (_needSyncLock != other._needSyncLock) return false;
     
     if (_nRows != other._nRows) return false;
     
@@ -161,6 +151,8 @@ CTwoIntsDistribution::operator==(const CTwoIntsDistribution& other) const
     
     if (_aoFock != other._aoFock) return false;
     
+    if (_fockContainer != other._fockContainer) return false;
+    
     return true;
 }
 
@@ -170,10 +162,21 @@ CTwoIntsDistribution::operator!=(const CTwoIntsDistribution& other) const
     return !(*this == other);
 }
 
-bool
-CTwoIntsDistribution::needSyncLock() const
+void
+CTwoIntsDistribution::setFockContainer(const CGtoPairsBlock&      braGtoPairsBlock,
+                                       const CGtoPairsBlock&      ketGtoPairsBlock)
 {
-    return _needSyncLock;
+    if (_distPattern == dist2e::fock)
+    {
+        _fockContainer = CFockContainer(_aoFock, braGtoPairsBlock,
+                                        ketGtoPairsBlock);
+    }
+}
+
+void
+CTwoIntsDistribution::accumulate()
+{
+    _fockContainer.accumulate(_aoFock); 
 }
 
 void
@@ -316,8 +319,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
         
         if (fcktyp == fockmat::restjk)
         {
-            distfock::distRestJK(_aoFock->getFock(i),
-                                 _aoFock->getNumberOfColumns(i),
+            distfock::distRestJK(_fockContainer, i, 
                                  _aoDensity->totalDensity(idden),
                                  _aoDensity->getNumberOfColumns(idden),
                                  spherInts, braGtoPairsBlock, ketGtoPairsBlock,
@@ -355,8 +357,6 @@ operator<<(      std::ostream&         output,
     
     output << "_distPattern: " << to_string(source._distPattern) << std::endl;
     
-    output << "_needSyncLock: " << fstr::to_string(source._needSyncLock) << std::endl;
-    
     output << "_nRows: " << source._nRows << std::endl;
     
     output << "_nColumns: " << source._nColumns << std::endl;
@@ -368,6 +368,8 @@ operator<<(      std::ostream&         output,
     output << "_aoDensity: " << source._aoDensity << std::endl;
     
     output << "_aoFock: " << source._aoFock << std::endl;
+    
+    output << "_fockContainer: " << source._fockContainer << std::endl;
     
     return output;
 }

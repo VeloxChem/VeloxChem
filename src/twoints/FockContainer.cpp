@@ -22,17 +22,17 @@ CFockContainer::CFockContainer(const std::vector<CFockSubMatrix>& subFockMatrice
     
 }
 
-CFockContainer::CFockContainer(const CAOFockMatrix*  fockMatrix,
+CFockContainer::CFockContainer(const CAOFockMatrix*  aoFockMatrix,
                                const CGtoPairsBlock& braGtoPairsBlock,
                                const CGtoPairsBlock& ketGtoPairsBlock)
 {
-    auto nfock = fockMatrix->getNumberOfFockMatrices();
+    auto nfock = aoFockMatrix->getNumberOfFockMatrices();
     
     for (int32_t i = 0; i < nfock; i++)
     {
         _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
                                                   ketGtoPairsBlock,
-                                                  fockMatrix->getFockType(i)));
+                                                  aoFockMatrix->getFockType(i)));
     }
 }
 
@@ -95,6 +95,19 @@ bool
 CFockContainer::operator!=(const CFockContainer& other) const
 {
     return !(*this == other);
+}
+
+void
+CFockContainer::accumulate(CAOFockMatrix* aoFockMatrix)
+{
+    auto nfock = aoFockMatrix->getNumberOfFockMatrices();
+    
+    for (int32_t i = 0; i < nfock; i++)
+    {
+        _subFockMatrices[i].accumulate(aoFockMatrix->getFock(i),
+                                       aoFockMatrix->getNumberOfColumns(i),
+                                       aoFockMatrix->getFockType(i));
+    }
 }
 
 double*

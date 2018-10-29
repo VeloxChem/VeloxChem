@@ -45,23 +45,6 @@ TEST_F(CTwoIntsDistributionTest, CopyAssignment)
     ASSERT_EQ(dista, distb);
 }
 
-TEST_F(CTwoIntsDistributionTest, NeedSyncLock)
-{
-    double val = 1.0;
-    
-    CTwoIntsDistribution dista(&val, 10, 20, 2, dist2e::qvalues);
-    
-    ASSERT_FALSE(dista.needSyncLock());
-    
-    CAODensityMatrix dmat;
-    
-    CAOFockMatrix fmat;
-    
-    CTwoIntsDistribution distb(&fmat, &dmat);
-    
-    ASSERT_TRUE(distb.needSyncLock());
-}
-
 TEST_F(CTwoIntsDistributionTest, DistributeWithBatchNoSym)
 {
     auto mlih = vlxmol::getTestLiH();

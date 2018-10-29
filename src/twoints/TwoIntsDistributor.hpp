@@ -16,6 +16,7 @@
 #include "GtoPairsBlock.hpp"
 #include "AODensityMatrix.hpp"
 #include "AOFockMatrix.hpp"
+#include "FockContainer.hpp"
 
 /**
  Class CTwoIntsDistribution provides set of two electron integrals distribution
@@ -29,12 +30,6 @@ class CTwoIntsDistribution
      The two electron integrals distribution pattern.
      */
     dist2e _distPattern;
-    
-    /**
-     The flag indicating need of synchronization lock for updating integrals to
-     integrals buffer. 
-     */
-    bool _needSyncLock;
     
     /**
      The number of rows.
@@ -66,6 +61,11 @@ class CTwoIntsDistribution
      The pointer to destination AO Fock matrix.
      */
     CAOFockMatrix* _aoFock;
+    
+    /**
+     The pointer to Fock container object with partial Fock matrix data.
+     */
+    CFockContainer _fockContainer;
     
     /**
      Distributes two electron integrals into data batch.
@@ -219,12 +219,14 @@ public:
     bool operator!=(const CTwoIntsDistribution& other) const;
     
     /**
-     Gets flag for synchronization lock
+     Allocates and initializes Fock container data for Fock matrices
+     distribution method.
 
-     @return true if synchronization lock is needed for distribution mode,
-             false - otherwise.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
      */
-    bool needSyncLock() const;
+    void setFockContainer(const CGtoPairsBlock&      braGtoPairsBlock,
+                          const CGtoPairsBlock&      ketGtoPairsBlock);
     
     /**
      Distributes two electron integrals into data buffer.
@@ -241,6 +243,13 @@ public:
                     const bool                 isBraEqualKet,
                     const int32_t              nKetContrPairs,
                     const int32_t              iContrPair);
+    
+    /**
+     Accumulates AO Fock matrix from partial Fock matrix data computed inside
+     single task. NOTE: Not threadsafe routine, must be allways called with
+     appropiate guards to prevent raise conditions.
+     */
+    void accumulate();
     
     /**
      Converts two electron integrals distributor object to text output and

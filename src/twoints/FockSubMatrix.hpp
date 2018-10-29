@@ -86,6 +86,25 @@ class CFockSubMatrix
                            const int32_t nComponentsC,
                            const int32_t nComponentsD);
     
+    /**
+     Adds specific submatrix contributtion to AO Fock matrix.
+
+     @param aoFockMatrix the pointer to AO Fock matrix data.
+     @param nColumns the number of columns in AO Fock matrix.
+     @param iMatrix the index of submatrix.
+     @param braComponents the vector of bra angular components.
+     @param ketComponents the vector of ket angular components.
+     @param braDimensions the dimensions of submatrix along bra side.
+     @param ketDimensions the dimensions of submatrix along ket side.
+     */
+    void _addContribution(      double*             aoFockMatrix,
+                          const int32_t             nColumns,
+                          const int32_t             iMatrix,
+                          const CMemBlock<int32_t>& braComponents,
+                          const CMemBlock<int32_t>& ketComponents,
+                          const int32_t             braDimensions,
+                          const int32_t             ketDimensions) const; 
+    
 public:
     
     /**
@@ -179,6 +198,17 @@ public:
      @return true if AO Fock submatrix objects are not equal, false otherwise.
      */
     bool operator!=(const CFockSubMatrix& other) const;
+    
+    /**
+     Accumulates partial Fock data in AO Fock matrix.
+
+     @param aoFockMatrix the pointer to AO Fock matrix data.
+     @param nColumns the number of columns in AO Fock matrix.
+     @param fockType the type of AO Fock matrix.
+     */
+    void accumulate(      double* aoFockMatrix,
+                    const int32_t nColumns,
+                    const fockmat fockType) const;
     
     /**
      Gets pointer to partial data of specific submatrix with requested angular
