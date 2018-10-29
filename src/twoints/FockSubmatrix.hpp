@@ -251,7 +251,6 @@ public:
      */
     int32_t getDimensionsD() const;
     
-    
     /**
      Converts AO Fock submatrix object to text output and insert it into output
      text stream.
