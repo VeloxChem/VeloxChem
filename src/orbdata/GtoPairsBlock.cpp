@@ -1325,9 +1325,14 @@ CGtoPairsBlock::getNumberOfScreenedContrPairs() const
 int32_t
 CGtoPairsBlock::getBraMatrixPosition(const int32_t iComponent) const
 {
-    auto bidx = getBraIdentifiers(iComponent);
+    if (_nScreenedContrPairs > 0)
+    {
+        auto bidx = getBraIdentifiers(iComponent);
     
-    return bidx[0];
+        return bidx[0];
+    }
+    
+    return -1;
 }
 
 int32_t
@@ -1335,16 +1340,30 @@ CGtoPairsBlock::getKetMatrixPosition(const int32_t iComponent) const
 {
     auto kidx = getKetIdentifiers(iComponent);
     
-    return kidx[0];
+    if (_nScreenedContrPairs > 0)
+    {
+        auto spos = kidx[0];
+    
+        for (int32_t i = 1; i < _nScreenedContrPairs; i++)
+        {
+            auto cpos = kidx[i];
+            
+            if (spos > cpos) spos = cpos;
+        }
+        
+        return spos;
+    }
+    
+    return -1;
 }
 
 int32_t
 CGtoPairsBlock::getNumberOfRowsInBraMatrix() const
 {
-    auto bidx = getBraIdentifiers(0);
-    
     if (_nScreenedContrPairs > 0)
     {
+        auto bidx = getBraIdentifiers(0);
+    
         return bidx[_nScreenedContrPairs - 1] - bidx[0] + 1;
     }
     
@@ -1358,7 +1377,20 @@ CGtoPairsBlock::getNumberOfRowsInKetMatrix() const
     
     if (_nScreenedContrPairs > 0)
     {
-        return kidx[_nScreenedContrPairs - 1] - kidx[0] + 1;
+        auto spos = kidx[0];
+        
+        auto epos = kidx[0];
+        
+        for (int32_t i = 0; i < _nScreenedContrPairs; i++)
+        {
+            auto cpos = kidx[i];
+            
+            if (spos > cpos) spos = cpos;
+            
+            if (epos < cpos) epos = cpos;
+        }
+        
+        return (epos - spos) + 1;
     }
     
     return 0;

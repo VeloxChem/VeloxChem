@@ -319,7 +319,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
         
         if (fcktyp == fockmat::restjk)
         {
-            distfock::distRestJK(_fockContainer, i, 
+            distfock::distRestJK(_fockContainer, i,
                                  _aoDensity->totalDensity(idden),
                                  _aoDensity->getNumberOfColumns(idden),
                                  spherInts, braGtoPairsBlock, ketGtoPairsBlock,
