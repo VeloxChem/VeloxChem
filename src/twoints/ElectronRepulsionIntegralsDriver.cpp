@@ -72,10 +72,6 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
                                     &bbpairs, &screeningContainer);
     
     aoFockMatrix.symmetrize(); 
-    
-    // print evaluation timing statistics
-    
-    // _printFockTiming(aoFockMatrix, eritim, oStream);
 }
 
 CScreeningContainer
@@ -1705,14 +1701,6 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
     
     auto pden = &aoDensityMatrix;
     
-    // set up OMP locking
-    
-    //omp_lock_t tsklock;
-    
-    //omp_lock_t* ptrlock = &tsklock;
-   
-    //omp_init_lock(ptrlock);
-    
     #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer, pfock, pden)
     {
         #pragma omp single nowait
@@ -1756,12 +1744,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
                         
                         // accumulate AO Fock matrix
                         
-                        //omp_set_lock(ptrlock);
-                        
                         #pragma omp critical (fockacc)
                         distpat.accumulate();
-                        
-                        //omp_unset_lock(ptrlock);
                     }
                     
                     // update screeners counter
@@ -1771,10 +1755,6 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
             }
         }
     }
-    
-    // clean up OMP locking
-    
-    //omp_destroy_lock(ptrlock);
 }
 
 void
