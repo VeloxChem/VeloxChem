@@ -7,6 +7,7 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <boost/python.hpp>
+#include <mpi.h>
 
 #include "SADGuessDriver.hpp"
 #include "Molecule.hpp"
@@ -15,7 +16,6 @@
 #include "AODensityMatrix.hpp"
 #include "DensityMatrixType.hpp"
 #include "OverlapMatrix.hpp"
-
 #include "ExportGeneral.hpp"
 #include "ExportSolvers.hpp"
 
@@ -23,7 +23,7 @@ namespace bp = boost::python;
 
 namespace bp_solvers { // bp_solvers namespace
 
-// Helper function for creating a CSADGuessDriver object
+// Helper function for CSADGuessDriver constructor
 
 static std::shared_ptr<CSADGuessDriver>
 CSADGuessDriver_create(int32_t    globRank,
@@ -39,7 +39,7 @@ CSADGuessDriver_create(int32_t    globRank,
 
 // Helper functions for overloading CSADGuessDriver::compute
 
-CAODensityMatrix
+static CAODensityMatrix
 CSADGuessDriver_compute(
           CSADGuessDriver& self,
     const CMolecule&       molecule,

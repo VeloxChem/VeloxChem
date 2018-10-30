@@ -83,6 +83,28 @@ getMoleculeLiHCation()
 }
 
 CMolecule
+getMoleculeHeAtom()
+{
+    std::vector<double> coords({0.0, 0.0, 0.0});
+    
+    std::vector<double> charges({2.0});
+    
+    std::vector<double> masses({4.002603});
+    
+    std::vector<std::string> labels({{"He"}});
+    
+    std::vector<int32_t> idselem({2});
+    
+    CMolecule mol(coords, charges, masses, labels, idselem);
+    
+    mol.setCharge(0.0);
+
+    mol.setMultiplicity(1);
+
+    return mol;
+}
+
+CMolecule
 getMoleculeH2O()
 {
     std::vector<double> coords({0.0, 0.0,  0.0,
@@ -96,6 +118,30 @@ getMoleculeH2O()
     std::vector<std::string> labels({{"O"}, {"H"}, {"H"}});
     
     std::vector<int32_t> idselem({8, 1, 1});
+    
+    CMolecule mol(coords, charges, masses, labels, idselem);
+    
+    mol.setCharge(0.0);
+
+    mol.setMultiplicity(1);
+
+    return mol;
+}
+
+CMolecule
+getMoleculeH2Se()
+{
+    std::vector<double> coords({0.0, 0.0, 0.0,
+                                0.0, 0.0, 2.8,
+                                0.0, 2.8, 0.0});
+    
+    std::vector<double> charges({34.0, 1.0, 1.0});
+    
+    std::vector<double> masses({79.916521, 1.007825, 1.007825});
+    
+    std::vector<std::string> labels({{"Se"}, {"H"}, {"H"}});
+    
+    std::vector<int32_t> idselem({34, 1, 1});
     
     CMolecule mol(coords, charges, masses, labels, idselem);
     
@@ -144,8 +190,8 @@ getMoleculeNH3CH4()
     std::vector<double> charges({7.0, 1.0, 1.0, 1.0,
                                  6.0, 1.0, 1.0, 1.0, 1.0});
     
-    std::vector<double> masses({14.007, 1.008, 1.008, 1.008,
-                                12.011, 1.008, 1.008, 1.008, 1.008});
+    std::vector<double> masses({14.003074, 1.007825, 1.007825, 1.007825,
+                                12.000000, 1.007825, 1.007825, 1.007825, 1.007825});
     
     std::vector<std::string> labels({"N", "H", "H", "H",
                                      "C", "H", "H", "H", "H"});

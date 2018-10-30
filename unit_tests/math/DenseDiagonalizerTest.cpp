@@ -96,3 +96,54 @@ TEST_F(CDenseDiagonalizerTest, GetInvertedMatrix)
     
     ASSERT_EQ(refmat, diagdrv.getInvertedMatrix());
 }
+
+TEST_F(CDenseDiagonalizerTest, GetInvertedSqrtMatrixWithThreshold)
+{
+    CDenseMatrix mata({10.0, 3.0, 4.0,
+                       3.0, 1.2, 1.0,
+                       4.0, 1.0, 4.0},
+                      3, 3);
+    
+    CDenseDiagonalizer diagdrv;
+    
+    diagdrv.diagonalize(mata);
+    
+    ASSERT_TRUE(diagdrv.getState());
+    
+    CDenseMatrix refmat({ 0.5227351824567613, -0.4976329506165474, -0.1947637155486871,
+                         -0.4976329506165478,  1.8097622833751084,  0.0808312367804720,
+                         -0.1947637155486870,  0.0808312367804720,  0.6298490905403010},
+                        3, 3);
+    
+    ASSERT_EQ(refmat, diagdrv.getInvertedSqrtMatrix(0.0));
+    
+    CDenseMatrix submat({ -0.4976329506165474, -0.1947637155486871,
+                           1.8097622833751084,  0.0808312367804720,
+                           0.0808312367804720,  0.6298490905403010},
+                        3, 2);
+    
+    ASSERT_EQ(submat, diagdrv.getInvertedSqrtMatrix(0.5));
+}
+
+TEST_F(CDenseDiagonalizerTest, GetNumberOfEigenValues)
+{
+    CDenseMatrix mata({10.0, 3.0, 4.0,
+                        3.0, 1.2, 1.0,
+                        4.0, 1.0, 4.0},
+                      3, 3);
+    
+    CDenseDiagonalizer diagdrv;
+    
+    diagdrv.diagonalize(mata);
+    
+    ASSERT_TRUE(diagdrv.getState());
+    
+    ASSERT_EQ(3, diagdrv.getNumberOfEigenValues(0.0));
+    
+    ASSERT_EQ(2, diagdrv.getNumberOfEigenValues(0.5));
+    
+    ASSERT_EQ(1, diagdrv.getNumberOfEigenValues(3.0));
+
+    ASSERT_EQ(0, diagdrv.getNumberOfEigenValues(20.0));
+}
+

@@ -131,6 +131,71 @@ CDenseMatrix::operator!=(const CDenseMatrix& other) const
     return !(*this == other);
 }
 
+void
+CDenseMatrix::zero()
+{
+    mathfunc::zero(_values.data(), _nRows * _nColumns);
+}
+
+void
+CDenseMatrix::symmetrize()
+{
+    if (_nRows == _nColumns)
+    {
+        auto fmat = _values.data();
+        
+        for (int32_t i = 0; i < _nRows; i++)
+        {
+            for (int32_t j = i; j < _nRows; j++)
+            {
+                auto ijoff = i * _nColumns + j;
+                
+                auto jioff = j * _nColumns + i;
+                
+                auto fval = fmat[ijoff] + fmat[jioff];
+                
+                fmat[ijoff] = fval;
+                
+                fmat[jioff] = fval;
+            }
+        }
+    }
+}
+
+CDenseMatrix
+CDenseMatrix::slice(const int32_t iRow,
+                    const int32_t iColumn,
+                    const int32_t nRows,
+                    const int32_t nColumns) const
+{
+    if (((iRow    + nRows)    <= _nRows) &&
+        ((iColumn + nColumns) <= _nColumns))
+    {
+        CDenseMatrix mat(nRows, nColumns);
+        
+        for (int32_t i = 0; i < nRows; i++)
+        {
+            // set up pointers to data
+            
+            auto srcrow = row(iRow + i);
+            
+            auto dstrow = mat.row(i);
+            
+            // copy dense matrix values
+            
+            #pragma omp simd
+            for (int32_t j = 0; j < nColumns; j++)
+            {
+                dstrow[j] = srcrow[iColumn + j];
+            }
+        }
+        
+        return mat;
+    }
+    
+    return CDenseMatrix();
+}
+
 int32_t
 CDenseMatrix::getNumberOfRows() const
 {
@@ -203,12 +268,6 @@ CDenseMatrix::getString() const
     }
     
     return sst.str();
-}
-
-void
-CDenseMatrix::zero()
-{
-    mathfunc::zero(_values.data(), _nRows * _nColumns); 
 }
 
 std::ostream&

@@ -294,6 +294,14 @@ public:
     CMemBlock<double> getMinDistances() const;
     
     /**
+     Gets nuclear repulsion energy for molecule assuming point charge model for
+     nucleus.
+
+     @return the nuclear repulsion energy.
+     */
+    double getNuclearRepulsionEnergy() const;
+    
+    /**
      Prints geometry of molecule as table to output stream.
 
      @param oStream the output stream.

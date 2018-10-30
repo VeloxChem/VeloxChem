@@ -1,14 +1,14 @@
 from mpi4py import MPI
-from HelperClass import Task
-from veloxchem.VeloxChemLib import Molecule
-from veloxchem.VeloxChemLib import MolecularBasis
-from veloxchem.VeloxChemLib import OverlapIntegralsDriver
-from veloxchem.VeloxChemLib import KineticEnergyIntegralsDriver
-from veloxchem.VeloxChemLib import NuclearPotentialIntegralsDriver
-from veloxchem.VeloxChemLib import mpi_master
-from veloxchem.VeloxChemLib import assemble_overlap_matrices
-from veloxchem.VeloxChemLib import assemble_kinetic_energy_matrices
-from veloxchem.VeloxChemLib import assemble_nuclear_potential_matrices
+from veloxchem.taskparser import GlobalTask
+from veloxchem.veloxchemlib import Molecule
+from veloxchem.veloxchemlib import MolecularBasis
+from veloxchem.veloxchemlib import OverlapIntegralsDriver
+from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
+from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import assemble_overlap_matrices
+from veloxchem.veloxchemlib import assemble_kinetic_energy_matrices
+from veloxchem.veloxchemlib import assemble_nuclear_potential_matrices
 
 import numpy as np
 import unittest
@@ -18,31 +18,16 @@ class TestExciton(unittest.TestCase):
 
     def test_assemble_matrices(self):
 
-        # set up MPI
+        task = GlobalTask("inputs/dimer.inp", "inputs/dimer.out",
+                          MPI.COMM_WORLD)
 
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+        molecule = task.molecule
+        basis = task.ao_basis
+        ostream = task.ostream
 
-        # process input
-
-        if (rank == mpi_master()):
-
-            task = Task("inputs/dimer.inp", "inputs/dimer.out")
-            molecule = task.molecule
-            basis = task.ao_basis
-            ostream = task.ostream
-
-        else:
-
-            molecule = Molecule()
-            basis = MolecularBasis()
-            ostream = OutputStream("")
-
-        # broadcast molecule and basis
-
-        molecule.broadcast(rank, comm)
-        basis.broadcast(rank, comm)
+        comm = task.mpi_comm
+        rank = task.mpi_rank
+        size = task.mpi_size
 
         # build sub molecules
 

@@ -55,6 +55,17 @@ class CCauchySchwarzScreener
      */
     double _threshold;
     
+    /**
+     Sets maximum GTOs pairs extents for given GTOs pairs block. Extents are
+     computed using Eq. B4 from Maurer et al., J. Chem. Phys. 136,
+     144107 (2012).
+
+     @param gtoPairExtents the vector of GTOs pairs extents. 
+     @param gtoPairsBlock the GTOs pairs block.
+     */
+    void _setPairsExtents(      CMemBlock<double>& gtoPairExtents,
+                          const CGtoPairsBlock&    gtoPairsBlock);
+    
 public:
     
     /**
@@ -188,11 +199,14 @@ public:
      GTOs pair).
 
      @param qqVector the screening vector.
+     @param pqDistances the vector of effective distances between contracted
+            GTOs pairs on bra and ket sides.
      @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
-     blocks.
+            blocks.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                            const CMemBlock<double>&  pqDistances,
                             const bool                isBraEqualKet,
                             const int32_t             iContrPair) const;
     

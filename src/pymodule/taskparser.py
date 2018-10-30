@@ -1,13 +1,15 @@
-from veloxchem.VeloxChemLib import InputData
-from veloxchem.VeloxChemLib import MolXYZReader
-from veloxchem.VeloxChemLib import EnvironmentReader
-from veloxchem.VeloxChemLib import BasisReader
-from veloxchem.VeloxChemLib import Molecule
-from veloxchem.VeloxChemLib import OutputStream
-from veloxchem.VeloxChemLib import InputStream
+from .veloxchemlib import InputData
+from .veloxchemlib import InputStream
+from .veloxchemlib import OutputStream
+from .veloxchemlib import MolXYZReader
+from .veloxchemlib import EnvironmentReader
+from .veloxchemlib import BasisReader
+from .veloxchemlib import Molecule
+from .veloxchemlib import MolecularBasis
+from .veloxchemlib import mpi_master
 
 
-class Task(object):
+class LocalTask:
 
     def __init__(self, input_file, output_file):
 
@@ -50,3 +52,37 @@ class Task(object):
 
         self.min_basis = self.basis_reader.get_min_basis(
             self.path_to_basis_sets, self.molecule, self.ostream)
+
+
+class GlobalTask:
+
+    def __init__(self, input_file, output_file, mpi_comm):
+
+        # mpi settings
+
+        self.mpi_comm = mpi_comm
+        self.mpi_rank = mpi_comm.Get_rank()
+        self.mpi_size = mpi_comm.Get_size()
+
+        # process input file on master node
+
+        if (self.mpi_rank == mpi_master()):
+
+            task = LocalTask(input_file, output_file)
+            self.molecule = task.molecule
+            self.ao_basis = task.ao_basis
+            self.min_basis = task.min_basis
+            self.ostream = task.ostream
+
+        else:
+
+            self.molecule = Molecule()
+            self.ao_basis = MolecularBasis()
+            self.min_basis = MolecularBasis()
+            self.ostream = OutputStream("")
+
+        # broadcast molecule and basis
+
+        self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
+        self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
+        self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)

@@ -269,7 +269,7 @@ TEST_F(CCauchySchwarzScreenerTest, IsEmpty)
     ASSERT_TRUE(qscrb.isEmpty()); 
 }
 
-TEST_F(CCauchySchwarzScreenerTest, SetScreeningVector)
+TEST_F(CCauchySchwarzScreenerTest, SetScreeningVectorForQQ)
 {
     auto mlih = vlxmol::getTestLiH();
     
@@ -292,37 +292,39 @@ TEST_F(CCauchySchwarzScreenerTest, SetScreeningVector)
     
     CMemBlock<int32_t> qqvec(6);
     
-    qscra.setScreeningVector(qqvec, false, 0);
+    CMemBlock<double> distpq(6);
+    
+    qscra.setScreeningVector(qqvec, distpq, false, 0);
     
     ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 1, 1, 0}));
     
-    qscra.setScreeningVector(qqvec, false, 1);
+    qscra.setScreeningVector(qqvec, distpq, false, 1);
     
     ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 1, 1, 0}));
     
-    qscra.setScreeningVector(qqvec, false, 2);
+    qscra.setScreeningVector(qqvec, distpq, false, 2);
     
     ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 1, 1, 1}));
     
-    qscra.setScreeningVector(qqvec, false, 3);
+    qscra.setScreeningVector(qqvec, distpq, false, 3);
     
     ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 1, 1}));
     
-    qscra.setScreeningVector(qqvec, true, 0);
+    qscra.setScreeningVector(qqvec, distpq, true, 0);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 1, 1}));
     
-    qscra.setScreeningVector(qqvec, true, 1);
+    qscra.setScreeningVector(qqvec, distpq, true, 1);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 1, 1, 1}));
     
-    qscra.setScreeningVector(qqvec, true, 2);
+    qscra.setScreeningVector(qqvec, distpq, true, 2);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 0, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 0, 1, 1, 1, 1}));
     
-    qscra.setScreeningVector(qqvec, true, 3);
+    qscra.setScreeningVector(qqvec, distpq, true, 3);
     
-    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 0, 0}));
+    ASSERT_EQ(qqvec, CMemBlock<int32_t>({0, 1, 1, 1, 1, 1}));
 }
 
 

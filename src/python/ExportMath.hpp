@@ -10,6 +10,7 @@
 #define ExportMath_hpp
 
 #include <boost/python/numpy.hpp>
+#include <memory>
 
 #include "DenseMatrix.hpp"
 
@@ -23,7 +24,7 @@ namespace bp_math { // bp_math namespace
  @param arr the numpy array.
  @return a CDenseMatrix object.
  */
-CDenseMatrix
+std::shared_ptr<CDenseMatrix>
 CDenseMatrix_from_numpy(const np::ndarray& arr);
 
 /**

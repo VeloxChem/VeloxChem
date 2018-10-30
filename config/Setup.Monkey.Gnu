@@ -8,9 +8,9 @@
 
 # NOTE: setup for monkey.theochem.kth.se
 
-USE_MPI    := true
-USE_GPU    := true
-USE_PYTHON := false
+USE_MPI := true
+USE_GPU := true
+USE_MKL := false
 
 # C++ compiler & linker
 
@@ -39,40 +39,42 @@ ifeq ($(USE_GPU),true)
   CPP_DEB_FLG += -DENABLE_GPU
 endif
 
-ifeq ($(USE_PYTHON),true)
-  CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
-  CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
+ifeq ($(USE_MKL),true)
+  CPP_REL_FLG += -DENABLE_MKL
+  CPP_DEB_FLG += -DENABLE_MKL
 endif
+
+CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
+CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 
 # MKL header and library
 
+MKLROOT := /home/xinli/software/openblas
 MKL_INCLUDES := $(MKLROOT)/include
 
-LIB_LIST := -L${MKLROOT}/lib -Wl,-rpath,${MKLROOT}/lib -lmkl_intel_lp64
-LIB_LIST += -lmkl_gnu_thread -lmkl_core -lmkl_avx -lgomp -lpthread -lm -ldl
+LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas
+LIB_LIST += -lgomp -lpthread -lm -ldl
 
 # Google Test root directory
 
-GST_ROOT := /home/xinli/gitlab/fiesta/external/googletest
+GST_ROOT := /home/xinli/gitlab/googletest
 
-GST_LIB := /home/xinli/gitlab/fiesta/lib/libgtest.a
+GST_LIB := $(GST_ROOT)/lib/libgtest.a
 
 # CUDA compiler & linker
 
 CUDA_ROOT := /usr/local/cuda
-NVCC := ${CUDA_ROOT}/bin/nvcc
+NVCC := $(CUDA_ROOT)/bin/nvcc
 
 ifeq ($(USE_GPU),true)
   NVCC_REL_FLG := -std=c++11 -O3 --compiler-options "-fopenmp" --compiler-options "-Wall"
   NVCC_DEB_FLG := -std=c++11 -O3 --compiler-options "-fopenmp" --compiler-options "-Wall" --compiler-options "-g"
 
-  ifeq ($(USE_PYTHON),true)
-    NVCC_REL_FLG += --compiler-options "-fPIC"
-    NVCC_DEB_FLG += --compiler-options "-fPIC"
-  endif
+  NVCC_REL_FLG += --compiler-options "-fPIC"
+  NVCC_DEB_FLG += --compiler-options "-fPIC"
 
   ifdef CUDA_ROOT
-    LIB_LIST += -L${CUDA_ROOT}/lib64
+    LIB_LIST += -L$(CUDA_ROOT)/lib64
   endif
 
   LIB_LIST += -lcuda -lcudart
@@ -81,25 +83,24 @@ endif
 # Boost header and library
 
 PYTHON := python3
-BOOST_PATH := /home/xinli/software/boost
+BOOST_PATH := /home/xinli/software/boost/1.68.0
 
-ifeq ($(USE_PYTHON),true)
-  PYTHON_INC := $(shell $(PYTHON)-config --includes)
-  PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
-  PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-  PYTHON_INC += -I$(BOOST_PATH)/include
+PYTHON_VER := $(shell $(PYTHON) -c "import sys; print(sys.version_info.major, sys.version_info.minor, sep='')")
 
-  PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
-  PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python3 -lboost_numpy3
+PYTHON_INC := $(shell $(PYTHON)-config --includes)
+PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
+PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
+PYTHON_INC += -I$(BOOST_PATH)/include
 
-  CXX_REL_FLG += -fPIC ${PYTHON_INC}
-  CXX_DEB_FLG += -fPIC ${PYTHON_INC}
+PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
+PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python$(PYTHON_VER) -lboost_numpy$(PYTHON_VER)
 
-  LIB_LIST += -shared ${PYTHON_LD}
-endif
+CXX_REL_FLG += -fPIC $(PYTHON_INC)
+CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # Native shell commands
 
+CP := cp -f
 MV := mv -f
 RM := rm -f
 

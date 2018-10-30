@@ -12,7 +12,7 @@ include Makefile.setup
 
 # Set TARGET and linker flags for VeloxChemMP shared library
 
-VLX_TARGET := VeloxChemLib.so
+VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 PYVLX_MAIN := VeloxChemMain.py
 
@@ -29,9 +29,9 @@ endif
 
 # Add includes directories
 ifeq ($(USE_GPU),true)
-  VLX_INCLUDES := ${shell find -not -path pymodule -type d -print}
+  VLX_INCLUDES := ${shell find * -not -path pymodule -type d -print}
 else
-  VLX_INCLUDES := ${shell find -not -path pymodule -not -path gpu -type d -print}
+  VLX_INCLUDES := ${shell find * -not -path pymodule -not -path gpu -type d -print}
 endif
 
 # Update CXX flags & includes path

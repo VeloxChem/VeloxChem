@@ -9,7 +9,6 @@
 #include <boost/python.hpp>
 
 #include "AssembleMatrices.hpp"
-
 #include "ExportExciton.hpp"
 
 namespace bp = boost::python;

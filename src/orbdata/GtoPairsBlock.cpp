@@ -20,6 +20,12 @@ CGtoPairsBlock::CGtoPairsBlock()
 
     , _ketAngularMomentum(-1)
 
+    , _contrPattern(CMemBlock2D<int32_t>())
+
+    , _contrFactors(CMemBlock2D<double>())
+
+    , _pairFactors(CMemBlock2D<double>())
+
     , _threshold(1.0e-13)
 
     , _nOriginalPrimPairs(0)
@@ -34,6 +40,7 @@ CGtoPairsBlock::CGtoPairsBlock()
 }
 
 CGtoPairsBlock::CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
+                               const CMemBlock2D<double>&  contrFactors, 
                                const CMemBlock2D<double>&  pairFactors,
                                const int32_t               braAngularMomentum,
                                const int32_t               ketAngularMomentum,
@@ -44,6 +51,8 @@ CGtoPairsBlock::CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
     , _ketAngularMomentum(ketAngularMomentum)
 
     , _contrPattern(contrPattern)
+
+    , _contrFactors(contrFactors)
 
     , _pairFactors(pairFactors)
 
@@ -63,11 +72,26 @@ CGtoPairsBlock::CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
 CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
                                const CGtoBlock& ketGtoBlock,
                                const double     threshold)
+
     : _braAngularMomentum(braGtoBlock.getAngularMomentum())
 
     , _ketAngularMomentum(ketGtoBlock.getAngularMomentum())
 
+    , _contrPattern(CMemBlock2D<int32_t>())
+
+    , _contrFactors(CMemBlock2D<double>())
+
+    , _pairFactors(CMemBlock2D<double>())
+
     , _threshold(threshold)
+
+    , _nOriginalPrimPairs(0)
+
+    , _nScreenedPrimPairs(0)
+
+    , _nOriginalContrPairs(0)
+
+    , _nScreenedContrPairs(0)
 {
     // set up dimensions of GTOs
     
@@ -193,9 +217,21 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     CMemBlock2D<int32_t> ppidx(bcgto * kcgto, 2 + bang + kang);
     
+    CMemBlock2D<double> pcfacts(bcgto * kcgto, 3);
+    
+    // set up pointers to start and end positions
+    
     auto ppspos = ppidx.data(0);
     
     auto ppepos = ppidx.data(1);
+    
+    // set up pointers to effective P coordinates
+    
+    auto pcrpx = pcfacts.data(0);
+    
+    auto pcrpy = pcfacts.data(1);
+    
+    auto pcrpz = pcfacts.data(2);
 
     // initialize number of pairs
     
@@ -215,6 +251,16 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
         
         for (int32_t j = joff; j < kcgto; j++)
         {
+            // effective P coordinates and normalization factor
+            
+            double repx = 0.0;
+            
+            double repy = 0.0;
+            
+            double repz = 0.0;
+            
+            double epnrm = 0.0;
+            
             // construct pair of contracted GTOs
             
             int32_t nprim = 0;
@@ -324,6 +370,18 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
                         ppraby[idxpgto + nprim] = aby;
                         
                         pprabz[idxpgto + nprim] = abz;
+                        
+                        // effective P coordinates
+                        
+                        auto cab = std::fabs(fan * knorm[l]);
+                        
+                        repx += cab * pprpx[idxpgto + nprim];
+                        
+                        repy += cab * pprpy[idxpgto + nprim];
+                        
+                        repz += cab * pprpz[idxpgto + nprim];
+                        
+                        epnrm += cab;
                 
                         // update local primitives counter 
                         
@@ -368,6 +426,16 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
                     cidx[idxcgto] = kidx[j];
                 }
                 
+                // effective P coordinates
+                
+                epnrm = 1.0 / epnrm;
+                
+                pcrpx[idxcgto] = epnrm * repx;
+                
+                pcrpy[idxcgto] = epnrm * repy;
+                
+                pcrpz[idxcgto] = epnrm * repz;
+                
                 // update indexes
                 
                 idxpgto += nprim;
@@ -388,6 +456,8 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     _pairFactors = ppfacts.slice(0, _nScreenedPrimPairs);
     
     _contrPattern = ppidx.slice(0, _nScreenedContrPairs);
+    
+    _contrFactors = pcfacts.slice(0, _nScreenedContrPairs);
 }
 
 CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& gtoBlock,
@@ -405,6 +475,8 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoPairsBlock& source)
     , _ketAngularMomentum(source._ketAngularMomentum)
 
     , _contrPattern(source._contrPattern)
+
+    , _contrFactors(source._contrFactors)
 
     , _pairFactors(source._pairFactors)
 
@@ -428,6 +500,8 @@ CGtoPairsBlock::CGtoPairsBlock(CGtoPairsBlock&& source) noexcept
     , _ketAngularMomentum(std::move(source._ketAngularMomentum))
 
     , _contrPattern(std::move(source._contrPattern))
+
+    , _contrFactors(std::move(source._contrFactors))
 
     , _pairFactors(std::move(source._pairFactors))
 
@@ -460,6 +534,8 @@ CGtoPairsBlock::operator=(const CGtoPairsBlock& source)
     
     _contrPattern = source._contrPattern;
     
+    _contrFactors = source._contrFactors;
+    
     _pairFactors = source._pairFactors;
     
     _threshold = source._threshold;
@@ -486,6 +562,8 @@ CGtoPairsBlock::operator=(CGtoPairsBlock&& source) noexcept
     
     _contrPattern = std::move(source._contrPattern);
     
+    _contrFactors = std::move(source._contrFactors);
+    
     _pairFactors = std::move(source._pairFactors);
     
     _threshold = std::move(source._threshold);
@@ -510,6 +588,8 @@ CGtoPairsBlock::operator==(const CGtoPairsBlock& other) const
     
     if (_contrPattern != other._contrPattern) return false;
     
+    if (_contrFactors != other._contrFactors) return false;
+    
     if (_pairFactors != other._pairFactors) return false;
     
     if (std::fabs(_threshold - other._threshold) > 1.0e-13) return false;
@@ -523,6 +603,12 @@ CGtoPairsBlock::operator==(const CGtoPairsBlock& other) const
     if (_nScreenedContrPairs != other._nScreenedContrPairs) return false;
     
     return true;
+}
+
+bool
+CGtoPairsBlock::operator!=(const CGtoPairsBlock& other) const
+{
+    return !(*this == other);
 }
 
 std::vector<CGtoPairsBlock>
@@ -568,6 +654,8 @@ CGtoPairsBlock::split(const int32_t batchSize) const
         
         auto cdat = _contrPattern.slice(cidx, cdim);
         
+        auto cfac = _contrFactors.slice(cidx, cdim);
+        
         // slice primitive GTOs pairs
         
         auto pidx = spos[cidx];
@@ -589,7 +677,7 @@ CGtoPairsBlock::split(const int32_t batchSize) const
             ecurpos[j] = epos[cidx + j] - pidx;
         }
         
-        ppvec.push_back(CGtoPairsBlock(cdat, pdat, _braAngularMomentum,
+        ppvec.push_back(CGtoPairsBlock(cdat, cfac, pdat, _braAngularMomentum,
                                        _ketAngularMomentum, _threshold));
     }
     
@@ -611,6 +699,8 @@ CGtoPairsBlock::pick(const int32_t iGtoPair) const
         
         auto cdat = _contrPattern.slice(iGtoPair, 1);
         
+        auto cfac = _contrFactors.slice(iGtoPair, 1);
+        
         // slice primitive GTOs pairs
         
         auto pidx = spos[iGtoPair];
@@ -629,8 +719,8 @@ CGtoPairsBlock::pick(const int32_t iGtoPair) const
             
         ecurpos[0] = pdim;
         
-        return CGtoPairsBlock(cdat, pdat, _braAngularMomentum, _ketAngularMomentum,
-                              _threshold);
+        return CGtoPairsBlock(cdat, cfac, pdat, _braAngularMomentum,
+                              _ketAngularMomentum, _threshold);
     }
     
     return CGtoPairsBlock(); 
@@ -644,6 +734,8 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     // clear contrated and primitive pairs data
     
     _contrPattern.zero();
+    
+    _contrFactors.zero();
     
     _pairFactors.zero();
     
@@ -750,6 +842,22 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     auto dspos = _contrPattern.data(0);
     
     auto depos = _contrPattern.data(1);
+    
+    // set up pointers to source effective P coordinates
+    
+    auto scrpx = source.getEffectiveCoordinatesPX();
+    
+    auto scrpy = source.getEffectiveCoordinatesPY();
+    
+    auto scrpz = source.getEffectiveCoordinatesPZ();
+    
+    // set up pointers to destination effective P coordinates
+    
+    auto dcrpx = _contrFactors.data(0);
+    
+    auto dcrpy = _contrFactors.data(1);
+    
+    auto dcrpz = _contrFactors.data(2);
     
     // set up angular momentum data
     
@@ -866,6 +974,14 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
                 cidx[ncpairs] = kidx[i];
             }
             
+            // effective P center
+            
+            dcrpx[ncpairs] = scrpx[i];
+            
+            dcrpy[ncpairs] = scrpy[i];
+            
+            dcrpz[ncpairs] = scrpz[i];
+            
             // update contracted pairs counters
             
             ncpairs++;
@@ -898,12 +1014,6 @@ bool
 CGtoPairsBlock::empty() const
 {
     return (_nScreenedContrPairs == 0);
-}
-
-bool
-CGtoPairsBlock::operator!=(const CGtoPairsBlock& other) const
-{
-    return !(*this == other);
 }
 
 const double*
@@ -1103,6 +1213,60 @@ CGtoPairsBlock::getDistancesAB() const
     return rab;
 }
 
+void
+CGtoPairsBlock::getDistancesAB(      CMemBlock2D<double>& abDistances,
+                               const int32_t              nContrPairs) const
+{
+    // set up pointers to R(AB) distances in primitives data
+    
+    auto abx = getDistancesABX();
+    
+    auto aby = getDistancesABY();
+    
+    auto abz = getDistancesABZ();
+    
+    // set up pointers to R(AB) distances
+    
+    auto rabx = abDistances.data(0);
+    
+    auto raby = abDistances.data(1);
+    
+    auto rabz = abDistances.data(2);
+    
+    // set up pointer to starting positions
+    
+    auto spos = getStartPositions();
+    
+    for (int32_t i = 0; i < nContrPairs; i++)
+    {
+        auto ppidx = spos[i];
+        
+        rabx[i] = abx[ppidx];
+        
+        raby[i] = aby[ppidx];
+        
+        rabz[i] = abz[ppidx];
+    }
+}
+
+const double*
+CGtoPairsBlock::getEffectiveCoordinatesPX() const
+{
+    return _contrFactors.data(0);
+}
+
+const double*
+CGtoPairsBlock::getEffectiveCoordinatesPY() const
+{
+    return _contrFactors.data(1);
+}
+
+const double*
+CGtoPairsBlock::getEffectiveCoordinatesPZ() const
+{
+    return _contrFactors.data(2);
+}
+
 int32_t
 CGtoPairsBlock::getNumberOfOriginalPrimPairs() const
 {
@@ -1156,6 +1320,80 @@ int32_t
 CGtoPairsBlock::getNumberOfScreenedContrPairs() const
 {
     return _nScreenedContrPairs; 
+}
+
+int32_t
+CGtoPairsBlock::getBraMatrixPosition(const int32_t iComponent) const
+{
+    if (_nScreenedContrPairs > 0)
+    {
+        auto bidx = getBraIdentifiers(iComponent);
+    
+        return bidx[0];
+    }
+    
+    return -1;
+}
+
+int32_t
+CGtoPairsBlock::getKetMatrixPosition(const int32_t iComponent) const
+{
+    auto kidx = getKetIdentifiers(iComponent);
+    
+    if (_nScreenedContrPairs > 0)
+    {
+        auto spos = kidx[0];
+    
+        for (int32_t i = 1; i < _nScreenedContrPairs; i++)
+        {
+            auto cpos = kidx[i];
+            
+            if (spos > cpos) spos = cpos;
+        }
+        
+        return spos;
+    }
+    
+    return -1;
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfRowsInBraMatrix() const
+{
+    if (_nScreenedContrPairs > 0)
+    {
+        auto bidx = getBraIdentifiers(0);
+    
+        return bidx[_nScreenedContrPairs - 1] - bidx[0] + 1;
+    }
+    
+    return 0;
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfRowsInKetMatrix() const
+{
+    auto kidx = getKetIdentifiers(0);
+    
+    if (_nScreenedContrPairs > 0)
+    {
+        auto spos = kidx[0];
+        
+        auto epos = kidx[0];
+        
+        for (int32_t i = 0; i < _nScreenedContrPairs; i++)
+        {
+            auto cpos = kidx[i];
+            
+            if (spos > cpos) spos = cpos;
+            
+            if (epos < cpos) epos = cpos;
+        }
+        
+        return (epos - spos) + 1;
+    }
+    
+    return 0;
 }
 
 std::string
@@ -1215,6 +1453,8 @@ operator<<(      std::ostream&   output,
     output << "_ketAngularMomentum: " << source._ketAngularMomentum << std::endl;
     
     output << "_contrPattern: " << source._contrPattern << std::endl;
+    
+    output << "_contrFactors: " << source._contrFactors << std::endl;
     
     output << "_pairFactors: " << source._pairFactors << std::endl;
     

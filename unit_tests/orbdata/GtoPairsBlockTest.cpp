@@ -131,6 +131,17 @@ TEST_F(CGtoPairsBlockTest, Split)
                                  12, 13, 13},
                                 3, 8);
     
+    CMemBlock2D<double> cfact00({0.0000, 0.0000, 0.000000000000000,
+                                 0.0000, 0.0000, 0.000000000000000,
+                                 0.0000, 0.0000, 0.781076809730870},
+                                3, 3);
+    
+    CMemBlock2D<double> cfact01({0.0000, 0.00000000000000, 0.0000,
+                                 0.0000, 0.00000000000000, 0.0000,
+                                 0.0000, 1.08843537414966, 1.2000},
+                                3, 3);
+    
+    
     CMemBlock2D<double> ppat00({2.900, 1.750, 1.750, 0.600, 1.532, 0.382, 2.250, 1.100,
                                 1.000 / 2.900, 1.000 / 1.750, 1.000 / 1.750, 1.000 / 0.600,
                                 1.000 / 1.532, 1.000 / 0.382, 1.000 / 2.250, 1.000 / 1.100,
@@ -186,9 +197,9 @@ TEST_F(CGtoPairsBlockTest, Split)
                                 0.000, -1.200, 0.000},
                                3, 22);
     
-    ASSERT_EQ(ppvec[0], CGtoPairsBlock(cpat00, ppat00, 1, 1, 1.0e-13));
+    ASSERT_EQ(ppvec[0], CGtoPairsBlock(cpat00, cfact00, ppat00, 1, 1, 1.0e-13));
     
-    ASSERT_EQ(ppvec[1], CGtoPairsBlock(cpat01, ppat01, 1, 1, 1.0e-13));
+    ASSERT_EQ(ppvec[1], CGtoPairsBlock(cpat01, cfact01, ppat01, 1, 1, 1.0e-13));
 }
 
 
@@ -217,6 +228,14 @@ TEST_F(CGtoPairsBlockTest, Pick)
     CMemBlock2D<int32_t> cpat02({ 0, 2, 5, 8, 11, 7, 10, 13}, 1, 8);
     
     CMemBlock2D<int32_t> cpat05({ 0, 1, 7, 10, 13, 7, 10, 13}, 1, 8);
+    
+    CMemBlock2D<double> cfact00({0.000, 0.000, 0.000}, 1, 3);
+    
+    CMemBlock2D<double> cfact01({0.000, 0.000, 0.000}, 1, 3);
+    
+    CMemBlock2D<double> cfact02({0.0000, 0.0000, 0.781076809730870}, 1, 3);
+    
+    CMemBlock2D<double> cfact05({0.000, 0.000, 1.200}, 1, 3);
     
     CMemBlock2D<double> ppat00({2.900, 1.750, 1.750, 0.600,
                                 1.000 / 2.900, 1.000 / 1.750, 1.000 / 1.750, 1.000 / 0.600,
@@ -315,13 +334,13 @@ TEST_F(CGtoPairsBlockTest, Pick)
                                  0.000},
                                 1, 22);
     
-    ASSERT_EQ(p0pair, CGtoPairsBlock(cpat00, ppat00, 1, 1, 1.0e-13));
+    ASSERT_EQ(p0pair, CGtoPairsBlock(cpat00, cfact00, ppat00, 1, 1, 1.0e-13));
     
-    ASSERT_EQ(p1pair, CGtoPairsBlock(cpat01, ppat01, 1, 1, 1.0e-13));
+    ASSERT_EQ(p1pair, CGtoPairsBlock(cpat01, cfact01, ppat01, 1, 1, 1.0e-13));
     
-    ASSERT_EQ(p2pair, CGtoPairsBlock(cpat02, ppat02, 1, 1, 1.0e-13));
+    ASSERT_EQ(p2pair, CGtoPairsBlock(cpat02, cfact02, ppat02, 1, 1, 1.0e-13));
    
-    ASSERT_EQ(p5pair, CGtoPairsBlock(cpat05, ppat05, 1, 1, 1.0e-13));
+    ASSERT_EQ(p5pair, CGtoPairsBlock(cpat05, cfact05, ppat05, 1, 1, 1.0e-13));
 }
 
 TEST_F(CGtoPairsBlockTest, Compress)
@@ -351,6 +370,11 @@ TEST_F(CGtoPairsBlockTest, Compress)
                                 9, 10, 10, 0, 0, 0,
                                12, 13, 13, 0, 0, 0},
                                 6, 8);
+    
+    CMemBlock2D<double> cfact({0.000, 0.000000000000000, 0.000, 0.000, 0.000, 0.0000,
+                               0.000, 0.000000000000000, 0.000, 0.000, 0.000, 0.0000,
+                               0.000, 0.781076809730870, 1.200, 0.000, 0.000, 0.000},
+                              6, 3);
     
     CMemBlock2D<double> ppat({ 1.532, 0.382, 2.250, 1.100, 1.600, 0.0000, 0.000,
                                0.000, 0.000, 0.000, 0.000,
@@ -405,7 +429,7 @@ TEST_F(CGtoPairsBlockTest, Compress)
                                0.000, 0.000, 0.000, 0.000},
                              11, 22);
     
-    ASSERT_EQ(bpairs, CGtoPairsBlock(cpat, ppat, 1, 1, 1.0e-13));
+    ASSERT_EQ(bpairs, CGtoPairsBlock(cpat, cfact, ppat, 1, 1, 1.0e-13));
     
     npp = bpairs.compress(apairs, scrpat, 3);
     
@@ -420,6 +444,11 @@ TEST_F(CGtoPairsBlockTest, Compress)
                                  9, 10, 0, 0, 0, 0,
                                 12, 13, 0, 0, 0, 0},
                               6, 8);
+    
+    CMemBlock2D<double> cfact0({0.000, 0.000000000000000, 0.000, 0.000, 0.000, 0.0000,
+                                0.000, 0.000000000000000, 0.000, 0.000, 0.000, 0.0000,
+                                0.000, 0.781076809730870, 0.000, 0.000, 0.000, 0.000},
+                               6, 3);
     
     CMemBlock2D<double> ppat0({ 1.532, 0.382, 2.250, 1.100, 0.000, 0.0000, 0.000,
                                 0.000, 0.000, 0.000, 0.000,
@@ -474,13 +503,13 @@ TEST_F(CGtoPairsBlockTest, Compress)
                                 0.000, 0.000, 0.000, 0.000},
                              11, 22);
     
-    ASSERT_EQ(bpairs, CGtoPairsBlock(cpat0, ppat0, 1, 1, 1.0e-13));
+    ASSERT_EQ(bpairs, CGtoPairsBlock(cpat0, cfact0,  ppat0, 1, 1, 1.0e-13));
     
     npp = bpairs.compress(apairs, scrpat, 5);
     
     ASSERT_EQ(npp, 2);
     
-    ASSERT_EQ(bpairs, CGtoPairsBlock(cpat0, ppat0, 1, 1, 1.0e-13));
+    ASSERT_EQ(bpairs, CGtoPairsBlock(cpat0, cfact0, ppat0, 1, 1, 1.0e-13));
 }
 
 TEST_F(CGtoPairsBlockTest, GetBraAngularMomentum)
@@ -931,6 +960,69 @@ TEST_F(CGtoPairsBlockTest, GetDistancesAB)
     ASSERT_EQ(apairs.getDistancesAB(), rab); 
 }
 
+TEST_F(CGtoPairsBlockTest, GetDistancesABWithNumberOfPairs)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    CMemBlock2D<double> rab(4, 3);
+    
+    apairs.getDistancesAB(rab, 4);
+    
+    CMemBlock2D<double> refab({0.0, 0.0,  0.0, 0.0,
+                               0.0, 0.0,  0.0, 0.0,
+                               0.0, 0.0, -1.2, 0.0},
+                               4, 3);
+    
+    ASSERT_EQ(refab, rab);
+}
+
+TEST_F(CGtoPairsBlockTest, GetEffectiveCoordinatesPX)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(6, 0.0), apairs.getEffectiveCoordinatesPX());
+}
+
+TEST_F(CGtoPairsBlockTest, GetEffectiveCoordinatesPY)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare(std::vector<double>(6, 0.0), apairs.getEffectiveCoordinatesPY());
+}
+
+TEST_F(CGtoPairsBlockTest, GetEffectiveCoordinatesPZ)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare({0.0000, 0.0000, 0.781076809730870, 0.0000,
+                     1.08843537414966, 1.2000},
+                     apairs.getEffectiveCoordinatesPZ());
+}
+
 TEST_F(CGtoPairsBlockTest, GetNumberOfOriginalPrimPairs)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
@@ -1033,6 +1125,70 @@ TEST_F(CGtoPairsBlockTest, GetNumberOfScreenedContrPairs)
     ASSERT_EQ(6, apairs.getNumberOfScreenedContrPairs());
     
     ASSERT_EQ(3, bpairs.getNumberOfScreenedContrPairs());
+}
+
+TEST_F(CGtoPairsBlockTest, GetBraMatrixPosition)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(0, apairs.getBraMatrixPosition(0));
+}
+
+TEST_F(CGtoPairsBlockTest, GetKetMatrixPosition)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(5, apairs.getKetMatrixPosition(0));
+    
+    ASSERT_EQ(8, apairs.getKetMatrixPosition(1));
+    
+    ASSERT_EQ(11, apairs.getKetMatrixPosition(2));
+}
+
+TEST_F(CGtoPairsBlockTest, GetNumberOfRowsInBraMatrix)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(5, apairs.getNumberOfRowsInBraMatrix());
+}
+
+TEST_F(CGtoPairsBlockTest, GetNumberOfRowsInKetMatrix)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
+    
+    ASSERT_EQ(3, apairs.getNumberOfRowsInKetMatrix());
 }
 
 TEST_F(CGtoPairsBlockTest, GetPairType)

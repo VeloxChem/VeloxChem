@@ -38,6 +38,68 @@ CSADGuessDriver::~CSADGuessDriver()
     
 }
 
+std::vector<double>
+CSADGuessDriver::_getOcc1s(double occ) const
+{
+    //                           1s
+    return std::vector<double>({ occ });
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc2s(double occ) const
+{
+    //                           1s   2s
+    return std::vector<double>({ 1.0, occ });
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc2s2p(double occ) const
+{
+    //                           1s   2s   2p-1 2p0  2p+1
+    return std::vector<double>({ 1.0, occ, occ, occ, occ });
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc3s(double occ) const
+{
+    //                           1s   2s   3s   2p-1 2p0  2p+1
+    return std::vector<double>({ 1.0, 1.0, occ, 1.0, 1.0, 1.0 });
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc3s3p(double occ) const
+{
+    //                           1s   2s   3s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
+    return std::vector<double>({ 1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ });
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc4s(double occ) const
+{
+    //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
+    return std::vector<double>({ 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 });
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc3d(double occ) const
+{
+    //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
+    return std::vector<double>({ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+
+    //                           3d-2 3d-1 3d0  3d+1 3d+2
+                                 occ, occ, occ, occ, occ });
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc4s4p(double occ) const
+{
+    //                           1s   2s   3s   4s   2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1
+    return std::vector<double>({ 1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ,
+
+    //                           3d-2 3d-1 3d0  3d+1 3d+2
+                                 1.0, 1.0, 1.0, 1.0, 1.0 });
+}
+
 std::vector< std::vector<double> >
 CSADGuessDriver::_buildQocc() const
 {
@@ -49,59 +111,91 @@ CSADGuessDriver::_buildQocc() const
 
     // H,He
 
-    //                                    1s
+    qocc.push_back(_getOcc1s(0.5));
 
-    qocc.push_back(std::vector<double> ({ 0.5 }));
-
-    qocc.push_back(std::vector<double> ({ 1.0 }));
+    qocc.push_back(_getOcc1s(1.0));
 
     // Li,Be
 
-    //                                    1s   2s
+    qocc.push_back(_getOcc2s(0.5));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 0.5 }));
-
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0 }));
+    qocc.push_back(_getOcc2s(1.0));
 
     // B,C,N,O,F,Ne
 
-    //                                    1s   2s     2p-1   2p0    2p+1
+    qocc.push_back(_getOcc2s2p(0.375));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 0.375, 0.375, 0.375, 0.375 }));
+    qocc.push_back(_getOcc2s2p(0.500));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 0.500, 0.500, 0.500, 0.500 }));
+    qocc.push_back(_getOcc2s2p(0.625));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 0.625, 0.625, 0.625, 0.625 }));
+    qocc.push_back(_getOcc2s2p(0.750));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 0.750, 0.750, 0.750, 0.750 }));
+    qocc.push_back(_getOcc2s2p(0.875));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 0.875, 0.875, 0.875, 0.875 }));
-
-    qocc.push_back(std::vector<double> ({ 1.0, 1.000, 1.000, 1.000, 1.000 }));
+    qocc.push_back(_getOcc2s2p(1.000));
 
     // Na,Mg
 
-    //                                    1s   2s   3s     2p-1 2p0  2p+1
+    qocc.push_back(_getOcc3s(0.5));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.500, 1.0, 1.0, 1.0 }));
-
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.000, 1.0, 1.0, 1.0 }));
+    qocc.push_back(_getOcc3s(1.0));
 
     // Al,Si,P,S,Cl,Ar
 
-    //                                    1s   2s   3s     2p-1 3p-1   2p0  3p0    2p+1 3p+1
+    qocc.push_back(_getOcc3s3p(0.375));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.375, 1.0, 0.375, 1.0, 0.375, 1.0, 0.375 }));
+    qocc.push_back(_getOcc3s3p(0.500));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.500, 1.0, 0.500, 1.0, 0.500, 1.0, 0.500 }));
+    qocc.push_back(_getOcc3s3p(0.625));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.625, 1.0, 0.625, 1.0, 0.625, 1.0, 0.625 }));
+    qocc.push_back(_getOcc3s3p(0.750));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.750, 1.0, 0.750, 1.0, 0.750, 1.0, 0.750 }));
+    qocc.push_back(_getOcc3s3p(0.875));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 0.875, 1.0, 0.875, 1.0, 0.875, 1.0, 0.875 }));
+    qocc.push_back(_getOcc3s3p(1.000));
 
-    qocc.push_back(std::vector<double> ({ 1.0, 1.0, 1.000, 1.0, 1.000, 1.0, 1.000, 1.0, 1.000 }));
+    // K,Ca
+
+    qocc.push_back(_getOcc4s(0.5));
+
+    qocc.push_back(_getOcc4s(1.0));
+
+    // Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn
+
+    qocc.push_back(_getOcc3d(0.1));
+
+    qocc.push_back(_getOcc3d(0.2));
+
+    qocc.push_back(_getOcc3d(0.3));
+
+    qocc.push_back(_getOcc3d(0.4));
+
+    qocc.push_back(_getOcc3d(0.5));
+
+    qocc.push_back(_getOcc3d(0.6));
+
+    qocc.push_back(_getOcc3d(0.7));
+
+    qocc.push_back(_getOcc3d(0.8));
+
+    qocc.push_back(_getOcc3d(0.9));
+
+    qocc.push_back(_getOcc3d(1.0));
+
+    // Ga,Ge,As,Se,Br,Kr
+
+    qocc.push_back(_getOcc4s4p(0.375));
+
+    qocc.push_back(_getOcc4s4p(0.500));
+
+    qocc.push_back(_getOcc4s4p(0.625));
+
+    qocc.push_back(_getOcc4s4p(0.750));
+
+    qocc.push_back(_getOcc4s4p(0.875));
+
+    qocc.push_back(_getOcc4s4p(1.000));
 
     return qocc;
 }
@@ -174,6 +268,8 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                                const COverlapMatrix&  S12,
                                const COverlapMatrix&  S22) const
 {
+    const bool closed_shell = (molecule.getMultiplicity() == 1);
+
     auto natoms = molecule.getNumberOfAtoms();
 
     auto nao_1 = S12.getNumberOfRows();
@@ -217,11 +313,29 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     auto qocc = _buildQocc();
 
+    // take care of electrons from net charge and/or multiplicity
+
+    double charge = molecule.getCharge();
+
+    double mult_1 = (double)(molecule.getMultiplicity() - 1);
+
+    double alpha_elec = 0.5 * (-charge + mult_1);
+
+    double beta_elec  = 0.5 * (-charge - mult_1);
+
+    alpha_elec /= (double)nao_1;
+
+    beta_elec  /= (double)nao_1;
+
     // C_SAD matrix
 
-    CDenseMatrix csad (nao_2, nao_1);
+    CDenseMatrix csad_alpha (nao_2, nao_1);
 
-    csad.zero();
+    CDenseMatrix csad_beta  (nao_2, nao_1);
+
+    csad_alpha.zero();
+
+    csad_beta.zero();
 
     #pragma omp parallel for schedule(dynamic)
     for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
@@ -323,15 +437,30 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         auto mat_c2 = denblas::multAB(block_22_inv, prod);
 
-        // update csad
+        // update csad_alpha
 
         for (int32_t j = 0; j < naodim_2; j++)
         {
             for (int32_t i = 0; i < naodim_1; i++)
             {
-                csad.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
+                csad_alpha.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
 
-                    mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i]);
+                    mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + alpha_elec);
+            }
+        }
+
+        // update csad_beta
+
+        if (! closed_shell)
+        {
+            for (int32_t j = 0; j < naodim_2; j++)
+            {
+                for (int32_t i = 0; i < naodim_1; i++)
+                {
+                    csad_beta.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
+
+                        mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + beta_elec);
+                }
             }
         }
     }
@@ -339,10 +468,21 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
     // D_SAD density matrix
 
     std::vector<CDenseMatrix> dsad;
-    
-    dsad.push_back(denblas::multABt(csad, csad));
 
-    return CAODensityMatrix(dsad, denmat::rest);
+    if (closed_shell)
+    {
+        dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
+
+        return CAODensityMatrix(dsad, denmat::rest);
+    }
+    else
+    {
+        dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
+
+        dsad.push_back(denblas::multABt(csad_beta,  csad_beta));
+
+        return CAODensityMatrix(dsad, denmat::unrest);
+    }
 }
 
 void

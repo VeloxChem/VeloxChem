@@ -171,6 +171,13 @@ public:
     std::vector<CBasisFunction> getBasisFunctions(const int32_t angularMomentum) const;
 
     /**
+     Reduces atom basis set to valence atom basis
+
+     @return the valence atom basis.
+     */
+    CAtomBasis reduceToValenceBasis() const;
+    
+    /**
      Broadcasts atom basis object within domain of MPI communicator.
      
      @param rank the rank of MPI process.

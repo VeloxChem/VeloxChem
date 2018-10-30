@@ -20,10 +20,18 @@ CAtomBasis getAtomBasisEmpty();
 CAtomBasis getAtomBasisForH();
 
 CAtomBasis getAtomBasisForLi();
+    
+CAtomBasis getAtomBasisForLiX();
 
 CAtomBasis getNormalizedAtomBasisForH();
 
+CAtomBasis getNormalizedAtomBasisForHe();
+    
+CAtomBasis getAtomBasisSPDForHe();
+
 CAtomBasis getNormalizedAtomBasisForO();
+
+CAtomBasis getNormalizedAtomBasisForSe();
 
 CAtomBasis getMinimalBasisForH();
 

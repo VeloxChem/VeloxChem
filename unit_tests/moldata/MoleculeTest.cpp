@@ -194,6 +194,14 @@ TEST_F(CMoleculeTest, GetMinDistances)
     ASSERT_EQ(mdist, mol.getMinDistances());
 }
 
+TEST_F(CMoleculeTest, GetNuclearRepulsionEnergy)
+{
+    CMolecule mol = vlxmol::getMoleculeH2O();
+    
+    ASSERT_NEAR(9.34363815797054450919, mol.getNuclearRepulsionEnergy(),
+                1.0e-13);
+}
+
 TEST_F(CMoleculeTest, GetSubMolecule)
 {
     CMolecule empty_molecule;

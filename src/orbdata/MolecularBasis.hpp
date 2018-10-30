@@ -21,7 +21,7 @@
 
 /**
 Class CMolecularBasis stores data about molecular basis set and provides set of
-methods for handling of moelcular basis set data.
+methods for handling of molecular basis set data.
 
 @author Z. Rinkevicius
 */
@@ -105,13 +105,6 @@ public:
      */
     void setMaxAngularMomentum(const int32_t maxAngularMomentum);
 
-    // void setLabel(const std::string& label):
-    //
-    // Sets name of molecular basis.
-    //
-    // Input:
-    // label (std::string&) - the name of molecular basis.
-
     /**
      Sets name of molecular basis.
 
@@ -125,6 +118,13 @@ public:
      @param atomBasis the atom basis object.
      */
     void addAtomBasis(const CAtomBasis& atomBasis);
+    
+    /**
+     Reduces molecular basis to valence molecular basis.
+
+     @return the valence molecular basis.
+     */
+    CMolecularBasis reduceToValenceBasis() const;
 
     /**
      Gets maximum angular momentum of molecular basis.

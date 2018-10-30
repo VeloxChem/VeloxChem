@@ -14,7 +14,6 @@
 
 #include "MpiFunc.hpp"
 #include "ErrorHandler.hpp"
-
 #include "ExportGeneral.hpp"
 
 namespace bp = boost::python;
@@ -24,6 +23,7 @@ namespace np = boost::python::numpy;
 namespace bp_general { // bp_general namespace
 
 // Gets MPI_Comm pointer from a boost python communicator object
+// Not a static function; used in other files
 
 MPI_Comm*
 get_mpi_comm(bp::object py_comm)
@@ -38,6 +38,7 @@ get_mpi_comm(bp::object py_comm)
 }
 
 // Gets numpy array from double pointer and dimensions
+// Not a static function; used in other files
 
 np::ndarray
 pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns)

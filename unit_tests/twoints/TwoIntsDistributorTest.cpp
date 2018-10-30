@@ -11,6 +11,8 @@
 #include "TwoIntsDistributor.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
+#include "AODensityMatrix.hpp"
+#include "AOFockMatrix.hpp"
 
 TEST_F(CTwoIntsDistributionTest, DefaultConstructor)
 {

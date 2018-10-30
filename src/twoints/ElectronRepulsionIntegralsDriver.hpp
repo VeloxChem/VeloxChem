@@ -13,6 +13,12 @@
 
 #include "mpi.h"
 
+#ifdef MAC_OS_OMP
+#include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
+#else
+#include "omp.h"
+#endif
+
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "OutputStream.hpp"
@@ -24,6 +30,8 @@
 #include "TwoIntsDistributor.hpp"
 #include "ScreeningContainer.hpp"
 #include "VecMemBlocks.hpp"
+#include "AODensityMatrix.hpp"
+#include "AOFockMatrix.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -67,7 +75,7 @@ class CElectronRepulsionIntegralsDriver
      @param braGtoPairsBlock the GTOs pairsblock on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      */
-    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution*   distPattern,
+    void _compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution&   distPattern,
                                                  const CCauchySchwarzScreener& intsScreener,
                                                  const CGtoPairsBlock&         braGtoPairsBlock,
                                                  const CGtoPairsBlock&         ketGtoPairsBlock) const;
@@ -239,6 +247,17 @@ class CElectronRepulsionIntegralsDriver
                             COutputStream& oStream) const;
     
     /**
+     Prints timing statistics for evaluation of AO Fock matrix.
+     
+     @param fockMatrix the AO Fock matrix.
+     @param timer the timer.
+     @param oStream the output stream.
+     */
+    void _printFockTiming(const CAOFockMatrix& fockMatrix,
+                          const CSystemClock&  timer,
+                                COutputStream& oStream) const;
+    
+    /**
      Prints timing statistics for evaluation of Q values.
      
      @param molecule the molecule.
@@ -250,13 +269,20 @@ class CElectronRepulsionIntegralsDriver
                                    COutputStream& oStream) const;
     
     /**
-     Comutes electron repulsion integrals for two GTOs pairs containers.
+     Comutes electron repulsion integrals and stores them into AO Fock matrix
+     for two GTOs pairs containers.
      
+     @param aoFockMatrix the AO Fock matrix.
+     @param aoDensityMatrix the AO density matrix.
      @param braGtoPairsContainer the GTOs pairs container on bra side.
      @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     @param screeningContainer the screening container object. 
      */
-    void _compElectronRepulsionIntegrals(const CGtoPairsContainer* braGtoPairsContainer,
-                                         const CGtoPairsContainer* ketGtoPairsContainer) const;
+    void _compElectronRepulsionIntegrals(      CAOFockMatrix&       aoFockMatrix,
+                                         const CAODensityMatrix&    aoDensityMatrix,
+                                         const CGtoPairsContainer*  braGtoPairsContainer,
+                                         const CGtoPairsContainer*  ketGtoPairsContainer,
+                                         const CScreeningContainer* screeningContainer) const;
 
     /**
      Comutes maximum Q values of electron repulsion integrals for GTOs pairs
@@ -295,20 +321,24 @@ public:
     ~CElectronRepulsionIntegralsDriver();
     
     /**
-     Computes electron repulsion integrals for molecule with specific AO basis
-     set and process results according to provided distribution function.
+     Computes electron repulsion integrals and stores them in AO Fock matrix
+     for molecule with specific AO basis set.
      
+     @param aoFockMatrix the AO Fock matrix.
+     @param aoDensityMatrix the AO density matrix.
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
-     @param threshold the integrals cut-off threshold.
+     @param screeningContainer the screening container object.
      @param oStream the output stream.
      @param comm the MPI communicator.
      */
-    void compute(const CMolecule&       molecule,
-                 const CMolecularBasis& aoBasis,
-                 const double           threshold,
-                       COutputStream&   oStream,
-                       MPI_Comm         comm) const;
+    void compute(      CAOFockMatrix&       aoFockMatrix,
+                 const CAODensityMatrix&    aoDensityMatrix,
+                 const CMolecule&           molecule,
+                 const CMolecularBasis&     aoBasis,
+                 const CScreeningContainer& screeningContainer,
+                       COutputStream&       oStream,
+                       MPI_Comm             comm) const;
     
     /**
      Computes Q values for electron repulsion integrals for molecule with

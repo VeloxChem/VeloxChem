@@ -201,3 +201,86 @@ TEST_F(CScreeningContainerTest, IsEmpty)
     
     ASSERT_TRUE(qscrb.isEmpty());
 }
+
+TEST_F(CScreeningContainerTest, GetNumberOfScreeners)
+{
+    auto mlih = vlxmol::getTestLiH();
+    
+    auto mbas = vlxbas::getTestBasisForLiH();
+    
+    CGtoBlock bgtos(mlih, mbas, 0);
+    
+    CGtoBlock kgtos(mlih, mbas, 1);
+    
+    CGtoPairsBlock bpairs(bgtos, kgtos, 1.0e-13);
+    
+    CGtoPairsBlock kpairs(bgtos, 1.0e-13);
+    
+    CMemBlock<double> bqvals({1.0, 2.0, 3.0, 4.0});
+    
+    CMemBlock<double> kqvals({0.0, 1.0, 2.0, 7.0, 7.0, 2.0});
+    
+    CVecMemBlock<double> bqvec{bqvals, kqvals};
+    
+    CVecMemBlock<double> kqvec{kqvals, kqvals};
+    
+    CGtoPairsContainer bppcont({bpairs, kpairs});
+    
+    CGtoPairsContainer kppcont({kpairs, kpairs});
+    
+    CScreeningContainer qscra(bqvec, kqvec, bppcont, kppcont, ericut::qq,
+                              1.0e-13);
+    
+    CScreeningContainer qscrb(bqvec, bqvec, bppcont, bppcont, ericut::qq,
+                              1.0e-13);
+    
+    ASSERT_EQ(qscra.getNumberOfScreeners(), 4);
+    
+    ASSERT_EQ(qscrb.getNumberOfScreeners(), 3);
+}
+
+TEST_F(CScreeningContainerTest, GetScreener)
+{
+    auto mlih = vlxmol::getTestLiH();
+    
+    auto mbas = vlxbas::getTestBasisForLiH();
+    
+    CGtoBlock bgtos(mlih, mbas, 0);
+    
+    CGtoBlock kgtos(mlih, mbas, 1);
+    
+    CGtoPairsBlock bpairs(bgtos, kgtos, 1.0e-13);
+    
+    CGtoPairsBlock kpairs(bgtos, 1.0e-13);
+    
+    CMemBlock<double> bqvals({1.0, 2.0, 3.0, 4.0});
+    
+    CMemBlock<double> kqvals({0.0, 1.0, 2.0, 7.0, 7.0, 2.0});
+    
+    CVecMemBlock<double> bqvec{bqvals, kqvals};
+    
+    CVecMemBlock<double> kqvec{kqvals, kqvals};
+    
+    CGtoPairsContainer bppcont({bpairs, kpairs});
+    
+    CGtoPairsContainer kppcont({kpairs, kpairs});
+    
+    CScreeningContainer qscra(bqvec, kqvec, bppcont, kppcont, ericut::qq,
+                              1.0e-13);
+    
+    CCauchySchwarzScreener qq0dat(bqvals, kqvals, bpairs, kpairs, ericut::qq,
+                                  1.0e-13);
+    
+    ASSERT_EQ(qscra.getScreener(0), qq0dat);
+    
+    ASSERT_EQ(qscra.getScreener(1), qq0dat);
+    
+    CCauchySchwarzScreener qq2dat(kqvals, kqvals, kpairs, kpairs, ericut::qq,
+                                  1.0e-13);
+    
+    ASSERT_EQ(qscra.getScreener(2), qq2dat);
+    
+    ASSERT_EQ(qscra.getScreener(3), qq2dat);
+    
+    ASSERT_EQ(qscra.getScreener(4), CCauchySchwarzScreener());
+}

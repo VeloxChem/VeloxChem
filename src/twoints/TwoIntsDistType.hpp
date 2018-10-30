@@ -16,15 +16,13 @@
  
  Defines supported two electron integrals distribution keys:
  dist2e::batch   - the batch with natural order of data
- dist2e::rfock   - the restricted Fock matrix for Hatree-Fock method
- dist2e::ufock   - the unrestricted Fock matrix for Hatree-Fock method
+ dist2e::fock    - the Fock matrix
  dist2e::qvalues - the Q values vectors for bra and ket sides
  */
 enum class dist2e
 {
     batch,
-    rfock,
-    ufock,
+    fock,
     qvalues 
 };
 
@@ -41,14 +39,9 @@ inline std::string to_string(const dist2e distPattern)
         return std::string("Raw Integrals Batch");
     }
     
-    if (distPattern == dist2e::rfock)
+    if (distPattern == dist2e::fock)
     {
-        return std::string("Restricted Fock Matrix");
-    }
-    
-    if (distPattern == dist2e::ufock)
-    {
-        return std::string("Unrestricted Fock Matrix");
+        return std::string("Fock Matrix");
     }
     
     if (distPattern == dist2e::qvalues)

@@ -133,6 +133,16 @@ TEST_F(CGtoPairsContainerTest, Split)
                                  12, 13, 13},
                                 3, 8);
     
+    CMemBlock2D<double> cfact00({0.0000, 0.0000, 0.000000000000000,
+                                 0.0000, 0.0000, 0.000000000000000,
+                                 0.0000, 0.0000, 0.781076809730870},
+                                3, 3);
+    
+    CMemBlock2D<double> cfact01({0.0000, 0.00000000000000, 0.0000,
+                                 0.0000, 0.00000000000000, 0.0000,
+                                 0.0000, 1.08843537414966, 1.2000},
+                                3, 3);
+    
     CMemBlock2D<double> ppat00({2.900, 1.750, 1.750, 0.600, 1.532, 0.382, 2.250, 1.100,
                                 1.000 / 2.900, 1.000 / 1.750, 1.000 / 1.750, 1.000 / 0.600,
                                 1.000 / 1.532, 1.000 / 0.382, 1.000 / 2.250, 1.000 / 1.100,
@@ -188,9 +198,9 @@ TEST_F(CGtoPairsContainerTest, Split)
                                 0.000, -1.200, 0.000},
                                3, 22);
     
-    auto pp0 = CGtoPairsBlock(cpat00, ppat00, 1, 1, 1.0e-13);
+    auto pp0 = CGtoPairsBlock(cpat00, cfact00, ppat00, 1, 1, 1.0e-13);
     
-    auto pp1 = CGtoPairsBlock(cpat01, ppat01, 1, 1, 1.0e-13);
+    auto pp1 = CGtoPairsBlock(cpat01, cfact01, ppat01, 1, 1, 1.0e-13);
     
     ASSERT_EQ(bcont, CGtoPairsContainer({pp0, pp1}));
     

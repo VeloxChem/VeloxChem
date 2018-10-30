@@ -24,7 +24,7 @@
 #include "ThreeCenterElectronRepulsionIntegralsDriver.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
 #include "SADGuessDriver.hpp"
-
+#include "AOFockMatrix.hpp"
 #include "MemBlock2D.hpp"
 
 CSinglePointEnergy::CSinglePointEnergy(const int32_t  globRank,
@@ -229,10 +229,22 @@ CSinglePointEnergy::run(COutputStream& oStream,
     
     //CGtoPairsBlock kpairs(sgtos, pgtos, 1.0e-13);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-8, _molecule, _aoBasis,
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, _molecule, _aoBasis,
                                  oStream, comm);
 
-    eridrv.compute(_molecule, _aoBasis, 1.0e-13, oStream, comm);
+    CAOFockMatrix fock(dsad);
+    
+    eridrv.compute(fock, dsad, _molecule, _aoBasis, qqdata, oStream, comm);
+    
+    //fock.addCoreHamiltonian(kinmat, npotmat, 0);
+    
+    //std::cout << kinmat.getString();
+    
+    //std::cout << npotmat.getString();
+    
+    //std::cout << dsad.getString();
+    
+    //std::cout << fock.getString();
 }
 
 void

@@ -118,6 +118,21 @@ public:
     bool isEmpty() const;
     
     /**
+     Gets number of screener object in screening container.
+
+     @return the number of screener object. 
+     */
+    int32_t getNumberOfScreeners() const;
+    
+    /**
+     Gets specific screener object from  screening container.
+
+     @param iScreener the index of screener object.
+     @return the screener object. 
+     */
+    CCauchySchwarzScreener getScreener(const int32_t iScreener) const;
+    
+    /**
      Converts screening container object to text output and insert it into
      output text stream.
      

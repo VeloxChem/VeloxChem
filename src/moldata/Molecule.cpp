@@ -483,6 +483,45 @@ CMolecule::getMinDistances() const
     return mdists;
 }
 
+double
+CMolecule::getNuclearRepulsionEnergy() const
+{
+    // set up pointers to atomic coordinates anf charges
+    
+    auto coordx = getCoordinatesX();
+    
+    auto coordy = getCoordinatesY();
+    
+    auto coordz = getCoordinatesZ();
+    
+    // loop over atoms
+    
+    double enuc = 0;
+    
+    auto natoms = getNumberOfAtoms();
+    
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        auto rax = coordx[i];
+        
+        auto ray = coordy[i];
+        
+        auto raz = coordz[i];
+       
+        auto zea = _atomCharges.at(i);
+        
+        for (int32_t j = i + 1; j < natoms; j++)
+        {
+            auto rab = mathfunc::distance(rax, ray, raz, coordx[j], coordy[j],
+                                          coordz[j]);
+            
+            enuc += zea * _atomCharges.at(j) / rab;
+        }
+    }
+    
+    return enuc;
+}
+
 void
 CMolecule::printGeometry(COutputStream& oStream) const
 {

@@ -17,7 +17,15 @@ CMolecularBasis getMolecularBasisEmpty();
 
 CMolecularBasis getMolecularBasisForLiH();
     
+CMolecularBasis getMolecularBasisForLiHX();
+    
+CMolecularBasis getMolecularBasisForHeAtom();
+    
+CMolecularBasis getMolecularBasisSPDForHeAtom();
+
 CMolecularBasis getMolecularBasisForH2O();
+
+CMolecularBasis getMolecularBasisForH2Se();
 
 CMolecularBasis getMinimalBasisForH2O();
 

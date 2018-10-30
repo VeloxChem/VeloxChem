@@ -46,15 +46,17 @@ CCauchySchwarzScreener::CCauchySchwarzScreener(const CMemBlock<double>& braQValu
 
     , _threshold(threshold)
 {
-    // FIX ME: Add stuff here...
+    // compute GTOs pairs entents for QQR screening scheme
     
     if (_screeningScheme == ericut::qqr)
     {
         _braPairExtends = CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedContrPairs());
         
+        _setPairsExtents(_braPairExtends, braGtoPairsBlock);
+        
         _ketPairExtends = CMemBlock<double>(ketGtoPairsBlock.getNumberOfScreenedContrPairs());
         
-        // TODO: add computation of extends....
+        _setPairsExtents(_ketPairExtends, ketGtoPairsBlock);
     }
 }
 
@@ -205,12 +207,13 @@ CCauchySchwarzScreener::isEmpty() const
 
 void
 CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                                           const CMemBlock<double>&  pqDistances,
                                            const bool                isBraEqualKet,
                                            const int32_t             iContrPair) const
 {
-    // all GTOs pairs are screened
+    // initialize vector
     
-    qqVector.zero();
+    mathfunc::set_to(qqVector.data(), 1, qqVector.size());
     
     // set up pointer to screening vector
     
@@ -234,7 +237,7 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
         
         for (int32_t i = 0; i < kdim; i++)
         {
-            if ((fbq * kqvals[i]) >= _threshold) qqvec[i] = 1;
+            if ((fbq * kqvals[i]) < _threshold) qqvec[i] = 0;
         }
     }
     
@@ -242,7 +245,95 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
     
     if (_screeningScheme == ericut::qqr)
     {
-        // FIX ME: Add QQR screening scheme
+        // set up pointer to effective PQ distances
+        
+        auto rpq = pqDistances.data();
+        
+        // set up pointer to GTOs pairs extents on ket side
+        
+        auto kext = _braPairExtends.data();
+        
+        // data for bra side
+        
+        auto bext = _braPairExtends.at(iContrPair);
+        
+        auto fbq  = _braQValues.at(iContrPair);
+    
+        for (int32_t i = 0; i < kdim; i++)
+        {
+            auto r = rpq[i] - bext - kext[i];
+            
+            double fact = (r > 1.0) ? 1.0 / r : 1.0;
+            
+            if ((fbq * kqvals[i] * fact) < _threshold) qqvec[i] = 0;
+        }
+    }
+}
+
+void
+CCauchySchwarzScreener::_setPairsExtents(      CMemBlock<double>& gtoPairExtents,
+                                         const CGtoPairsBlock&    gtoPairsBlock)
+{
+    // threshold scaling factor
+    
+    auto ferf = 1.0 / std::erfc(_threshold);
+    
+    // set up dimensions of GTOs pairs vector
+    
+    auto ndim = gtoPairsBlock.getNumberOfScreenedContrPairs();
+    
+    // set up pointers to 1 / (e_a + e_b) factors
+    
+    auto foxi = gtoPairsBlock.getFactorsOneOverXi();
+    
+    // set up pointers to coordinates of primitive P center
+    
+    auto rpx = gtoPairsBlock.getCoordinatesPX();
+    
+    auto rpy = gtoPairsBlock.getCoordinatesPY();
+    
+    auto rpz = gtoPairsBlock.getCoordinatesPZ();
+    
+    // set up pointers to coordinates of effective centers
+    
+    auto repx = gtoPairsBlock.getEffectiveCoordinatesPX();
+    
+    auto repy = gtoPairsBlock.getEffectiveCoordinatesPY();
+    
+    auto repz = gtoPairsBlock.getEffectiveCoordinatesPZ();
+    
+    // set pointers to start and end position in primitive GTOs pairs vector
+    
+    auto spos = gtoPairsBlock.getStartPositions();
+    
+    auto epos = gtoPairsBlock.getEndPositions();
+    
+    // loop over GTOs pairs
+    
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        double rext = 0.0;
+
+        for (int32_t j = spos[i]; j < epos[i]; j++)
+        {
+            // distances R(P_eff - P) = P_eff - P
+            
+            auto dpx = repx[i] - rpx[j];
+            
+            auto dpy = repy[i] - rpy[j];
+            
+            auto dpz = repz[i] - rpz[j];
+            
+            // primitive extent
+            
+            auto pext = std::sqrt(dpx * dpx +  dpy * dpy + dpz * dpz)
+            
+                      + std::sqrt(2.0 * foxi[j]) * ferf;
+            
+            if (pext > rext) rext = pext;
+        }
+        
+        gtoPairExtents.at(i) = rext;
     }
 }
 

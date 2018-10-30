@@ -37,6 +37,44 @@ getMolecularBasisForLiH()
 }
 
 CMolecularBasis
+getMolecularBasisForLiHX()
+{
+    CMolecularBasis mbas;
+        
+    mbas.setLabel({"def2-SVP-X"});
+        
+    mbas.addAtomBasis(getAtomBasisForLiX());
+        
+    mbas.addAtomBasis(getAtomBasisForH());
+        
+    return mbas;
+}
+
+CMolecularBasis
+getMolecularBasisForHeAtom()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"def2-SVP"});
+
+    mbas.addAtomBasis(getNormalizedAtomBasisForHe());
+
+    return mbas;
+}
+    
+CMolecularBasis
+getMolecularBasisSPDForHeAtom()
+{
+    CMolecularBasis mbas;
+        
+    mbas.setLabel({"XTEST-SPD"});
+        
+    mbas.addAtomBasis(getAtomBasisSPDForHe());
+        
+    return mbas;
+}
+
+CMolecularBasis
 getMolecularBasisForH2O()
 {
     CMolecularBasis mbas;
@@ -49,7 +87,21 @@ getMolecularBasisForH2O()
 
     return mbas;
 }
-    
+
+CMolecularBasis
+getMolecularBasisForH2Se()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"def2-SVP"});
+
+    mbas.addAtomBasis(getNormalizedAtomBasisForSe());
+
+    mbas.addAtomBasis(getNormalizedAtomBasisForH());
+
+    return mbas;
+}
+
 CMolecularBasis
 getMinimalBasisForH2O()
 {

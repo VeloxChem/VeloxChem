@@ -40,6 +40,11 @@ class CGtoPairsBlock
     CMemBlock2D<int32_t> _contrPattern;
     
     /**
+     The contracted Gaussian function pair factors data (effective P coordinates).
+     */
+    CMemBlock2D<double> _contrFactors;
+    
+    /**
      The primitives Gaussian function pair factors data (overlap, P coordinates,
      PA and PB distances, etc).
      */
@@ -83,13 +88,16 @@ public:
      @param contrPattern the contraction pattern (contracted basis functions
             start/end position in primitive Gaussian functions
             vector, basis functions indexes).
-     @param pairFactors the various pair factors (overlap, P coordinates,
-            PA and PB distances, etc)
+     @param contrFactors the various contracted pair factors (effective P
+            coordintes)
+     @param pairFactors the various primitive pair factors (overlap,
+            P coordinates, PA and PB distances, etc)
      @param braAngularMomentum the angular momentum on bra side.
      @param ketAngularMomentum the angular momentum on ket side.
      @param threshold the primitive pairs screening threshold.
      */
     CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
+                   const CMemBlock2D<double>&  contrFactors,
                    const CMemBlock2D<double>&  pairFactors,
                    const int32_t               braAngularMomentum,
                    const int32_t               ketAngularMomentum,
@@ -427,6 +435,40 @@ public:
     CMemBlock2D<double> getDistancesAB() const;
     
     /**
+     Gets vector with Cartesian R(AB) = A - B distances for specific set of
+     contracted GTOs pairs.
+
+     @param abDistances the vector of Cartesian distances.
+     @param nContrPairs the number of contracted pairs. 
+     */
+    void getDistancesAB(      CMemBlock2D<double>& abDistances,
+                        const int32_t              nContrPairs) const;
+    
+    /**
+     Gets contants vector to Cartesian X coordinates of effective P center of
+     contracted GTOs pairs.
+
+     @return the vector of effective PX coordinates.
+     */
+    const double* getEffectiveCoordinatesPX() const;
+    
+    /**
+     Gets contants vector to Cartesian Y coordinates of effective P center of
+     contracted GTOs pairs.
+     
+     @return the vector of effective PY coordinates.
+     */
+    const double* getEffectiveCoordinatesPY() const;
+    
+    /**
+     Gets contants vector to Cartesian Z coordinates of effective P center of
+     contracted GTOs pairs.
+     
+     @return the vector of effective PZ coordinates.
+     */
+    const double* getEffectiveCoordinatesPZ() const;
+    
+    /**
      Gets number of initial primitive pairs generated from input data.
 
      @return the number of primitive pairs.
@@ -468,6 +510,38 @@ public:
      @return the number of contracted pairs.
      */
     int32_t getNumberOfScreenedContrPairs() const;
+    
+    /**
+     Gets starting position of submatrix along bra side of full matrix for
+     specific angular component of bra angular momentum.
+
+     @param iComponent the angular momentum component.
+     @return the starting position of submatrix.
+     */
+    int32_t getBraMatrixPosition(const int32_t iComponent) const;
+    
+    /**
+     Gets starting position of submatrix along ket side of full matrix for
+     specific angular component of ket angular momentum.
+     
+     @param iComponent the angular momentum component.
+     @return the starting position of submatrix.
+     */
+    int32_t getKetMatrixPosition(const int32_t iComponent) const;
+    
+    /**
+     Gets number of rows in submatrix along bra side of full matrix.
+     
+     @return the number of rows in submatrix.
+     */
+    int32_t getNumberOfRowsInBraMatrix() const;
+    
+    /**
+     Gets number of rows in submatrix along ket side of full matrix.
+     
+     @return the number of rows in submatrix.
+     */
+    int32_t getNumberOfRowsInKetMatrix() const;
     
     /**
      Gets pair type string for GTOs pairs object.

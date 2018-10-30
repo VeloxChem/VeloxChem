@@ -9,7 +9,11 @@
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
 
+#ifdef ENABLE_MKL
 #include "mkl.h"
+#else
+#include "cblas.h"
+#endif
 
 namespace denblas { // denblas namespace
     

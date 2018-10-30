@@ -73,6 +73,17 @@ getAtomBasisForLi()
 
     return bas;
 }
+    
+CAtomBasis
+getAtomBasisForLiX()
+{
+    CAtomBasis bas = vlxbas::getAtomBasisForLi();
+    
+    bas.addBasisFunction(CBasisFunction({3.000000000000e-02},
+                                        {1.000000000000e+00}, 0));
+    
+    return bas;
+}
 
 CAtomBasis
 getNormalizedAtomBasisForH()
@@ -95,6 +106,69 @@ getNormalizedAtomBasisForH()
 
     bf.push_back(CBasisFunction ({8.000000000000e-01},
                                  {1.000000000000e+00}, 1));
+
+    for (size_t i = 0; i < bf.size(); i++)
+    {
+        bf[i].normalize();
+
+        bas.addBasisFunction(bf[i]);
+    }
+
+    return bas;
+}
+
+CAtomBasis
+getNormalizedAtomBasisForHe()
+{
+    CAtomBasis bas;
+
+    bas.setIdElemental(2);
+
+    std::vector<CBasisFunction> bf;
+
+    bf.push_back(CBasisFunction({3.835493673700e+01,
+                                 5.768908147900e+00,
+                                 1.239940703500e+00},
+                                {2.381428890500e-02,
+                                 1.549090677700e-01,
+                                 4.699809663300e-01}, 0));
+
+    bf.push_back(CBasisFunction({2.975781595300e-01},
+                                {1.000000000000e+00}, 0));
+
+    bf.push_back(CBasisFunction({1.000000000000e+00},
+                                {1.000000000000e+00}, 1));
+
+    for (size_t i = 0; i < bf.size(); i++)
+    {
+        bf[i].normalize();
+
+        bas.addBasisFunction(bf[i]);
+    }
+
+    return bas;
+}
+    
+CAtomBasis
+getAtomBasisSPDForHe()
+{
+    CAtomBasis bas;
+
+    bas.setIdElemental(2);
+
+    std::vector<CBasisFunction> bf;
+
+    bf.push_back(CBasisFunction({2.2000000000000000},
+                                {1.0000000000000000},
+                                0));
+    
+    bf.push_back(CBasisFunction({1.3000000000000000},
+                                {1.0000000000000000},
+                                1));
+    
+    bf.push_back(CBasisFunction({0.8000000000000000},
+                                {1.0000000000000000},
+                                2));
 
     for (size_t i = 0; i < bf.size(); i++)
     {
@@ -143,6 +217,77 @@ getNormalizedAtomBasisForO()
                                  { 1.000000000000e+00}, 1));
                        
     bf.push_back(CBasisFunction ({ 1.200000000000e+00},
+                                 { 1.000000000000e+00}, 2));
+
+    for (size_t i = 0; i < bf.size(); i++)
+    {
+        bf[i].normalize();
+
+        bas.addBasisFunction(bf[i]);
+    }
+
+    return bas;
+}
+
+CAtomBasis
+getNormalizedAtomBasisForSe()
+{
+    CAtomBasis bas;
+
+    bas.setIdElemental(34);
+
+    std::vector<CBasisFunction> bf;
+
+    bf.push_back(CBasisFunction ({ 1.066122002700e+05, 1.600760470100e+04,
+                                   3.642169970700e+03, 1.028591299300e+03,
+                                   3.353029888800e+02, 1.158012915400e+02},
+                                 { 1.427488911300e-03, 1.094352511400e-02,
+                                   5.437417159600e-02, 1.901809294700e-01,
+                                   3.891302169600e-01, 3.062020708800e-01}, 0));
+
+    bf.push_back(CBasisFunction ({ 2.229332502000e+02, 2.672625793400e+01,
+                                   1.112450192300e+01},
+                                 {-1.119880800900e-01, 6.475212420700e-01,
+                                   4.424197665100e-01}, 0));
+
+    bf.push_back(CBasisFunction ({ 1.988852006100e+01, 3.366847380300e+00,
+                                   1.524927783900e+00},
+                                 {-2.285722776200e-01, 7.359135995100e-01,
+                                   4.433019957700e-01}, 0));
+
+    bf.push_back(CBasisFunction ({ 2.963003791200e-01},
+                                 { 1.000000000000e+00}, 0));
+
+    bf.push_back(CBasisFunction ({ 1.100928897400e-01},
+                                 { 1.000000000000e+00}, 0));
+
+    bf.push_back(CBasisFunction ({ 1.455906812000e+03, 3.437510183100e+02,
+                                   1.092955496400e+02, 3.970771102200e+01,
+                                   1.495018523200e+01},
+                                 { 8.820359704300e-03, 6.687585196700e-02,
+                                   2.664057808000e-01, 5.383492842200e-01,
+                                   3.630328199300e-01}, 1));
+
+    bf.push_back(CBasisFunction ({ 8.020896209400e+00, 3.293464975600e+00,
+                                   1.405860243800e+00},
+                                 { 3.415380702500e-01, 5.725790658300e-01,
+                                   2.554981322200e-01}, 1));
+
+    bf.push_back(CBasisFunction ({ 4.507612322600e-01},
+                                 { 1.000000000000e+00}, 1));
+
+    bf.push_back(CBasisFunction ({ 1.335341332500e-01},
+                                 { 1.000000000000e+00}, 1));
+
+    bf.push_back(CBasisFunction ({ 9.449402404400e+01, 2.718818526000e+01,
+                                   9.509156735200e+00, 3.417051685300e+00},
+                                 { 2.349010109800e-02, 1.374773576700e-01,
+                                   3.664992912400e-01, 4.875098988400e-01}, 2));
+
+    bf.push_back(CBasisFunction ({ 1.147959008300e+00},
+                                 { 1.000000000000e+00}, 2));
+
+    bf.push_back(CBasisFunction ({ 3.380000000000e-01},
                                  { 1.000000000000e+00}, 2));
 
     for (size_t i = 0; i < bf.size(); i++)

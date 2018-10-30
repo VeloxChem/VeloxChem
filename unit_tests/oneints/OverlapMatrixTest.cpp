@@ -108,3 +108,31 @@ TEST_F(COverlapMatrixTest, Values)
     
     vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, smata.values());
 }
+
+TEST_F(COverlapMatrixTest, GetOrthogonalizationMatrix)
+{
+    COutputStream ost(std::string("dummy.out"));
+    
+    CDenseMatrix ma({10.0, 3.0, 4.0,
+                     3.0, 1.2, 1.0,
+                     4.0, 1.0, 4.0},
+                     3, 3);
+    
+    COverlapMatrix smata(ma);
+    
+    CDenseMatrix refmat({ 0.5227351824567613, -0.4976329506165474, -0.1947637155486871,
+                         -0.4976329506165478,  1.8097622833751084,  0.0808312367804720,
+                         -0.1947637155486870,  0.0808312367804720,  0.6298490905403010},
+                        3, 3);
+    
+    ASSERT_EQ(refmat, smata.getOrthogonalizationMatrix(0.0, ost));
+    
+    CDenseMatrix submat({ -0.4976329506165474, -0.1947637155486871,
+                           1.8097622833751084,  0.0808312367804720,
+                           0.0808312367804720,  0.6298490905403010},
+                        3, 2);
+    
+    ASSERT_EQ(submat, smata.getOrthogonalizationMatrix(0.5, ost));
+}
+
+

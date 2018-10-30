@@ -14,6 +14,9 @@
 #include "TwoIntsDistType.hpp"
 #include "MemBlock2D.hpp"
 #include "GtoPairsBlock.hpp"
+#include "AODensityMatrix.hpp"
+#include "AOFockMatrix.hpp"
+#include "FockContainer.hpp"
 
 /**
  Class CTwoIntsDistribution provides set of two electron integrals distribution
@@ -27,12 +30,6 @@ class CTwoIntsDistribution
      The two electron integrals distribution pattern.
      */
     dist2e _distPattern;
-    
-    /**
-     The flag indicating need of synchronization lock for updating integrals to
-     integrals buffer. 
-     */
-    bool _needSyncLock;
     
     /**
      The number of rows.
@@ -53,6 +50,22 @@ class CTwoIntsDistribution
      The pointer to two electron integrals destination data buffer.
      */
     double* _intsData;
+    
+    /**
+     The pointer to AO density matrix used to distribute integrals into Fock
+     matrix.
+     */
+    const CAODensityMatrix* _aoDensity;
+    
+    /**
+     The pointer to destination AO Fock matrix.
+     */
+    CAOFockMatrix* _aoFock;
+    
+    /**
+     The pointer to Fock container object with partial Fock matrix data.
+     */
+    CFockContainer _fockContainer;
     
     /**
      Distributes two electron integrals into data batch.
@@ -88,6 +101,24 @@ class CTwoIntsDistribution
                                    const CGtoPairsBlock&      ketGtoPairsBlock,
                                    const bool                 isBraEqualKet,
                                    const int32_t              iContrPair);
+    
+    /**
+     Distributes two electron integrals into AO fock matrix.
+     
+     @param spherInts the spherical two electron integrals buffer.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
+            bra and ket sides.
+     @param nKetContrPairs the number of contracted GTOs pairs on ket side.
+     @param iContrPair the index of contracted GTO pair being computed.
+     */
+    void _distSpherIntsIntoFock(const CMemBlock2D<double>& spherInts,
+                                const CGtoPairsBlock&      braGtoPairsBlock,
+                                const CGtoPairsBlock&      ketGtoPairsBlock,
+                                const bool                 isBraEqualKet,
+                                const int32_t              nKetContrPairs,
+                                const int32_t              iContrPair);
     
     /**
      Gets starting index of spherical integrals vector in batch of integrals.
@@ -138,6 +169,15 @@ public:
                          const dist2e  distPattern);
     
     /**
+     Creates a two electron integrals distributor object.
+     
+     @param aoFock the pointer AO Fock matrix.
+     @param aoDensity the pointer AO Density matrix.
+     */
+    CTwoIntsDistribution(      CAOFockMatrix*    aoFock,
+                         const CAODensityMatrix* aoDensity);
+    
+    /**
      Creates an two electron integrals distributor object by copying other
      two electron integrals distributor object.
      
@@ -179,12 +219,14 @@ public:
     bool operator!=(const CTwoIntsDistribution& other) const;
     
     /**
-     Gets flag for synchronization lock
+     Allocates and initializes Fock container data for Fock matrices
+     distribution method.
 
-     @return true if synchronization lock is needed for distribution mode,
-             false - otherwise.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
      */
-    bool needSyncLock() const;
+    void setFockContainer(const CGtoPairsBlock&      braGtoPairsBlock,
+                          const CGtoPairsBlock&      ketGtoPairsBlock);
     
     /**
      Distributes two electron integrals into data buffer.
@@ -192,7 +234,7 @@ public:
      @param spherInts the spherical two electron integrals buffer.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param nKetContrPairs the number of contractes GTOs pairs on ket side.
+     @param nKetContrPairs the number of contracted GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void distribute(const CMemBlock2D<double>& spherInts,
@@ -201,6 +243,13 @@ public:
                     const bool                 isBraEqualKet,
                     const int32_t              nKetContrPairs,
                     const int32_t              iContrPair);
+    
+    /**
+     Accumulates AO Fock matrix from partial Fock matrix data computed inside
+     single task. NOTE: Not threadsafe routine, must be allways called with
+     appropiate guards to prevent raise conditions.
+     */
+    void accumulate();
     
     /**
      Converts two electron integrals distributor object to text output and

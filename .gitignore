@@ -7,5 +7,6 @@ build
 *.optrpt
 *.out
 *.log
+*.pyc
 *~
 __pycache__
