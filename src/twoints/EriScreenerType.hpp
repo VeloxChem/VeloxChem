@@ -21,7 +21,9 @@
 enum class ericut
 {
     qq,
-    qqr
+    qqr,
+    qqden,
+    qqrden
 };
 
 /**
@@ -40,6 +42,21 @@ inline std::string to_string(const ericut screenType)
     if (screenType == ericut::qqr)
     {
         return std::string("Modified Cauchy-Schwarz (QQR)");
+    }
+    
+    if (screenType == ericut::qqden)
+    {
+        return std::string("Cauchy-Schwarz (QQ) + Density");
+    }
+    
+    if (screenType == ericut::qqr)
+    {
+        return std::string("Modified Cauchy-Schwarz (QQR)");
+    }
+    
+    if (screenType == ericut::qqrden)
+    {
+        return std::string("Modified Cauchy-Schwarz (QQR) + Density");
     }
     
     return std::string("UNKNOWN");
