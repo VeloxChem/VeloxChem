@@ -54,6 +54,11 @@ class ScfDriver:
         # DIIS data lists
         self.fock_matrices = deque()
         self.den_matrices = deque()
+
+    def compute_task(self, task, comm):
+
+        self.compute(task.molecule, task.ao_basis, task.min_basis, comm,
+                     task.ostream)
     
     def compute(self, molecule, ao_basis, min_basis, comm, ostream):
        
@@ -345,6 +350,9 @@ class ScfDriver:
             exec_str += ("{:5.8f}".format(dden)).center(15) + " "
             ostream.put_header(exec_str)
             ostream.flush()
+
+    def get_scf_energy(self, enuc):
+        return self.old_energy + enuc
 
     def get_scf_type(self):
         return "Undefined"

@@ -152,8 +152,10 @@ void export_twoints()
     // ericut enum class
 
     bp::enum_<ericut> ("ericut")
-        .value("qq",  ericut::qq )
-        .value("qqr", ericut::qqr)
+        .value("qq",     ericut::qq )
+        .value("qqr",    ericut::qqr)
+        .value("qqden",  ericut::qqden)
+        .value("qqrden", ericut::qqrden)
     ;
 
     // CAOFockMatrix class
