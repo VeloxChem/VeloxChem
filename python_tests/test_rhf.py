@@ -12,19 +12,18 @@ class TestRHF(unittest.TestCase):
         task = vlx.GlobalTask("inputs/" + molname + ".inp",
                               "inputs/" + molname + ".out", comm)
 
-        molecule = task.molecule
-        ao_basis = task.ao_basis
-        min_basis = task.min_basis
-        ostream = task.ostream
+        enuc = task.molecule.nuclear_repulsion_energy()
 
         scf_drv = vlx.ScfRestrictedDriver()
-        scf_drv.compute(molecule, ao_basis, min_basis, comm, ostream)
 
-        return scf_drv.old_energy + molecule.nuclear_repulsion_energy()
+        scf_drv.compute_task(task, comm)
+
+        return scf_drv.get_scf_energy(enuc)
 
     def test_caffeine(self):
 
         e_scf = self.run_rhf("caf")
+
         self.assertAlmostEqual(e_scf, -675.828421206170, 10)
 
 
