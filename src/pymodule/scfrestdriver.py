@@ -71,56 +71,83 @@ class ScfRestrictedDriver(ScfDriver):
             return np.copy(self.fock_matrices[0])
         
         if len(self.fock_matrices) > 1:
-            weights = self.comp_diis_weigths(ovl_mat, oao_mat)
-            if len(self.fock_matrices) > 1:
-                return self.get_scaled_fock(weights)
-    
+            weights = self.comp_c2diis_weigths(ovl_mat, oao_mat)
+            return self.get_scaled_fock(weights)
+        
         return np.copy(fock_mat.to_numpy(0))
             
-    def comp_diis_weigths(self, ovl_mat, oao_mat):
+    def comp_c2diis_weigths(self, ovl_mat, oao_mat):
         
-        need_weights = True
-        while need_weights:
-            bmat = self.comp_diis_matrix(ovl_mat, oao_mat)
-            weights = self.solve_diis_weigts(bmat)
-            need_weights = self.check_diis_weights(weights)
+        evecs = self.comp_error_vectors(ovl_mat, oao_mat)
         
+        bmat = self.comp_bmatrix(evecs)
+        beigs, bvecs = np.linalg.eigh(bmat);
+        
+        weights = self.pick_weights(evecs, self.norm_bvectors(bvecs))
+
         return weights
     
-    def comp_diis_matrix(self, ovl_mat, oao_mat):
+    def get_scaled_fock(self, weights):
         
-        bdim = len(self.fock_matrices)
-        bmat = np.zeros(shape=(bdim+1, bdim+1), dtype=float)
+        effmat = np.zeros(self.fock_matrices[0].shape, dtype=float)
+      
+        for w, fmat in zip(weights, self.fock_matrices):
+            effmat = effmat + w * fmat
+        
+        return effmat
+    
+    def comp_error_vectors(self, ovl_mat, oao_mat):
+        
         smat = ovl_mat.to_numpy()
         tmat = oao_mat.to_numpy()
         
-        for i in range(bdim):
-            fmat = self.fock_matrices[i]
-            dmat = self.den_matrices[i]
-            
+        evecs = []
+        for fmat, dmat in zip(self.fock_matrices, self.den_matrices):
             fa = np.matmul(fmat, np.matmul(dmat, smat))
             fb = np.matmul(smat, np.matmul(dmat, fmat))
-            
-            evec_i = np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat))
-            bmat[i][i] = np.vdot(evec_i, evec_i)
-            
-            for j in range(i + 1, bdim):
-                fmat = self.fock_matrices[j]
-                dmat = self.den_matrices[j]
-                
-                fa = np.matmul(fmat, np.matmul(dmat, smat))
-                fb = np.matmul(smat, np.matmul(dmat, fmat))
-                
-                evec_j = np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat))
-                feij = np.vdot(evec_i, evec_j)
-                
-                bmat[i][j] = feij
-                bmat[j][i] = feij
-            
-            bmat[bdim, i] = 1.0
-            bmat[i, bdim] = 1.0
+            evecs.append(np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat)))
+        
+        return evecs
+    
+    def comp_bmatrix(self, evecs):
+        
+        bdim = len(evecs)
+        bmat = np.zeros(shape=(bdim, bdim), dtype=float)
+    
+        for i in range(bdim):
+            for j in range(i, bdim):
+                fij = np.vdot(evecs[i], evecs[j])
+                bmat[i][j] = fij
+                bmat[j][i] = fij
         
         return bmat
+    
+    def norm_bvectors(self, bvectors):
+    
+        bsums = np.sum(bvectors, axis=0)
+        
+        normvecs = []
+        for i in range(len(bsums)):
+            if abs(bsums[i]) > 1.0e-6:
+                normvecs.append(bvectors[:,i] / bsums[i]);
+
+        return normvecs
+    
+    def pick_weights(self, evecs, weights):
+        
+        fmin = 1.0e8
+        wmin = weights[0]
+        
+        for w in weights:
+            ev = np.zeros(evecs[0].shape, dtype=float)
+            for f, v in zip(w, evecs):
+                ev = ev + f * v
+            fact = np.vdot(ev, ev)
+            if fmin > fact:
+                fmin = fact
+                wmin = w
+    
+        return wmin
     
     def solve_diis_weigts(self, bmat):
         
@@ -134,8 +161,8 @@ class ScfRestrictedDriver(ScfDriver):
     def check_diis_weights(self, weights):
         
         wdim = len(weights)
-        for i in range(len(weights) - 1):
-            if abs(weights[i]) > 1.3:
+        for i in range(wdim-1):
+            if abs(weights[i]) > 1.5:
                 self.fock_matrices.popleft()
                 self.den_matrices.popleft()
                 if len(self.fock_matrices) == 1:
@@ -144,21 +171,6 @@ class ScfRestrictedDriver(ScfDriver):
                     return True
     
         return False
-    
-    def get_scaled_fock(self, weights):
-        
-        wdim = len(weights) - 1
-        fdim = len(self.fock_matrices)
-        
-        if len(self.fock_matrices) != wdim:
-            return np.copy(self.fock_matrices[-1])
-        
-        fmat = np.copy(self.fock_matrices[0])
-        fmat = weights[0] * fmat
-        for i in range(1, wdim):
-            fmat = fmat + weights[i] * self.fock_matrices[i]
-        
-        return fmat
     
     def apply_level_shift(self, fock_mat, oao_mat, molecule):
         
