@@ -55,10 +55,10 @@ class ScfDriver:
         self.fock_matrices = deque()
         self.den_matrices = deque()
 
-    def compute_task(self, task, comm):
+    def compute_task(self, task):
 
-        self.compute(task.molecule, task.ao_basis, task.min_basis, comm,
-                     task.ostream)
+        self.compute(task.molecule, task.ao_basis, task.min_basis,
+                     task.mpi_comm, task.ostream)
     
     def compute(self, molecule, ao_basis, min_basis, comm, ostream):
        
