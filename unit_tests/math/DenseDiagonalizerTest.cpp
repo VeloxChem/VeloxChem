@@ -117,10 +117,10 @@ TEST_F(CDenseDiagonalizerTest, GetInvertedSqrtMatrixWithThreshold)
     
     ASSERT_EQ(refmat, diagdrv.getInvertedSqrtMatrix(0.0));
     
-    CDenseMatrix submat({ 0.5227351824567613, -0.4976329506165474,
-                         -0.4976329506165478,  1.8097622833751084,
-                         -0.1947637155486870,  0.0808312367804720},
-                        3, 2);
+    CDenseMatrix submat({ 0.3044355370024007,  0.1212888395340206, -0.1269299596631874,
+                          0.1212888395340206,  0.0549990929636519, -0.1114906038615801,
+                         -0.1269299596631874, -0.1114906038615801,  0.6087706392768726},
+                        3, 3);
     
     ASSERT_EQ(submat, diagdrv.getInvertedSqrtMatrix(0.5));
 }

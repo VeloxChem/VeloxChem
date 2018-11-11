@@ -177,13 +177,27 @@ CDenseDiagonalizer::getInvertedSqrtMatrix(const double threshold) const
         
         if (rdim > 0)
         {
-            // set up shift position
+            auto spos = ndim - rdim;
             
-            //auto spos = ndim - rdim;
+            auto eigs = _eigenValues.slice(spos, rdim);
             
-            auto mat = getInvertedSqrtMatrix();
+            auto vecs = _eigenVectors.slice(0, spos, ndim, rdim);
             
-            return mat.slice(0, 0, ndim, rdim);
+            // compute e^-1/2 vector
+            
+            auto fvals = eigs.data();
+            
+            #pragma omp simd aligned(fvals: VLX_ALIGN)
+            for (int32_t i = 0; i < rdim; i++)
+            {
+                fvals[i] = 1.0 / std::sqrt(fvals[i]);
+            }
+            
+            // construct A^-1/2 matrix
+            
+            auto mat = denblas::multDiagByAt(eigs, vecs);
+            
+            return denblas::multAB(vecs, mat);
         }
     }
     
