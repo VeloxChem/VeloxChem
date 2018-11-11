@@ -37,8 +37,8 @@ class ScfDriver:
         
         # thresholds
         self.conv_thresh = 1.0e-6
-        self.eri_thresh = 1.0e-12
-        self.ovl_thresh = 1.0e-12
+        self.eri_thresh  = 1.0e-12
+        self.ovl_thresh  = 1.0e-12
         self.diis_thresh = 0.1
         
         # iterations data
@@ -185,6 +185,7 @@ class ScfDriver:
             
             mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                    ostream)
+            
             den_mat = self.gen_new_density(mol_orbs, molecule)
         
         valstr = "Valence SCF energy: "

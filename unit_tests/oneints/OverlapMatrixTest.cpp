@@ -127,9 +127,9 @@ TEST_F(COverlapMatrixTest, GetOrthogonalizationMatrix)
     
     ASSERT_EQ(refmat, smata.getOrthogonalizationMatrix(0.0, ost));
     
-    CDenseMatrix submat({ -0.4976329506165474, -0.1947637155486871,
-                           1.8097622833751084,  0.0808312367804720,
-                           0.0808312367804720,  0.6298490905403010},
+    CDenseMatrix submat({ 0.5227351824567613, -0.4976329506165474,
+                         -0.4976329506165478,  1.8097622833751084,
+                         -0.1947637155486870,  0.0808312367804720},
                         3, 2);
     
     ASSERT_EQ(submat, smata.getOrthogonalizationMatrix(0.5, ost));

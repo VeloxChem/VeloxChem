@@ -179,11 +179,11 @@ CDenseDiagonalizer::getInvertedSqrtMatrix(const double threshold) const
         {
             // set up shift position
             
-            auto spos = ndim - rdim;
+            //auto spos = ndim - rdim;
             
             auto mat = getInvertedSqrtMatrix();
             
-            return mat.slice(0, spos, ndim, rdim);
+            return mat.slice(0, 0, ndim, rdim);
         }
     }
     

@@ -189,6 +189,7 @@ class ScfRestrictedDriver(ScfDriver):
     def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
         
         smat = oao_mat.to_numpy()
+        
         fmo = np.matmul(smat.transpose(), np.matmul(fock_mat, smat))
         
         eigs, evecs = np.linalg.eigh(fmo)
