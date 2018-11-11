@@ -16,7 +16,7 @@ class TestRHF(unittest.TestCase):
 
         scf_drv = vlx.ScfRestrictedDriver()
 
-        scf_drv.compute_task(task, comm)
+        scf_drv.compute_task(task)
 
         return scf_drv.get_scf_energy(enuc)
 
