@@ -127,12 +127,21 @@ TEST_F(COverlapMatrixTest, GetOrthogonalizationMatrix)
     
     ASSERT_EQ(refmat, smata.getOrthogonalizationMatrix(0.0, ost));
     
-    CDenseMatrix submat({{ 0.3044355370024007,  0.1212888395340206, -0.1269299596631874,
-                           0.1212888395340206,  0.0549990929636519, -0.1114906038615801,
-                          -0.1269299596631874, -0.1114906038615801,  0.6087706392768726}},
-                        3, 3);
+    CDenseMatrix submat({{ 0.2545280076864466, 0.2423193899561403,
+                           0.1578026238399430, 0.0725559748124375,
+                          -0.6206955232198551, 0.1178139554973027}},
+                          3, 2);
     
-    ASSERT_EQ(submat, smata.getOrthogonalizationMatrix(0.5, ost));
+    auto omat = smata.getOrthogonalizationMatrix(0.5, ost);
+    
+    auto prefmat = submat.values();
+    
+    auto psolmat = omat.values();
+    
+    for (int32_t i = 0; i < omat.getNumberOfElements(); i++)
+    {
+        ASSERT_NEAR(std::fabs(prefmat[i]), std::fabs(psolmat[i]), 1.0e-13);
+    }
 }
 
 

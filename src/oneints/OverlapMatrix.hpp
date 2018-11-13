@@ -139,7 +139,9 @@ public:
     const double* values() const;
     
     /**
-     Gets Löwdin symmetric orthogonalization matrix for this overlap matrix.
+     Gets Löwdin symmetric orthogonalization matrix if overalp matrix
+     eigenvalues is linearly independent, or canonical orthogonalization
+     matrix if overlap matrix eigenvalues is linearly dependent.
 
      @param threshold the linear dependence threshold.
      @param oStream the output stream.

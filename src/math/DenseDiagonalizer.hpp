@@ -76,6 +76,14 @@ public:
     bool getState() const;
     
     /**
+     Check if basis of solution vectors is linearly dependent.
+
+     @param threshold the linear dependence threshold.
+     @return true if basis is linearly dependent, false otherwise.
+     */
+    bool isLinearlyDependentBasis(const double threshold) const;
+    
+    /**
      Gets eigenvectors of dense matrix.
 
      @return the eigenvectors of matrix.
@@ -83,11 +91,27 @@ public:
     CDenseMatrix getEigenVectors() const;
     
     /**
+     Gets eigenvectors of dense matrix above specifc threshold.
+     
+     @param threshold the cut-off threshold for eigenvalues.
+     @return the eigenvectors of matrix.
+     */
+    CDenseMatrix getEigenVectors(const double threshold) const;
+    
+    /**
      Gets eigenvalues of dense matrix.
 
      @return the eigenvalues of matrix.
      */
     CMemBlock<double> getEigenValues() const;
+    
+    /**
+     Gets eigenvalues of dense matrix above specifc threshold.
+     
+     @param threshold the cut-off threshold for eigenvalues.
+     @return the eigenvalues of matrix.
+     */
+    CMemBlock<double> getEigenValues(const double threshold) const;
     
     /**
      Computes A^-1/2 matrix using eigenvalues and eigenvectors of A matrix.
@@ -102,15 +126,6 @@ public:
      @return the A^-1 matrix.
      */
     CDenseMatrix getInvertedMatrix() const;
-    
-    /**
-     Computes reduced A^-1/2 matrix using eigenvalues of matrix A, which are
-     above given threshold.
-     
-     @param threshold the eigenvalues cutt-off threshold.
-     @return the A^-1/2 matrix.
-     */
-    CDenseMatrix getInvertedSqrtMatrix(const double threshold) const;
     
     /**
      Gets number of eigenvalues bellow given threshold.

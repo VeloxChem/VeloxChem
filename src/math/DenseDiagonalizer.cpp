@@ -86,15 +86,60 @@ CDenseDiagonalizer::getState() const
     return _state;
 }
 
+bool
+CDenseDiagonalizer::isLinearlyDependentBasis(const double threshold) const
+{
+    if (getNumberOfEigenValues(threshold) != _eigenValues.size())
+    {
+        return true;
+    }
+    
+    return false; 
+}
+
 CDenseMatrix
 CDenseDiagonalizer::getEigenVectors() const
 {
     return _eigenVectors;
 }
 
+CDenseMatrix
+CDenseDiagonalizer::getEigenVectors(const double threshold) const
+{
+    auto rdim = getNumberOfEigenValues(threshold);
+    
+    auto nrow = _eigenVectors.getNumberOfRows();
+
+    if (rdim != nrow)
+    {
+        auto spos = nrow - rdim;
+        
+        return _eigenVectors.slice(0, spos, nrow, rdim);
+    }
+    
+    return _eigenVectors;
+}
+
 CMemBlock<double>
 CDenseDiagonalizer::getEigenValues() const
 {
+    return _eigenValues;
+}
+
+CMemBlock<double>
+CDenseDiagonalizer::getEigenValues(const double threshold) const
+{
+    auto rdim = getNumberOfEigenValues(threshold);
+    
+    auto ndim = _eigenValues.size();
+    
+    if (rdim != ndim)
+    {
+        auto spos = ndim - rdim;
+        
+        return _eigenValues.slice(spos, rdim);
+    }
+    
     return _eigenValues;
 }
 
@@ -164,46 +209,6 @@ CDenseDiagonalizer::getInvertedMatrix() const
     return CDenseMatrix();
 }
 
-CDenseMatrix
-CDenseDiagonalizer::getInvertedSqrtMatrix(const double threshold) const
-{
-    if (_isSolved)
-    {
-        // set up dimensions
-        
-        auto ndim = _eigenValues.size();
-        
-        auto rdim = getNumberOfEigenValues(threshold);
-        
-        if (rdim > 0)
-        {
-            auto spos = ndim - rdim;
-            
-            auto eigs = _eigenValues.slice(spos, rdim);
-            
-            auto vecs = _eigenVectors.slice(0, spos, ndim, rdim);
-            
-            // compute e^-1/2 vector
-            
-            auto fvals = eigs.data();
-            
-            #pragma omp simd aligned(fvals: VLX_ALIGN)
-            for (int32_t i = 0; i < rdim; i++)
-            {
-                fvals[i] = 1.0 / std::sqrt(fvals[i]);
-            }
-            
-            // construct A^-1/2 matrix
-            
-            auto mat = denblas::multDiagByAt(eigs, vecs);
-            
-            return denblas::multAB(vecs, mat);
-        }
-    }
-    
-    return CDenseMatrix();
-}
-
 int32_t
 CDenseDiagonalizer::getNumberOfEigenValues(const double threshold) const
 {
@@ -222,3 +227,4 @@ CDenseDiagonalizer::getNumberOfEigenValues(const double threshold) const
     
     return 0;
 }
+
