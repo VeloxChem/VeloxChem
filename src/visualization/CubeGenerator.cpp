@@ -25,11 +25,11 @@ cubes::buildCartesianAngularMomentum(int32_t angl)
     // 6D: xx,xy,xz,yy,yz,zz
     // 10F: ...
 
-    for (int32_t index = 0, i = 0; i <= angl; i++)
+    for (int32_t i = 0; i <= angl; i++)
     {
         int32_t lx = angl - i;
 
-        for (int32_t j = 0; j <= i; j++, index++)
+        for (int32_t j = 0; j <= i; j++)
         {
             int32_t ly = i - j;
 
@@ -81,13 +81,13 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
             std::vector<double> fcarts, lx, ly, lz;
 
-            int32_t ncomp = sphmom.getNumberOfFactors(isph);
+            auto ncomp = sphmom.getNumberOfFactors(isph);
             
             for (int32_t icomp = 0; icomp < ncomp; icomp++)
             {
                 fcarts.push_back(sphmom.getFactors(isph)[icomp]);
 
-                int32_t cartind = sphmom.getIndexes(isph)[icomp];
+                auto cartind = sphmom.getIndexes(isph)[icomp];
 
                 lx.push_back(lmn[cartind][0]);
 
@@ -112,9 +112,9 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
                 // process atomic orbitals
 
-                int32_t idelem = molecule.getIdsElemental()[atomidx];
+                auto idelem = molecule.getIdsElemental()[atomidx];
 
-                int32_t nao = basis.getNumberOfBasisFunctions(idelem, angl);
+                auto nao = basis.getNumberOfBasisFunctions(idelem, angl);
 
                 auto basisfunc = basis.getBasisFunctions(idelem, angl);
 
@@ -134,7 +134,7 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
                     for (int32_t iprim = 0; iprim < nprims; iprim++)
                     {
-                        double alpha = exponents[iprim];
+                        double expon = exp(-exponents[iprim] * r2);
 
                         double coef1 = mocoef * normcoefs[iprim];
 
@@ -148,7 +148,7 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
                                           * pow(ry, ly[icomp])
                                           * pow(rz, lz[icomp]);
 
-                            psi += coef2 * powxyz * exp(-alpha*r2);
+                            psi += coef2 * powxyz * expon;
                         }
                     }
                 }
