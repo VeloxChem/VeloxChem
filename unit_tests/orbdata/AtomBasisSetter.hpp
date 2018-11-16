@@ -35,6 +35,8 @@ CAtomBasis getNormalizedAtomBasisForSe();
 
 CAtomBasis getMinimalBasisForH();
 
+CAtomBasis getMinimalBasisForHe();
+
 CAtomBasis getMinimalBasisForC();
 
 CAtomBasis getMinimalBasisForN();

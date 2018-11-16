@@ -134,7 +134,7 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
                     for (int32_t iprim = 0; iprim < nprims; iprim++)
                     {
-                        double expon = exp(-exponents[iprim] * r2);
+                        double expon = std::exp(-exponents[iprim] * r2);
 
                         double coef1 = mocoef * normcoefs[iprim];
 
@@ -144,9 +144,9 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
                         {
                             double coef2 = coef1 * fcarts[icomp];
 
-                            double powxyz = pow(rx, lx[icomp])
-                                          * pow(ry, ly[icomp])
-                                          * pow(rz, lz[icomp]);
+                            double powxyz = std::pow(rx, lx[icomp])
+                                          * std::pow(ry, ly[icomp])
+                                          * std::pow(rz, lz[icomp]);
 
                             psi += coef2 * powxyz * expon;
                         }
