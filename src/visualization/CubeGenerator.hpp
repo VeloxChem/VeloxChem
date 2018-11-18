@@ -26,6 +26,13 @@ namespace cubes { // cubes namespace
 const std::vector<std::vector<int32_t>>
 buildCartesianAngularMomentum(int angl);
 
+const std::vector<double>
+getPhiAO(const CMolecule&        molecule,
+         const CMolecularBasis&  basis,
+         const double            xp,
+         const double            yp,
+         const double            zp);
+
 /**
  Calculates the psi value of a molecular orbital at a give grid point.
  
@@ -46,6 +53,15 @@ getPsiMolecularOrbital(const CMolecule&          molecule,
                        const double              xp,
                        const double              yp,
                        const double              zp);
+
+double
+getPsiDensity(const CMolecule&        molecule,
+              const CMolecularBasis&  basis,
+              const CAODensityMatrix& density,
+              const int32_t           densityIndex,
+              const double            xp,
+              const double            yp,
+              const double            zp);
 
 } // cubes namespace
 

@@ -42,26 +42,18 @@ cubes::buildCartesianAngularMomentum(int32_t angl)
     return lmn;
 }
 
-double
-cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
-                              const CMolecularBasis&    basis,
-                              const CMolecularOrbitals& molorb,
-                              const int32_t             moidx,
-                              const double              xp,
-                              const double              yp,
-                              const double              zp)
+const std::vector<double>
+cubes::getPhiAO(const CMolecule&          molecule,
+                const CMolecularBasis&    basis,
+                const double              xp,
+                const double              yp,
+                const double              zp)
 {
     auto natoms = molecule.getNumberOfAtoms();
 
     auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
 
-    //auto morows = molorb.getNumberOfRows();
-
-    auto mocols = molorb.getNumberOfColumns();
-
-    auto mocoefs = molorb.alphaOrbitals();
-
-    double psi = 0.0;
+    std::vector<double> phi;
 
     // azimuthal quantum number: s,p,d,f,...
 
@@ -120,9 +112,7 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
                 for (int32_t i = 0; i < nao; i++, aoidx++)
                 {
-                    // get MO coefficient
-
-                    double mocoef = mocoefs[aoidx * mocols + moidx];
+                    double phiao = 0.0;
 
                     // process primitives
 
@@ -136,7 +126,7 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
                     {
                         double expon = std::exp(-exponents[iprim] * r2);
 
-                        double coef1 = mocoef * normcoefs[iprim];
+                        double coef1 = normcoefs[iprim];
 
                         // transform from Cartesian to spherical harmonics
 
@@ -148,11 +138,70 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
                                           * std::pow(ry, ly[icomp])
                                           * std::pow(rz, lz[icomp]);
 
-                            psi += coef2 * powxyz * expon;
+                            phiao += coef2 * powxyz * expon;
                         }
                     }
+
+                    phi.push_back(phiao);
                 }
             }
+        }
+    }
+
+    return phi;
+}
+
+double
+cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
+                              const CMolecularBasis&    basis,
+                              const CMolecularOrbitals& molorb,
+                              const int32_t             moidx,
+                              const double              xp,
+                              const double              yp,
+                              const double              zp)
+{
+    auto phi = getPhiAO(molecule, basis, xp, yp, zp);
+
+    double psi = 0.0;
+
+    auto mocoefs = molorb.alphaOrbitals();
+
+    auto mocols = molorb.getNumberOfColumns();
+
+    int32_t nao = (int32_t)(phi.size());
+
+    for (int32_t aoidx = 0; aoidx < nao; aoidx++)
+    {
+        double mocoef = mocoefs[aoidx * mocols + moidx];
+
+        psi += mocoef * phi[aoidx];
+    }
+
+    return psi;
+}
+
+double
+cubes::getPsiDensity(const CMolecule&        molecule,
+                     const CMolecularBasis&  basis,
+                     const CAODensityMatrix& density,
+                     const int32_t           densityIndex,
+                     const double            xp,
+                     const double            yp,
+                     const double            zp)
+{
+    auto phi = getPhiAO(molecule, basis, xp, yp, zp);
+
+    double psi = 0.0;
+
+    auto rho = density.totalDensity(densityIndex);
+
+    int32_t nao = (int32_t)(phi.size());
+
+    for (int32_t iao = 0; iao < nao; iao++)
+    {
+        for (int32_t jao = 0; jao < nao; jao++)
+        {
+            psi += phi[iao] * rho[iao * nao + jao] * phi[jao];
         }
     }
 

@@ -18,6 +18,7 @@
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MolecularOrbitals.hpp"
+#include "AODensityMatrix.hpp"
 
 TEST_F(CCubeGeneratorTest, Helium)
 {
@@ -96,8 +97,17 @@ TEST_F(CCubeGeneratorTest, Helium)
     
     auto basis = vlxbas::getMinimalBasisForHeAtom();
 
-    auto psi = cubes::getPsiMolecularOrbital(mol, basis, moa, 0,
-                                             xp, yp, zp);
+    auto psi = cubes::getPsiMolecularOrbital(mol, basis, moa, 0, xp, yp, zp);
 
     ASSERT_NEAR(mypsi, psi, 1.0e-13);
+
+    // density matrix
+
+    CDenseMatrix da({mocoef * mocoef}, 1, 1);
+    
+    CAODensityMatrix dena({da}, denmat::rest);
+
+    auto psi2 = cubes::getPsiDensity(mol, basis, dena, 0, xp, yp, zp);
+
+    ASSERT_NEAR(psi*psi, psi2, 1.0e-13);
 }

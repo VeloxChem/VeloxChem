@@ -21,6 +21,9 @@ void export_visualization()
 {
     bp::def("get_psi_molecular_orbital",
             &cubes::getPsiMolecularOrbital);
+
+    bp::def("get_psi_density",
+            &cubes::getPsiDensity);
 }
 
 } // bp_visualization namespace
