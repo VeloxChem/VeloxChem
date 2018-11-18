@@ -15,6 +15,8 @@ from .veloxchemlib import molorb
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 
+from .denguess import DensityGuess
+
 import numpy as np
 import time as tm
 
@@ -24,7 +26,8 @@ class ScfDriver:
 
     def __init__(self):
         
-        self.guess_type = "SAD"
+        # density guess
+        self.den_guess = DensityGuess("SAD")
         
         # scf accelerator
         self.acc_type = "L2_DIIS"
@@ -38,7 +41,7 @@ class ScfDriver:
         # thresholds
         self.conv_thresh = 1.0e-6
         self.eri_thresh  = 1.0e-12
-        self.ovl_thresh  = 1.0e-12
+        self.ovl_thresh  = 1.0e-6
         self.diis_thresh = 0.1
         
         # iterations data
@@ -84,16 +87,22 @@ class ScfDriver:
                                       molecule, ao_basis, ostream, comm)
                                       
             if self.acc_type == "L2_DIIS":
+                
                 val_basis = ao_basis.get_valence_basis()
+                
                 val_orbs = self.comp_valence_scf(molecule, val_basis, min_basis,
                                                  loc_rank, loc_nodes, comm,
                                                  ostream)
-                prj_orbs = val_orbs.insert(molecule, ao_basis, val_basis)
-                den_mat = self.gen_new_density(prj_orbs, molecule)
+                                                 
+                self.den_guess = DensityGuess("PRCMO")
+                
+                den_mat = self.den_guess.prcmo_density(molecule, ao_basis,
+                                                       val_basis, val_orbs)
             else:
-                den_mat = self.gen_guess_density(molecule, ao_basis, min_basis,
-                                                 ovl_mat, loc_rank, loc_nodes,
-                                                 comm, ostream)
+                den_mat = self.den_guess.sad_density(molecule, ao_basis,
+                                                     min_basis, ovl_mat,
+                                                     loc_rank, loc_nodes,
+                                                     comm, ostream)
            
             if loc_rank == mpi_master():
                 oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh, ostream)
@@ -159,9 +168,9 @@ class ScfDriver:
         ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, val_basis,
                                                         loc_rank, loc_nodes,
                                                         comm, ostream)
-        den_mat = self.gen_guess_density(molecule, val_basis, min_basis,
-                                         ovl_mat, loc_rank, loc_nodes, comm,
-                                         ostream);
+        den_mat = self.den_guess.sad_density(molecule, val_basis, min_basis,
+                                             ovl_mat, loc_rank, loc_nodes, comm,
+                                             ostream);
         
         eri_drv = ElectronRepulsionIntegralsDriver.create(loc_rank,
                                                           loc_nodes,
@@ -197,23 +206,6 @@ class ScfDriver:
         
         return mol_orbs
 
-    def gen_guess_density(self, molecule, ao_basis, min_basis, ovl_mat,
-                          loc_rank, loc_nodes, comm, ostream):
-        
-        if self.guess_type == "SAD":
-            ovl_driver = OverlapIntegralsDriver.create(loc_rank, loc_nodes,
-                                                       comm)
-            ovl_mat_sb = ovl_driver.compute(molecule, min_basis, ao_basis,
-                                            ostream, comm)
-            sad_drv = SADGuessDriver.create(loc_rank, loc_nodes, comm)
-            den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
-                                      ovl_mat, ostream, comm)
-            return den_mat
-        
-        # TODO: implemet restart or other types of density matrices
-
-        return AODensityMatrix()
-
     def set_skip_iter_flag(self, i, e_grad):
         
         if self.acc_type == "L2_DIIS":
@@ -224,7 +216,7 @@ class ScfDriver:
             self.use_level_shift = False
             return
         
-        if self.guess_type == "SAD" and i < 2:
+        if self.den_guess.guess_type == "SAD" and i < 2:
             self.skip_iter = True
             self.use_level_shift = True
             return
@@ -284,7 +276,7 @@ class ScfDriver:
 
     def get_scf_range(self):
         
-        if self.guess_type == "SAD":
+        if self.den_guess.guess_type == "SAD":
             return range(self.max_iter + 1)
         
         return range(self.max_iter)
@@ -299,7 +291,7 @@ class ScfDriver:
         str_width = 80
         cur_str = "WaveFunction Model           : " + self.get_scf_type()
         ostream.put_header(cur_str.ljust(str_width))
-        cur_str = "Initial Guess Model          : " + self.get_guess_type()
+        cur_str = "Initial Guess Model          : " + self.den_guess.guess_type
         ostream.put_header(cur_str.ljust(str_width))
         
         cur_str = "Convergence Accelerator      : " + self.get_acc_type()
@@ -334,13 +326,13 @@ class ScfDriver:
 
     def print_iter_data(self, i, ostream):
         
-        if self.guess_type == "SAD" and i == 0:
+        if self.den_guess.guess_type == "SAD" and i == 0:
             return
         
         ddim = len(self.iter_data)
         if ddim > 0:
             energy, denergy, egrad, dden = self.iter_data[-1]
-            if self.guess_type == "SAD" and i == 1:
+            if self.den_guess.guess_type == "SAD" and i == 1:
                 denergy = 0.0
                 dden = 0.0
             
@@ -360,7 +352,7 @@ class ScfDriver:
 
     def get_guess_type(self):
         
-        if self.guess_type == "SAD":
+        if self.den_guess.guess_type == "SAD":
             return "Superposition of Atomic Densities"
         
         return "Undefined"
