@@ -182,7 +182,7 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
     errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
 
-    const bool restricted = (mo.getOrbitalsType() == molorb::rest);
+    const bool morest = (mo.getOrbitalsType() == molorb::rest);
 
     const bool alphaspin = (mospin == std::string("alpha")
                          || mospin == std::string("a"));
@@ -194,7 +194,7 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
     if (betaspin)
     {
-        errors::assertMsgCritical(!restricted, errspin);
+        errors::assertMsgCritical(!morest, errspin);
     }
 
     auto mocoefs = alphaspin ? mo.alphaOrbitals() : mo.betaOrbitals();
@@ -241,7 +241,7 @@ cubes::getPsiDensity(const CMolecule&        molecule,
 
     errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
 
-    const bool restricted = (density.getDensityType() == denmat::rest);
+    const bool denrest = (density.getDensityType() == denmat::rest);
 
     const bool alphaspin = (denspin == std::string("alpha")
                          || denspin == std::string("a"));
@@ -253,10 +253,10 @@ cubes::getPsiDensity(const CMolecule&        molecule,
 
     if (betaspin)
     {
-        errors::assertMsgCritical(!restricted, errspin);
+        errors::assertMsgCritical(!denrest, errspin);
     }
 
-    auto rho = (restricted ? density.totalDensity(denidx) :
+    auto rho = (denrest ? density.totalDensity(denidx) :
                 (alphaspin ? density.alphaDensity(denidx) :
                  density.betaDensity(denidx)));
 
