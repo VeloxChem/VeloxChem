@@ -97,7 +97,9 @@ TEST_F(CCubeGeneratorTest, Helium)
     
     auto basis = vlxbas::getMinimalBasisForHeAtom();
 
-    auto psi = cubes::getPsiMolecularOrbital(mol, basis, moa, 0, xp, yp, zp);
+    auto psi = cubes::getPsiMolecularOrbital(mol, basis,
+                                             moa, 0, "a",
+                                             xp, yp, zp);
 
     ASSERT_NEAR(mypsi, psi, 1.0e-13);
 
@@ -107,7 +109,9 @@ TEST_F(CCubeGeneratorTest, Helium)
     
     CAODensityMatrix dena({da}, denmat::rest);
 
-    auto psi2 = cubes::getPsiDensity(mol, basis, dena, 0, xp, yp, zp);
+    auto psi2 = cubes::getPsiDensity(mol, basis,
+                                     dena, 0, "a",
+                                     xp, yp, zp);
 
     ASSERT_NEAR(psi*psi, psi2, 1.0e-13);
 }

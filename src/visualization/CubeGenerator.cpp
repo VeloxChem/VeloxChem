@@ -13,6 +13,7 @@
 #include "SphericalMomentum.hpp"
 #include "BasisFunction.hpp"
 #include "MolecularBasis.hpp"
+#include "ErrorHandler.hpp"
 
 const std::vector<std::vector<int32_t>>
 cubes::buildCartesianAngularMomentum(int32_t angl)
@@ -43,11 +44,11 @@ cubes::buildCartesianAngularMomentum(int32_t angl)
 }
 
 const std::vector<double>
-cubes::getPhiAO(const CMolecule&          molecule,
-                const CMolecularBasis&    basis,
-                const double              xp,
-                const double              yp,
-                const double              zp)
+cubes::getPhiAtomicOrbitals(const CMolecule&       molecule,
+                            const CMolecularBasis& basis,
+                            const double           xp,
+                            const double           yp,
+                            const double           zp)
 {
     auto natoms = molecule.getNumberOfAtoms();
 
@@ -154,21 +155,49 @@ cubes::getPhiAO(const CMolecule&          molecule,
 double
 cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
                               const CMolecularBasis&    basis,
-                              const CMolecularOrbitals& molorb,
+                              const CMolecularOrbitals& mo,
                               const int32_t             moidx,
+                              const std::string&        mospin,
                               const double              xp,
                               const double              yp,
                               const double              zp)
 {
-    auto phi = getPhiAO(molecule, basis, xp, yp, zp);
-
     double psi = 0.0;
 
-    auto mocoefs = molorb.alphaOrbitals();
+    auto phi = getPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
 
-    auto mocols = molorb.getNumberOfColumns();
+    const int32_t nao = (int32_t)(phi.size());
 
-    int32_t nao = (int32_t)(phi.size());
+    auto morows = mo.getNumberOfRows();
+
+    auto mocols = mo.getNumberOfColumns();
+
+    std::string errnao  ("cubes::getPsiMolecularOrbital - Inconsistent number of AOs");
+
+    std::string erridx  ("cubes::getPsiMolecularOrbital - Invalid MO index");
+
+    std::string errspin ("cubes::getPsiMolecularOrbital - Invalid MO spin");
+
+    errors::assertMsgCritical(morows == nao, errnao);
+
+    errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
+
+    const bool restricted = (mo.getOrbitalsType() == molorb::rest);
+
+    const bool alphaspin = (mospin == std::string("alpha")
+                         || mospin == std::string("a"));
+
+    const bool betaspin  = (mospin == std::string("beta")
+                         || mospin == std::string("b"));
+
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+
+    if (betaspin)
+    {
+        errors::assertMsgCritical(!restricted, errspin);
+    }
+
+    auto mocoefs = alphaspin ? mo.alphaOrbitals() : mo.betaOrbitals();
 
     for (int32_t aoidx = 0; aoidx < nao; aoidx++)
     {
@@ -184,18 +213,52 @@ double
 cubes::getPsiDensity(const CMolecule&        molecule,
                      const CMolecularBasis&  basis,
                      const CAODensityMatrix& density,
-                     const int32_t           densityIndex,
+                     const int32_t           denidx,
+                     const std::string&      denspin,
                      const double            xp,
                      const double            yp,
                      const double            zp)
 {
-    auto phi = getPhiAO(molecule, basis, xp, yp, zp);
-
     double psi = 0.0;
 
-    auto rho = density.totalDensity(densityIndex);
+    auto phi = getPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
 
     int32_t nao = (int32_t)(phi.size());
+
+    auto denrows = density.getNumberOfRows(denidx);
+
+    auto dencols = density.getNumberOfColumns(denidx);
+
+    std::string errnao  ("cubes::getPsiDensity - Inconsistent number of AOs");
+
+    std::string erridx  ("cubes::getPsiDensity - Invalid density matrix index");
+
+    std::string errspin ("cubes::getPsiDensity - Invalid density matrix spin");
+
+    errors::assertMsgCritical(denrows == nao && dencols == nao, errnao);
+
+    auto numdens = density.getNumberOfDensityMatrices();
+
+    errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
+
+    const bool restricted = (density.getDensityType() == denmat::rest);
+
+    const bool alphaspin = (denspin == std::string("alpha")
+                         || denspin == std::string("a"));
+
+    const bool betaspin  = (denspin == std::string("beta")
+                         || denspin == std::string("b"));
+
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+
+    if (betaspin)
+    {
+        errors::assertMsgCritical(!restricted, errspin);
+    }
+
+    auto rho = (restricted ? density.totalDensity(denidx) :
+                (alphaspin ? density.alphaDensity(denidx) :
+                 density.betaDensity(denidx)));
 
     for (int32_t iao = 0; iao < nao; iao++)
     {

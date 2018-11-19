@@ -27,11 +27,11 @@ const std::vector<std::vector<int32_t>>
 buildCartesianAngularMomentum(int angl);
 
 const std::vector<double>
-getPhiAO(const CMolecule&        molecule,
-         const CMolecularBasis&  basis,
-         const double            xp,
-         const double            yp,
-         const double            zp);
+getPhiAtomicOrbitals(const CMolecule&       molecule,
+                     const CMolecularBasis& basis,
+                     const double           xp,
+                     const double           yp,
+                     const double           zp);
 
 /**
  Calculates the psi value of a molecular orbital at a give grid point.
@@ -50,6 +50,7 @@ getPsiMolecularOrbital(const CMolecule&          molecule,
                        const CMolecularBasis&    basis,
                        const CMolecularOrbitals& molorb,
                        const int32_t             moidx,
+                       const std::string&        mospin,
                        const double              xp,
                        const double              yp,
                        const double              zp);
@@ -59,6 +60,7 @@ getPsiDensity(const CMolecule&        molecule,
               const CMolecularBasis&  basis,
               const CAODensityMatrix& density,
               const int32_t           densityIndex,
+              const std::string&      densitySpin,
               const double            xp,
               const double            yp,
               const double            zp);
