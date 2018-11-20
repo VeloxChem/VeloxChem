@@ -96,7 +96,7 @@ class ScfDriver:
             self.conv_thresh = 1.0e-3
             
             old_max_iter = self.max_iter
-            self.max_iter = 30
+            self.max_iter = 10
             
             val_basis = ao_basis.get_valence_basis()
             
@@ -238,8 +238,8 @@ class ScfDriver:
                 self.skip_iter = True
                 self.use_level_shift = True
                 # special case: second step in two level DIIS
-                if (self.acc_type == "L2_DIIS") and (not self.first_step):
-                    self.use_level_shift = False
+                #if (self.acc_type == "L2_DIIS") and (not self.first_step):
+                #    self.use_level_shift = False
                     
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         return (0.0, 0.0, 0.0)
