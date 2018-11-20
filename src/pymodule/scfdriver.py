@@ -33,6 +33,7 @@ class ScfDriver:
         self.acc_type = "L2_DIIS"
         self.max_err_vecs = 10
         self.max_iter = 50
+        self.first_step = False
         
         # screening scheme
         self.qq_type = "QQ"
@@ -49,6 +50,7 @@ class ScfDriver:
         self.is_converged = False
         self.skip_iter = False
         self.old_energy = 0.0
+        self.num_iter = 0
         
         # level shifting data
         self.use_level_shift = False
@@ -57,6 +59,12 @@ class ScfDriver:
         # DIIS data lists
         self.fock_matrices = deque()
         self.den_matrices = deque()
+    
+        # molecular orbitals
+        self.mol_orbs = MolecularOrbitals()
+    
+        # nuclear-nuclear repulsion energy
+        self.nuc_energy = 0.0
 
     def compute_task(self, task):
 
@@ -71,76 +79,116 @@ class ScfDriver:
         if loc_rank == mpi_master():
             self.print_header(ostream)
         
-        self.fock_matrices.clear()
-        self.den_matrices.clear()
+        self.nuc_energy = molecule.nuclear_repulsion_energy()
+    
+        # DIIS method
+        if self.acc_type == "DIIS":
+            self.comp_diis(molecule, ao_basis, min_basis, loc_rank, loc_nodes,
+                           comm, ostream)
+       
+        # Two level DIIS method
+        if self.acc_type == "L2_DIIS":
         
+            # first step
+            self.first_step = True
+            
+            old_thresh = self.conv_thresh
+            self.conv_thresh = 1.0e-3
+            
+            old_max_iter = self.max_iter
+            self.max_iter = 30
+            
+            val_basis = ao_basis.get_valence_basis()
+            
+            self.comp_diis(molecule, val_basis, min_basis, loc_rank, loc_nodes,
+                           comm, ostream)
+            
+            # second step
+            self.first_step = False
+        
+            self.conv_thresh = old_thresh
+            
+            self.max_iter = old_max_iter
+
+            self.den_guess.guess_type = "PRCMO"
+
+            self.comp_diis(molecule, ao_basis, val_basis, loc_rank, loc_nodes,
+                           comm, ostream)
+
+    def comp_diis(self, molecule, ao_basis, min_basis, loc_rank, loc_nodes,
+                  comm, ostream):
+        
+        start_time = tm.time()
+
+        self.fock_matrices.clear()
+        
+        self.den_matrices.clear()
+    
         ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis,
                                                         loc_rank, loc_nodes,
                                                         comm, ostream)
                                                         
-        # DIIS or L2_DIIS method
-        if self.acc_type == "DIIS" or self.acc_type == "L2_DIIS":
-            eri_drv = ElectronRepulsionIntegralsDriver.create(loc_rank,
-                                                              loc_nodes,
-                                                              comm)
-            qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
-                                      molecule, ao_basis, ostream, comm)
-                                      
-            if self.acc_type == "L2_DIIS":
+        if loc_rank == mpi_master():
+            oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh, ostream)
+    
+        eri_drv = ElectronRepulsionIntegralsDriver.create(loc_rank,
+                                                          loc_nodes,
+                                                          comm)
+                                                          
+        qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
+                                  molecule, ao_basis, ostream, comm)
+
+        den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
+                                          ovl_mat, loc_rank, loc_nodes, comm,
+                                          ostream)
+
+        old_den_mat = AODensityMatrix(den_mat)
+
+        fock_mat = AOFockMatrix(den_mat)
+    
+        if loc_rank == mpi_master():
+            self.print_scf_title(ostream)
+
+        for i in self.get_scf_range():
+            
+            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
+                            ostream, comm)
                 
-                val_basis = ao_basis.get_valence_basis()
+            e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
+                                                 den_mat)
                 
-                val_orbs = self.comp_valence_scf(molecule, val_basis, min_basis,
-                                                 loc_rank, loc_nodes, comm,
-                                                 ostream)
-                                                 
-                self.den_guess = DensityGuess("PRCMO")
+            self.comp_full_fock(fock_mat, kin_mat, npot_mat)
+                        
+            e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat)
                 
-                den_mat = self.den_guess.prcmo_density(molecule, ao_basis,
-                                                       val_basis, val_orbs)
-            else:
-                den_mat = self.den_guess.sad_density(molecule, ao_basis,
-                                                     min_basis, ovl_mat,
-                                                     loc_rank, loc_nodes,
-                                                     comm, ostream)
-           
-            if loc_rank == mpi_master():
-                oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh, ostream)
+            diff_den = self.comp_density_change(den_mat, old_den_mat)
+                
+            self.set_skip_iter_flag(i, e_grad)
+                
+            self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
+
+            self.check_convergence()
+                
+            self.print_iter_data(i, ostream)
+                
+            self.store_diis_data(i, fock_mat, den_mat)
+    
+            eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
+
+            self.apply_level_shift(eff_fock_mat, oao_mat, molecule)
+
+            self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
+                                                        ostream)
             
             old_den_mat = AODensityMatrix(den_mat)
-            fock_mat = AOFockMatrix(den_mat)
-            mol_orbs = MolecularOrbitals()
-           
-            self.print_scf_title(ostream)
+
+            den_mat = self.gen_new_density(molecule)
             
-            for i in self.get_scf_range():
-                eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
-                                ostream, comm)
-                e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat,
-                                                     npot_mat, den_mat)
-                self.comp_full_fock(fock_mat, kin_mat, npot_mat)
-                
-                e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat)
-                diff_den = self.comp_density_change(den_mat, old_den_mat)
-                
-                self.set_skip_iter_flag(i, e_grad)
-                self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
-                self.check_convergence()
-                self.print_iter_data(i, ostream)
-                
-                self.store_diis_data(i, fock_mat, den_mat)
-                
-                eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat,
-                                                       oao_mat)
-                self.apply_level_shift(eff_fock_mat, oao_mat, molecule)
-                mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
-                                                       ostream)
-            
-                old_den_mat = AODensityMatrix(den_mat)
-                den_mat = self.gen_new_density(mol_orbs, molecule)
-                
-                if self.is_converged:
-                    break
+            if self.is_converged:
+                break
+
+        if loc_rank == mpi_master():
+            self.print_scf_finish(start_time, ostream)
 
     def comp_one_ints(self, molecule, basis, loc_rank, loc_nodes, comm,
                       ostream):
@@ -157,77 +205,42 @@ class ScfDriver:
         
         return (ovl_mat, kin_mat, npot_mat)
     
-    def comp_valence_scf(self, molecule, val_basis, min_basis, loc_rank,
-                         loc_nodes, comm, ostream):
-        
-        start_time = tm.time()
-        
-        ostream.put_info("Starting Valence SCF calculation...")
-        ostream.new_line()
-        
-        ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, val_basis,
-                                                        loc_rank, loc_nodes,
-                                                        comm, ostream)
-        den_mat = self.den_guess.sad_density(molecule, val_basis, min_basis,
-                                             ovl_mat, loc_rank, loc_nodes, comm,
-                                             ostream);
-        
-        eri_drv = ElectronRepulsionIntegralsDriver.create(loc_rank,
-                                                          loc_nodes,
-                                                          comm)
-        qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
-                                  molecule, val_basis, ostream, comm)
+    def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat,
+                           loc_rank, loc_nodes, comm, ostream):
        
-        if loc_rank == mpi_master():
-            oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh, ostream)
+        # guess: superposition of atomic densities
+        if self.den_guess.guess_type == "SAD":
+           
+            return self.den_guess.sad_density(molecule, ao_basis, min_basis,
+                                              ovl_mat, loc_rank, loc_nodes,
+                                              comm, ostream)
         
-        fock_mat = AOFockMatrix(den_mat)
-        mol_orbs = MolecularOrbitals()
-        
-        for i in range(6):
-            eri_drv.compute(fock_mat, den_mat, molecule, val_basis, qq_data,
-                            ostream, comm)
-            e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
-                                                 den_mat)
-            self.comp_full_fock(fock_mat, kin_mat, npot_mat)
-            eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
+        # guess: projection of molecular orbitals from reduced basis
+        if self.den_guess.guess_type == "PRCMO":
             
-            mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
-                                                   ostream)
-            
-            den_mat = self.gen_new_density(mol_orbs, molecule)
-        
-        valstr = "Valence SCF energy: "
-        valstr += "{:.12f}".format(e_ee + e_kin + e_en)
-        valstr += " au. Time: "
-        valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
-        ostream.put_info(valstr)
-        ostream.new_line()
-        
-        return mol_orbs
+            return self.den_guess.prcmo_density(molecule, ao_basis, min_basis,
+                                                self.mol_orbs)
+
+        return AODensityMatrix()
 
     def set_skip_iter_flag(self, i, e_grad):
         
-        if self.acc_type == "L2_DIIS":
-            if i == 0:
-                self.skip_iter = True
-            else:
-                self.skip_iter = False
-            self.use_level_shift = False
-            return
+        self.num_iter = i
         
-        if self.den_guess.guess_type == "SAD" and i < 2:
+        self.use_level_shift = False
+        
+        if i == 0:
             self.skip_iter = True
-            self.use_level_shift = True
-            return
-        
-        if e_grad < self.diis_thresh:
-            self.skip_iter = False
-            self.use_level_shift = False
         else:
-            self.skip_iter = True
-            self.use_level_shift = True
-
+            if e_grad < self.diis_thresh:
+                self.skip_iter = False
+            else:
+                self.skip_iter = True
+                self.use_level_shift = True
+                # special case: second step in two level DIIS
+                if (self.acc_type == "L2_DIIS") and (not self.first_step):
+                    self.use_level_shift = False
+                    
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         return (0.0, 0.0, 0.0)
 
@@ -252,23 +265,27 @@ class ScfDriver:
     def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
         return MolecularOrbitals()
 
-    def gen_new_density(self, mol_orbs, molecule):
+    def gen_new_density(self, molecule):
         return AODensityMatrix()
     
     def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
-        e_elec = e_ee + e_kin + e_en
+        
+        e_elec = e_ee + e_kin + e_en + self.nuc_energy
+
         de_elec = e_elec - self.old_energy
         
         self.iter_data.append((e_elec, de_elec, e_grad, diff_den))
+        
         self.old_energy = e_elec
 
     def check_convergence(self):
         
         self.is_converged = False
-        ddim = len(self.iter_data)
         
-        if ddim > 0:
+        if len(self.iter_data) > 0:
+            
             e_elec, de_elec, e_grad, diff_den = self.iter_data[-1]
+            
             if (abs(de_elec)  < self.conv_thresh and
                 abs(e_grad)   < self.conv_thresh and
                 abs(diff_den) < self.conv_thresh):
@@ -276,10 +293,7 @@ class ScfDriver:
 
     def get_scf_range(self):
         
-        if self.den_guess.guess_type == "SAD":
-            return range(self.max_iter + 1)
-        
-        return range(self.max_iter)
+        return range(self.max_iter + 1)
 
     def print_header(self, ostream):
         
@@ -318,34 +332,64 @@ class ScfDriver:
 
     def print_scf_title(self, ostream):
         
-        ostream.new_line()
-        ostream.put_header("Iter. |   Hartree-Fock Energy, au   | "
-                           "Energy Change, au |  Gradient Norm  | "
-                           "Density Change |")
-        ostream.put_header(92 * "-")
+        if self.first_step:
+            ostream.put_info("Starting Reduced Basis SCF calculation...")
+        else:
+            ostream.new_line()
+            ostream.put_header("Iter. |   Hartree-Fock Energy, au   | "
+                               "Energy Change, au |  Gradient Norm  | "
+                               "Density Change |")
+            ostream.put_header(92 * "-")
+
+    def print_scf_finish(self, start_time, ostream):
+    
+        if self.first_step:
+            valstr = "...done. SCF energy: "
+            valstr += "{:.12f}".format(self.old_energy)
+            valstr += " au. Time: "
+            valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
+            ostream.put_info(valstr)
+            ostream.new_line()
+        else:
+            valstr = "*** SCF "
+            if self.is_converged:
+                valstr += "converged in "
+            else:
+                valstr += "not converged in "
+            valstr += str(self.num_iter)
+            valstr += " iterations. Time: "
+            valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
+            ostream.new_line()
+            ostream.put_header(valstr.ljust(92))
+            ostream.new_line()
 
     def print_iter_data(self, i, ostream):
         
-        if self.den_guess.guess_type == "SAD" and i == 0:
+        # no output for first step in two level DIIS
+        if self.first_step:
             return
         
-        ddim = len(self.iter_data)
-        if ddim > 0:
-            energy, denergy, egrad, dden = self.iter_data[-1]
-            if self.den_guess.guess_type == "SAD" and i == 1:
-                denergy = 0.0
-                dden = 0.0
+        # DIIS or second step in two level DIIS
+        if i > 0:
+
+            if len(self.iter_data) > 0:
+                energy, diff_energy, e_grad, diff_den = self.iter_data[-1]
+
+            if i == 1:
+                diff_energy = 0.0
+                diff_den = 0.0
             
-            exec_str =  " " + (str(i)).rjust(3) + 4 * " "
+            exec_str  = " " + (str(i)).rjust(3) + 4 * " "
             exec_str += ("{:7.12f}".format(energy)).center(27) + 3 * " "
-            exec_str += ("{:5.10f}".format(denergy)).center(17) + 3 * " "
-            exec_str += ("{:5.8f}".format(egrad)).center(15) + 3 * " "
-            exec_str += ("{:5.8f}".format(dden)).center(15) + " "
+            exec_str += ("{:5.10f}".format(diff_energy)).center(17) + 3 * " "
+            exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
+            exec_str += ("{:5.8f}".format(diff_den)).center(15) + " "
+
             ostream.put_header(exec_str)
             ostream.flush()
 
-    def get_scf_energy(self, enuc):
-        return self.old_energy + enuc
+    def get_scf_energy(self):
+        return self.old_energy
 
     def get_scf_type(self):
         return "Undefined"
