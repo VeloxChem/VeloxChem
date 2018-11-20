@@ -43,7 +43,7 @@ class ScfDriver:
         self.conv_thresh = 1.0e-6
         self.eri_thresh  = 1.0e-12
         self.ovl_thresh  = 1.0e-6
-        self.diis_thresh = 0.1
+        self.diis_thresh = 0.2
         
         # iterations data
         self.iter_data = []
@@ -51,10 +51,6 @@ class ScfDriver:
         self.skip_iter = False
         self.old_energy = 0.0
         self.num_iter = 0
-        
-        # level shifting data
-        self.use_level_shift = False
-        self.level_shift = 0.2
         
         # DIIS data lists
         self.fock_matrices = deque()
@@ -96,7 +92,7 @@ class ScfDriver:
             self.conv_thresh = 1.0e-3
             
             old_max_iter = self.max_iter
-            self.max_iter = 10
+            self.max_iter = 5
             
             val_basis = ao_basis.get_valence_basis()
             
@@ -105,6 +101,8 @@ class ScfDriver:
             
             # second step
             self.first_step = False
+
+            self.diis_thresh = 1000.0
         
             self.conv_thresh = old_thresh
             
@@ -175,8 +173,6 @@ class ScfDriver:
     
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
-            self.apply_level_shift(eff_fock_mat, oao_mat, molecule)
-
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                         ostream)
             
@@ -236,10 +232,6 @@ class ScfDriver:
                 self.skip_iter = False
             else:
                 self.skip_iter = True
-                self.use_level_shift = True
-                # special case: second step in two level DIIS
-                #if (self.acc_type == "L2_DIIS") and (not self.first_step):
-                #    self.use_level_shift = False
                     
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         return (0.0, 0.0, 0.0)
@@ -258,9 +250,6 @@ class ScfDriver:
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         return None
-
-    def apply_level_shift(self, fock_mat, oao_mat, molecule):
-        return
 
     def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
         return MolecularOrbitals()

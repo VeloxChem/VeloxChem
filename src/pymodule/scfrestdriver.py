@@ -99,24 +99,6 @@ class ScfRestrictedDriver(ScfDriver):
         
         return effmat
     
-    def apply_level_shift(self, fock_mat, oao_mat, molecule):
-        
-        if self.use_level_shift:
-            
-            tmat = oao_mat.to_numpy()
-            
-            ndomo = molecule.number_of_electrons() // 2
-            ndim = fock_mat.shape[0]
-            
-            fdisp = np.zeros(shape=(ndim, ndim), dtype=float)
-            
-            for i in range(ndomo):
-                
-                fdisp[i][i] = -self.level_shift;
-            
-            fock_mat = fock_mat + np.matmul(tmat.transpose(),
-                                            np.matmul(fdisp, tmat))
-
     def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
         
         tmat = oao_mat.to_numpy()
