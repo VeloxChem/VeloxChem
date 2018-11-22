@@ -293,9 +293,7 @@ class ScfDriver:
             
             e_elec, de_elec, e_grad, diff_den = self.iter_data[-1]
             
-            if (abs(de_elec)  < self.conv_thresh and
-                abs(e_grad)   < self.conv_thresh and
-                abs(diff_den) < self.conv_thresh):
+            if e_grad < self.conv_thresh:
                 self.is_converged = True
 
     def get_scf_range(self):
