@@ -110,6 +110,15 @@ CScreeningContainer::operator!=(const CScreeningContainer& other) const
     return !(*this == other);
 }
 
+void
+CScreeningContainer::setThreshold(const double threshold)
+{
+    for (size_t i = 0; i < _screeners.size(); i++)
+    {
+        _screeners[i].setThreshold(threshold); 
+    }
+}
+
 bool
 CScreeningContainer::isEmpty() const
 {

@@ -189,6 +189,7 @@ void export_twoints()
         )
         .def(bp::init<const CCauchySchwarzScreener&>())
         .def("get_threshold", &CCauchySchwarzScreener::getThreshold)
+        .def("set_threshold", &CCauchySchwarzScreener::setThreshold)
         .def("get_screening_scheme", &CCauchySchwarzScreener::getScreeningScheme)
         .def(bp::self == bp::other<CCauchySchwarzScreener>())
     ;
@@ -203,6 +204,7 @@ void export_twoints()
         .def(bp::init<const CScreeningContainer&>())
         .def("is_empty", &CScreeningContainer::isEmpty)
         .def("get_number_of_screeners", &CScreeningContainer::getNumberOfScreeners)
+        .def("set_threshold", &CScreeningContainer::setThreshold)
         .def(bp::self == bp::other<CScreeningContainer>())
     ;
 

@@ -19,6 +19,7 @@ from .denguess import DensityGuess
 
 import numpy as np
 import time as tm
+import math
 
 from collections import deque
 
@@ -180,6 +181,9 @@ class ScfDriver:
 
             den_mat = self.gen_new_density(molecule)
             
+            if self.qq_dyn:
+                qq_data.set_threshold(self.get_dyn_threshold(e_grad))
+            
             if self.is_converged:
                 break
 
@@ -256,6 +260,20 @@ class ScfDriver:
 
     def gen_new_density(self, molecule):
         return AODensityMatrix()
+
+    def get_dyn_threshold(self, e_grad):
+
+        nteri = math.pow(10, math.floor(math.log10(e_grad)));
+
+        nteri = 1.0e-8 * nteri
+    
+        if nteri > 1.0e-8:
+            return 1.0e-8
+        
+        if nteri < self.eri_thresh:
+            return self.eri_thresh
+
+        return nteri
     
     def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
         
