@@ -36,7 +36,7 @@ class ScfDriver:
         self.first_step = False
         
         # screening scheme
-        self.qq_type = "QQ"
+        self.qq_type = "QQ_DEN"
         self.qq_dyn = True
         
         # thresholds
@@ -292,7 +292,7 @@ class ScfDriver:
         ostream.new_line()
         
         str_width = 80
-        cur_str = "WaveFunction Model           : " + self.get_scf_type()
+        cur_str = "Wave Function Model          : " + self.get_scf_type()
         ostream.put_header(cur_str.ljust(str_width))
         cur_str = "Initial Guess Model          : " + self.den_guess.guess_type
         ostream.put_header(cur_str.ljust(str_width))
@@ -441,4 +441,10 @@ class ScfDriver:
         if self.qq_type == "QQR":
             return ericut.qqr
         
+        if self.qq_type == "QQ_DEN":
+            return ericut.qqden
+
+        if self.qq_type == "QQR_DEN":
+            return ericut.qqrden
+
         return None;

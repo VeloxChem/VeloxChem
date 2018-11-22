@@ -318,9 +318,15 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     auto qqpairs = ketpairs;
     
+    auto ddpairs = ketpairs;
+    
     CMemBlock<int32_t> qqvec(cdim);
     
+    CMemBlock<int32_t> qqidx(cdim);
+    
     CMemBlock<double> distpq(cdim);
+    
+    CMemBlock<double> qqden(cdim);
     
     // loop over contracted GTOs ob bra side
     
@@ -346,6 +352,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
             
             intsScreener.setScreeningVector(qqvec, distpq, symbk, i);
             
+            mathfunc::ordering(qqidx.data(), qqvec.data(), nqcdim);
+            
             nqcdim = qqpairs.compress(ketpairs, qqvec, nqcdim);
             
             if (nqcdim > 0) nqpdim = qqpairs.getNumberOfPrimPairs(nqcdim - 1);
@@ -355,63 +363,160 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
         
         if (nqcdim == 0) continue;
         
-        // compute distances: R(PQ) = P - Q
+        // density based screeing of integrals batches
         
-        twointsfunc::compDistancesPQ(rpq, brapairs, qqpairs, nqpdim, i);
+        if (useqq)
+        {
+            // determine max. density element for GTO pairs on ket side
+            
+            if ((intsScreener.getScreeningScheme() == ericut::qqden) ||
+                (intsScreener.getScreeningScheme() == ericut::qqrden))
+            {
+                distPattern.getMaxDensityElements(qqden, brapairs, qqpairs,
+                                                  symbk, nqcdim, i);
+                
+                intsScreener.setScreeningVector(qqvec, qqidx, qqden, distpq,
+                                                nqcdim, i);
+                
+                nqcdim = ddpairs.compress(qqpairs, qqvec, nqcdim);
+                
+                if (nqcdim > 0) nqpdim = ddpairs.getNumberOfPrimPairs(nqcdim - 1);
+            }
+        }
         
-        // compute Obara-Saika recursion factors
+        // all integrals are vanishing in batch, skip computations
         
-        twointsfunc::compFactorsForElectronRepulsion(rfacts, brapairs, qqpairs,
-                                                     nqpdim, i);
+        if (nqcdim == 0) continue;
         
-        // compute coordinates of center W
+        // density screened scheme
         
-        twointsfunc::compCoordinatesForW(rw, rfacts, 4, brapairs, qqpairs,
-                                         nqpdim, i);
+        if ((intsScreener.getScreeningScheme() == ericut::qqden) ||
+            (intsScreener.getScreeningScheme() == ericut::qqrden))
+        {
+            // compute distances: R(PQ) = P - Q
+            
+            twointsfunc::compDistancesPQ(rpq, brapairs, ddpairs, nqpdim, i);
+            
+            // compute Obara-Saika recursion factors
+            
+            twointsfunc::compFactorsForElectronRepulsion(rfacts, brapairs,
+                                                         ddpairs, nqpdim, i);
+            
+            // compute coordinates of center W
+            
+            twointsfunc::compCoordinatesForW(rw, rfacts, 4, brapairs, ddpairs,
+                                             nqpdim, i);
+            
+            // compute distances: R(WP) = W - P
+            
+            twointsfunc::compDistancesWP(rwp, rw, brapairs, ddpairs, nqpdim, i);
+            
+            // compute distances: R(WQ) = W - Q;
+            
+            twointsfunc::compDistancesWQ(rwq, rw, brapairs, ddpairs, nqpdim, i);
+            
+            // compute primitive electron repulsion integrals
+            
+            _compPrimElectronRepulsionInts(pbuffer, vrrvec, vrridx, bftab,
+                                           bargs, bvals, bord, rfacts, rpq, rwp,
+                                           rwq, brapairs, ddpairs, nqpdim, i);
+            
+            // contract primitive electron repulsion integrals
+            
+            genfunc::contract(khrrbuffer, pbuffer, khrrvec, khrridx, vrrvec,
+                              vrridx, brapairs, ddpairs, nqpdim, nqcdim, i);
+            
+            // apply horizontal recursion on ket side
+            
+            ddpairs.getDistancesAB(rcd, nqcdim);
+            
+            _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, ddpairs, nqcdim,
+                           i);
+            
+            // transform ket side to spherical form
+            
+            genfunc::transform_ket(bhrrbuffer, khrrbuffer, cmom, dmom, bhrrvec,
+                                   bhrridx, khrrvec, khrridx, ddpairs, nqcdim,
+                                   i);
+            
+            // apply horizontal recursion on bra side
+            
+            _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, ddpairs, nqcdim,
+                           i);
+            
+            // transform bra side to spherical form
+            
+            genfunc::transform_bra(spherbuffer, bhrrbuffer, amom, bmom, bhrrvec,
+                                   bhrridx, ddpairs, nqcdim, i);
+            
+            // distribute integrals: add distribution or Fock formation code
+            
+            distPattern.distribute(spherbuffer, brapairs, ddpairs, symbk,
+                                   nqcdim, i);
+        }
+        else
+        {
+            // compute distances: R(PQ) = P - Q
         
-        // compute distances: R(WP) = W - P
+            twointsfunc::compDistancesPQ(rpq, brapairs, qqpairs, nqpdim, i);
         
-        twointsfunc::compDistancesWP(rwp, rw, brapairs, qqpairs, nqpdim, i);
+            // compute Obara-Saika recursion factors
         
-        // compute distances: R(WQ) = W - Q;
+            twointsfunc::compFactorsForElectronRepulsion(rfacts, brapairs,
+                                                         qqpairs, nqpdim, i);
         
-        twointsfunc::compDistancesWQ(rwq, rw, brapairs, qqpairs, nqpdim, i);
+            // compute coordinates of center W
         
-        // compute primitive electron repulsion integrals
+            twointsfunc::compCoordinatesForW(rw, rfacts, 4, brapairs, qqpairs,
+                                             nqpdim, i);
         
-        _compPrimElectronRepulsionInts(pbuffer, vrrvec, vrridx, bftab, bargs,
-                                       bvals, bord, rfacts, rpq, rwp, rwq,
-                                       brapairs, qqpairs, nqpdim, i);
+            // compute distances: R(WP) = W - P
         
-        // contract primitive electron repulsion integrals
+            twointsfunc::compDistancesWP(rwp, rw, brapairs, qqpairs, nqpdim, i);
         
-        genfunc::contract(khrrbuffer, pbuffer, khrrvec, khrridx, vrrvec, vrridx,
-                          brapairs, qqpairs, nqpdim, nqcdim, i);
+            // compute distances: R(WQ) = W - Q;
         
-        // apply horizontal recursion on ket side
+            twointsfunc::compDistancesWQ(rwq, rw, brapairs, qqpairs, nqpdim, i);
         
-        qqpairs.getDistancesAB(rcd, nqcdim); 
+            // compute primitive electron repulsion integrals
         
-        _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, qqpairs, nqcdim, i);
+            _compPrimElectronRepulsionInts(pbuffer, vrrvec, vrridx, bftab,
+                                           bargs, bvals, bord, rfacts, rpq, rwp,
+                                           rwq, brapairs, qqpairs, nqpdim, i);
         
-        // transform ket side to spherical form
+            // contract primitive electron repulsion integrals
         
-        genfunc::transform_ket(bhrrbuffer, khrrbuffer, cmom, dmom, bhrrvec, bhrridx,
-                               khrrvec, khrridx, qqpairs, nqcdim, i);
+            genfunc::contract(khrrbuffer, pbuffer, khrrvec, khrridx, vrrvec,
+                              vrridx, brapairs, qqpairs, nqpdim, nqcdim, i);
         
-        // apply horizontal recursion on bra side
+            // apply horizontal recursion on ket side
         
-        _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, qqpairs, nqcdim, i);
+            qqpairs.getDistancesAB(rcd, nqcdim);
         
+            _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, qqpairs, nqcdim,
+                           i);
         
-        // transform bra side to spherical form
+            // transform ket side to spherical form
         
-        genfunc::transform_bra(spherbuffer, bhrrbuffer, amom, bmom, bhrrvec, bhrridx,
-                               qqpairs, nqcdim, i);
+            genfunc::transform_ket(bhrrbuffer, khrrbuffer, cmom, dmom, bhrrvec,
+                                   bhrridx, khrrvec, khrridx, qqpairs, nqcdim,
+                                   i);
         
-        // distribute integrals: add distribution or Fock formation code
+            // apply horizontal recursion on bra side
         
-        distPattern.distribute(spherbuffer, brapairs, qqpairs, symbk, nqcdim, i);
+            _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, qqpairs, nqcdim,
+                           i);
+        
+            // transform bra side to spherical form
+        
+            genfunc::transform_bra(spherbuffer, bhrrbuffer, amom, bmom, bhrrvec,
+                                   bhrridx, qqpairs, nqcdim, i);
+        
+            // distribute integrals: add distribution or Fock formation code
+        
+            distPattern.distribute(spherbuffer, brapairs, qqpairs, symbk,
+                                   nqcdim, i);
+        }
     }
 }
 

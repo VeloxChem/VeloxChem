@@ -211,6 +211,25 @@ public:
                             const int32_t             iContrPair) const;
     
     /**
+     Sets screening vector with elements 0 (exclude GTOs pair) or 1 (include
+     GTOs pair) for AO based screening.
+
+     @param qqVector the screening vector.
+     @param qqIndexes the vector of indexes to QQ values.
+     @param maxDensityElements the vector of maximum density elements.
+     @param pqDistances the vector of effective distances between contracted
+            GTOs pairs on bra and ket sides.
+     @param nContrPairs the number of contracted GTOs pairs on ket side.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                            const CMemBlock<int32_t>& qqIndexes,
+                            const CMemBlock<double>&  maxDensityElements,
+                            const CMemBlock<double>&  pqDistances,
+                            const int32_t             nContrPairs,
+                            const int32_t             iContrPair) const;
+    
+    /**
      Converts Cauchy-Schwarz screener object to text output and insert it into
      output text stream.
      

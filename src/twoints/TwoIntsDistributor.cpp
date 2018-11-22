@@ -13,6 +13,7 @@
 #include "StringFormat.hpp"
 #include "AngularMomentum.hpp"
 #include "DistFock.hpp"
+#include "DistMaxDensity.hpp"
 
 CTwoIntsDistribution::CTwoIntsDistribution()
 
@@ -174,12 +175,6 @@ CTwoIntsDistribution::setFockContainer(const CGtoPairsBlock&      braGtoPairsBlo
 }
 
 void
-CTwoIntsDistribution::accumulate()
-{
-    _fockContainer.accumulate(_aoFock); 
-}
-
-void
 CTwoIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
                                  const CGtoPairsBlock&      braGtoPairsBlock,
                                  const CGtoPairsBlock&      ketGtoPairsBlock,
@@ -213,6 +208,49 @@ CTwoIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
                                isBraEqualKet, nKetContrPairs, iContrPair);
         
         return;
+    }
+}
+
+void
+CTwoIntsDistribution::accumulate()
+{
+    _fockContainer.accumulate(_aoFock);
+}
+
+void
+CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityElements,
+                                            const CGtoPairsBlock&    braGtoPairsBlock,
+                                            const CGtoPairsBlock&    ketGtoPairsBlock,
+                                            const bool               isBraEqualKet,
+                                            const int32_t            nKetContrPairs,
+                                            const int32_t            iContrPair) const
+{
+    // initialize vector of max. density elements
+    
+    maxDensityElements.zero();
+    
+    // set up number of AO Fock matrices
+    
+    auto nfock = _aoFock->getNumberOfFockMatrices();
+    
+    for (int32_t i = 0; i < nfock; i++)
+    {
+        // set up fock matrix type and origin
+        
+        auto fcktyp = _aoFock->getFockType(i);
+        
+        auto idden = _aoFock->getDensityIdentifier(i);
+        
+        // closed shell restricted Hatree-Fock: J + K
+        
+        if (fcktyp == fockmat::restjk)
+        {
+            distmaxden::getMaxRestDenJK(maxDensityElements,
+                                        _aoDensity->totalDensity(idden),
+                                        _aoDensity->getNumberOfColumns(idden),
+                                        braGtoPairsBlock, ketGtoPairsBlock,
+                                        nKetContrPairs, iContrPair);
+        }
     }
 }
 
@@ -323,7 +361,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                  _aoDensity->totalDensity(idden),
                                  _aoDensity->getNumberOfColumns(idden),
                                  spherInts, braGtoPairsBlock, ketGtoPairsBlock,
-                                 isBraEqualKet, nKetContrPairs, iContrPair);
+                                 nKetContrPairs, iContrPair);
         }
     }
 }
