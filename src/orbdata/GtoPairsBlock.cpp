@@ -612,8 +612,10 @@ CGtoPairsBlock::operator!=(const CGtoPairsBlock& other) const
 }
 
 std::vector<CGtoPairsBlock>
-CGtoPairsBlock::split(const int32_t batchSize) const
+CGtoPairsBlock::split() const
 {
+    auto batchSize = _getBlockDimensions();
+    
     // determine number of batches
     
     auto nbtch = _nScreenedContrPairs / batchSize;
@@ -1438,6 +1440,22 @@ CGtoPairsBlock::getScreenedSizeString() const
     str.append(std::to_string(_nScreenedPrimPairs));
     
     return fstr::format(str, 32, fmt::left);
+}
+
+int32_t
+CGtoPairsBlock::_getBlockDimensions() const
+{
+    auto angab = _braAngularMomentum + _ketAngularMomentum ;
+    
+    if (angab > 7) return 16;
+    
+    if (angab > 5) return 32;
+    
+    if (angab > 3) return 64;
+    
+    if (angab > 1) return 128;
+    
+    return 256;
 }
 
 std::ostream&

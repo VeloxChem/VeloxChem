@@ -301,7 +301,7 @@ class CElectronRepulsionIntegralsDriver
      @return the Q values buffer as vector of mememory block objects.
      */
      CVecMemBlock<double> _getQValuesBuffer(const CGtoPairsContainer& gtoPairsContainer) const;
-    
+        
 public:
     
     /**

@@ -62,7 +62,7 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
     
     // split GTOs pairs into batches on bra side
     
-    auto bbpairs = bgtopairs.split(500);
+    auto bbpairs = bgtopairs.split();
     
     // compute repulsion integrals
     
@@ -90,7 +90,7 @@ CElectronRepulsionIntegralsDriver::compute(const ericut           screeningSchem
     
     // split GTOs pairs into batches on bra side
     
-    auto bbpairs = bgtopairs.split(500);
+    auto bbpairs = bgtopairs.split();
     
     // allocate temporary buffer for Q values on bra side
     
@@ -1902,3 +1902,4 @@ CElectronRepulsionIntegralsDriver::_getQValuesBuffer(const CGtoPairsContainer& g
     
     return buffvec;
 }
+
