@@ -6,21 +6,21 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "CubeGeneratorTest.hpp"
+#include "VisualizationDriverTest.hpp"
 
 #include <iostream>
 #include <iomanip>
 #include <cmath>
 #include <vector>
 
-#include "CubeGenerator.hpp"
+#include "VisualizationDriver.hpp"
 #include "MathConst.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MolecularOrbitals.hpp"
 #include "AODensityMatrix.hpp"
 
-TEST_F(CCubeGeneratorTest, Helium)
+TEST_F(CVisualizationDriverTest, Helium)
 {
     // predefined variables
 
@@ -97,9 +97,9 @@ TEST_F(CCubeGeneratorTest, Helium)
     
     auto basis = vlxbas::getMinimalBasisForHeAtom();
 
-    auto psi = cubes::getPsiMolecularOrbital(mol, basis,
-                                             moa, 0, "a",
-                                             xp, yp, zp);
+    CVisualizationDriver visdrv;
+
+    auto psi = visdrv.compute(mol, basis, moa, 0, "a", xp, yp, zp);
 
     ASSERT_NEAR(mypsi, psi, 1.0e-13);
 
@@ -109,9 +109,7 @@ TEST_F(CCubeGeneratorTest, Helium)
     
     CAODensityMatrix dena({da}, denmat::rest);
 
-    auto psi2 = cubes::getPsiDensity(mol, basis,
-                                     dena, 0, "a",
-                                     xp, yp, zp);
+    auto psi2 = visdrv.compute(mol, basis, dena, 0, "a", xp, yp, zp);
 
     ASSERT_NEAR(psi*psi, psi2, 1.0e-13);
 }

@@ -6,7 +6,7 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "CubeGenerator.hpp"
+#include "VisualizationDriver.hpp"
 
 #include <cmath>
 
@@ -15,8 +15,18 @@
 #include "MolecularBasis.hpp"
 #include "ErrorHandler.hpp"
 
-const std::vector<std::vector<int32_t>>
-cubes::buildCartesianAngularMomentum(int32_t angl)
+CVisualizationDriver::CVisualizationDriver()
+{
+    
+}
+
+CVisualizationDriver::~CVisualizationDriver()
+{
+    
+}
+
+std::vector<std::vector<int32_t>>
+CVisualizationDriver::_buildCartesianAngularMomentum(int32_t angl) const
 {
     std::vector<std::vector<int32_t>> lmn;
 
@@ -43,12 +53,12 @@ cubes::buildCartesianAngularMomentum(int32_t angl)
     return lmn;
 }
 
-const std::vector<double>
-cubes::getPhiAtomicOrbitals(const CMolecule&       molecule,
-                            const CMolecularBasis& basis,
-                            const double           xp,
-                            const double           yp,
-                            const double           zp)
+std::vector<double>
+CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
+                                             const CMolecularBasis& basis,
+                                             const double           xp,
+                                             const double           yp,
+                                             const double           zp) const
 {
     auto natoms = molecule.getNumberOfAtoms();
 
@@ -64,7 +74,7 @@ cubes::getPhiAtomicOrbitals(const CMolecule&       molecule,
 
         auto nsph = sphmom.getNumberOfComponents();
 
-        auto lmn = buildCartesianAngularMomentum(angl);
+        auto lmn = _buildCartesianAngularMomentum(angl);
 
         // magnetic quantum number: s,p-1,p0,p+1,d-2,d-1,d0,d+1,d+2,...
 
@@ -153,18 +163,18 @@ cubes::getPhiAtomicOrbitals(const CMolecule&       molecule,
 }
 
 double
-cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
+CVisualizationDriver::compute(const CMolecule&          molecule,
                               const CMolecularBasis&    basis,
                               const CMolecularOrbitals& mo,
                               const int32_t             moidx,
                               const std::string&        mospin,
                               const double              xp,
                               const double              yp,
-                              const double              zp)
+                              const double              zp) const
 {
     double psi = 0.0;
 
-    auto phi = getPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+    auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
 
     const int32_t nao = (int32_t)(phi.size());
 
@@ -172,11 +182,11 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 
     auto mocols = mo.getNumberOfColumns();
 
-    std::string errnao  ("cubes::getPsiMolecularOrbital - Inconsistent number of AOs");
+    std::string errnao  ("getPsiMolecularOrbital - Inconsistent number of AOs");
 
-    std::string erridx  ("cubes::getPsiMolecularOrbital - Invalid MO index");
+    std::string erridx  ("getPsiMolecularOrbital - Invalid MO index");
 
-    std::string errspin ("cubes::getPsiMolecularOrbital - Invalid MO spin");
+    std::string errspin ("getPsiMolecularOrbital - Invalid MO spin");
 
     errors::assertMsgCritical(morows == nao, errnao);
 
@@ -210,18 +220,18 @@ cubes::getPsiMolecularOrbital(const CMolecule&          molecule,
 }
 
 double
-cubes::getPsiDensity(const CMolecule&        molecule,
-                     const CMolecularBasis&  basis,
-                     const CAODensityMatrix& density,
-                     const int32_t           denidx,
-                     const std::string&      denspin,
-                     const double            xp,
-                     const double            yp,
-                     const double            zp)
+CVisualizationDriver::compute(const CMolecule&        molecule,
+                              const CMolecularBasis&  basis,
+                              const CAODensityMatrix& density,
+                              const int32_t           denidx,
+                              const std::string&      denspin,
+                              const double            xp,
+                              const double            yp,
+                              const double            zp) const
 {
     double psi = 0.0;
 
-    auto phi = getPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+    auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
 
     int32_t nao = (int32_t)(phi.size());
 
@@ -229,11 +239,11 @@ cubes::getPsiDensity(const CMolecule&        molecule,
 
     auto dencols = density.getNumberOfColumns(denidx);
 
-    std::string errnao  ("cubes::getPsiDensity - Inconsistent number of AOs");
+    std::string errnao  ("getPsiDensity - Inconsistent number of AOs");
 
-    std::string erridx  ("cubes::getPsiDensity - Invalid density matrix index");
+    std::string erridx  ("getPsiDensity - Invalid density matrix index");
 
-    std::string errspin ("cubes::getPsiDensity - Invalid density matrix spin");
+    std::string errspin ("getPsiDensity - Invalid density matrix spin");
 
     errors::assertMsgCritical(denrows == nao && dencols == nao, errnao);
 

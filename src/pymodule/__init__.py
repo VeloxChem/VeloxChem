@@ -7,6 +7,7 @@ from .veloxchemlib import EnvironmentReader
 from .veloxchemlib import BasisReader
 from .veloxchemlib import Molecule
 from .veloxchemlib import MolecularBasis
+from .veloxchemlib import VisualizationDriver
 
 # C++ functions
 from .veloxchemlib import mpi_master
