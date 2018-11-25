@@ -1826,13 +1826,13 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
             
             // loop over pairs of GTOs blocks
             
-            for (int32_t i = 0; i < nbra; i++)
+            for (int32_t i = (nbra - 1); i >= 0; i--)
             {
                 auto bpairs = braGtoPairsContainer->getGtoPairsBlock(i);
                 
                 auto joff = (symbk) ? i : 0;
                 
-                for (int32_t j = joff; j < nket; j++)
+                for (int32_t j = (nket - 1); j >= joff; j--)
                 {
                     #pragma omp task firstprivate(j, idx)
                     {

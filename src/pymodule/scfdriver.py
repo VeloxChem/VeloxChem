@@ -43,7 +43,7 @@ class ScfDriver:
         # thresholds
         self.conv_thresh = 1.0e-6
         self.eri_thresh  = 1.0e-12
-        self.ovl_thresh  = 1.0e-6
+        self.ovl_thresh  = 1.0e-12
         self.diis_thresh = 0.2
         
         # iterations data

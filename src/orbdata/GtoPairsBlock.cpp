@@ -1447,15 +1447,15 @@ CGtoPairsBlock::_getBlockDimensions() const
 {
     auto angab = _braAngularMomentum + _ketAngularMomentum ;
     
-    if (angab > 7) return 16;
+    if (angab > 3) return 50;
     
-    if (angab > 5) return 32;
+    if (angab = 3) return 100;
     
-    if (angab > 3) return 64;
+    if (angab = 2) return 150;
     
-    if (angab > 1) return 128;
+    if (angab = 1) return 200;
     
-    return 256;
+    return 300;
 }
 
 std::ostream&
