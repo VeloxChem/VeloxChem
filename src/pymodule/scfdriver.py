@@ -57,6 +57,9 @@ class ScfDriver:
         self.fock_matrices = deque()
         self.den_matrices = deque()
     
+        # density matrix
+        self.density = AODensityMatrix()
+
         # molecular orbitals
         self.mol_orbs = MolecularOrbitals()
     
@@ -141,7 +144,7 @@ class ScfDriver:
                                           ovl_mat, loc_rank, loc_nodes, comm,
                                           ostream)
 
-        old_den_mat = AODensityMatrix(den_mat)
+        self.density = AODensityMatrix(den_mat)
 
         fock_mat = AOFockMatrix(den_mat)
     
@@ -160,7 +163,7 @@ class ScfDriver:
                         
             e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat)
                 
-            diff_den = self.comp_density_change(den_mat, old_den_mat)
+            diff_den = self.comp_density_change(den_mat, self.density)
                 
             self.set_skip_iter_flag(i, e_grad)
                 
@@ -177,7 +180,7 @@ class ScfDriver:
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                         ostream)
             
-            old_den_mat = AODensityMatrix(den_mat)
+            self.density = AODensityMatrix(den_mat)
 
             den_mat = self.gen_new_density(molecule)
             

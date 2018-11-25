@@ -17,6 +17,7 @@ from .veloxchemlib import assert_msg_critical
 # Python classes
 from .outputstream import OutputStream
 from .aodensitymatrix import AODensityMatrix
+from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .taskparser import GlobalTask
