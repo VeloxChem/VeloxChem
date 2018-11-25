@@ -12,13 +12,11 @@ class TestRHF(unittest.TestCase):
         task = vlx.GlobalTask("inputs/" + molname + ".inp",
                               "inputs/" + molname + ".out", comm)
 
-        enuc = task.molecule.nuclear_repulsion_energy()
-
         scf_drv = vlx.ScfRestrictedDriver()
 
         scf_drv.compute_task(task)
 
-        return scf_drv.get_scf_energy(enuc)
+        return scf_drv.get_scf_energy()
 
     def test_caffeine(self):
 

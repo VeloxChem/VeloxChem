@@ -25,7 +25,7 @@
 /**
  Class CSADGuessDriver computes SAD initial guess.
  
- @author 
+ @author X. Li
  */
 class CSADGuessDriver
 {

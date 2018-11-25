@@ -8,7 +8,7 @@
 
 #include <boost/python.hpp>
 
-#include "CubeGenerator.hpp"
+#include "VisualizationDriver.hpp"
 #include "ExportVisualization.hpp"
 
 namespace bp = boost::python;
@@ -19,11 +19,39 @@ namespace bp_visualization { // bp_visualization namespace
 
 void export_visualization()
 {
-    bp::def("get_psi_molecular_orbital",
-            &cubes::getPsiMolecularOrbital);
+    // CVisualizationDriver class
+    // Note: Need member function pointers for proper overloading
 
-    bp::def("get_psi_density",
-            &cubes::getPsiDensity);
+    double (CVisualizationDriver::*compute_mol_orb)(
+            const CMolecule&          molecule,
+            const CMolecularBasis&    basis,
+            const CMolecularOrbitals& mo,
+            const int32_t             moidx,
+            const std::string&        mospin,
+            const double              xp,
+            const double              yp,
+            const double              zp) const
+        = &CVisualizationDriver::compute;
+
+    double (CVisualizationDriver::*compute_density)(
+            const CMolecule&        molecule,
+            const CMolecularBasis&  basis,
+            const CAODensityMatrix& density,
+            const int32_t           denidx,
+            const std::string&      denspin,
+            const double            xp,
+            const double            yp,
+            const double            zp) const
+        = &CVisualizationDriver::compute;
+
+    bp::class_< CVisualizationDriver, std::shared_ptr<CVisualizationDriver> >
+        (
+            "VisualizationDriver",
+            bp::init<>()
+        )
+        .def("compute", compute_mol_orb)
+        .def("compute", compute_density)
+    ;
 }
 
 } // bp_visualization namespace

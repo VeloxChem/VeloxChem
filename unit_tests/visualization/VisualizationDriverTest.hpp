@@ -6,18 +6,18 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef CubeGeneratorTest_hpp
-#define CubeGeneratorTest_hpp
+#ifndef VisualizationDriverTest_hpp
+#define VisualizationDriverTest_hpp
 
 #include "gtest/gtest.h"
 
-class CCubeGeneratorTest : public ::testing::Test
+class CVisualizationDriverTest : public ::testing::Test
 {
 protected:
     
-    CCubeGeneratorTest() {};
+    CVisualizationDriverTest() {};
     
-    virtual ~CCubeGeneratorTest() {};
+    virtual ~CVisualizationDriverTest() {};
 };
 
-#endif /* CubeGeneratorTest_hpp */
+#endif /* VisualizationDriverTest_hpp */
