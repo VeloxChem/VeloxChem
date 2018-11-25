@@ -118,7 +118,7 @@ def main():
 
     scf_drv.compute(mol_geom, mol_basis, min_basis, comm, ostream)
 
-    #TODO: write hdf5 MOs and density after SCF
+    # write hdf5 files for MOs and density after SCF convergence
 
     if scf_drv.is_converged:
         scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
@@ -132,9 +132,9 @@ def main():
     # TODO: should also be able to compute psi/density along a line
 
     if scf_drv.is_converged:
-        #vis_grid = vis_drv.gen_grid(mol_geom, nx, ny, nz)
-        #vis_drv.write_cube(mol_geom, mol_basis, scf_drv.mol_orbs, "HOMO", "alpha")
-        pass
+        vis_grid = vis_drv.gen_grid(mol_geom)
+        vis_drv.write_cube(mol_geom, mol_basis, scf_drv.mol_orbs, "HOMO",
+                           "alpha")
 
     # all done, print finish header to output stream
 
