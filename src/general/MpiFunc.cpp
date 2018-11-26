@@ -11,6 +11,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "MathFunc.hpp"
+
 namespace mpi { // mpi namespace
 
 bool
@@ -394,6 +396,25 @@ gather(double*  vector,
     else
     {
         vector[0] = value;
+    }
+}
+   
+void
+reduce_sum(const double*  source,
+                 double*  destination,
+           const int32_t  nElements,
+                 MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        auto merror = MPI_Reduce(source, destination, nElements, MPI_DOUBLE,
+                                 MPI_SUM, mpi::master(), comm);
+        
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::reduce_sum(double)");
+    }
+    else
+    {
+        mathfunc::copy(destination, 0, source, 0, nElements);
     }
 }
     

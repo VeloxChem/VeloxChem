@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "MpiFunc.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityMatrixType.hpp"
 
@@ -176,6 +177,15 @@ public:
      @return the string representation.
      */
     std::string getString() const;
+    
+    /**
+     Broadcasts AO density matrix object within domain of MPI communicator.
+     
+     @param rank the rank of MPI process.
+     @param comm the MPI communicator.
+     */
+    void broadcast(int32_t  rank,
+                   MPI_Comm comm);
 
     /**
      Converts AO density matrix object to text output and insert it into output

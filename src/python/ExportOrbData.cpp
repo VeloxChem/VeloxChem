@@ -95,6 +95,18 @@ CAODensityMatrix_from_numpy_list(const bp::list& arr_list,
     return std::shared_ptr<CAODensityMatrix>(new CAODensityMatrix(dmat, den_type));
 }
     
+// Helper function for broadcasting CAODensityMatrix object
+    
+static void
+CAODensityMatrix_broadcast(CAODensityMatrix& self,
+                           int32_t           rank,
+                           bp::object        py_comm)
+{
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+        
+    self.broadcast(rank, *comm_ptr);
+}
+    
 // Helper function for printing CMolecularOrbitals
 
 static std::string
@@ -253,6 +265,7 @@ void export_orbdata()
         .def("get_number_of_density_matrices",
                 &CAODensityMatrix::getNumberOfDensityMatrices)
         .def("get_density_type", &CAODensityMatrix::getDensityType)
+        .def("broadcast", &CAODensityMatrix_broadcast)
         .def(bp::self == bp::other<CAODensityMatrix>())
     ;
 
