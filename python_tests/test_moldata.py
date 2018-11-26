@@ -90,6 +90,13 @@ class TestMolData(unittest.TestCase):
 
         self.assertTrue((atom_radii == ref_radii).all())
 
+        elem_ids = mol.get_ids_elem()
+
+        ref_ids = [ 1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80 ]
+
+        for a,b in zip(elem_ids, ref_ids):
+            self.assertTrue(a == b)
+
 
 if __name__ == "__main__":
     unittest.main()

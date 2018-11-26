@@ -99,16 +99,37 @@ CMolecule_coordinates_to_numpy(const CMolecule& self)
 static np::ndarray
 CMolecule_vdw_radii_to_numpy(CMolecule& self)
 {
+    auto natoms = self.getNumberOfAtoms();
+
     auto atomradii = vdwradii::getRadii(self);
 
     bp::list radii;
 
-    for (size_t i = 0; i < atomradii.size(); i++)
+    for (int32_t i = 0; i < natoms; i++)
     {
         radii.append(atomradii[i]);
     }
 
     return np::array(radii);
+}
+
+// Helper function for getting nuclear charges for molecule
+
+static bp::list
+CMolecule_get_ids_elem(CMolecule& self)
+{
+    auto natoms = self.getNumberOfAtoms();
+
+    auto idselem = self.getIdsElemental();
+
+    bp::list ids;
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        ids.append(idselem[i]);
+    }
+
+    return ids;
 }
 
 // Helper function for broadcasting CMolecule object
@@ -166,6 +187,7 @@ void export_moldata()
         .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
         .def("coordinates_to_numpy", &CMolecule_coordinates_to_numpy)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
+        .def("get_ids_elem", &CMolecule_get_ids_elem)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
     ;
