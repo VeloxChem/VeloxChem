@@ -7,12 +7,15 @@
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "VdwRadii.hpp"
+#include "Codata.hpp"
 
 namespace vdwradii { // vdwradii namespace
 
 const std::vector<double> buildVdwRadii()
 {
-    return std::vector<double>({
+    // VDW radii in Angstrom
+
+    std::vector<double> radii({
 
         // dummy
         0.00,
@@ -70,6 +73,15 @@ const std::vector<double> buildVdwRadii()
         
         // Rn
         2.00 });
+
+    // VDW radii in Bohr
+
+    for (size_t i = 0; i < radii.size(); i++)
+    {
+        radii[i] /= units::getBohrValueInAngstroms();
+    }
+
+    return radii;
 }
 
 const std::vector<double> getRadii(const CMolecule& mol)

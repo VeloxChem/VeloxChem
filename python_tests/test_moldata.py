@@ -1,6 +1,7 @@
 from mpi4py import MPI
 from veloxchem.taskparser import LocalTask
 from veloxchem.veloxchemlib import Molecule
+from veloxchem.veloxchemlib import bohr_in_angstroms
 
 import numpy as np
 import unittest
@@ -87,6 +88,8 @@ class TestMolData(unittest.TestCase):
 
         ref_radii = np.array([ 1.09, 1.82, 1.70, 1.55, 1.52, 1.80, 1.40, 1.39,
                                1.85, 1.72, 1.66, 1.55 ])
+
+        ref_radii /= bohr_in_angstroms()
 
         self.assertTrue((atom_radii == ref_radii).all())
 
