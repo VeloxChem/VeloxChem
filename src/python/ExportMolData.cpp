@@ -13,6 +13,7 @@
 #include <string>
 
 #include "Molecule.hpp"
+#include "VdwRadii.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
@@ -93,6 +94,23 @@ CMolecule_coordinates_to_numpy(const CMolecule& self)
     return np::array(coords);
 }
 
+// Helper function for getting VDW radii for molecule
+
+static np::ndarray
+CMolecule_vdw_radii_to_numpy(CMolecule& self)
+{
+    auto atomradii = vdwradii::getRadii(self);
+
+    bp::list radii;
+
+    for (size_t i = 0; i < atomradii.size(); i++)
+    {
+        radii.append(atomradii[i]);
+    }
+
+    return np::array(radii);
+}
+
 // Helper function for broadcasting CMolecule object
 
 static void
@@ -147,6 +165,7 @@ void export_moldata()
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
         .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
         .def("coordinates_to_numpy", &CMolecule_coordinates_to_numpy)
+        .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
     ;

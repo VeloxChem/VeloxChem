@@ -69,6 +69,27 @@ class TestMolData(unittest.TestCase):
         self.assertEqual(mol.number_of_atoms(0, 1, 1), 0)
         self.assertEqual(mol.number_of_atoms(0, 2, 1), 1)
 
+    def test_vdw_radii(self):
+
+        # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
+
+        mol = Molecule.from_list(
+            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0,
+              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0,
+              0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0 ],
+            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0 ],
+            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0 ],
+            [ "H", "Li", "C", "N", "O", "S", "Cu", "Zn",
+              "Br", "Ag", "Au", "Hg", ],
+            [ 1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80 ])
+
+        atom_radii = mol.vdw_radii_to_numpy()
+
+        ref_radii = np.array([ 1.09, 1.82, 1.70, 1.55, 1.52, 1.80, 1.40, 1.39,
+                               1.85, 1.72, 1.66, 1.55 ])
+
+        self.assertTrue((atom_radii == ref_radii).all())
+
 
 if __name__ == "__main__":
     unittest.main()
