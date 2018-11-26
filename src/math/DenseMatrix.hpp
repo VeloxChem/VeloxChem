@@ -14,6 +14,7 @@
 #include <vector>
 #include <string>
 
+#include "MpiFunc.hpp"
 #include "MemBlock.hpp"
 
 /**
@@ -135,6 +136,18 @@ public:
     void symmetrize();
     
     /**
+     Reduces dense matrix objects from all MPI process within domain of MPI
+     communicator into dense matrix object on master node by summing them.
+     
+     @param rank the rank of MPI process.
+     @param nodes the number of MPI processes in MPI communicator.
+     @param comm the MPI communicator.
+     */
+    void reduce_sum(int32_t  rank,
+                    int32_t  nodes,
+                    MPI_Comm comm);
+    
+    /**
      Creates dense matrix object by slicing specified size submatrix at
      selected position from this dense matrix object.
 
@@ -204,6 +217,15 @@ public:
      @return the string representation.
      */
     std::string getString() const;
+    
+    /**
+     Broadcasts density matrix object within domain of MPI communicator.
+     
+     @param rank the rank of MPI process.
+     @param comm the MPI communicator.
+     */
+    void broadcast(int32_t  rank,
+                   MPI_Comm comm);
     
     /**
      Converts dense matrix object to text output and insert it into output

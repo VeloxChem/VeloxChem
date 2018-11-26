@@ -234,6 +234,44 @@ CAODensityMatrix::getString() const
     return dmat_str;
 }
 
+void
+CAODensityMatrix::broadcast(int32_t  rank,
+                            MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        // broadcast density matrix type
+        
+        int32_t dmtyp = 0;
+        
+        if (rank == mpi::master()) dmtyp = to_int(_denType);
+        
+        mpi::bcast(dmtyp, comm);
+        
+        if (rank != mpi::master()) _denType = to_denmat(dmtyp);
+        
+        // broadcast vector of AO density matrices 
+        
+        int32_t ndmat = static_cast<int32_t>(_denMatrices.size());
+        
+        mpi::bcast(ndmat, comm);
+        
+        for (int32_t i = 0; i < ndmat; i++)
+        {
+            CDenseMatrix dmat;
+            
+            if (rank == mpi::master()) dmat = _denMatrices[i];
+            
+            dmat.broadcast(rank, comm);
+            
+            if (rank != mpi::master()) _denMatrices.push_back(dmat);
+            
+            MPI_Barrier(comm);
+        }
+        
+    }
+}
+
 std::ostream&
 operator<<(      std::ostream&     output,
            const CAODensityMatrix& source)

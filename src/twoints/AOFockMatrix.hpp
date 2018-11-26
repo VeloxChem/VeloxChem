@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "MpiFunc.hpp"
 #include "DenseMatrix.hpp"
 #include "FockMatrixType.hpp"
 #include "AODensityMatrix.hpp"
@@ -145,6 +146,18 @@ public:
     void addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMatrix,
                             const CNuclearPotentialMatrix& nuclearPotentialMatrix,
                             const int32_t                  iFockMatrix);
+    
+    /**
+     Reduces AO Fock matrix objects from all MPI process within domain of MPI
+     communicator into AO Fock matrix object on master node by summing them.
+     
+     @param rank the rank of MPI process.
+     @param nodes the number of MPI processes in MPI communicator.
+     @param comm the MPI communicator.
+     */
+    void reduce_sum(int32_t  rank,
+                    int32_t  nodes,
+                    MPI_Comm comm);
     
     /**
      Gets number of Fock matrices.

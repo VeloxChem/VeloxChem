@@ -129,6 +129,19 @@ CElectronRepulsionIntegralsDriver_compute_2(
                         oStream, *comm_ptr);
 }
 
+// Helper function for reduce_sum CAOFockMatrix object
+    
+static void
+CAOFockMatrix_reduce_sum(CAOFockMatrix& self,
+                         int32_t        rank,
+                         int32_t        nodes,
+                         bp::object     py_comm)
+{
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+        
+    self.reduce_sum(rank, nodes, *comm_ptr);
+}
+    
 // Exports classes/functions in src/twoints to python
 
 void export_twoints()
@@ -177,6 +190,7 @@ void export_twoints()
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
+        .def("reduce_sum", &CAOFockMatrix_reduce_sum)
         .def(bp::self == bp::other<CAOFockMatrix>())
     ;
 

@@ -270,6 +270,31 @@ CDenseMatrix::getString() const
     return sst.str();
 }
 
+void
+CDenseMatrix::broadcast(int32_t  rank,
+                        MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        mpi::bcast(_nRows, comm);
+    
+        mpi::bcast(_nColumns, comm);
+    
+        _values.broadcast(rank, comm);
+    }
+}
+
+void
+CDenseMatrix::reduce_sum(int32_t rank,
+                         int32_t  nodes,
+                         MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        _values.reduce_sum(rank, nodes, comm);
+    }
+}
+
 std::ostream&
 operator<<(      std::ostream&  output,
            const CDenseMatrix& source)

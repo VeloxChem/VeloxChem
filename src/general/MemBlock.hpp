@@ -256,6 +256,18 @@ public:
     void scatter(int32_t  rank,
                  int32_t  nodes,
                  MPI_Comm comm);
+    
+    /**
+     Reduces memory block objects from all MPI process within domain of MPI
+     communicator into memory block object on master node by summing them.
+     
+     @param rank the rank of MPI process.
+     @param nodes the number of MPI processes in MPI communicator.
+     @param comm the MPI communicator.
+     */
+    void reduce_sum(int32_t  rank,
+                    int32_t  nodes,
+                    MPI_Comm comm);
 
     /**
      Converts memory block object to text output and insert it into output text
@@ -813,6 +825,33 @@ CMemBlock<double>::scatter(int32_t  rank,
         if (_data != nullptr)  mem::free(_data);
 
         _data = bdata;
+    }
+}
+
+template <>
+inline void
+CMemBlock<double>::reduce_sum(int32_t  rank,
+                              int32_t  nodes,
+                              MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        if (nodes == 1) return;
+        
+        double* bdata = nullptr;
+    
+        auto nsize = static_cast<size_t>(_nElements) * sizeof(double);
+        
+        if (rank == mpi::master()) bdata = (double*) mem::malloc(nsize);
+        
+        mpi::reduce_sum(_data, bdata, _nElements, comm);
+        
+        if (rank == mpi::master())
+        {
+            mem::free(_data);
+            
+            _data = bdata;
+        }
     }
 }
 
