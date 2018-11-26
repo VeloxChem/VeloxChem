@@ -68,12 +68,29 @@ CMolecule_from_list(const bp::list& coord_list,
             );
 }
 
-// Helper function for overloading CMolecule::getNumberOfAtoms
+// Helper function for getting coordinates as numpy array
 
-static int32_t
-CMolecule_number_of_atoms(const CMolecule& self)
+static np::ndarray
+CMolecule_coordinates_to_numpy(const CMolecule& self)
 {
-    return self.getNumberOfAtoms();
+    bp::list coords, rx, ry, rz;
+
+    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
+    {
+        rx.append(self.getCoordinatesX()[i]);
+
+        ry.append(self.getCoordinatesY()[i]);
+
+        rz.append(self.getCoordinatesZ()[i]);
+    }
+
+    coords.append(rx);
+
+    coords.append(ry);
+
+    coords.append(rz);
+
+    return np::array(coords);
 }
 
 // Helper function for broadcasting CMolecule object
@@ -93,6 +110,21 @@ CMolecule_broadcast(CMolecule& self,
 void export_moldata()
 {
     // CMolecule class
+    // Note: Need member function pointers for proper overloading
+
+    int32_t (CMolecule::*number_of_atoms_1)(
+            ) const
+        = &CMolecule::getNumberOfAtoms;
+
+    int32_t (CMolecule::*number_of_atoms_2)(
+            const int32_t idElemental) const
+        = &CMolecule::getNumberOfAtoms;
+
+    int32_t (CMolecule::*number_of_atoms_3)(
+            const int32_t iAtom,
+            const int32_t nAtoms,
+            const int32_t idElemental) const
+        = &CMolecule::getNumberOfAtoms;
 
     bp::class_< CMolecule, std::shared_ptr<CMolecule> >
         (
@@ -109,9 +141,12 @@ void export_moldata()
         .def("get_multiplicity", &CMolecule::getMultiplicity)
         .def("print_geometry", &CMolecule::printGeometry)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
-        .def("number_of_atoms", &CMolecule_number_of_atoms)
+        .def("number_of_atoms", number_of_atoms_1)
+        .def("number_of_atoms", number_of_atoms_2)
+        .def("number_of_atoms", number_of_atoms_3)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
         .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
+        .def("coordinates_to_numpy", &CMolecule_coordinates_to_numpy)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
     ;

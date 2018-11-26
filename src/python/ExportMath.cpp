@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "DenseMatrix.hpp"
+#include "MathConst.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 
@@ -90,6 +91,10 @@ void export_math()
         .def("slice", &CDenseMatrix::slice)
         .def(bp::self == bp::other<CDenseMatrix>())
     ;
+
+    // exposing functions
+
+    bp::def("mathconst_pi", &mathconst::getPiValue);
 }
 
 } // bp_math namespace

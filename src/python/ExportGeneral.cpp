@@ -14,6 +14,7 @@
 
 #include "MpiFunc.hpp"
 #include "ErrorHandler.hpp"
+#include "Codata.hpp"
 #include "ExportGeneral.hpp"
 
 namespace bp = boost::python;
@@ -81,6 +82,10 @@ void export_general()
     bp::def("mpi_initialized", &mpi::initialized);
 
     bp::def("assert_msg_critical", &errors::assertMsgCritical);
+
+    bp::def("bohr_in_angstroms", &units::getBohrValueInAngstroms);
+
+    bp::def("hartree_in_ev", &units::getHatreeValueInElectronVolts);
 }
 
 } // bp_general namespace
