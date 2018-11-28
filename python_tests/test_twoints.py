@@ -109,8 +109,7 @@ class TestTwoInts(unittest.TestCase):
 
         eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
 
-        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
-                                comm)
+        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream)
 
         fock = AOFockMatrix(dmat)
 
