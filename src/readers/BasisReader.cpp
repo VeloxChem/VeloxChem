@@ -32,6 +32,12 @@ CBasisReader::getState() const
 }
 
 void
+CBasisReader::setLabel(const std::string& label)
+{
+    _label = label;
+}
+
+void
 CBasisReader::parse(const CInputData&    inputData,
                           COutputStream& oStream)
 {

@@ -8,9 +8,14 @@
 
 #include <boost/python.hpp>
 #include <mpi.h>
+#include <string>
+#include <fstream>
 
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
+#include "BasisReader.hpp"
+#include "StringFormat.hpp"
+#include "ErrorHandler.hpp"
 #include "DenseMatrix.hpp"
 #include "AODensityMatrix.hpp"
 #include "DensityMatrixType.hpp"
@@ -25,6 +30,45 @@ namespace bp = boost::python;
 namespace np = boost::python::numpy;
 
 namespace bp_orbdata { // bp_orbdata namespace
+
+// Helper function for CMolecularBasis constructor
+
+static std::shared_ptr<CMolecularBasis>
+CMolecularBasis_from_lib(const std::string&   basisLabel,
+                         const std::string&   pathToBasisSets,
+                         const CMolecule&     molecule,
+                               COutputStream& oStream)
+{
+    // check existence
+
+    std::string errbas("MolecularBasis.from_lib - Cannot find basis set");
+
+    std::string fname = pathToBasisSets + "/" + fstr::upcase(basisLabel);
+
+    std::ifstream finp(fname);
+
+    errors::assertMsgCritical(finp.good(), errbas);
+
+    finp.close();
+
+    // form basis set from reader
+
+    CBasisReader basrdr;
+
+    basrdr.setLabel(basisLabel);
+
+    auto basis = basrdr.getAOBasis(pathToBasisSets, molecule, oStream);
+
+    // create shared pointer
+
+    std::shared_ptr<CMolecularBasis> pbasis = 
+
+        std::shared_ptr<CMolecularBasis>(new CMolecularBasis());
+
+    (*pbasis) = basis;
+
+    return pbasis;
+}
 
 // Helper function for broadcasting CMolecularBasis object
 
@@ -235,6 +279,8 @@ void export_orbdata()
             "MolecularBasis",
             bp::init<>()
         )
+        .def("from_lib", &CMolecularBasis_from_lib)
+        .staticmethod("from_lib")
         .def("get_label", &CMolecularBasis::getLabel)
         .def("broadcast", &CMolecularBasis_broadcast)
         .def("print_basis", &CMolecularBasis::printBasis)

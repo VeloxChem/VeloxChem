@@ -160,6 +160,11 @@ public:
     bool getState() const;
 
     /**
+     Set the name of basis set.
+     */
+    void setLabel(const std::string& label);
+
+    /**
      Parses @basis control group from input data and sets internal data of basis
      set reader object. Parsing errors are printed to output stream.
 

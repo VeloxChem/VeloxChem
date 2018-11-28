@@ -1,5 +1,6 @@
 from mpi4py import MPI
 from veloxchem.taskparser import GlobalTask
+from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -93,9 +94,15 @@ class TestTwoInts(unittest.TestCase):
         task = GlobalTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
 
         molecule = task.molecule
-        ao_basis = task.ao_basis
-        min_basis = task.min_basis
+        #ao_basis = task.ao_basis
+        #min_basis = task.min_basis
         ostream = task.ostream
+
+        ao_basis = MolecularBasis.from_lib(
+            "DEF2-SVP", "../basis/", molecule, ostream)
+
+        min_basis = MolecularBasis.from_lib(
+            "MIN-CC-PVDZ", "../basis/", molecule, ostream)
 
         comm = task.mpi_comm
         rank = task.mpi_rank
