@@ -15,6 +15,8 @@
 #include "Molecule.hpp"
 #include "VdwRadii.hpp"
 #include "ErrorHandler.hpp"
+#include "StringFormat.hpp"
+#include "ChemicalElement.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
 
@@ -25,44 +27,72 @@ namespace bp_moldata { // bp_moldata namespace
 // Helper function for CMolecule constructor
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_list(const bp::list& coord_list,
-                    const bp::list& charge_list,
-                    const bp::list& mass_list,
-                    const bp::list& label_list,
-                    const bp::list& idelem_list)
+CMolecule_from_xyz(const bp::list& label_list,
+                   const bp::list& x_list,
+                   const bp::list& y_list,
+                   const bp::list& z_list)
 {
-    std::string errmol("Molecule.from_numpy_list: Inconsistent lengths of lists!");
+    // form coordinate vector
 
-    const int natoms = bp::len(charge_list);
-    errors::assertMsgCritical(bp::len(coord_list)  == natoms * 3, errmol);
-    errors::assertMsgCritical(bp::len(mass_list)   == natoms, errmol);
-    errors::assertMsgCritical(bp::len(label_list)  == natoms, errmol);
-    errors::assertMsgCritical(bp::len(idelem_list) == natoms, errmol);
+    std::string errmol("Molecule.from_xyz - Inconsistent lengths of lists");
+
+    const int32_t natoms = (int32_t)bp::len(label_list);
+
+    errors::assertMsgCritical(bp::len(x_list) == natoms, errmol);
+
+    errors::assertMsgCritical(bp::len(y_list) == natoms, errmol);
+
+    errors::assertMsgCritical(bp::len(z_list) == natoms, errmol);
 
     std::vector<double> coords;
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        coords.push_back(bp::extract<double>(x_list[i]));
+    }
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        coords.push_back(bp::extract<double>(y_list[i]));
+    }
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        coords.push_back(bp::extract<double>(z_list[i]));
+    }
+
+    // form charge, mass, label and elemental ID vectors
+
+    std::string errelm("Molecule.from_xyz - Unsupported chemical element");
+
     std::vector<double> charges;
+
     std::vector<double> masses;
+
     std::vector<std::string> labels;
+
     std::vector<int32_t> idselem;
 
-    for (int i = 0; i < natoms * 3; i++)
+    for (int32_t i = 0; i < natoms; i++)
     {
-        double x = bp::extract<double>(coord_list[i]);
-        coords.push_back(x);
-    }
+        std::string lbl = bp::extract<std::string>(label_list[i]);
 
-    for (int i = 0; i < natoms; i++)
-    {
-        double      chg  = bp::extract<double>(charge_list[i]);
-        double      mass = bp::extract<double>(mass_list[i]);
-        std::string lbl  = bp::extract<std::string>(label_list[i]);
-        int32_t     id   = bp::extract<int32_t>(idelem_list[i]);
+        CChemicalElement chemelm;
 
-        charges.push_back(chg);
-        masses.push_back(mass);
+        auto err = chemelm.setAtomType(fstr::upcase(lbl));
+
+        errors::assertMsgCritical(err, errelm);
+
+        charges.push_back(chemelm.getAtomicCharge());
+
+        masses.push_back(chemelm.getAtomicMass());
+
         labels.push_back(lbl);
-        idselem.push_back(id);
+
+        idselem.push_back(chemelm.getIdentifier());
     }
+
+    // form molecule
 
     return std::shared_ptr<CMolecule>(
             new CMolecule(coords, charges, masses, labels, idselem)
@@ -172,8 +202,8 @@ void export_moldata()
         )
         .def(bp::init<const CMolecule&>())
         .def(bp::init<const CMolecule&, const CMolecule&>())
-        .def("from_list", &CMolecule_from_list)
-        .staticmethod("from_list")
+        .def("from_xyz", &CMolecule_from_xyz)
+        .staticmethod("from_xyz")
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)
