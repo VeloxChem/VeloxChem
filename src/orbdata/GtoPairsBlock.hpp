@@ -75,6 +75,14 @@ class CGtoPairsBlock
      */
     int32_t _nScreenedContrPairs;
     
+    
+    /**
+     Determines recommended dimensions of GTOs pairs block.
+
+     @return the number of GTOs pairs.
+     */
+    int32_t _getBlockDimensions() const;
+    
 public:
     
     /**
@@ -176,10 +184,9 @@ public:
     /**
      Creates vector of GTOs pairs objects by splitting GTOs pairs object.
 
-     @param batchSize the size of contracted GTOs pairs batch.
      @return the vector of GTOs pairs objects.
      */
-    std::vector<CGtoPairsBlock> split(const int32_t batchSize) const;
+    std::vector<CGtoPairsBlock> split() const;
     
     /**
      Creates GTOs pairs object consisting from specific GTOs pairs object.

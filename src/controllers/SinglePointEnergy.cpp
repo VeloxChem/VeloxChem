@@ -230,7 +230,7 @@ CSinglePointEnergy::run(COutputStream& oStream,
     //CGtoPairsBlock kpairs(sgtos, pgtos, 1.0e-13);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, _molecule, _aoBasis,
-                                 oStream, comm);
+                                 oStream);
 
     CAOFockMatrix fock(dsad);
     

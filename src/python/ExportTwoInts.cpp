@@ -119,16 +119,25 @@ CElectronRepulsionIntegralsDriver_compute_2(
     const double                             threshold,
     const CMolecule&                         molecule,
     const CMolecularBasis&                   aoBasis,
-          COutputStream&                     oStream,
-          bp::object                         py_comm)
+          COutputStream&                     oStream)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
-
     return self.compute(screeningScheme, threshold,
-                        molecule, aoBasis,
-                        oStream, *comm_ptr);
+                        molecule, aoBasis, oStream);
 }
 
+// Helper function for reduce_sum CAOFockMatrix object
+    
+static void
+CAOFockMatrix_reduce_sum(CAOFockMatrix& self,
+                         int32_t        rank,
+                         int32_t        nodes,
+                         bp::object     py_comm)
+{
+    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+        
+    self.reduce_sum(rank, nodes, *comm_ptr);
+}
+    
 // Exports classes/functions in src/twoints to python
 
 void export_twoints()
@@ -177,6 +186,7 @@ void export_twoints()
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
+        .def("reduce_sum", &CAOFockMatrix_reduce_sum)
         .def(bp::self == bp::other<CAOFockMatrix>())
     ;
 
@@ -189,6 +199,7 @@ void export_twoints()
         )
         .def(bp::init<const CCauchySchwarzScreener&>())
         .def("get_threshold", &CCauchySchwarzScreener::getThreshold)
+        .def("set_threshold", &CCauchySchwarzScreener::setThreshold)
         .def("get_screening_scheme", &CCauchySchwarzScreener::getScreeningScheme)
         .def(bp::self == bp::other<CCauchySchwarzScreener>())
     ;
@@ -203,6 +214,7 @@ void export_twoints()
         .def(bp::init<const CScreeningContainer&>())
         .def("is_empty", &CScreeningContainer::isEmpty)
         .def("get_number_of_screeners", &CScreeningContainer::getNumberOfScreeners)
+        .def("set_threshold", &CScreeningContainer::setThreshold)
         .def(bp::self == bp::other<CScreeningContainer>())
     ;
 

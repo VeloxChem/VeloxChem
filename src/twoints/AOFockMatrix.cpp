@@ -211,6 +211,19 @@ CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMa
     }
 }
 
+void
+CAOFockMatrix::reduce_sum(int32_t  rank,
+                          int32_t  nodes,
+                          MPI_Comm comm)
+{
+    for (size_t i = 0; i < _fockMatrices.size(); i++)
+    {
+        _fockMatrices[i].reduce_sum(rank, nodes, comm);
+        
+        MPI_Barrier(comm);
+    }
+}
+
 int32_t
 CAOFockMatrix::getNumberOfFockMatrices() const
 {

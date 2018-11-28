@@ -33,13 +33,13 @@ CScreeningContainer::CScreeningContainer(const CVecMemBlock<double>& braQValues,
     
     // create list of screened objects
     
-    for (int32_t i = 0; i < bdim; i++)
+    for (int32_t i = (bdim - 1); i >= 0; i--)
     {
         auto bpairs = braGtoPairsContainer.getGtoPairsBlock(i);
         
         auto joff = (symbk) ? i : 0;
         
-        for (int32_t j = joff; j < kdim; j++)
+        for (int32_t j = (kdim - 1); j >= joff; j--)
         {
             auto kpairs = ketGtoPairsContainer.getGtoPairsBlock(j);
             
@@ -108,6 +108,15 @@ bool
 CScreeningContainer::operator!=(const CScreeningContainer& other) const
 {
     return !(*this == other);
+}
+
+void
+CScreeningContainer::setThreshold(const double threshold)
+{
+    for (size_t i = 0; i < _screeners.size(); i++)
+    {
+        _screeners[i].setThreshold(threshold); 
+    }
 }
 
 bool

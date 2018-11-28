@@ -234,6 +234,8 @@ public:
      @param spherInts the spherical two electron integrals buffer.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
+            bra and ket sides.
      @param nKetContrPairs the number of contracted GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
@@ -250,6 +252,27 @@ public:
      appropiate guards to prevent raise conditions.
      */
     void accumulate();
+    
+    /**
+     Determines maximum density elements over shell pair used for construction
+     of Fock matrices for given set GTO pairs on ket side and GTO pair on bra
+     side.
+
+     @param maxDensityElements the vector of maximum density elements.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
+             bra and ket sides.
+     @param nKetContrPairs nKetContrPairs the number of contracted GTOs pairs
+            on ket side.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void getMaxDensityElements(      CMemBlock<double>& maxDensityElements,
+                               const CGtoPairsBlock&    braGtoPairsBlock,
+                               const CGtoPairsBlock&    ketGtoPairsBlock,
+                               const bool               isBraEqualKet,
+                               const int32_t            nKetContrPairs,
+                               const int32_t            iContrPair) const;
     
     /**
      Converts two electron integrals distributor object to text output and

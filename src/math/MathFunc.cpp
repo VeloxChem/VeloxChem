@@ -144,6 +144,24 @@ namespace mathfunc { // mathfunc namespace
     }
     
     void
+    ordering(      int32_t* aVector,
+             const int32_t* bVector,
+             const int32_t  nElements)
+    {
+        int32_t cidx = 0;
+        
+        for (int32_t i = 0; i < nElements; i++)
+        {
+            if (bVector[i] == 1)
+            {
+                aVector[cidx] = i;
+                
+                cidx++;
+            }
+        }
+    }
+    
+    void
     distances(      double* abDistancesX,
                     double* abDistancesY,
                     double* abDistancesZ,

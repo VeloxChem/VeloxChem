@@ -118,6 +118,25 @@ def main():
 
     scf_drv.compute(mol_geom, mol_basis, min_basis, comm, ostream)
 
+    # write hdf5 files for MOs and density after SCF convergence
+
+    if glob_rank == vlx.mpi_master():
+        if scf_drv.is_converged:
+            scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
+            scf_drv.density.write_hdf5("density.h5")
+
+        # initialize visualization driver
+
+        vis_drv = vlx.VisualizationDriver()
+
+        # TODO: generate grid and write cube file
+        # TODO: should also be able to compute psi/density along a line
+
+        if scf_drv.is_converged:
+            vis_grid = vis_drv.gen_grid(mol_geom)
+            vis_drv.write_cube(mol_geom, mol_basis, scf_drv.mol_orbs, "HOMO",
+                               "alpha")
+
     # all done, print finish header to output stream
 
     if glob_rank == vlx.mpi_master():

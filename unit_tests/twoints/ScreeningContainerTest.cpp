@@ -271,16 +271,16 @@ TEST_F(CScreeningContainerTest, GetScreener)
     CCauchySchwarzScreener qq0dat(bqvals, kqvals, bpairs, kpairs, ericut::qq,
                                   1.0e-13);
     
-    ASSERT_EQ(qscra.getScreener(0), qq0dat);
-    
-    ASSERT_EQ(qscra.getScreener(1), qq0dat);
-    
     CCauchySchwarzScreener qq2dat(kqvals, kqvals, kpairs, kpairs, ericut::qq,
                                   1.0e-13);
     
-    ASSERT_EQ(qscra.getScreener(2), qq2dat);
+    ASSERT_EQ(qscra.getScreener(0), qq2dat);
     
-    ASSERT_EQ(qscra.getScreener(3), qq2dat);
+    ASSERT_EQ(qscra.getScreener(1), qq2dat);
+    
+    ASSERT_EQ(qscra.getScreener(2), qq0dat);
+    
+    ASSERT_EQ(qscra.getScreener(3), qq0dat);
     
     ASSERT_EQ(qscra.getScreener(4), CCauchySchwarzScreener());
 }

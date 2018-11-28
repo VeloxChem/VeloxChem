@@ -319,6 +319,25 @@ getMinimalBasisForH()
 }
 
 CAtomBasis
+getMinimalBasisForHe()
+{
+    CAtomBasis bas;
+
+    bas.setIdElemental(2);
+
+    CBasisFunction bf_1 ({3.836000000000e+01, 5.770000000000e+00,
+                          1.240000000000e+00, 2.976000000000e-01},
+                         {2.380900000000e-02, 1.548910000000e-01,
+                          4.699870000000e-01, 5.130270000000e-01}, 0);
+
+    bf_1.normalize();
+
+    bas.addBasisFunction(bf_1);
+
+    return bas;
+}
+
+CAtomBasis
 getMinimalBasisForC()
 {
     CAtomBasis bas;

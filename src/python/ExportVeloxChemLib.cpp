@@ -19,6 +19,7 @@
 #include "ExportSolvers.hpp"
 #include "ExportExciton.hpp"
 #include "ExportControllers.hpp"
+#include "ExportVisualization.hpp"
 
 BOOST_PYTHON_MODULE(veloxchemlib)
 {
@@ -43,4 +44,6 @@ BOOST_PYTHON_MODULE(veloxchemlib)
     bp_exciton::export_exciton();
 
     bp_controllers::export_controllers();
+
+    bp_visualization::export_visualization();
 }

@@ -231,7 +231,8 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
     
     // original Cauchy-Schwarz screening scheme
     
-    if (_screeningScheme == ericut::qq)
+    if ((_screeningScheme == ericut::qq) ||
+        (_screeningScheme == ericut::qqden))
     {
         auto fbq = _braQValues.at(iContrPair);
         
@@ -243,7 +244,8 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
     
     // distance dependent Cauchy-Schwarz screening scheme
     
-    if (_screeningScheme == ericut::qqr)
+    if ((_screeningScheme == ericut::qqr) ||
+        (_screeningScheme == ericut::qqrden))
     {
         // set up pointer to effective PQ distances
         
@@ -266,6 +268,79 @@ CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
             double fact = (r > 1.0) ? 1.0 / r : 1.0;
             
             if ((fbq * kqvals[i] * fact) < _threshold) qqvec[i] = 0;
+        }
+    }
+}
+
+void
+CCauchySchwarzScreener::setScreeningVector(      CMemBlock<int32_t>& qqVector,
+                                           const CMemBlock<int32_t>& qqIndexes,
+                                           const CMemBlock<double>&  maxDensityElements,
+                                           const CMemBlock<double>&  pqDistances,
+                                           const int32_t             nContrPairs,
+                                           const int32_t             iContrPair) const
+{
+    // initialize vector
+    
+    qqVector.zero();
+    
+    mathfunc::set_to(qqVector.data(), 1, nContrPairs);
+    
+    // set up pointer to screening vector
+    
+    auto qqvec = qqVector.data();
+    
+    // set up pointer to indexes
+    
+    auto qqidx = qqIndexes.data();
+    
+    // set up pointer to Q values on ket side
+    
+    auto kqvals = _ketQValues.data();
+    
+    // set up pointer to max. density elements
+    
+    auto mden = maxDensityElements.data();
+    
+    // original Cauchy-Schwarz + AO density screening scheme
+    
+    if (_screeningScheme == ericut::qqden)
+    {
+        auto fbq = _braQValues.at(iContrPair);
+        
+        for (int32_t i = 0; i < nContrPairs; i++)
+        {
+            if ((fbq * kqvals[qqidx[i]] * mden[i]) < _threshold) qqvec[i] = 0;
+        }
+    }
+    
+    // distance dependent Cauchy-Schwarz + AO density screening scheme
+    
+    if (_screeningScheme == ericut::qqrden)
+    {
+        // set up pointer to effective PQ distances
+        
+        auto rpq = pqDistances.data();
+        
+        // set up pointer to GTOs pairs extents on ket side
+        
+        auto kext = _braPairExtends.data();
+        
+        // data for bra side
+        
+        auto bext = _braPairExtends.at(iContrPair);
+        
+        auto fbq  = _braQValues.at(iContrPair);
+        
+        for (int32_t i = 0; i < nContrPairs; i++)
+        {
+            auto idx = qqidx[i];
+            
+            auto r = rpq[idx] - bext - kext[idx];
+            
+            double fact = (r > 1.0) ? 1.0 / r : 1.0;
+            
+            if ((fbq * kqvals[idx] * fact * mden[i]) < _threshold) qqvec[i] = 0;
         }
     }
 }

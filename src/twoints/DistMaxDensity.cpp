@@ -6,22 +6,22 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "DistFock.hpp"
+#include "DistMaxDensity.hpp"
+
+#include <cmath>
 
 #include "AngularMomentum.hpp"
 
-namespace distfock { // distfock namespace
+namespace distmaxden { // distmaxden namespace
 
     void
-    distRestJK(      CFockContainer&      fockContainer,
-               const int32_t              iFockMatrix,
-               const double*              densityMatrix,
-               const int32_t              nDensityColumns,
-               const CMemBlock2D<double>& spherInts,
-               const CGtoPairsBlock&      braGtoPairsBlock,
-               const CGtoPairsBlock&      ketGtoPairsBlock,
-               const int32_t              nKetContrPairs,
-               const int32_t              iContrPair)
+    getMaxRestDenJK(      CMemBlock<double>&   maxDensityElements,
+                    const double*              densityMatrix,
+                    const int32_t              nDensityColumns,
+                    const CGtoPairsBlock&      braGtoPairsBlock,
+                    const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const int32_t              nKetContrPairs,
+                    const int32_t              iContrPair)
     {
         // set up angular momentum on bra
         
@@ -61,23 +61,9 @@ namespace distfock { // distfock namespace
         
         auto prefl = ketGtoPairsBlock.getKetIdentifiers(0);
         
-        // set up pointers to start positions for A, B, C, D centers
+        // set up pointer to vector max. density elements
         
-        auto apos = fockContainer.getStartPositionsA(iFockMatrix);
-        
-        auto bpos = fockContainer.getStartPositionsB(iFockMatrix);
-        
-        auto cpos = fockContainer.getStartPositionsC(iFockMatrix);
-        
-        auto dpos = fockContainer.getStartPositionsD(iFockMatrix);
-        
-        // set up dimensions of submatrices for A, B, C, D centers
-        
-        auto bdim = fockContainer.getDimensionsB(iFockMatrix);
-        
-        auto cdim = fockContainer.getDimensionsC(iFockMatrix);
-        
-        auto ddim = fockContainer.getDimensionsD(iFockMatrix);
+        auto mdenvec = maxDensityElements.data();
         
         // loop over angular components on bra side
         
@@ -86,8 +72,6 @@ namespace distfock { // distfock namespace
             // set up index P for bra side
             
             int32_t idp  = (braGtoPairsBlock.getBraIdentifiers(i))[iContrPair];
-            
-            int32_t redp = idp - apos[i];
             
             // starting angular index of Q
             
@@ -98,12 +82,6 @@ namespace distfock { // distfock namespace
                 // set up index Q for bra side
                 
                 int32_t idq = (braGtoPairsBlock.getKetIdentifiers(j))[iContrPair];
-                
-                int32_t redq = idq - bpos[j];
-                
-                // angular offset from bra side
-                
-                auto braoff = (i * bcomp + j) * ccomp * dcomp;
                 
                 // loop over angular components on ket side
                 
@@ -118,24 +96,6 @@ namespace distfock { // distfock namespace
                         // set up pointer to S indexes on ket side
                         
                         auto idxl = ketGtoPairsBlock.getKetIdentifiers(l);
-                        
-                        // set up pointer to integrals
-                        
-                        auto pints = spherInts.data(braoff + k * dcomp + l);
-                        
-                        // set up pointers to submatrices
-                        
-                        auto submat_pq = fockContainer.getSubMatrixData(iFockMatrix, 0, i * bcomp + j);
-                        
-                        auto submat_rs = fockContainer.getSubMatrixData(iFockMatrix, 1, k * dcomp + l);
-                        
-                        auto submat_pr = fockContainer.getSubMatrixData(iFockMatrix, 2, i * ccomp + k);
-                        
-                        auto submat_ps = fockContainer.getSubMatrixData(iFockMatrix, 3, i * dcomp + l);
-                        
-                        auto submat_qr = fockContainer.getSubMatrixData(iFockMatrix, 4, j * ccomp + k);
-                        
-                        auto submat_qs = fockContainer.getSubMatrixData(iFockMatrix, 5, j * dcomp + l);
                         
                         // loop over pairs on ket side
                         
@@ -154,42 +114,42 @@ namespace distfock { // distfock namespace
                             bool braeqket = (refp == refr) && (refq == refs);
                             
                             if  (((k * dcomp + l) < (i * bcomp + j)) && braeqket) continue;
-                
+                            
                             // set up S and R indexes
                             
                             auto idr = idxk[m];
                             
                             auto ids = idxl[m];
                             
-                            auto redr = idr - cpos[k];
-                            
-                            auto reds = ids - dpos[l];
-                            
-                            // scale integral value
-                            
-                            auto fval = pints[m];
-                                
-                            if (idp == idq) fval *= 0.5;
-                            
-                            if (idr == ids) fval *= 0.5;
-                            
-                            if ((idp == idr) && (idq == ids)) fval *= 0.5;
-                            
                             // Coulomb contributions
                             
-                            submat_pq[redp * bdim + redq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
-                                
-                            submat_rs[redr * ddim + reds] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                            auto mden = 4.0 * std::fabs(densityMatrix[idr * nDensityColumns + ids]);
+                            
+                            auto cden = 4.0 * std::fabs(densityMatrix[idp * nDensityColumns + idq]);
+                            
+                            if (cden > mden) mden = cden;
                             
                             // exchange contributions
                             
-                            submat_pr[redp * cdim + redr] -= fval * densityMatrix[idq * nDensityColumns + ids];
+                            cden = std::fabs(densityMatrix[idq * nDensityColumns + ids]);
                             
-                            submat_ps[redp * ddim + reds] -= fval * densityMatrix[idq * nDensityColumns + idr];
+                            if (cden > mden) mden = cden;
                             
-                            submat_qr[redq * cdim + redr] -= fval * densityMatrix[idp * nDensityColumns + ids];
-                                
-                            submat_qs[redq * ddim + reds] -= fval * densityMatrix[idp * nDensityColumns + idr];
+                            cden = std::fabs(densityMatrix[idq * nDensityColumns + idr]);
+                            
+                            if (cden > mden) mden = cden;
+                            
+                            cden = std::fabs(densityMatrix[idp * nDensityColumns + ids]);
+                            
+                            if (cden > mden) mden = cden;
+                            
+                            cden = std::fabs(densityMatrix[idp * nDensityColumns + idr]);
+                            
+                            if (cden > mden) mden = cden;
+                            
+                            // copy max. density element
+                            
+                            if (mden > mdenvec[m]) mdenvec[m] = mden;
                         }
                     }
                 }
@@ -197,4 +157,4 @@ namespace distfock { // distfock namespace
         }
     }
     
-} // distfock namespace
+} // distmaxden namespace

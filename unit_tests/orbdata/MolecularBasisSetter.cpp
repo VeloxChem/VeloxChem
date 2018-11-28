@@ -103,6 +103,18 @@ getMolecularBasisForH2Se()
 }
 
 CMolecularBasis
+getMinimalBasisForHeAtom()
+{
+    CMolecularBasis mbas;
+
+    mbas.setLabel({"MIN-CC-PVDZ"});
+
+    mbas.addAtomBasis(getMinimalBasisForHe());
+
+    return mbas;
+}
+
+CMolecularBasis
 getMinimalBasisForH2O()
 {
     CMolecularBasis mbas;

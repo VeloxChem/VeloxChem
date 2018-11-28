@@ -126,6 +126,18 @@ namespace mathfunc { // mathfunc namespace
                  const int32_t* bVector,
                  const int32_t  offset,
                  const int32_t  nElements);
+    
+    /**
+     Sets ordering vector for given vector of binary values (0 or 1) by storing
+     all indexes of binary vector elements equal to 1.
+
+     @param aVector the ordering vector.
+     @param bVector the binary vector.
+     @param nElements the number of elements in vectors.
+     */
+    void ordering(      int32_t* aVector,
+                  const int32_t* bVector,
+                  const int32_t  nElements);
 
     /**
      Computes distance between two 3D vectors.

@@ -25,7 +25,7 @@ namespace distfock { // distfock namespace
      @param fockContainer the Fock container.
      @param iFockMatrix the index of Fock submatrix in Fock container.
      @param densityMatrix the constant pointer to AO density matrix.
-     @param nDensityColumns the number of columns in AO Fock matrix.
+     @param nDensityColumns the number of columns in AO density matrix.
      @param spherInts the spherical integrals buffer.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
@@ -39,7 +39,6 @@ namespace distfock { // distfock namespace
                     const CMemBlock2D<double>& spherInts,
                     const CGtoPairsBlock&      braGtoPairsBlock,
                     const CGtoPairsBlock&      ketGtoPairsBlock,
-                    const bool                 isBraEqualKet,
                     const int32_t              nKetContrPairs,
                     const int32_t              iContrPair);
     

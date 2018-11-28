@@ -111,6 +111,13 @@ public:
     bool operator!=(const CScreeningContainer& other) const;
     
     /**
+     Sets threshold for screening of electron repulsion integrals.
+     
+     @param threshold the screening threshold.
+     */
+    void setThreshold(const double threshold);
+    
+    /**
      Checks if screening container object is empty.
 
      @return true if screening container object is empty, false - otherwise.

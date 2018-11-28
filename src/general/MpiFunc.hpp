@@ -247,6 +247,20 @@ void gather(double*  vector,
             MPI_Comm comm);
 
 /**
+ Sums vector of real numbers on master MPI process from vectors of real numbers
+ accross MPI processes.
+
+ @param source the vector of real numbers associated with MPI process.
+ @param destination the summed vector of real numbers.
+ @param nElements the number of elements in vector.
+ @param comm the MPI communicator.
+ */
+void reduce_sum(const double*  source,
+                      double*  destination,
+                const int32_t  nElements,
+                      MPI_Comm comm);
+
+/**
  Terminates all MPI processes and prints error message to standard error stream.
 
  @param errorcode the MPI error code.
