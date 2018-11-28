@@ -119,14 +119,10 @@ CElectronRepulsionIntegralsDriver_compute_2(
     const double                             threshold,
     const CMolecule&                         molecule,
     const CMolecularBasis&                   aoBasis,
-          COutputStream&                     oStream,
-          bp::object                         py_comm)
+          COutputStream&                     oStream)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
-
     return self.compute(screeningScheme, threshold,
-                        molecule, aoBasis,
-                        oStream, *comm_ptr);
+                        molecule, aoBasis, oStream);
 }
 
 // Helper function for reduce_sum CAOFockMatrix object

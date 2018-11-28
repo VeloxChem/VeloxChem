@@ -301,6 +301,21 @@ class CElectronRepulsionIntegralsDriver
      @return the Q values buffer as vector of mememory block objects.
      */
      CVecMemBlock<double> _getQValuesBuffer(const CGtoPairsContainer& gtoPairsContainer) const;
+    
+    /**
+     Creates tasks execution grid for computation of AO Fock matrix on
+     specific MPI process.
+
+     @param nBraGtoPairsBlocks the number of GTOs pairs blocks on bra side.
+     @param nKetGtoPairsBlocks the number of GTOs pairs blocks on ket side.
+     @param isBraEqualKet the flag for equality for bra and ket GTOs pairs
+             blocks.
+     @return the vector of tasks with elements 1 or 0: 1  execute task on
+             this MPI process, 0 skip task on this MPI process.
+     */
+    CMemBlock<int32_t> _setTasksGrid(const int32_t nBraGtoPairsBlocks,
+                                     const int32_t nKetGtoPairsBlocks,
+                                     const bool    isBraEqualKet) const;
         
 public:
     
@@ -349,15 +364,13 @@ public:
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
      @param oStream the output stream.
-     @param comm the MPI communicator.
      @return the screening container with Q values.
      */
     CScreeningContainer compute(const ericut           screeningScheme,
                                 const double           threshold,
                                 const CMolecule&       molecule,
                                 const CMolecularBasis& aoBasis,
-                                      COutputStream&   oStream,
-                                      MPI_Comm         comm) const;
+                                      COutputStream&   oStream) const;
     
     /**
      Computes electron repulsion integrals blocks for pair of GTOs pairs blocks

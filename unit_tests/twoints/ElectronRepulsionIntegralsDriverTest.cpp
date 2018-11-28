@@ -5726,8 +5726,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAtom)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
 
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost,
-                                 MPI_COMM_WORLD);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost);
 
     CAOFockMatrix fock(dmat);
 
@@ -5780,8 +5779,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAnionWithSPD)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost,
-                                 MPI_COMM_WORLD);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost);
     
     CAOFockMatrix fock(dmat);
     
@@ -6035,8 +6033,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2O)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas, ost,
-                                 MPI_COMM_WORLD);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas, ost);
     
     CAOFockMatrix fock(dmat);
     
@@ -6851,8 +6848,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, mh2o, mbas, ost,
-                                 MPI_COMM_WORLD);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, mh2o, mbas, ost);
     
     CAOFockMatrix fock(dmat);
     

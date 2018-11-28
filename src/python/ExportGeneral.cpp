@@ -61,6 +61,7 @@ pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns)
     return np::from_data(ptr, dt_double, shape, stride, bp::object());
 }
 
+    
 // Exports classes/functions in src/general to python
 
 void export_general()
@@ -80,7 +81,7 @@ void export_general()
     bp::def("mpi_master", &mpi::master);
 
     bp::def("mpi_initialized", &mpi::initialized);
-
+    
     bp::def("assert_msg_critical", &errors::assertMsgCritical);
 
     bp::def("bohr_in_angstroms", &units::getBohrValueInAngstroms);

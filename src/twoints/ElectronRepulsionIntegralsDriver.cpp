@@ -79,8 +79,7 @@ CElectronRepulsionIntegralsDriver::compute(const ericut           screeningSchem
                                            const double           threshold,
                                            const CMolecule&       molecule,
                                            const CMolecularBasis& aoBasis,
-                                                 COutputStream&   oStream,
-                                                 MPI_Comm         comm) const
+                                                 COutputStream&   oStream) const
 {
     CSystemClock eritim;
     
@@ -110,10 +109,6 @@ CElectronRepulsionIntegralsDriver::compute(const ericut           screeningSchem
     
     CScreeningContainer qcont(bqbuff, kqbuff, bbpairs, bbpairs, screeningScheme,
                               threshold);
-    
-    // print Q values computation timings
-    
-    _printQValuesTiming(molecule, eritim, oStream); 
     
     return qcont;
 }
@@ -1806,20 +1801,26 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
     
     auto pden = &aoDensityMatrix;
     
-    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer, pfock, pden)
+    // determine number of GTOs pairs blocks in bra/ket sides
+    
+    auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
+    
+    auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
+    
+    // determine symmetry of bra/ket GTOs pairs containers
+    
+    auto symbk = ((*braGtoPairsContainer) == (*ketGtoPairsContainer));
+    
+    // initialize tasks grid for each MPI process
+    
+    auto nodpatt = _setTasksGrid(nbra, nket, symbk);
+    
+    auto ptgrid = nodpatt.data();
+    
+    #pragma omp parallel shared(braGtoPairsContainer, ketGtoPairsContainer, pfock, pden, nbra, nket, symbk, ptgrid)
     {
         #pragma omp single nowait
         {
-            // determine number of GTOs pairs blocks in bra/ket sides
-            
-            auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
-            
-            auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
-            
-            // determine symmetry of bra/ket GTOs pairs containers
-            
-            auto symbk = ((*braGtoPairsContainer) == (*ketGtoPairsContainer));
-            
             // screeners counter
             
             int32_t idx = 0;
@@ -1834,23 +1835,26 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
                 
                 for (int32_t j = (nket - 1); j >= joff; j--)
                 {
-                    #pragma omp task firstprivate(j, idx)
+                    if (ptgrid[idx] == 1)
                     {
-                        auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
+                        #pragma omp task firstprivate(j, idx)
+                        {
+                            auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(j);
                         
-                        auto qqdat = screeningContainer->getScreener(idx);
+                            auto qqdat = screeningContainer->getScreener(idx);
                         
-                        CTwoIntsDistribution distpat(pfock, pden);
+                            CTwoIntsDistribution distpat(pfock, pden);
                         
-                        distpat.setFockContainer(bpairs, kpairs);
+                            distpat.setFockContainer(bpairs, kpairs);
                         
-                        _compElectronRepulsionForGtoPairsBlocks(distpat, qqdat,
-                                                                bpairs, kpairs);
+                            _compElectronRepulsionForGtoPairsBlocks(distpat, qqdat,
+                                                                    bpairs, kpairs);
                         
-                        // accumulate AO Fock matrix
+                            // accumulate AO Fock matrix
                         
-                        #pragma omp critical (fockacc)
-                        distpat.accumulate();
+                            #pragma omp critical (fockacc)
+                            distpat.accumulate();
+                        }
                     }
                     
                     // update screeners counter
@@ -1903,3 +1907,50 @@ CElectronRepulsionIntegralsDriver::_getQValuesBuffer(const CGtoPairsContainer& g
     return buffvec;
 }
 
+CMemBlock<int32_t>
+CElectronRepulsionIntegralsDriver::_setTasksGrid(const int32_t nBraGtoPairsBlocks,
+                                                 const int32_t nKetGtoPairsBlocks,
+                                                 const bool    isBraEqualKet) const
+{
+    // determine number of tasks
+    
+    int32_t nelem = 0;
+    
+    if (isBraEqualKet)
+    {
+        nelem = nBraGtoPairsBlocks * (nBraGtoPairsBlocks + 1) / 2;
+    }
+    else
+    {
+        nelem = nBraGtoPairsBlocks * nKetGtoPairsBlocks;
+    }
+    
+    // initialize tasks grid
+    
+    CMemBlock<int32_t> tgrid(nelem);
+    
+    if (_locNodes == 1)
+    {
+        mathfunc::set_to(tgrid.data(), 1, nelem);
+    }
+    else
+    {
+        mathfunc::set_to(tgrid.data(), 0, nelem);
+        
+        auto ndim = nelem / _locNodes;
+        
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            tgrid.at(i * _locNodes + _locRank) = 1;
+        }
+        
+        auto nrem = nelem % _locNodes;
+        
+        if (_locRank < nrem)
+        {
+            tgrid.at(ndim * _locNodes + _locRank) = 1;
+        }
+    }
+    
+    return tgrid;
+}
