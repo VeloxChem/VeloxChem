@@ -98,6 +98,8 @@ class TestTwoInts(unittest.TestCase):
         #min_basis = task.min_basis
         ostream = task.ostream
 
+        molecule.check_multiplicity()
+
         ao_basis = MolecularBasis.from_lib(
             "DEF2-SVP", "../basis/", molecule, ostream)
 

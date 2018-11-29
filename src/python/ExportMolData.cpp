@@ -127,7 +127,7 @@ CMolecule_coordinates_to_numpy(const CMolecule& self)
 // Helper function for getting VDW radii for molecule
 
 static np::ndarray
-CMolecule_vdw_radii_to_numpy(CMolecule& self)
+CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 {
     auto natoms = self.getNumberOfAtoms();
 
@@ -146,7 +146,7 @@ CMolecule_vdw_radii_to_numpy(CMolecule& self)
 // Helper function for getting nuclear charges for molecule
 
 static bp::list
-CMolecule_get_ids_elem(CMolecule& self)
+CMolecule_get_ids_elem(const CMolecule& self)
 {
     auto natoms = self.getNumberOfAtoms();
 
@@ -160,6 +160,28 @@ CMolecule_get_ids_elem(CMolecule& self)
     }
 
     return ids;
+}
+
+// Helper function for checking multiplicity of molecule
+
+static void
+CMolecule_check_multiplicity(const CMolecule& self)
+{
+    auto multip = self.getMultiplicity() % 2;
+
+    auto nelec = self.getNumberOfElectrons() % 2;
+
+    bool flag = true;
+
+    if ((multip == 0) && (nelec != 1)) flag = false;
+
+    if ((multip == 1) && (nelec != 0)) flag = false;
+
+    std::string errmult("Molecule.check_multiplicity: ");
+
+    errmult += "Incompatble multiplicity & number of electrons";
+
+    errors::assertMsgCritical(flag, errmult);
 }
 
 // Helper function for broadcasting CMolecule object
@@ -208,6 +230,7 @@ void export_moldata()
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)
         .def("get_multiplicity", &CMolecule::getMultiplicity)
+        .def("check_multiplicity", &CMolecule_check_multiplicity)
         .def("print_geometry", &CMolecule::printGeometry)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
         .def("number_of_atoms", number_of_atoms_1)
