@@ -14,6 +14,7 @@ from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
 
 import numpy as np
+import math
 import unittest
 
 
@@ -98,7 +99,15 @@ class TestTwoInts(unittest.TestCase):
         #min_basis = task.min_basis
         ostream = task.ostream
 
+        molecule.check_proximity(0.1, ostream)
+
         molecule.check_multiplicity()
+
+        enuc = molecule.nuclear_repulsion_energy()
+
+        ref_enuc = 34.0 / 2.8 + 34.0 / 2.8 + 1.0 / (2.8 * math.sqrt(2.0))
+
+        self.assertEqual(enuc, ref_enuc)
 
         ao_basis = MolecularBasis.from_lib(
             "DEF2-SVP", "../basis/", molecule, ostream)
