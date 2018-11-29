@@ -102,26 +102,42 @@ CMolecule_from_xyz(const bp::list& label_list,
 // Helper function for getting coordinates as numpy array
 
 static np::ndarray
-CMolecule_coordinates_to_numpy(const CMolecule& self)
+CMolecule_x_to_numpy(const CMolecule& self)
 {
-    bp::list coords, rx, ry, rz;
+    bp::list rx;
 
     for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
     {
         rx.append(self.getCoordinatesX()[i]);
+    }
 
+    return np::array(rx);
+}
+
+static np::ndarray
+CMolecule_y_to_numpy(const CMolecule& self)
+{
+    bp::list ry;
+
+    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
+    {
         ry.append(self.getCoordinatesY()[i]);
+    }
 
+    return np::array(ry);
+}
+
+static np::ndarray
+CMolecule_z_to_numpy(const CMolecule& self)
+{
+    bp::list rz;
+
+    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
+    {
         rz.append(self.getCoordinatesZ()[i]);
     }
 
-    coords.append(rx);
-
-    coords.append(ry);
-
-    coords.append(rz);
-
-    return np::array(coords);
+    return np::array(rz);
 }
 
 // Helper function for getting VDW radii for molecule
@@ -145,8 +161,8 @@ CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 
 // Helper function for getting nuclear charges for molecule
 
-static bp::list
-CMolecule_get_ids_elem(const CMolecule& self)
+static np::ndarray
+CMolecule_elem_ids_to_numpy(const CMolecule& self)
 {
     auto natoms = self.getNumberOfAtoms();
 
@@ -159,7 +175,7 @@ CMolecule_get_ids_elem(const CMolecule& self)
         ids.append(idselem[i]);
     }
 
-    return ids;
+    return np::array(ids);
 }
 
 // Helper function for checking multiplicity of molecule
@@ -239,9 +255,11 @@ void export_moldata()
         .def("number_of_atoms", number_of_atoms_3)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
         .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
-        .def("coordinates_to_numpy", &CMolecule_coordinates_to_numpy)
+        .def("x_to_numpy", &CMolecule_x_to_numpy)
+        .def("y_to_numpy", &CMolecule_y_to_numpy)
+        .def("z_to_numpy", &CMolecule_z_to_numpy)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
-        .def("get_ids_elem", &CMolecule_get_ids_elem)
+        .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
     ;
