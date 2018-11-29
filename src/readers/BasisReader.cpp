@@ -12,6 +12,7 @@
 
 #include "ChemicalElement.hpp"
 #include "StringFormat.hpp"
+#include "ErrorHandler.hpp"
 
 CBasisReader::CBasisReader()
 
@@ -131,6 +132,10 @@ CBasisReader::_readAtomBasis(const int32_t        idElemental,
     std::ifstream istream;
 
     istream.open(fileName.c_str(), std::ifstream::in);
+
+    std::string errbas("readAtomBasis: Cannot find basis set ");
+
+    errors::assertMsgCritical(istream.good(), errbas + fileName);
 
     if (istream.good())
     {
@@ -369,6 +374,8 @@ CBasisReader::_getBasis(const std::string&   basisLabel,
     CMolecularBasis molbasis;
     
     auto fname = pathToBasisSets;
+
+    fname.append("/");
     
     fname.append(basisLabel);
     

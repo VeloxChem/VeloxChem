@@ -41,13 +41,13 @@ CMolecularBasis_from_lib(const std::string&   basisLabel,
 {
     // check existence
 
-    std::string errbas("MolecularBasis.from_lib - Cannot find basis set");
-
     std::string fname = pathToBasisSets + "/" + fstr::upcase(basisLabel);
 
-    std::ifstream finp(fname);
+    std::ifstream finp(fname, std::ifstream::in);
 
-    errors::assertMsgCritical(finp.good(), errbas);
+    std::string errbas("MolecularBasis.from_lib: Cannot find basis set ");
+
+    errors::assertMsgCritical(finp.good(), errbas + fname);
 
     finp.close();
 
