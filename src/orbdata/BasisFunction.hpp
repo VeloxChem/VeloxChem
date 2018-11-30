@@ -32,6 +32,12 @@ class CBasisFunction
      The vector of normalization factors of primitive Gaussian functions.
      */
     std::vector<double> _normFactors;
+    
+    /**
+     The number of contraction vectors: 1 for segmented contraction scheme,
+     more than 1 for general contraction scheme.
+     */
+    int32_t _nContrVectors;
 
     /**
      The angular momentum of basis function.
@@ -49,10 +55,12 @@ class CBasisFunction
 
      @param iComponent the index of first primitve Gaussain function.
      @param jComponent the index of second primitve Gaussain function.
+     @param iContrVector the index of contraction vector.
      @return the overlap between two primitive Gaussian functions.
      */
-    double _overlap(const size_t iComponent,
-                    const size_t jComponent) const;
+    double _overlap(const int32_t iComponent,
+                    const int32_t jComponent,
+                    const int32_t iContrVector) const;
 
 public:
 
@@ -60,9 +68,24 @@ public:
      Creates an empty basis function object.
      */
     CBasisFunction();
+    
+    /**
+     Creates a basis function object with segmented or general contraction
+     scheme.
+     
+     @param exponents the vector of exponents of primitive Gaussian functions.
+     @param normFactors the vector of normalization factors of primitive
+     Gaussian functions.
+     @param nContrVectors the number of contraction vectors.
+     @param angularMomentum the angular momentum of basis function.
+     */
+    CBasisFunction(const std::vector<double>& exponents,
+                   const std::vector<double>& normFactors,
+                   const int32_t              nContrVectors,
+                   const int32_t              angularMomentum);
 
     /**
-     Creates a basis function object.
+     Creates a basis function object with segmented contraction scheme.
      
      @param exponents the vector of exponents of primitive Gaussian functions.
      @param normFactors the vector of normalization factors of primitive
@@ -172,6 +195,15 @@ public:
      @return the vector of normalization factors.
      */
     std::vector<double> getNormalizationFactors() const;
+    
+    /**
+     Gets specific vector of normalization factors of primitive Gaussian
+     functions.
+     
+     @param iContrVector the index of contraction vector.
+     @return the vector of normalization factors.
+     */
+    std::vector<double> getNormalizationFactors(const int32_t iContrVector) const;
 
     /**
      Gets angular momentum of basis function.
@@ -179,14 +211,21 @@ public:
      @return the angular momentum.
      */
     int32_t getAngularMomentum() const;
-
+    
     /**
      Gets number of primitive Gaussian functions in basis function.
 
      @return the number of primitive Gaussian functions.
      */
     int32_t getNumberOfPrimitiveFunctions() const;
+    
+    /**
+     Gets number of contracted Gaussian functions associated with basis function.
 
+     @return the number of contracted Gaussian functions.
+     */
+    int32_t getNumberOfContractedFunctions() const;
+    
     /**
      Broadcasts basis function object within domain of MPI communicator.
 
