@@ -11,6 +11,7 @@
 
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
@@ -59,21 +60,32 @@ class CBasisReader
      @param inputLine the input line onject.
      @param oStream the output stream.
      @return the tuple (angular momentum, number of primitive Gaussian
-             functions).
+             functions, number of contracted Gaussian functions).
      */
-    std::tuple<int32_t, int32_t> _readShellHeader(const CInputLine&    inputLine,
-                                                        COutputStream& oStream);
+    std::tuple<int32_t, int32_t, int32_t> _readShellHeader(const CInputLine&    inputLine,
+                                                                 COutputStream& oStream);
 
     /**
-     Reads primitive Gausian function data (exponent, normalization factor) from
-     input line object. Parsing errors are printed to output stream.
+     Reads primitive Gausian function data into vector of exponents and
+     vector of normalization factors from input line object. Parsing
+     errors are printed to output stream.
 
      @param inputLine the input line object.
+     @param exponents the vector of primitive Gaussian exponents.
+     @param normFactors the vector of normalization factors.
+     @param iExponent the index of current exponent in vector of exponents.
+     @param nExponents the number of exponents in vector of exponents.
+     @param nContrVectors the number of contraction vectors in vector of
+            normalization factors.
      @param oStream the output stream.
-     @return the tuple (exponent, normalization factor).
      */
-    std::tuple<double, double> _readPrimitveBasisFuction(const CInputLine& inputLine,
-                                                               COutputStream& oStream);
+    void _readPrimitveBasisFuction(const CInputLine&          inputLine,
+                                         std::vector<double>& exponents,
+                                         std::vector<double>& normFactors,
+                                   const int32_t              iExponent,
+                                   const int32_t              nExponents,
+                                   const int32_t              nContrVectors,
+                                         COutputStream&       oStream);
 
     /**
      Prints multiple definitions error message for @basis control group to
