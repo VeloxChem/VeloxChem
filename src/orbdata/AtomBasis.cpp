@@ -147,7 +147,7 @@ CAtomBasis::getNumberOfBasisFunctions(const int32_t angularMomentum) const
     {
         if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
         {
-            nbfuncs++;
+            nbfuncs += _basisFunctions[i].getNumberOfContractedFunctions();
         }
     }
 
