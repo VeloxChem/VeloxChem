@@ -35,7 +35,7 @@ CBasisReader::getState() const
 void
 CBasisReader::setLabel(const std::string& label)
 {
-    _label = label;
+    _label = fstr::upcase(label);
 }
 
 void
