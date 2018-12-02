@@ -235,6 +235,46 @@ TEST_F(CMolecularBasisTest, GetNumberOfPrimitiveBasisFunctionsWithMoleculeAndAto
     ASSERT_EQ(0, ambas.getNumberOfPrimitiveBasisFunctions(lih, 0, 2, 2));
 }
 
+TEST_F(CMolecularBasisTest, GetNumberOfNormalizationFactorsWithMolecule)
+{
+    CMolecularBasis ambas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(11, ambas.getNumberOfNormalizationFactors(lih, 0));
+    
+    ASSERT_EQ(2, ambas.getNumberOfNormalizationFactors(lih, 1));
+    
+    ASSERT_EQ(0, ambas.getNumberOfNormalizationFactors(lih, 2));
+}
+
+TEST_F(CMolecularBasisTest, GetNumberOfNormalizationFactorsWithMoleculeAndAtomsList)
+{
+    CMolecularBasis ambas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ(7, ambas.getNumberOfNormalizationFactors(lih, 0, 1, 0));
+    
+    ASSERT_EQ(4, ambas.getNumberOfNormalizationFactors(lih, 1, 1, 0));
+    
+    ASSERT_EQ(11, ambas.getNumberOfNormalizationFactors(lih, 0, 2, 0));
+    
+    ASSERT_EQ(1, ambas.getNumberOfNormalizationFactors(lih, 0, 1, 1));
+    
+    ASSERT_EQ(1, ambas.getNumberOfNormalizationFactors(lih, 1, 1, 1));
+    
+    ASSERT_EQ(2, ambas.getNumberOfNormalizationFactors(lih, 0, 2, 1));
+    
+    ASSERT_EQ(0, ambas.getNumberOfNormalizationFactors(lih, 0, 1, 2));
+    
+    ASSERT_EQ(0, ambas.getNumberOfNormalizationFactors(lih, 1, 1, 2));
+    
+    ASSERT_EQ(0, ambas.getNumberOfNormalizationFactors(lih, 0, 2, 2));
+}
+
+
+
 TEST_F(CMolecularBasisTest, GetDimensionsOfBasis)
 {
     CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
