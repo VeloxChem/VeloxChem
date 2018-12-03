@@ -328,18 +328,7 @@ CBasisReader::_readPrimitveBasisFuction(const CInputLine&          inputLine,
     for (int32_t i = 0; i < nContrVectors; i++)
     {
         auto rcoef = inputLine.getRealNumber(i + 1);
-        
-        if (std::fabs(rcoef) < 1.0e-6)
-        {
-            _errorCorruptedBasisSet(oStream);
-            
-            exponents.clear();
-            
-            normFactors.clear();
-            
-            return;
-        }
-        
+                
         normFactors[i * nExponents + iExponent] = rcoef;
     }
     
