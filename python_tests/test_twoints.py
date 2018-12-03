@@ -1,5 +1,6 @@
 from mpi4py import MPI
 from veloxchem.taskparser import GlobalTask
+from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -13,6 +14,7 @@ from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
 
 import numpy as np
+import math
 import unittest
 
 
@@ -93,9 +95,25 @@ class TestTwoInts(unittest.TestCase):
         task = GlobalTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
 
         molecule = task.molecule
-        ao_basis = task.ao_basis
-        min_basis = task.min_basis
+        #ao_basis = task.ao_basis
+        #min_basis = task.min_basis
         ostream = task.ostream
+
+        molecule.check_proximity(0.1, ostream)
+
+        molecule.check_multiplicity()
+
+        enuc = molecule.nuclear_repulsion_energy()
+
+        ref_enuc = 34.0 / 2.8 + 34.0 / 2.8 + 1.0 / (2.8 * math.sqrt(2.0))
+
+        self.assertEqual(enuc, ref_enuc)
+
+        ao_basis = MolecularBasis.from_lib(
+            "def2-svp", "../basis/", molecule, ostream)
+
+        min_basis = MolecularBasis.from_lib(
+            "min-cc-pvdz", "../basis/", molecule, ostream)
 
         comm = task.mpi_comm
         rank = task.mpi_rank
@@ -109,8 +127,7 @@ class TestTwoInts(unittest.TestCase):
 
         eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
 
-        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
-                                comm)
+        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream)
 
         fock = AOFockMatrix(dmat)
 

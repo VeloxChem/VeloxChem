@@ -256,6 +256,32 @@ CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
 }
 
 int32_t
+CMolecularBasis::getNumberOfNormalizationFactors(const CMolecule& molecule,
+                                                 const int32_t    angularMomentum) const
+{
+    return getNumberOfNormalizationFactors(molecule, 0, molecule.getNumberOfAtoms(),
+                                           angularMomentum);
+}
+
+int32_t
+CMolecularBasis::getNumberOfNormalizationFactors(const CMolecule& molecule,
+                                                 const int32_t    iAtom,
+                                                 const int32_t    nAtoms,
+                                                 const int32_t    angularMomentum) const
+{
+    int32_t nfacts = 0;
+    
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    {
+        nfacts += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
+        
+                * _atomicBasisSets[i].getNumberOfNormalizationFactors(angularMomentum);
+    }
+    
+    return nfacts;
+}
+
+int32_t
 CMolecularBasis::getDimensionsOfBasis(const CMolecule& molecule) const
 {
     int32_t ndim = 0;

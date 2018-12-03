@@ -15,6 +15,8 @@
 #include "Molecule.hpp"
 #include "VdwRadii.hpp"
 #include "ErrorHandler.hpp"
+#include "StringFormat.hpp"
+#include "ChemicalElement.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
 
@@ -25,44 +27,72 @@ namespace bp_moldata { // bp_moldata namespace
 // Helper function for CMolecule constructor
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_list(const bp::list& coord_list,
-                    const bp::list& charge_list,
-                    const bp::list& mass_list,
-                    const bp::list& label_list,
-                    const bp::list& idelem_list)
+CMolecule_from_xyz(const bp::list& label_list,
+                   const bp::list& x_list,
+                   const bp::list& y_list,
+                   const bp::list& z_list)
 {
-    std::string errmol("Molecule.from_numpy_list: Inconsistent lengths of lists!");
+    // form coordinate vector
 
-    const int natoms = bp::len(charge_list);
-    errors::assertMsgCritical(bp::len(coord_list)  == natoms * 3, errmol);
-    errors::assertMsgCritical(bp::len(mass_list)   == natoms, errmol);
-    errors::assertMsgCritical(bp::len(label_list)  == natoms, errmol);
-    errors::assertMsgCritical(bp::len(idelem_list) == natoms, errmol);
+    std::string errmol("Molecule.from_xyz - Inconsistent lengths of lists");
+
+    const int32_t natoms = (int32_t)bp::len(label_list);
+
+    errors::assertMsgCritical(bp::len(x_list) == natoms, errmol);
+
+    errors::assertMsgCritical(bp::len(y_list) == natoms, errmol);
+
+    errors::assertMsgCritical(bp::len(z_list) == natoms, errmol);
 
     std::vector<double> coords;
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        coords.push_back(bp::extract<double>(x_list[i]));
+    }
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        coords.push_back(bp::extract<double>(y_list[i]));
+    }
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        coords.push_back(bp::extract<double>(z_list[i]));
+    }
+
+    // form charge, mass, label and elemental ID vectors
+
+    std::string errelm("Molecule.from_xyz - Unsupported chemical element");
+
     std::vector<double> charges;
+
     std::vector<double> masses;
+
     std::vector<std::string> labels;
+
     std::vector<int32_t> idselem;
 
-    for (int i = 0; i < natoms * 3; i++)
+    for (int32_t i = 0; i < natoms; i++)
     {
-        double x = bp::extract<double>(coord_list[i]);
-        coords.push_back(x);
-    }
+        std::string lbl = bp::extract<std::string>(label_list[i]);
 
-    for (int i = 0; i < natoms; i++)
-    {
-        double      chg  = bp::extract<double>(charge_list[i]);
-        double      mass = bp::extract<double>(mass_list[i]);
-        std::string lbl  = bp::extract<std::string>(label_list[i]);
-        int32_t     id   = bp::extract<int32_t>(idelem_list[i]);
+        CChemicalElement chemelm;
 
-        charges.push_back(chg);
-        masses.push_back(mass);
+        auto err = chemelm.setAtomType(fstr::upcase(lbl));
+
+        errors::assertMsgCritical(err, errelm);
+
+        charges.push_back(chemelm.getAtomicCharge());
+
+        masses.push_back(chemelm.getAtomicMass());
+
         labels.push_back(lbl);
-        idselem.push_back(id);
+
+        idselem.push_back(chemelm.getIdentifier());
     }
+
+    // form molecule
 
     return std::shared_ptr<CMolecule>(
             new CMolecule(coords, charges, masses, labels, idselem)
@@ -72,32 +102,48 @@ CMolecule_from_list(const bp::list& coord_list,
 // Helper function for getting coordinates as numpy array
 
 static np::ndarray
-CMolecule_coordinates_to_numpy(const CMolecule& self)
+CMolecule_x_to_numpy(const CMolecule& self)
 {
-    bp::list coords, rx, ry, rz;
+    bp::list rx;
 
     for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
     {
         rx.append(self.getCoordinatesX()[i]);
+    }
 
+    return np::array(rx);
+}
+
+static np::ndarray
+CMolecule_y_to_numpy(const CMolecule& self)
+{
+    bp::list ry;
+
+    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
+    {
         ry.append(self.getCoordinatesY()[i]);
+    }
 
+    return np::array(ry);
+}
+
+static np::ndarray
+CMolecule_z_to_numpy(const CMolecule& self)
+{
+    bp::list rz;
+
+    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
+    {
         rz.append(self.getCoordinatesZ()[i]);
     }
 
-    coords.append(rx);
-
-    coords.append(ry);
-
-    coords.append(rz);
-
-    return np::array(coords);
+    return np::array(rz);
 }
 
 // Helper function for getting VDW radii for molecule
 
 static np::ndarray
-CMolecule_vdw_radii_to_numpy(CMolecule& self)
+CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 {
     auto natoms = self.getNumberOfAtoms();
 
@@ -115,8 +161,8 @@ CMolecule_vdw_radii_to_numpy(CMolecule& self)
 
 // Helper function for getting nuclear charges for molecule
 
-static bp::list
-CMolecule_get_ids_elem(CMolecule& self)
+static np::ndarray
+CMolecule_elem_ids_to_numpy(const CMolecule& self)
 {
     auto natoms = self.getNumberOfAtoms();
 
@@ -129,7 +175,29 @@ CMolecule_get_ids_elem(CMolecule& self)
         ids.append(idselem[i]);
     }
 
-    return ids;
+    return np::array(ids);
+}
+
+// Helper function for checking multiplicity of molecule
+
+static void
+CMolecule_check_multiplicity(const CMolecule& self)
+{
+    auto multip = self.getMultiplicity() % 2;
+
+    auto nelec = self.getNumberOfElectrons() % 2;
+
+    bool flag = true;
+
+    if ((multip == 0) && (nelec != 1)) flag = false;
+
+    if ((multip == 1) && (nelec != 0)) flag = false;
+
+    std::string errmult("Molecule.check_multiplicity: ");
+
+    errmult += "Incompatble multiplicity & number of electrons";
+
+    errors::assertMsgCritical(flag, errmult);
 }
 
 // Helper function for broadcasting CMolecule object
@@ -172,22 +240,26 @@ void export_moldata()
         )
         .def(bp::init<const CMolecule&>())
         .def(bp::init<const CMolecule&, const CMolecule&>())
-        .def("from_list", &CMolecule_from_list)
-        .staticmethod("from_list")
+        .def("from_xyz", &CMolecule_from_xyz)
+        .staticmethod("from_xyz")
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)
         .def("get_multiplicity", &CMolecule::getMultiplicity)
+        .def("check_multiplicity", &CMolecule_check_multiplicity)
         .def("print_geometry", &CMolecule::printGeometry)
+        .def("check_proximity", &CMolecule::checkProximity)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
         .def("number_of_atoms", number_of_atoms_1)
         .def("number_of_atoms", number_of_atoms_2)
         .def("number_of_atoms", number_of_atoms_3)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
         .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
-        .def("coordinates_to_numpy", &CMolecule_coordinates_to_numpy)
+        .def("x_to_numpy", &CMolecule_x_to_numpy)
+        .def("y_to_numpy", &CMolecule_y_to_numpy)
+        .def("z_to_numpy", &CMolecule_z_to_numpy)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
-        .def("get_ids_elem", &CMolecule_get_ids_elem)
+        .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
     ;

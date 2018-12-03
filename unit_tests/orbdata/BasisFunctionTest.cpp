@@ -15,7 +15,7 @@ TEST_F(CBasisFunctionTest, DefaultConstructor)
 {
     CBasisFunction bfa;
 
-    CBasisFunction bfb(std::vector<double>(), std::vector<double>(), -1);
+    CBasisFunction bfb(std::vector<double>(), std::vector<double>(), 0, -1);
 
     ASSERT_EQ(bfa, bfb);
 }
@@ -184,6 +184,20 @@ TEST_F(CBasisFunctionTest, Normalize)
     ASSERT_EQ(bfa, bfb);
 }
 
+TEST_F(CBasisFunctionTest, NormalizeWithGeneralContraction)
+{
+    CBasisFunction bfa({1.5, 0.8}, {1.0, 0.8, 1.4, 1.2}, 2, 0);
+    
+    bfa.normalize();
+    
+    CBasisFunction bfb = CBasisFunction({1.5, 0.8},
+                                        {0.546234791546083, 0.272720881091111,
+                                         0.529489551834861, 0.283243303598867},
+                                        2, 0);
+    
+    ASSERT_EQ(bfa, bfb);
+}
+
 TEST_F(CBasisFunctionTest, GetExponents)
 {
     CBasisFunction bfa({0.3, 0.7}, {1.5, 5.6}, 1);
@@ -198,11 +212,35 @@ TEST_F(CBasisFunctionTest, GetNormalizationFactors)
     vlxtest::compare({1.5, 5.6}, bfa.getNormalizationFactors());
 }
 
+TEST_F(CBasisFunctionTest, GetNormalizationFactorsWithGeneralContraction)
+{
+    CBasisFunction bfa({1.5, 0.8}, {1.0, 0.8, 1.4, 1.2}, 2, 0);
+    
+    vlxtest::compare({1.0, 0.8}, bfa.getNormalizationFactors(0));
+    
+    vlxtest::compare({1.4, 1.2}, bfa.getNormalizationFactors(1));
+    
+    auto vec = bfa.getNormalizationFactors(2);
+    
+    ASSERT_TRUE(vec.empty());
+}
+
 TEST_F(CBasisFunctionTest, GetAngularMomentum)
 {
     CBasisFunction bfa({0.3, 0.7}, {1.5, 5.6}, 1);
 
     ASSERT_EQ(1, bfa.getAngularMomentum());
+}
+
+TEST_F(CBasisFunctionTest, GetNumberOfContractedFunctions)
+{
+    CBasisFunction bfa({1.5, 0.8}, {1.0, 0.8, 1.4, 1.2}, 2, 0);
+    
+    ASSERT_EQ(2, bfa.getNumberOfContractedFunctions());
+    
+    CBasisFunction bfb({0.3, 0.7}, {1.5, 5.6}, 1);
+    
+    ASSERT_EQ(1, bfb.getNumberOfContractedFunctions());
 }
 
 TEST_F(CBasisFunctionTest, Add)
@@ -225,4 +263,15 @@ TEST_F(CBasisFunctionTest, GetNumberOfPrimitiveFunctions)
     CBasisFunction bfa({0.3, 0.7, 0.9}, {1.5, 5.6, 1.3}, 0);
 
     ASSERT_EQ(3, bfa.getNumberOfPrimitiveFunctions());
+}
+
+TEST_F(CBasisFunctionTest, GetNumberOfNormalizationFactors)
+{
+    CBasisFunction bfa({1.5, 0.8}, {1.0, 0.8, 1.4, 1.2}, 2, 0);
+    
+    ASSERT_EQ(4, bfa.getNumberOfNormalizationFactors());
+    
+    CBasisFunction bfb({0.3, 0.7}, {1.5, 5.6}, 1);
+    
+    ASSERT_EQ(2, bfb.getNumberOfNormalizationFactors());
 }

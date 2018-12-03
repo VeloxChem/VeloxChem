@@ -1449,11 +1449,11 @@ CGtoPairsBlock::_getBlockDimensions() const
     
     if (angab > 3) return 50;
     
-    if (angab = 3) return 100;
+    if (angab == 3) return 100;
     
-    if (angab = 2) return 150;
+    if (angab == 2) return 150;
     
-    if (angab = 1) return 200;
+    if (angab == 1) return 200;
     
     return 300;
 }
