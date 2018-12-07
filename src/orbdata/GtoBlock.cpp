@@ -80,7 +80,11 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         auto angcomp = angmom::to_SphericalComponents(_angularMomentum);
         
         auto ncdim = basis.getNumberOfBasisFunctions(molecule, iAtom, nAtoms,
-                                                     angularMomentum);
+                                                     _angularMomentum);
+        
+        auto nrdim = basis.getNumberOfReducedBasisFunctions(molecule,
+                                                            iAtom, nAtoms,
+                                                            _angularMomentum);
         
         _contrPattern = CMemBlock2D<int32_t>(ncdim, 3 + angcomp);
         
@@ -92,7 +96,7 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         // determine offset in contracted GTOs block
         
         auto ncoff = basis.getNumberOfBasisFunctions(molecule, 0, iAtom,
-                                                     angularMomentum);
+                                                     _angularMomentum);
         
         // set up pointers to molecular data
         
