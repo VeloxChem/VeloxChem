@@ -22,6 +22,7 @@ CGtoBlock::CGtoBlock()
 }
 
 CGtoBlock::CGtoBlock(const CMemBlock2D<double>&  gtoPrimitives,
+                     const CMemBlock<double>&    gtoNormFactors,
                      const CMemBlock2D<int32_t>& contrPattern,
                      const int32_t               angularMomentum)
 
@@ -30,6 +31,8 @@ CGtoBlock::CGtoBlock(const CMemBlock2D<double>&  gtoPrimitives,
     , _contrPattern(contrPattern)
 
     , _gtoPrimitives(gtoPrimitives)
+
+    , _gtoNormFactors(gtoNormFactors)
 {
 
 }
@@ -59,7 +62,15 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
     
     if (npfuncs > 0)
     {
-        _gtoPrimitives = CMemBlock2D<double>(npfuncs, 5);
+        _gtoPrimitives = CMemBlock2D<double>(npfuncs, 4);
+        
+        // allocate normalization factors
+        
+        auto npfacts = basis.getNumberOfNormalizationFactors(molecule,
+                                                             iAtom, nAtoms,
+                                                             _angularMomentum);
+        
+        _gtoNormFactors = CMemBlock<double>(npfacts); 
         
         // allocate contraction data
         
@@ -105,13 +116,13 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         
         auto gtoexps = _gtoPrimitives.data(0);
         
-        auto gtonorms = _gtoPrimitives.data(1);
+        auto coordsx = _gtoPrimitives.data(1);
         
-        auto coordsx = _gtoPrimitives.data(2);
+        auto coordsy = _gtoPrimitives.data(2);
         
-        auto coordsy = _gtoPrimitives.data(3);
+        auto coordsz = _gtoPrimitives.data(3);
         
-        auto coordsz = _gtoPrimitives.data(4);
+        auto gtonorms = _gtoNormFactors.data();
         
         // loop over atoms in molecule
         
@@ -195,6 +206,8 @@ CGtoBlock::CGtoBlock(const CGtoBlock& source)
     , _contrPattern(source._contrPattern)
 
     , _gtoPrimitives(source._gtoPrimitives)
+
+    , _gtoNormFactors(source._gtoNormFactors)
 {
 
 }
@@ -206,6 +219,8 @@ CGtoBlock::CGtoBlock(CGtoBlock&& source) noexcept
     , _contrPattern(std::move(source._contrPattern))
 
     , _gtoPrimitives(std::move(source._gtoPrimitives))
+
+    , _gtoNormFactors(std::move(source._gtoNormFactors))
 {
 
 }
@@ -225,6 +240,8 @@ CGtoBlock::operator=(const CGtoBlock& source)
     _contrPattern = source._contrPattern;
 
     _gtoPrimitives = source._gtoPrimitives;
+    
+    _gtoNormFactors = source._gtoNormFactors;
 
     return *this;
 }
@@ -239,6 +256,8 @@ CGtoBlock::operator=(CGtoBlock&& source) noexcept
     _contrPattern = std::move(source._contrPattern);
 
     _gtoPrimitives = std::move(source._gtoPrimitives);
+    
+    _gtoNormFactors = std::move(source._gtoNormFactors);
 
     return *this;
 }
@@ -251,6 +270,8 @@ CGtoBlock::operator==(const CGtoBlock& other) const
     if (_contrPattern != other._contrPattern) return false;
 
     if (_gtoPrimitives != other._gtoPrimitives) return false;
+    
+    if (_gtoNormFactors != other._gtoNormFactors) return false;
 
     return true;
 }
@@ -274,6 +295,8 @@ CGtoBlock::compress(const CGtoBlock&         source,
     // zero current data
     
     _gtoPrimitives.zero();
+    
+    _gtoNormFactors.zero(); 
     
     _contrPattern.zero();
     
@@ -492,49 +515,49 @@ CGtoBlock::getExponents()
 const double*
 CGtoBlock::getNormFactors() const
 {
-    return _gtoPrimitives.data(1);
+    return _gtoNormFactors.data();
 }
 
 double*
 CGtoBlock::getNormFactors()
 {
-    return _gtoPrimitives.data(1);
+    return _gtoNormFactors.data();
 }
 
 const double*
 CGtoBlock::getCoordinatesX() const
 {
-    return _gtoPrimitives.data(2);
+    return _gtoPrimitives.data(1);
 }
 
 double*
 CGtoBlock::getCoordinatesX()
 {
-    return _gtoPrimitives.data(2);
+    return _gtoPrimitives.data(1);
 }
 
 const double*
 CGtoBlock::getCoordinatesY() const
 {
-    return _gtoPrimitives.data(3);
+    return _gtoPrimitives.data(2);
 }
 
 double*
 CGtoBlock::getCoordinatesY()
 {
-    return _gtoPrimitives.data(3);
+    return _gtoPrimitives.data(2);
 }
 
 const double*
 CGtoBlock::getCoordinatesZ() const
 {
-    return _gtoPrimitives.data(4);
+    return _gtoPrimitives.data(3);
 }
 
 double*
 CGtoBlock::getCoordinatesZ()
 {
-    return _gtoPrimitives.data(4);
+    return _gtoPrimitives.data(3);
 }
 
 int32_t
@@ -569,6 +592,8 @@ operator<<(      std::ostream& output,
     output << "_contrPattern: " << source._contrPattern << std::endl;
 
     output << "_gtoPrimitives: " << source._gtoPrimitives << std::endl;
+    
+    output << "_gtoNormFactors: " << source._gtoNormFactors << std::endl;
     
     return output;
 }

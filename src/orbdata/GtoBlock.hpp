@@ -36,10 +36,14 @@ class CGtoBlock
     CMemBlock2D<int32_t> _contrPattern;
 
     /**
-     The primitives Gaussian functions data (exponents, norm. factors and
-     coordinates).
+     The primitives Gaussian functions data (exponents and coordinates).
      */
-    CMemBlock2D<double> _gtoPrimitives; 
+    CMemBlock2D<double> _gtoPrimitives;
+    
+    /**
+     The normalization factors pf primitives Gaussian functions.
+     */
+    CMemBlock<double> _gtoNormFactors;
 
 public:
 
@@ -52,13 +56,16 @@ public:
      Creates a GTOs block object.
      
      @param gtoPrimitives the primitives Gaussian functions data (exponents,
-                           norm. factors, coordinates).
+                          coordinates).
+     @param gtoNormFactors the normalization factiosn of primitive Gaussian
+                           functions.
      @param contrPattern the contraction pattern (contracted basis functions
                          start/end position in primitive Gaussian functions
                          vector, basis functions indexes).
      @param angularMomentum the angular momentum of contracted basis functions.
      */
     CGtoBlock(const CMemBlock2D<double>&  gtoPrimitives,
+              const CMemBlock<double>&    gtoNormFactors,
               const CMemBlock2D<int32_t>& contrPattern,
               const int32_t               angularMomentum);
 
