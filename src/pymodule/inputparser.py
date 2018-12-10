@@ -1,4 +1,4 @@
-from .veloxchemlib import bohr_in_angstoms
+from .veloxchemlib import bohr_in_angstroms
 
 import re
 
@@ -36,8 +36,8 @@ class InputParser:
             self.success_monitor = False
 
         except SyntaxError:
-            print('Selected input file has bad syntax!
-                  You may check for incomplete or empty groups.')
+            print('Selected input file has bad syntax!')
+            print('You may check for incomplete or empty groups.')
             self.success_monitor = False
 
         if self.success_monitor:
@@ -172,8 +172,7 @@ class InputParser:
         """ Converting molecule coordinates from angstroms to atomic units. """
 
         coords = ['x_coords', 'y_coords', 'z_coords']
-	angstroms_in_bohr = 1 / vlx.bohr_in_angstroms()
+        angstroms_in_bohr = 1 / bohr_in_angstroms()
         for n in coords:
             for p in range(len(self.input_dict['molecule'][n])):
-                self.input_dict['molecule'][n][p] =
-                self.input_dict['molecule'][n][p] * angstroms_in_bohr
+                self.input_dict['molecule'][n][p] *= angstroms_in_bohr
