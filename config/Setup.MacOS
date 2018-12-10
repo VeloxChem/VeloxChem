@@ -10,7 +10,7 @@
 
 USE_MPI := true
 USE_GPU := false
-USE_MKL := false
+USE_MKL := true
 
 # C++ compiler & linker
 
@@ -18,8 +18,8 @@ CXX := mpicxx
 
 # Compiler flags for generic intel CPUs
 
-CXX_REL_FLG := -std=c++11 -O3 -fopenmp -Wall
-CXX_DEB_FLG := -std=c++11 -O3 -fopenmp -Wall -g
+CXX_REL_FLG := -std=c++11 -O3 -Xpreprocessor -fopenmp -Wall
+CXX_DEB_FLG := -std=c++11 -O3 -Xpreprocessor -fopenmp -Wall -g
 
 # Generic preprocessor flags
 
@@ -49,11 +49,10 @@ CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 
 # MKL header and library
 
-MKLROOT := /usr/local/Cellar/openblas/0.3.3
 MKL_INCLUDES := $(MKLROOT)/include
 
-LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas
-LIB_LIST += -lomp -lpthread -lm -ldl
+LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lmkl_intel_lp64
+LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx -lomp -lpthread -lm -ldl
 
 # Google Test root directory
 
