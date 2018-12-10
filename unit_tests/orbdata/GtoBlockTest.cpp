@@ -23,11 +23,15 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeForS)
 
     CGtoBlock sorb(lih, bas, 0);
 
-    CMemBlock2D<int32_t> sidx({0, 5, 6,  7, 10,
+    CMemBlock2D<int32_t> scntr({0, 5, 6,  7, 10,
                                5, 6, 7, 10, 11,
                                0, 0, 0,  1,  1,
-                               0, 1, 2,  3, 4},
-                               5, 4);
+                               0, 0, 0,  0,  0,
+                               0, 0, 0,  0,  0},
+                               5, 5);
+    
+    CMemBlock2D<int32_t> sidx({0, 1, 2,  3, 4},
+                              5, 1);
 
     CMemBlock2D<double> sprim({2.662778551600e+02, 4.006978344700e+01, 9.055994438900e+00,
                                2.450300905100e+00, 7.220957185500e-01, 5.281088472100e-02,
@@ -52,7 +56,7 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeForS)
                               1.000000000000e+00, 1.968215800000e-02, 1.379652400000e-01,
                               4.783193500000e-01, 1.000000000000e+00});
 
-    CGtoBlock sdat(sprim, sfacts, sidx, 0);
+    CGtoBlock sdat(sprim, sfacts, scntr, sidx, 0);
 
     ASSERT_EQ(sorb, sdat);
 }
@@ -65,13 +69,17 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeForP)
 
     CGtoBlock porb(lih, bas, 1);
 
-    CMemBlock2D<int32_t> pidx({ 0,  2,  3,
+    CMemBlock2D<int32_t> pcntr({ 0,  2,  3,
                                 2,  3,  4,
                                 0,  0,  1,
-                                5,  6,  7,
-                                8,  9, 10,
+                                0,  0,  0,
+                                0,  0,  0},
+                               3, 5);
+    
+    CMemBlock2D<int32_t> pidx({5,  6,  7,
+                               8,  9, 10,
                                11, 12, 13},
-                               3, 6);
+                              3, 3);
 
     CMemBlock2D<double> pprim({1.450000000000e+00, 3.000000000000e-01, 8.200000000000e-02,
                                8.000000000000e-01,
@@ -86,7 +94,7 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeForP)
     CMemBlock<double> pfacts({2.586000000000e-01, 1.000000000000e+00, 1.000000000000e+00,
                               1.000000000000e+00});
 
-    CGtoBlock pdat(pprim, pfacts, pidx, 1);
+    CGtoBlock pdat(pprim, pfacts, pcntr, pidx, 1);
 
     ASSERT_EQ(porb, pdat);
 }
@@ -99,13 +107,17 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeAndAtomlistForP)
     
     CGtoBlock aporb(lih, bas, 0, 1, 1);
     
-    CMemBlock2D<int32_t> apidx({ 0,  2,
+    CMemBlock2D<int32_t> apcntr({ 0,  2,
                                  2,  3,
                                  0,  0,
-                                 5,  6,
-                                 8,  9,
-                                11, 12},
-                               2, 6);
+                                 0,  0,
+                                 0,  0},
+                                2, 5);
+    
+    CMemBlock2D<int32_t> apidx({5,  6,
+                                8,  9,
+                               11, 12},
+                                2, 3);
     
     CMemBlock2D<double> apprim({1.450000000000e+00, 3.000000000000e-01, 8.200000000000e-02,
                                 0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
@@ -115,19 +127,23 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeAndAtomlistForP)
     
     CMemBlock<double> apfacts({2.586000000000e-01, 1.000000000000e+00, 1.000000000000e+00});
     
-    CGtoBlock apdat(apprim, apfacts, apidx, 1);
+    CGtoBlock apdat(apprim, apfacts, apcntr, apidx, 1);
     
     ASSERT_EQ(aporb, apdat);
     
     CGtoBlock bporb(lih, bas, 1, 1, 1);
     
-    CMemBlock2D<int32_t> bpidx({ 0,
+    CMemBlock2D<int32_t> bpcntr({ 0,
                                  1,
                                  1,
-                                 7,
+                                 0,
+                                 0},
+                                1, 5);
+    
+    CMemBlock2D<int32_t> bpidx({ 7,
                                 10,
                                 13},
-                               1, 6);
+                                1, 3);
     
     CMemBlock2D<double> bpprim({8.000000000000e-01,
                                 0.000000000000e+00,
@@ -137,19 +153,23 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeAndAtomlistForP)
     
     CMemBlock<double> bpfacts(std::vector<double>({1.000000000000e+00}));
     
-    CGtoBlock bpdat(bpprim, bpfacts, bpidx, 1);
+    CGtoBlock bpdat(bpprim, bpfacts, bpcntr, bpidx, 1);
     
     ASSERT_EQ(bporb, bpdat);
     
     CGtoBlock cporb(lih, bas, 0, 2, 1);
     
-    CMemBlock2D<int32_t> cpidx({ 0,  2,  3,
+    CMemBlock2D<int32_t> cpcntr({ 0,  2,  3,
                                  2,  3,  4,
                                  0,  0,  1,
-                                 5,  6,  7,
-                                 8,  9, 10,
-                                11, 12, 13},
-                                3, 6);
+                                 0,  0,  0,
+                                 0,  0,  0},
+                                3, 5);
+    
+    CMemBlock2D<int32_t> cpidx({5,  6,  7,
+                                8,  9, 10,
+                               11, 12, 13},
+                               3, 3);
     
     CMemBlock2D<double> cpprim({1.450000000000e+00, 3.000000000000e-01, 8.200000000000e-02,
                                 8.000000000000e-01,
@@ -164,7 +184,7 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeAndAtomlistForP)
     CMemBlock<double> cpfacts({ 2.586000000000e-01, 1.000000000000e+00, 1.000000000000e+00,
                                 1.000000000000e+00});
     
-    CGtoBlock cpdat(cpprim, cpfacts, cpidx, 1);
+    CGtoBlock cpdat(cpprim, cpfacts, cpcntr, cpidx, 1);
     
     ASSERT_EQ(cporb, cpdat);
 }
@@ -177,13 +197,15 @@ TEST_F(CGtoBlockTest, ConstructorWithMoleculeForD)
 
     CGtoBlock dorb(lih, bas, 2);
 
+    CMemBlock2D<int32_t> dcntr;
+    
     CMemBlock2D<int32_t> didx;
 
     CMemBlock2D<double> dprim;
     
     CMemBlock<double> dfacts;
 
-    CGtoBlock ddat(dprim, dfacts, didx, 2);
+    CGtoBlock ddat(dprim, dfacts, dcntr, didx, 2);
 
     ASSERT_EQ(dorb, ddat);
 }
@@ -636,11 +658,15 @@ TEST_F(CGtoBlockTest, Compress)
     
     ASSERT_EQ(std::get<1>(pdim), 4);
     
-    CMemBlock2D<int32_t> sidx({0, 2, 3, 5, 0,
-                               2, 3, 5, 6, 0,
-                               0, 0, 1, 1, 0,
-                               0, 1, 3, 4, 0},
-                               5, 4);
+    CMemBlock2D<int32_t> scntr({0, 2, 3, 5, 0,
+                                2, 3, 5, 6, 0,
+                                0, 0, 1, 1, 0,
+                                0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0},
+                                5, 5);
+    
+    CMemBlock2D<int32_t> sidx({0, 1, 3, 4, 0},
+                               5, 1);
     
     CMemBlock2D<double> sprim({9.055994438900e+00, 2.450300905100e+00, 5.281088472100e-02,
                                1.301070100000e+01, 1.962257200000e+00, 1.219496200000e-01,
@@ -665,7 +691,7 @@ TEST_F(CGtoBlockTest, Compress)
                               0.000000000000e+00, 0.000000000000e+00, 0.000000000000e+00,
                               0.000000000000e+00, 0.000000000000e+00});
     
-    CGtoBlock sdat(sprim, cfacts, sidx, 0);
+    CGtoBlock sdat(sprim, cfacts, scntr, sidx, 0);
     
     ASSERT_EQ(redorb, sdat);
     
@@ -688,7 +714,8 @@ TEST_F(CGtoBlockTest, Compress)
     ASSERT_EQ(std::get<1>(pdim), 0);
     
     sdat = CGtoBlock(CMemBlock2D<double>(11, 4), CMemBlock<double>(11),
-                     CMemBlock2D<int32_t>(5, 4), 0); 
+                     CMemBlock2D<int32_t>(5, 5), CMemBlock2D<int32_t>(5, 1),
+                     0);
     
     ASSERT_EQ(sdat, redorb);
 }
