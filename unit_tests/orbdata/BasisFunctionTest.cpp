@@ -264,3 +264,14 @@ TEST_F(CBasisFunctionTest, GetNumberOfPrimitiveFunctions)
 
     ASSERT_EQ(3, bfa.getNumberOfPrimitiveFunctions());
 }
+
+TEST_F(CBasisFunctionTest, GetNumberOfNormalizationFactors)
+{
+    CBasisFunction bfa({1.5, 0.8}, {1.0, 0.8, 1.4, 1.2}, 2, 0);
+    
+    ASSERT_EQ(4, bfa.getNumberOfNormalizationFactors());
+    
+    CBasisFunction bfb({0.3, 0.7}, {1.5, 5.6}, 1);
+    
+    ASSERT_EQ(2, bfb.getNumberOfNormalizationFactors());
+}

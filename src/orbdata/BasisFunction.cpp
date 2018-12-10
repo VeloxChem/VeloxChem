@@ -276,6 +276,12 @@ CBasisFunction::getNumberOfContractedFunctions() const
     return _nContrVectors; 
 }
 
+int32_t
+CBasisFunction::getNumberOfNormalizationFactors() const
+{
+    return static_cast<int32_t>(_normFactors.size()); 
+}
+
 void
 CBasisFunction::_rescale()
 {

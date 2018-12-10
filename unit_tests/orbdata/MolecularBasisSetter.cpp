@@ -172,5 +172,19 @@ getReducedTestBasisForLiH()
     return mbas;
 }
 
+CMolecularBasis
+getGenContrBasisForLiH()
+{
+    CMolecularBasis mbas;
+    
+    mbas.setLabel({"General-Contraction-Basis"});
+    
+    mbas.addAtomBasis(getGenContrBasisForLi());
+    
+    mbas.addAtomBasis(getAtomBasisForH());
+    
+    return mbas;
+}
+    
 } // vlxbas namespace
 

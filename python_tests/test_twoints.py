@@ -110,10 +110,10 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(enuc, ref_enuc)
 
         ao_basis = MolecularBasis.from_lib(
-            "DEF2-SVP", "../basis/", molecule, ostream)
+            "def2-svp", "../basis/", molecule, ostream)
 
         min_basis = MolecularBasis.from_lib(
-            "MIN-CC-PVDZ", "../basis/", molecule, ostream)
+            "min-cc-pvdz", "../basis/", molecule, ostream)
 
         comm = task.mpi_comm
         rank = task.mpi_rank

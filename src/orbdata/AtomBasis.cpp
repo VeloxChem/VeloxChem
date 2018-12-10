@@ -147,10 +147,28 @@ CAtomBasis::getNumberOfBasisFunctions(const int32_t angularMomentum) const
     {
         if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
         {
-            nbfuncs++;
+            nbfuncs += _basisFunctions[i].getNumberOfContractedFunctions();
         }
     }
 
+    return nbfuncs;
+}
+
+int32_t
+CAtomBasis::getNumberOfReducedBasisFunctions(const int32_t angularMomentum) const
+{
+    if (angularMomentum > _maxAngularMomentum) return 0;
+    
+    int32_t nbfuncs = 0;
+    
+    for (size_t i = 0; i < _basisFunctions.size(); i++)
+    {
+        if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
+        {
+            nbfuncs++;
+        }
+    }
+    
     return nbfuncs;
 }
 
@@ -170,6 +188,24 @@ CAtomBasis::getNumberOfPrimitiveFunctions(const int32_t angularMomentum) const
     }
 
     return npfuncs;
+}
+
+int32_t
+CAtomBasis::getNumberOfNormalizationFactors(const int32_t angularMomentum) const
+{
+    if (angularMomentum > _maxAngularMomentum) return 0;
+    
+    int32_t nfacts = 0;
+    
+    for (size_t i = 0; i < _basisFunctions.size(); i++)
+    {
+        if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
+        {
+            nfacts += _basisFunctions[i].getNumberOfNormalizationFactors();
+        }
+    }
+    
+    return nfacts;
 }
 
 std::string

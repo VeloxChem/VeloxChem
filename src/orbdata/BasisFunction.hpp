@@ -227,6 +227,13 @@ public:
     int32_t getNumberOfContractedFunctions() const;
     
     /**
+     Gets total number of normalization factors in basis function.
+     
+     @return the total number of normalization factors.
+     */
+    int32_t getNumberOfNormalizationFactors() const;
+    
+    /**
      Broadcasts basis function object within domain of MPI communicator.
 
      @param rank the rank of MPI process.

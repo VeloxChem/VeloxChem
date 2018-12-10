@@ -35,7 +35,7 @@ CBasisReader::getState() const
 void
 CBasisReader::setLabel(const std::string& label)
 {
-    _label = label;
+    _label = fstr::upcase(label);
 }
 
 void
@@ -198,29 +198,29 @@ CBasisReader::_readAtomBasis(const int32_t        idElemental,
 
             if (_state)
             {
-                CBasisFunction bf;
+                auto npgto = std::get<1>(bpar);
+                
+                auto ncgto = std::get<2>(bpar);
+                
+                std::vector<double> pexps(npgto, 0.0);
+                
+                std::vector<double> pcoefs(npgto * ncgto, 0.0);
 
-                for (int32_t i = 0; i < std::get<1>(bpar); i++)
+                for (int32_t i = 0; i < npgto; i++)
                 {
                     std::getline(istream, str);
 
                     iline = CInputLine(str);
 
-                    auto pfun = _readPrimitveBasisFuction(iline, oStream);
+                    _readPrimitveBasisFuction(iline, pexps, pcoefs, i, npgto,
+                                              ncgto, oStream);
 
-                    if (_state)
-                    {
-                        bf.add(std::get<0>(pfun), std::get<1>(pfun));
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    if (!_state) break;
                 }
 
                 if (_state)
                 {
-                    bf.setAngularMomentum(std::get<0>(bpar));
+                    CBasisFunction bf(pexps, pcoefs, ncgto, std::get<0>(bpar));
 
                     bf.normalize();
 
@@ -245,7 +245,7 @@ CBasisReader::_readAtomBasis(const int32_t        idElemental,
     return atmbasis;
 }
 
-std::tuple<int32_t, int32_t>
+std::tuple<int32_t, int32_t, int32_t>
 CBasisReader::_readShellHeader(const CInputLine&    inputLine,
                                      COutputStream& oStream)
 {
@@ -253,60 +253,86 @@ CBasisReader::_readShellHeader(const CInputLine&    inputLine,
     {
         _errorCorruptedBasisSet(oStream);
 
-        return std::make_tuple(-1, -1);
+        return std::make_tuple(-1, -1, -1);
     }
 
-    if (inputLine.getIntegerNumber(2) != 1)
+    auto mang = fstr::to_AngularMomentum(inputLine.getKeyword(0));
+    
+    if (mang < 0)
     {
         _errorCorruptedBasisSet(oStream);
-
-        return std::make_tuple(-1, -1);
+        
+        return std::make_tuple(-1, -1, -1);
     }
-
+    
     auto nbfuncs = inputLine.getIntegerNumber(1);
 
     if (nbfuncs < 1)
     {
         _errorCorruptedBasisSet(oStream);
 
-        return std::make_tuple(-1, -1);
+        return std::make_tuple(-1, -1, -1);
     }
 
-    auto mang = fstr::to_AngularMomentum(inputLine.getKeyword(0));
-
-    if (mang < 0)
+    auto ncfuncs = inputLine.getIntegerNumber(2);
+    
+    if (ncfuncs < 1)
     {
         _errorCorruptedBasisSet(oStream);
-
-        return std::make_tuple(-1, -1);
+        
+        return std::make_tuple(-1, -1, -1);
     }
-
-    return std::make_tuple(mang, nbfuncs);
+    
+    return std::make_tuple(mang, nbfuncs, ncfuncs);
 }
 
-std::tuple<double, double>
-CBasisReader::_readPrimitveBasisFuction(const CInputLine&    inputLine,
-                                              COutputStream& oStream)
+void
+CBasisReader::_readPrimitveBasisFuction(const CInputLine&          inputLine,
+                                              std::vector<double>& exponents,
+                                              std::vector<double>& normFactors,
+                                        const int32_t              iExponent,
+                                        const int32_t              nExponents,
+                                        const int32_t              nContrVectors,
+                                              COutputStream&       oStream)
 {
-    if (inputLine.getNumberOfKeywords() != 2)
+    if (inputLine.getNumberOfKeywords() != (nContrVectors + 1))
     {
         _errorCorruptedBasisSet(oStream);
+        
+        exponents.clear();
+        
+        normFactors.clear();
 
-        return std::make_tuple(0.0, 0.0);
+        return;
     }
+    
+    // read exponent
 
     auto rexp = inputLine.getRealNumber(0);
 
     if (rexp <= 1.0e-6)
     {
         _errorCorruptedBasisSet(oStream);
+        
+        exponents.clear();
+        
+        normFactors.clear();
 
-        return std::make_tuple(0.0, 0.0);
+        return;
     }
 
-    auto rcoef = inputLine.getRealNumber(1);
-
-    return  std::make_tuple(rexp, rcoef);
+    exponents[iExponent] = rexp;
+    
+    // read normalization factors
+    
+    for (int32_t i = 0; i < nContrVectors; i++)
+    {
+        auto rcoef = inputLine.getRealNumber(i + 1);
+                
+        normFactors[i * nExponents + iExponent] = rcoef;
+    }
+    
+    return;
 }
 
 void

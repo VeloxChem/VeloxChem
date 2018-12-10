@@ -139,6 +139,14 @@ public:
      @return the number of basis functions.
      */
     int32_t getNumberOfBasisFunctions(const int32_t angularMomentum) const;
+    
+    /**
+     Gets reduced number of basis functions with specific angular momentum.
+     
+     @param angularMomentum the angular momentum.
+     @return the reduced number of basis functions.
+     */
+    int32_t getNumberOfReducedBasisFunctions(const int32_t angularMomentum) const;
 
     /**
      Gets number of primitive Gaussain functions with requested angular momentum.
@@ -147,6 +155,15 @@ public:
      @return the number of primitive Gaussian functions.
      */
     int32_t getNumberOfPrimitiveFunctions(const int32_t angularMomentum) const;
+    
+    
+    /**
+     Gets number of normalization factors with requested angular momentum.
+
+     @param angularMomentum the angular momentum.
+     @return the number of normalization factors.
+     */
+    int32_t getNumberOfNormalizationFactors(const int32_t angularMomentum) const;
 
     /**
      Gets contraction string for atom basis.

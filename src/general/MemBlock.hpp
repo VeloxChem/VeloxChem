@@ -299,6 +299,8 @@ CMemBlock<T>::CMemBlock(const int32_t nElements)
     , _nElements(nElements)
 {
     _allocate();
+    
+    zero(); 
 }
 
 template<class T>
