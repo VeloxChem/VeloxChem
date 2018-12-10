@@ -10,6 +10,12 @@
 
 #include <cmath>
 
+#ifdef MAC_OS_OMP
+#include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
+#else
+#include "omp.h"
+#endif
+
 #include "MathConst.hpp"
 #include "AngularMomentum.hpp"
 #include "StringFormat.hpp"
@@ -614,13 +620,17 @@ CGtoPairsBlock::operator!=(const CGtoPairsBlock& other) const
 std::vector<CGtoPairsBlock>
 CGtoPairsBlock::split() const
 {
-    auto batchSize = _getBlockDimensions();
+    //auto batchSize = _getBlockDimensions();
     
     // determine number of batches
     
-    auto nbtch = _nScreenedContrPairs / batchSize;
+    //auto nbtch = _nScreenedContrPairs / batchSize;
     
-    if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
+    //if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
+    
+    //printf("Batches: (%i,%i): %i\n", _braAngularMomentum, _ketAngularMomentum, nbtch);
+    
+    int32_t nbtch = 2 * omp_get_max_threads();
     
     // set up batches distribution pattern
     
