@@ -22,16 +22,26 @@ assertMsgCritical(const bool         condition,
 {
     if (! condition)
     {
-        if (mpi::initialized())
+        bool masternode = false;
+
+        if (!mpi::initialized() || mpi::rank(MPI_COMM_WORLD) == mpi::master())
         {
-            mpi::abort(MPI_ERR_OTHER, label.c_str());
+            masternode = true;
         }
 
-        std::stringstream sst;
+        if (masternode)
+        {
+            std::stringstream sst;
 
-        sst << "**** Critical Error in " << label << " ****" << std::endl;
+            sst << "**** Critical Error in " << label << " ****" << std::endl;
 
-        std::cerr << sst.str();
+            std::cerr << sst.str();
+        }
+
+        if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
+        {
+            MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
+        }
 
         std::abort();
     }
