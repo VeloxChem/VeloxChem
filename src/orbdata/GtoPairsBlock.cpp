@@ -10,6 +10,12 @@
 
 #include <cmath>
 
+#ifdef MAC_OS_OMP
+#include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
+#else
+#include "omp.h"
+#endif
+
 #include "MathConst.hpp"
 #include "AngularMomentum.hpp"
 #include "StringFormat.hpp"
@@ -1446,16 +1452,36 @@ int32_t
 CGtoPairsBlock::_getBlockDimensions() const
 {
     auto angab = _braAngularMomentum + _ketAngularMomentum ;
+
+    int32_t ndim = 200;  
+     
+    if (angab >  4) ndim = 25;
     
-    if (angab > 3) return 50;
+    if (angab == 4) ndim = 50;
     
-    if (angab == 3) return 100;
+    if (angab == 3) ndim = 75;
     
-    if (angab == 2) return 150;
+    if (angab == 2) ndim = 100;
     
-    if (angab == 1) return 200;
+    if (angab == 1) ndim = 150;
+
+    // system size scaling
+
+    double fsz = 1.0;
+
+    if (angab == 0) fsz = _nScreenedContrPairs / 320000.0;
+
+    if (angab == 1) fsz = _nScreenedContrPairs / 250000.0;
+
+    if (angab == 2) fsz = _nScreenedContrPairs / 7000.0;
+
+    if (angab == 3) fsz = _nScreenedContrPairs / 3750.0;
+
+    if (angab > 3) fsz = _nScreenedContrPairs / 500.0;
     
-    return 300;
+    if (fsz < 1.00) fsz = 1.01; 
+    
+    return ndim * static_cast<int32_t>(fsz);
 }
 
 std::ostream&
