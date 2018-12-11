@@ -11,14 +11,14 @@ def _gen_grid(mol, n_x=80, n_y=80, n_z=80):
 
     atom_radii = mol.vdw_radii_to_numpy()
 
-    x_max = np.max(x + atom_radii)
-    x_min = np.min(x - atom_radii)
+    x_max = np.max(x + atom_radii * 2.0)
+    x_min = np.min(x - atom_radii * 2.0)
 
-    y_max = np.max(y + atom_radii)
-    y_min = np.min(y - atom_radii)
+    y_max = np.max(y + atom_radii * 2.0)
+    y_min = np.min(y - atom_radii * 2.0)
 
-    z_max = np.max(z + atom_radii)
-    z_min = np.min(z - atom_radii)
+    z_max = np.max(z + atom_radii * 2.0)
+    z_min = np.min(z - atom_radii * 2.0)
 
     x_step = (x_max - x_min) / float(n_x)
     y_step = (y_max - y_min) / float(n_y)
@@ -31,7 +31,8 @@ def _gen_grid(mol, n_x=80, n_y=80, n_z=80):
 
 def _write_cube(self, mol, basis, mol_orbs, mo_idx, mo_spin, v):
 
-    # need implementation
+    # TODO: take cube filename from input parser
+
     outfile = open("outfilename.cube", 'w')
 
     x = mol.x_to_numpy()
@@ -54,8 +55,8 @@ def _write_cube(self, mol, basis, mol_orbs, mo_idx, mo_spin, v):
     n_y = v[7]
     n_z = v[8]
 
-    outfile.write(' Title Card Required MO={}\n' .format("HOMO"))
-    outfile.write(' MO coefficients\n')
+    outfile.write('VeloxChem Cube File\n')
+    outfile.write('MO %d, %s spin\n' % (mo_idx + 1, mo_spin))
     outfile.write('%5d%12.6f%12.6f%12.6f%5d\n' %
                   (-natoms, x_min, y_min, z_min, 1))
 
@@ -66,6 +67,7 @@ def _write_cube(self, mol, basis, mol_orbs, mo_idx, mo_spin, v):
     for a in range(natoms):
         outfile.write('%5d%12.6f%12.6f%12.6f%12.6f\n' %
                       (elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]))
+
     outfile.write('%5d%5d\n' % (1, mo_idx + 1))
 
     for ix in range(n_x):
@@ -76,17 +78,21 @@ def _write_cube(self, mol, basis, mol_orbs, mo_idx, mo_spin, v):
 
             for iz in range(n_z):
                 rz = z_min + z_step * iz
-                psi = self.compute(mol, basis, mol_orbs,
-                                   mo_idx, mo_spin, rx, ry, rz)
-                outfile.write(' %12.5E' % (psi))
+
+                psi = self.compute(mol, basis, mol_orbs, mo_idx, mo_spin,
+                                   rx, ry, rz)
+
+                outfile.write(' %12.5E' % psi)
                 if iz % 6 == 5:
                     outfile.write("\n")
+
             outfile.write("\n")
 
 
 def _write_cube_dens(self, mol, basis, density, dens_idx, dens_spin, v):
 
-    # need implementation
+    # TODO: take cube filename from input parser
+
     outfile = open("outfilename_dens.cube", 'w')
 
     x = mol.x_to_numpy()
@@ -109,8 +115,8 @@ def _write_cube_dens(self, mol, basis, density, dens_idx, dens_spin, v):
     n_y = v[7]
     n_z = v[8]
 
-    outfile.write('Title Card Required Density\n')
-    outfile.write('Electron density from Total SCF Density\n')
+    outfile.write('VeloxChem Cube File\n')
+    outfile.write('Electron density, %s spin\n' % mo_spin)
     outfile.write('%5d%12.6f%12.6f%12.6f%5d\n' %
                   (natoms, x_min, y_min, z_min, 1))
 
@@ -130,12 +136,14 @@ def _write_cube_dens(self, mol, basis, density, dens_idx, dens_spin, v):
 
             for iz in range(n_z):
                 rz = z_min + z_step * iz
-                dens = self.compute(mol, basis, density,
-                                    dens_idx, dens_spin, rx, ry, rz)
-                dens *= 2.0
+
+                dens = self.compute(mol, basis, density, dens_idx, dens_spin,
+                                    rx, ry, rz)
+
                 outfile.write(' %12.5E' % (dens))
                 if iz % 6 == 5:
                     outfile.write("\n")
+
             outfile.write("\n")
 
 

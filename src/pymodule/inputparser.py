@@ -55,11 +55,16 @@ class InputParser:
             self.convert_dict()
             self.convert_moldict()
 
-            if self.input_dict['molecule']['units'] == 'angs':
+            # converting angstroms to atomic units, if needed
 
-                # converting angstroms to atomic units
+            units = self.input_dict['molecule']['units']
 
+            if units in ['ang', 'angs', 'angstrom', 'angstroms']:
                 self.convert_units()
+            elif units in ['au', 'bohr', 'bohrs']:
+                pass
+            else:
+                raise SyntaxError
 
             return self.input_dict
 
@@ -120,8 +125,8 @@ class InputParser:
         """ Creating a list in which every element is a list itself containing
         every line of a group, while deleting '@' and '@end' tags. """
 
-        self.grouplist = re.findall(
-            r'@(?!end[\s])\s*\w+[^@]*@end(?![\w])', self.content)
+        self.grouplist = re.findall(r'@(?!end[\s])\s*\w+[^@]*@end(?![\w])',
+                                    self.content)
         for i in range(len(self.grouplist)):
             self.grouplist[i] = self.grouplist[i].lstrip('@ \n')
             self.grouplist[i] = self.grouplist[i].rstrip('end\n')
@@ -140,8 +145,7 @@ class InputParser:
             inner_dic = {}
             for k in j[1:]:
                 if ':' in k and 'xyz' not in k:
-                    inner_dic[k.split(':')[0].strip()] = k.split(':')[
-                        1].strip()
+                    inner_dic[k.split(':')[0].strip()] = k.split(':')[1].strip()
                 elif j[0] != 'molecule':
                     inner_dic[k.strip()] = None
                 elif 'xyz' in k:
@@ -172,7 +176,7 @@ class InputParser:
         """ Converting molecule coordinates from angstroms to atomic units. """
 
         coords = ['x_coords', 'y_coords', 'z_coords']
-        angstroms_in_bohr = 1 / bohr_in_angstroms()
+        angstroms_in_bohr = 1.0 / bohr_in_angstroms()
         for n in coords:
             for p in range(len(self.input_dict['molecule'][n])):
                 self.input_dict['molecule'][n][p] *= angstroms_in_bohr

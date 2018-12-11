@@ -140,7 +140,7 @@ def main():
             vis_drv.write_cube(mol_geom, mol_basis, scf_drv.mol_orbs, homo,
                                "alpha", vis_grid)
             vis_drv.write_cube_dens(mol_geom, mol_basis, scf_drv.density, 0,
-                               "alpha", vis_grid)
+                                    "alpha", vis_grid)
         """
 
     # all done, print finish header to output stream
