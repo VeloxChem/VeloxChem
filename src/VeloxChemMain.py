@@ -68,23 +68,25 @@ def main():
         if scf_drv.is_converged:
             scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
             scf_drv.density.write_hdf5("density.h5")
-        """
-        # initialize visualization driver
 
-        vis_drv = vlx.VisualizationDriver()
+    # generate cube file
 
-        # TODO: generate grid and write cube file
-        # TODO: should also be able to compute psi/density along a line
+    """
+    vis_drv = vlx.VisualizationDriver()
 
-        if scf_drv.is_converged:
-            vis_grid = vis_drv.gen_grid(molecule)
-            nelec = molecule.number_of_electrons()
-            homo = nelec // 2 -1
-            vis_drv.write_cube(molecule, mol_basis, scf_drv.mol_orbs, homo,
-                               "alpha", vis_grid)
-            vis_drv.write_cube_dens(molecule, mol_basis, scf_drv.density, 0,
-                                    "alpha", vis_grid)
-        """
+    if glob_rank == vlx.mpi_master():
+        mol_orbs = vlx.MolecularOrbitals.read_hdf5("mol_orbs.h5")
+        density = vlx.AODensityMatrix.read_hdf5("density.h5")
+
+        nelec = task.molecule.number_of_electrons()
+        homo = nelec // 2 - 1
+
+        vis_grid = vis_drv.gen_grid(task.molecule)
+        vis_drv.write_cube(task.molecule, task.ao_basis, scf_drv.mol_orbs,
+                           homo, "alpha", vis_grid)
+        vis_drv.write_cube_dens(task.molecule, task.ao_basis,
+                                scf_drv.density, 0, "alpha", vis_grid)
+    """
 
     # all done, print finish header to output stream
 
