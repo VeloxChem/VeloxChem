@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from veloxchem.taskparser import GlobalTask
+from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import Molecule
 from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
@@ -18,8 +18,7 @@ class TestExciton(unittest.TestCase):
 
     def test_assemble_matrices(self):
 
-        task = GlobalTask("inputs/dimer.inp", "inputs/dimer.out",
-                          MPI.COMM_WORLD)
+        task = MpiTask("inputs/dimer.inp", "inputs/dimer.out", MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis

@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from veloxchem.taskparser import GlobalTask
+from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
@@ -92,7 +92,7 @@ class TestTwoInts(unittest.TestCase):
 
     def test_fock_build(self):
 
-        task = GlobalTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
+        task = MpiTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
 
         molecule = task.molecule
         #ao_basis = task.ao_basis
