@@ -125,6 +125,7 @@ def main():
             scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
             scf_drv.density.write_hdf5("density.h5")
 
+        """
         # initialize visualization driver
 
         vis_drv = vlx.VisualizationDriver()
@@ -134,8 +135,13 @@ def main():
 
         if scf_drv.is_converged:
             vis_grid = vis_drv.gen_grid(mol_geom)
-            vis_drv.write_cube(mol_geom, mol_basis, scf_drv.mol_orbs, "HOMO",
-                               "alpha")
+            nelec = mol_geom.number_of_electrons()
+            homo = nelec // 2 -1
+            vis_drv.write_cube(mol_geom, mol_basis, scf_drv.mol_orbs, homo,
+                               "alpha", vis_grid)
+            vis_drv.write_cube_dens(mol_geom, mol_basis, scf_drv.density, 0,
+                                    "alpha", vis_grid)
+        """
 
     # all done, print finish header to output stream
 
