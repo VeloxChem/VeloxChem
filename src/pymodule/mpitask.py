@@ -63,14 +63,14 @@ class MpiTask:
             self.ostream.new_line()
 
             self.ao_basis = MolecularBasis.from_lib(
-                input_dict["method settings"]["basis"],
-                input_dict["method settings"]["basis path"], self.molecule,
+                input_dict["method_settings"]["basis"],
+                input_dict["method_settings"]["basis_path"], self.molecule,
                 self.ostream)
             self.ao_basis.print_basis("Atomic Basis", self.molecule,
                                       self.ostream)
 
             self.min_basis = MolecularBasis.from_lib(
-                "MIN-CC-PVDZ", input_dict["method settings"]["basis path"],
+                "MIN-CC-PVDZ", input_dict["method_settings"]["basis_path"],
                 self.molecule, self.ostream)
 
             self.ostream.flush()

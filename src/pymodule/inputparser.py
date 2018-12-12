@@ -24,7 +24,7 @@ class InputParser:
 
             # reading selected file
 
-            self.reading_file()
+            self.read_file()
 
             # checking for syntax correctness of the input file
 
@@ -44,16 +44,12 @@ class InputParser:
 
             # manipulation of input string
 
-            self.del_comments()
             self.clear_interspace()
-            self.del_whitespace()
-            self.lowercase_content()
 
             # processing the data into lists and dictionaries
 
             self.groupsplit()
             self.convert_dict()
-            self.convert_moldict()
 
             # converting angstroms to atomic units, if needed
 
@@ -76,11 +72,20 @@ class InputParser:
 
     # defining subordinated functions
 
-    def reading_file(self):
-        """ Storing content of selected file as a string type """
+    def read_file(self):
+        """ Storing content of selected file as a string type. Deleting
+        comments (marked by '!'). Deleting unnecassary whitespace. """
 
-        with open(self.filename, 'r') as f:
-            self.content = f.read()
+        self.content = ''
+        with open(self.filename, 'r') as f_inp:
+            for line in f_inp:
+                line = line.strip()
+                line = re.sub('!.*', '', line)
+                line = ' '.join(line.split())
+                if line.lower()[:4] == '@end':
+                    line = line.lower()
+                if line:
+                    self.content += line + '\n'
 
     def incomp_group_check(self):
         """ Checking for any incomplete groups. """
@@ -96,30 +101,10 @@ class InputParser:
         if re.findall(r'@[\w ]*\n\s*@end(?![\w])', self.content) != []:
             raise SyntaxError
 
-    def del_comments(self):
-        """ Deleting comments (marked by '!'). """
-
-        self.content = re.sub('!.*', '', self.content)
-
     def clear_interspace(self):
         """ Deleting content, that's not within a group. """
 
         self.content = re.sub(r'@end\s[^@]*@', '@end\n@', self.content)
-
-    def del_whitespace(self):
-        """ Deleting unnecassary whitespace. """
-
-        self.content = self.content.strip()
-        self.content = re.sub(r'\n\s*\n', '\n', self.content)
-        self.content = re.sub(' +', ' ', self.content)
-        self.content = re.sub('\n +', '\n', self.content)
-        self.content = re.sub(' +\n', '\n', self.content)
-
-    def lowercase_content(self):
-        """ Lowercasing every alphabetical character. Atom labels will be
-        uppercased when the dictionary is created. """
-
-        self.content = self.content.lower()
 
     def groupsplit(self):
         """ Creating a list in which every element is a list itself containing
@@ -136,41 +121,36 @@ class InputParser:
     def convert_dict(self):
         """ Converting the list of lists into a dictionary with groupnames as
         keys and group content as a dictionary itself. The geometry definition
-        of the molecule group is stored in a different dictionary. """
+        of the molecule group is stored in a different dictionary. Converting
+        the molecular structure into the required format. """
 
         self.input_dict = {}
-        self.moldict = {}
-        r = 1
-        for j in self.grouplist:
-            inner_dic = {}
-            for k in j[1:]:
-                if ':' in k and 'xyz' not in k:
-                    inner_dic[k.split(':')[0].strip()] = k.split(':')[1].strip()
-                elif j[0] != 'molecule':
-                    inner_dic[k.strip()] = None
-                elif 'xyz' in k:
-                    pass
+        self.atom_list = []
+        for group in self.grouplist:
+            inner_dict = {}
+            for entry in group[1:]:
+                if ':' in entry:
+                    key = entry.split(':')[0].strip()
+                    key = '_'.join(key.split())
+                    val = entry.split(':')[1].strip()
+                    if key.lower() != 'xyz':
+                        inner_dict[key.lower()] = val
                 else:
-                    self.moldict[r] = k.strip().upper()
-                    r += 1
-            self.input_dict[j[0]] = inner_dic
-
-    def convert_moldict(self):
-        """ Converting the molecular structure into the required format. """
+                    self.atom_list.append(entry)
+            group_key = group[0]
+            group_key = '_'.join(group_key.split())
+            self.input_dict[group_key.lower()] = inner_dict
 
         self.input_dict['molecule']['atom_labels'] = []
         self.input_dict['molecule']['x_coords'] = []
         self.input_dict['molecule']['y_coords'] = []
         self.input_dict['molecule']['z_coords'] = []
-        for j in self.moldict.keys():
-            self.input_dict['molecule']['atom_labels'].append(
-                self.moldict[j].split()[0])
-            self.input_dict['molecule']['x_coords'].append(
-                float(self.moldict[j].split()[1]))
-            self.input_dict['molecule']['y_coords'].append(
-                float(self.moldict[j].split()[2]))
-            self.input_dict['molecule']['z_coords'].append(
-                float(self.moldict[j].split()[3]))
+        for atom in self.atom_list:
+            axyz = atom.split()
+            self.input_dict['molecule']['atom_labels'].append(axyz[0].upper())
+            self.input_dict['molecule']['x_coords'].append(float(axyz[1]))
+            self.input_dict['molecule']['y_coords'].append(float(axyz[2]))
+            self.input_dict['molecule']['z_coords'].append(float(axyz[3]))
 
     def convert_units(self):
         """ Converting molecule coordinates from angstroms to atomic units. """

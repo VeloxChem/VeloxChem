@@ -82,10 +82,10 @@ def main():
         homo = nelec // 2 - 1
 
         vis_grid = vis_drv.gen_grid(task.molecule)
-        vis_drv.write_cube(task.molecule, task.ao_basis, scf_drv.mol_orbs,
+        vis_drv.write_cube(task.molecule, task.ao_basis, mol_orbs,
                            homo, "alpha", vis_grid)
-        vis_drv.write_cube_dens(task.molecule, task.ao_basis,
-                                scf_drv.density, 0, "alpha", vis_grid)
+        vis_drv.write_cube_dens(task.molecule, task.ao_basis, density,
+                                0, "alpha", vis_grid)
     """
 
     # all done, print finish header to output stream
