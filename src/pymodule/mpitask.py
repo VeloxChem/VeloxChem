@@ -46,7 +46,7 @@ class MpiTask:
 
             # create molecule
 
-            self.ostream.put_info("Parsing @self.molecule group...")
+            self.ostream.put_info("Parsing @molecule group...")
             self.ostream.put_info("...done.")
             self.ostream.new_line()
 
