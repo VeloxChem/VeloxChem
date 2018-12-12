@@ -65,7 +65,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     // split GTOs pairs into batches
     
-    auto kbpairs = kgtopairs.split();
+    auto kbpairs = kgtopairs.split(_locNodes);
     
     // set up GTOs splitting pattern for RI basis
     

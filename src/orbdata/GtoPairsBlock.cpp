@@ -618,7 +618,7 @@ CGtoPairsBlock::operator!=(const CGtoPairsBlock& other) const
 }
 
 std::vector<CGtoPairsBlock>
-CGtoPairsBlock::split() const
+CGtoPairsBlock::split(const int32_t nodes) const
 {
     auto batchSize = _getBlockDimensions();
     
@@ -627,7 +627,15 @@ CGtoPairsBlock::split() const
     auto nbtch = _nScreenedContrPairs / batchSize;
     
     if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
-    
+  
+    auto ntsk = omp_get_max_threads(); 
+     
+    if (nbtch > ntsk) nbtch = ntsk; 
+
+    // rescale number of batches over compute nodes
+
+    nbtch = static_cast<int32_t>(nbtch * std::sqrt(nodes)); 
+
     // set up batches distribution pattern
     
     CMemBlock2D<int32_t> bblk(nbtch, 2);
@@ -1453,35 +1461,19 @@ CGtoPairsBlock::_getBlockDimensions() const
 {
     auto angab = _braAngularMomentum + _ketAngularMomentum ;
 
-    int32_t ndim = 200;  
+    int32_t ndim = 300;  
      
-    if (angab >  4) ndim = 25;
+    if (angab >  4) ndim = 50;
     
-    if (angab == 4) ndim = 50;
+    if (angab == 4) ndim = 100;
     
-    if (angab == 3) ndim = 75;
+    if (angab == 3) ndim = 150;
     
-    if (angab == 2) ndim = 100;
+    if (angab == 2) ndim = 200;
     
-    if (angab == 1) ndim = 150;
+    if (angab == 1) ndim = 250;
 
-    // system size scaling
-
-    double fsz = 1.0;
-
-    if (angab == 0) fsz = _nScreenedContrPairs / 320000.0;
-
-    if (angab == 1) fsz = _nScreenedContrPairs / 250000.0;
-
-    if (angab == 2) fsz = _nScreenedContrPairs / 7000.0;
-
-    if (angab == 3) fsz = _nScreenedContrPairs / 3750.0;
-
-    if (angab > 3) fsz = _nScreenedContrPairs / 500.0;
-    
-    if (fsz < 1.00) fsz = 1.01; 
-    
-    return ndim * static_cast<int32_t>(fsz);
+    return ndim;
 }
 
 std::ostream&

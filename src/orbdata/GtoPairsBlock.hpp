@@ -184,9 +184,10 @@ public:
     /**
      Creates vector of GTOs pairs objects by splitting GTOs pairs object.
 
+     @param nodes the number of MPI ranks.
      @return the vector of GTOs pairs objects.
      */
-    std::vector<CGtoPairsBlock> split() const;
+    std::vector<CGtoPairsBlock> split(const int32_t nodes) const;
     
     /**
      Creates GTOs pairs object consisting from specific GTOs pairs object.

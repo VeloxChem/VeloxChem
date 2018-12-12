@@ -111,9 +111,10 @@ public:
      Creates a GTOs pairs container object by splitting the GTOs pairs container
      object.
 
+     @param nodes the number of MPI processes. 
      @return the GTOs pairs container object.
      */
-    CGtoPairsContainer split() const;
+    CGtoPairsContainer split(const int32_t nodes) const;
     
     /**
      Gets numnber of GTOs pairs block objects in GTOs pairs container.
