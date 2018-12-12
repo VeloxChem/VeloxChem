@@ -116,7 +116,7 @@ def _write_cube_dens(self, mol, basis, density, dens_idx, dens_spin, v):
     n_z = v[8]
 
     outfile.write('VeloxChem Cube File\n')
-    outfile.write('Electron density, %s spin\n' % mo_spin)
+    outfile.write('Electron density, %s spin\n' % dens_spin)
     outfile.write('%5d%12.6f%12.6f%12.6f%5d\n' %
                   (natoms, x_min, y_min, z_min, 1))
 

@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from veloxchem.taskparser import GlobalTask
+from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import Molecule
 from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import OutputStream
@@ -15,8 +15,7 @@ class TestSolvers(unittest.TestCase):
 
     def test_sad_guess(self):
 
-        task = GlobalTask("inputs/water.inp", "inputs/water.out",
-                          MPI.COMM_WORLD)
+        task = MpiTask("inputs/water.inp", "inputs/water.out", MPI.COMM_WORLD)
 
         molecule = task.molecule
         ao_basis = task.ao_basis

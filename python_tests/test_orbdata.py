@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from veloxchem.taskparser import LocalTask
+from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
 from veloxchem.veloxchemlib import mpi_master
@@ -15,7 +15,7 @@ class TestOrbData(unittest.TestCase):
 
     def test_get_label(self):
 
-        task = LocalTask("inputs/dimer.inp", "inputs/dimer.out")
+        task = MpiTask("inputs/dimer.inp", "inputs/dimer.out", MPI.COMM_WORLD)
         basis = task.ao_basis
 
         self.assertEqual(basis.get_label(), "DEF2-SVP")

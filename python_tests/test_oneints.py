@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from veloxchem.taskparser import GlobalTask
+from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
@@ -53,7 +53,7 @@ class TestOneInts(unittest.TestCase):
 
     def test_1e_integrals(self):
 
-        task = GlobalTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
+        task = MpiTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis

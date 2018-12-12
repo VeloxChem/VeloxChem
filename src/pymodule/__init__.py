@@ -23,4 +23,4 @@ from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .visualizationdriver import VisualizationDriver
-from .taskparser import GlobalTask
+from .mpitask import MpiTask

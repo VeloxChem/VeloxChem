@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from veloxchem.taskparser import LocalTask
+from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import Molecule
 from veloxchem.veloxchemlib import bohr_in_angstroms
 
@@ -11,7 +11,7 @@ class TestMolData(unittest.TestCase):
 
     def test_get_sub_molecule(self):
 
-        task = LocalTask("inputs/dimer.inp", "inputs/dimer.out")
+        task = MpiTask("inputs/dimer.inp", "inputs/dimer.out", MPI.COMM_WORLD)
         molecule = task.molecule
 
         mol_1 = molecule.get_sub_molecule(0, 4)
