@@ -107,13 +107,13 @@ CGtoPairsContainer::operator!=(const CGtoPairsContainer& other) const
 }
 
 CGtoPairsContainer
-CGtoPairsContainer::split() const
+CGtoPairsContainer::split(const int32_t nodes) const
 {
     std::vector<CGtoPairsBlock> ppvec;
     
     for (size_t i = 0; i < _gtoPairsBlocks.size(); i++)
     {
-        auto cvec = _gtoPairsBlocks[i].split();
+        auto cvec = _gtoPairsBlocks[i].split(nodes);
         
         for (size_t j = 0; j < cvec.size(); j++)
         {
