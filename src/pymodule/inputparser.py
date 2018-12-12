@@ -1,5 +1,11 @@
+from .veloxchemlib import Molecule
+from .veloxchemlib import MolecularBasis
+from .veloxchemlib import AtomBasis
+from .veloxchemlib import BasisFunction
+from .veloxchemlib import ChemicalElement
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import assert_msg_critical
+from .veloxchemlib import to_angular_momentum
 
 import re
 
@@ -77,6 +83,85 @@ class InputParser:
 
         self.parse()
         return self.success_monitor
+
+    # defining molecule and basis set readers
+
+    @staticmethod
+    def create_molecule(input_dict):
+
+        mol = Molecule.from_xyz(
+            input_dict['molecule']['atom_labels'],
+            input_dict['molecule']['x_coords'],
+            input_dict['molecule']['y_coords'],
+            input_dict['molecule']['z_coords'])
+
+        if 'charge' in input_dict['molecule'].keys():
+            mol.set_charge(int(input_dict['molecule']['charge']))
+
+        if 'multiplicity' in input_dict['molecule'].keys():
+            mol.set_multiplicity(
+                int(input_dict['molecule']['multiplicity']))
+
+        mol.check_multiplicity()
+
+        return mol
+
+    @staticmethod
+    def create_basis_set(mol, basis_dict):
+
+        mol_basis = MolecularBasis()
+
+        elem_comp = mol.get_elemental_composition()
+
+        for elem_id in elem_comp:
+
+            elem = ChemicalElement()
+            err = elem.set_atom_type(elem_id)
+            assert_msg_critical(err, "ChemicalElement.set_atom_type")
+
+            basis_key = 'atombasis_%s' % elem.get_name().lower()
+            basis_list = [entry for entry in basis_dict[basis_key]]
+
+            atom_basis = AtomBasis()
+
+            while basis_list:
+                shell_title = basis_list.pop(0).split()
+                assert_msg_critical(
+                    len(shell_title) == 3,
+                    "Basis set parser (shell): %s" % ' '.join(shell_title))
+
+                angl = to_angular_momentum(shell_title[0])
+                npgto = int(shell_title[1])
+                ncgto = int(shell_title[2])
+
+                expons = [0.0] * npgto
+                coeffs = [0.0] * npgto * ncgto
+
+                for i in range(npgto):
+                    prims = basis_list.pop(0).split()
+                    assert_msg_critical(
+                        len(prims) == ncgto + 1,
+                        "Basis set parser (primitive): %s" %
+                        ' '.join(prims))
+
+                    expons[i] = float(prims[0])
+                    for k in range(ncgto):
+                        coeffs[k * npgto + i] = float(prims[k + 1])
+
+                bf = BasisFunction.from_list(expons, coeffs, ncgto, angl)
+                bf.normalize()
+
+                atom_basis.add_basis_function(bf)
+
+            atom_basis.set_elemental_id(elem_id)
+
+            mol_basis.add_atom_basis(atom_basis)
+
+        basis_label = basis_dict['basis_set_name'].upper();
+
+        mol_basis.set_label(basis_label)
+
+        return mol_basis
 
     # defining subordinated functions
 

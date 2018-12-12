@@ -50,20 +50,8 @@ class MpiTask:
             self.ostream.put_info("...done.")
             self.ostream.new_line()
 
-            self.molecule = Molecule.from_xyz(
-                input_dict["molecule"]["atom_labels"],
-                input_dict["molecule"]["x_coords"],
-                input_dict["molecule"]["y_coords"],
-                input_dict["molecule"]["z_coords"])
+            self.molecule = InputParser.create_molecule(input_dict)
 
-            if "charge" in input_dict["molecule"].keys():
-                self.molecule.set_charge(int(input_dict["molecule"]["charge"]))
-
-            if "multiplicity" in input_dict["molecule"].keys():
-                self.molecule.set_multiplicity(
-                    int(input_dict["molecule"]["multiplicity"]))
-
-            self.molecule.check_multiplicity()
             self.molecule.check_proximity(0.1, self.ostream)
             self.molecule.print_geometry(self.ostream)
 
@@ -78,57 +66,15 @@ class MpiTask:
                 basis_label == basis_dict['basis_set_name'].upper(),
                 "basis set name")
 
-            mol_basis = MolecularBasis()
-
-            elem_comp = self.molecule.get_elemental_composition()
-
-            for elem_id in elem_comp:
-
-                elem = ChemicalElement()
-                err = elem.set_atom_type(elem_id)
-                assert_msg_critical(err, "ChemicalElement.set_atom_type")
-
-                basis_key = 'atombasis_%s' % elem.get_name().lower()
-                basis_list = [entry for entry in basis_dict[basis_key]]
-
-                atom_basis = AtomBasis()
-
-                while basis_list:
-                    shell_title = basis_list.pop(0).split()
-                    assert_msg_critical(
-                        len(shell_title) == 3,
-                        "Basis set parser (shell): %s" % ' '.join(shell_title))
-
-                    angl = to_angular_momentum(shell_title[0])
-                    npgto = int(shell_title[1])
-                    ncgto = int(shell_title[2])
-
-                    expons = [0.0] * npgto
-                    coeffs = [0.0] * npgto * ncgto
-
-                    for i in range(npgto):
-                        prims = basis_list.pop(0).split()
-                        assert_msg_critical(
-                            len(prims) == ncgto + 1,
-                            "Basis set parser (primitive): %s" %
-                            ' '.join(prims))
-
-                        expons[i] = float(prims[0])
-                        for k in range(ncgto):
-                            coeffs[k * npgto + i] = float(prims[k + 1])
-
-                    bf = BasisFunction.from_list(expons, coeffs, ncgto, angl)
-                    bf.normalize()
-
-                    atom_basis.add_basis_function(bf)
-
-                atom_basis.set_elemental_id(elem_id)
-
-                mol_basis.add_atom_basis(atom_basis)
-
-            mol_basis.set_label(basis_label)
+            mol_basis = InputParser.create_basis_set(self.molecule, basis_dict)
 
             mol_basis.print_basis("Atomic Basis", self.molecule, self.ostream)
+
+            min_basis_label = 'MIN-CC-PVDZ'
+            min_basis_fname = basis_path + '/' + min_basis_label
+            min_basis_dict = InputParser(min_basis_fname).parse()
+
+            min_basis = InputParser.create_basis_set(self.molecule, min_basis_dict)
 
             # create basis set (old code)
 
@@ -143,13 +89,15 @@ class MpiTask:
             self.ao_basis.print_basis("Atomic Basis", self.molecule,
                                       self.ostream)
 
-            assert (self.ao_basis == mol_basis)
-
             self.min_basis = MolecularBasis.from_lib(
                 "MIN-CC-PVDZ", input_dict["method_settings"]["basis_path"],
                 self.molecule, self.ostream)
 
             self.ostream.flush()
+
+            assert (self.ao_basis == mol_basis)
+
+            assert (self.min_basis == min_basis)
 
         # broadcast molecule and basis set
 
