@@ -9,4 +9,5 @@ build
 *.log
 *.pyc
 *~
+dummy.*
 __pycache__
