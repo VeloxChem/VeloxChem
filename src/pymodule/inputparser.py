@@ -41,13 +41,15 @@ class InputParser:
             self.empty_group_check()
 
         except FileNotFoundError:
-            print('Selected file was not found!')
+            msg = 'input parser: cannot open file %s' % self.filename
             self.success_monitor = False
+            assert_msg_critical(self.success_monitor, msg)
 
         except SyntaxError:
-            print('Selected input file has bad syntax!')
-            print('You may check for incomplete or empty groups.')
+            msg = 'input parser: bad syntax in file %s' % self.filename
+            msg += '\n     You may check for incomplete or empty groups.'
             self.success_monitor = False
+            assert_msg_critical(self.success_monitor, msg)
 
         if self.success_monitor:
 
@@ -197,6 +199,12 @@ class InputParser:
                 self.content) != []:
             raise SyntaxError
 
+        last_lines = self.content.split('@end')[-1].split('\n')
+        for line in last_lines:
+            line = line.strip()
+            if len(line) > 0 and line[0] == '@':
+                raise SyntaxError
+
     def empty_group_check(self):
         """ Checking for any empty groups. """
 
@@ -247,8 +255,9 @@ class InputParser:
             if self.is_basis_set:
                 self.input_dict[group_key.lower()] = local_list
             else:
-                self.atom_list = local_list
                 self.input_dict[group_key.lower()] = local_dict
+                if group_key.lower() == 'molecule':
+                    self.atom_list = local_list
 
         if self.is_basis_set:
             self.input_dict['basis_set_name'] = self.basis_set_name
