@@ -1,4 +1,5 @@
 from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import assert_msg_critical
 
 import re
 
@@ -13,6 +14,8 @@ class InputParser:
         self.success_monitor = True
 
         self.filename = filename
+        self.is_basis_set = False
+        self.basis_set_name = ''
 
     # defining main functions
 
@@ -51,16 +54,21 @@ class InputParser:
             self.groupsplit()
             self.convert_dict()
 
+            if self.is_basis_set:
+                return self.input_dict
+
             # converting angstroms to atomic units, if needed
 
-            units = self.input_dict['molecule']['units']
+            need_convert_units = True
 
-            if units in ['ang', 'angs', 'angstrom', 'angstroms']:
+            if 'molecule' in self.input_dict.keys():
+                if 'units' in self.input_dict['molecule'].keys():
+                    units = self.input_dict['molecule']['units']
+                    if units in ['au', 'bohr', 'bohrs']:
+                        need_convert_units = False
+
+            if need_convert_units:
                 self.convert_units()
-            elif units in ['au', 'bohr', 'bohrs']:
-                pass
-            else:
-                raise SyntaxError
 
             return self.input_dict
 
@@ -79,11 +87,23 @@ class InputParser:
         self.content = ''
         with open(self.filename, 'r') as f_inp:
             for line in f_inp:
+
+                # remove comment and extra white spaces
                 line = line.strip()
                 line = re.sub('!.*', '', line)
                 line = ' '.join(line.split())
+
+                # skip first line if reading basis set
+                if line[:10] == '@BASIS_SET':
+                    self.is_basis_set = True
+                    self.basis_set_name = line.split()[1]
+                    continue
+
+                # take care of end of group
                 if line.lower()[:4] == '@end':
                     line = line.lower()
+
+                # add trailing '\n'
                 if line:
                     self.content += line + '\n'
 
@@ -125,21 +145,32 @@ class InputParser:
         the molecular structure into the required format. """
 
         self.input_dict = {}
-        self.atom_list = []
         for group in self.grouplist:
-            inner_dict = {}
+            local_dict = {}
+            local_list = []
+
             for entry in group[1:]:
                 if ':' in entry:
                     key = entry.split(':')[0].strip()
                     key = '_'.join(key.split())
                     val = entry.split(':')[1].strip()
                     if key.lower() != 'xyz':
-                        inner_dict[key.lower()] = val
+                        local_dict[key.lower()] = val
                 else:
-                    self.atom_list.append(entry)
+                    local_list.append(entry)
+
             group_key = group[0]
             group_key = '_'.join(group_key.split())
-            self.input_dict[group_key.lower()] = inner_dict
+
+            if self.is_basis_set:
+                self.input_dict[group_key.lower()] = local_list
+            else:
+                self.atom_list = local_list
+                self.input_dict[group_key.lower()] = local_dict
+
+        if self.is_basis_set:
+            self.input_dict['basis_set_name'] = self.basis_set_name
+            return
 
         self.input_dict['molecule']['atom_labels'] = []
         self.input_dict['molecule']['x_coords'] = []
@@ -147,7 +178,7 @@ class InputParser:
         self.input_dict['molecule']['z_coords'] = []
         for atom in self.atom_list:
             axyz = atom.split()
-            self.input_dict['molecule']['atom_labels'].append(axyz[0].upper())
+            self.input_dict['molecule']['atom_labels'].append(axyz[0])
             self.input_dict['molecule']['x_coords'].append(float(axyz[1]))
             self.input_dict['molecule']['y_coords'].append(float(axyz[2]))
             self.input_dict['molecule']['z_coords'].append(float(axyz[3]))

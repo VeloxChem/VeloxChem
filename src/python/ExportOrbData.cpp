@@ -262,6 +262,34 @@ CMolecularOrbitals_get_rest_density(const CMolecularOrbitals& self,
     return self.getAODensity(nelec);
 }
 
+// Helper function for CBasisFunction constructor
+    
+static std::shared_ptr<CBasisFunction>
+CBasisFunction_from_list(const bp::list& expons_list,
+                         const bp::list& coeffs_list,
+                         const int32_t   nContrVectors,
+                         const int32_t   angularMomentum)
+{
+    std::vector<double> exponents;
+
+    std::vector<double> normFactors;
+
+    for (int i = 0; i < bp::len(expons_list); i++)
+    {
+        exponents.push_back(bp::extract<double>(expons_list[i]));
+    }
+
+    for (int i = 0; i < bp::len(coeffs_list); i++)
+    {
+        normFactors.push_back(bp::extract<double>(coeffs_list[i]));
+    }
+
+    return std::shared_ptr<CBasisFunction>(
+            new CBasisFunction(exponents, normFactors,
+                               nContrVectors, angularMomentum)
+            );
+}
+
 // Exports classes/functions in src/orbdata to python
 
 void export_orbdata()
@@ -272,6 +300,29 @@ void export_orbdata()
 
     np::initialize();
 
+    // CBasisFunction class
+
+    bp::class_< CBasisFunction, std::shared_ptr<CBasisFunction> >
+        (
+            "BasisFunction",
+            bp::init<>()
+        )
+        .def("from_list", &CBasisFunction_from_list)
+        .staticmethod("from_list")
+        .def("normalize", &CBasisFunction::normalize)
+    ;
+
+    // CAtomBasis class
+
+    bp::class_< CAtomBasis, std::shared_ptr<CAtomBasis> >
+        (
+            "AtomBasis",
+            bp::init<>()
+        )
+        .def("add_basis_function", &CAtomBasis::addBasisFunction)
+        .def("set_elemental_id", &CAtomBasis::setIdElemental)
+    ;
+
     // CMolecularBasis class
 
     bp::class_< CMolecularBasis, std::shared_ptr<CMolecularBasis> >
@@ -281,10 +332,13 @@ void export_orbdata()
         )
         .def("from_lib", &CMolecularBasis_from_lib)
         .staticmethod("from_lib")
+        .def("set_label", &CMolecularBasis::setLabel)
         .def("get_label", &CMolecularBasis::getLabel)
         .def("broadcast", &CMolecularBasis_broadcast)
         .def("print_basis", &CMolecularBasis::printBasis)
         .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis)
+        .def("add_atom_basis", &CMolecularBasis::addAtomBasis)
+        .def(bp::self == bp::other<CMolecularBasis>())
     ;
 
     // denmat enum class

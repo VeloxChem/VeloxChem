@@ -13,6 +13,7 @@
 
 #include "InputStream.hpp"
 #include "OutputStream.hpp"
+#include "StringFormat.hpp"
 #include "ExportStreams.hpp"
 
 namespace bp = boost::python;
@@ -56,6 +57,20 @@ COutputStream_new_line(COutputStream& self)
     self.flush();
 }
 
+// Helper function for converting angular momentum
+
+static std::string
+string_to_angular_momentum(const int32_t angl)
+{
+    return fstr::to_AngularMomentum(angl);
+}
+
+static int32_t
+integer_to_angular_momentum(const std::string& label)
+{
+    return fstr::to_AngularMomentum(label);
+}
+
 // Exports classes/functions in src/streams to python
 
 void export_streams()
@@ -95,6 +110,12 @@ void export_streams()
             bp::init<>()
         )
     ;
+
+    // to_angular_momentum methods
+
+    bp::def("to_angular_momentum", &string_to_angular_momentum);
+
+    bp::def("to_angular_momentum", &integer_to_angular_momentum);
 }
 
 } // bp_streams namespace

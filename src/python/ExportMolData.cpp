@@ -179,6 +179,23 @@ CMolecule_elem_ids_to_numpy(const CMolecule& self)
     return np::array(ids);
 }
 
+// Helper function for getting elemental composition
+
+static bp::list
+CMolecule_get_elem_comp(const CMolecule& self)
+{
+    bp::list elemcomp;
+
+    auto elmlist = self.getElementalComposition();
+    
+    for (auto p = elmlist.cbegin(); p != elmlist.cend(); ++p)
+    {
+        elemcomp.append(*p);
+    }
+
+    return elemcomp;
+}
+
 // Helper function for checking multiplicity of molecule
 
 static void
@@ -274,8 +291,31 @@ void export_moldata()
         .def("z_to_numpy", &CMolecule_z_to_numpy)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
+        .def("get_elemental_composition", &CMolecule_get_elem_comp)
         .def("broadcast", &CMolecule_broadcast)
         .def(bp::self == bp::other<CMolecule>())
+    ;
+
+    // CChemicalElement class
+    // Note: Need member function pointers for proper overloading
+
+    bool (CChemicalElement::*set_atom_type_by_name)(
+            const std::string& atomLabel)
+        = &CChemicalElement::setAtomType;
+
+    bool (CChemicalElement::*set_atom_type_by_id)(
+            const int32_t idElemental)
+        = &CChemicalElement::setAtomType;
+
+    bp::class_< CChemicalElement, std::shared_ptr<CChemicalElement> >
+        (
+            "ChemicalElement",
+            bp::init<>()
+        )
+        .def("set_atom_type", set_atom_type_by_name)
+        .def("set_atom_type", set_atom_type_by_id)
+        .def("get_name", &CChemicalElement::getName)
+        .def(bp::self == bp::other<CChemicalElement>())
     ;
 }
 
