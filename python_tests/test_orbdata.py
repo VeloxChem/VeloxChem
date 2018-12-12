@@ -1,11 +1,15 @@
 from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
+from veloxchem.veloxchemlib import Molecule
+from veloxchem.veloxchemlib import MolecularBasis
+from veloxchem.veloxchemlib import OutputStream
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
 from veloxchem.veloxchemlib import mpi_master
 
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.molecularorbitals import MolecularOrbitals
+from veloxchem.inputparser import InputParser
 
 import numpy as np
 import unittest
@@ -47,8 +51,7 @@ class TestOrbData(unittest.TestCase):
         data_c = [[ .8, .6, ], [ .6, .8, ]]
         data_d = [[ .7, .5, ], [ .5, .7, ]]
 
-        d_rest = AODensityMatrix.from_numpy_list(
-            [data_a, data_b], denmat.rest)
+        d_rest = AODensityMatrix.from_numpy_list([data_a, data_b], denmat.rest)
 
         d_unrest = AODensityMatrix.from_numpy_list(
             [data_a, data_b, data_c, data_d], denmat.unrest)
@@ -70,11 +73,11 @@ class TestOrbData(unittest.TestCase):
         data_a = [[ .9, .2, ], [ .1, .3, ], [ .4, .9, ]]
         data_b = [[ .8, .3, ], [ .2, .4, ], [ .5, .8, ]]
 
-        ener_a = [ 0.5, 0.9 ]
-        ener_b = [ 0.3, 0.6 ]
+        ener_a = [0.5, 0.9]
+        ener_b = [0.3, 0.6]
 
-        d_rest = MolecularOrbitals.from_numpy_list(
-            [data_a], [ener_a], molorb.rest) 
+        d_rest = MolecularOrbitals.from_numpy_list([data_a], [ener_a],
+                                                   molorb.rest)
 
         d_unrest = MolecularOrbitals.from_numpy_list(
             [data_a, data_b], [ener_a, ener_b], molorb.unrest)
@@ -109,6 +112,34 @@ class TestOrbData(unittest.TestCase):
             d_unrest.write_hdf5("inputs/dummy.h5")
             dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
             self.assertEqual(d_unrest, dummy)
+
+    def test_basis_set_reader(self):
+
+        # fake molecule made of H,C,N,O,S,Cl,Br
+
+        mol = Molecule.from_xyz(["H", "C", "N", "O", "S", "Cl", "Br"],
+                                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                                [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+
+        ostream = OutputStream('inputs/dummy.out')
+
+        for basis_label in ['CC-PVDZ', 'CC-PVDZ-GC']:
+
+            basis_dict = InputParser('../basis/' + basis_label).parse()
+
+            new_basis = InputParser.create_basis_set(mol, basis_dict)
+
+            old_basis = MolecularBasis.from_lib(basis_label, '../basis/', mol,
+                                                ostream)
+
+            new_basis.print_basis("New Basis", mol, ostream)
+
+            old_basis.print_basis("Old Basis", mol, ostream)
+
+            ostream.flush()
+
+            self.assertTrue(new_basis == old_basis)
 
 
 if __name__ == "__main__":

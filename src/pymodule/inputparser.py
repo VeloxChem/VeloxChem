@@ -89,18 +89,16 @@ class InputParser:
     @staticmethod
     def create_molecule(input_dict):
 
-        mol = Molecule.from_xyz(
-            input_dict['molecule']['atom_labels'],
-            input_dict['molecule']['x_coords'],
-            input_dict['molecule']['y_coords'],
-            input_dict['molecule']['z_coords'])
+        mol = Molecule.from_xyz(input_dict['molecule']['atom_labels'],
+                                input_dict['molecule']['x_coords'],
+                                input_dict['molecule']['y_coords'],
+                                input_dict['molecule']['z_coords'])
 
         if 'charge' in input_dict['molecule'].keys():
             mol.set_charge(int(input_dict['molecule']['charge']))
 
         if 'multiplicity' in input_dict['molecule'].keys():
-            mol.set_multiplicity(
-                int(input_dict['molecule']['multiplicity']))
+            mol.set_multiplicity(int(input_dict['molecule']['multiplicity']))
 
         mol.check_multiplicity()
 
@@ -141,8 +139,7 @@ class InputParser:
                     prims = basis_list.pop(0).split()
                     assert_msg_critical(
                         len(prims) == ncgto + 1,
-                        "Basis set parser (primitive): %s" %
-                        ' '.join(prims))
+                        "Basis set parser (primitive): %s" % ' '.join(prims))
 
                     expons[i] = float(prims[0])
                     for k in range(ncgto):
@@ -157,7 +154,7 @@ class InputParser:
 
             mol_basis.add_atom_basis(atom_basis)
 
-        basis_label = basis_dict['basis_set_name'].upper();
+        basis_label = basis_dict['basis_set_name'].upper()
 
         mol_basis.set_label(basis_label)
 
