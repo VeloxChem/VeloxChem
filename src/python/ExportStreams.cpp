@@ -11,7 +11,6 @@
 #include <string>
 #include <iostream>
 
-#include "InputStream.hpp"
 #include "OutputStream.hpp"
 #include "StringFormat.hpp"
 #include "ExportStreams.hpp"
@@ -89,26 +88,6 @@ void export_streams()
         .def("put_header", &COutputStream_put_header)
         .def("put_separator", &COutputStream_put_separator)
         .def("new_line", &COutputStream_new_line)
-    ;
-
-    // CInputStream class
-
-    bp::class_< CInputStream, std::shared_ptr<CInputStream> >
-        (
-            "InputStream",
-            bp::init<const std::string&, COutputStream&>()
-        )
-        .def("read",      &CInputStream::read)
-        .def("get_state", &CInputStream::getState)
-    ;
-
-    // CInputData class
-
-    bp::class_< CInputData, std::shared_ptr<CInputData> >
-        (
-            "InputData",
-            bp::init<>()
-        )
     ;
 
     // to_angular_momentum methods

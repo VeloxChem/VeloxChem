@@ -10,7 +10,6 @@
 
 #include "ExportGeneral.hpp"
 #include "ExportStreams.hpp"
-#include "ExportReaders.hpp"
 #include "ExportMolData.hpp"
 #include "ExportOrbData.hpp"
 #include "ExportOneInts.hpp"
@@ -25,8 +24,6 @@ BOOST_PYTHON_MODULE(veloxchemlib)
     bp_general::export_general();
 
     bp_streams::export_streams();
-
-    bp_readers::export_readers();
 
     bp_moldata::export_moldata();
 

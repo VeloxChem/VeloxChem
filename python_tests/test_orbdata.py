@@ -113,34 +113,6 @@ class TestOrbData(unittest.TestCase):
             dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
             self.assertEqual(d_unrest, dummy)
 
-    def test_basis_set_reader(self):
-
-        # fake molecule made of H,C,N,O,S,Cl,Br
-
-        mol = Molecule.from_xyz(["H", "C", "N", "O", "S", "Cl", "Br"],
-                                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                                [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-
-        ostream = OutputStream('inputs/dummy.out')
-
-        for basis_label in ['CC-PVDZ', 'CC-PVDZ-GC']:
-
-            basis_dict = InputParser('../basis/' + basis_label).parse()
-
-            new_basis = InputParser.create_basis_set(mol, basis_dict)
-
-            old_basis = MolecularBasis.from_lib(basis_label, '../basis/', mol,
-                                                ostream)
-
-            new_basis.print_basis("New Basis", mol, ostream)
-
-            old_basis.print_basis("Old Basis", mol, ostream)
-
-            ostream.flush()
-
-            self.assertTrue(new_basis == old_basis)
-
 
 if __name__ == "__main__":
     unittest.main()
