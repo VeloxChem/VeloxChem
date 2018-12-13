@@ -18,7 +18,7 @@ class TestExciton(unittest.TestCase):
 
     def test_assemble_matrices(self):
 
-        task = MpiTask("inputs/dimer.inp", "inputs/dimer.out", MPI.COMM_WORLD)
+        task = MpiTask(["inputs/dimer.inp", "inputs/dimer.out"], MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis

@@ -15,7 +15,7 @@ class TestSolvers(unittest.TestCase):
 
     def test_sad_guess(self):
 
-        task = MpiTask("inputs/water.inp", "inputs/water.out", MPI.COMM_WORLD)
+        task = MpiTask(["inputs/water.inp", "inputs/water.out"], MPI.COMM_WORLD)
 
         molecule = task.molecule
         ao_basis = task.ao_basis

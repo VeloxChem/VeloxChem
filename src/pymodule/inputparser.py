@@ -15,19 +15,24 @@ class InputParser:
     which passes the needed information to the rest of the program """
 
     def __init__(self, filename):
-        """ Initializes parsing process by setting monitor value to TRUE """
+        """ Initializes the parser and parses the input file """
 
+        self.input_dict = {}
         self.success_monitor = True
 
         self.filename = filename
         self.is_basis_set = False
         self.basis_set_name = ''
 
+        self.parse()
+
     # defining main functions
 
     def parse(self):
         """ Calls every function needed for the parsing process depending on
         the success of the parsing in different stages """
+
+        errmsg = ''
 
         try:
 
@@ -41,15 +46,15 @@ class InputParser:
             self.empty_group_check()
 
         except FileNotFoundError:
-            msg = 'input parser: cannot open file %s' % self.filename
+            errmsg = 'input parser: cannot open file %s' % self.filename
             self.success_monitor = False
-            assert_msg_critical(self.success_monitor, msg)
 
         except SyntaxError:
-            msg = 'input parser: bad syntax in file %s' % self.filename
-            msg += '\n     You may check for incomplete or empty groups.'
+            errmsg = 'input parser: bad syntax in file %s' % self.filename
+            errmsg += '\n     You may check for incomplete or empty groups.'
             self.success_monitor = False
-            assert_msg_critical(self.success_monitor, msg)
+
+        assert_msg_critical(self.success_monitor, errmsg)
 
         if self.success_monitor:
 
@@ -63,7 +68,7 @@ class InputParser:
             self.convert_dict()
 
             if self.is_basis_set:
-                return self.input_dict
+                return
 
             # converting angstroms to atomic units, if needed
 
@@ -78,36 +83,35 @@ class InputParser:
             if need_convert_units:
                 self.convert_units()
 
-            return self.input_dict
+    def get_dict(self):
+        """ Gets the input dictonary """
 
-    def parse_success(self):
-        """ Performing the parsing process and returning monitor value. """
-
-        self.parse()
-        return self.success_monitor
+        return self.input_dict
 
     # defining molecule and basis set readers
 
-    @staticmethod
-    def create_molecule(input_dict):
+    def create_molecule(self):
 
-        mol = Molecule.from_xyz(input_dict['molecule']['atom_labels'],
-                                input_dict['molecule']['x_coords'],
-                                input_dict['molecule']['y_coords'],
-                                input_dict['molecule']['z_coords'])
+        mol_dict = self.input_dict
 
-        if 'charge' in input_dict['molecule'].keys():
-            mol.set_charge(int(input_dict['molecule']['charge']))
+        mol = Molecule.from_xyz(mol_dict['molecule']['atom_labels'],
+                                mol_dict['molecule']['x_coords'],
+                                mol_dict['molecule']['y_coords'],
+                                mol_dict['molecule']['z_coords'])
 
-        if 'multiplicity' in input_dict['molecule'].keys():
-            mol.set_multiplicity(int(input_dict['molecule']['multiplicity']))
+        if 'charge' in mol_dict['molecule'].keys():
+            mol.set_charge(int(mol_dict['molecule']['charge']))
+
+        if 'multiplicity' in mol_dict['molecule'].keys():
+            mol.set_multiplicity(int(mol_dict['molecule']['multiplicity']))
 
         mol.check_multiplicity()
 
         return mol
 
-    @staticmethod
-    def create_basis_set(mol, basis_dict):
+    def create_basis_set(self, mol):
+
+        basis_dict = self.input_dict
 
         mol_basis = MolecularBasis()
 
@@ -223,9 +227,9 @@ class InputParser:
         self.grouplist = re.findall(r'@(?!end[\s])\s*\w+[^@]*@end(?![\w])',
                                     self.content)
         for i in range(len(self.grouplist)):
-            self.grouplist[i] = self.grouplist[i].lstrip('@ \n')
-            self.grouplist[i] = self.grouplist[i].rstrip('end\n')
-            self.grouplist[i] = self.grouplist[i].rstrip('\n@')
+            self.grouplist[i] = self.grouplist[i].strip()
+            self.grouplist[i] = self.grouplist[i].lstrip('@')
+            self.grouplist[i] = self.grouplist[i].rstrip('\n@end')
             self.grouplist[i] = self.grouplist[i].split('\n')
 
     def convert_dict(self):
@@ -234,7 +238,6 @@ class InputParser:
         of the molecule group is stored in a different dictionary. Converting
         the molecular structure into the required format. """
 
-        self.input_dict = {}
         for group in self.grouplist:
             local_dict = {}
             local_list = []

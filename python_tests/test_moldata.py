@@ -11,7 +11,7 @@ class TestMolData(unittest.TestCase):
 
     def test_get_sub_molecule(self):
 
-        task = MpiTask("inputs/dimer.inp", "inputs/dimer.out", MPI.COMM_WORLD)
+        task = MpiTask(["inputs/dimer.inp", "inputs/dimer.out"], MPI.COMM_WORLD)
         molecule = task.molecule
 
         mol_1 = molecule.get_sub_molecule(0, 4)

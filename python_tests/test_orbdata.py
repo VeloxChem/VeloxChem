@@ -19,7 +19,7 @@ class TestOrbData(unittest.TestCase):
 
     def test_get_label(self):
 
-        task = MpiTask("inputs/dimer.inp", "inputs/dimer.out", MPI.COMM_WORLD)
+        task = MpiTask(["inputs/dimer.inp", "inputs/dimer.out"], MPI.COMM_WORLD)
         basis = task.ao_basis
 
         self.assertEqual(basis.get_label(), "DEF2-SVP")

@@ -12,47 +12,9 @@ def main():
 
     vlx.assert_msg_critical(vlx.mpi_initialized(), "MPI: Initialized")
 
-    # set up MPI communicator data
-
-    comm = MPI.COMM_WORLD
-    glob_rank = comm.Get_rank()
-    glob_nodes = comm.Get_size()
-
-    # read command line parameters on master node
-
-    input_fname = ""
-    output_fname = ""
-
-    if glob_rank == vlx.mpi_master():
-
-        # input syntax error
-
-        if len(sys.argv) <= 2:
-            print("Usage: %s [input file] [output file]\n" % sys.argv[0])
-            print("[input  file] - name of the input  file.")
-            print("[output file] - name of the output file.")
-            return
-
-        # set up names of input and output files
-
-        input_fname = sys.argv[1]
-        output_fname = sys.argv[2]
-
-        # critical error: input file does not exist
-
-        if not os.path.isfile(input_fname):
-            print("**** Error: %s does not exist ****" % input_fname)
-            return
-
-        # critical error: input file and output files have same name
-
-        if input_fname == output_fname:
-            print("**** Error: input/output files cannot be the same ****")
-            return
-
     # set up MPI task
 
-    task = vlx.MpiTask(input_fname, output_fname, comm)
+    task = vlx.MpiTask(sys.argv[1:], MPI.COMM_WORLD)
 
     # initialize scf driver
 
@@ -64,17 +26,16 @@ def main():
 
     # write hdf5 files for MOs and density after SCF convergence
 
-    if glob_rank == vlx.mpi_master():
-        if scf_drv.is_converged:
-            scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
-            scf_drv.density.write_hdf5("density.h5")
+    if task.mpi_rank == vlx.mpi_master() and scf_drv.is_converged:
+        scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
+        scf_drv.density.write_hdf5("density.h5")
 
     # generate cube file
 
     """
     vis_drv = vlx.VisualizationDriver()
 
-    if glob_rank == vlx.mpi_master():
+    if task.mpi_rank == vlx.mpi_master():
         mol_orbs = vlx.MolecularOrbitals.read_hdf5("mol_orbs.h5")
         density = vlx.AODensityMatrix.read_hdf5("density.h5")
 

@@ -9,16 +9,40 @@ from .veloxchemlib import assert_msg_critical
 from .veloxchemlib import to_angular_momentum
 from .inputparser import InputParser
 
+from os.path import isfile
+
 
 class MpiTask:
 
-    def __init__(self, input_fname, output_fname, mpi_comm):
+    def __init__(self, fname_list, mpi_comm):
 
         # mpi settings
 
         self.mpi_comm = mpi_comm
         self.mpi_rank = mpi_comm.Get_rank()
         self.mpi_size = mpi_comm.Get_size()
+
+        # input/output files
+
+        input_fname = ''
+        output_fname = ''
+
+        if self.mpi_rank == mpi_master():
+
+            assert_msg_critical(
+                len(fname_list) >= 2,
+                "MpiTask: Need input and output file names")
+
+            input_fname = fname_list[0]
+            output_fname = fname_list[1]
+
+            assert_msg_critical(
+                isfile(input_fname),
+                "MpiTask: input file %s does not exist" % input_fname)
+
+            assert_msg_critical(
+                input_fname != output_fname,
+                "MpiTask: input/output file cannot be the same")
 
         # initialize molecule, basis set and output stream
 
@@ -29,7 +53,7 @@ class MpiTask:
 
         # process input file on master node
 
-        if (self.mpi_rank == mpi_master()):
+        if self.mpi_rank == mpi_master():
 
             self.start_time = self.ostream.print_start_header(self.mpi_size)
 
@@ -37,7 +61,8 @@ class MpiTask:
 
             # read input file
 
-            input_dict = InputParser(input_fname).parse()
+            input_parser = InputParser(input_fname)
+            input_dict = input_parser.get_dict()
 
             self.ostream.put_info(
                 "Found %d control groups." % len(input_dict.keys()))
@@ -50,7 +75,7 @@ class MpiTask:
             self.ostream.put_info("...done.")
             self.ostream.new_line()
 
-            self.molecule = InputParser.create_molecule(input_dict)
+            self.molecule = input_parser.create_molecule()
 
             self.molecule.check_proximity(0.1, self.ostream)
             self.molecule.print_geometry(self.ostream)
@@ -64,23 +89,23 @@ class MpiTask:
             basis_path = input_dict["method_settings"]["basis_path"]
             basis_label = input_dict["method_settings"]["basis"].upper()
             basis_fname = basis_path + '/' + basis_label
-            basis_dict = InputParser(basis_fname).parse()
+
+            basis_parser = InputParser(basis_fname)
+            basis_dict = basis_parser.get_dict()
 
             assert_msg_critical(
                 basis_label == basis_dict['basis_set_name'].upper(),
                 "basis set name")
 
-            self.ao_basis = InputParser.create_basis_set(
-                self.molecule, basis_dict)
+            self.ao_basis = basis_parser.create_basis_set(self.molecule)
 
             self.ao_basis.print_basis("Atomic Basis", self.molecule,
                                       self.ostream)
 
             min_basis_fname = basis_path + '/MIN-CC-PVDZ'
-            min_basis_dict = InputParser(min_basis_fname).parse()
+            min_basis_parser = InputParser(min_basis_fname)
 
-            self.min_basis = InputParser.create_basis_set(
-                self.molecule, min_basis_dict)
+            self.min_basis = min_basis_parser.create_basis_set(self.molecule)
 
             self.ostream.flush()
 

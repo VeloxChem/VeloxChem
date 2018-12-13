@@ -53,7 +53,7 @@ class TestOneInts(unittest.TestCase):
 
     def test_1e_integrals(self):
 
-        task = MpiTask("inputs/h2se.inp", "inputs/h2se.out", MPI.COMM_WORLD)
+        task = MpiTask(["inputs/h2se.inp", "inputs/h2se.out"], MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis
