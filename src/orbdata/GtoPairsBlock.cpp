@@ -636,7 +636,14 @@ CGtoPairsBlock::split(const int32_t nodes) const
 
     nbtch = static_cast<int32_t>(nbtch * std::sqrt(nodes));
     
-    if ((_nScreenedContrPairs / nbtch) < 30) nbtch = _nScreenedContrPairs / 30;
+    batchSize = 30;
+    
+    if ((_nScreenedContrPairs / nbtch) < batchSize)
+    {
+        nbtch = _nScreenedContrPairs / batchSize;
+        
+        if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
+    }
 
     // set up batches distribution pattern
     
