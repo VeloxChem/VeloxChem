@@ -6,15 +6,16 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#ifndef DeviceProp_hpp
-#define DeviceProp_hpp
+#ifndef ExportGpu_hpp
+#define ExportGpu_hpp
 
-#include "OutputStream.hpp"
+namespace bp_gpu { // bp_gpu namespace
 
-namespace gpu {
+/**
+ Exports classes/functions in src/gpu to python.
+ */
+void export_gpu();
 
-    void getDeviceProperties(COutputStream& oStream);
+} // bp_gpu namespace
 
-}
-
-#endif
+#endif /* ExportGpu_hpp */

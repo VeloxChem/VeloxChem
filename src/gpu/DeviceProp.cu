@@ -14,22 +14,21 @@
 
 namespace gpu { // gpu namespace
 
-    #ifdef ENABLE_GPU
-
-    void get_device_prop(COutputStream& oStream)
+    void getDeviceProperties(COutputStream& oStream)
     {
+        #ifdef ENABLE_GPU
 
         int32_t devcnt = 0;
 
         cudaGetDeviceCount(&devcnt);
 
-        oStream << fmt::info;
-
-        for (int32_t i = 0; i < devcnt; i++) {
-
+        for (int32_t i = 0; i < devcnt; i++)
+        {
             cudaDeviceProp prop;
 
             cudaGetDeviceProperties(&prop, i);
+
+            oStream << fmt::info;
 
             oStream << "GPU device ID: " << std::to_string(i) << fmt::end;
 
@@ -61,12 +60,10 @@ namespace gpu { // gpu namespace
             
             oStream << fstr::to_string(bandwidth, 0) << " GB/s" << fmt::end;
 
+            oStream << fmt::blank;
         }
 
-        oStream << fmt::blank;
-
+        #endif
     }
-
-    #endif
 
 }

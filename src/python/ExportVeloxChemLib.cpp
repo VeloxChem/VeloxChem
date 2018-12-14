@@ -15,6 +15,7 @@
 #include "ExportOneInts.hpp"
 #include "ExportTwoInts.hpp"
 #include "ExportMath.hpp"
+#include "ExportGpu.hpp"
 #include "ExportSolvers.hpp"
 #include "ExportExciton.hpp"
 #include "ExportVisualization.hpp"
@@ -34,6 +35,8 @@ BOOST_PYTHON_MODULE(veloxchemlib)
     bp_twoints::export_twoints();
 
     bp_math::export_math();
+
+    bp_gpu::export_gpu();
 
     bp_solvers::export_solvers();
 

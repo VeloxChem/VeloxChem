@@ -6,15 +6,20 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#ifndef DeviceProp_hpp
-#define DeviceProp_hpp
+#include <boost/python.hpp>
 
-#include "OutputStream.hpp"
+#include "DeviceProp.hpp"
+#include "ExportGpu.hpp"
 
-namespace gpu {
+namespace bp = boost::python;
 
-    void getDeviceProperties(COutputStream& oStream);
+namespace bp_gpu { // bp_gpu namespace
 
+// Exports classes/functions in src/gpu to python
+
+void export_gpu()
+{
+    bp::def("get_device_properties", &gpu::getDeviceProperties);
 }
 
-#endif
+} // bp_gpu namespace
