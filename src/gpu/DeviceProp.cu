@@ -16,8 +16,6 @@ namespace gpu { // gpu namespace
 
     void getDeviceProperties(COutputStream& oStream)
     {
-        #ifdef ENABLE_GPU
-
         int32_t devcnt = 0;
 
         cudaGetDeviceCount(&devcnt);
@@ -63,7 +61,6 @@ namespace gpu { // gpu namespace
             oStream << fmt::blank;
         }
 
-        #endif
     }
 
 }
