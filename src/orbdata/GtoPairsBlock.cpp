@@ -636,7 +636,7 @@ CGtoPairsBlock::split(const int32_t nodes) const
 
     nbtch = static_cast<int32_t>(nbtch * std::sqrt(nodes));
     
-    batchSize = 30;
+    batchSize = _getBlockDimensions();
     
     if ((_nScreenedContrPairs / nbtch) < batchSize)
     {
