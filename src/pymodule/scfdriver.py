@@ -131,7 +131,24 @@ class ScfDriver:
                                                         comm, ostream)
                                                         
         if self.rank == mpi_master():
-            oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh, ostream)
+            t0 = tm.time()
+
+            oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
+
+            ostream.put_info("Orthogonalization matrix computed in %.2f sec." %
+                             (tm.time() - t0))
+            ostream.new_line()
+
+            nrow = oao_mat.number_of_rows()
+            ncol = oao_mat.number_of_columns()
+            if nrow != ncol:
+                ndim = nrow - ncol
+                ostream.put_info(" Removed %d linearly dependent vector%s." %
+                                 (ndim, '' if ndim ==1 else 's'))
+                ostream.new_line()
+
+            ostream.flush()
+
         else:
             oao_mat = None
     
@@ -201,17 +218,41 @@ class ScfDriver:
             self.print_scf_finish(start_time, ostream)
 
     def comp_one_ints(self, molecule, basis, comm, ostream):
+
+        t0 = tm.time()
         
         ovl_drv = OverlapIntegralsDriver.create(self.rank, self.nodes, comm)
-        ovl_mat = ovl_drv.compute(molecule, basis, ostream, comm)
+        ovl_mat = ovl_drv.compute(molecule, basis, comm)
+
+        t1 = tm.time()
         
         kin_drv = KineticEnergyIntegralsDriver.create(self.rank, self.nodes,
                                                       comm)
-        kin_mat = kin_drv.compute(molecule, basis, ostream, comm)
+        kin_mat = kin_drv.compute(molecule, basis, comm)
         
+        t2 = tm.time()
+
         npot_drv = NuclearPotentialIntegralsDriver.create(self.rank, self.nodes,
                                                           comm)
-        npot_mat = npot_drv.compute(molecule, basis, ostream, comm)
+        npot_mat = npot_drv.compute(molecule, basis, comm)
+
+        t3 = tm.time()
+
+        if self.rank == mpi_master():
+
+            ostream.put_info("Overlap matrix computed in %.2f sec." %
+                             (t1 - t0))
+            ostream.new_line()
+
+            ostream.put_info("Kinetic energy matrix computed in %.2f sec." %
+                             (t2 - t1))
+            ostream.new_line()
+
+            ostream.put_info("Nuclear potential matrix computed in %.2f sec." %
+                             (t3 - t2))
+            ostream.new_line()
+
+            ostream.flush()
         
         return (ovl_mat, kin_mat, npot_mat)
     

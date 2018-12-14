@@ -38,7 +38,6 @@ CKineticEnergyIntegralsDriver::~CKineticEnergyIntegralsDriver()
 CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& basis,
-                                             COutputStream&   oStream, 
                                              MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -56,8 +55,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
         kinmat = _compKineticEnergyIntegrals(&bracontr, &bracontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return kinmat;
 }
 
@@ -65,7 +62,6 @@ CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& braBasis,
                                        const CMolecularBasis& ketBasis,
-                                             COutputStream&   oStream,
                                              MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -85,8 +81,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
         kinmat = _compKineticEnergyIntegrals(&bracontr, &ketcontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return kinmat;
 }
 
@@ -94,7 +88,6 @@ CKineticEnergyMatrix
 CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecule&       ketMolecule,
                                        const CMolecularBasis& basis,
-                                             COutputStream&   oStream,
                                              MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -114,8 +107,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
         kinmat = _compKineticEnergyIntegrals(&bracontr, &ketcontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return kinmat;
 }
 
@@ -124,7 +115,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecule&       ketMolecule,
                                        const CMolecularBasis& braBasis,
                                        const CMolecularBasis& ketBasis,
-                                             COutputStream&   oStream,
                                              MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -143,8 +133,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         kinmat = _compKineticEnergyIntegrals(&bracontr, &ketcontr);
     }
-    
-    _printComputationTime(timer, oStream);
     
     return kinmat;
 }
@@ -705,26 +693,4 @@ CKineticEnergyIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<
     }
     
     return nblk;
-}
-
-void
-CKineticEnergyIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
-                                                           COutputStream& oStream) const
-{
-    auto tsec = timer.getElapsedTimeInSeconds();
-    
-    if (_isLocalMode)
-    {
-        // FIX ME: we need tags for each driver to be implemented to manage
-        //         MPI send/receive cycle.
-    }
-    
-    if (_globRank == mpi::master())
-    {
-        oStream << fmt::info << "Kinetic energy matrix computed in ";
-        
-        oStream << fstr::to_string(tsec, 2) << " sec.";
-        
-        oStream << fmt::end << fmt::blank;
-    }
 }

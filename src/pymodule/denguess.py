@@ -76,8 +76,7 @@ class DensityGuess:
             
             ovl_drv = OverlapIntegralsDriver.create(loc_rank, loc_nodes, comm)
             
-            ovl_mat_sb = ovl_drv.compute(molecule, min_basis, ao_basis, ostream,
-                                         comm)
+            ovl_mat_sb = ovl_drv.compute(molecule, min_basis, ao_basis, comm)
                                             
             sad_drv = SADGuessDriver.create(loc_rank, loc_nodes, comm)
             

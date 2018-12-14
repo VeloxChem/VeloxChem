@@ -22,7 +22,6 @@ class TestExciton(unittest.TestCase):
 
         molecule = task.molecule
         basis = task.ao_basis
-        ostream = task.ostream
 
         comm = task.mpi_comm
         rank = task.mpi_rank
@@ -36,11 +35,11 @@ class TestExciton(unittest.TestCase):
         # compute overlap
 
         ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
-        S = ovldrv.compute(molecule, basis, ostream, comm)
-        S11 = ovldrv.compute(mol_1, basis, ostream, comm)
-        S22 = ovldrv.compute(mol_2, basis, ostream, comm)
-        S12 = ovldrv.compute(mol_1, mol_2, basis, ostream, comm)
-        S21 = ovldrv.compute(mol_2, mol_1, basis, ostream, comm)
+        S = ovldrv.compute(molecule, basis, comm)
+        S11 = ovldrv.compute(mol_1, basis, comm)
+        S22 = ovldrv.compute(mol_2, basis, comm)
+        S12 = ovldrv.compute(mol_1, mol_2, basis, comm)
+        S21 = ovldrv.compute(mol_2, mol_1, basis, comm)
 
         if (rank == mpi_master()):
 
@@ -52,11 +51,11 @@ class TestExciton(unittest.TestCase):
         # compute kinetic energy
 
         kindrv = KineticEnergyIntegralsDriver.create(rank, size, comm)
-        T = kindrv.compute(molecule, basis, ostream, comm)
-        T11 = kindrv.compute(mol_1, basis, ostream, comm)
-        T22 = kindrv.compute(mol_2, basis, ostream, comm)
-        T12 = kindrv.compute(mol_1, mol_2, basis, ostream, comm)
-        T21 = kindrv.compute(mol_2, mol_1, basis, ostream, comm)
+        T = kindrv.compute(molecule, basis, comm)
+        T11 = kindrv.compute(mol_1, basis, comm)
+        T22 = kindrv.compute(mol_2, basis, comm)
+        T12 = kindrv.compute(mol_1, mol_2, basis, comm)
+        T21 = kindrv.compute(mol_2, mol_1, basis, comm)
 
         if (rank == mpi_master()):
 
@@ -68,11 +67,11 @@ class TestExciton(unittest.TestCase):
         # compute nuclear potential
 
         npotdrv = NuclearPotentialIntegralsDriver.create(rank, size, comm)
-        V = npotdrv.compute(molecule, basis, ostream, comm)
-        V11 = npotdrv.compute(mol_1, basis, molecule, ostream, comm)
-        V22 = npotdrv.compute(mol_2, basis, molecule, ostream, comm)
-        V12 = npotdrv.compute(mol_1, mol_2, basis, molecule, ostream, comm)
-        V21 = npotdrv.compute(mol_2, mol_1, basis, molecule, ostream, comm)
+        V = npotdrv.compute(molecule, basis, comm)
+        V11 = npotdrv.compute(mol_1, basis, molecule, comm)
+        V22 = npotdrv.compute(mol_2, basis, molecule, comm)
+        V12 = npotdrv.compute(mol_1, mol_2, basis, molecule, comm)
+        V21 = npotdrv.compute(mol_2, mol_1, basis, molecule, comm)
 
         if (rank == mpi_master()):
 

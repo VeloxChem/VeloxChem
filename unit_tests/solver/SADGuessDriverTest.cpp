@@ -58,9 +58,9 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     COutputStream ost(std::string("dummy.out"));
     
-    auto S12 = ovldrv.compute(h2o, min_basis, ao_basis, ost, MPI_COMM_WORLD);
+    auto S12 = ovldrv.compute(h2o, min_basis, ao_basis, MPI_COMM_WORLD);
 
-    auto S22 = ovldrv.compute(h2o, ao_basis, ost, MPI_COMM_WORLD);
+    auto S22 = ovldrv.compute(h2o, ao_basis, MPI_COMM_WORLD);
 
     auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, ost, MPI_COMM_WORLD);
 

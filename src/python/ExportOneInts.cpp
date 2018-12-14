@@ -53,12 +53,11 @@ COverlapIntegralsDriver_compute_1(
           COverlapIntegralsDriver& self,
     const CMolecule&               molecule,
     const CMolecularBasis&         basis,
-          COutputStream&           oStream,
           bp::object               py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(molecule, basis, oStream, *comm_ptr);
+    return self.compute(molecule, basis, *comm_ptr);
 }
 
 static COverlapMatrix
@@ -67,12 +66,11 @@ COverlapIntegralsDriver_compute_2(
     const CMolecule&               molecule,
     const CMolecularBasis&         braBasis,
     const CMolecularBasis&         ketBasis,
-          COutputStream&           oStream,
           bp::object               py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(molecule, braBasis, ketBasis, oStream, *comm_ptr);
+    return self.compute(molecule, braBasis, ketBasis, *comm_ptr);
 }
 
 static COverlapMatrix
@@ -81,12 +79,11 @@ COverlapIntegralsDriver_compute_3(
     const CMolecule&               braMolecule,
     const CMolecule&               ketMolecule,
     const CMolecularBasis&         basis,
-          COutputStream&           oStream,
           bp::object               py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(braMolecule, ketMolecule, basis, oStream, *comm_ptr);
+    return self.compute(braMolecule, ketMolecule, basis, *comm_ptr);
 }
 
 static COverlapMatrix
@@ -96,13 +93,12 @@ COverlapIntegralsDriver_compute_4(
     const CMolecule&               ketMolecule,
     const CMolecularBasis&         braBasis,
     const CMolecularBasis&         ketBasis,
-          COutputStream&           oStream,
           bp::object               py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
-                        oStream, *comm_ptr);
+                        *comm_ptr);
 }
 
 // Helper function for printing COverlapMatrix
@@ -154,12 +150,11 @@ CKineticEnergyIntegralsDriver_compute_1(
           CKineticEnergyIntegralsDriver& self,
     const CMolecule&                     molecule,
     const CMolecularBasis&               basis,
-          COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(molecule, basis, oStream, *comm_ptr);
+    return self.compute(molecule, basis, *comm_ptr);
 }
 
 static CKineticEnergyMatrix
@@ -168,12 +163,11 @@ CKineticEnergyIntegralsDriver_compute_2(
     const CMolecule&                     molecule,
     const CMolecularBasis&               braBasis,
     const CMolecularBasis&               ketBasis,
-          COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(molecule, braBasis, ketBasis, oStream, *comm_ptr);
+    return self.compute(molecule, braBasis, ketBasis, *comm_ptr);
 }
 
 static CKineticEnergyMatrix
@@ -182,12 +176,11 @@ CKineticEnergyIntegralsDriver_compute_3(
     const CMolecule&                     braMolecule,
     const CMolecule&                     ketMolecule,
     const CMolecularBasis&               basis,
-          COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(braMolecule, ketMolecule, basis, oStream, *comm_ptr);
+    return self.compute(braMolecule, ketMolecule, basis, *comm_ptr);
 }
 
 static CKineticEnergyMatrix
@@ -197,13 +190,12 @@ CKineticEnergyIntegralsDriver_compute_4(
     const CMolecule&                     ketMolecule,
     const CMolecularBasis&               braBasis,
     const CMolecularBasis&               ketBasis,
-          COutputStream&                 oStream, 
           bp::object                     py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
-                        oStream, *comm_ptr);
+                        *comm_ptr);
 }
 
 // Helper function for printing CKineticEnergyMatrix
@@ -255,12 +247,11 @@ CNuclearPotentialIntegralsDriver_compute_0(
           CNuclearPotentialIntegralsDriver& self,
     const CMolecule&                        molecule,
     const CMolecularBasis&                  basis,
-          COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(molecule, basis, oStream, *comm_ptr);
+    return self.compute(molecule, basis, *comm_ptr);
 }
 
 static CNuclearPotentialMatrix
@@ -269,12 +260,11 @@ CNuclearPotentialIntegralsDriver_compute_1(
     const CMolecule&                        molecule,
     const CMolecularBasis&                  basis,
     const CMolecule&                        pchgMolecule,
-          COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(molecule, basis, pchgMolecule, oStream, *comm_ptr);
+    return self.compute(molecule, basis, pchgMolecule, *comm_ptr);
 }
 
 static CNuclearPotentialMatrix
@@ -284,13 +274,12 @@ CNuclearPotentialIntegralsDriver_compute_2(
     const CMolecularBasis&                  braBasis,
     const CMolecularBasis&                  ketBasis,
     const CMolecule&                        pchgMolecule,
-          COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, braBasis, ketBasis, pchgMolecule,
-                        oStream, *comm_ptr);
+                        *comm_ptr);
 }
 
 static CNuclearPotentialMatrix
@@ -300,13 +289,12 @@ CNuclearPotentialIntegralsDriver_compute_3(
     const CMolecule&                        ketMolecule,
     const CMolecularBasis&                  basis,
     const CMolecule&                        pchgMolecule,
-          COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, basis, pchgMolecule,
-                        oStream, *comm_ptr);
+                        *comm_ptr);
 }
 
 static CNuclearPotentialMatrix
@@ -317,13 +305,12 @@ CNuclearPotentialIntegralsDriver_compute_4(
     const CMolecularBasis&                  braBasis,
     const CMolecularBasis&                  ketBasis,
     const CMolecule&                        pchgMolecule,
-          COutputStream&                    oStream, 
           bp::object                        py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis, pchgMolecule,
-                        oStream, *comm_ptr);
+                        *comm_ptr);
 }
 
 // Helper function for printing CNuclearPotentialMatrix

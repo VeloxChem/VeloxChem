@@ -57,7 +57,6 @@ class TestOneInts(unittest.TestCase):
 
         molecule = task.molecule
         basis = task.ao_basis
-        ostream = task.ostream
 
         comm = task.mpi_comm
         rank = task.mpi_rank
@@ -66,15 +65,15 @@ class TestOneInts(unittest.TestCase):
         # compute 1e integrals
 
         ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
-        S = ovldrv.compute(molecule, basis, ostream, comm)
+        S = ovldrv.compute(molecule, basis, comm)
         S1 = S.to_numpy()
 
         kindrv = KineticEnergyIntegralsDriver.create(rank, size, comm)
-        T = kindrv.compute(molecule, basis, ostream, comm)
+        T = kindrv.compute(molecule, basis, comm)
         T1 = T.to_numpy()
 
         npotdrv = NuclearPotentialIntegralsDriver.create(rank, size, comm)
-        V = npotdrv.compute(molecule, basis, ostream, comm)
+        V = npotdrv.compute(molecule, basis, comm)
         V1 = V.to_numpy()
 
         # compare with reference

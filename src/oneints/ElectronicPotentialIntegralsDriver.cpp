@@ -39,7 +39,6 @@ CElectronicPotentialIntegralsDriver::~CElectronicPotentialIntegralsDriver()
 CElectronicPotentialMatrix
 CElectronicPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                              const CMolecularBasis& basis,
-                                                   COutputStream&   oStream, 
                                                    MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -56,8 +55,6 @@ CElectronicPotentialIntegralsDriver::compute(const CMolecule&       molecule,
         
         epotmat = _compElectronicPotentialIntegrals(&bracontr, &bracontr);
     }
-    
-    _printComputationTime(timer, oStream);
     
     return epotmat;
 }
@@ -589,26 +586,4 @@ CElectronicPotentialIntegralsDriver::_getIndexesForRecursionPattern(      std::v
     }
     
     return nblk;
-}
-
-void
-CElectronicPotentialIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
-                                                                 COutputStream& oStream) const
-{
-    auto tsec = timer.getElapsedTimeInSeconds();
-    
-    if (_isLocalMode)
-    {
-        // FIX ME: we need tags for each driver to be implemented to manage
-        //         MPI send/receive cycle.
-    }
-    
-    if (_globRank == mpi::master())
-    {
-        oStream << fmt::info << "Electronic potential matrix computed in ";
-        
-        oStream << fstr::to_string(tsec, 2) << " sec.";
-        
-        oStream << fmt::end << fmt::blank;
-    }
 }

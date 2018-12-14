@@ -19,7 +19,6 @@
 #include "ThreeIndexes.hpp"
 #include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
-#include "OutputStream.hpp"
 #include "SystemClock.hpp"
 #include "OneIntsDistributor.hpp"
 
@@ -175,15 +174,6 @@ class CNuclearPotentialIntegralsDriver
                                        const CGtoBlock&            ketGtoBlock,
                                        const int32_t               iContrGto) const;
     
-    /**
-     Prints nuclear potential integrals computation time to output stream.
-     
-     @param timer the system clock timer.
-     @param oStream the output stream.
-     */
-    void _printComputationTime(const CSystemClock&  timer,
-                                     COutputStream& oStream) const;
-    
 public:
     
     /**
@@ -208,13 +198,11 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       molecule,
                                     const CMolecularBasis& basis,
-                                          COutputStream&   oStream, 
                                           MPI_Comm         comm) const;
     
     /**
@@ -224,14 +212,12 @@ public:
      @param molecule the molecule.
      @param basis the molecular basis.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       molecule,
                                     const CMolecularBasis& basis,
                                     const CMolecule&       pchgMolecule,
-                                          COutputStream&   oStream,
                                           MPI_Comm         comm) const;
 
     /**
@@ -242,7 +228,6 @@ public:
      @param braBasis the molecular basis for bra side of nuclear potential matrix.
      @param ketBasis the molecular basis for ket side of nuclear potential matrix.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
@@ -250,7 +235,6 @@ public:
                                     const CMolecularBasis& braBasis,
                                     const CMolecularBasis& ketBasis,
                                     const CMolecule&       pchgMolecule,
-                                          COutputStream&   oStream,
                                           MPI_Comm         comm) const;
 
     /**
@@ -261,7 +245,6 @@ public:
      @param ketMolecule the molecule for ket side of nuclear potential matrix.
      @param basis the molecular basis.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
@@ -269,7 +252,6 @@ public:
                                     const CMolecule&       ketMolecule,
                                     const CMolecularBasis& basis,
                                     const CMolecule&       pchgMolecule,
-                                          COutputStream&   oStream,
                                           MPI_Comm         comm) const;
 
     /**
@@ -281,7 +263,6 @@ public:
      @param braBasis the molecular basis for bra side of nuclear potential matrix.
      @param ketBasis the molecular basis for ket side of nuclear potential matrix.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
@@ -290,7 +271,6 @@ public:
                                     const CMolecularBasis& braBasis,
                                     const CMolecularBasis& ketBasis,
                                     const CMolecule&       pchgMolecule,
-                                          COutputStream&   oStream,
                                           MPI_Comm         comm) const;
 
     /**
