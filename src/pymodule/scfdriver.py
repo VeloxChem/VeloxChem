@@ -157,7 +157,7 @@ class ScfDriver:
                                                           comm)
                                                           
         qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
-                                  molecule, ao_basis, ostream)
+                                  molecule, ao_basis)
 
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
                                           ovl_mat, comm, ostream)
@@ -174,7 +174,7 @@ class ScfDriver:
         for i in self.get_scf_range():
             
             eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
-                            ostream, comm)
+                            comm)
             
             fock_mat.reduce_sum(self.rank, self.nodes, comm)
             

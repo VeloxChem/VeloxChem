@@ -5,6 +5,7 @@ from .veloxchemlib import SADGuessDriver
 from .aodensitymatrix import AODensityMatrix
 
 import numpy as np
+import time as tm
 
 class DensityGuess:
     """Implements initial density guess generator.
@@ -77,12 +78,21 @@ class DensityGuess:
             ovl_drv = OverlapIntegralsDriver.create(loc_rank, loc_nodes, comm)
             
             ovl_mat_sb = ovl_drv.compute(molecule, min_basis, ao_basis, comm)
+
+            t0 = tm.time()
                                             
             sad_drv = SADGuessDriver.create(loc_rank, loc_nodes, comm)
             
             den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
-                                      overlap_matrix, ostream, comm)
-                                      
+                                      overlap_matrix, comm)
+
+            ostream.put_info("SAD initial guess computed in %.2f sec." %
+                             (tm.time() - t0))
+
+            ostream.new_line()
+
+            ostream.flush()
+
             return den_mat
         
         return AODensityMatrix()

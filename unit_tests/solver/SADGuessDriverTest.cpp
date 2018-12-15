@@ -56,13 +56,11 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     auto ao_basis  = vlxbas::getMolecularBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
-    
     auto S12 = ovldrv.compute(h2o, min_basis, ao_basis, MPI_COMM_WORLD);
 
     auto S22 = ovldrv.compute(h2o, ao_basis, MPI_COMM_WORLD);
 
-    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, ost, MPI_COMM_WORLD);
+    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, MPI_COMM_WORLD);
 
     ASSERT_EQ(1, dsad.getNumberOfDensityMatrices());
 

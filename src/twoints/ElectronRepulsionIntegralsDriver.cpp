@@ -51,7 +51,6 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
                                            const CMolecule&           molecule,
                                            const CMolecularBasis&     aoBasis,
                                            const CScreeningContainer& screeningContainer,
-                                                 COutputStream&       oStream,
                                                  MPI_Comm             comm) const
 {
     CSystemClock eritim;
@@ -78,8 +77,7 @@ CScreeningContainer
 CElectronRepulsionIntegralsDriver::compute(const ericut           screeningScheme,
                                            const double           threshold,
                                            const CMolecule&       molecule,
-                                           const CMolecularBasis& aoBasis,
-                                                 COutputStream&   oStream) const
+                                           const CMolecularBasis& aoBasis) const
 {
     CSystemClock eritim;
     

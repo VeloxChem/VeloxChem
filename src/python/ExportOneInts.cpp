@@ -12,7 +12,6 @@
 #include <memory>
 #include <string>
 
-#include "OutputStream.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "DenseMatrix.hpp"

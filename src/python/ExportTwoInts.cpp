@@ -102,14 +102,12 @@ CElectronRepulsionIntegralsDriver_compute_1(
     const CMolecule&                         molecule,
     const CMolecularBasis&                   aoBasis,
     const CScreeningContainer&               screeningContainer,
-          COutputStream&                     oStream,
           bp::object                         py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    self.compute(aoFockMatrix, aoDensityMatrix,
-                 molecule, aoBasis, screeningContainer,
-                 oStream, *comm_ptr);
+    self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis,
+                 screeningContainer, *comm_ptr);
 }
 
 static CScreeningContainer
@@ -118,11 +116,9 @@ CElectronRepulsionIntegralsDriver_compute_2(
     const ericut                             screeningScheme,
     const double                             threshold,
     const CMolecule&                         molecule,
-    const CMolecularBasis&                   aoBasis,
-          COutputStream&                     oStream)
+    const CMolecularBasis&                   aoBasis)
 {
-    return self.compute(screeningScheme, threshold,
-                        molecule, aoBasis, oStream);
+    return self.compute(screeningScheme, threshold, molecule, aoBasis);
 }
 
 // Helper function for reduce_sum CAOFockMatrix object

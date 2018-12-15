@@ -344,7 +344,6 @@ public:
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
      @param screeningContainer the screening container object.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      */
     void compute(      CAOFockMatrix&       aoFockMatrix,
@@ -352,7 +351,6 @@ public:
                  const CMolecule&           molecule,
                  const CMolecularBasis&     aoBasis,
                  const CScreeningContainer& screeningContainer,
-                       COutputStream&       oStream,
                        MPI_Comm             comm) const;
     
     /**
@@ -363,14 +361,12 @@ public:
      @param threshold the screening threshold for screening container object.
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
-     @param oStream the output stream.
      @return the screening container with Q values.
      */
     CScreeningContainer compute(const ericut           screeningScheme,
                                 const double           threshold,
                                 const CMolecule&       molecule,
-                                const CMolecularBasis& aoBasis,
-                                      COutputStream&   oStream) const;
+                                const CMolecularBasis& aoBasis) const;
     
     /**
      Computes electron repulsion integrals blocks for pair of GTOs pairs blocks

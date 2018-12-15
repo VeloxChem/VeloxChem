@@ -20,7 +20,6 @@ class TestSolvers(unittest.TestCase):
         molecule = task.molecule
         ao_basis = task.ao_basis
         min_basis = task.min_basis
-        ostream = task.ostream
 
         comm = task.mpi_comm
         rank = task.mpi_rank
@@ -35,8 +34,7 @@ class TestSolvers(unittest.TestCase):
         # compute initial guess
 
         saddrv = SADGuessDriver.create(rank, size, comm)
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
-                           comm)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
         # matrix to numpy
 
@@ -63,8 +61,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge + 2)
         molecule.set_multiplicity(multiplicity)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
-                           comm)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
         density_a = D.total_to_numpy(0)
 
@@ -77,8 +74,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge - 2)
         molecule.set_multiplicity(multiplicity)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
-                           comm)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
         density_a = D.total_to_numpy(0)
 
@@ -91,8 +87,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge + 1)
         molecule.set_multiplicity(multiplicity + 1)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
-                           comm)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
@@ -107,8 +102,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge - 1)
         molecule.set_multiplicity(multiplicity + 1)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
-                           comm)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
@@ -123,8 +117,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge)
         molecule.set_multiplicity(multiplicity + 2)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, ostream,
-                           comm)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
