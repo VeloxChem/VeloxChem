@@ -7,7 +7,9 @@
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "AODensityMatrix.hpp"
+
 #include "ErrorHandler.hpp"
+#include "DenseLinearAlgebra.hpp"
 
 CAODensityMatrix::CAODensityMatrix()
 
@@ -98,6 +100,19 @@ bool
 CAODensityMatrix::operator!=(const CAODensityMatrix& other) const
 {
     return !(*this == other);
+}
+
+CAODensityMatrix
+CAODensityMatrix::sub(const CAODensityMatrix& other) const
+{
+    std::vector<CDenseMatrix> dmats;
+    
+    for (size_t i = 0; i < _denMatrices.size(); i++)
+    {
+        dmats.push_back(denblas::subAB(_denMatrices[i], other._denMatrices[i])); 
+    }
+    
+    return CAODensityMatrix(dmats, _denType);
 }
 
 int32_t

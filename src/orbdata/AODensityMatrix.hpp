@@ -104,6 +104,16 @@ public:
     bool operator!=(const CAODensityMatrix& other) const;
     
     /**
+     Creates difference AO density matrix between this AO density matrix and
+     given AO density matrix.
+
+     @param other the AO density matrix object.
+     @return the AO density matrix object with difference between AO density
+             matrices.
+     */
+    CAODensityMatrix sub(const CAODensityMatrix& other) const;
+    
+    /**
      Gets number of density matrices.
      
      @return the number of density matrices.

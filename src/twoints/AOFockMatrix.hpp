@@ -136,6 +136,13 @@ public:
     void symmetrize();
     
     /**
+     Add AO Fock matrix to AO Fock matrix.
+
+     @param source the AO Fock matrix.
+     */
+    void add(const CAOFockMatrix& source);
+    
+    /**
      Adds core Hamiltonian, kinetic energy and nuclear potential matrices, to
      specific Fock matrix.
 

@@ -323,6 +323,7 @@ void export_orbdata()
         .def("get_number_of_density_matrices",
                 &CAODensityMatrix::getNumberOfDensityMatrices)
         .def("get_density_type", &CAODensityMatrix::getDensityType)
+        .def("substract", &CAODensityMatrix::sub)
         .def("broadcast", &CAODensityMatrix_broadcast)
         .def(bp::self == bp::other<CAODensityMatrix>())
     ;

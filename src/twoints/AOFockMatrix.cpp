@@ -10,6 +10,8 @@
 
 #include <cmath>
 
+#include "DenseLinearAlgebra.hpp"
+
 CAOFockMatrix::CAOFockMatrix()
 {
     
@@ -180,6 +182,16 @@ CAOFockMatrix::symmetrize()
         if (isSymmetric(i)) _fockMatrices[i].symmetrize();
         
         // FIX ME: Add antisymmetric matrices
+    }
+}
+
+void
+CAOFockMatrix::add(const CAOFockMatrix& source)
+{
+    for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+    {
+        _fockMatrices[i] = denblas::addAB(_fockMatrices[i],
+                                          source._fockMatrices[i], 1.0);
     }
 }
 

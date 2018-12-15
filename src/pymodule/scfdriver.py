@@ -39,12 +39,14 @@ class ScfDriver:
         # screening scheme
         self.qq_type = "QQ_DEN"
         self.qq_dyn = True
+        self.qq_dden = True
         
         # thresholds
         self.conv_thresh = 1.0e-6
         self.eri_thresh  = 1.0e-12
         self.ovl_thresh  = 1.0e-12
         self.diis_thresh = 0.2
+        self.dden_thresh = 1.0e-3
         
         # iterations data
         self.iter_data = []
@@ -151,14 +153,18 @@ class ScfDriver:
 
         fock_mat = AOFockMatrix(den_mat)
     
+        dden_fock = False
+
         if self.rank == mpi_master():
             self.print_scf_title(ostream)
 
         for i in self.get_scf_range():
             
-            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
-                            ostream, comm)
-            
+            self.comp_2e_fock(eri_drv, fock_mat, den_mat, dden_fock, molecule,
+                              ao_basis, qq_data, ostream, comm)
+                              
+            ref_fock_mat = self.store_fock_mat(fock_mat)
+           
             fock_mat.reduce_sum(self.rank, self.nodes, comm)
             
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
@@ -171,6 +177,10 @@ class ScfDriver:
             self.set_skip_iter_flag(i, e_grad)
                 
             diff_den = self.comp_density_change(den_mat, self.density, comm)
+            
+            dden_fock = self.use_diff_density_fock(diff_den)
+            
+            print("Diff. density Fock flag: ", dden_fock)
 
             self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
 
@@ -189,7 +199,11 @@ class ScfDriver:
 
             den_mat = self.gen_new_density(molecule)
             
-            den_mat.broadcast(self.rank, comm)
+            if dden_fock:
+                diff_den_mat = AODensityMatrix(den_mat)
+                diff_den_mat.broadcast(self.rank, comm)
+            else:
+                den_mat.broadcast(self.rank, comm)
             
             if self.qq_dyn:
                 qq_data.set_threshold(self.get_dyn_threshold(e_grad))
@@ -252,6 +266,18 @@ class ScfDriver:
                     
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat, comm):
         return (0.0, 0.0, 0.0)
+    
+    def comp_2e_fock(self, eri_drv, fock_mat, den_mat, dden_fock, molecule,
+                     ao_basis, qq_data, ostream, comm):
+        
+        if dden_fock:
+            print("I am here...")
+            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
+                            ostream, comm)
+        else:
+            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
+                            ostream, comm)
+    
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
         return
@@ -261,6 +287,14 @@ class ScfDriver:
 
     def comp_density_change(self, den_mat, old_den_mat, comm):
         return 0.0
+    
+    def store_fock_mat(self, fock_mat):
+    
+        if self.qq_dden and (not self.skip_iter):
+            print("Storing Fock matrix...")
+            return AOFockMatrix(fock_mat)
+
+        return AOFockMatrix()
     
     def store_diis_data(self, i, fock_mat, den_mat):
         return
@@ -478,3 +512,13 @@ class ScfDriver:
             return ericut.qqrden
 
         return None;
+
+    def use_diff_density_fock(self, diff_den):
+        
+        if self.skip_iter:
+            return False
+        
+        if self.qq_dden and (diff_den < self.dden_thresh):
+            return True
+    
+        return False
