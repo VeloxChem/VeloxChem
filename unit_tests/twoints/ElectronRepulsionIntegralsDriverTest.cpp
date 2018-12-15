@@ -5706,8 +5706,6 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAtom)
 
     auto mbas = vlxbas::getMolecularBasisForHeAtom();
 
-    COutputStream ost(std::string("dummy.out"));
-
     const int nrows = 5, ncols = 5;
 
     std::vector<double> denvals{  0.351213608529393,  0.304029605741231, -0.000000000000000,
@@ -5726,11 +5724,11 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAtom)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
 
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas);
 
     CAOFockMatrix fock(dmat);
 
-    eridrv.compute(fock, dmat, mhe, mbas, qqdata, ost, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mhe, mbas, qqdata, MPI_COMM_WORLD);
 
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
 
@@ -5759,8 +5757,6 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAnionWithSPD)
     
     auto mbas = vlxbas::getMolecularBasisSPDForHeAtom();
     
-    COutputStream ost(std::string("dummy.out"));
-    
     const int nrows = 9, ncols = 9;
     
     std::vector<double> denvals{  1.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
@@ -5779,11 +5775,11 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForHeAnionWithSPD)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas, ost);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas);
     
     CAOFockMatrix fock(dmat);
     
-    eridrv.compute(fock, dmat, mhe, mbas, qqdata, ost, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mhe, mbas, qqdata, MPI_COMM_WORLD);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -5829,8 +5825,6 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2O)
     auto mh2o = vlxmol::getMoleculeH2O();
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
-    
-    COutputStream ost(std::string("dummy.out"));
     
     const int nrows = 24, ncols = 24;
 
@@ -6033,11 +6027,11 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2O)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas, ost);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
     CAOFockMatrix fock(dmat);
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, ost, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -6248,8 +6242,6 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
     auto mh2o = vlxmol::getMoleculeH2Se();
     
     auto mbas = vlxbas::getMolecularBasisForH2Se();
-    
-    COutputStream ost(std::string("dummy.out"));
     
     const int nrows = 42, ncols = 42;
 
@@ -6848,11 +6840,11 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
                                              mpi::nodes(MPI_COMM_WORLD),
                                              MPI_COMM_WORLD);
     
-    auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, mh2o, mbas, ost);
+    auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, mh2o, mbas);
     
     CAOFockMatrix fock(dmat);
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, ost, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     

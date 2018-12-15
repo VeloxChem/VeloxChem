@@ -13,17 +13,14 @@
 
 #include "mpi.h"
 
-#include "OutputStream.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
-#include "OutputStream.hpp"
 #include "ExecMode.hpp"
 #include "ElectronicPotentialMatrix.hpp"
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
 #include "SparseMatrix.hpp"
 #include "BoysFunction.hpp"
-#include "OutputStream.hpp"
 #include "SystemClock.hpp"
 #include "OneIntsDistributor.hpp"
 
@@ -146,15 +143,6 @@ class CElectronicPotentialIntegralsDriver
                                            const CVecThreeIndexes&     recPattern,
                                            const int32_t               maxPrimGtos) const;
     
-    /**
-     Prints electronic potential integrals computation time to output stream.
-     
-     @param timer the system clock timer.
-     @param oStream the output stream.
-     */
-    void _printComputationTime(const CSystemClock&  timer,
-                                     COutputStream& oStream) const;
-    
 public:
     
     /**
@@ -179,13 +167,11 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the electronic potential matrix object.
      */
     CElectronicPotentialMatrix compute(const CMolecule&       molecule,
                                        const CMolecularBasis& basis,
-                                             COutputStream&   oStream, 
                                              MPI_Comm         comm) const;
     
     /**

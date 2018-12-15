@@ -41,7 +41,6 @@ COverlapIntegralsDriver::~COverlapIntegralsDriver()
 COverlapMatrix
 COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const 
 {
     CSystemClock timer;
@@ -59,8 +58,6 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
         ovlmat = _compOverlapIntegrals(&bracontr, &bracontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return ovlmat;
 }
 
@@ -68,7 +65,6 @@ COverlapMatrix
 COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const
 {
     COverlapMatrix ovlmat;
@@ -93,7 +89,6 @@ COverlapMatrix
 COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& basis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const
 {
     COverlapMatrix ovlmat;
@@ -119,7 +114,6 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const
 {
     COverlapMatrix ovlmat;
@@ -624,26 +618,4 @@ COverlapIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_
     }
     
     return nblk;
-}
-
-void
-COverlapIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
-                                                     COutputStream& oStream) const
-{
-    auto tsec = timer.getElapsedTimeInSeconds();
-    
-    if (_isLocalMode)
-    {
-        // FIX ME: we need tags for each driver to be implemented to manage
-        //         MPI send/receive cycle.
-    }
-    
-    if (_globRank == mpi::master())
-    {
-        oStream << fmt::info << "Overlap matrix computed in ";
-        
-        oStream << fstr::to_string(tsec, 2) << " sec.";
-        
-        oStream << fmt::end << fmt::blank;
-    }
 }

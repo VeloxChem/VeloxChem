@@ -242,7 +242,6 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
                          const CMolecularBasis& basis_2,
                          const COverlapMatrix&  S12,
                          const COverlapMatrix&  S22,
-                               COutputStream&   oStream,
                                MPI_Comm         comm) const 
 {
     CSystemClock timer;
@@ -255,8 +254,6 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
         
         dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22);
     }
-    
-    _printComputationTime(timer, oStream);
     
     return dsad;
 }
@@ -482,27 +479,5 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         dsad.push_back(denblas::multABt(csad_beta,  csad_beta));
 
         return CAODensityMatrix(dsad, denmat::unrest);
-    }
-}
-
-void
-CSADGuessDriver::_printComputationTime(const CSystemClock&  timer,
-                                             COutputStream& oStream) const
-{
-    auto tsec = timer.getElapsedTimeInSeconds();
-    
-    if (_isLocalMode)
-    {
-        // FIX ME: we need tags for each driver to be implemented to manage
-        //         MPI send/receive cycle.
-    }
-    
-    if (_globRank == mpi::master())
-    {
-        oStream << fmt::info << "SAD initial guess computed in ";
-        
-        oStream << fstr::to_string(tsec, 2) << " sec.";
-        
-        oStream << fmt::end << fmt::blank;
     }
 }

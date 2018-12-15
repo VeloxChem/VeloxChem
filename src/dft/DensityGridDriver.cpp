@@ -48,7 +48,6 @@ CDensityGridDriver::generate(const CMolecule&       molecule,
                              const CMolecularBasis& basis,
                              const CMolecularGrid&  molGrid,
                              const xcfun            xcFunctional, 
-                                   COutputStream&   oStream,
                                    MPI_Comm         comm)
 {
     CSystemClock tim;
@@ -58,7 +57,7 @@ CDensityGridDriver::generate(const CMolecule&       molecule,
     if (_runMode == execmode::cpu)
     {
         _genDensityGridOnCPU(molecule, basis, molGrid, xcFunctional,
-                             oStream, comm);
+                             comm);
     }
     
     // execution mode: CPU/GPU
@@ -79,7 +78,6 @@ CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
                                          const CMolecularBasis& basis,
                                          const CMolecularGrid&  molGrid,
                                          const xcfun            xcFunctional,
-                                               COutputStream&   oStream,
                                                MPI_Comm         comm)
 {
     // set up OMP tasks

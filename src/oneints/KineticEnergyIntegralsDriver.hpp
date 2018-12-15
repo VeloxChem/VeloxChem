@@ -13,16 +13,13 @@
 
 #include "mpi.h"
 
-#include "OutputStream.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
-#include "OutputStream.hpp"
 #include "ExecMode.hpp"
 #include "KineticEnergyMatrix.hpp"
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
 #include "SparseMatrix.hpp"
-#include "OutputStream.hpp"
 #include "SystemClock.hpp"
 #include "OneIntsDistributor.hpp"
 
@@ -137,15 +134,6 @@ class CKineticEnergyIntegralsDriver
                                            const CVecThreeIndexes&     recPattern,
                                            const int32_t               maxPrimGtos) const;
     
-    /**
-     Prints kinetic energy integrals computation time to output stream.
-     
-     @param timer the system clock timer.
-     @param oStream the output stream.
-     */
-    void _printComputationTime(const CSystemClock&  timer,
-                                     COutputStream& oStream) const;
-    
 public:
     
     /**
@@ -170,13 +158,11 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
     
     /**
@@ -186,14 +172,12 @@ public:
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of kinetic energy matrix.
      @param ketBasis the molecular basis for ket side of kinetic energy matrix.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       molecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
     
     /**
@@ -203,14 +187,12 @@ public:
      @param braMolecule the molecule for bra side of kinetic energy matrix.
      @param ketMolecule the molecule for ket side of kinetic energy matrix.
      @param basis the molecular basis.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& basis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
     
     /**
@@ -221,7 +203,6 @@ public:
      @param ketMolecule the molecule for ket side of kinetic energy matrix.
      @param braBasis the molecular basis for bra side of kinetic energy matrix.
      @param ketBasis the molecular basis for ket side of kinetic energy matrix.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
@@ -229,7 +210,6 @@ public:
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& braBasis,
                                  const CMolecularBasis& ketBasis,
-                                       COutputStream&   oStream,
                                        MPI_Comm         comm) const;
     
     /**

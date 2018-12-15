@@ -39,7 +39,7 @@ class ScfDriver:
         # screening scheme
         self.qq_type = "QQ_DEN"
         self.qq_dyn = True
-        self.qq_dden = True
+        self.qq_dden = False
         
         # thresholds
         self.conv_thresh = 1.0e-6
@@ -133,7 +133,24 @@ class ScfDriver:
                                                         comm, ostream)
                                                         
         if self.rank == mpi_master():
-            oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh, ostream)
+            t0 = tm.time()
+
+            oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
+
+            ostream.put_info("Orthogonalization matrix computed in %.2f sec." %
+                             (tm.time() - t0))
+            ostream.new_line()
+
+            nrow = oao_mat.number_of_rows()
+            ncol = oao_mat.number_of_columns()
+            if nrow != ncol:
+                ndim = nrow - ncol
+                ostream.put_info(" Removed %d linearly dependent vector%s." %
+                                 (ndim, '' if ndim ==1 else 's'))
+                ostream.new_line()
+
+            ostream.flush()
+
         else:
             oao_mat = None
     
@@ -142,7 +159,7 @@ class ScfDriver:
                                                           comm)
                                                           
         qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
-                                  molecule, ao_basis, ostream)
+                                  molecule, ao_basis)
 
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
                                           ovl_mat, comm, ostream)
@@ -161,7 +178,7 @@ class ScfDriver:
         for i in self.get_scf_range():
             
             self.comp_2e_fock(eri_drv, fock_mat, den_mat, dden_fock, molecule,
-                              ao_basis, qq_data, ostream, comm)
+                              ao_basis, qq_data, comm)
                               
             ref_fock_mat = self.store_fock_mat(fock_mat)
            
@@ -180,7 +197,7 @@ class ScfDriver:
             
             dden_fock = self.use_diff_density_fock(diff_den)
             
-            print("Diff. density Fock flag: ", dden_fock)
+            #print("Diff. density Fock flag: ", dden_fock)
 
             self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
 
@@ -215,17 +232,41 @@ class ScfDriver:
             self.print_scf_finish(start_time, ostream)
 
     def comp_one_ints(self, molecule, basis, comm, ostream):
+
+        t0 = tm.time()
         
         ovl_drv = OverlapIntegralsDriver.create(self.rank, self.nodes, comm)
-        ovl_mat = ovl_drv.compute(molecule, basis, ostream, comm)
+        ovl_mat = ovl_drv.compute(molecule, basis, comm)
+
+        t1 = tm.time()
         
         kin_drv = KineticEnergyIntegralsDriver.create(self.rank, self.nodes,
                                                       comm)
-        kin_mat = kin_drv.compute(molecule, basis, ostream, comm)
+        kin_mat = kin_drv.compute(molecule, basis, comm)
         
+        t2 = tm.time()
+
         npot_drv = NuclearPotentialIntegralsDriver.create(self.rank, self.nodes,
                                                           comm)
-        npot_mat = npot_drv.compute(molecule, basis, ostream, comm)
+        npot_mat = npot_drv.compute(molecule, basis, comm)
+
+        t3 = tm.time()
+
+        if self.rank == mpi_master():
+
+            ostream.put_info("Overlap matrix computed in %.2f sec." %
+                             (t1 - t0))
+            ostream.new_line()
+
+            ostream.put_info("Kinetic energy matrix computed in %.2f sec." %
+                             (t2 - t1))
+            ostream.new_line()
+
+            ostream.put_info("Nuclear potential matrix computed in %.2f sec." %
+                             (t3 - t2))
+            ostream.new_line()
+
+            ostream.flush()
         
         return (ovl_mat, kin_mat, npot_mat)
     
@@ -268,15 +309,14 @@ class ScfDriver:
         return (0.0, 0.0, 0.0)
     
     def comp_2e_fock(self, eri_drv, fock_mat, den_mat, dden_fock, molecule,
-                     ao_basis, qq_data, ostream, comm):
+                     ao_basis, qq_data, comm):
         
         if dden_fock:
-            print("I am here...")
             eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
-                            ostream, comm)
+                            comm)
         else:
             eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
-                            ostream, comm)
+                            comm)
     
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
@@ -291,7 +331,6 @@ class ScfDriver:
     def store_fock_mat(self, fock_mat):
     
         if self.qq_dden and (not self.skip_iter):
-            print("Storing Fock matrix...")
             return AOFockMatrix(fock_mat)
 
         return AOFockMatrix()

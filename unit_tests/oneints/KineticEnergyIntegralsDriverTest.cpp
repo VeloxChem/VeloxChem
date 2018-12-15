@@ -3885,9 +3885,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeForLiH)
     
     auto mbas = vlxbas::getTestBasisForLiH();
     
-    COutputStream ost("test.kinetic.energy.log");
-    
-    auto kinmat = kindrv.compute(mlih, mbas, ost, MPI_COMM_WORLD);
+    auto kinmat = kindrv.compute(mlih, mbas, MPI_COMM_WORLD);
     
     std::vector<double> intvals{ 3.082911586456580,  2.133606523257290, -0.118704796811193,
                                  0.188907818018553,  0.000000000000000,  0.000000000000000,
@@ -7239,9 +7237,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
-    
-    CKineticEnergyMatrix kinmat = kindrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix kinmat = kindrv.compute(mh2o, mbas, MPI_COMM_WORLD);
 
     std::vector<double> intvals{  29.356654381441949,  -0.768111871596593,  -0.117549361967610, 
                                    0.002649698131267,  -0.017043989536863,   0.002649698131267, 
@@ -7457,17 +7453,15 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S11 = kindrv.compute(mh2o_1, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S11 = kindrv.compute(mh2o_1, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S22 = kindrv.compute(mh2o_2, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S22 = kindrv.compute(mh2o_2, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S12 = kindrv.compute(mh2o_1, mh2o_2, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S12 = kindrv.compute(mh2o_1, mh2o_2, mbas, ost, MPI_COMM_WORLD);
-
-    CKineticEnergyMatrix S21 = kindrv.compute(mh2o_2, mh2o_1, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S21 = kindrv.compute(mh2o_2, mh2o_1, mbas, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7498,17 +7492,15 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForNH3CH4)
     
     auto mbas = vlxbas::getMinimalBasisForNH3CH4();
 
-    COutputStream ost(std::string("dummy.out"));
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S11 = kindrv.compute(mnh3, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S11 = kindrv.compute(mnh3, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S22 = kindrv.compute(mch4, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S22 = kindrv.compute(mch4, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S12 = kindrv.compute(mnh3, mch4, mbas, MPI_COMM_WORLD);
 
-    CKineticEnergyMatrix S12 = kindrv.compute(mnh3, mch4, mbas, ost, MPI_COMM_WORLD);
-
-    CKineticEnergyMatrix S21 = kindrv.compute(mch4, mnh3, mbas, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S21 = kindrv.compute(mch4, mnh3, mbas, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7537,9 +7529,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForTwoBasis)
 
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
-    
-    CKineticEnergyMatrix kinmat = kindrv.compute(h2o, ao_basis, min_basis, ost, MPI_COMM_WORLD);
+    CKineticEnergyMatrix kinmat = kindrv.compute(h2o, ao_basis, min_basis, MPI_COMM_WORLD);
 
     std::vector<double> intvals{-29.279305345784234,  8.076500670892111, -0.006981963263064,
                                  -0.006981963263064,  0.000000000000000,  0.000000000000000,

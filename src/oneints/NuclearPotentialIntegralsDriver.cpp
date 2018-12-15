@@ -39,7 +39,6 @@ CNuclearPotentialIntegralsDriver::~CNuclearPotentialIntegralsDriver()
 CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecularBasis& basis,
-                                                COutputStream&   oStream,
                                                 MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -64,8 +63,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                                  &bracontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return npotmat;
 }
 
@@ -73,7 +70,6 @@ CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecularBasis& basis,
                                           const CMolecule&       pchgMolecule,
-                                                COutputStream&   oStream,
                                                 MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -98,8 +94,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                                  &bracontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return npotmat;
 }
 
@@ -108,7 +102,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecularBasis& braBasis,
                                           const CMolecularBasis& ketBasis,
                                           const CMolecule&       pchgMolecule,
-                                                COutputStream&   oStream,
                                                 MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -135,8 +128,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                                  &ketcontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return npotmat;
 }
 
@@ -145,7 +136,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecule&       ketMolecule,
                                           const CMolecularBasis& basis,
                                           const CMolecule&       pchgMolecule,
-                                                COutputStream&   oStream,
                                                 MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -172,8 +162,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                                  &ketcontr);
     }
     
-    _printComputationTime(timer, oStream);
-    
     return npotmat;
 }
 
@@ -183,7 +171,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecularBasis& braBasis,
                                           const CMolecularBasis& ketBasis,
                                           const CMolecule&       pchgMolecule,
-                                                COutputStream&   oStream,
                                                 MPI_Comm         comm) const
 {
     CSystemClock timer;
@@ -209,8 +196,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
         npotmat = _compNuclearPotentialIntegrals(&pcharges, &pcoords, &bracontr,
                                                  &ketcontr);
     }
-    
-    _printComputationTime(timer, oStream);
     
     return npotmat;
 }
@@ -867,27 +852,5 @@ CNuclearPotentialIntegralsDriver::_addPointChargeContribution(      CMemBlock2D<
                 abuf[k] += fact * pbuf[k];
             }
         }
-    }
-}
-
-void
-CNuclearPotentialIntegralsDriver::_printComputationTime(const CSystemClock&  timer,
-                                                              COutputStream& oStream) const
-{
-    auto tsec = timer.getElapsedTimeInSeconds();
-    
-    if (_isLocalMode)
-    {
-        // FIX ME: we need tags for each driver to be implemented to manage
-        //         MPI send/receive cycle.
-    }
-    
-    if (_globRank == mpi::master())
-    {
-        oStream << fmt::info << "Nuclear potential matrix computed in ";
-        
-        oStream << fstr::to_string(tsec, 2) << " sec.";
-        
-        oStream << fmt::end << fmt::blank;
     }
 }

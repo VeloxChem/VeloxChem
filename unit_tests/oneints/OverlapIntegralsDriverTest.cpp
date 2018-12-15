@@ -3886,9 +3886,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeForLiH)
     
     auto mbas = vlxbas::getTestBasisForLiH();
     
-    COutputStream ost("test.overlap.log");
-    
-    auto ovlmat = ovldrv.compute(mlih, mbas, ost, MPI_COMM_WORLD);
+    auto ovlmat = ovldrv.compute(mlih, mbas, MPI_COMM_WORLD);
     
     std::vector<double> intvals{ 1.000000000000000,  0.950707129188576,  0.153183585372556,
                                  0.323354079718979,  0.000000000000000,  0.000000000000000,
@@ -7240,9 +7238,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2O)
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
-    
-    COverlapMatrix ovlmat = ovldrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix ovlmat = ovldrv.compute(mh2o, mbas, MPI_COMM_WORLD);
 
     std::vector<double> intvals{   0.999999999999999,  -0.344016553802724,  -0.157870042005142, 
                                   -0.050165623197619,  -0.063330527957723,  -0.050165623197619, 
@@ -7458,17 +7454,15 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
+    COverlapMatrix S = ovldrv.compute(mdimer, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S = ovldrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S11 = ovldrv.compute(mh2o_1, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S11 = ovldrv.compute(mh2o_1, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S22 = ovldrv.compute(mh2o_2, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S22 = ovldrv.compute(mh2o_2, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S12 = ovldrv.compute(mh2o_1, mh2o_2, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S12 = ovldrv.compute(mh2o_1, mh2o_2, mbas, ost, MPI_COMM_WORLD);
-
-    COverlapMatrix S21 = ovldrv.compute(mh2o_2, mh2o_1, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S21 = ovldrv.compute(mh2o_2, mh2o_1, mbas, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7499,17 +7493,15 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForNH3CH4)
     
     auto mbas = vlxbas::getMinimalBasisForNH3CH4();
 
-    COutputStream ost(std::string("dummy.out"));
+    COverlapMatrix S = ovldrv.compute(mdimer, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S = ovldrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S11 = ovldrv.compute(mnh3, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S11 = ovldrv.compute(mnh3, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S22 = ovldrv.compute(mch4, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S22 = ovldrv.compute(mch4, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S12 = ovldrv.compute(mnh3, mch4, mbas, MPI_COMM_WORLD);
 
-    COverlapMatrix S12 = ovldrv.compute(mnh3, mch4, mbas, ost, MPI_COMM_WORLD);
-
-    COverlapMatrix S21 = ovldrv.compute(mch4, mnh3, mbas, ost, MPI_COMM_WORLD);
+    COverlapMatrix S21 = ovldrv.compute(mch4, mnh3, mbas, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7538,9 +7530,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForTwoBasis)
 
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
-    
-    COverlapMatrix ovlmat = ovldrv.compute(h2o, ao_basis, min_basis, ost, MPI_COMM_WORLD);
+    COverlapMatrix ovlmat = ovldrv.compute(h2o, ao_basis, min_basis, MPI_COMM_WORLD);
 
     std::vector<double> intvals{ -0.999725064261023,  0.018870459069969, -0.061222289562095,
                                  -0.061222289562095,  0.000000000000000,  0.000000000000000,

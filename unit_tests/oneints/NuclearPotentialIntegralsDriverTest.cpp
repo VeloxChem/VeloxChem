@@ -3985,9 +3985,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeForLiH)
     
     auto mbas = vlxbas::getTestBasisForLiH();
     
-    COutputStream ost("test.nuclear.potential.log");
-    
-    auto npotmat = npotdrv.compute(mlih, mbas, ost, MPI_COMM_WORLD);
+    auto npotmat = npotdrv.compute(mlih, mbas, MPI_COMM_WORLD);
     
     std::vector<double> intvals{ 7.736774122879349,  6.549415227007131,  0.855280000184068,
                                  1.949488520360516,  0.091633975206306,  0.084729594009098,
@@ -7339,9 +7337,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
-    
-    CNuclearPotentialMatrix npotmat = npotdrv.compute(mh2o, mbas, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix npotmat = npotdrv.compute(mh2o, mbas, MPI_COMM_WORLD);
 
     std::vector<double> intvals{  62.407271930631438, -11.891776058068634,  -5.253809097285499, 
                                   -1.637393640002757,  -2.082849579191473,  -1.637393640002757, 
@@ -7557,17 +7553,15 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
 
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
+    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
-
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mbas, mdimer, MPI_COMM_WORLD);
                                                                   
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mbas, mdimer, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mdimer, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mdimer, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7598,17 +7592,15 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
     
     auto mbas = vlxbas::getMinimalBasisForNH3CH4();
 
-    COutputStream ost(std::string("dummy.out"));
+    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, ost, MPI_COMM_WORLD);
-
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mbas, mdimer, MPI_COMM_WORLD);
                                                                                 
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mbas, mdimer, MPI_COMM_WORLD);
 
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mdimer, MPI_COMM_WORLD);
                                                                                 
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mdimer, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mdimer, MPI_COMM_WORLD);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7637,9 +7629,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForTwoBasis)
 
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    COutputStream ost(std::string("dummy.out"));
-    
-    CNuclearPotentialMatrix npotmat = npotdrv.compute(h2o, ao_basis, min_basis, h2o, ost, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix npotmat = npotdrv.compute(h2o, ao_basis, min_basis, h2o, MPI_COMM_WORLD);
 
     std::vector<double> intvals{-62.330818445846084,  8.873516667931849, -2.006175030692724,
                                  -2.006175030692724, -0.000000000000000, -0.020725456424117,

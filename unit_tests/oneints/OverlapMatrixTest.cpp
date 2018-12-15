@@ -111,8 +111,6 @@ TEST_F(COverlapMatrixTest, Values)
 
 TEST_F(COverlapMatrixTest, GetOrthogonalizationMatrix)
 {
-    COutputStream ost(std::string("dummy.out"));
-    
     CDenseMatrix ma({10.0, 3.0, 4.0,
                      3.0, 1.2, 1.0,
                      4.0, 1.0, 4.0},
@@ -125,14 +123,14 @@ TEST_F(COverlapMatrixTest, GetOrthogonalizationMatrix)
                          -0.1947637155486870,  0.0808312367804720,  0.6298490905403010},
                         3, 3);
     
-    ASSERT_EQ(refmat, smata.getOrthogonalizationMatrix(0.0, ost));
+    ASSERT_EQ(refmat, smata.getOrthogonalizationMatrix(0.0));
     
     CDenseMatrix submat({{ 0.2545280076864466, 0.2423193899561403,
                            0.1578026238399430, 0.0725559748124375,
                           -0.6206955232198551, 0.1178139554973027}},
                           3, 2);
     
-    auto omat = smata.getOrthogonalizationMatrix(0.5, ost);
+    auto omat = smata.getOrthogonalizationMatrix(0.5);
     
     auto prefmat = submat.values();
     

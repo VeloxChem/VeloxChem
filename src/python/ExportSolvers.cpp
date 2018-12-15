@@ -47,12 +47,11 @@ CSADGuessDriver_compute(
     const CMolecularBasis& basis_2,
     const COverlapMatrix&  S12,
     const COverlapMatrix&  S22,
-          COutputStream&   oStream,
           bp::object       py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
-    return self.compute(molecule, basis_1, basis_2, S12, S22, oStream, *comm_ptr);
+    return self.compute(molecule, basis_1, basis_2, S12, S22, *comm_ptr);
 }
 
 // Exports classes/functions in src/solvers to python

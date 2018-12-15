@@ -13,7 +13,6 @@
 
 #include "mpi.h"
 
-#include "OutputStream.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "DenseMatrix.hpp"
@@ -143,15 +142,6 @@ class CSADGuessDriver
                   const COverlapMatrix&  S12,
                   const COverlapMatrix&  S22) const;
     
-    /**
-     Prints overlap integrals computation time to output stream.
-
-     @param timer the system clock timer.
-     @param oStream the output stream.
-     */
-    void _printComputationTime(const CSystemClock&  timer,
-                                     COutputStream& oStream) const;
-
 public:
     
     /**
@@ -178,7 +168,6 @@ public:
      @param basis_2 the molecular (larger) basis set.
      @param S12 the crossing overlap matrix between basis_1 and basis_2.
      @param S22 the overlap matrix computed from basis_2.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the density matrix of SAD guess.
      */
@@ -188,7 +177,6 @@ public:
             const CMolecularBasis& basis_2,
             const COverlapMatrix&  S12,
             const COverlapMatrix&  S22,
-                  COutputStream&   oStream,
                   MPI_Comm         comm) const;
     
     /**

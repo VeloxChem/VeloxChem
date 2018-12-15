@@ -79,14 +79,12 @@ class CDensityGridDriver
      @param basis the molecular basis.
      @param molGrid the distributed molecular grid.
      @param xcFunctional the exchange-correlation functional type.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      */
     void _genDensityGridOnCPU(const CMolecule&       molecule,
                               const CMolecularBasis& basis,
                               const CMolecularGrid&  molGrid,
                               const xcfun            xcFunctional,
-                                    COutputStream&   oStream,
                                     MPI_Comm         comm);
     
     /**
@@ -298,14 +296,12 @@ public:
      @param basis the molecular basis.
      @param molGrid the molecular grid.
      @param xcFunctional the type of exchange-correlation functional.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      */
     void generate(const CMolecule&       molecule,
                   const CMolecularBasis& basis,
                   const CMolecularGrid&  molGrid,
                   const xcfun            xcFunctional,
-                        COutputStream&   oStream,
                         MPI_Comm         comm);
 };
 

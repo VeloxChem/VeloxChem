@@ -109,8 +109,7 @@ COverlapMatrix::values() const
 }
 
 CDenseMatrix
-COverlapMatrix::getOrthogonalizationMatrix(const double         threshold,
-                                                 COutputStream& oStream) const
+COverlapMatrix::getOrthogonalizationMatrix(const double threshold) const
 {
     CSystemClock timer;
     
@@ -151,47 +150,8 @@ COverlapMatrix::getOrthogonalizationMatrix(const double         threshold,
         omat = diagdrv.getInvertedSqrtMatrix();
     }
     
-    _printComputationTime(timer, omat, oStream); 
-    
     return omat;
 }
-
-void
-COverlapMatrix::_printComputationTime(const CSystemClock&  timer,
-                                      const CDenseMatrix&  orthoMatrix, 
-                                            COutputStream& oStream) const
-{
-    auto tsec = timer.getElapsedTimeInSeconds();
-    
-    oStream << fmt::info << "Orthogonalization matrix computed in ";
-        
-    oStream << fstr::to_string(tsec, 2) << " sec.";
-    
-    auto nrow = orthoMatrix.getNumberOfRows();
-    
-    auto ncol = orthoMatrix.getNumberOfColumns();
-    
-    if (nrow != ncol)
-    {
-        auto ndim = nrow - ncol;
-        
-        oStream << " Removed " << std::to_string(ndim);
-        
-        oStream << " linearly dependent ";
-        
-        if (ndim == 1)
-        {
-            oStream << "vector.";
-        }
-        else
-        {
-            oStream << "vectors.";
-        }
-    }
-        
-    oStream << fmt::end << fmt::blank;
-}
-
 
 std::ostream&
 operator<<(      std::ostream&  output,

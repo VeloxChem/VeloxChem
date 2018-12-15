@@ -52,8 +52,6 @@ static void
 COutputStream_new_line(COutputStream& self)
 {
     self << fmt::blank;
-
-    self.flush();
 }
 
 // Helper function for converting angular momentum
