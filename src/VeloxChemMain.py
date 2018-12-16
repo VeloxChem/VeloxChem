@@ -16,38 +16,44 @@ def main():
 
     task = vlx.MpiTask(sys.argv[1:], MPI.COMM_WORLD)
 
-    # initialize scf driver
+    task_type = task.input_dict['jobs']['task'].lower()
 
-    scf_drv = vlx.ScfRestrictedDriver()
+    # Hartree-Fock
 
-    # read minimal basis if needed
+    if task_type == 'hf':
 
-    scf_drv.compute_task(task)
+        # initialize scf driver and run scf
 
-    # write hdf5 files for MOs and density after SCF convergence
+        scf_drv = vlx.ScfRestrictedDriver()
 
-    if task.mpi_rank == vlx.mpi_master() and scf_drv.is_converged:
-        scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
-        scf_drv.density.write_hdf5("density.h5")
+        scf_drv.compute_task(task)
 
-    # generate cube file
+        # write hdf5 files after convergence
 
-    """
-    vis_drv = vlx.VisualizationDriver()
+        if task.mpi_rank == vlx.mpi_master() and scf_drv.is_converged:
+            scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
+            scf_drv.density.write_hdf5("density.h5")
 
-    if task.mpi_rank == vlx.mpi_master():
-        mol_orbs = vlx.MolecularOrbitals.read_hdf5("mol_orbs.h5")
-        density = vlx.AODensityMatrix.read_hdf5("density.h5")
+    # Cube
 
-        nelec = task.molecule.number_of_electrons()
-        homo = nelec // 2 - 1
+    elif task_type == 'cube':
 
-        vis_grid = vis_drv.gen_grid(task.molecule)
-        vis_drv.write_cube(task.molecule, task.ao_basis, mol_orbs,
-                           homo, "alpha", vis_grid)
-        vis_drv.write_cube_dens(task.molecule, task.ao_basis, density,
-                                0, "alpha", vis_grid)
-    """
+        # generate cube file
+
+        vis_drv = vlx.VisualizationDriver()
+
+        if task.mpi_rank == vlx.mpi_master():
+            mol_orbs = vlx.MolecularOrbitals.read_hdf5("mol_orbs.h5")
+            density = vlx.AODensityMatrix.read_hdf5("density.h5")
+
+            nelec = task.molecule.number_of_electrons()
+            homo = nelec // 2 - 1
+
+            vis_grid = vis_drv.gen_grid(task.molecule)
+            vis_drv.write_cube(task.molecule, task.ao_basis, mol_orbs, homo,
+                               "alpha", vis_grid)
+            vis_drv.write_cube_dens(task.molecule, task.ao_basis, density, 0,
+                                    "alpha", vis_grid)
 
     # all done, print finish header to output stream
 

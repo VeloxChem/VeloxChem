@@ -53,6 +53,8 @@ class MpiTask:
 
         # process input file on master node
 
+        self.input_dict = {}
+
         if self.mpi_rank == mpi_master():
 
             self.start_time = self.ostream.print_start_header(self.mpi_size)
@@ -63,6 +65,8 @@ class MpiTask:
 
             input_parser = InputParser(input_fname)
             input_dict = input_parser.get_dict()
+
+            self.input_dict = input_dict
 
             self.ostream.put_info(
                 "Found %d control groups." % len(input_dict.keys()))

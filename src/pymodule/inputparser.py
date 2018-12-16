@@ -227,10 +227,8 @@ class InputParser:
         self.grouplist = re.findall(r'@(?!end[\s])\s*\w+[^@]*@end(?![\w])',
                                     self.content)
         for i in range(len(self.grouplist)):
-            self.grouplist[i] = self.grouplist[i].strip()
-            self.grouplist[i] = self.grouplist[i].lstrip('@')
-            self.grouplist[i] = self.grouplist[i].rstrip('\n@end')
-            self.grouplist[i] = self.grouplist[i].split('\n')
+            self.grouplist[i] = self.grouplist[i].strip().replace('@', '')
+            self.grouplist[i] = self.grouplist[i].split('\n')[:-1]
 
     def convert_dict(self):
         """ Converting the list of lists into a dictionary with groupnames as
