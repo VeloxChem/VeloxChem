@@ -39,7 +39,7 @@ class ScfDriver:
         # screening scheme
         self.qq_type = "QQ_DEN"
         self.qq_dyn = True
-        self.qq_dden = True
+        self.qq_dden = False
         
         # thresholds
         self.conv_thresh = 1.0e-6
@@ -198,8 +198,6 @@ class ScfDriver:
             diff_den = self.comp_density_change(den_mat, self.density, comm)
             
             dden_fock = self.use_diff_density_fock(diff_den)
-            
-            #print("Diff. density Fock flag: ", dden_fock)
 
             self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
 
