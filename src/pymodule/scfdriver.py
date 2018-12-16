@@ -39,7 +39,7 @@ class ScfDriver:
         # screening scheme
         self.qq_type = "QQ_DEN"
         self.qq_dyn = True
-        self.qq_dden = False
+        self.qq_dden = True
         
         # thresholds
         self.conv_thresh = 1.0e-6
@@ -169,6 +169,8 @@ class ScfDriver:
         self.density = AODensityMatrix(den_mat)
 
         fock_mat = AOFockMatrix(den_mat)
+        
+        ref_fock_mat = AOFockMatrix()
     
         dden_fock = False
 
@@ -177,8 +179,8 @@ class ScfDriver:
 
         for i in self.get_scf_range():
             
-            self.comp_2e_fock(eri_drv, fock_mat, den_mat, dden_fock, molecule,
-                              ao_basis, qq_data, comm)
+            self.comp_2e_fock(eri_drv, fock_mat, ref_fock_mat, den_mat,
+                              dden_fock, molecule, ao_basis, qq_data, comm)
                               
             ref_fock_mat = self.store_fock_mat(fock_mat)
            
@@ -308,12 +310,14 @@ class ScfDriver:
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat, comm):
         return (0.0, 0.0, 0.0)
     
-    def comp_2e_fock(self, eri_drv, fock_mat, den_mat, dden_fock, molecule,
-                     ao_basis, qq_data, comm):
+    def comp_2e_fock(self, eri_drv, fock_mat, ref_fock_mat, den_mat, dden_fock,
+                     molecule, ao_basis, qq_data, comm):
         
         if dden_fock:
-            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
+            dden_mat = den_mat.sub(self.density)
+            eri_drv.compute(fock_mat, dden_mat, molecule, ao_basis, qq_data,
                             comm)
+            fock_mat.add(ref_fock_mat)
         else:
             eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
                             comm)

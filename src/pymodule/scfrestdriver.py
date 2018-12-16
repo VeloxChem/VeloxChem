@@ -74,10 +74,10 @@ class ScfRestrictedDriver(ScfDriver):
     def comp_density_change(self, den_mat, old_den_mat, comm):
         
         if self.rank == mpi_master():
-            ndmat = den_mat.total_to_numpy(0)
-            odmat = old_den_mat.total_to_numpy(0)
+            diff_mat = den_mat.sub(old_den_mat)
+            ddmat = diff_mat.total_to_numpy(0)
         
-            diff_den = np.linalg.norm(ndmat - odmat)
+            diff_den = np.linalg.norm(ddmat)
         else:
             diff_den = 0.0
         

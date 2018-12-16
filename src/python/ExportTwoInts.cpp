@@ -182,6 +182,7 @@ void export_twoints()
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
+        .def("add", &CAOFockMatrix::add)
         .def("reduce_sum", &CAOFockMatrix_reduce_sum)
         .def(bp::self == bp::other<CAOFockMatrix>())
     ;
