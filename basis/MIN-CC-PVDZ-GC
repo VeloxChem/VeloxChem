@@ -1,6 +1,5 @@
-@BASIS_SET MIN-CC-PVDZ
-! "min-cc-pVDZ"
-!
+@BASIS_SET MIN-CC-PVDZ-GC
+!  min-cc-pVDZ  Basis Set for initial guess
 
 @ATOMBASIS H
 S 4  1
