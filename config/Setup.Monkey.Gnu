@@ -52,7 +52,7 @@ CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 MKLROOT := /home/xinli/software/openblas
 MKL_INCLUDES := $(MKLROOT)/include
 
-LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas
+LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas -lgfortran
 LIB_LIST += -lgomp -lpthread -lm -ldl
 
 # Google Test root directory
