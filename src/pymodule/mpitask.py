@@ -113,6 +113,11 @@ class MpiTask:
 
             self.ostream.flush()
 
+        # broadcast input dictionary
+
+        self.input_dict = self.mpi_comm.bcast(
+            self.input_dict, root=mpi_master())
+
         # broadcast molecule and basis set
 
         self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
