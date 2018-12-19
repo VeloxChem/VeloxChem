@@ -20,6 +20,7 @@ CXX := mpicxx
 
 CXX_REL_FLG := -std=c++11 -O3 -Xpreprocessor -fopenmp -Wall
 CXX_DEB_FLG := -std=c++11 -O3 -Xpreprocessor -fopenmp -Wall -g
+CXX_DEB_FLG += -Rpass=loop-vectorize -Rpass-analysis=loop-vectorize
 
 # Generic preprocessor flags
 
