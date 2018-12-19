@@ -9,11 +9,9 @@
 #ifndef DeviceProp_hpp
 #define DeviceProp_hpp
 
-#include "OutputStream.hpp"
-
 namespace gpu {
 
-    void getDeviceProperties(COutputStream& oStream);
+    std::string getDeviceProperties();
 
 }
 

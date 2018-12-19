@@ -23,11 +23,9 @@ TEST_F(CGridDriverTest, DefaultConstructor)
     
     gdrv.setLevel(6, MPI_COMM_WORLD);
     
-    COutputStream ost(std::string("dummy.out"));
-    
     auto mlih = vlxmol::getMoleculeLiH();
     
-    auto mgrid = gdrv.generate(mlih, ost, MPI_COMM_WORLD);
+    auto mgrid = gdrv.generate(mlih, MPI_COMM_WORLD);
     
     auto npnt = mgrid.getNumberOfGridPoints();
     

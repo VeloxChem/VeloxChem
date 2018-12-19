@@ -13,9 +13,7 @@
 
 #include "mpi.h"
 
-#include "OutputStream.hpp"
 #include "Molecule.hpp"
-#include "OutputStream.hpp"
 #include "ExecMode.hpp"
 #include "MolecularGrid.hpp"
 #include "SystemClock.hpp"
@@ -88,21 +86,19 @@ class CGridDriver
      Prints start header with grid generation settings to output stream.
 
      @param molecule the molecule.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _startHeader(const CMolecule&     molecule,
-                            COutputStream& oStream) const;
+    std::string _startHeader(const CMolecule& molecule) const;
     
     /**
      Prints finish header with grid generation settings to output stream.
 
      @param time the time clock object.
      @param molecularGrid the molecular grid object.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _finishHeader(const CSystemClock&   time,
-                       const CMolecularGrid& molecularGrid,
-                             COutputStream&  oStream) const;
+    std::string _finishHeader(const CSystemClock&   time,
+                              const CMolecularGrid& molecularGrid) const;
     
     /**
      Creates molecular grid on master node by generating fraction of grid
@@ -195,12 +191,10 @@ public:
      Grid generation is distributed within domain of MPI communicator.
 
      @param molecule the molecule.
-     @param oStream the output stream.
      @param comm the MPI communicator.
      @return the molecular grid object.
      */
     CMolecularGrid generate(const CMolecule&     molecule,
-                                  COutputStream& oStream,
                                   MPI_Comm       comm) const;
 };
 

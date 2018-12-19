@@ -10,6 +10,7 @@
 
 #include <array>
 #include <cmath>
+#include <sstream>
 
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"
@@ -66,13 +67,10 @@ CGridDriver::setLevel(const int32_t  gridLevel,
 }
 
 CMolecularGrid
-CGridDriver::generate(const CMolecule&     molecule,
-                            COutputStream& oStream,
-                            MPI_Comm       comm) const
+CGridDriver::generate(const CMolecule& molecule,
+                            MPI_Comm   comm) const
 {
     CSystemClock time;
-    
-    if (_globRank == mpi::master()) _startHeader(molecule, oStream);
     
     // initialize molecular grid
     
@@ -96,8 +94,6 @@ CGridDriver::generate(const CMolecule&     molecule,
     {
         // FIX ME: add tranfer from local master to global master
     }
-    
-    if (_globRank == mpi::master()) _finishHeader(time, molgrid, oStream);
     
     return molgrid;
 }
@@ -190,39 +186,40 @@ CGridDriver::_getNumberOfAngularPoints(const int32_t idElemental) const
     return 0;
 }
 
-void
-CGridDriver::_startHeader(const CMolecule&     molecule,
-                                COutputStream& oStream) const
+std::string
+CGridDriver::_startHeader(const CMolecule& molecule) const
 {
-    oStream << fmt::header << "Numerical Grid For DFT Integration" << fmt::end;
+    std::stringstream ss;
+
+    ss << "Numerical Grid For DFT Integration" << "\n";
     
-    oStream << std::string(36, '=') << fmt::end << fmt::blank;
+    ss << std::string(36, '=') << "\n\n";
     
     std::string str("Grid Level          : ");
     
     str.append(std::to_string(_gridLevel));
     
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
     
     str.assign("Radial Quadrature   : Log3");
     
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
     
     str.assign("Angular Quadrature  : Lebedev-Laikov");
     
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
     
     str.assign("Partitioning Scheme : SSF");
     
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end << fmt::blank;
+    ss << fstr::format(str, 54, fmt::left) << "\n\n";
     
-    oStream << "  Atom ";
+    ss << "  Atom ";
     
-    oStream << fstr::format(std::string("Angular Points"), 15, fmt::center);
+    ss << fstr::format(std::string("Angular Points"), 15, fmt::center);
     
-    oStream << fstr::format(std::string("Radial Points"), 15, fmt::center);
+    ss << fstr::format(std::string("Radial Points"), 15, fmt::center);
     
-    oStream << fmt::end << fmt::blank;
+    ss << "\n\n";
     
     auto molcomp = molecule.getElementalComposition();
     
@@ -238,46 +235,51 @@ CGridDriver::_startHeader(const CMolecule&     molecule,
         
         label.append(elem.getName());
         
-        oStream << fstr::format(label, 6, fmt::left);
+        ss << fstr::format(label, 6, fmt::left);
         
         auto apoints = _getNumberOfAngularPoints(*i);
         
         auto rpoints = _getNumberOfRadialPoints(*i);
         
-        oStream << fstr::format(std::to_string(apoints), 15, fmt::center);
+        ss << fstr::format(std::to_string(apoints), 15, fmt::center);
         
-        oStream << fstr::format(std::to_string(rpoints), 15, fmt::center);
+        ss << fstr::format(std::to_string(rpoints), 15, fmt::center);
         
-        oStream << fmt::end;
+        ss << "\n";
         
         npoints += apoints * rpoints * molecule.getNumberOfAtoms(*i);
     }
     
-    oStream << fmt::blank;
+    ss << "\n";
     
     str.assign("Full Grid       : ");
     
     str.append(std::to_string(npoints));
     
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
+
+    return ss.str();
 }
 
-void
+std::string
 CGridDriver::_finishHeader(const CSystemClock&   time,
-                           const CMolecularGrid& molecularGrid,
-                                 COutputStream&  oStream) const
+                           const CMolecularGrid& molecularGrid) const
 {
+    std::stringstream ss;
+
     std::string str("Pruned Grid     : ");
     
     str.append(std::to_string(molecularGrid.getNumberOfGridPoints()));
     
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
     
     str.assign("Generation Time : ");
     
     str.append(time.getElapsedTime());
     
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end << fmt::blank;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
+
+    return ss.str();
 }
 
 CMolecularGrid

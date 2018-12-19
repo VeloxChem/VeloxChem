@@ -8,17 +8,20 @@
 
 #include <cmath>
 #include <string>
+#include <sstream>
 
 #include "DeviceProp.hpp"
 #include "StringFormat.hpp"
 
 namespace gpu { // gpu namespace
 
-    void getDeviceProperties(COutputStream& oStream)
+    std::string getDeviceProperties()
     {
         int32_t devcnt = 0;
 
         cudaGetDeviceCount(&devcnt);
+
+        std::stringstream ss;
 
         for (int32_t i = 0; i < devcnt; i++)
         {
@@ -26,41 +29,38 @@ namespace gpu { // gpu namespace
 
             cudaGetDeviceProperties(&prop, i);
 
-            oStream << fmt::info;
+            ss << "GPU device ID: " << std::to_string(i) << "\n";
 
-            oStream << "GPU device ID: " << std::to_string(i) << fmt::end;
+            ss << "  Device name:             ";
 
-            oStream << "  Device name:             ";
+            ss << prop.name << "\n";
 
-            oStream << prop.name << fmt::end;
+            ss << "  Compute capability:      ";
 
-            oStream << "  Compute capability:      ";
+            ss << std::to_string(prop.major) << "." << std::to_string(prop.minor) << "\n";
 
-            oStream << std::to_string(prop.major) << "." << std::to_string(prop.minor) << fmt::end;
-
-            oStream << "  Multiprocessor count:    ";
+            ss << "  Multiprocessor count:    ";
             
-            oStream << std::to_string(prop.multiProcessorCount) << fmt::end;
+            ss << std::to_string(prop.multiProcessorCount) << "\n";
 
-            oStream << "  Max clock rate:          ";
+            ss << "  Max clock rate:          ";
             
-            oStream << fstr::to_string(prop.clockRate * 1.0e-6, 2) << " GHz" << fmt::end;
+            ss << fstr::to_string(prop.clockRate * 1.0e-6, 2) << " GHz" << "\n";
 
             double glbmem = (double)prop.totalGlobalMem / std::pow(1024, 3);
 
-            oStream << "  Global memory:           ";
+            ss << "  Global memory:           ";
             
-            oStream << fstr::to_string(glbmem, 0) << " GB" << fmt::end;
+            ss << fstr::to_string(glbmem, 0) << " GB" << "\n";
 
-            oStream << "  Peak memory bandwidth:   ";
+            ss << "  Peak memory bandwidth:   ";
 
             double bandwidth = 2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e+6;
             
-            oStream << fstr::to_string(bandwidth, 0) << " GB/s" << fmt::end;
-
-            oStream << fmt::blank;
+            ss << fstr::to_string(bandwidth, 0) << " GB/s" << "\n\n";
         }
 
+        return ss.str();
     }
 
 }
