@@ -106,6 +106,7 @@ class InputParser:
             mol.set_multiplicity(int(mol_dict['molecule']['multiplicity']))
 
         mol.check_multiplicity()
+        mol.check_proximity(0.1)
 
         return mol
 

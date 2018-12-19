@@ -47,5 +47,14 @@ def _print_finish_header(self, start_time):
     self.flush()
 
 
+def _put_block(self, block_lines):
+
+    lines = block_lines.split('\n')
+    self.put_header(lines.pop(0))
+    for line in lines:
+        self.put_line(line)
+
+
 OutputStream.print_start_header = _print_start_header
 OutputStream.print_finish_header = _print_finish_header
+OutputStream.put_block = _put_block

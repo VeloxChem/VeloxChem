@@ -8,6 +8,8 @@
 
 #include "GtoPairsContainer.hpp"
 
+#include <sstream>
+
 #include "GtoContainer.hpp"
 #include "StringFormat.hpp"
 
@@ -136,12 +138,14 @@ CGtoPairsContainer::getGtoPairsBlock(const int32_t iBlock) const
     return _gtoPairsBlocks[iBlock]; 
 }
 
-void
-CGtoPairsContainer::printScreeningInfo(COutputStream& oStream) const
+std::string
+CGtoPairsContainer::printScreeningInfo() const
 {
     std::string str("Contracted and Primitive GTO Pairs Screening: ");
+
+    std::stringstream ss;
     
-    oStream << fstr::format(str, 80, fmt::left) << fmt::end << fmt::blank;
+    ss << fstr::format(str, 80, fmt::left) << "\n\n";
     
     for (size_t i = 0; i < _gtoPairsBlocks.size(); i++)
     {
@@ -155,8 +159,10 @@ CGtoPairsContainer::printScreeningInfo(COutputStream& oStream) const
         
         str.append(_gtoPairsBlocks[i].getScreenedSizeString());
         
-        oStream << fstr::format(str, 80, fmt::left) << fmt::end;
+        ss << fstr::format(str, 80, fmt::left) << "\n";
     }
+
+    return ss.str();
 }
 
 std::ostream&

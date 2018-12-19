@@ -81,8 +81,7 @@ class MpiTask:
 
             self.molecule = input_parser.create_molecule()
 
-            self.molecule.check_proximity(0.1, self.ostream)
-            self.molecule.print_geometry(self.ostream)
+            self.ostream.put_block(self.molecule.get_string())
 
             # create basis set
 
@@ -103,8 +102,8 @@ class MpiTask:
 
             self.ao_basis = basis_parser.create_basis_set(self.molecule)
 
-            self.ao_basis.print_basis("Atomic Basis", self.molecule,
-                                      self.ostream)
+            self.ostream.put_block(
+                self.ao_basis.get_string("Atomic Basis", self.molecule))
 
             min_basis_fname = basis_path + '/MIN-CC-PVDZ'
             min_basis_parser = InputParser(min_basis_fname)

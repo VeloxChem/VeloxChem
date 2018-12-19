@@ -255,7 +255,7 @@ CDenseMatrix::getString() const
     
     auto vals = _values.data();
     
-    sst << "[Dimension " << _nRows << " x " << _nColumns << "]" << std::endl;
+    sst << "[Dimension " << _nRows << " x " << _nColumns << "]\n";
     
     for (int32_t i = 0; i < _nRows; i++)
     {
@@ -264,7 +264,7 @@ CDenseMatrix::getString() const
             sst << fstr::to_string(vals[i * _nColumns + j], 8, 15, fmt::right);
         }
         
-        sst << std::endl;
+        sst << "\n";
     }
     
     return sst.str();

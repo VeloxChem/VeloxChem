@@ -16,7 +16,6 @@
 #include "VdwRadii.hpp"
 #include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
-#include "OutputStream.hpp"
 #include "ChemicalElement.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
@@ -221,14 +220,12 @@ CMolecule_check_multiplicity(const CMolecule& self)
 // Helper function for checking proximity of atoms
 
 static void
-CMolecule_check_proximity(const CMolecule&     self,
-                          const double         minDistance,
-                                COutputStream& oStream)
+CMolecule_check_proximity(const CMolecule& self,
+                          const double     minDistance)
 {
     std::string errproxi("Molecule.check_proximity: Atoms too close");
 
-    errors::assertMsgCritical(self.checkProximity(minDistance, oStream),
-                              errproxi);
+    errors::assertMsgCritical(self.checkProximity(minDistance), errproxi);
 }
 
 // Helper function for broadcasting CMolecule object
@@ -278,7 +275,7 @@ void export_moldata()
         .def("set_multiplicity", &CMolecule::setMultiplicity)
         .def("get_multiplicity", &CMolecule::getMultiplicity)
         .def("check_multiplicity", &CMolecule_check_multiplicity)
-        .def("print_geometry", &CMolecule::printGeometry)
+        .def("get_string", &CMolecule::printGeometry)
         .def("check_proximity", &CMolecule_check_proximity)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
         .def("number_of_atoms", number_of_atoms_1)

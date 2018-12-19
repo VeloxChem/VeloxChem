@@ -9,6 +9,7 @@
 #include "ThreeCenterElectronRepulsionIntegralsDriver.hpp"
 
 #include <string>
+#include <sstream>
 
 #ifdef MAC_OS_OMP
 #include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
@@ -54,7 +55,6 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
                                                       const CMolecularBasis& aoBasis,
                                                       const CMolecularBasis& riBasis,
                                                       const double           threshold, 
-                                                            COutputStream&   oStream,
                                                             MPI_Comm         comm) const
 {
     CSystemClock eritim;
@@ -75,17 +75,9 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     CGtoContainer bgtos(molecule, riBasis, gtopat);
     
-    // print start header
-    
-    if (_globRank == mpi::master()) _startHeader(kgtopairs, oStream);
-    
     // compute electron repulsion integrals on node
     
     _compElectronRepulsionIntegrals(&bgtos, &kbpairs);
-    
-    // print evaluation timing statistics
-    
-    _printTiming(molecule, eritim, oStream);
 }
 
 void
@@ -668,29 +660,29 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compContrElectronRepulsionInts(  
                                            cdDistances, bang, ketGtoPairsBlock);
 }
 
-void
-CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContainer& gtoPairs,
-                                                                 COutputStream&      oStream) const
+std::string
+CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContainer& gtoPairs) const
 {
-    oStream << fmt::header << "Three-Center Electron Repulsion Integrals" << fmt::end;
+    std::stringstream ss;
+
+    ss << "Three-Center Electron Repulsion Integrals\n";
     
-    oStream << std::string(43, '=') << fmt::end << fmt::blank;
+    ss << std::string(43, '=') << "\n\n";
     
     // GTO pairs screening information
     
-    gtoPairs.printScreeningInfo(oStream);
+    ss << gtoPairs.printScreeningInfo();
     
-    oStream << fmt::blank;
+    return ss.str();
 }
 
-void
-CThreeCenterElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
-                                                           const CSystemClock&  timer,
-                                                                 COutputStream& oStream) const
+std::string
+CThreeCenterElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&    molecule,
+                                                           const CSystemClock& timer) const
 {
     // NOTE: Silent for local execution mode
     
-    if (_isLocalMode) return;
+    if (_isLocalMode) return std::string("");
     
     // collect timing data from MPI nodes
     
@@ -704,13 +696,15 @@ CThreeCenterElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     
     
     // print timing data
     
+    std::stringstream ss;
+
     if (_globRank == mpi::master())
     {
         auto natoms = molecule.getNumberOfAtoms();
         
         std::string str("Three-Center Integrals Evaluation Timings: ");
         
-        oStream << fstr::format(str, 80, fmt::left) << fmt::end << fmt::blank;
+        ss << fstr::format(str, 80, fmt::left) << "\n\n";
         
         for (int32_t i = 0; i < _globNodes; i++)
         {
@@ -744,9 +738,11 @@ CThreeCenterElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     
             
             str.append(" sec.");
             
-            oStream << fstr::format(str, 80, fmt::left) << fmt::end;
+            ss << fstr::format(str, 80, fmt::left) << "\n";
         }
     }
+
+    return ss.str();
 }
 
 CMemBlock2D<int32_t>

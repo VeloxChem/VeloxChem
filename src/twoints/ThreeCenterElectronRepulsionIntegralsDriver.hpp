@@ -15,7 +15,6 @@
 
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
-#include "OutputStream.hpp"
 #include "MemBlock2D.hpp"
 #include "GtoPairsContainer.hpp"
 #include "GtoContainer.hpp"
@@ -128,21 +127,19 @@ class CThreeCenterElectronRepulsionIntegralsDriver
      integrals.
      
      @param gtoPairs the GTOs pairs container on ket side.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _startHeader(const CGtoPairsContainer& gtoPairs,
-                            COutputStream&      oStream) const;
+    std::string _startHeader(const CGtoPairsContainer& gtoPairs) const;
     
     /**
      Prints timing statistics for evaluation of electron repulsion integrals.
 
      @param molecule the molecule.
      @param timer the timer.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _printTiming(const CMolecule&     molecule,
-                      const CSystemClock&  timer,
-                            COutputStream& oStream) const;
+    std::string _printTiming(const CMolecule&    molecule,
+                             const CSystemClock& timer) const;
     
     /**
      Creates atoms list splitting pattern for generation of GTO blocks on each
@@ -242,14 +239,12 @@ public:
      @param aoBasis the molecular AO basis.
      @param riBasis the molecular RI basis.
      @param threshold the integrals cut-off threshold. 
-     @param oStream the output stream.
      @param comm the MPI communicator.
      */
     void  compute(const CMolecule&       molecule,
                   const CMolecularBasis& aoBasis,
                   const CMolecularBasis& riBasis,
                   const double           threshold,
-                        COutputStream&   oStream,
                         MPI_Comm         comm) const;
     
     /**

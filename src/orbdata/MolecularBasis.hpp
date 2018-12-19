@@ -17,7 +17,6 @@
 
 #include "AtomBasis.hpp"
 #include "Molecule.hpp"
-#include "OutputStream.hpp"
 
 /**
 Class CMolecularBasis stores data about molecular basis set and provides set of
@@ -325,11 +324,9 @@ public:
 
      @param title the header line of AO basis output.
      @param molecule the molecule.
-     @param oStream the output stream.
      */
-    void printBasis(const char*          title,
-                    const CMolecule&     molecule,
-                          COutputStream& oStream) const;
+    std::string printBasis(const char*      title,
+                           const CMolecule& molecule) const;
 
     /**
      Broadcasts molecular basis object within domain of MPI communicator.

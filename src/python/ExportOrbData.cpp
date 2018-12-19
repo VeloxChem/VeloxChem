@@ -290,6 +290,7 @@ void export_orbdata()
             "MolecularBasis",
             bp::init<>()
         )
+        .def("get_string", &CMolecularBasis::printBasis)
         .def("set_label", &CMolecularBasis::setLabel)
         .def("get_label", &CMolecularBasis::getLabel)
         .def("broadcast", &CMolecularBasis_broadcast)

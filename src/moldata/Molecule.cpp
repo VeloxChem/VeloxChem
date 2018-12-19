@@ -9,6 +9,7 @@
 #include "Molecule.hpp"
 
 #include <cmath>
+#include <sstream>
 
 #include "StringFormat.hpp"
 #include "Codata.hpp"
@@ -522,28 +523,28 @@ CMolecule::getNuclearRepulsionEnergy() const
     return enuc;
 }
 
-void
-CMolecule::printGeometry(COutputStream& oStream) const
+std::string
+CMolecule::printGeometry() const
 {
-    oStream << fmt::header;
+    std::stringstream ss;
+
+    ss << "Molecular Geometry (Angstroms)\n";
     
-    oStream << "Molecular Geometry (Angstroms)" << fmt::end;
+    ss << std::string(32, '=') << "\n\n";
     
-    oStream << std::string(32, '=') << fmt::end << fmt::blank;
+    ss << "  Atom ";
     
-    oStream << "  Atom ";
+    ss << fstr::format(std::string("Coordinate X"), 20, fmt::right);
     
-    oStream << fstr::format(std::string("Coordinate X"), 20, fmt::right);
+    ss << "  ";
     
-    oStream << "  ";
+    ss << fstr::format(std::string("Coordinate Y"), 20, fmt::right);
     
-    oStream << fstr::format(std::string("Coordinate Y"), 20, fmt::right);
+    ss << "  ";
     
-    oStream << "  ";
+    ss << fstr::format(std::string("Coordinate Z"), 20, fmt::right);
     
-    oStream << fstr::format(std::string("Coordinate Z"), 20, fmt::right);
-    
-    oStream << "  " << fmt::end << fmt::blank;
+    ss << "  \n\n";
     
     auto factor = units::getBohrValueInAngstroms();
     
@@ -559,23 +560,22 @@ CMolecule::printGeometry(COutputStream& oStream) const
         
         label.append(_atomLabels.at(i));
         
-        oStream << fstr::format(label, 6, fmt::left);
+        ss << fstr::format(label, 6, fmt::left);
         
-        oStream << fstr::to_string(factor * coordx[i], 12, 22, fmt::right);
+        ss << fstr::to_string(factor * coordx[i], 12, 22, fmt::right);
         
-        oStream << fstr::to_string(factor * coordy[i], 12, 22, fmt::right);
+        ss << fstr::to_string(factor * coordy[i], 12, 22, fmt::right);
         
-        oStream << fstr::to_string(factor * coordz[i], 12, 22, fmt::right);
+        ss << fstr::to_string(factor * coordz[i], 12, 22, fmt::right);
         
-        oStream << fmt::end;
+        ss << "\n";
     }
-    
-    oStream << fmt::blank;
+
+    return ss.str();
 }
 
 bool
-CMolecule::checkProximity(const double        minDistance,
-                               COutputStream& oStream) const
+CMolecule::checkProximity(const double minDistance) const
 {
     auto natoms = _atomCoordinates.size(0);
     
@@ -594,8 +594,6 @@ CMolecule::checkProximity(const double        minDistance,
             
             if (rab < minDistance)
             {
-                _errorAtomsToClose(i, j, minDistance, oStream);
-                
                 return false;
             }
         }
@@ -626,25 +624,6 @@ CMolecule::broadcast(int32_t  rank,
         
         _idsElemental.broadcast(rank, comm);
     }
-}
-
-void
-CMolecule::_errorAtomsToClose(const int32_t        iAtomA,
-                              const int32_t        iAtomB,
-                              const double         minDistance,
-                                    COutputStream& oStream) const
-{
-    oStream << fmt::cerror << "Distance between atoms:" << fmt::end;
-    
-    oStream << _atomLabels[iAtomA] << "(" << std::to_string(iAtomA);
-    
-    oStream << ") and " << _atomLabels[iAtomB] << "(" << std::to_string(iAtomB);
-    
-    oStream << ") is smaller the minimal separation distance of ";
-    
-    oStream << std::to_string(minDistance) << " Bohr!" << fmt::end;
-    
-    oStream << "Please correct Your input!" << fmt::end << fmt::blank;
 }
 
 std::ostream&

@@ -16,7 +16,6 @@
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
-#include "OutputStream.hpp"
 
 /**
  Class CMolecule stores data about single molecule and provides set of methods
@@ -66,20 +65,6 @@ class CMolecule
      */
     CMemBlock<int32_t> _idsElemental;
     
-    /**
-     Prints atoms proximity error message to output stream, if distance between
-     two atoms is shorter than given minimal distance.
-
-     @param iAtomA the index of first atom.
-     @param iAtomB the index of second atom.
-     @param minDistance the minimal distance between atoms.
-     @param oStream the output stream.
-     */
-    void _errorAtomsToClose(const int32_t        iAtomA,
-                            const int32_t        iAtomB,
-                            const double         minDistance,
-                                  COutputStream& oStream) const;
-
 public:
 
     /**
@@ -304,9 +289,9 @@ public:
     /**
      Prints geometry of molecule as table to output stream.
 
-     @param oStream the output stream.
+     @return the output string.
      */
-    void printGeometry(COutputStream& oStream) const;
+    std::string printGeometry() const;
     
     /**
      Checks if any pair of atoms in molecule is closer than given minimal
@@ -317,8 +302,7 @@ public:
      @param oStream the output stream.
      @return true if proximity condition is not violated, false otherwise.
      */
-    bool checkProximity(const double         minDistance,
-                              COutputStream& oStream) const;
+    bool checkProximity(const double minDistance) const;
     
     /**
      Broadcasts molecule object within domain of MPI communicator.

@@ -22,6 +22,13 @@ namespace bp_streams { // bp_streams namespace
 // Helper function for writing to output stream
 
 static void
+COutputStream_put_line(      COutputStream& self,
+                       const std::string&   source)
+{
+    self << source.c_str() << fmt::end;
+}
+
+static void
 COutputStream_put_info(      COutputStream& self,
                        const std::string&   source)
 {
@@ -81,6 +88,7 @@ void export_streams()
         )
         .def("get_state", &COutputStream::getState)
         .def("flush", &COutputStream::flush)
+        .def("put_line", &COutputStream_put_line)
         .def("put_info", &COutputStream_put_info)
         .def("put_title", &COutputStream_put_title)
         .def("put_header", &COutputStream_put_header)

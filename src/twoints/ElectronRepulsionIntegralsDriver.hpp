@@ -21,7 +21,6 @@
 
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
-#include "OutputStream.hpp"
 #include "GtoPairsBlock.hpp"
 #include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
@@ -230,43 +229,39 @@ class CElectronRepulsionIntegralsDriver
      integrals.
      
      @param gtoPairs the GTOs pairs container on ket side.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _startHeader(const CGtoPairsContainer& gtoPairs,
-                            COutputStream&      oStream) const;
+    std::string _startHeader(const CGtoPairsContainer& gtoPairs) const;
     
     /**
      Prints timing statistics for evaluation of electron repulsion integrals.
      
      @param molecule the molecule.
      @param timer the timer.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _printTiming(const CMolecule&     molecule,
-                      const CSystemClock&  timer,
-                            COutputStream& oStream) const;
+    std::string _printTiming(const CMolecule&    molecule,
+                             const CSystemClock& timer) const;
     
     /**
      Prints timing statistics for evaluation of AO Fock matrix.
      
      @param fockMatrix the AO Fock matrix.
      @param timer the timer.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _printFockTiming(const CAOFockMatrix& fockMatrix,
-                          const CSystemClock&  timer,
-                                COutputStream& oStream) const;
+    std::string _printFockTiming(const CAOFockMatrix& fockMatrix,
+                                 const CSystemClock&  timer) const;
     
     /**
      Prints timing statistics for evaluation of Q values.
      
      @param molecule the molecule.
      @param timer the timer.
-     @param oStream the output stream.
+     @return the output string.
      */
-    void _printQValuesTiming(const CMolecule&     molecule,
-                             const CSystemClock&  timer,
-                                   COutputStream& oStream) const;
+    std::string _printQValuesTiming(const CMolecule&    molecule,
+                                   const CSystemClock& timer) const;
     
     /**
      Comutes electron repulsion integrals and stores them into AO Fock matrix

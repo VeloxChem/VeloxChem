@@ -8,6 +8,8 @@
 
 #include "MolecularBasis.hpp"
 
+#include <sstream>
+
 #include "StringFormat.hpp"
 #include "ChemicalElement.hpp"
 #include "AngularMomentum.hpp"
@@ -410,10 +412,9 @@ CMolecularBasis::getBasisFunctions(const int32_t idElemental,
     return std::vector<CBasisFunction>();
 }
 
-void
-CMolecularBasis::printBasis(const char*          title,
-                            const CMolecule&     molecule,
-                                  COutputStream& oStream) const
+std::string
+CMolecularBasis::printBasis(const char*      title,
+                            const CMolecule& molecule) const
 {
     std::string str("Molecular Basis (");
 
@@ -421,25 +422,25 @@ CMolecularBasis::printBasis(const char*          title,
 
     str.append(")");
 
-    oStream << fmt::header;
+    std::stringstream ss;
 
-    oStream << str << fmt::end;
+    ss << str << "\n";
 
-    oStream << std::string(str.size() + 2, '=') << fmt::end << fmt::blank;
+    ss << std::string(str.size() + 2, '=') << "\n\n";
 
     str.assign("Basis: ");
 
     str.append(_label);
 
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end << fmt::blank;
+    ss << fstr::format(str, 54, fmt::left) << "\n\n";
 
-    oStream << "  Atom ";
+    ss << "  Atom ";
 
-    oStream << fstr::format(std::string("Contracted GTOs"), 25, fmt::left);
+    ss << fstr::format(std::string("Contracted GTOs"), 25, fmt::left);
 
-    oStream << fstr::format(std::string("Primitive GTOs"), 25, fmt::left);
+    ss << fstr::format(std::string("Primitive GTOs"), 25, fmt::left);
 
-    oStream << fmt::end << fmt::blank;
+    ss << "\n\n";
 
     for (auto i = _atomicBasisSets.cbegin(); i != _atomicBasisSets.cend(); ++i)
     {
@@ -451,28 +452,30 @@ CMolecularBasis::printBasis(const char*          title,
 
         lbl.append(ce.getName());
 
-        oStream << fstr::format(lbl, 6, fmt::left);
+        ss << fstr::format(lbl, 6, fmt::left);
 
-        oStream << fstr::format(i->getContractionString(), 25, fmt::left);
+        ss << fstr::format(i->getContractionString(), 25, fmt::left);
 
-        oStream << fstr::format(i->getPrimitivesString(), 25, fmt::left);
+        ss << fstr::format(i->getPrimitivesString(), 25, fmt::left);
 
-        oStream << fmt::end;
+        ss << "\n";
     }
 
-    oStream << fmt::blank;
+    ss << "\n";
 
     str.assign("Contracted Basis Functions : ");
 
     str.append(std::to_string(getDimensionsOfBasis(molecule)));
 
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
 
     str.assign("Primitive Basis Functions  : ");
 
     str.append(std::to_string(getDimensionsOfPrimitiveBasis(molecule)));
 
-    oStream << fstr::format(str, 54, fmt::left) << fmt::end << fmt::blank;
+    ss << fstr::format(str, 54, fmt::left) << "\n";
+
+    return ss.str();
 }
 
 void

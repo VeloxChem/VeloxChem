@@ -97,9 +97,8 @@ class TestTwoInts(unittest.TestCase):
         molecule = task.molecule
         ao_basis = task.ao_basis
         min_basis = task.min_basis
-        ostream = task.ostream
 
-        molecule.check_proximity(0.1, ostream)
+        molecule.check_proximity(0.1)
 
         molecule.check_multiplicity()
 

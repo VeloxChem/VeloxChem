@@ -8,6 +8,8 @@
 
 #include "ElectronRepulsionIntegralsDriver.hpp"
 
+#include <sstream>
+
 #include "SystemClock.hpp"
 #include "GtoPairsContainer.hpp"
 #include "SphericalMomentum.hpp"
@@ -1640,29 +1642,29 @@ CElectronRepulsionIntegralsDriver::_applyHRRonBra(      CMemBlock2D<double>&  br
                                              nKetContrPairs, iContrPair);
 }
 
-void
-CElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContainer& gtoPairs,
-                                                      COutputStream&      oStream) const
+std::string
+CElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContainer& gtoPairs) const
 {
-    oStream << fmt::header << "Electron Repulsion Integrals" << fmt::end;
+    std::stringstream ss;
+
+    ss << "Electron Repulsion Integrals\n";
     
-    oStream << std::string(27, '=') << fmt::end << fmt::blank;
+    ss << std::string(27, '=') << "\n\n";
     
     // GTO pairs screening information
+        
+    ss << gtoPairs.printScreeningInfo();
     
-    gtoPairs.printScreeningInfo(oStream);
-    
-    oStream << fmt::blank;
+    return ss.str();
 }
 
-void
-CElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
-                                                const CSystemClock&  timer,
-                                                      COutputStream& oStream) const
+std::string
+CElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&    molecule,
+                                                const CSystemClock& timer) const
 {
     // NOTE: Silent for local execution mode
     
-    if (_isLocalMode) return;
+    if (_isLocalMode) return std::string("");
     
     // collect timing data from MPI nodes
     
@@ -1676,13 +1678,15 @@ CElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
     
     // print timing data
     
+    std::stringstream ss;
+
     if (_globRank == mpi::master())
     {
         auto natoms = molecule.getNumberOfAtoms();
         
         std::string str("Two-Electron Integrals Evaluation Timings: ");
         
-        oStream << fstr::format(str, 80, fmt::left) << fmt::end << fmt::blank;
+        ss << fstr::format(str, 80, fmt::left) << "\n\n";
         
         for (int32_t i = 0; i < _globNodes; i++)
         {
@@ -1716,19 +1720,20 @@ CElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&     molecule,
             
             str.append(" sec.");
             
-            oStream << fstr::format(str, 80, fmt::left) << fmt::end;
+            ss << fstr::format(str, 80, fmt::left) << "\n";
         }
     }
+
+    return ss.str();
 }
 
-void
+std::string
 CElectronRepulsionIntegralsDriver::_printFockTiming(const CAOFockMatrix& fockMatrix,
-                                                    const CSystemClock&  timer,
-                                                          COutputStream& oStream) const
+                                                    const CSystemClock&  timer) const
 {
     // NOTE: Silent for local execution mode
     
-    if (_isLocalMode) return;
+    if (_isLocalMode) return std::string("");
     
     // collect timing data from MPI nodes
     
@@ -1736,6 +1741,8 @@ CElectronRepulsionIntegralsDriver::_printFockTiming(const CAOFockMatrix& fockMat
     
     // print timing data
     
+    std::stringstream ss;
+
     if (_globRank == mpi::master())
     {
         std::string str("AO Fock timing: ");
@@ -1759,31 +1766,34 @@ CElectronRepulsionIntegralsDriver::_printFockTiming(const CAOFockMatrix& fockMat
         
         str.append(" sec.");
         
-        oStream << fstr::format(str, 80, fmt::left) << fmt::end;
+        ss << fstr::format(str, 80, fmt::left) << "\n";
     }
+
+    return ss.str();
 }
 
-void
-CElectronRepulsionIntegralsDriver::_printQValuesTiming(const CMolecule&     molecule,
-                                                       const CSystemClock&  timer,
-                                                             COutputStream& oStream) const
+std::string
+CElectronRepulsionIntegralsDriver::_printQValuesTiming(const CMolecule&    molecule,
+                                                       const CSystemClock& timer) const
 {
     // NOTE: Silent for local execution mode
     
-    if (_isLocalMode) return;
+    if (_isLocalMode) return std::string("");
     
     // collect timing data from MPI nodes
     
+    std::stringstream ss;
+
     if (_globRank == mpi::master())
     {
         auto tsec = timer.getElapsedTimeInSeconds();
         
-        oStream << fmt::info << "ERIs screening factors computed in ";
+        ss << "ERIs screening factors computed in ";
         
-        oStream << fstr::to_string(tsec, 2) << " sec.";
-        
-        oStream << fmt::end << fmt::blank;
+        ss << fstr::to_string(tsec, 2) << " sec.\n";
     }
+
+    return ss.str();
 }
 
 void
