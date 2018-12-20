@@ -9,21 +9,21 @@ def _print_start_header(self, num_nodes):
 
     start_time = tm.time()
 
-    self.put_separator()
-    self.put_title("")
-    self.put_title("VELOX CHEM MP (V.0.0 2018)")
-    self.put_title("AN ELECTRONIC STRUCTURE CODE FOR NANOSCALE")
-    self.put_title("")
-    self.put_title("Copyright (c) 2018 Velox Chem MP developers.")
-    self.put_title("All rights reserved.")
-    self.put_separator()
+    self.print_separator()
+    self.print_title("")
+    self.print_title("VELOX CHEM MP (V.0.0 2018)")
+    self.print_title("AN ELECTRONIC STRUCTURE CODE FOR NANOSCALE")
+    self.print_title("")
+    self.print_title("Copyright (c) 2018 Velox Chem MP developers.")
+    self.print_title("All rights reserved.")
+    self.print_separator()
     exec_str = "VeloxChem MP execution started"
     if num_nodes > 1:
         exec_str += " on " + str(num_nodes) + " compute nodes"
     exec_str += " at " + tm.asctime(tm.localtime(start_time)) + "."
-    self.put_title(exec_str)
-    self.put_separator()
-    self.new_line()
+    self.print_title(exec_str)
+    self.print_separator()
+    self.print_blank()
 
     return start_time
 
@@ -35,26 +35,29 @@ def _print_finish_header(self, start_time):
 
     end_time = tm.time()
 
-    self.put_separator()
+    self.print_separator()
     exec_str = "VeloxChem MP execution completed at "
     exec_str += tm.asctime(tm.localtime(end_time)) + "."
-    self.put_title(exec_str)
-    self.put_separator()
+    self.print_title(exec_str)
+    self.print_separator()
     exec_str = "Total execution time is "
     exec_str += "{:.2f}".format(end_time - start_time) + " sec."
-    self.put_title(exec_str)
-    self.put_separator()
+    self.print_title(exec_str)
+    self.print_separator()
     self.flush()
 
 
-def _put_block(self, block_lines):
+def _print_block(self, block_lines):
+    """
+    Prints multiline text block to output stream.
+    """
 
     lines = block_lines.split('\n')
-    self.put_header(lines.pop(0))
+    self.print_header(lines.pop(0))
     for line in lines:
-        self.put_line(line)
+        self.print_line(line)
 
 
 OutputStream.print_start_header = _print_start_header
 OutputStream.print_finish_header = _print_finish_header
-OutputStream.put_block = _put_block
+OutputStream.print_block = _print_block

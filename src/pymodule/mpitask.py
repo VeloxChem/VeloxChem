@@ -59,7 +59,7 @@ class MpiTask:
 
             self.start_time = self.ostream.print_start_header(self.mpi_size)
 
-            self.ostream.put_info("Reading input file %s..." % input_fname)
+            self.ostream.print_info("Reading input file %s..." % input_fname)
 
             # read input file
 
@@ -68,26 +68,26 @@ class MpiTask:
 
             self.input_dict = input_dict
 
-            self.ostream.put_info(
+            self.ostream.print_info(
                 "Found %d control groups." % len(input_dict.keys()))
-            self.ostream.put_info("...done.")
-            self.ostream.new_line()
+            self.ostream.print_info("...done.")
+            self.ostream.print_blank()
 
             # create molecule
 
-            self.ostream.put_info("Parsing @molecule group...")
-            self.ostream.put_info("...done.")
-            self.ostream.new_line()
+            self.ostream.print_info("Parsing @molecule group...")
+            self.ostream.print_info("...done.")
+            self.ostream.print_blank()
 
             self.molecule = input_parser.create_molecule()
 
-            self.ostream.put_block(self.molecule.get_string())
+            self.ostream.print_block(self.molecule.get_string())
 
             # create basis set
 
-            self.ostream.put_info("Parsing @method settings group...")
-            self.ostream.put_info("...done.")
-            self.ostream.new_line()
+            self.ostream.print_info("Parsing @method settings group...")
+            self.ostream.print_info("...done.")
+            self.ostream.print_blank()
 
             basis_path = input_dict["method_settings"]["basis_path"]
             basis_label = input_dict["method_settings"]["basis"].upper()
@@ -102,7 +102,7 @@ class MpiTask:
 
             self.ao_basis = basis_parser.create_basis_set(self.molecule)
 
-            self.ostream.put_block(
+            self.ostream.print_block(
                 self.ao_basis.get_string("Atomic Basis", self.molecule))
 
             min_basis_fname = basis_path + '/MIN-CC-PVDZ'

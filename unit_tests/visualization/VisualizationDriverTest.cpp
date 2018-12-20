@@ -8,8 +8,6 @@
 
 #include "VisualizationDriverTest.hpp"
 
-#include <iostream>
-#include <iomanip>
 #include <cmath>
 #include <vector>
 

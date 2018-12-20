@@ -11,7 +11,6 @@
 #include <cmath>
 
 #include "GridDriver.hpp"
-#include "OutputStream.hpp"
 #include "MoleculeSetter.hpp"
 #include "MathConst.hpp"
 #include "MpiFunc.hpp"

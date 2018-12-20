@@ -2,7 +2,6 @@ from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import Molecule
 from veloxchem.veloxchemlib import MolecularBasis
-from veloxchem.veloxchemlib import OutputStream
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
 from veloxchem.veloxchemlib import mpi_master

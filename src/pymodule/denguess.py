@@ -86,10 +86,10 @@ class DensityGuess:
             den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
                                       overlap_matrix, comm)
 
-            ostream.put_info("SAD initial guess computed in %.2f sec." %
-                             (tm.time() - t0))
+            ostream.print_info("SAD initial guess computed in %.2f sec." %
+                               (tm.time() - t0))
 
-            ostream.new_line()
+            ostream.print_blank()
 
             ostream.flush()
 

@@ -9,7 +9,6 @@
 #include <boost/python.hpp>
 #include <memory>
 #include <string>
-#include <iostream>
 
 #include "OutputStream.hpp"
 #include "StringFormat.hpp"
@@ -22,41 +21,41 @@ namespace bp_streams { // bp_streams namespace
 // Helper function for writing to output stream
 
 static void
-COutputStream_put_line(      COutputStream& self,
+COutputStream_print_line(      COutputStream& self,
                        const std::string&   source)
 {
     self << source.c_str() << fmt::end;
 }
 
 static void
-COutputStream_put_info(      COutputStream& self,
+COutputStream_print_info(      COutputStream& self,
                        const std::string&   source)
 {
     self << fmt::info << source.c_str() << fmt::end;
 }
     
 static void
-COutputStream_put_title(      COutputStream& self,
+COutputStream_print_title(      COutputStream& self,
                         const std::string&   source)
 {
     self << fmt::title << source.c_str() << fmt::end;
 }
     
 static void
-COutputStream_put_header(      COutputStream& self,
+COutputStream_print_header(      COutputStream& self,
                          const std::string&   source)
 {
     self << fmt::header << source.c_str() << fmt::end;
 }
 
 static void
-COutputStream_put_separator(COutputStream& self)
+COutputStream_print_separator(COutputStream& self)
 {
     self << fmt::title << fmt::tsep;
 }
     
 static void
-COutputStream_new_line(COutputStream& self)
+COutputStream_print_blank(COutputStream& self)
 {
     self << fmt::blank;
 }
@@ -88,12 +87,12 @@ void export_streams()
         )
         .def("get_state", &COutputStream::getState)
         .def("flush", &COutputStream::flush)
-        .def("put_line", &COutputStream_put_line)
-        .def("put_info", &COutputStream_put_info)
-        .def("put_title", &COutputStream_put_title)
-        .def("put_header", &COutputStream_put_header)
-        .def("put_separator", &COutputStream_put_separator)
-        .def("new_line", &COutputStream_new_line)
+        .def("print_line", &COutputStream_print_line)
+        .def("print_info", &COutputStream_print_info)
+        .def("print_title", &COutputStream_print_title)
+        .def("print_header", &COutputStream_print_header)
+        .def("print_separator", &COutputStream_print_separator)
+        .def("print_blank", &COutputStream_print_blank)
     ;
 
     // to_angular_momentum methods

@@ -10,7 +10,6 @@
 
 #include "Molecule.hpp"
 #include "MoleculeSetter.hpp"
-#include "OutputStream.hpp"
 #include "CheckFunctions.hpp"
 
 TEST_F(CMoleculeTest, DefaultConstructor)

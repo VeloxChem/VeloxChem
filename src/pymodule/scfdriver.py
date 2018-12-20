@@ -137,17 +137,17 @@ class ScfDriver:
 
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
 
-            ostream.put_info("Orthogonalization matrix computed in %.2f sec." %
-                             (tm.time() - t0))
-            ostream.new_line()
+            ostream.print_info("Orthogonalization matrix computed in %.2f sec."
+                               % (tm.time() - t0))
+            ostream.print_blank()
 
             nrow = oao_mat.number_of_rows()
             ncol = oao_mat.number_of_columns()
             if nrow != ncol:
                 ndim = nrow - ncol
-                ostream.put_info(" Removed %d linearly dependent vector%s." %
-                                 (ndim, '' if ndim ==1 else 's'))
-                ostream.new_line()
+                ostream.print_info(" Removed %d linearly dependent vector%s."
+                                   % (ndim, '' if ndim ==1 else 's'))
+                ostream.print_blank()
 
             ostream.flush()
 
@@ -254,17 +254,17 @@ class ScfDriver:
 
         if self.rank == mpi_master():
 
-            ostream.put_info("Overlap matrix computed in %.2f sec." %
-                             (t1 - t0))
-            ostream.new_line()
+            ostream.print_info("Overlap matrix computed in %.2f sec."
+                               % (t1 - t0))
+            ostream.print_blank()
 
-            ostream.put_info("Kinetic energy matrix computed in %.2f sec." %
-                             (t2 - t1))
-            ostream.new_line()
+            ostream.print_info("Kinetic energy matrix computed in %.2f sec."
+                               % (t2 - t1))
+            ostream.print_blank()
 
-            ostream.put_info("Nuclear potential matrix computed in %.2f sec." %
-                             (t3 - t2))
-            ostream.new_line()
+            ostream.print_info("Nuclear potential matrix computed in %.2f sec."
+                               % (t3 - t2))
+            ostream.print_blank()
 
             ostream.flush()
         
@@ -390,49 +390,49 @@ class ScfDriver:
 
     def print_header(self, ostream):
         
-        ostream.new_line()
-        ostream.put_header("Self Consistent Field Driver Setup")
-        ostream.put_header(36 * "=")
-        ostream.new_line()
+        ostream.print_blank()
+        ostream.print_header("Self Consistent Field Driver Setup")
+        ostream.print_header(36 * "=")
+        ostream.print_blank()
         
         str_width = 80
         cur_str = "Wave Function Model          : " + self.get_scf_type()
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Initial Guess Model          : " + self.den_guess.guess_type
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         
         cur_str = "Convergence Accelerator      : " + self.get_acc_type()
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Error Vectors : " + str(self.max_err_vecs)
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold        : " + \
             "{:.1e}".format(self.conv_thresh)
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         
         cur_str = "ERI screening scheme         : " + self.get_qq_type()
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI screening mode           : " + self.get_qq_dyn()
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI Screening Threshold      : " + \
             "{:.1e}".format(self.eri_thresh)
-        ostream.put_header(cur_str.ljust(str_width))
+        ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Linear Dependence Threshold  : " + \
             "{:.1e}".format(self.ovl_thresh)
-        ostream.put_header(cur_str.ljust(str_width))
-        ostream.new_line()
+        ostream.print_header(cur_str.ljust(str_width))
+        ostream.print_blank()
 
     def print_scf_title(self, ostream):
         
         if self.first_step:
-            ostream.put_info("Starting Reduced Basis SCF calculation...")
+            ostream.print_info("Starting Reduced Basis SCF calculation...")
         else:
-            ostream.new_line()
-            ostream.put_header("Iter. |   Hartree-Fock Energy, au   | "
-                               "Energy Change, au |  Gradient Norm  | "
-                               "Density Change |")
-            ostream.put_header(92 * "-")
+            ostream.print_blank()
+            ostream.print_header("Iter. |   Hartree-Fock Energy, au   | "
+                                 "Energy Change, au |  Gradient Norm  | "
+                                 "Density Change |")
+            ostream.print_header(92 * "-")
 
     def print_scf_finish(self, start_time, ostream):
     
@@ -441,8 +441,8 @@ class ScfDriver:
             valstr += "{:.12f}".format(self.old_energy)
             valstr += " au. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
-            ostream.put_info(valstr)
-            ostream.new_line()
+            ostream.print_info(valstr)
+            ostream.print_blank()
         else:
             valstr = "*** SCF "
             if self.is_converged:
@@ -452,9 +452,9 @@ class ScfDriver:
             valstr += str(self.num_iter)
             valstr += " iterations. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
-            ostream.new_line()
-            ostream.put_header(valstr.ljust(92))
-            ostream.new_line()
+            ostream.print_blank()
+            ostream.print_header(valstr.ljust(92))
+            ostream.print_blank()
 
     def print_iter_data(self, i, ostream):
         
@@ -479,7 +479,7 @@ class ScfDriver:
                 exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
                 exec_str += ("{:5.8f}".format(diff_den)).center(15) + " "
 
-                ostream.put_header(exec_str)
+                ostream.print_header(exec_str)
                 ostream.flush()
 
     def get_scf_energy(self):
