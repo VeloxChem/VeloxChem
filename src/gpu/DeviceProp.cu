@@ -17,11 +17,19 @@ namespace gpu { // gpu namespace
 
     std::string getDeviceProperties()
     {
+        std::string str("GPU Devices");
+
+        std::stringstream ss;
+
+        const int32_t width = 50;
+
+        ss << str << "\n";
+
+        ss << std::string(str.size() + 2, '=') << "\n\n";
+
         int32_t devcnt = 0;
 
         cudaGetDeviceCount(&devcnt);
-
-        std::stringstream ss;
 
         for (int32_t i = 0; i < devcnt; i++)
         {
@@ -29,35 +37,63 @@ namespace gpu { // gpu namespace
 
             cudaGetDeviceProperties(&prop, i);
 
-            ss << "GPU device ID: " << std::to_string(i) << "\n";
+            str.assign("GPU device ID: ");
 
-            ss << "  Device name:             ";
+            str.append(std::to_string(i));
 
-            ss << prop.name << "\n";
+            ss << fstr::format(str, width, fmt::left) << "\n";
 
-            ss << "  Compute capability:      ";
+            str.assign("  Device name:             ");
 
-            ss << std::to_string(prop.major) << "." << std::to_string(prop.minor) << "\n";
+            str.append(prop.name);
 
-            ss << "  Multiprocessor count:    ";
-            
-            ss << std::to_string(prop.multiProcessorCount) << "\n";
+            ss << fstr::format(str, width, fmt::left) << "\n";
 
-            ss << "  Max clock rate:          ";
-            
-            ss << fstr::to_string(prop.clockRate * 1.0e-6, 2) << " GHz" << "\n";
+            str.assign("  Compute capability:      ");
+
+            str.append(std::to_string(prop.major));
+
+            str.append(".");
+
+            str.append(std::to_string(prop.minor));
+
+            ss << fstr::format(str, width, fmt::left) << "\n";
+
+            str.assign("  Multiprocessor count:    ");
+
+            str.append(std::to_string(prop.multiProcessorCount));
+
+            ss << fstr::format(str, width, fmt::left) << "\n";
+
+            str.assign("  Max clock rate:          ");
+
+            str.append(fstr::to_string(prop.clockRate * 1.0e-6, 2));
+
+            str.append(" GHz");
+
+            ss << fstr::format(str, width, fmt::left) << "\n";
+
+            str.assign("  Global memory:           ");
 
             double glbmem = (double)prop.totalGlobalMem / std::pow(1024, 3);
 
-            ss << "  Global memory:           ";
-            
-            ss << fstr::to_string(glbmem, 0) << " GB" << "\n";
+            str.append(fstr::to_string(glbmem, 0));
 
-            ss << "  Peak memory bandwidth:   ";
+            str.append(" GB");
+
+            ss << fstr::format(str, width, fmt::left) << "\n";
+
+            str.assign("  Peak memory bandwidth:   ");
 
             double bandwidth = 2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e+6;
-            
-            ss << fstr::to_string(bandwidth, 0) << " GB/s" << "\n\n";
+
+            str.append(fstr::to_string(bandwidth, 0));
+
+            str.append(" GB/s");
+
+            ss << fstr::format(str, width, fmt::left) << "\n";
+
+            if (i < devcnt - 1) ss << "\n";
         }
 
         return ss.str();
