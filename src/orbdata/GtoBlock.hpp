@@ -229,6 +229,70 @@ public:
     int32_t* getEndPositions();
     
     /**
+     Gets constant pointer to contracted basis function start positions in
+     indexing vector.
+     
+     @return the start positions of contracted basis fucntions.
+     */
+    const int32_t* getContrStartPositions() const;
+    
+    /**
+     Gets pointer to contarcted basis function start positions in indexing
+     vector.
+     
+     @return the start positions of contracted basis fucntions.
+     */
+    int32_t* getContrStartPositions();
+    
+    /**
+     Gets constant pointer to contracted basis function end positions in
+     indexing vector.
+     
+     @return the end positions of contracted basis fucntions.
+     */
+    const int32_t* getContrEndPositions() const;
+    
+    /**
+     Gets pointer to contracted basis function end positions in indexing
+     vector.
+     
+     @return the end positions of contracted basis fucntions.
+     */
+    int32_t* getContrEndPositions();
+    
+    /**
+     Gets constant pointer to normalization factors start positions in
+     normalization factors vector.
+     
+     @return the start positions of normalization factors.
+     */
+    const int32_t* getNormFactorsStartPositions() const;
+    
+    /**
+     Gets pointer to normalization factors start positions in normalization
+     factors vector.
+     
+     @return the start positions of normalization factors.
+     */
+    int32_t* getNormFactorsStartPositions();
+    
+    /**
+     Gets constant pointer to normalization factors end positions in
+     normalization factors vector.
+     
+     @return the end positions of normalization factors.
+     */
+    const int32_t* getNormFactorsEndPositions() const;
+    
+    /**
+     Gets pointer to normalization factors end positions in normalization
+     factors vector.
+     
+     @return the end positions of normalization factors.
+     */
+    int32_t* getNormFactorsEndPositions();
+    
+    /**
      Gets constant pointer to atomic identifiers vector.
      
      @return the atomic identifiers.
