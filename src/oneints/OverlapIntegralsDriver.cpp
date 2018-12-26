@@ -282,26 +282,36 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
     
     // set up contracted GTOs dimensions
     
+    auto ngfunc = bragtos.getMaxNumberContrFunctions();
+    
     auto kdim = ketgtos.getNumberOfContrGtos();
     
     // allocate contracted Cartesian integrals buffer
     
     auto ncart = angmom::to_CartesianComponents(bang, kang);
     
-    CMemBlock2D<double> cartbuffer(kdim, ncart);
+    CMemBlock2D<double> cartbuffer(kdim * ngfunc, ncart);
     
     // allocate contracted spherical integrals buffer
     
     auto nspher = angmom::to_SphericalComponents(bang, kang);
     
-    CMemBlock2D<double> spherbuffer(kdim, nspher);
+    CMemBlock2D<double> spherbuffer(kdim * ngfunc, nspher);
     
     // determine bra and ket sides symmetry
     
     bool symbk = (bragtos == ketgtos);
+    
+    // contraction pattern on bra side
+    
+    auto sbcpos = bragtos.getContrStartPositions();
+    
+    auto ebcpos = bragtos.getContrEndPositions();
 
-    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    for (int32_t i = 0; i < bragtos.getNumberOfRedContrGtos(); i++)
     {
+        auto bgfunc = ebcpos[i] - sbcpos[i];
+        
         // compute distances: R(AB) = A - B
         
         intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
@@ -329,7 +339,8 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
         
         // transform Cartesian to spherical integrals
         
-        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0, kdim);
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0,
+                           bgfunc * kdim);
         
         // add batch of integrals to integrals matrix
         

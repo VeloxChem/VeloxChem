@@ -64,53 +64,98 @@ contract(      CMemBlock2D<double>& contrData,
     
     // set up pointers to primitives data on bra side
     
-    auto spos = braGtoBlock.getStartPositions();
+    auto sbpos = braGtoBlock.getStartPositions();
     
-    auto epos = braGtoBlock.getEndPositions();
+    auto ebpos = braGtoBlock.getEndPositions();
     
-    auto bdim = epos[iContrGto] - spos[iContrGto];
+    auto bdim = ebpos[iContrGto] - sbpos[iContrGto];
     
-    // set up pointers to primitives data on ket side
+    // set up pointers to contraction data on bra side
     
-    auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+    auto sbcpos = braGtoBlock.getContrStartPositions();
     
-    // first step: vertical summation over bra GTO
+    auto ebcpos = braGtoBlock.getContrEndPositions();
     
-    for (int32_t i = 1; i < bdim; i++)
+    // set up pointers to contraction data on ket side
+    
+    auto skcpos = ketGtoBlock.getContrStartPositions();
+    
+    auto ekcpos = ketGtoBlock.getContrEndPositions();
+    
+    // set up pointers to normalization factors
+    
+    auto bfnorm = braGtoBlock.getNormFactors();
+    
+    auto kfnorm = ketGtoBlock.getNormFactors();
+    
+    // set up pointers to indexing of normalization factors
+    
+    auto sbfpos = braGtoBlock.getNormFactorsStartPositions();
+    
+    auto skfpos = ketGtoBlock.getNormFactorsStartPositions();
+    
+    auto ekfpos = ketGtoBlock.getNormFactorsEndPositions();
+    
+    // set up ket dimensions
+    
+    auto krdim = ketGtoBlock.getNumberOfRedContrGtos();
+    
+    auto kcdim = ketGtoBlock.getNumberOfContrGtos();
+    
+    auto spos = ketGtoBlock.getStartPositions();
+    
+    // loop over contracted GTOs on bra side
+    
+    int32_t gfoff = 0;
+    
+    for (int32_t i = sbcpos[iContrGto]; i < ebcpos[iContrGto]; i++)
     {
-        // accumulate summation over primitives on bra side
-        
-        for (int32_t j = 0; j < ncomp; j++)
+        for (int32_t j = 0; j < bdim; j++)
         {
-            // summation buffer
+            auto bfact = bfnorm[sbfpos[i] + j];
             
-            auto sumbuf = primData.data(primIndex + j);
-            
-            // source buffer
-            
-            auto srcbuf = primData.data(primIndex + i * ncomp + j);
-            
-            // loop over primitive GTOs on ket side
-            
-            #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
-            for (int32_t k = 0; k < nprim; k++)
+            for (int32_t k = 0; k < krdim; k++)
             {
-                sumbuf[k] += srcbuf[k];
+                auto srcoff = spos[k];
+                
+                for (int32_t l = skcpos[k]; l < ekcpos[k]; l++)
+                {
+                    auto nstart = skfpos[l];
+                    
+                    auto nend = ekfpos[l];
+                    
+                    for (int32_t m = 0; m < ncomp; m++)
+                    {
+                        // sum up primitive integrals
+                        
+                        double fsum = 0.0;
+                        
+                        auto srcbuf = primData.data(primIndex + j * ncomp + m);
+                        
+                        for (int32_t n = nstart; n < nend; n++)
+                        {
+                            fsum += kfnorm[n] * srcbuf[srcoff + n - nstart];
+                        }
+                        
+                        // distribute integrals
+                        
+                        auto dstbuf = contrData.data(m);
+                        
+                        if (j == 0)
+                        {
+                            dstbuf[gfoff + l] = bfact * fsum;
+                        }
+                        else
+                        {
+                            dstbuf[gfoff + l] += bfact * fsum;
+                        }
+                    }
+                }
             }
         }
+        
+        gfoff += kcdim;
     }
-    
-    // reset primitive GTOs indexing pointers to ket side
-    
-    spos = ketGtoBlock.getStartPositions();
-    
-    epos = ketGtoBlock.getEndPositions();
-    
-    auto kdim = ketGtoBlock.getNumberOfContrGtos();
-    
-    // second step: direct contraction over ket side
-    
-    genfunc::contract(contrData, primData, 0, primIndex, spos, epos, kdim, ncomp);
 }
 
 void

@@ -28,15 +28,11 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     {
         // set up pointers to primitives data on bra side
         
-        auto bnorm = braGtoBlock.getNormFactors();
-        
         auto spos = braGtoBlock.getStartPositions();
         
         auto epos = braGtoBlock.getEndPositions();
         
         // set up pointers to primitives data on ket side
-        
-        auto knorm = ketGtoBlock.getNormFactors();
         
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
         
@@ -68,17 +64,14 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             
             auto fz = osFactors.data(2 * idx + 1);
             
-            auto fb = bnorm[i];
-            
             // set up primitives buffer data
             
             auto fovl = primBuffer.data(soff + idx);
             
-            #pragma omp simd aligned(fovl, fx, fz, knorm, abx, aby,\
-                                     abz: VLX_ALIGN)
+            #pragma omp simd aligned(fovl, fx, fz, abx, aby, abz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                fovl[j] = fb * knorm[j] * std::pow(fpi * fx[j], 1.5)
+                fovl[j] = std::pow(fpi * fx[j], 1.5)
                 
                         * std::exp(-fz[j] * (abx[j] * abx[j] + aby[j] * aby[j] +
                                              

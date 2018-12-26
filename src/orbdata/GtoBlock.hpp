@@ -190,6 +190,13 @@ public:
     int32_t getNumberOfPrimGtos() const;
     
     /**
+     Gets number of reduced contracted basis functions in GTOs block.
+     
+     @return the number of reduced contracted basis functions.
+     */
+    int32_t getNumberOfRedContrGtos() const;
+    
+    /**
      Gets number of contracted basis functions in GTOs block.
 
      @return the number of contracted basis functions.
@@ -406,6 +413,14 @@ public:
      @return the contraction depth.
      */
     int32_t getMaxContractionDepth() const;
+    
+    /**
+     Gets maximum number of contracted Gaussian functions associated with
+     set of primitive Gaussian functions.
+     
+     @return the maximum number of contracted Gaussian functions.
+     */
+    int32_t getMaxNumberContrFunctions() const;
     
     /**
      Converts GTOs block object to text output and insert it into output

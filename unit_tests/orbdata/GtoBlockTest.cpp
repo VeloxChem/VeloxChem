@@ -369,6 +369,44 @@ TEST_F(CGtoBlockTest, GetNumberOfPrimGtos)
     ASSERT_EQ(0, cgto.getNumberOfPrimGtos());
 }
 
+TEST_F(CGtoBlockTest, GetNumberOfRedContrGtos)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(5, agto.getNumberOfRedContrGtos());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(3, bgto.getNumberOfRedContrGtos());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getNumberOfRedContrGtos());
+}
+
+TEST_F(CGtoBlockTest, GetNumberOfRedContrGtosWithGeneralContraction)
+{
+    CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(4, agto.getNumberOfRedContrGtos());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(2, bgto.getNumberOfRedContrGtos());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getNumberOfRedContrGtos());
+}
+
 TEST_F(CGtoBlockTest, GetNumberOfContrGtos)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
@@ -382,6 +420,25 @@ TEST_F(CGtoBlockTest, GetNumberOfContrGtos)
     CGtoBlock bgto(lih, bas, 1);
     
     ASSERT_EQ(3, bgto.getNumberOfContrGtos());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getNumberOfContrGtos());
+}
+
+TEST_F(CGtoBlockTest, GetNumberOfContrGtosWithGeneralContraction)
+{
+    CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(5, agto.getNumberOfContrGtos());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(2, bgto.getNumberOfContrGtos());
     
     CGtoBlock cgto(lih, bas, 2);
     
@@ -907,3 +964,40 @@ TEST_F(CGtoBlockTest, GetMaxContractionDepth)
     ASSERT_EQ(0, cgto.getMaxContractionDepth());
 }
 
+TEST_F(CGtoBlockTest, GetMaxNumberContrFunctions)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(1, agto.getMaxNumberContrFunctions());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(1, bgto.getMaxNumberContrFunctions());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getMaxNumberContrFunctions());
+}
+
+TEST_F(CGtoBlockTest, GetMaxNumberContrFunctionsWithGeneralCOntraction)
+{
+    CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(2, agto.getMaxNumberContrFunctions());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(1, bgto.getMaxNumberContrFunctions());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getMaxNumberContrFunctions());
+}

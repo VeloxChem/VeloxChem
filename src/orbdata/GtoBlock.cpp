@@ -555,9 +555,15 @@ CGtoBlock::getNumberOfPrimGtos() const
 }
 
 int32_t
-CGtoBlock::getNumberOfContrGtos() const
+CGtoBlock::getNumberOfRedContrGtos() const
 {
     return _contrPattern.size(0);
+}
+
+int32_t
+CGtoBlock::getNumberOfContrGtos() const
+{
+    return _indexPattern.size(0);
 }
 
 const int32_t*
@@ -735,7 +741,7 @@ CGtoBlock::getMaxContractionDepth() const
     
     auto epos = getEndPositions();
     
-    for (int32_t i = 0; i < getNumberOfContrGtos(); i++)
+    for (int32_t i = 0; i < getNumberOfRedContrGtos(); i++)
     {
         auto cdim = epos[i] - spos[i];
         
@@ -743,6 +749,25 @@ CGtoBlock::getMaxContractionDepth() const
     }
     
     return ndim; 
+}
+
+int32_t
+CGtoBlock::getMaxNumberContrFunctions() const
+{
+    int32_t ndim = 0;
+    
+    auto spos = getContrStartPositions();
+    
+    auto epos = getContrEndPositions();
+    
+    for (int32_t i = 0; i < getNumberOfRedContrGtos(); i++)
+    {
+        auto cdim = epos[i] - spos[i];
+        
+        if (cdim > ndim) ndim = cdim;
+    }
+    
+    return ndim;
 }
 
 std::ostream&

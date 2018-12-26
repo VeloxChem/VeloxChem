@@ -372,17 +372,19 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
     
     // set up contracted GTOs dimensions
     
+    auto ngfunc = bragtos.getMaxNumberContrFunctions();
+    
     auto kdim = ketgtos.getNumberOfContrGtos();
     
     // allocate contracted Cartesian integrals buffer
     
-    CMemBlock2D<double> cartbuffer(kdim, ncart);
+    CMemBlock2D<double> cartbuffer(ngfunc * kdim, ncart);
     
     // allocate contracted spherical integrals buffer
     
     auto nspher = angmom::to_SphericalComponents(bang, kang);
     
-    CMemBlock2D<double> spherbuffer(kdim, nspher);
+    CMemBlock2D<double> spherbuffer(ngfunc * kdim, nspher);
     
     // initialize Boys function evaluator
     
@@ -398,8 +400,16 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
     
     bool symbk = (bragtos == ketgtos);
     
-    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    // contraction pattern on bra side
+    
+    auto sbcpos = bragtos.getContrStartPositions();
+    
+    auto ebcpos = bragtos.getContrEndPositions();
+    
+    for (int32_t i = 0; i < bragtos.getNumberOfRedContrGtos(); i++)
     {
+        auto bgfunc = ebcpos[i] - sbcpos[i];
+        
         // compute distances: R(AB) = A - B
         
         intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
@@ -450,9 +460,8 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
         
         // transform Cartesian to spherical integrals
         
-        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0, kdim);
-        
-        // add batch of integrals to integrals matrix
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0,
+                           bgfunc * kdim);
         
         // add batch of integrals to integrals matrix
         
