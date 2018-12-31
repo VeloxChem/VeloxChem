@@ -185,6 +185,34 @@ getGenContrBasisForLiH()
     
     return mbas;
 }
+
+CMolecularBasis
+getMinimalBasisSegForLiH()
+{
+    CMolecularBasis mbas;
+    
+    mbas.setLabel({"MIN-CC-PVDZ-SEG"});
+    
+    mbas.addAtomBasis(getMinimalBasisForLi());
+    
+    mbas.addAtomBasis(getMinimalBasisForH());
+    
+    return mbas;
+}
+    
+CMolecularBasis
+getMinimalBasisGenForLiH()
+{
+    CMolecularBasis mbas;
+        
+    mbas.setLabel({"MIN-CC-PVDZ-GEN"});
+        
+    mbas.addAtomBasis(getMinimalGenBasisForLi());
+        
+    mbas.addAtomBasis(getMinimalBasisForH());
+        
+    return mbas;
+}
     
 } // vlxbas namespace
 

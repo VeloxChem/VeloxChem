@@ -7594,3 +7594,22 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForTwoBasis)
 
     ASSERT_EQ(kinmat, CKineticEnergyMatrix(m));
 }
+
+TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForGenContrBasis)
+{
+    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
+                                         mpi::nodes(MPI_COMM_WORLD),
+                                         MPI_COMM_WORLD);
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    auto segbas = vlxbas::getMinimalBasisSegForLiH();
+    
+    auto genbas = vlxbas::getMinimalBasisGenForLiH();
+    
+    auto kinseg = kindrv.compute(lih, segbas, MPI_COMM_WORLD);
+    
+    auto kingen = kindrv.compute(lih, genbas, MPI_COMM_WORLD);
+    
+    EXPECT_EQ(kinseg, kingen);
+}

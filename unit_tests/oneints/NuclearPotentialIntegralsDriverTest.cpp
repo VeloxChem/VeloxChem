@@ -7694,3 +7694,22 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForTwoBasis)
 
     ASSERT_EQ(npotmat, CNuclearPotentialMatrix(m));
 }
+
+TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForGenContrBasis)
+{
+    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
+                                             mpi::nodes(MPI_COMM_WORLD),
+                                             MPI_COMM_WORLD);
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    auto segbas = vlxbas::getMinimalBasisSegForLiH();
+    
+    auto genbas = vlxbas::getMinimalBasisGenForLiH();
+    
+    auto npotseg = npotdrv.compute(lih, segbas, MPI_COMM_WORLD);
+    
+    auto npotgen = npotdrv.compute(lih, genbas, MPI_COMM_WORLD);
+    
+    EXPECT_EQ(npotseg, npotgen);
+}
