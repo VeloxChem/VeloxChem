@@ -983,7 +983,7 @@ TEST_F(CGtoBlockTest, GetMaxNumberContrFunctions)
     ASSERT_EQ(0, cgto.getMaxNumberContrFunctions());
 }
 
-TEST_F(CGtoBlockTest, GetMaxNumberContrFunctionsWithGeneralCOntraction)
+TEST_F(CGtoBlockTest, GetMaxNumberContrFunctionsWithGeneralContraction)
 {
     CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
     
@@ -1000,4 +1000,60 @@ TEST_F(CGtoBlockTest, GetMaxNumberContrFunctionsWithGeneralCOntraction)
     CGtoBlock cgto(lih, bas, 2);
     
     ASSERT_EQ(0, cgto.getMaxNumberContrFunctions());
+}
+
+TEST_F(CGtoBlockTest, GetMaxNormFactor)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock sorb(lih, bas, 0);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 0), 6.492015032500e-03, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 1), 4.774786321500e-02, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 2), 2.026879611100e-01, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 3), 4.860657481700e-01, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 4), 4.362697795500e-01, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(1, 0), 1.000000000000e+00, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(2, 0), 1.000000000000e+00, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(3, 0), 1.968215800000e-02, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(3, 1), 1.379652400000e-01, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(3, 2), 4.783193500000e-01, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(4, 0), 1.000000000000e+00, 1.0e-13);
+}
+
+TEST_F(CGtoBlockTest, GetMaxNormFactorWithGeneralContraction)
+{
+    CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock sorb(lih, bas, 0);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 0), 0.800000000000e+00, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 1), 0.200000000000e+00, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(0, 2), 0.900000000000e+00, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(1, 0), 1.000000000000e+00, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(2, 0), 1.968215800000e-02, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(2, 1), 1.379652400000e-01, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(2, 2), 4.783193500000e-01, 1.0e-13);
+    
+    ASSERT_NEAR(sorb.getMaxNormFactor(3, 0), 1.000000000000e+00, 1.0e-13);
 }

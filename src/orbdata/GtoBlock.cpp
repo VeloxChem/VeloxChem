@@ -770,6 +770,28 @@ CGtoBlock::getMaxNumberContrFunctions() const
     return ndim;
 }
 
+double
+CGtoBlock::getMaxNormFactor(const int32_t iContrGto,
+                            const int32_t iPrimGto) const
+{
+    double mfact = 0.0;
+    
+    auto spos = getContrStartPositions();
+    
+    auto epos = getContrEndPositions();
+    
+    auto sfpos = getNormFactorsStartPositions();
+    
+    for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+    {
+        auto cfact = std::fabs(_gtoNormFactors.at(sfpos[i] + iPrimGto));
+        
+        if (cfact > mfact) mfact = cfact;
+    }
+    
+    return mfact;
+}
+
 std::ostream&
 operator<<(      std::ostream& output,
            const CGtoBlock&    source)

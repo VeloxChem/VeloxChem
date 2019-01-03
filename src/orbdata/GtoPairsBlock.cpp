@@ -28,9 +28,13 @@ CGtoPairsBlock::CGtoPairsBlock()
 
     , _contrPattern(CMemBlock2D<int32_t>())
 
+    , _indexPattern(CMemBlock2D<int32_t>())
+
     , _contrFactors(CMemBlock2D<double>())
 
     , _pairFactors(CMemBlock2D<double>())
+
+    , _normFactors(CMemBlock<double>())
 
     , _threshold(1.0e-13)
 
@@ -58,9 +62,13 @@ CGtoPairsBlock::CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
 
     , _contrPattern(contrPattern)
 
+    , _indexPattern(CMemBlock2D<int32_t>())
+
     , _contrFactors(contrFactors)
 
     , _pairFactors(pairFactors)
+
+    , _normFactors(CMemBlock<double>())
 
     , _threshold(threshold)
 
@@ -85,9 +93,13 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
 
     , _contrPattern(CMemBlock2D<int32_t>())
 
+    , _indexPattern(CMemBlock2D<int32_t>())
+
     , _contrFactors(CMemBlock2D<double>())
 
     , _pairFactors(CMemBlock2D<double>())
+
+    , _normFactors(CMemBlock<double>())
 
     , _threshold(threshold)
 
@@ -144,10 +156,6 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     // determine if bra and ket GTOs block objects are the same
     
     bool symbk = (braGtoBlock == ketGtoBlock);
-    
-    // set up temporary memory blocks
-    
-    CMemBlock2D<double> (bpgto * kpgto, 4); 
     
     // fetch pi value
     
@@ -482,9 +490,13 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoPairsBlock& source)
 
     , _contrPattern(source._contrPattern)
 
+    , _indexPattern(source._indexPattern)
+
     , _contrFactors(source._contrFactors)
 
     , _pairFactors(source._pairFactors)
+
+    , _normFactors(source._normFactors)
 
     , _threshold(source._threshold)
 
@@ -507,9 +519,13 @@ CGtoPairsBlock::CGtoPairsBlock(CGtoPairsBlock&& source) noexcept
 
     , _contrPattern(std::move(source._contrPattern))
 
+    , _indexPattern(std::move(source._indexPattern))
+
     , _contrFactors(std::move(source._contrFactors))
 
     , _pairFactors(std::move(source._pairFactors))
+
+    , _normFactors(std::move(source._normFactors))
 
     , _threshold(std::move(source._threshold))
 
@@ -540,9 +556,13 @@ CGtoPairsBlock::operator=(const CGtoPairsBlock& source)
     
     _contrPattern = source._contrPattern;
     
+    _indexPattern = source._indexPattern;
+    
     _contrFactors = source._contrFactors;
     
     _pairFactors = source._pairFactors;
+    
+    _normFactors = source._normFactors;
     
     _threshold = source._threshold;
     
@@ -568,9 +588,13 @@ CGtoPairsBlock::operator=(CGtoPairsBlock&& source) noexcept
     
     _contrPattern = std::move(source._contrPattern);
     
+    _indexPattern = std::move(source._indexPattern);
+    
     _contrFactors = std::move(source._contrFactors);
     
     _pairFactors = std::move(source._pairFactors);
+    
+    _normFactors = std::move(source._normFactors);
     
     _threshold = std::move(source._threshold);
     
@@ -594,9 +618,13 @@ CGtoPairsBlock::operator==(const CGtoPairsBlock& other) const
     
     if (_contrPattern != other._contrPattern) return false;
     
+    if (_indexPattern != other._indexPattern) return false;
+    
     if (_contrFactors != other._contrFactors) return false;
     
     if (_pairFactors != other._pairFactors) return false;
+    
+     if (_normFactors != other._normFactors) return false;
     
     if (std::fabs(_threshold - other._threshold) > 1.0e-13) return false;
     
@@ -1499,9 +1527,13 @@ operator<<(      std::ostream&   output,
     
     output << "_contrPattern: " << source._contrPattern << std::endl;
     
+    output << "_indexPattern: " << source._indexPattern << std::endl;
+    
     output << "_contrFactors: " << source._contrFactors << std::endl;
     
     output << "_pairFactors: " << source._pairFactors << std::endl;
+    
+    output << "_normFactors: " << source._normFactors << std::endl;
     
     output << "_threshold: " << source._threshold << std::endl;
     

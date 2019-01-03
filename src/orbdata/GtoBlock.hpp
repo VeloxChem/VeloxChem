@@ -48,7 +48,7 @@ class CGtoBlock
     CMemBlock2D<double> _gtoPrimitives;
     
     /**
-     The normalization factors pf primitives Gaussian functions.
+     The normalization factors of primitives Gaussian functions.
      */
     CMemBlock<double> _gtoNormFactors;
 
@@ -421,6 +421,17 @@ public:
      @return the maximum number of contracted Gaussian functions.
      */
     int32_t getMaxNumberContrFunctions() const;
+    
+    /**
+     Gets maximum absolute value of normalization factor for requested
+     primitive GTO in specific set of contracted GTOs.
+
+     @param iContrGto the identifier of contracted GTOs.
+     @param iPrimGto the index of primitive GTO.
+     @return the absolute value of normalization factor.
+     */
+    double getMaxNormFactor(const int32_t iContrGto,
+                            const int32_t iPrimGto) const;
     
     /**
      Converts GTOs block object to text output and insert it into output

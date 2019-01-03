@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "GtoBlock.hpp"
 
@@ -34,13 +35,19 @@ class CGtoPairsBlock
     
     /**
      The contraction scheme (contracted basis functions start/end position in
-     primitive Gaussian functions vector, contracted basis function pair
-     indexes).
+     primitive Gaussian functions vector, contracted basis start/end positions
+     in indexing vector).
      */
     CMemBlock2D<int32_t> _contrPattern;
     
     /**
-     The contracted Gaussian function pair factors data (effective P coordinates).
+    The contraction scheme (contracted basis functions start/end position in
+    normalization factors vector, indexing vector).
+    */
+    CMemBlock2D<int32_t> _indexPattern;
+    
+    /**
+     The contracted Gaussian function pair factors data (A-B distances).
      */
     CMemBlock2D<double> _contrFactors;
     
@@ -49,6 +56,11 @@ class CGtoPairsBlock
      PA and PB distances, etc).
      */
     CMemBlock2D<double> _pairFactors;
+    
+    /**
+     The normalization factors of primitive GTO pairs.
+     */
+    CMemBlock<double> _normFactors;
     
     /**
      The GTO pairs screening threshold.
