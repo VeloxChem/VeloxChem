@@ -78,9 +78,9 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
     }
     else if (f_style)
     {
-        for (size_t i = 0; i < arr.shape(0); i++)
+        for (ssize_t i = 0; i < arr.shape(0); i++)
         {
-            for (size_t j = 0; j < arr.shape(1); j++)
+            for (ssize_t j = 0; j < arr.shape(1); j++)
             {
                 vec.data()[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
             }
