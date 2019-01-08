@@ -19,7 +19,7 @@ CXX := mpicxx
 # Compiler flags for generic intel CPUs
 
 CXX_REL_FLG := -std=c++11 -O3 -fopenmp -Wall
-CXX_DEB_FLG := -std=c++11 -O3 -fopenmp -Wall -g -fopt-info
+CXX_DEB_FLG := -std=c++11 -O3 -fopenmp -Wall -g
 
 # Generic preprocessor flags
 

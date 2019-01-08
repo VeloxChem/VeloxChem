@@ -19,7 +19,7 @@ CXX := mpicxx
 # Compiler flags for generic intel CPUs
 
 CXX_REL_FLG := -std=c++11 -O3 -fopenmp -Wall
-CXX_DEB_FLG := -std=c++11 -O3 -fopenmp -Wall -g -fopt-info
+CXX_DEB_FLG := -std=c++11 -O3 -fopenmp -Wall -g
 
 # Generic preprocessor flags
 
@@ -43,9 +43,6 @@ ifeq ($(USE_MKL),true)
   CPP_REL_FLG += -DENABLE_MKL
   CPP_DEB_FLG += -DENABLE_MKL
 endif
-
-CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
-CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
 
 # MKL header and library
 
@@ -79,20 +76,17 @@ ifeq ($(USE_GPU),true)
   LIB_LIST += -lcuda -lcudart
 endif
 
-# Boost header and library
+# Python interface
 
 PYTHON := python3
-BOOST_PATH := /home/lixin/software/boost
-
-PYTHON_VER := $(shell $(PYTHON) -c "import sys; print(sys.version_info.major, sys.version_info.minor, sep='')")
+PYBIND11_PATH := /home/lixin/software/pybind11
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(BOOST_PATH)/include
+PYTHON_INC += -I$(PYBIND11_PATH)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
-PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python$(PYTHON_VER) -lboost_numpy$(PYTHON_VER)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
