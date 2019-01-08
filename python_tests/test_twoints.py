@@ -33,7 +33,7 @@ class TestTwoInts(unittest.TestCase):
         arr_kx = x * arr_k
         arr_jkx = arr_j + arr_kx
 
-        fock = AOFockMatrix.from_numpy_list(
+        fock = AOFockMatrix(
             [arr_jk, arr_jkx, arr_j, arr_k, arr_kx],
             [fockmat.restjk, fockmat.restjkx,
                 fockmat.restj, fockmat.restk, fockmat.restkx],
@@ -56,7 +56,7 @@ class TestTwoInts(unittest.TestCase):
 
         data_a = [[ 1., .2, ], [ .2, 1., ]]
 
-        d_rest = AODensityMatrix.from_numpy_list([data_a], denmat.rest)
+        d_rest = AODensityMatrix([data_a], denmat.rest)
 
         f_rest = AOFockMatrix(d_rest)
 
@@ -77,8 +77,8 @@ class TestTwoInts(unittest.TestCase):
 
         indices = [0, 0, 1, 0]
 
-        f_rest = AOFockMatrix.from_numpy_list([data_a, data_b, data_c, data_d],
-                                              types, factors, indices)
+        f_rest = AOFockMatrix([data_a, data_b, data_c, data_d],
+                              types, factors, indices)
 
         # hdf5 read/write tests
 
@@ -118,7 +118,7 @@ class TestTwoInts(unittest.TestCase):
 
         # compute Fock
 
-        eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
+        eridrv = ElectronRepulsionIntegralsDriver(rank, size, comm)
 
         qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis)
 

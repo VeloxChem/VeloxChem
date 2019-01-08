@@ -12,9 +12,9 @@ class TestMath(unittest.TestCase):
         data = [[ 1., 2., ], [ 3., 4., ]]
 
         array = np.array(data)
-        matrix = DenseMatrix.from_numpy(array)
+        matrix = DenseMatrix(array)
         array2 = matrix.to_numpy()
-        matrix2 = DenseMatrix.from_numpy(array2)
+        matrix2 = DenseMatrix(array2)
 
         self.assertEqual(0, np.max(np.abs(array - array2)))
         self.assertEqual(matrix, matrix2)

@@ -6,7 +6,7 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
 
 #ifdef ENABLE_GPU
 #include "DeviceProp.hpp"
@@ -14,17 +14,17 @@
 
 #include "ExportGpu.hpp"
 
-namespace bp = boost::python;
+namespace py = pybind11;
 
 namespace bp_gpu { // bp_gpu namespace
 
 // Exports classes/functions in src/gpu to python
 
-void export_gpu()
+void export_gpu(py::module& m)
 {
     #ifdef ENABLE_GPU
 
-    bp::def("get_device_properties", &gpu::getDeviceProperties);
+    m.def("get_device_properties", &gpu::getDeviceProperties);
 
     #endif
 }

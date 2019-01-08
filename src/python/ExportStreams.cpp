@@ -6,7 +6,8 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
+
 #include <memory>
 #include <string>
 
@@ -14,7 +15,7 @@
 #include "StringFormat.hpp"
 #include "ExportStreams.hpp"
 
-namespace bp = boost::python;
+namespace py = pybind11;
 
 namespace bp_streams { // bp_streams namespace
 
@@ -22,28 +23,28 @@ namespace bp_streams { // bp_streams namespace
 
 static void
 COutputStream_print_line(      COutputStream& self,
-                       const std::string&   source)
+                         const std::string&   source)
 {
     self << source.c_str() << fmt::end;
 }
 
 static void
 COutputStream_print_info(      COutputStream& self,
-                       const std::string&   source)
+                         const std::string&   source)
 {
     self << fmt::info << source.c_str() << fmt::end;
 }
     
 static void
 COutputStream_print_title(      COutputStream& self,
-                        const std::string&   source)
+                          const std::string&   source)
 {
     self << fmt::title << source.c_str() << fmt::end;
 }
     
 static void
 COutputStream_print_header(      COutputStream& self,
-                         const std::string&   source)
+                           const std::string&   source)
 {
     self << fmt::header << source.c_str() << fmt::end;
 }
@@ -76,15 +77,15 @@ integer_to_angular_momentum(const std::string& label)
 
 // Exports classes/functions in src/streams to python
 
-void export_streams()
+void export_streams(py::module& m)
 {
     // COutputStream class
 
-    bp::class_< COutputStream, std::shared_ptr<COutputStream> >
+    py::class_< COutputStream, std::shared_ptr<COutputStream> >
         (
-            "OutputStream",
-            bp::init<const std::string&>()
+            m, "OutputStream"
         )
+        .def(py::init<const std::string&>())
         .def("get_state", &COutputStream::getState)
         .def("flush", &COutputStream::flush)
         .def("print_line", &COutputStream_print_line)
@@ -97,9 +98,9 @@ void export_streams()
 
     // to_angular_momentum methods
 
-    bp::def("to_angular_momentum", &string_to_angular_momentum);
+    m.def("to_angular_momentum", &string_to_angular_momentum);
 
-    bp::def("to_angular_momentum", &integer_to_angular_momentum);
+    m.def("to_angular_momentum", &integer_to_angular_momentum);
 }
 
 } // bp_streams namespace

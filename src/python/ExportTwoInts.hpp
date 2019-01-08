@@ -9,12 +9,16 @@
 #ifndef ExportTwoInts_hpp
 #define ExportTwoInts_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_twoints { // bp_twoints namespace
 
 /**
  Exports classes/functions in src/twoints to python.
  */
-void export_twoints();
+void export_twoints(py::module& m);
 
 } // bp_twoints namespace
 

@@ -9,12 +9,16 @@
 #ifndef ExportExciton_hpp
 #define ExportExciton_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_exciton { // bp_exciton namespace
 
 /**
  Exports classes/functions in src/exciton to python.
  */
-void export_exciton();
+void export_exciton(py::module& m);
 
 } // bp_exciton namespace
 

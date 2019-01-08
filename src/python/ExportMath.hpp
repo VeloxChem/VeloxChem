@@ -9,12 +9,14 @@
 #ifndef ExportMath_hpp
 #define ExportMath_hpp
 
-#include <boost/python/numpy.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+
 #include <memory>
 
 #include "DenseMatrix.hpp"
 
-namespace np = boost::python::numpy;
+namespace py = pybind11;
 
 namespace bp_math { // bp_math namespace
 
@@ -25,12 +27,12 @@ namespace bp_math { // bp_math namespace
  @return a CDenseMatrix object.
  */
 std::shared_ptr<CDenseMatrix>
-CDenseMatrix_from_numpy(const np::ndarray& arr);
+CDenseMatrix_from_numpy(const py::array_t<double>& arr);
 
 /**
  Exports classes/functions in src/math to python.
  */
-void export_math();
+void export_math(py::module& m);
 
 } // bp_math namespace
 

@@ -75,13 +75,13 @@ class DensityGuess:
         
         if self._guess_type == "SAD":
             
-            ovl_drv = OverlapIntegralsDriver.create(loc_rank, loc_nodes, comm)
+            ovl_drv = OverlapIntegralsDriver(loc_rank, loc_nodes, comm)
             
             ovl_mat_sb = ovl_drv.compute(molecule, min_basis, ao_basis, comm)
 
             t0 = tm.time()
                                             
-            sad_drv = SADGuessDriver.create(loc_rank, loc_nodes, comm)
+            sad_drv = SADGuessDriver(loc_rank, loc_nodes, comm)
             
             den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
                                       overlap_matrix, comm)

@@ -18,7 +18,7 @@ class TestMolData(unittest.TestCase):
         mol_2 = molecule.get_sub_molecule(0, 9)
         mol_3 = mol_2.get_sub_molecule(0, 4)
 
-        mol_4 = Molecule.from_xyz(
+        mol_4 = Molecule(
             [ "N", "H", "H", "H" ],
             [ -3.710, -3.702, -4.704, -4.780 ],
             [  3.019,  4.942,  2.415,  2.569 ],
@@ -34,7 +34,7 @@ class TestMolData(unittest.TestCase):
         y_list = [  3.019,  4.942,  2.415,  2.569 ]
         z_list = [ -0.037,  0.059,  1.497, -1.573 ]
 
-        mol = Molecule.from_xyz([ "N", "H", "H", "H" ], x_list, y_list, z_list)
+        mol = Molecule([ "N", "H", "H", "H" ], x_list, y_list, z_list)
 
         x_arr = np.array(x_list)
         y_arr = np.array(y_list)
@@ -50,7 +50,7 @@ class TestMolData(unittest.TestCase):
 
     def test_number_of_atoms(self):
 
-        mol = Molecule.from_xyz(
+        mol = Molecule(
             [ "N", "H", "H", "H" ],
             [ -3.710, -3.702, -4.704, -4.780 ],
             [  3.019,  4.942,  2.415,  2.569 ],
@@ -66,7 +66,7 @@ class TestMolData(unittest.TestCase):
 
         # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
 
-        mol = Molecule.from_xyz(
+        mol = Molecule(
             [ "H", "Li", "C", "N", "O", "S", "Cu", "Zn",
               "Br", "Ag", "Au", "Hg", ],
             [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0 ],

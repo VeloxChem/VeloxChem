@@ -1,14 +1,17 @@
 @jobs
-!RunMode: cpu/gpu
-SinglePoint: energy
+task: hf
 @end
 
-@basis
-MIN-CC-PVDZ
-@end 
+@method settings
+basis: min-cc-pvdz
+basis path: ../basis
+@end
 
-@molxyz 
-0 1 Au  
+@molecule
+charge: 0
+multiplicity: 1
+units: au
+xyz:  
  N       -3.53561871980000        1.52353377980000        1.54253704100000     
  C       -1.12830262750000        1.72301931660000        2.53961597630000     
  O       -0.20240185630000        0.85666203260000        4.42144182440000     
@@ -51,7 +54,3 @@ MIN-CC-PVDZ
  H      -11.02895427820000       -1.54077098760000        1.60040514520000     
  H       -4.74485725740000       -1.87546751210000        3.13198111260000     
 @end 
-
-@progenv 
-BasisLibrary: ../basis/
-@end

@@ -20,9 +20,9 @@ class TestOneInts(unittest.TestCase):
         data = [[ 1., .2, ], [ .2, 1., ]]
 
         array = np.array(data)
-        matrix = OverlapMatrix.from_numpy(array)
+        matrix = OverlapMatrix(array)
         array2 = matrix.to_numpy()
-        matrix2 = OverlapMatrix.from_numpy(array2)
+        matrix2 = OverlapMatrix(array2)
 
         self.assertEqual(0, np.max(np.abs(array - array2)))
         self.assertEqual(matrix, matrix2)
@@ -32,9 +32,9 @@ class TestOneInts(unittest.TestCase):
         data = [[ 1., .2, ], [ .2, 1., ]]
 
         array = np.array(data)
-        matrix = KineticEnergyMatrix.from_numpy(array)
+        matrix = KineticEnergyMatrix(array)
         array2 = matrix.to_numpy()
-        matrix2 = KineticEnergyMatrix.from_numpy(array2)
+        matrix2 = KineticEnergyMatrix(array2)
 
         self.assertEqual(0, np.max(np.abs(array - array2)))
         self.assertEqual(matrix, matrix2)
@@ -44,9 +44,9 @@ class TestOneInts(unittest.TestCase):
         data = [[ 1., .2, ], [ .2, 1., ]]
 
         array = np.array(data)
-        matrix = NuclearPotentialMatrix.from_numpy(array)
+        matrix = NuclearPotentialMatrix(array)
         array2 = matrix.to_numpy()
-        matrix2 = NuclearPotentialMatrix.from_numpy(array2)
+        matrix2 = NuclearPotentialMatrix(array2)
 
         self.assertEqual(0, np.max(np.abs(array - array2)))
         self.assertEqual(matrix, matrix2)
@@ -64,15 +64,15 @@ class TestOneInts(unittest.TestCase):
 
         # compute 1e integrals
 
-        ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
+        ovldrv = OverlapIntegralsDriver(rank, size, comm)
         S = ovldrv.compute(molecule, basis, comm)
         S1 = S.to_numpy()
 
-        kindrv = KineticEnergyIntegralsDriver.create(rank, size, comm)
+        kindrv = KineticEnergyIntegralsDriver(rank, size, comm)
         T = kindrv.compute(molecule, basis, comm)
         T1 = T.to_numpy()
 
-        npotdrv = NuclearPotentialIntegralsDriver.create(rank, size, comm)
+        npotdrv = NuclearPotentialIntegralsDriver(rank, size, comm)
         V = npotdrv.compute(molecule, basis, comm)
         V1 = V.to_numpy()
 

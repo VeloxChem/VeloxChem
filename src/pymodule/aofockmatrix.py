@@ -70,7 +70,7 @@ def _read_hdf5(fname):
             ftype in list(focktype.values()),
             "AOFockMatrix.read_hdf5: invalid Fock types!")
 
-    return AOFockMatrix.from_numpy_list(focks, types, factors, indices)
+    return AOFockMatrix(focks, types, factors, indices)
 
 
 AOFockMatrix.write_hdf5 = _write_hdf5

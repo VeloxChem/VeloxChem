@@ -9,23 +9,22 @@
 #ifndef ExportGeneral_hpp
 #define ExportGeneral_hpp
 
-#include <boost/python.hpp>
-#include <boost/python/numpy.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+
 #include <mpi.h>
 
-namespace bp = boost::python;
-
-namespace np = boost::python::numpy;
+namespace py = pybind11;
 
 namespace bp_general { // bp_general namespace
 
 /**
- Gets MPI_Comm pointer from a boost python communicator object.
+ Gets MPI_Comm pointer from a mpi4py communicator object.
 
- @param py_comm boost python communicator object.
+ @param py_comm mpi4py communicator object.
  @return the MPI_Comm pointer.
  */
-MPI_Comm* get_mpi_comm(bp::object py_comm);
+MPI_Comm* get_mpi_comm(py::object py_comm);
 
 /**
  Gets numpy array from double pointer and dimension.
@@ -35,12 +34,14 @@ MPI_Comm* get_mpi_comm(bp::object py_comm);
  @param nColumns number of columns.
  @return numpy array.
  */
-np::ndarray pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns);
+py::array_t<double> pointer_to_numpy(const double* ptr,
+                                     const int32_t nRows,
+                                     const int32_t nColumns);
 
 /**
  Exports classes/functions in src/general to python.
  */
-void export_general();
+void export_general(py::module& m);
 
 } // bp_general namespace
 

@@ -9,12 +9,16 @@
 #ifndef ExportGpu_hpp
 #define ExportGpu_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_gpu { // bp_gpu namespace
 
 /**
  Exports classes/functions in src/gpu to python.
  */
-void export_gpu();
+void export_gpu(py::module& m);
 
 } // bp_gpu namespace
 

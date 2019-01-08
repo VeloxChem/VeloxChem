@@ -26,13 +26,13 @@ class TestSolvers(unittest.TestCase):
 
         # compute overlap
 
-        ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
+        ovldrv = OverlapIntegralsDriver(rank, size, comm)
         S12 = ovldrv.compute(molecule, min_basis, ao_basis, comm)
         S22 = ovldrv.compute(molecule, ao_basis, comm)
 
         # compute initial guess
 
-        saddrv = SADGuessDriver.create(rank, size, comm)
+        saddrv = SADGuessDriver(rank, size, comm)
         D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
         # matrix to numpy

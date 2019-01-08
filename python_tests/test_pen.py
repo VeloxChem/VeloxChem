@@ -1,5 +1,4 @@
 from mpi4py import MPI
-from veloxchem.taskparser import GlobalTask
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
@@ -14,6 +13,7 @@ from veloxchem.veloxchemlib import fockmat
 from veloxchem.veloxchemlib import ericut
 from veloxchem.veloxchemlib import mpi_master
 
+from veloxchem.mpitask import MpiTask
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
 
@@ -26,12 +26,11 @@ class TestPen(unittest.TestCase):
 
     def test_penicillin(self):
 
-        task = GlobalTask("inputs/pen.inp", "inputs/pen.out", MPI.COMM_WORLD)
+        task = MpiTask(["inputs/pen.inp", "inputs/pen.out"], MPI.COMM_WORLD)
 
         molecule = task.molecule
         ao_basis = task.ao_basis
         min_basis = task.min_basis
-        ostream = task.ostream
 
         comm = task.mpi_comm
         rank = task.mpi_rank
@@ -39,16 +38,16 @@ class TestPen(unittest.TestCase):
 
         # compute 1e integrals
 
-        ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
-        S = ovldrv.compute(molecule, ao_basis, ostream, comm)
+        ovldrv = OverlapIntegralsDriver(rank, size, comm)
+        S = ovldrv.compute(molecule, ao_basis, comm)
         S1 = S.to_numpy()
 
-        kindrv = KineticEnergyIntegralsDriver.create(rank, size, comm)
-        T = kindrv.compute(molecule, ao_basis, ostream, comm)
+        kindrv = KineticEnergyIntegralsDriver(rank, size, comm)
+        T = kindrv.compute(molecule, ao_basis, comm)
         T1 = T.to_numpy()
 
-        npotdrv = NuclearPotentialIntegralsDriver.create(rank, size, comm)
-        V = npotdrv.compute(molecule, ao_basis, ostream, comm)
+        npotdrv = NuclearPotentialIntegralsDriver(rank, size, comm)
+        V = npotdrv.compute(molecule, ao_basis, comm)
         V1 = V.to_numpy()
 
         # compare with reference
@@ -75,14 +74,13 @@ class TestPen(unittest.TestCase):
 
         # compute Fock
 
-        eridrv = ElectronRepulsionIntegralsDriver.create(rank, size, comm)
+        eridrv = ElectronRepulsionIntegralsDriver(rank, size, comm)
 
-        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis, ostream,
-                                comm)
+        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis)
 
         fock = AOFockMatrix(dmat)
 
-        eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, ostream, comm)
+        eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, comm)
 
         F1 = fock.to_numpy(0)
 

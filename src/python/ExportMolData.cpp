@@ -6,7 +6,10 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/operators.h>
+
 #include <mpi.h>
 #include <memory>
 #include <vector>
@@ -20,74 +23,59 @@
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
 
-namespace bp = boost::python;
+namespace py = pybind11;
 
 namespace bp_moldata { // bp_moldata namespace
 
 // Helper function for CMolecule constructor
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_xyz(const bp::list& label_list,
-                   const bp::list& x_list,
-                   const bp::list& y_list,
-                   const bp::list& z_list)
+CMolecule_from_xyz(const std::vector<std::string>& labels,
+                   const std::vector<double>& x_coords,
+                   const std::vector<double>& y_coords,
+                   const std::vector<double>& z_coords)
 {
     // form coordinate vector
 
-    std::string errmol("Molecule.from_xyz - Inconsistent lengths of lists");
+    std::string errmol("Molecule.from_xyz: Inconsistent lengths of lists");
 
-    const int32_t natoms = (int32_t)bp::len(label_list);
+    errors::assertMsgCritical(x_coords.size() == labels.size(), errmol);
 
-    errors::assertMsgCritical(bp::len(x_list) == natoms, errmol);
+    errors::assertMsgCritical(y_coords.size() == labels.size(), errmol);
 
-    errors::assertMsgCritical(bp::len(y_list) == natoms, errmol);
-
-    errors::assertMsgCritical(bp::len(z_list) == natoms, errmol);
+    errors::assertMsgCritical(z_coords.size() == labels.size(), errmol);
 
     std::vector<double> coords;
 
-    for (int32_t i = 0; i < natoms; i++)
-    {
-        coords.push_back(bp::extract<double>(x_list[i]));
-    }
+    coords.insert(coords.end(), x_coords.begin(), x_coords.end());
 
-    for (int32_t i = 0; i < natoms; i++)
-    {
-        coords.push_back(bp::extract<double>(y_list[i]));
-    }
+    coords.insert(coords.end(), y_coords.begin(), y_coords.end());
 
-    for (int32_t i = 0; i < natoms; i++)
-    {
-        coords.push_back(bp::extract<double>(z_list[i]));
-    }
+    coords.insert(coords.end(), z_coords.begin(), z_coords.end());
 
     // form charge, mass, label and elemental ID vectors
 
-    std::string errelm("Molecule.from_xyz - Unsupported chemical element");
+    std::string errelm("Molecule.from_xyz: Unsupported chemical element");
 
     std::vector<double> charges;
 
     std::vector<double> masses;
 
-    std::vector<std::string> labels;
-
     std::vector<int32_t> idselem;
+
+    const int32_t natoms = static_cast<int32_t>(labels.size());
 
     for (int32_t i = 0; i < natoms; i++)
     {
-        std::string lbl = bp::extract<std::string>(label_list[i]);
-
         CChemicalElement chemelm;
 
-        auto err = chemelm.setAtomType(fstr::upcase(lbl));
+        auto err = chemelm.setAtomType(fstr::upcase(labels[i]));
 
         errors::assertMsgCritical(err, errelm);
 
         charges.push_back(chemelm.getAtomicCharge());
 
         masses.push_back(chemelm.getAtomicMass());
-
-        labels.push_back(lbl);
 
         idselem.push_back(chemelm.getIdentifier());
     }
@@ -101,89 +89,89 @@ CMolecule_from_xyz(const bp::list& label_list,
 
 // Helper function for getting coordinates as numpy array
 
-static np::ndarray
+static py::array
 CMolecule_x_to_numpy(const CMolecule& self)
 {
-    bp::list rx;
+    py::list rx;
 
     for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
     {
         rx.append(self.getCoordinatesX()[i]);
     }
 
-    return np::array(rx);
+    return py::array(rx);
 }
 
-static np::ndarray
+static py::array
 CMolecule_y_to_numpy(const CMolecule& self)
 {
-    bp::list ry;
+    py::list ry;
 
     for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
     {
         ry.append(self.getCoordinatesY()[i]);
     }
 
-    return np::array(ry);
+    return py::array(ry);
 }
 
-static np::ndarray
+static py::array
 CMolecule_z_to_numpy(const CMolecule& self)
 {
-    bp::list rz;
+    py::list rz;
 
     for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
     {
         rz.append(self.getCoordinatesZ()[i]);
     }
 
-    return np::array(rz);
+    return py::array(rz);
 }
 
 // Helper function for getting VDW radii for molecule
 
-static np::ndarray
+static py::array
 CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 {
     auto natoms = self.getNumberOfAtoms();
 
     auto atomradii = vdwradii::getRadii(self);
 
-    bp::list radii;
+    py::list radii;
 
     for (int32_t i = 0; i < natoms; i++)
     {
         radii.append(atomradii[i]);
     }
 
-    return np::array(radii);
+    return py::array(radii);
 }
 
 // Helper function for getting nuclear charges for molecule
 
-static np::ndarray
+static py::array
 CMolecule_elem_ids_to_numpy(const CMolecule& self)
 {
     auto natoms = self.getNumberOfAtoms();
 
     auto idselem = self.getIdsElemental();
 
-    bp::list ids;
+    py::list ids;
 
     for (int32_t i = 0; i < natoms; i++)
     {
         ids.append(idselem[i]);
     }
 
-    return np::array(ids);
+    return py::array(ids);
 }
 
 // Helper function for getting elemental composition
 
-static bp::list
+static py::list
 CMolecule_get_elem_comp(const CMolecule& self)
 {
-    bp::list elemcomp;
+    py::list elemcomp;
 
     auto elmlist = self.getElementalComposition();
     
@@ -233,7 +221,7 @@ CMolecule_check_proximity(const CMolecule& self,
 static void
 CMolecule_broadcast(CMolecule& self,
                     int32_t    rank,
-                    bp::object py_comm)
+                    py::object py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
@@ -242,7 +230,7 @@ CMolecule_broadcast(CMolecule& self,
 
 // Exports classes/functions in src/moldata to python
 
-void export_moldata()
+void export_moldata(py::module& m)
 {
     // CMolecule class
     // Note: Need member function pointers for proper overloading
@@ -261,15 +249,14 @@ void export_moldata()
             const int32_t idElemental) const
         = &CMolecule::getNumberOfAtoms;
 
-    bp::class_< CMolecule, std::shared_ptr<CMolecule> >
+    py::class_< CMolecule, std::shared_ptr<CMolecule> >
         (
-            "Molecule",
-            bp::init<>()
+            m, "Molecule"
         )
-        .def(bp::init<const CMolecule&>())
-        .def(bp::init<const CMolecule&, const CMolecule&>())
-        .def("from_xyz", &CMolecule_from_xyz)
-        .staticmethod("from_xyz")
+        .def(py::init<>())
+        .def(py::init<const CMolecule&>())
+        .def(py::init<const CMolecule&, const CMolecule&>())
+        .def(py::init(&CMolecule_from_xyz))
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)
@@ -290,7 +277,7 @@ void export_moldata()
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("get_elemental_composition", &CMolecule_get_elem_comp)
         .def("broadcast", &CMolecule_broadcast)
-        .def(bp::self == bp::other<CMolecule>())
+        .def(py::self == py::self)
     ;
 
     // CChemicalElement class
@@ -304,15 +291,15 @@ void export_moldata()
             const int32_t idElemental)
         = &CChemicalElement::setAtomType;
 
-    bp::class_< CChemicalElement, std::shared_ptr<CChemicalElement> >
+    py::class_< CChemicalElement, std::shared_ptr<CChemicalElement> >
         (
-            "ChemicalElement",
-            bp::init<>()
+            m, "ChemicalElement"
         )
+        .def(py::init<>())
         .def("set_atom_type", set_atom_type_by_name)
         .def("set_atom_type", set_atom_type_by_id)
         .def("get_name", &CChemicalElement::getName)
-        .def(bp::self == bp::other<CChemicalElement>())
+        .def(py::self == py::self)
     ;
 }
 

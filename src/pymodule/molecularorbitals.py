@@ -56,7 +56,7 @@ def _read_hdf5(fname):
 
     hf.close()
 
-    return MolecularOrbitals.from_numpy_list(orbs, enes, orbs_type)
+    return MolecularOrbitals(orbs, enes, orbs_type)
 
 
 MolecularOrbitals.write_hdf5 = _write_hdf5

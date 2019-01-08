@@ -28,9 +28,8 @@ class TestOrbData(unittest.TestCase):
         data_a = [[ 1., .2, ], [ .2, 1., ]]
         data_b = [[ .9, .5, ], [ .5, .9, ]]
 
-        d_rest = AODensityMatrix.from_numpy_list([data_a], denmat.rest)
-        d_unrest = AODensityMatrix.from_numpy_list([data_a, data_b],
-                                                   denmat.unrest)
+        d_rest = AODensityMatrix([data_a], denmat.rest)
+        d_unrest = AODensityMatrix([data_a, data_b], denmat.unrest)
 
         den_a1 = d_rest.total_to_numpy(0)
         den_a2 = d_unrest.alpha_to_numpy(0)
@@ -50,9 +49,9 @@ class TestOrbData(unittest.TestCase):
         data_c = [[ .8, .6, ], [ .6, .8, ]]
         data_d = [[ .7, .5, ], [ .5, .7, ]]
 
-        d_rest = AODensityMatrix.from_numpy_list([data_a, data_b], denmat.rest)
+        d_rest = AODensityMatrix([data_a, data_b], denmat.rest)
 
-        d_unrest = AODensityMatrix.from_numpy_list(
+        d_unrest = AODensityMatrix(
             [data_a, data_b, data_c, data_d], denmat.unrest)
 
         # hdf5 read/write tests
@@ -75,10 +74,9 @@ class TestOrbData(unittest.TestCase):
         ener_a = [0.5, 0.9]
         ener_b = [0.3, 0.6]
 
-        d_rest = MolecularOrbitals.from_numpy_list([data_a], [ener_a],
-                                                   molorb.rest)
+        d_rest = MolecularOrbitals([data_a], [ener_a], molorb.rest)
 
-        d_unrest = MolecularOrbitals.from_numpy_list(
+        d_unrest = MolecularOrbitals(
             [data_a, data_b], [ener_a, ener_b], molorb.unrest)
 
         den_a1 = d_rest.alpha_to_numpy()

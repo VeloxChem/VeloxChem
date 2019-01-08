@@ -9,8 +9,8 @@ class TestRHF(unittest.TestCase):
 
         comm = MPI.COMM_WORLD
 
-        task = vlx.GlobalTask("inputs/" + molname + ".inp",
-                              "inputs/" + molname + ".out", comm)
+        task = vlx.MpiTask(["inputs/" + molname + ".inp",
+                            "inputs/" + molname + ".out"], comm)
 
         scf_drv = vlx.ScfRestrictedDriver()
 

@@ -1,14 +1,16 @@
 @jobs
-!RunMode: cpu/gpu
-SinglePoint: energy
+task: hf
 @end
 
-@basis
-DEF2-SVP
-@end 
+@method settings
+basis: def2-svp
+basis path: ../basis
+@end
 
-@molxyz 
-0 1 Angs
+@molecule
+charge: 0
+multiplicity: 1
+xyz:  
  O       5.7104702986     2.7671960840    -0.0000002279
  O       3.5309907102    -1.3014107963    -0.0000000147
  N       5.8134817673    -1.3561761467    -0.0000000895
@@ -34,7 +36,3 @@ DEF2-SVP
  H       2.7477724188     1.0714370186     0.8862835798
  H       2.7477709858     1.0714361229    -0.8862812549
 @end 
-
-@progenv 
-BasisLibrary: ../basis/
-@end

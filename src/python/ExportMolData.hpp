@@ -9,12 +9,16 @@
 #ifndef ExportMolData_hpp
 #define ExportMolData_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_moldata { // bp_moldata namespace
 
 /**
  Exports classes/functions in src/moldata to python.
  */
-void export_moldata();
+void export_moldata(py::module& m);
 
 } // bp_moldata namespace
 

@@ -9,12 +9,16 @@
 #ifndef ExportVisualization_hpp
 #define ExportVisualization_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_visualization { // bp_visualization namespace
 
 /**
  Exports classes/functions in src/visualization to python.
  */
-void export_visualization();
+void export_visualization(py::module& m);
 
 } // bp_visualization namespace
 

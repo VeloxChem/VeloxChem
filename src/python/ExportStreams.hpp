@@ -9,12 +9,16 @@
 #ifndef ExportStreams_hpp
 #define ExportStreams_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_streams { // bp_streams namespace
 
 /**
  Exports classes/functions in src/streams to python.
  */
-void export_streams();
+void export_streams(py::module& m);
 
 } // bp_streams namespace
 

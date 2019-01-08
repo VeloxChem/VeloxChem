@@ -9,12 +9,16 @@
 #ifndef ExportOneInts_hpp
 #define ExportOneInts_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_oneints { // bp_oneints namespace
 
 /**
  Exports classes/functions in src/oneints to python.
  */
-void export_oneints();
+void export_oneints(py::module& m);
 
 } // bp_oneints namespace
 

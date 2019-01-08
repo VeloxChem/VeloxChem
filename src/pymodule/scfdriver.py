@@ -154,9 +154,9 @@ class ScfDriver:
         else:
             oao_mat = None
     
-        eri_drv = ElectronRepulsionIntegralsDriver.create(self.rank,
-                                                          self.nodes,
-                                                          comm)
+        eri_drv = ElectronRepulsionIntegralsDriver(self.rank,
+                                                   self.nodes,
+                                                   comm)
                                                           
         qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
                                   molecule, ao_basis)
@@ -235,19 +235,17 @@ class ScfDriver:
 
         t0 = tm.time()
         
-        ovl_drv = OverlapIntegralsDriver.create(self.rank, self.nodes, comm)
+        ovl_drv = OverlapIntegralsDriver(self.rank, self.nodes, comm)
         ovl_mat = ovl_drv.compute(molecule, basis, comm)
 
         t1 = tm.time()
         
-        kin_drv = KineticEnergyIntegralsDriver.create(self.rank, self.nodes,
-                                                      comm)
+        kin_drv = KineticEnergyIntegralsDriver(self.rank, self.nodes, comm)
         kin_mat = kin_drv.compute(molecule, basis, comm)
         
         t2 = tm.time()
 
-        npot_drv = NuclearPotentialIntegralsDriver.create(self.rank, self.nodes,
-                                                          comm)
+        npot_drv = NuclearPotentialIntegralsDriver(self.rank, self.nodes, comm)
         npot_mat = npot_drv.compute(molecule, basis, comm)
 
         t3 = tm.time()

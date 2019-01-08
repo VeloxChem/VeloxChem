@@ -6,7 +6,11 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h>
+#include <pybind11/operators.h>
+
 #include <mpi.h>
 #include <string>
 #include <fstream>
@@ -24,9 +28,7 @@
 #include "ExportMath.hpp"
 #include "ExportOrbData.hpp"
 
-namespace bp = boost::python;
-
-namespace np = boost::python::numpy;
+namespace py = pybind11;
 
 namespace bp_orbdata { // bp_orbdata namespace
 
@@ -35,7 +37,7 @@ namespace bp_orbdata { // bp_orbdata namespace
 static void
 CMolecularBasis_broadcast(CMolecularBasis& self,
                           int32_t          rank,
-                          bp::object       py_comm)
+                          py::object       py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
@@ -52,7 +54,7 @@ CAODensityMatrix_str (const CAODensityMatrix& self)
 
 // Helper function for converting CAODensityMatrix to numpy array
 
-static np::ndarray
+static py::array_t<double>
 CAODensityMatrix_total_density_to_numpy(const CAODensityMatrix& self,
                                         const int32_t iDensityMatrix)
 {
@@ -61,7 +63,7 @@ CAODensityMatrix_total_density_to_numpy(const CAODensityMatrix& self,
                                         self.getNumberOfColumns(iDensityMatrix));
 }
 
-static np::ndarray
+static py::array_t<double>
 CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self,
                                         const int32_t iDensityMatrix)
 {
@@ -70,7 +72,7 @@ CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self,
                                         self.getNumberOfColumns(iDensityMatrix));
 }
 
-static np::ndarray
+static py::array_t<double>
 CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self,
                                        const int32_t iDensityMatrix)
 {
@@ -82,29 +84,27 @@ CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self,
 // Helper function for CAODensityMatrix constructor
 
 static std::shared_ptr<CAODensityMatrix>
-CAODensityMatrix_from_numpy_list(const bp::list& arr_list,
-                                 const denmat    den_type)
+CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
+                                 const denmat                            den_type)
 {
     std::vector<CDenseMatrix> dmat;
 
-    for (int i = 0; i < bp::len(arr_list); i++)
+    for (size_t i = 0; i < arrays.size(); i++)
     {
-        np::ndarray arr = np::array(arr_list[i]);
-
-        std::shared_ptr<CDenseMatrix> mp = bp_math::CDenseMatrix_from_numpy(arr);
+        auto mp = bp_math::CDenseMatrix_from_numpy(arrays[i]);
 
         dmat.push_back(*mp);
     }
 
     return std::shared_ptr<CAODensityMatrix>(new CAODensityMatrix(dmat, den_type));
 }
-    
+
 // Helper function for broadcasting CAODensityMatrix object
     
 static void
 CAODensityMatrix_broadcast(CAODensityMatrix& self,
                            int32_t           rank,
-                           bp::object        py_comm)
+                           py::object        py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
         
@@ -121,7 +121,7 @@ CMolecularOrbitals_str (const CMolecularOrbitals& self)
 
 // Helper function for converting CMolecularOrbitals to numpy array
 
-static np::ndarray
+static py::array_t<double>
 CMolecularOrbitals_alpha_orbitals_to_numpy(const CMolecularOrbitals& self)
 {
     return bp_general::pointer_to_numpy(self.alphaOrbitals(),
@@ -129,7 +129,7 @@ CMolecularOrbitals_alpha_orbitals_to_numpy(const CMolecularOrbitals& self)
                                         self.getNumberOfColumns());
 }
 
-static np::ndarray
+static py::array_t<double>
 CMolecularOrbitals_beta_orbitals_to_numpy(const CMolecularOrbitals& self)
 {
     return bp_general::pointer_to_numpy(self.betaOrbitals(),
@@ -137,75 +137,68 @@ CMolecularOrbitals_beta_orbitals_to_numpy(const CMolecularOrbitals& self)
                                         self.getNumberOfColumns());
 }
 
-static np::ndarray
+static py::array_t<double>
 CMolecularOrbitals_alpha_energies_to_numpy(const CMolecularOrbitals& self)
 {
-    bp::list ea;
+    py::list ea;
 
     for (int32_t i = 0; i < self.getNumberOfColumns(); i++)
     {
         ea.append(self.alphaEnergies()[i]);
     }
 
-    return np::array(ea);
+    return py::array_t<double>(ea);
 }
 
-static np::ndarray
+static py::array_t<double>
 CMolecularOrbitals_beta_energies_to_numpy(const CMolecularOrbitals& self)
 {
-    bp::list eb;
+    py::list eb;
 
     for (int32_t i = 0; i < self.getNumberOfColumns(); i++)
     {
         eb.append(self.betaEnergies()[i]);
     }
 
-    return np::array(eb);
+    return py::array_t<double>(eb);
 }
 
 // Helper function for CMolecularOrbitals constructor
     
 static std::shared_ptr<CMolecularOrbitals>
-CMolecularOrbitals_from_numpy_list(const bp::list& orbs_list,
-                                   const bp::list& eigs_list,
-                                   const molorb    orbs_type)
+CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_orbs,
+                                   const std::vector<py::array_t<double>>& eig_vals,
+                                   const molorb                            orbs_type)
 {
     std::vector<CDenseMatrix> cmos;
-    
-    for (int i = 0; i < bp::len(orbs_list); i++)
-    {
-        np::ndarray arr = np::array(orbs_list[i]);
 
-        std::shared_ptr<CDenseMatrix> mp = bp_math::CDenseMatrix_from_numpy(arr);
-        
+    for (size_t i = 0; i < mol_orbs.size(); i++)
+    {
+        auto mp = bp_math::CDenseMatrix_from_numpy(mol_orbs[i]);
+
         cmos.push_back(*mp);
     }
 
     std::vector<CMemBlock<double>> ceigs;
-    
-    for (int i = 0; i < bp::len(eigs_list); i++)
+
+    for (size_t i = 0; i < eig_vals.size(); i++)
     {
-        np::ndarray arr = np::array(eigs_list[i]);
-        
-        const double* data = reinterpret_cast<double*>(arr.get_data());
-        
-        if (data == nullptr)
+        const py::array_t<double>& arr = eig_vals[i];
+
+        std::string errdim("MolecularOrbitals eigenvalues: need 1D numpy arrays");
+
+        errors::assertMsgCritical(arr.ndim() == 1, errdim);
+
+        if (arr.data() == nullptr || arr.size() == 0)
         {
             return std::shared_ptr<CMolecularOrbitals>(new CMolecularOrbitals());
         }
-        
-        auto size = static_cast<int32_t>(arr.shape(0));
-        
-        if (size == 0)
-        {
-            return std::shared_ptr<CMolecularOrbitals>(new CMolecularOrbitals());
-        }
-        
-        std::vector<double> vec (data, data + size);
-        
+
+        std::vector<double> vec(arr.data(), arr.data() + arr.size());
+
         ceigs.push_back(CMemBlock<double>(vec));
     }
-    
+
     return std::shared_ptr<CMolecularOrbitals>(
             new CMolecularOrbitals(cmos, ceigs, orbs_type)
             );
@@ -222,74 +215,42 @@ CMolecularOrbitals_get_rest_density(const CMolecularOrbitals& self,
     return self.getAODensity(nelec);
 }
 
-// Helper function for CBasisFunction constructor
-    
-static std::shared_ptr<CBasisFunction>
-CBasisFunction_from_list(const bp::list& expons_list,
-                         const bp::list& coeffs_list,
-                         const int32_t   nContrVectors,
-                         const int32_t   angularMomentum)
-{
-    std::vector<double> exponents;
-
-    std::vector<double> normFactors;
-
-    for (int i = 0; i < bp::len(expons_list); i++)
-    {
-        exponents.push_back(bp::extract<double>(expons_list[i]));
-    }
-
-    for (int i = 0; i < bp::len(coeffs_list); i++)
-    {
-        normFactors.push_back(bp::extract<double>(coeffs_list[i]));
-    }
-
-    return std::shared_ptr<CBasisFunction>(
-            new CBasisFunction(exponents, normFactors,
-                               nContrVectors, angularMomentum)
-            );
-}
-
 // Exports classes/functions in src/orbdata to python
 
-void export_orbdata()
+void export_orbdata(py::module& m)
 {
-    // initialize numpy
-
-    Py_Initialize();
-
-    np::initialize();
-
     // CBasisFunction class
 
-    bp::class_< CBasisFunction, std::shared_ptr<CBasisFunction> >
+    py::class_< CBasisFunction, std::shared_ptr<CBasisFunction> >
         (
-            "BasisFunction",
-            bp::init<>()
+            m, "BasisFunction"
         )
-        .def("from_list", &CBasisFunction_from_list)
-        .staticmethod("from_list")
+        .def(py::init<>())
+        .def(py::init<const std::vector<double>&,
+                      const std::vector<double>&,
+                      const int32_t,
+                      const int32_t>())
         .def("normalize", &CBasisFunction::normalize)
     ;
 
     // CAtomBasis class
 
-    bp::class_< CAtomBasis, std::shared_ptr<CAtomBasis> >
+    py::class_< CAtomBasis, std::shared_ptr<CAtomBasis> >
         (
-            "AtomBasis",
-            bp::init<>()
+            m, "AtomBasis"
         )
+        .def(py::init<>())
         .def("add_basis_function", &CAtomBasis::addBasisFunction)
         .def("set_elemental_id", &CAtomBasis::setIdElemental)
     ;
 
     // CMolecularBasis class
 
-    bp::class_< CMolecularBasis, std::shared_ptr<CMolecularBasis> >
+    py::class_< CMolecularBasis, std::shared_ptr<CMolecularBasis> >
         (
-            "MolecularBasis",
-            bp::init<>()
+            m, "MolecularBasis"
         )
+        .def(py::init<>())
         .def("get_string", &CMolecularBasis::printBasis)
         .def("set_label", &CMolecularBasis::setLabel)
         .def("get_label", &CMolecularBasis::getLabel)
@@ -297,64 +258,62 @@ void export_orbdata()
         .def("print_basis", &CMolecularBasis::printBasis)
         .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis)
         .def("add_atom_basis", &CMolecularBasis::addAtomBasis)
-        .def(bp::self == bp::other<CMolecularBasis>())
+        .def(py::self == py::self)
     ;
 
     // denmat enum class
 
-    bp::enum_<denmat> ("denmat")
+    py::enum_<denmat> (m, "denmat")
         .value("rest",   denmat::rest  )
         .value("unrest", denmat::unrest)
     ;
 
     // CAODensityMatrix class
 
-    bp::class_< CAODensityMatrix, std::shared_ptr<CAODensityMatrix> >
+    py::class_< CAODensityMatrix, std::shared_ptr<CAODensityMatrix> >
         (
-            "AODensityMatrix",
-            bp::init<>()
+            m, "AODensityMatrix"
         )
-        .def(bp::init<const CAODensityMatrix&>())
+        .def(py::init<>())
+        .def(py::init<const CAODensityMatrix&>())
+        .def(py::init(&CAODensityMatrix_from_numpy_list))
         .def("__str__", &CAODensityMatrix_str)
         .def("total_to_numpy", &CAODensityMatrix_total_density_to_numpy)
         .def("alpha_to_numpy", &CAODensityMatrix_alpha_density_to_numpy)
         .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy)
-        .def("from_numpy_list", &CAODensityMatrix_from_numpy_list)
-        .staticmethod("from_numpy_list")
         .def("get_number_of_density_matrices",
                 &CAODensityMatrix::getNumberOfDensityMatrices)
         .def("get_density_type", &CAODensityMatrix::getDensityType)
         .def("sub", &CAODensityMatrix::sub)
         .def("broadcast", &CAODensityMatrix_broadcast)
-        .def(bp::self == bp::other<CAODensityMatrix>())
+        .def(py::self == py::self)
     ;
 
     // molorb enum class
 
-    bp::enum_<molorb> ("molorb")
+    py::enum_<molorb> (m, "molorb")
         .value("rest",   molorb::rest  )
         .value("unrest", molorb::unrest)
     ;
 
     // CMolecularOrbitals class
 
-    bp::class_< CMolecularOrbitals, std::shared_ptr<CMolecularOrbitals> >
+    py::class_< CMolecularOrbitals, std::shared_ptr<CMolecularOrbitals> >
         (
-            "MolecularOrbitals",
-            bp::init<>()
+            m, "MolecularOrbitals"
          )
-        .def(bp::init<const CMolecularOrbitals&>())
+        .def(py::init<>())
+        .def(py::init<const CMolecularOrbitals&>())
+        .def(py::init(&CMolecularOrbitals_from_numpy_list))
         .def("__str__", &CMolecularOrbitals_str)
         .def("alpha_to_numpy", &CMolecularOrbitals_alpha_orbitals_to_numpy)
         .def("beta_to_numpy", &CMolecularOrbitals_beta_orbitals_to_numpy)
         .def("ea_to_numpy", &CMolecularOrbitals_alpha_energies_to_numpy)
         .def("eb_to_numpy", &CMolecularOrbitals_beta_energies_to_numpy)
-        .def("from_numpy_list", &CMolecularOrbitals_from_numpy_list)
-        .staticmethod("from_numpy_list")
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType)
-        .def(bp::self == bp::other<CMolecularOrbitals>())
         .def("get_rest_density", &CMolecularOrbitals_get_rest_density)
         .def("insert", &CMolecularOrbitals::insert)
+        .def(py::self == py::self)
     ;
 }
 

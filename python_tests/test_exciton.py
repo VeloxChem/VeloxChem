@@ -34,7 +34,7 @@ class TestExciton(unittest.TestCase):
 
         # compute overlap
 
-        ovldrv = OverlapIntegralsDriver.create(rank, size, comm)
+        ovldrv = OverlapIntegralsDriver(rank, size, comm)
         S = ovldrv.compute(molecule, basis, comm)
         S11 = ovldrv.compute(mol_1, basis, comm)
         S22 = ovldrv.compute(mol_2, basis, comm)
@@ -50,7 +50,7 @@ class TestExciton(unittest.TestCase):
 
         # compute kinetic energy
 
-        kindrv = KineticEnergyIntegralsDriver.create(rank, size, comm)
+        kindrv = KineticEnergyIntegralsDriver(rank, size, comm)
         T = kindrv.compute(molecule, basis, comm)
         T11 = kindrv.compute(mol_1, basis, comm)
         T22 = kindrv.compute(mol_2, basis, comm)
@@ -66,7 +66,7 @@ class TestExciton(unittest.TestCase):
 
         # compute nuclear potential
 
-        npotdrv = NuclearPotentialIntegralsDriver.create(rank, size, comm)
+        npotdrv = NuclearPotentialIntegralsDriver(rank, size, comm)
         V = npotdrv.compute(molecule, basis, comm)
         V11 = npotdrv.compute(mol_1, basis, molecule, comm)
         V22 = npotdrv.compute(mol_2, basis, molecule, comm)

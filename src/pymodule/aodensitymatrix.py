@@ -68,7 +68,7 @@ def _read_hdf5(fname):
         types[0] in list(dentype.values()),
         "AODensityMatrix.read_hdf5: invalid density type!")
 
-    return AODensityMatrix.from_numpy_list(dens, types[0])
+    return AODensityMatrix(dens, types[0])
 
 
 AODensityMatrix.write_hdf5 = _write_hdf5

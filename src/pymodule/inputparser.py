@@ -94,10 +94,10 @@ class InputParser:
 
         mol_dict = self.input_dict
 
-        mol = Molecule.from_xyz(mol_dict['molecule']['atom_labels'],
-                                mol_dict['molecule']['x_coords'],
-                                mol_dict['molecule']['y_coords'],
-                                mol_dict['molecule']['z_coords'])
+        mol = Molecule(mol_dict['molecule']['atom_labels'],
+                       mol_dict['molecule']['x_coords'],
+                       mol_dict['molecule']['y_coords'],
+                       mol_dict['molecule']['z_coords'])
 
         if 'charge' in mol_dict['molecule'].keys():
             mol.set_charge(int(mol_dict['molecule']['charge']))
@@ -152,7 +152,7 @@ class InputParser:
                     for k in range(ncgto):
                         coeffs[k * npgto + i] = float(prims[k + 1])
 
-                bf = BasisFunction.from_list(expons, coeffs, ncgto, angl)
+                bf = BasisFunction(expons, coeffs, ncgto, angl)
                 bf.normalize()
 
                 atom_basis.add_basis_function(bf)

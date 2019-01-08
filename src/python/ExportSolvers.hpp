@@ -9,12 +9,16 @@
 #ifndef ExportSolvers_hpp
 #define ExportSolvers_hpp
 
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+
 namespace bp_solvers { // bp_solvers namespace
 
 /**
  Exports classes/functions in src/solvers to python.
  */
-void export_solvers();
+void export_solvers(py::module& m);
 
 } // bp_solvers namespace
 

@@ -6,18 +6,18 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
 
 #include "VisualizationDriver.hpp"
 #include "ExportVisualization.hpp"
 
-namespace bp = boost::python;
+namespace py = pybind11;
 
 namespace bp_visualization { // bp_visualization namespace
 
 // Exports classes/functions in src/visualization to python
 
-void export_visualization()
+void export_visualization(py::module& m)
 {
     // CVisualizationDriver class
     // Note: Need member function pointers for proper overloading
@@ -44,11 +44,11 @@ void export_visualization()
             const double            zp) const
         = &CVisualizationDriver::compute;
 
-    bp::class_< CVisualizationDriver, std::shared_ptr<CVisualizationDriver> >
+    py::class_< CVisualizationDriver, std::shared_ptr<CVisualizationDriver> >
         (
-            "VisualizationDriver",
-            bp::init<>()
+            m, "VisualizationDriver"
         )
+        .def(py::init<>())
         .def("compute", compute_mol_orb)
         .def("compute", compute_density)
     ;

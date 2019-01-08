@@ -6,7 +6,8 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
+
 #include <mpi.h>
 
 #include "SADGuessDriver.hpp"
@@ -19,7 +20,7 @@
 #include "ExportGeneral.hpp"
 #include "ExportSolvers.hpp"
 
-namespace bp = boost::python;
+namespace py = pybind11;
 
 namespace bp_solvers { // bp_solvers namespace
 
@@ -28,7 +29,7 @@ namespace bp_solvers { // bp_solvers namespace
 static std::shared_ptr<CSADGuessDriver>
 CSADGuessDriver_create(int32_t    globRank,
                        int32_t    globNodes,
-                       bp::object py_comm)
+                       py::object py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
@@ -47,7 +48,7 @@ CSADGuessDriver_compute(
     const CMolecularBasis& basis_2,
     const COverlapMatrix&  S12,
     const COverlapMatrix&  S22,
-          bp::object       py_comm)
+          py::object       py_comm)
 {
     MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
 
@@ -56,17 +57,16 @@ CSADGuessDriver_compute(
 
 // Exports classes/functions in src/solvers to python
 
-void export_solvers()
+void export_solvers(py::module& m)
 {
     // CSADGuessDriver class
 
-    bp::class_< CSADGuessDriver, std::shared_ptr<CSADGuessDriver> >
+    py::class_< CSADGuessDriver, std::shared_ptr<CSADGuessDriver> >
         (
-            "SADGuessDriver",
-            bp::init<const int32_t, const int32_t, MPI_Comm>()
+            m, "SADGuessDriver"
         )
-        .def("create", &CSADGuessDriver_create)
-        .staticmethod("create")
+        .def(py::init<const int32_t, const int32_t, MPI_Comm>())
+        .def(py::init(&CSADGuessDriver_create))
         .def("compute", &CSADGuessDriver_compute)
     ;
 }
