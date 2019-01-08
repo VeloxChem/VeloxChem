@@ -44,9 +44,6 @@ ifeq ($(USE_MKL),true)
   CPP_DEB_FLG += -DENABLE_MKL
 endif
 
-CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
-CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
-
 # MKL header and library
 
 MKL_INCLUDES := $(MKLROOT)/include
@@ -56,7 +53,7 @@ LIB_LIST += -lmkl_gnu_thread -lmkl_core -lmkl_avx2 -lgomp -lpthread -lm -ldl
 
 # Google Test root directory
 
-GST_ROOT := /cfs/klemming/nobackup/l/lxin/googletest/googletest
+GST_ROOT := /cfs/klemming/nobackup/l/lxin/software/beskow/googletest/googletest
 
 GST_LIB := $(GST_ROOT)/lib/libgtest.a
 
@@ -79,21 +76,17 @@ ifeq ($(USE_GPU),true)
   LIB_LIST += -lcuda -lcudart
 endif
 
-# Boost header and library
+# Python interface
 
 PYTHON := python3
-BOOST_PATH := /pdc/vol/boost/1.66.0-gcc7-py36
-
-#PYTHON_VER := $(shell $(PYTHON) -c "import sys; print(sys.version_info.major, sys.version_info.minor, sep='')")
-PYTHON_VER := $(shell $(PYTHON) -c "import sys; print(sys.version_info.major)")
+PYBIND11_PATH := /cfs/klemming/nobackup/l/lxin/software/beskow/pybind11
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(BOOST_PATH)/include
+PYTHON_INC += -I$(PYBIND11_PATH)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
-PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python$(PYTHON_VER) -lboost_numpy$(PYTHON_VER)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)

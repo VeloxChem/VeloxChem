@@ -44,12 +44,9 @@ ifeq ($(USE_MKL),true)
   CPP_DEB_FLG += -DENABLE_MKL
 endif
 
-CPP_REL_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
-CPP_DEB_FLG += -DENABLE_PYTHON -DBOOST_NO_AUTO_PTR
-
 # MKL header and library
 
-MKLROOT := /home/xinli/software/openblas
+MKLROOT := /home/lxin/software/openblas
 MKL_INCLUDES := $(MKLROOT)/include
 
 LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas -lgfortran
@@ -57,13 +54,13 @@ LIB_LIST += -lgomp -lpthread -lm -ldl
 
 # Google Test root directory
 
-GST_ROOT := /home/xinli/gitlab/googletest
+GST_ROOT := /home/lxin/software/googletest/googletest
 
 GST_LIB := $(GST_ROOT)/lib/libgtest.a
 
 # CUDA compiler & linker
 
-CUDA_ROOT := /usr/local/cuda
+CUDA_ROOT := /usr/local/cuda-8.0
 NVCC := $(CUDA_ROOT)/bin/nvcc
 
 ifeq ($(USE_GPU),true)
@@ -80,20 +77,17 @@ ifeq ($(USE_GPU),true)
   LIB_LIST += -lcuda -lcudart
 endif
 
-# Boost header and library
+# Python interface
 
 PYTHON := python3
-BOOST_PATH := /home/xinli/software/boost/1.68.0
-
-PYTHON_VER := $(shell $(PYTHON) -c "import sys; print(sys.version_info.major, sys.version_info.minor, sep='')")
+PYBIND11_PATH := /home/lxin/software/pybind11
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(BOOST_PATH)/include
+PYTHON_INC += -I$(PYBIND11_PATH)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
-PYTHON_LD  += -L$(BOOST_PATH)/lib -lboost_python$(PYTHON_VER) -lboost_numpy$(PYTHON_VER)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
