@@ -1,6 +1,7 @@
 from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import Molecule
+from veloxchem.veloxchemlib import ChemicalElement
 from veloxchem.veloxchemlib import bohr_in_angstroms
 
 import numpy as np
@@ -48,6 +49,26 @@ class TestMolData(unittest.TestCase):
         self.assertTrue((y == y_arr).all())
         self.assertTrue((z == z_arr).all())
 
+    def test_setters_and_getters(self):
+
+        mol = Molecule(
+            [ "N", "H", "H", "H" ],
+            [ -3.710, -3.702, -4.704, -4.780 ],
+            [  3.019,  4.942,  2.415,  2.569 ],
+            [ -0.037,  0.059,  1.497, -1.573 ])
+
+        mol.set_charge(-1)
+        self.assertEqual(-1, mol.get_charge())
+
+        mol.set_multiplicity(2)
+        self.assertEqual(2, mol.get_multiplicity())
+
+        mol.check_multiplicity()
+        mol.check_proximity(0.1)
+
+        elem_comp = mol.get_elemental_composition()
+        self.assertTrue(elem_comp == [1, 7])
+
     def test_number_of_atoms(self):
 
         mol = Molecule(
@@ -87,6 +108,19 @@ class TestMolData(unittest.TestCase):
         ref_ids = np.array([ 1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80 ])
 
         self.assertTrue((elem_ids == ref_ids).all())
+
+    def test_chemical_element(self):
+
+        elem = ChemicalElement()
+        self.assertEqual("", elem.get_name())
+        elem.set_atom_type("BR")
+        self.assertEqual("Br", elem.get_name())
+
+        elem2 = ChemicalElement()
+        elem2.set_atom_type(35)
+        self.assertEqual("Br", elem2.get_name())
+
+        self.assertEqual(elem, elem2)
 
 
 if __name__ == "__main__":
