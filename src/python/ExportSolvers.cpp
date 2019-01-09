@@ -65,7 +65,6 @@ void export_solvers(py::module& m)
         (
             m, "SADGuessDriver"
         )
-        .def(py::init<const int32_t, const int32_t, MPI_Comm>())
         .def(py::init(&CSADGuessDriver_create))
         .def("compute", &CSADGuessDriver_compute)
     ;

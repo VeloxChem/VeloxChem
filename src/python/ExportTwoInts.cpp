@@ -205,7 +205,6 @@ void export_twoints(py::module& m)
         (
             m, "ElectronRepulsionIntegralsDriver"
         )
-        .def(py::init<const int32_t, const int32_t, MPI_Comm>())
         .def(py::init(&CElectronRepulsionIntegralsDriver_create))
         .def("compute", &CElectronRepulsionIntegralsDriver_compute_1)
         .def("compute", &CElectronRepulsionIntegralsDriver_compute_2)

@@ -367,7 +367,6 @@ void export_oneints(py::module& m)
         (
             m, "OverlapIntegralsDriver"
         )
-        .def(py::init<const int32_t, const int32_t, MPI_Comm>())
         .def(py::init(&COverlapIntegralsDriver_create))
         .def("compute", &COverlapIntegralsDriver_compute_1)
         .def("compute", &COverlapIntegralsDriver_compute_2)
@@ -397,7 +396,6 @@ void export_oneints(py::module& m)
         (
             m, "KineticEnergyIntegralsDriver"
         )
-        .def(py::init<const int32_t, const int32_t, MPI_Comm>())
         .def(py::init(&CKineticEnergyIntegralsDriver_create))
         .def("compute", &CKineticEnergyIntegralsDriver_compute_1)
         .def("compute", &CKineticEnergyIntegralsDriver_compute_2)
@@ -427,7 +425,6 @@ void export_oneints(py::module& m)
         (
             m, "NuclearPotentialIntegralsDriver"
         )
-        .def(py::init<const int32_t, const int32_t, MPI_Comm>())
         .def(py::init(&CNuclearPotentialIntegralsDriver_create))
         .def("compute", &CNuclearPotentialIntegralsDriver_compute_0)
         .def("compute", &CNuclearPotentialIntegralsDriver_compute_1)
