@@ -25,7 +25,7 @@
 
 namespace py = pybind11;
 
-namespace bp_moldata { // bp_moldata namespace
+namespace vlx_moldata { // vlx_moldata namespace
 
 // Helper function for CMolecule constructor
 
@@ -245,7 +245,7 @@ CMolecule_broadcast(CMolecule& self,
                     int32_t    rank,
                     py::object py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     self.broadcast(rank, *comm_ptr);
 }
@@ -315,4 +315,4 @@ void export_moldata(py::module& m)
     ;
 }
 
-} // bp_moldata namespace
+} // vlx_moldata namespace

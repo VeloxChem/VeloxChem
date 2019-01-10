@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace bp_gpu { // bp_gpu namespace
+namespace vlx_gpu { // vlx_gpu namespace
 
 /**
  Exports classes/functions in src/gpu to python.
  */
 void export_gpu(py::module& m);
 
-} // bp_gpu namespace
+} // vlx_gpu namespace
 
 #endif /* ExportGpu_hpp */

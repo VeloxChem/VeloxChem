@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace bp_orbdata { // bp_orbdata namespace
+namespace vlx_orbdata { // vlx_orbdata namespace
 
 /**
  Exports classes/functions in src/orbdata to python.
  */
 void export_orbdata(py::module& m);
 
-} // bp_orbdata namespace
+} // vlx_orbdata namespace
 
 #endif /* ExportOrbData_hpp */

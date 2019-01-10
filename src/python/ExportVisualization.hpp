@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace bp_visualization { // bp_visualization namespace
+namespace vlx_visualization { // vlx_visualization namespace
 
 /**
  Exports classes/functions in src/visualization to python.
  */
 void export_visualization(py::module& m);
 
-} // bp_visualization namespace
+} // vlx_visualization namespace
 
 #endif /* ExportVisualization_hpp */

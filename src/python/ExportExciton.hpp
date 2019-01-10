@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace bp_exciton { // bp_exciton namespace
+namespace vlx_exciton { // vlx_exciton namespace
 
 /**
  Exports classes/functions in src/exciton to python.
  */
 void export_exciton(py::module& m);
 
-} // bp_exciton namespace
+} // vlx_exciton namespace
 
 #endif /* ExportExciton_hpp */

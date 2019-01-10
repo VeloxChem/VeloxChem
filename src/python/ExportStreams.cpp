@@ -17,7 +17,7 @@
 
 namespace py = pybind11;
 
-namespace bp_streams { // bp_streams namespace
+namespace vlx_streams { // vlx_streams namespace
 
 // Helper function for writing to output stream
 
@@ -103,4 +103,4 @@ void export_streams(py::module& m)
     m.def("to_angular_momentum", &integer_to_angular_momentum);
 }
 
-} // bp_streams namespace
+} // vlx_streams namespace

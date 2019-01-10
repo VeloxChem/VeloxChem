@@ -22,25 +22,25 @@
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
-    bp_general::export_general(m);
+    vlx_general::export_general(m);
 
-    bp_streams::export_streams(m);
+    vlx_streams::export_streams(m);
 
-    bp_moldata::export_moldata(m);
+    vlx_moldata::export_moldata(m);
 
-    bp_orbdata::export_orbdata(m);
+    vlx_orbdata::export_orbdata(m);
 
-    bp_oneints::export_oneints(m);
+    vlx_oneints::export_oneints(m);
 
-    bp_twoints::export_twoints(m);
+    vlx_twoints::export_twoints(m);
 
-    bp_math::export_math(m);
+    vlx_math::export_math(m);
 
-    bp_gpu::export_gpu(m);
+    vlx_gpu::export_gpu(m);
 
-    bp_solvers::export_solvers(m);
+    vlx_solvers::export_solvers(m);
 
-    bp_exciton::export_exciton(m);
+    vlx_exciton::export_exciton(m);
 
-    bp_visualization::export_visualization(m);
+    vlx_visualization::export_visualization(m);
 }

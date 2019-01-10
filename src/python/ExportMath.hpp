@@ -18,7 +18,7 @@
 
 namespace py = pybind11;
 
-namespace bp_math { // bp_math namespace
+namespace vlx_math { // vlx_math namespace
 
 /**
  Converts numpy array to CDenseMatrix
@@ -34,6 +34,6 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr);
  */
 void export_math(py::module& m);
 
-} // bp_math namespace
+} // vlx_math namespace
 
 #endif /* ExportMath_hpp */

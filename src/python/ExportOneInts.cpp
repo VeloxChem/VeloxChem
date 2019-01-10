@@ -29,7 +29,7 @@
 
 namespace py = pybind11;
 
-namespace bp_oneints { // bp_oneints namespace
+namespace vlx_oneints { // vlx_oneints namespace
 
 // Helper function for COverlapIntegralsDriver constructor
 
@@ -38,7 +38,7 @@ COverlapIntegralsDriver_create(int32_t    globRank,
                                int32_t    globNodes,
                                py::object py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<COverlapIntegralsDriver>(
         new COverlapIntegralsDriver(globRank, globNodes, *comm_ptr)
@@ -54,7 +54,7 @@ COverlapIntegralsDriver_compute_1(
     const CMolecularBasis&         basis,
           py::object               py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, *comm_ptr);
 }
@@ -67,7 +67,7 @@ COverlapIntegralsDriver_compute_2(
     const CMolecularBasis&         ketBasis,
           py::object               py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, braBasis, ketBasis, *comm_ptr);
 }
@@ -80,7 +80,7 @@ COverlapIntegralsDriver_compute_3(
     const CMolecularBasis&         basis,
           py::object               py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, basis, *comm_ptr);
 }
@@ -94,7 +94,7 @@ COverlapIntegralsDriver_compute_4(
     const CMolecularBasis&         ketBasis,
           py::object               py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
                         *comm_ptr);
@@ -113,7 +113,7 @@ COverlapMatrix_str (const COverlapMatrix& self)
 static py::array_t<double>
 COverlapMatrix_to_numpy(const COverlapMatrix& self)
 {
-    return bp_general::pointer_to_numpy(self.values(),
+    return vlx_general::pointer_to_numpy(self.values(),
                                          self.getNumberOfRows(),
                                          self.getNumberOfColumns());
 }
@@ -123,7 +123,7 @@ COverlapMatrix_to_numpy(const COverlapMatrix& self)
 static std::shared_ptr<COverlapMatrix>
 COverlapMatrix_from_numpy(const py::array_t<double>& arr)
 {
-    auto mp = bp_math::CDenseMatrix_from_numpy(arr);
+    auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
 
     return std::shared_ptr<COverlapMatrix>(new COverlapMatrix(*mp));
 }
@@ -135,7 +135,7 @@ CKineticEnergyIntegralsDriver_create(int32_t    globRank,
                                      int32_t    globNodes,
                                      py::object py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CKineticEnergyIntegralsDriver>(
         new CKineticEnergyIntegralsDriver(globRank, globNodes, *comm_ptr)
@@ -151,7 +151,7 @@ CKineticEnergyIntegralsDriver_compute_1(
     const CMolecularBasis&               basis,
           py::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, *comm_ptr);
 }
@@ -164,7 +164,7 @@ CKineticEnergyIntegralsDriver_compute_2(
     const CMolecularBasis&               ketBasis,
           py::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, braBasis, ketBasis, *comm_ptr);
 }
@@ -177,7 +177,7 @@ CKineticEnergyIntegralsDriver_compute_3(
     const CMolecularBasis&               basis,
           py::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, basis, *comm_ptr);
 }
@@ -191,7 +191,7 @@ CKineticEnergyIntegralsDriver_compute_4(
     const CMolecularBasis&               ketBasis,
           py::object                     py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
                         *comm_ptr);
@@ -210,7 +210,7 @@ CKineticEnergyMatrix_str (const CKineticEnergyMatrix& self)
 static py::array_t<double>
 CKineticEnergyMatrix_to_numpy(const CKineticEnergyMatrix& self)
 {
-    return bp_general::pointer_to_numpy(self.values(),
+    return vlx_general::pointer_to_numpy(self.values(),
                                          self.getNumberOfRows(),
                                          self.getNumberOfColumns());
 }
@@ -220,7 +220,7 @@ CKineticEnergyMatrix_to_numpy(const CKineticEnergyMatrix& self)
 static std::shared_ptr<CKineticEnergyMatrix>
 CKineticEnergyMatrix_from_numpy(const py::array_t<double>& arr)
 {
-    auto mp = bp_math::CDenseMatrix_from_numpy(arr);
+    auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
 
     return std::shared_ptr<CKineticEnergyMatrix>(new CKineticEnergyMatrix(*mp));
 }
@@ -232,7 +232,7 @@ CNuclearPotentialIntegralsDriver_create(int32_t    globRank,
                                         int32_t    globNodes,
                                         py::object py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CNuclearPotentialIntegralsDriver>(
         new CNuclearPotentialIntegralsDriver(globRank, globNodes, *comm_ptr)
@@ -248,7 +248,7 @@ CNuclearPotentialIntegralsDriver_compute_0(
     const CMolecularBasis&                  basis,
           py::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, *comm_ptr);
 }
@@ -261,7 +261,7 @@ CNuclearPotentialIntegralsDriver_compute_1(
     const CMolecule&                        pchgMolecule,
           py::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis, pchgMolecule, *comm_ptr);
 }
@@ -275,7 +275,7 @@ CNuclearPotentialIntegralsDriver_compute_2(
     const CMolecule&                        pchgMolecule,
           py::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, braBasis, ketBasis, pchgMolecule,
                         *comm_ptr);
@@ -290,7 +290,7 @@ CNuclearPotentialIntegralsDriver_compute_3(
     const CMolecule&                        pchgMolecule,
           py::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, basis, pchgMolecule,
                         *comm_ptr);
@@ -306,7 +306,7 @@ CNuclearPotentialIntegralsDriver_compute_4(
     const CMolecule&                        pchgMolecule,
           py::object                        py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(braMolecule, ketMolecule, braBasis, ketBasis, pchgMolecule,
                         *comm_ptr);
@@ -325,7 +325,7 @@ CNuclearPotentialMatrix_str (const CNuclearPotentialMatrix& self)
 static py::array_t<double>
 CNuclearPotentialMatrix_to_numpy(const CNuclearPotentialMatrix& self)
 {
-    return bp_general::pointer_to_numpy(self.values(),
+    return vlx_general::pointer_to_numpy(self.values(),
                                          self.getNumberOfRows(),
                                          self.getNumberOfColumns());
 }
@@ -335,7 +335,7 @@ CNuclearPotentialMatrix_to_numpy(const CNuclearPotentialMatrix& self)
 static std::shared_ptr<CNuclearPotentialMatrix>
 CNuclearPotentialMatrix_from_numpy(const py::array_t<double>& arr)
 {
-    auto mp = bp_math::CDenseMatrix_from_numpy(arr);
+    auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
 
     return std::shared_ptr<CNuclearPotentialMatrix>(new CNuclearPotentialMatrix(*mp));
 }
@@ -434,4 +434,4 @@ void export_oneints(py::module& m)
     ;
 }
 
-} // bp_oneints namespace
+} // vlx_oneints namespace

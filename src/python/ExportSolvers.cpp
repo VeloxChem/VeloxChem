@@ -22,7 +22,7 @@
 
 namespace py = pybind11;
 
-namespace bp_solvers { // bp_solvers namespace
+namespace vlx_solvers { // vlx_solvers namespace
 
 // Helper function for CSADGuessDriver constructor
 
@@ -31,7 +31,7 @@ CSADGuessDriver_create(int32_t    globRank,
                        int32_t    globNodes,
                        py::object py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CSADGuessDriver>(
         new CSADGuessDriver(globRank, globNodes, *comm_ptr)
@@ -50,7 +50,7 @@ CSADGuessDriver_compute(
     const COverlapMatrix&  S22,
           py::object       py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return self.compute(molecule, basis_1, basis_2, S12, S22, *comm_ptr);
 }
@@ -70,4 +70,4 @@ void export_solvers(py::module& m)
     ;
 }
 
-} // bp_solvers namespace
+} // vlx_solvers namespace

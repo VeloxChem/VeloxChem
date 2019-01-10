@@ -21,7 +21,7 @@
 
 namespace py = pybind11;
 
-namespace bp_math { // bp_math namespace
+namespace vlx_math { // vlx_math namespace
 
 // Helper function for printing CDenseMatrix
 
@@ -36,7 +36,7 @@ CDenseMatrix_str(const CDenseMatrix& self)
 static py::array_t<double>
 CDenseMatrix_to_numpy(const CDenseMatrix& self)
 {
-    return bp_general::pointer_to_numpy(self.values(),
+    return vlx_general::pointer_to_numpy(self.values(),
                                          self.getNumberOfRows(),
                                          self.getNumberOfColumns());
 }
@@ -123,4 +123,4 @@ void export_math(py::module& m)
     m.def("mathconst_pi", &mathconst::getPiValue);
 }
 
-} // bp_math namespace
+} // vlx_math namespace

@@ -25,7 +25,7 @@
 
 namespace py = pybind11;
 
-namespace bp_twoints { // bp_twoints namespace
+namespace vlx_twoints { // vlx_twoints namespace
 
 // Helper function for printing CAOFockMatrix
 
@@ -41,7 +41,7 @@ static py::array_t<double>
 CAOFockMatrix_to_numpy(const CAOFockMatrix& self,
                        const int32_t iFockMatrix)
 {
-    return bp_general::pointer_to_numpy(self.getFock(iFockMatrix),
+    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix),
                                          self.getNumberOfRows(iFockMatrix),
                                          self.getNumberOfColumns(iFockMatrix));
 }
@@ -58,7 +58,7 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 
     for (size_t i = 0; i < arrays.size(); i++)
     {
-        auto mp = bp_math::CDenseMatrix_from_numpy(arrays[i]);
+        auto mp = vlx_math::CDenseMatrix_from_numpy(arrays[i]);
 
         fmat.push_back(*mp);
     }
@@ -75,7 +75,7 @@ CElectronRepulsionIntegralsDriver_create(int32_t    globRank,
                                          int32_t    globNodes,
                                          py::object py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CElectronRepulsionIntegralsDriver>(
         new CElectronRepulsionIntegralsDriver(globRank, globNodes, *comm_ptr)
@@ -94,7 +94,7 @@ CElectronRepulsionIntegralsDriver_compute_1(
     const CScreeningContainer&               screeningContainer,
           py::object                         py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis,
                  screeningContainer, *comm_ptr);
@@ -119,7 +119,7 @@ CAOFockMatrix_reduce_sum(CAOFockMatrix& self,
                          int32_t        nodes,
                          py::object     py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
         
     self.reduce_sum(rank, nodes, *comm_ptr);
 }
@@ -210,4 +210,4 @@ void export_twoints(py::module& m)
     ;
 }
 
-} // bp_twoints namespace
+} // vlx_twoints namespace

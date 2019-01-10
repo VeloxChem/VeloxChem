@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace bp_streams { // bp_streams namespace
+namespace vlx_streams { // vlx_streams namespace
 
 /**
  Exports classes/functions in src/streams to python.
  */
 void export_streams(py::module& m);
 
-} // bp_streams namespace
+} // vlx_streams namespace
 
 #endif /* ExportStreams_hpp */

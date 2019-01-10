@@ -29,7 +29,7 @@
 
 namespace py = pybind11;
 
-namespace bp_orbdata { // bp_orbdata namespace
+namespace vlx_orbdata { // vlx_orbdata namespace
 
 // Helper function for broadcasting CMolecularBasis object
 
@@ -38,7 +38,7 @@ CMolecularBasis_broadcast(CMolecularBasis& self,
                           int32_t          rank,
                           py::object       py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     self.broadcast(rank, *comm_ptr);
 }
@@ -57,7 +57,7 @@ static py::array_t<double>
 CAODensityMatrix_total_density_to_numpy(const CAODensityMatrix& self,
                                         const int32_t iDensityMatrix)
 {
-    return bp_general::pointer_to_numpy(self.totalDensity(iDensityMatrix),
+    return vlx_general::pointer_to_numpy(self.totalDensity(iDensityMatrix),
                                          self.getNumberOfRows(iDensityMatrix),
                                          self.getNumberOfColumns(iDensityMatrix));
 }
@@ -66,7 +66,7 @@ static py::array_t<double>
 CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self,
                                         const int32_t iDensityMatrix)
 {
-    return bp_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix),
+    return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix),
                                          self.getNumberOfRows(iDensityMatrix),
                                          self.getNumberOfColumns(iDensityMatrix));
 }
@@ -75,7 +75,7 @@ static py::array_t<double>
 CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self,
                                        const int32_t iDensityMatrix)
 {
-    return bp_general::pointer_to_numpy(self.betaDensity(iDensityMatrix),
+    return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix),
                                          self.getNumberOfRows(iDensityMatrix),
                                          self.getNumberOfColumns(iDensityMatrix));
 }
@@ -90,7 +90,7 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 
     for (size_t i = 0; i < arrays.size(); i++)
     {
-        auto mp = bp_math::CDenseMatrix_from_numpy(arrays[i]);
+        auto mp = vlx_math::CDenseMatrix_from_numpy(arrays[i]);
 
         dmat.push_back(*mp);
     }
@@ -105,7 +105,7 @@ CAODensityMatrix_broadcast(CAODensityMatrix& self,
                            int32_t           rank,
                            py::object        py_comm)
 {
-    MPI_Comm* comm_ptr = bp_general::get_mpi_comm(py_comm);
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
         
     self.broadcast(rank, *comm_ptr);
 }
@@ -123,7 +123,7 @@ CMolecularOrbitals_str (const CMolecularOrbitals& self)
 static py::array_t<double>
 CMolecularOrbitals_alpha_orbitals_to_numpy(const CMolecularOrbitals& self)
 {
-    return bp_general::pointer_to_numpy(self.alphaOrbitals(),
+    return vlx_general::pointer_to_numpy(self.alphaOrbitals(),
                                          self.getNumberOfRows(),
                                          self.getNumberOfColumns());
 }
@@ -131,7 +131,7 @@ CMolecularOrbitals_alpha_orbitals_to_numpy(const CMolecularOrbitals& self)
 static py::array_t<double>
 CMolecularOrbitals_beta_orbitals_to_numpy(const CMolecularOrbitals& self)
 {
-    return bp_general::pointer_to_numpy(self.betaOrbitals(),
+    return vlx_general::pointer_to_numpy(self.betaOrbitals(),
                                          self.getNumberOfRows(),
                                          self.getNumberOfColumns());
 }
@@ -173,7 +173,7 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 
     for (size_t i = 0; i < mol_orbs.size(); i++)
     {
-        auto mp = bp_math::CDenseMatrix_from_numpy(mol_orbs[i]);
+        auto mp = vlx_math::CDenseMatrix_from_numpy(mol_orbs[i]);
 
         cmos.push_back(*mp);
     }
@@ -310,4 +310,4 @@ void export_orbdata(py::module& m)
     ;
 }
 
-} // bp_orbdata namespace
+} // vlx_orbdata namespace

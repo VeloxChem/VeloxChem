@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace bp_oneints { // bp_oneints namespace
+namespace vlx_oneints { // vlx_oneints namespace
 
 /**
  Exports classes/functions in src/oneints to python.
  */
 void export_oneints(py::module& m);
 
-} // bp_oneints namespace
+} // vlx_oneints namespace
 
 #endif /* ExportOneInts_hpp */

@@ -19,7 +19,7 @@
 
 namespace py = pybind11;
 
-namespace bp_general { // bp_general namespace
+namespace vlx_general { // vlx_general namespace
 
 // Gets MPI_Comm pointer from a mpi4py communicator object
 // Not a static function; used in other files
@@ -72,4 +72,4 @@ void export_general(py::module& m)
     m.def("hartree_in_ev", &units::getHatreeValueInElectronVolts);
 }
 
-} // bp_general namespace
+} // vlx_general namespace

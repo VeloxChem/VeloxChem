@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace bp_twoints { // bp_twoints namespace
+namespace vlx_twoints { // vlx_twoints namespace
 
 /**
  Exports classes/functions in src/twoints to python.
  */
 void export_twoints(py::module& m);
 
-} // bp_twoints namespace
+} // vlx_twoints namespace
 
 #endif /* ExportTwoInts_hpp */
