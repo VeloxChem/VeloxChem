@@ -42,8 +42,8 @@ CAOFockMatrix_to_numpy(const CAOFockMatrix& self,
                        const int32_t iFockMatrix)
 {
     return bp_general::pointer_to_numpy(self.getFock(iFockMatrix),
-                                        self.getNumberOfRows(iFockMatrix),
-                                        self.getNumberOfColumns(iFockMatrix));
+                                         self.getNumberOfRows(iFockMatrix),
+                                         self.getNumberOfColumns(iFockMatrix));
 }
 
 // Helper function for CAOFockMatrix constructor
@@ -159,8 +159,7 @@ void export_twoints(py::module& m)
         .def(py::init(&CAOFockMatrix_from_numpy_list))
         .def("__str__", &CAOFockMatrix_str)
         .def("to_numpy", &CAOFockMatrix_to_numpy)
-        .def("zero", &CAOFockMatrix::zero)
-        .def("get_number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices)
+        .def("number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices)
         .def("get_fock_type", &CAOFockMatrix::getFockType)
         .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
         .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
@@ -179,7 +178,6 @@ void export_twoints(py::module& m)
         .def(py::init<>())
         .def(py::init<const CCauchySchwarzScreener&>())
         .def("get_threshold", &CCauchySchwarzScreener::getThreshold)
-        .def("set_threshold", &CCauchySchwarzScreener::setThreshold)
         .def("get_screening_scheme", &CCauchySchwarzScreener::getScreeningScheme)
         .def(py::self == py::self)
     ;
@@ -193,7 +191,8 @@ void export_twoints(py::module& m)
         .def(py::init<>())
         .def(py::init<const CScreeningContainer&>())
         .def("is_empty", &CScreeningContainer::isEmpty)
-        .def("get_number_of_screeners", &CScreeningContainer::getNumberOfScreeners)
+        .def("number_of_screeners", &CScreeningContainer::getNumberOfScreeners)
+        .def("get_screener", &CScreeningContainer::getScreener)
         .def("set_threshold", &CScreeningContainer::setThreshold)
         .def(py::self == py::self)
     ;

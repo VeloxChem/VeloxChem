@@ -5,6 +5,26 @@ import h5py
 import numpy as np
 
 
+def _get_density(self, molecule):
+
+    if self.get_orbitals_type() == molorb.rest:
+
+        nelec = molecule.number_of_electrons()
+        return self.get_ao_density(nelec)
+
+    elif self.get_orbitals_type() == molorb.unrest:
+
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+        return self.get_ao_density(nalpha, nbeta)
+
+    else:
+
+        errmsg = "MolecularOrbitals.get_density:"
+        errmsg += " Invalid molecular orbitals type"
+        assert_msg_critical(False, errmsg)
+
+
 def _write_hdf5(self, fname):
 
     hf = h5py.File(fname, 'w')
@@ -59,5 +79,6 @@ def _read_hdf5(fname):
     return MolecularOrbitals(orbs, enes, orbs_type)
 
 
+MolecularOrbitals.get_density = _get_density
 MolecularOrbitals.write_hdf5 = _write_hdf5
 MolecularOrbitals.read_hdf5 = _read_hdf5

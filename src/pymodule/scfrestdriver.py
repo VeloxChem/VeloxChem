@@ -152,7 +152,7 @@ class ScfRestrictedDriver(ScfDriver):
         
         if self.rank == mpi_master():
             
-            return self.mol_orbs.get_rest_density(molecule)
+            return self.mol_orbs.get_density(molecule)
 
         return AODensityMatrix()
     

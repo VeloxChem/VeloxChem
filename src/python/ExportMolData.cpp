@@ -87,6 +87,28 @@ CMolecule_from_xyz(const std::vector<std::string>& labels,
             );
 }
 
+// Helper function for getting number of alpha/beta electrons
+
+static int32_t
+CMolecule_alpha_elec(const CMolecule& self)
+{
+    int32_t nelec = self.getNumberOfElectrons();
+
+    int32_t mult_1 = self.getMultiplicity() - 1;
+
+    return (nelec + mult_1) / 2;
+}
+
+static int32_t
+CMolecule_beta_elec(const CMolecule& self)
+{
+    int32_t nelec = self.getNumberOfElectrons();
+
+    int32_t mult_1 = self.getMultiplicity() - 1;
+
+    return (nelec - mult_1) / 2;
+}
+
 // Helper function for getting coordinates as numpy array
 
 static py::array
@@ -233,21 +255,6 @@ CMolecule_broadcast(CMolecule& self,
 void export_moldata(py::module& m)
 {
     // CMolecule class
-    // Note: Need member function pointers for proper overloading
-
-    int32_t (CMolecule::*number_of_atoms_1)(
-            ) const
-        = &CMolecule::getNumberOfAtoms;
-
-    int32_t (CMolecule::*number_of_atoms_2)(
-            const int32_t idElemental) const
-        = &CMolecule::getNumberOfAtoms;
-
-    int32_t (CMolecule::*number_of_atoms_3)(
-            const int32_t iAtom,
-            const int32_t nAtoms,
-            const int32_t idElemental) const
-        = &CMolecule::getNumberOfAtoms;
 
     py::class_< CMolecule, std::shared_ptr<CMolecule> >
         (
@@ -265,10 +272,20 @@ void export_moldata(py::module& m)
         .def("get_string", &CMolecule::printGeometry)
         .def("check_proximity", &CMolecule_check_proximity)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
-        .def("number_of_atoms", number_of_atoms_1)
-        .def("number_of_atoms", number_of_atoms_2)
-        .def("number_of_atoms", number_of_atoms_3)
+        .def("number_of_atoms",
+             (int32_t (CMolecule::*)() const)
+             &CMolecule::getNumberOfAtoms)
+        .def("number_of_atoms",
+             (int32_t (CMolecule::*)(const int32_t) const)
+             &CMolecule::getNumberOfAtoms)
+        .def("number_of_atoms",
+             (int32_t (CMolecule::*)(const int32_t,
+                                     const int32_t,
+                                     const int32_t) const)
+             &CMolecule::getNumberOfAtoms)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
+        .def("number_of_alpha_electrons", &CMolecule_alpha_elec)
+        .def("number_of_beta_electrons", &CMolecule_beta_elec)
         .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
         .def("x_to_numpy", &CMolecule_x_to_numpy)
         .def("y_to_numpy", &CMolecule_y_to_numpy)
@@ -281,23 +298,18 @@ void export_moldata(py::module& m)
     ;
 
     // CChemicalElement class
-    // Note: Need member function pointers for proper overloading
-
-    bool (CChemicalElement::*set_atom_type_by_name)(
-            const std::string& atomLabel)
-        = &CChemicalElement::setAtomType;
-
-    bool (CChemicalElement::*set_atom_type_by_id)(
-            const int32_t idElemental)
-        = &CChemicalElement::setAtomType;
 
     py::class_< CChemicalElement, std::shared_ptr<CChemicalElement> >
         (
             m, "ChemicalElement"
         )
         .def(py::init<>())
-        .def("set_atom_type", set_atom_type_by_name)
-        .def("set_atom_type", set_atom_type_by_id)
+        .def("set_atom_type",
+             (bool (CChemicalElement::*)(const std::string&))
+             &CChemicalElement::setAtomType)
+        .def("set_atom_type",
+             (bool (CChemicalElement::*)(const int32_t))
+             &CChemicalElement::setAtomType)
         .def("get_name", &CChemicalElement::getName)
         .def(py::self == py::self)
     ;

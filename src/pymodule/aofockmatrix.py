@@ -18,11 +18,11 @@ def _write_hdf5(self, fname):
     hf = h5py.File(fname, 'w')
 
     factors = []
-    for i in range(self.get_number_of_fock_matrices()):
+    for i in range(self.number_of_fock_matrices()):
         factors.append(self.get_scale_factor(i))
     hf.create_dataset("factors", data=factors, compression="gzip")
 
-    for i in range(self.get_number_of_fock_matrices()):
+    for i in range(self.number_of_fock_matrices()):
         index = self.get_density_identifier(i)
         name = str(i) + "_" + focktype[self.get_fock_type(i)] + "_" + str(index)
         array = self.to_numpy(i)

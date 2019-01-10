@@ -33,14 +33,29 @@ class TestOrbData(unittest.TestCase):
 
         den_a1 = d_rest.total_to_numpy(0)
         den_a2 = d_unrest.alpha_to_numpy(0)
-        den_b1 = d_unrest.beta_to_numpy(0)
+        den_b2 = d_unrest.beta_to_numpy(0)
 
-        self.assertEqual(0, np.max(np.abs(data_a - den_a1)))
-        self.assertEqual(0, np.max(np.abs(data_a - den_a2)))
-        self.assertEqual(0, np.max(np.abs(data_b - den_b1)))
+        self.assertTrue((data_a == den_a1).all())
+        self.assertTrue((data_a == den_a2).all())
+        self.assertTrue((data_b == den_b2).all())
 
         self.assertEqual(denmat.rest, d_rest.get_density_type())
         self.assertEqual(denmat.unrest, d_unrest.get_density_type())
+
+        self.assertEqual(1, d_rest.number_of_density_matrices())
+        self.assertEqual(1, d_unrest.number_of_density_matrices())
+
+    def test_density_sub(self):
+
+        arr_1 = np.array([[ 1., .2, ], [ .2,  1., ]])
+        arr_2 = np.array([[ .9, .5, ], [ .5,  .9, ]])
+
+        den_1 = AODensityMatrix([arr_1], denmat.rest)
+        den_2 = AODensityMatrix([arr_2], denmat.rest)
+        den_diff = den_1.sub(den_2)
+
+        diff = np.max(np.abs(den_diff.total_to_numpy(0) - (arr_1 - arr_2)))
+        self.assertAlmostEqual(0., diff, 13)
 
     def test_density_hdf5(self):
 
@@ -74,41 +89,56 @@ class TestOrbData(unittest.TestCase):
         ener_a = [0.5, 0.9]
         ener_b = [0.3, 0.6]
 
-        d_rest = MolecularOrbitals([data_a], [ener_a], molorb.rest)
+        orb_rest = MolecularOrbitals([data_a], [ener_a], molorb.rest)
 
-        d_unrest = MolecularOrbitals(
+        orb_unrest = MolecularOrbitals(
             [data_a, data_b], [ener_a, ener_b], molorb.unrest)
 
-        den_a1 = d_rest.alpha_to_numpy()
-        den_a2 = d_unrest.alpha_to_numpy()
-        den_b1 = d_unrest.beta_to_numpy()
+        orb_a1 = orb_rest.alpha_to_numpy()
+        orb_a2 = orb_unrest.alpha_to_numpy()
+        orb_b2 = orb_unrest.beta_to_numpy()
 
-        self.assertEqual(0, np.max(np.abs(data_a - den_a1)))
-        self.assertEqual(0, np.max(np.abs(data_a - den_a2)))
-        self.assertEqual(0, np.max(np.abs(data_b - den_b1)))
+        self.assertTrue((data_a == orb_a1).all())
+        self.assertTrue((data_a == orb_a2).all())
+        self.assertTrue((data_b == orb_b2).all())
 
-        ene_a1 = d_rest.ea_to_numpy()
-        ene_a2 = d_unrest.ea_to_numpy()
-        ene_b1 = d_unrest.eb_to_numpy()
+        ene_a1 = orb_rest.ea_to_numpy()
+        ene_a2 = orb_unrest.ea_to_numpy()
+        ene_b2 = orb_unrest.eb_to_numpy()
 
-        self.assertEqual(0, np.max(np.abs(ener_a - ene_a1)))
-        self.assertEqual(0, np.max(np.abs(ener_a - ene_a2)))
-        self.assertEqual(0, np.max(np.abs(ener_b - ene_b1)))
+        self.assertTrue((ener_a == ene_a1).all())
+        self.assertTrue((ener_a == ene_a2).all())
+        self.assertTrue((ener_b == ene_b2).all())
 
-        self.assertEqual(molorb.rest, d_rest.get_orbitals_type())
-        self.assertEqual(molorb.unrest, d_unrest.get_orbitals_type())
+        self.assertEqual(molorb.rest, orb_rest.get_orbitals_type())
+        self.assertEqual(molorb.unrest, orb_unrest.get_orbitals_type())
 
         # hdf5 read/write tests
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-            d_rest.write_hdf5("inputs/dummy.h5")
+            orb_rest.write_hdf5("inputs/dummy.h5")
             dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
-            self.assertEqual(d_rest, dummy)
+            self.assertEqual(orb_rest, dummy)
 
-            d_unrest.write_hdf5("inputs/dummy.h5")
+            orb_unrest.write_hdf5("inputs/dummy.h5")
             dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
-            self.assertEqual(d_unrest, dummy)
+            self.assertEqual(orb_unrest, dummy)
+
+    def test_rest_density(self):
+
+        arr = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
+        ene = [.7, .8, .9]
+
+        orb_rest = MolecularOrbitals([arr], [ene], molorb.rest)
+
+        mol = Molecule(["H", "H"], [0.0, 0.0], [0.0, 0.0], [0.0, 1.4])
+        den_rest = orb_rest.get_density(mol).total_to_numpy(0)
+
+        arr_occ = arr[:, :1]
+        den_ref = np.dot(arr_occ, arr_occ.T)
+
+        self.assertTrue((den_ref == den_rest).all())
 
 
 if __name__ == "__main__":

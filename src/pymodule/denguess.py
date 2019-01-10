@@ -120,8 +120,7 @@ class DensityGuess:
 
             proj_orbs = red_orbs.insert(molecule, ao_basis, red_basis)
         
-            # add handling of unrestricted case
-            return proj_orbs.get_rest_density(molecule)
+            return proj_orbs.get_density(molecule)
 
         return AODensityMatrix()
 

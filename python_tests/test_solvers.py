@@ -48,6 +48,10 @@ class TestSolvers(unittest.TestCase):
 
             # number of electrons
 
+            self.assertEqual(molecule.number_of_electrons(), 10)
+            self.assertEqual(molecule.number_of_alpha_electrons(), 5)
+            self.assertEqual(molecule.number_of_beta_electrons(), 5)
+
             self.assertAlmostEqual(2.0 * np.sum(density * overlap), 10., 13)
 
         # compute other initial guess
@@ -66,6 +70,10 @@ class TestSolvers(unittest.TestCase):
 
         if (rank == mpi_master()):
 
+            self.assertEqual(molecule.number_of_electrons(), 8)
+            self.assertEqual(molecule.number_of_alpha_electrons(), 4)
+            self.assertEqual(molecule.number_of_beta_electrons(), 4)
+
             self.assertAlmostEqual(np.sum(density_a * overlap), 4., 13)
 
         # closed-shell anion initial guess
@@ -78,6 +86,10 @@ class TestSolvers(unittest.TestCase):
         density_a = D.total_to_numpy(0)
 
         if (rank == mpi_master()):
+
+            self.assertEqual(molecule.number_of_electrons(), 12)
+            self.assertEqual(molecule.number_of_alpha_electrons(), 6)
+            self.assertEqual(molecule.number_of_beta_electrons(), 6)
 
             self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
 
@@ -92,6 +104,10 @@ class TestSolvers(unittest.TestCase):
         density_b = D.beta_to_numpy(0)
 
         if (rank == mpi_master()):
+
+            self.assertEqual(molecule.number_of_electrons(), 9)
+            self.assertEqual(molecule.number_of_alpha_electrons(), 5)
+            self.assertEqual(molecule.number_of_beta_electrons(), 4)
 
             self.assertAlmostEqual(np.sum(density_a * overlap), 5., 13)
             self.assertAlmostEqual(np.sum(density_b * overlap), 4., 13)
@@ -108,6 +124,10 @@ class TestSolvers(unittest.TestCase):
 
         if (rank == mpi_master()):
 
+            self.assertEqual(molecule.number_of_electrons(), 11)
+            self.assertEqual(molecule.number_of_alpha_electrons(), 6)
+            self.assertEqual(molecule.number_of_beta_electrons(), 5)
+
             self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
             self.assertAlmostEqual(np.sum(density_b * overlap), 5., 13)
 
@@ -122,6 +142,10 @@ class TestSolvers(unittest.TestCase):
         density_b = D.beta_to_numpy(0)
 
         if (rank == mpi_master()):
+
+            self.assertEqual(molecule.number_of_electrons(), 10)
+            self.assertEqual(molecule.number_of_alpha_electrons(), 6)
+            self.assertEqual(molecule.number_of_beta_electrons(), 4)
 
             self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
             self.assertAlmostEqual(np.sum(density_b * overlap), 4., 13)

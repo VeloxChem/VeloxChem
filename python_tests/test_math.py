@@ -7,7 +7,7 @@ import unittest
 
 class TestMath(unittest.TestCase):
 
-    def test_rectanglar_matrix(self):
+    def test_matrix_numpy(self):
 
         data = [[ 1., 2., 3. ], [ 4., 5., 6. ]]
 
@@ -16,7 +16,7 @@ class TestMath(unittest.TestCase):
         array2 = matrix.to_numpy()
         matrix2 = DenseMatrix(array2)
 
-        self.assertEqual(0, np.max(np.abs(array - array2)))
+        self.assertTrue((array == array2).all())
         self.assertEqual(matrix, matrix2)
 
         self.assertEqual(2, matrix.number_of_rows())
@@ -27,21 +27,18 @@ class TestMath(unittest.TestCase):
         array2_t = matrix_t.to_numpy()
         matrix2_t = DenseMatrix(array2_t)
 
-        self.assertEqual(0, np.max(np.abs(array_t - array2_t)))
+        self.assertTrue((array_t == array2_t).all())
         self.assertEqual(matrix_t, matrix2_t)
 
         self.assertEqual(3, matrix_t.number_of_rows())
         self.assertEqual(2, matrix_t.number_of_columns())
 
-    def test_square_matrix(self):
+    def test_symmetrize(self):
 
         matrix = DenseMatrix(np.array([[ 1., 2. ], [ 3., 4. ]]))
 
         matrix.symmetrize()
         self.assertEqual(matrix, DenseMatrix([[ 2., 5. ], [ 5., 8. ]]))
-
-        matrix.zero()
-        self.assertEqual(matrix, DenseMatrix([[ 0., 0. ], [ 0., 0. ]]))
 
     def test_slice_matrix(self):
 

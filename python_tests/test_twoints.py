@@ -1,6 +1,8 @@
 from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import MolecularBasis
+from veloxchem.veloxchemlib import KineticEnergyMatrix
+from veloxchem.veloxchemlib import NuclearPotentialMatrix
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -44,13 +46,44 @@ class TestTwoInts(unittest.TestCase):
         np_j = fock.to_numpy(2)
         np_k = fock.to_numpy(3)
 
-        self.assertEqual(0, np.max(np.abs(arr_j - np_j)))
-        self.assertEqual(0, np.max(np.abs(arr_k - np_k)))
-        self.assertEqual(0, np.max(np.abs(arr_jkx - np_jkx)))
+        self.assertTrue((arr_j == np_j).all())
+        self.assertTrue((arr_k == np_k).all())
+        self.assertTrue((arr_jkx == np_jkx).all())
 
         self.assertEqual(fockmat.restjk, fock.get_fock_type(0))
         self.assertEqual(x, fock.get_scale_factor(1))
         self.assertEqual(0, fock.get_density_identifier(2))
+
+        self.assertEqual(5, fock.number_of_fock_matrices())
+
+    def test_add_hcore(self):
+
+        arr_t = np.array([[  3., .2, ], [ .2,  3., ]])
+        arr_v = np.array([[ -9., .5, ], [ .5, -9., ]])
+        arr_jk = np.array([[  5., .1, ], [ .1,  5., ]])
+        arr_fock = arr_jk + arr_t - arr_v
+
+        kin = KineticEnergyMatrix(arr_t)
+        npot = NuclearPotentialMatrix(arr_v)
+        fock = AOFockMatrix([arr_jk], [fockmat.restjk], [1.0], [0])
+        fock.add_hcore(kin, npot, 0)
+
+        diff = np.max(np.abs(fock.to_numpy(0) - arr_fock))
+        self.assertAlmostEqual(0., diff, 13)
+
+    def test_add_fock(self):
+
+        arr_1 = np.array([[ 1., .2, ], [ .2,  1., ]])
+        arr_2 = np.array([[ .9, .5, ], [ .5,  .9, ]])
+
+        fock_1 = AOFockMatrix([arr_1], [fockmat.restjk], [1.0], [0])
+        fock_2 = AOFockMatrix([arr_2], [fockmat.restjk], [1.0], [0])
+
+        fock_sum = AOFockMatrix(fock_1)
+        fock_sum.add(fock_2)
+
+        diff = np.max(np.abs(fock_sum.to_numpy(0) - (arr_1 + arr_2)))
+        self.assertAlmostEqual(0., diff, 13)
 
     def test_fock_density(self):
 
@@ -114,29 +147,44 @@ class TestTwoInts(unittest.TestCase):
 
         # read density
 
-        dmat = AODensityMatrix.read_hdf5("inputs/h2se.dens.h5")
+        if rank == mpi_master():
+            dmat = AODensityMatrix.read_hdf5("inputs/h2se.dens.h5")
+        else:
+            dmat = AODensityMatrix()
+
+        dmat.broadcast(rank, comm)
 
         # compute Fock
 
         eridrv = ElectronRepulsionIntegralsDriver(rank, size, comm)
 
-        qqdata = eridrv.compute(ericut.qq, 1.0e-12, molecule, ao_basis)
+        qqdata = eridrv.compute(ericut.qqden, 1.0e-12, molecule, ao_basis)
+
+        num_screeners = qqdata.number_of_screeners()
+        self.assertTrue(num_screeners > 0)
+        self.assertFalse(qqdata.is_empty())
+
+        for screener_index in range(num_screeners):
+            screener = qqdata.get_screener(screener_index)
+            self.assertEqual(1.0e-12, screener.get_threshold())
+            self.assertEqual(ericut.qqden, screener.get_screening_scheme())
 
         fock = AOFockMatrix(dmat)
 
         eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, comm)
 
-        F1 = fock.to_numpy(0)
+        fock.reduce_sum(rank, size, comm)
 
         # compare with reference
 
-        fock_ref = AOFockMatrix.read_hdf5("inputs/h2se.twoe.h5")
-
-        F2 = fock_ref.to_numpy(0)
-
         if rank == mpi_master():
 
+            fock_ref = AOFockMatrix.read_hdf5("inputs/h2se.twoe.h5")
+
+            F1 = fock.to_numpy(0)
+            F2 = fock_ref.to_numpy(0)
             dF = np.max(np.abs(F1 - F2))
+
             self.assertTrue(dF < 1.0e-11)
 
 

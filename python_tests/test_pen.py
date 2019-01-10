@@ -7,7 +7,6 @@ from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
-from veloxchem.veloxchemlib import ScreeningContainer
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import fockmat
 from veloxchem.veloxchemlib import ericut
@@ -70,7 +69,11 @@ class TestPen(unittest.TestCase):
 
         # read density
 
-        dmat = AODensityMatrix.read_hdf5("inputs/pen.dens.h5")
+        if rank == mpi_master():
+            dmat = AODensityMatrix.read_hdf5("inputs/pen.dens.h5")
+        else:
+            dmat = AODensityMatrix()
+        dmat.broadcast(rank, comm)
 
         # compute Fock
 
@@ -82,18 +85,18 @@ class TestPen(unittest.TestCase):
 
         eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, comm)
 
-        F1 = fock.to_numpy(0)
+        fock.reduce_sum(rank, size, comm)
 
         # compare with reference
 
-        fock_ref = AOFockMatrix.read_hdf5("inputs/pen.twoe.h5")
-
-        F2 = fock_ref.to_numpy(0)
-
         if rank == mpi_master():
 
-            maxelem = max(np.max(np.abs(F1)), np.max(np.abs(F2)))
+            fock_ref = AOFockMatrix.read_hdf5("inputs/pen.twoe.h5")
 
+            F1 = fock.to_numpy(0)
+            F2 = fock_ref.to_numpy(0)
+
+            maxelem = max(np.max(np.abs(F1)), np.max(np.abs(F2)))
             maxdiff = np.max(np.abs(F1 - F2))
 
             print(maxelem, maxdiff, maxdiff/maxelem)

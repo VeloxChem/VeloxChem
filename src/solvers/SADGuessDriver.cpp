@@ -314,15 +314,15 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     double charge = molecule.getCharge();
 
-    double mult_1 = (double)(molecule.getMultiplicity() - 1);
+    double mult_1 = static_cast<double>(molecule.getMultiplicity() - 1);
 
     double alpha_elec = 0.5 * (-charge + mult_1);
 
     double beta_elec  = 0.5 * (-charge - mult_1);
 
-    alpha_elec /= (double)nao_1;
+    alpha_elec /= static_cast<double>(nao_1);
 
-    beta_elec  /= (double)nao_1;
+    beta_elec  /= static_cast<double>(nao_1);
 
     // C_SAD matrix
 

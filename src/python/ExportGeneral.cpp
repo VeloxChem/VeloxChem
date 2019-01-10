@@ -53,7 +53,11 @@ void export_general(py::module& m)
 {
     // initialize mpi4py's C-API
 
-    if (import_mpi4py() < 0) return;
+    auto err = import_mpi4py();
+
+    std::string errmpi4py("mpi4py: failed to import mpi4py");
+
+    errors::assertMsgCritical(err == 0, errmpi4py);
 
     // exposing functions
 

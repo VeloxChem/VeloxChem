@@ -37,8 +37,8 @@ static py::array_t<double>
 CDenseMatrix_to_numpy(const CDenseMatrix& self)
 {
     return bp_general::pointer_to_numpy(self.values(),
-                                        self.getNumberOfRows(),
-                                        self.getNumberOfColumns());
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
 }
 
 // Helper function for CDenseMatrix constructor
@@ -113,7 +113,6 @@ void export_math(py::module& m)
         .def("to_numpy", &CDenseMatrix_to_numpy)
         .def("number_of_rows", &CDenseMatrix::getNumberOfRows)
         .def("number_of_columns", &CDenseMatrix::getNumberOfColumns)
-        .def("zero", &CDenseMatrix::zero)
         .def("symmetrize", &CDenseMatrix::symmetrize)
         .def("slice", &CDenseMatrix::slice)
         .def(py::self == py::self)

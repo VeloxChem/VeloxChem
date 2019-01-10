@@ -15,7 +15,6 @@
 #include <string>
 #include <fstream>
 
-#include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "StringFormat.hpp"
 #include "ErrorHandler.hpp"
@@ -59,8 +58,8 @@ CAODensityMatrix_total_density_to_numpy(const CAODensityMatrix& self,
                                         const int32_t iDensityMatrix)
 {
     return bp_general::pointer_to_numpy(self.totalDensity(iDensityMatrix),
-                                        self.getNumberOfRows(iDensityMatrix),
-                                        self.getNumberOfColumns(iDensityMatrix));
+                                         self.getNumberOfRows(iDensityMatrix),
+                                         self.getNumberOfColumns(iDensityMatrix));
 }
 
 static py::array_t<double>
@@ -68,8 +67,8 @@ CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self,
                                         const int32_t iDensityMatrix)
 {
     return bp_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix),
-                                        self.getNumberOfRows(iDensityMatrix),
-                                        self.getNumberOfColumns(iDensityMatrix));
+                                         self.getNumberOfRows(iDensityMatrix),
+                                         self.getNumberOfColumns(iDensityMatrix));
 }
 
 static py::array_t<double>
@@ -77,8 +76,8 @@ CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self,
                                        const int32_t iDensityMatrix)
 {
     return bp_general::pointer_to_numpy(self.betaDensity(iDensityMatrix),
-                                        self.getNumberOfRows(iDensityMatrix),
-                                        self.getNumberOfColumns(iDensityMatrix));
+                                         self.getNumberOfRows(iDensityMatrix),
+                                         self.getNumberOfColumns(iDensityMatrix));
 }
 
 // Helper function for CAODensityMatrix constructor
@@ -125,16 +124,16 @@ static py::array_t<double>
 CMolecularOrbitals_alpha_orbitals_to_numpy(const CMolecularOrbitals& self)
 {
     return bp_general::pointer_to_numpy(self.alphaOrbitals(),
-                                        self.getNumberOfRows(),
-                                        self.getNumberOfColumns());
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
 }
 
 static py::array_t<double>
 CMolecularOrbitals_beta_orbitals_to_numpy(const CMolecularOrbitals& self)
 {
     return bp_general::pointer_to_numpy(self.betaOrbitals(),
-                                        self.getNumberOfRows(),
-                                        self.getNumberOfColumns());
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
 }
 
 static py::array_t<double>
@@ -204,17 +203,6 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
             );
 }
 
-// Helper function for restricted density matrix from CMolecularOrbitals
-    
-static CAODensityMatrix
-CMolecularOrbitals_get_rest_density(const CMolecularOrbitals& self,
-                                    const CMolecule&          molecule)
-{
-    auto nelec = molecule.getNumberOfElectrons();
-    
-    return self.getAODensity(nelec);
-}
-
 // Exports classes/functions in src/orbdata to python
 
 void export_orbdata(py::module& m)
@@ -255,7 +243,6 @@ void export_orbdata(py::module& m)
         .def("set_label", &CMolecularBasis::setLabel)
         .def("get_label", &CMolecularBasis::getLabel)
         .def("broadcast", &CMolecularBasis_broadcast)
-        .def("print_basis", &CMolecularBasis::printBasis)
         .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis)
         .def("add_atom_basis", &CMolecularBasis::addAtomBasis)
         .def(py::self == py::self)
@@ -281,7 +268,7 @@ void export_orbdata(py::module& m)
         .def("total_to_numpy", &CAODensityMatrix_total_density_to_numpy)
         .def("alpha_to_numpy", &CAODensityMatrix_alpha_density_to_numpy)
         .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy)
-        .def("get_number_of_density_matrices",
+        .def("number_of_density_matrices",
                 &CAODensityMatrix::getNumberOfDensityMatrices)
         .def("get_density_type", &CAODensityMatrix::getDensityType)
         .def("sub", &CAODensityMatrix::sub)
@@ -311,7 +298,13 @@ void export_orbdata(py::module& m)
         .def("ea_to_numpy", &CMolecularOrbitals_alpha_energies_to_numpy)
         .def("eb_to_numpy", &CMolecularOrbitals_beta_energies_to_numpy)
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType)
-        .def("get_rest_density", &CMolecularOrbitals_get_rest_density)
+        .def("get_ao_density",
+             (CAODensityMatrix (CMolecularOrbitals::*)(const int32_t) const)
+             &CMolecularOrbitals::getAODensity)
+        .def("get_ao_density",
+             (CAODensityMatrix (CMolecularOrbitals::*)(const int32_t,
+                                                       const int32_t) const)
+             &CMolecularOrbitals::getAODensity)
         .def("insert", &CMolecularOrbitals::insert)
         .def(py::self == py::self)
     ;

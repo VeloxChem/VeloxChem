@@ -11,7 +11,7 @@ def _write_hdf5(self, fname):
 
     count = 0
 
-    for index in range(self.get_number_of_density_matrices()):
+    for index in range(self.number_of_density_matrices()):
 
         if self.get_density_type() == denmat.rest:
             name = str(count) + "_total_" + str(index)

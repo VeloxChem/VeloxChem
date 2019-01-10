@@ -114,8 +114,8 @@ static py::array_t<double>
 COverlapMatrix_to_numpy(const COverlapMatrix& self)
 {
     return bp_general::pointer_to_numpy(self.values(),
-                                        self.getNumberOfRows(),
-                                        self.getNumberOfColumns());
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
 }
 
 // Helper function for COverlapMatrix constructor
@@ -211,8 +211,8 @@ static py::array_t<double>
 CKineticEnergyMatrix_to_numpy(const CKineticEnergyMatrix& self)
 {
     return bp_general::pointer_to_numpy(self.values(),
-                                        self.getNumberOfRows(),
-                                        self.getNumberOfColumns());
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
 }
 
 // Helper function for CKineticEnergyMatrix constructor
@@ -326,8 +326,8 @@ static py::array_t<double>
 CNuclearPotentialMatrix_to_numpy(const CNuclearPotentialMatrix& self)
 {
     return bp_general::pointer_to_numpy(self.values(),
-                                        self.getNumberOfRows(),
-                                        self.getNumberOfColumns());
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
 }
 
 // Helper function for CNuclearPotentialMatrix constructor
