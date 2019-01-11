@@ -1,17 +1,25 @@
 import time as tm
+from .veloxchemlib import assert_msg_critical
 
 
 class OutputStream:
 
-    def __init__(self, filename):
+    def __init__(self, filename, width=122):
         self.state = False
+        self.buffer = []
+        self.width = width
         if len(filename):
-            self.stream = open(filename, 'w')
+            try:
+                self.stream = open(filename, 'w')
+            except OSError:
+                errio = "OutputStream: cannot open output file %s" % filename
+                assert_msg_critical(False, errio)
             self.state = True
-            self.width = 122
 
     def __del__(self):
         if self.state:
+            if self.buffer:
+                self.flush()
             self.stream.close()
 
     def get_state(self):
@@ -19,7 +27,10 @@ class OutputStream:
 
     def flush(self):
         if self.state:
+            for line in self.buffer:
+                self.stream.write(line)
             self.stream.flush()
+            del self.buffer[:]
 
     @staticmethod
     def header(line, width):
@@ -49,32 +60,32 @@ class OutputStream:
     def print_line(self, line):
         if not self.state:
             return
-        self.stream.write(line + '\n')
+        self.buffer.append(line + '\n')
 
     def print_blank(self):
         if not self.state:
             return
-        self.stream.write(' ' * self.width + '\n')
+        self.buffer.append(' ' * self.width + '\n')
 
     def print_header(self, line):
         if not self.state:
             return
-        self.stream.write(self.header(line, self.width) + '\n')
+        self.buffer.append(self.header(line, self.width) + '\n')
 
     def print_title(self, line):
         if not self.state:
             return
-        self.stream.write(self.title(line, self.width) + '\n')
+        self.buffer.append(self.title(line, self.width) + '\n')
 
     def print_info(self, line):
         if not self.state:
             return
-        self.stream.write(self.info(line, self.width) + '\n')
+        self.buffer.append(self.info(line, self.width) + '\n')
 
     def print_separator(self):
         if not self.state:
             return
-        self.stream.write(self.tsep(self.width) + '\n')
+        self.buffer.append(self.tsep(self.width) + '\n')
 
     def print_block(self, block_lines):
         """
