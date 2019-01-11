@@ -9,7 +9,6 @@
 #include <pybind11/pybind11.h>
 
 #include "ExportGeneral.hpp"
-#include "ExportStreams.hpp"
 #include "ExportMolData.hpp"
 #include "ExportOrbData.hpp"
 #include "ExportOneInts.hpp"
@@ -23,8 +22,6 @@
 PYBIND11_MODULE(veloxchemlib, m)
 {
     vlx_general::export_general(m);
-
-    vlx_streams::export_streams(m);
 
     vlx_moldata::export_moldata(m);
 

@@ -11,10 +11,12 @@
 
 #include <mpi.h>
 #include <mpi4py/mpi4py.h>
+#include <string>
 
 #include "MpiFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "Codata.hpp"
+#include "StringFormat.hpp"
 #include "ExportGeneral.hpp"
 
 namespace py = pybind11;
@@ -47,6 +49,20 @@ pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns)
                                ptr);
 }
     
+// Helper function for converting angular momentum
+
+static std::string
+string_to_angular_momentum(const int32_t angl)
+{
+    return fstr::to_AngularMomentum(angl);
+}
+
+static int32_t
+integer_to_angular_momentum(const std::string& label)
+{
+    return fstr::to_AngularMomentum(label);
+}
+
 // Exports classes/functions in src/general to python
 
 void export_general(py::module& m)
@@ -70,6 +86,10 @@ void export_general(py::module& m)
     m.def("bohr_in_angstroms", &units::getBohrValueInAngstroms);
 
     m.def("hartree_in_ev", &units::getHatreeValueInElectronVolts);
+
+    m.def("to_angular_momentum", &string_to_angular_momentum);
+
+    m.def("to_angular_momentum", &integer_to_angular_momentum);
 }
 
 } // vlx_general namespace
