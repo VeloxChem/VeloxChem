@@ -6,8 +6,8 @@ class OutputStream:
 
     def __init__(self, filename, width=122):
         self.state = False
-        self.buffer = []
         self.width = width
+        self.buffer_lines = []
         if len(filename):
             try:
                 self.stream = open(filename, 'w')
@@ -18,7 +18,7 @@ class OutputStream:
 
     def __del__(self):
         if self.state:
-            if self.buffer:
+            if self.buffer_lines:
                 self.flush()
             self.stream.close()
 
@@ -27,10 +27,10 @@ class OutputStream:
 
     def flush(self):
         if self.state:
-            for line in self.buffer:
+            for line in self.buffer_lines:
                 self.stream.write(line)
             self.stream.flush()
-            del self.buffer[:]
+            del self.buffer_lines[:]
 
     @staticmethod
     def header(line, width):
@@ -60,32 +60,32 @@ class OutputStream:
     def print_line(self, line):
         if not self.state:
             return
-        self.buffer.append(line + '\n')
+        self.buffer_lines.append(line + '\n')
 
     def print_blank(self):
         if not self.state:
             return
-        self.buffer.append(' ' * self.width + '\n')
+        self.buffer_lines.append(' ' * self.width + '\n')
 
     def print_header(self, line):
         if not self.state:
             return
-        self.buffer.append(self.header(line, self.width) + '\n')
+        self.buffer_lines.append(self.header(line, self.width) + '\n')
 
     def print_title(self, line):
         if not self.state:
             return
-        self.buffer.append(self.title(line, self.width) + '\n')
+        self.buffer_lines.append(self.title(line, self.width) + '\n')
 
     def print_info(self, line):
         if not self.state:
             return
-        self.buffer.append(self.info(line, self.width) + '\n')
+        self.buffer_lines.append(self.info(line, self.width) + '\n')
 
     def print_separator(self):
         if not self.state:
             return
-        self.buffer.append(self.tsep(self.width) + '\n')
+        self.buffer_lines.append(self.tsep(self.width) + '\n')
 
     def print_block(self, block_lines):
         """
