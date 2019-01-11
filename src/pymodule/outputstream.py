@@ -1,63 +1,135 @@
-from .veloxchemlib import OutputStream
 import time as tm
 
 
-def _print_start_header(self, num_nodes):
-    """
-    Prints start header to output stream.
-    """
+class OutputStream:
 
-    start_time = tm.time()
+    def __init__(self, filename):
+        self.state = False
+        if len(filename):
+            self.stream = open(filename, 'w')
+            self.state = True
+            self.width = 122
 
-    self.print_separator()
-    self.print_title("")
-    self.print_title("VELOX CHEM MP (V.0.0 2018)")
-    self.print_title("AN ELECTRONIC STRUCTURE CODE FOR NANOSCALE")
-    self.print_title("")
-    self.print_title("Copyright (c) 2018 Velox Chem MP developers.")
-    self.print_title("All rights reserved.")
-    self.print_separator()
-    exec_str = "VeloxChem MP execution started"
-    if num_nodes > 1:
-        exec_str += " on " + str(num_nodes) + " compute nodes"
-    exec_str += " at " + tm.asctime(tm.localtime(start_time)) + "."
-    self.print_title(exec_str)
-    self.print_separator()
-    self.print_blank()
+    def __del__(self):
+        if self.state:
+            self.stream.close()
 
-    return start_time
+    def get_state(self):
+        return self.state
 
+    def flush(self):
+        if self.state:
+            self.stream.flush()
 
-def _print_finish_header(self, start_time):
-    """
-    Prints start header to output stream.
-    """
+    @staticmethod
+    def header(line, width):
+        length = len(line)
+        left = (width - length) // 2
+        right = width - length - left
+        return ' ' * left + line + ' ' * right
 
-    end_time = tm.time()
+    @staticmethod
+    def title(line, width):
+        length = len(line)
+        left = (width - 2 - length) // 2
+        right = width - 2 - length - left
+        return '!' + ' ' * left + line + ' ' * right + '!'
 
-    self.print_separator()
-    exec_str = "VeloxChem MP execution completed at "
-    exec_str += tm.asctime(tm.localtime(end_time)) + "."
-    self.print_title(exec_str)
-    self.print_separator()
-    exec_str = "Total execution time is "
-    exec_str += "{:.2f}".format(end_time - start_time) + " sec."
-    self.print_title(exec_str)
-    self.print_separator()
-    self.flush()
+    @staticmethod
+    def info(line, width):
+        length = len(line)
+        left = 9
+        right = width - length - left
+        return '* Info * ' + line + ' ' * right
 
+    @staticmethod
+    def tsep(width):
+        return '!' + '=' * (width - 2) + '!'
 
-def _print_block(self, block_lines):
-    """
-    Prints multiline text block to output stream.
-    """
+    def print_line(self, line):
+        if not self.state:
+            return
+        self.stream.write(line + '\n')
 
-    lines = block_lines.split('\n')
-    self.print_header(lines.pop(0))
-    for line in lines:
-        self.print_line(line)
+    def print_blank(self):
+        if not self.state:
+            return
+        self.stream.write(' ' * self.width + '\n')
 
+    def print_header(self, line):
+        if not self.state:
+            return
+        self.stream.write(self.header(line, self.width) + '\n')
 
-OutputStream.print_start_header = _print_start_header
-OutputStream.print_finish_header = _print_finish_header
-OutputStream.print_block = _print_block
+    def print_title(self, line):
+        if not self.state:
+            return
+        self.stream.write(self.title(line, self.width) + '\n')
+
+    def print_info(self, line):
+        if not self.state:
+            return
+        self.stream.write(self.info(line, self.width) + '\n')
+
+    def print_separator(self):
+        if not self.state:
+            return
+        self.stream.write(self.tsep(self.width) + '\n')
+
+    def print_block(self, block_lines):
+        """
+        Prints multiline text block to output stream.
+        """
+        if not self.state:
+            return
+
+        lines = block_lines.split('\n')
+        for line in lines:
+            self.print_header(line)
+
+    def print_start_header(self, num_nodes):
+        """
+        Prints start header to output stream.
+        """
+        if not self.state:
+            return tm.time()
+
+        start_time = tm.time()
+
+        self.print_separator()
+        self.print_title("")
+        self.print_title("VELOX CHEM MP (V.0.0 2018)")
+        self.print_title("AN ELECTRONIC STRUCTURE CODE FOR NANOSCALE")
+        self.print_title("")
+        self.print_title("Copyright (c) 2018 Velox Chem MP developers.")
+        self.print_title("All rights reserved.")
+        self.print_separator()
+        exec_str = "VeloxChem MP execution started"
+        if num_nodes > 1:
+            exec_str += " on " + str(num_nodes) + " compute nodes"
+        exec_str += " at " + tm.asctime(tm.localtime(start_time)) + "."
+        self.print_title(exec_str)
+        self.print_separator()
+        self.print_blank()
+
+        return start_time
+
+    def print_finish_header(self, start_time):
+        """
+        Prints start header to output stream.
+        """
+        if not self.state:
+            return
+
+        end_time = tm.time()
+
+        self.print_separator()
+        exec_str = "VeloxChem MP execution completed at "
+        exec_str += tm.asctime(tm.localtime(end_time)) + "."
+        self.print_title(exec_str)
+        self.print_separator()
+        exec_str = "Total execution time is "
+        exec_str += "{:.2f}".format(end_time - start_time) + " sec."
+        self.print_title(exec_str)
+        self.print_separator()
+        self.flush()

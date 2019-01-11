@@ -1,6 +1,7 @@
 from .veloxchemlib import OverlapMatrix
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import SADGuessDriver
+from .veloxchemlib import mpi_master
 
 from .aodensitymatrix import AODensityMatrix
 
@@ -86,12 +87,14 @@ class DensityGuess:
             den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
                                       overlap_matrix, comm)
 
-            ostream.print_info("SAD initial guess computed in %.2f sec." %
-                               (tm.time() - t0))
+            if loc_rank == mpi_master():
 
-            ostream.print_blank()
+                ostream.print_info("SAD initial guess computed in %.2f sec." %
+                                   (tm.time() - t0))
 
-            ostream.flush()
+                ostream.print_blank()
+
+                ostream.flush()
 
             return den_mat
         

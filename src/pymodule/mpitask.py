@@ -3,11 +3,11 @@ from .veloxchemlib import MolecularBasis
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import ChemicalElement
-from .veloxchemlib import OutputStream
 from .veloxchemlib import mpi_master
 from .veloxchemlib import assert_msg_critical
 from .veloxchemlib import to_angular_momentum
 from .inputparser import InputParser
+from .outputstream import OutputStream
 
 from os.path import isfile
 
