@@ -10,6 +10,8 @@ from test_orbdata import TestOrbData
 from test_solvers import TestSolvers
 from test_streams import TestStreams
 
+from test_rhf import TestRHF
+
 import unittest
 
 if __name__ == "__main__":

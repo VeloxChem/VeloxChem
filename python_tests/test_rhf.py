@@ -16,13 +16,33 @@ class TestRHF(unittest.TestCase):
 
         scf_drv.compute_task(task)
 
+        task.finish()
+
         return scf_drv.get_scf_energy()
 
-    def test_caffeine(self):
+    def test_h2o(self):
 
-        e_scf = self.run_rhf("caf")
+        e_scf = self.run_rhf("h2o")
 
-        self.assertAlmostEqual(e_scf, -675.828421206170, 10)
+        self.assertAlmostEqual(e_scf, -75.922903268112, 10)
+
+    def test_nh3(self):
+
+        e_scf = self.run_rhf("nh3")
+
+        self.assertAlmostEqual(e_scf, -56.195395860545, 10)
+
+    def test_ch4(self):
+
+        e_scf = self.run_rhf("ch4")
+
+        self.assertAlmostEqual(e_scf, -40.155481408646, 10)
+
+    def test_c2h4(self):
+
+        e_scf = self.run_rhf("c2h4")
+
+        self.assertAlmostEqual(e_scf, -78.043152739545, 10)
 
 
 if __name__ == "__main__":

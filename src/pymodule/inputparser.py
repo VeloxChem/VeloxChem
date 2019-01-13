@@ -90,6 +90,32 @@ class InputParser:
 
     # defining molecule and basis set readers
 
+    @staticmethod
+    def create_molecule_from_xyz(xyzfile, charge=0, spinmult=1):
+
+        atom_labels = []
+        x_coords = []
+        y_coords = []
+        z_coords = []
+
+        with open(xyzfile, 'r') as f_xyz:
+            natoms = int(f_xyz.readline().split()[0])
+            f_xyz.readline()
+            for a in range(natoms):
+                content = f_xyz.readline().split()
+                atom_labels.append(content[0])
+                x_coords.append(float(content[1]) / bohr_in_angstroms())
+                y_coords.append(float(content[2]) / bohr_in_angstroms())
+                z_coords.append(float(content[3]) / bohr_in_angstroms())
+
+        mol = Molecule(atom_labels, x_coords, y_coords, z_coords)
+        mol.set_charge(charge)
+        mol.set_multiplicity(spinmult)
+        mol.check_multiplicity()
+        mol.check_proximity(0.1)
+
+        return mol
+
     def create_molecule(self):
 
         mol_dict = self.input_dict

@@ -51,13 +51,13 @@ class TestPen(unittest.TestCase):
 
         # compare with reference
 
-        hf = h5py.File("inputs/pen.onee.h5", 'r')
-        S2 = np.array(hf.get("overlap"))
-        T2 = np.array(hf.get("kinetic_energy"))
-        V2 = np.array(hf.get("nuclear_potential"))
-        hf.close()
-
         if rank == mpi_master():
+
+            hf = h5py.File("inputs/pen.onee.h5", 'r')
+            S2 = np.array(hf.get("overlap"))
+            T2 = np.array(hf.get("kinetic_energy"))
+            V2 = np.array(hf.get("nuclear_potential"))
+            hf.close()
 
             dS = np.max(np.abs(S1 - S2))
             dT = np.max(np.abs(T1 - T2))
