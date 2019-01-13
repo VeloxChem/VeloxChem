@@ -4,7 +4,7 @@ task: hf
 
 @method settings
 basis: def2-svp
-basis path: /home/xinli/gitlab/VeloxChemMP/basis/
+basis path: ../basis/
 @end
 
 @molecule
