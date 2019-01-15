@@ -555,6 +555,12 @@ CGtoBlock::getNumberOfPrimGtos() const
 }
 
 int32_t
+CGtoBlock::getNumberOfNormFactors() const
+{
+    return _gtoNormFactors.size();
+}
+
+int32_t
 CGtoBlock::getNumberOfRedContrGtos() const
 {
     return _contrPattern.size(0);

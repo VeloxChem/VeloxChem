@@ -262,6 +262,38 @@ contract(      CMemBlock2D<double>&  contrData,
     
     auto kepos = ketGtoPairsBlock.getEndPositions();
     
+    // set up pointers to contraction data on bra side
+    
+    auto sbcpos = braGtoPairsBlock.getContrStartPositions();
+    
+    auto ebcpos = braGtoPairsBlock.getContrEndPositions();
+    
+    // set up pointers to contraction data on ket side
+    
+    auto skcpos = ketGtoPairsBlock.getContrStartPositions();
+    
+    auto ekcpos = ketGtoPairsBlock.getContrEndPositions();
+    
+    // set up pointers to normalization factors
+    
+    auto bfnorm = braGtoPairsBlock.getNormFactors();
+    
+    auto kfnorm = ketGtoPairsBlock.getNormFactors();
+    
+    // set up pointers to indexing of normalization factors
+    
+    auto sbfpos = braGtoPairsBlock.getNormFactorsStartPositions();
+    
+    auto skfpos = ketGtoPairsBlock.getNormFactorsStartPositions();
+    
+    auto ekfpos = ketGtoPairsBlock.getNormFactorsEndPositions();
+    
+    // set up ket dimensions
+    
+    auto krdim = ketGtoPairsBlock.getNumberOfScreenedRedContrPairs();
+    
+    auto kcdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+    
     // loop over set of data vectors
     
     for (size_t i = 0; i < contrPattern.size(); i++)
@@ -283,36 +315,83 @@ contract(      CMemBlock2D<double>&  contrData,
         
         auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.third());
         
-        // first step: vertical summation over bra GTO
-        
-        for (int32_t j = 1; j < bdim; j++)
+        for (int32_t j = sbcpos[iContrPair]; j < ebcpos[iContrPair]; j++)
         {
-            // accumulate summation over primitives on bra side
-            
-            for (int32_t k = 0; k < ncomp; k++)
+            for (int32_t k = 0; k < bdim; k++)
             {
-                // summation buffer
+                auto bfact = bfnorm[sbfpos[j] + k];
                 
-                auto sumbuf = primData.data(pidx + k);
-                
-                // source buffer
-                
-                auto srcbuf = primData.data(pidx + j * ncomp + k);
-                
-                // loop over primitive GTOs on ket side
-                
-                #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
-                for (int32_t l = 0; l < nKetPrimPairs; l++)
+                for (int32_t l = 0; l < krdim; l++)
                 {
-                    sumbuf[l] += srcbuf[l];
+                    auto srcoff = kspos[l];
+                    
+                    for (int32_t m = skcpos[l]; m < ekcpos[l]; m++)
+                    {
+                        auto ostart = skfpos[m];
+                        
+                        auto oend = ekfpos[m];
+                        
+                        for (int32_t n = 0; n < ncomp; n++)
+                        {
+                            // sum up primitive integrals
+                            
+                            double fsum = 0.0;
+                            
+                            auto srcbuf = primData.data(pidx + k * ncomp + n);
+                            
+                            for (int32_t o = ostart; o < oend; o++)
+                            {
+                                fsum += kfnorm[o] * srcbuf[srcoff + o - ostart];
+                            }
+                            
+                            // distribute integrals
+                            
+                            auto dstbuf = contrData.data(cidx + n);
+                            
+                            if (k == 0)
+                            {
+                                dstbuf[m] = bfact * fsum;
+                            }
+                            else
+                            {
+                                dstbuf[m] += bfact * fsum;
+                            }
+                        }
+                    }
                 }
             }
         }
         
-        // second step: direct contraction over ket side
+        // first step: vertical summation over bra GTO
         
-        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos,
-                          nKetContrPairs, ncomp);
+//        for (int32_t j = 1; j < bdim; j++)
+//        {
+//            // accumulate summation over primitives on bra side
+//
+//            for (int32_t k = 0; k < ncomp; k++)
+//            {
+//                // summation buffer
+//
+//                auto sumbuf = primData.data(pidx + k);
+//
+//                // source buffer
+//
+//                auto srcbuf = primData.data(pidx + j * ncomp + k);
+//
+//                // loop over primitive GTOs on ket side
+//
+//                #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
+//                for (int32_t l = 0; l < nKetPrimPairs; l++)
+//                {
+//                    sumbuf[l] += srcbuf[l];
+//                }
+//            }
+//        }
+//
+//        // second step: direct contraction over ket side
+//
+//        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos,
+//                          nKetContrPairs, ncomp);
     }
 }
     

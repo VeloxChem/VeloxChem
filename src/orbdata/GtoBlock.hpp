@@ -190,6 +190,13 @@ public:
     int32_t getNumberOfPrimGtos() const;
     
     /**
+     Gets number of normalization factors in GTOs block.
+
+     @return the number of normalization factors.
+     */
+    int32_t getNumberOfNormFactors() const;
+    
+    /**
      Gets number of reduced contracted basis functions in GTOs block.
      
      @return the number of reduced contracted basis functions.

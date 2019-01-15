@@ -369,6 +369,64 @@ TEST_F(CGtoBlockTest, GetNumberOfPrimGtos)
     ASSERT_EQ(0, cgto.getNumberOfPrimGtos());
 }
 
+TEST_F(CGtoBlockTest, GetNumberOfPrimGtosWithGeneralContraction)
+{
+    CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(8, agto.getNumberOfPrimGtos());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(2, bgto.getNumberOfPrimGtos());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getNumberOfPrimGtos());
+}
+
+TEST_F(CGtoBlockTest, GetNumberOfNormFactors)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(11, agto.getNumberOfNormFactors());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(4, bgto.getNumberOfNormFactors());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getNumberOfNormFactors());
+}
+
+TEST_F(CGtoBlockTest, GetNumberOfNormFactorsWithGeneralContraction)
+{
+    CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(11, agto.getNumberOfNormFactors());
+    
+    CGtoBlock bgto(lih, bas, 1);
+    
+    ASSERT_EQ(2, bgto.getNumberOfNormFactors());
+    
+    CGtoBlock cgto(lih, bas, 2);
+    
+    ASSERT_EQ(0, cgto.getNumberOfNormFactors());
+}
+
+
 TEST_F(CGtoBlockTest, GetNumberOfRedContrGtos)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

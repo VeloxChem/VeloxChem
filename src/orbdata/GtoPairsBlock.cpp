@@ -42,6 +42,10 @@ CGtoPairsBlock::CGtoPairsBlock()
 
     , _nScreenedPrimPairs(0)
 
+    , _nOriginalRedContrPairs(0)
+
+    , _nScreenedRedContrPairs(0)
+
     , _nOriginalContrPairs(0)
 
     , _nScreenedContrPairs(0)
@@ -50,8 +54,10 @@ CGtoPairsBlock::CGtoPairsBlock()
 }
 
 CGtoPairsBlock::CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
+                               const CMemBlock2D<int32_t>& indexPattern,
                                const CMemBlock2D<double>&  contrFactors, 
                                const CMemBlock2D<double>&  pairFactors,
+                               const CMemBlock<double>&    normFactors,
                                const int32_t               braAngularMomentum,
                                const int32_t               ketAngularMomentum,
                                const double                threshold)
@@ -62,13 +68,13 @@ CGtoPairsBlock::CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
 
     , _contrPattern(contrPattern)
 
-    , _indexPattern(CMemBlock2D<int32_t>())
+    , _indexPattern(indexPattern)
 
     , _contrFactors(contrFactors)
 
     , _pairFactors(pairFactors)
 
-    , _normFactors(CMemBlock<double>())
+    , _normFactors(normFactors)
 
     , _threshold(threshold)
 
@@ -76,9 +82,13 @@ CGtoPairsBlock::CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
 
     , _nScreenedPrimPairs(pairFactors.size(0))
 
-    , _nOriginalContrPairs(contrPattern.size(0))
+    , _nOriginalRedContrPairs(contrPattern.size(0))
 
-    , _nScreenedContrPairs(contrPattern.size(0))
+    , _nScreenedRedContrPairs(contrPattern.size(0))
+
+    , _nOriginalContrPairs(indexPattern.size(0))
+
+    , _nScreenedContrPairs(indexPattern.size(0))
 {
     
 }
@@ -107,6 +117,10 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
 
     , _nScreenedPrimPairs(0)
 
+    , _nOriginalRedContrPairs(0)
+
+    , _nScreenedRedContrPairs(0)
+
     , _nOriginalContrPairs(0)
 
     , _nScreenedContrPairs(0)
@@ -117,9 +131,17 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     auto kpgto = ketGtoBlock.getNumberOfPrimGtos();
     
+    auto brgto = braGtoBlock.getNumberOfRedContrGtos();
+    
+    auto krgto = ketGtoBlock.getNumberOfRedContrGtos();
+    
     auto bcgto = braGtoBlock.getNumberOfContrGtos();
     
     auto kcgto = ketGtoBlock.getNumberOfContrGtos();
+    
+    auto bnfacts = braGtoBlock.getNumberOfNormFactors();
+    
+    auto knfacts = ketGtoBlock.getNumberOfNormFactors();
     
     // set up pointers to GTOs block data on bra side
     
@@ -137,6 +159,12 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     auto bepos = braGtoBlock.getEndPositions();
     
+    auto bcspos = braGtoBlock.getContrStartPositions();
+    
+    auto bcepos = braGtoBlock.getContrEndPositions();
+    
+    auto bfspos = braGtoBlock.getNormFactorsStartPositions();
+    
     // set up pointers to GTOs block data on ket side
     
     auto kexp = ketGtoBlock.getExponents();
@@ -152,6 +180,12 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     auto kspos = ketGtoBlock.getStartPositions();
     
     auto kepos = ketGtoBlock.getEndPositions();
+    
+    auto kcspos = ketGtoBlock.getContrStartPositions();
+    
+    auto kcepos = ketGtoBlock.getContrEndPositions();
+    
+    auto kfspos = ketGtoBlock.getNormFactorsStartPositions();
     
     // determine if bra and ket GTOs block objects are the same
     
@@ -229,15 +263,27 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     auto kang = angmom::to_SphericalComponents(_ketAngularMomentum);
     
-    CMemBlock2D<int32_t> ppidx(bcgto * kcgto, 2 + bang + kang);
+    CMemBlock2D<int32_t> ppidx(brgto * krgto, 4);
     
-    CMemBlock2D<double> pcfacts(bcgto * kcgto, 3);
+    CMemBlock2D<int32_t> pcidx(bcgto * kcgto, 2 + bang + kang);
+    
+    CMemBlock2D<double> pcfacts(brgto * krgto, 3);
+    
+    CMemBlock<double> pnfacts(bnfacts * knfacts); 
     
     // set up pointers to start and end positions
     
     auto ppspos = ppidx.data(0);
     
     auto ppepos = ppidx.data(1);
+    
+    auto ppcspos = ppidx.data(2);
+    
+    auto ppcepos = ppidx.data(3);
+    
+    auto ppfspos = pcidx.data(0);
+    
+    auto ppfepos = pcidx.data(1);
     
     // set up pointers to effective P coordinates
     
@@ -249,23 +295,33 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
 
     // initialize number of pairs
     
-    _nOriginalContrPairs = 0;
+    //_nOriginalContrPairs = 0;
     
-    _nOriginalPrimPairs  = 0;
+    //_nOriginalPrimPairs  = 0;
     
     // loop over contracted GTOs
     
     int32_t idxpgto = 0;
+   
+    int32_t idxrgto = 0;
     
     int32_t idxcgto = 0;
     
-    for (int32_t i = 0; i < bcgto; i++)
+    int32_t idxfact = 0;
+    
+    for (int32_t i = 0; i < brgto; i++)
     {
         int32_t joff = (symbk) ? i : 0;
         
-        for (int32_t j = joff; j < kcgto; j++)
+        auto bcdim = bcepos[i] - bcspos[i];
+        
+        for (int32_t j = joff; j < krgto; j++)
         {
-            // effective P coordinates and normalization factor
+            auto kcdim = kcepos[j] - kcspos[j];
+            
+            auto bkcdim = (symbk && (i == j)) ? bcdim * (bcdim + 1) / 2 : bcdim * kcdim;
+            
+            // effective averaged P coordinates and normalization factor
             
             double repx = 0.0;
             
@@ -279,125 +335,145 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
             
             int32_t nprim = 0;
             
+            std::vector<double> bkfacts;
+            
             for (int32_t k = bspos[i]; k < bepos[i]; k++)
             {
                 // A center coordinates
-                
+            
                 auto rax = brx[k];
-                
+            
                 auto ray = bry[k];
-                
+            
                 auto raz = brz[k];
-                
+            
                 // A center primitive GTO
-                
+            
                 auto fae = bexp[k];
+            
+                auto bfan = braGtoBlock.getMaxNormFactor(i, k - bspos[i]);
                 
-                auto fan = bnorm[k];
-                
-                for (int32_t l = kspos[j];  l < kepos[j]; l++)
+                for (int32_t l = kspos[j]; l < kepos[j]; l++)
                 {
                     // R(AB) = A - B
                     
                     auto abx = rax - krx[l];
                     
                     auto aby = ray - kry[l];
-                    
+            
                     auto abz = raz - krz[l];
-                    
+            
                     // Obara-Saika factors
                     
                     auto fx = fae + kexp[l];
-                    
+            
                     auto fi = 1.0 / fx;
-                    
+        
                     auto fz = fae * kexp[l] * fi;
-                    
+            
                     // pair overlap value
                     
-                    auto fovl = fan * knorm[l] * std::pow(fpi * fi, 1.50)
+                    auto kfan = ketGtoBlock.getMaxNormFactor(j, l - kspos[j]);
+            
+                    auto fovl = std::pow(fpi * fi, 1.50)
                     
                               * std::exp(-fz * (abx * abx + aby * aby + abz * abz));
-                    
+            
                     // update number of orginal primitive pairs
-                    
+            
                     _nOriginalPrimPairs++;
-                    
+            
                     // add primitive pair to list of primitive pairs
-                    
-                    if (std::fabs(fovl) > _threshold)
+            
+                    if (std::fabs(bfan * kfan * fovl) > _threshold)
                     {
                         // Obara-Saika factors
-                        
+            
                         ppfx[idxpgto + nprim] = fx;
-                        
+            
                         ppfi[idxpgto + nprim] = fi;
-                        
+            
                         ppfz[idxpgto + nprim] = fz;
-                        
+            
                         ppss[idxpgto + nprim] = fovl;
-                        
+            
                         // P center
-                        
+            
                         pprpx[idxpgto + nprim] = fi * (fae * rax + kexp[l] * krx[l]);
-                        
+            
                         pprpy[idxpgto + nprim] = fi * (fae * ray + kexp[l] * kry[l]);
-                        
+            
                         pprpz[idxpgto + nprim] = fi * (fae * raz + kexp[l] * krz[l]);
-                        
+            
                         // R(PA) distances
-                        
+            
                         pprpax[idxpgto + nprim] = pprpx[idxpgto + nprim] - rax;
-                        
+            
                         pprpay[idxpgto + nprim] = pprpy[idxpgto + nprim] - ray;
-                        
+            
                         pprpaz[idxpgto + nprim] = pprpz[idxpgto + nprim] - raz;
-                        
+            
                         // R(PB) distances
-                        
+            
                         pprpbx[idxpgto + nprim] = pprpx[idxpgto + nprim] - krx[l];
-                        
+            
                         pprpby[idxpgto + nprim] = pprpy[idxpgto + nprim] - kry[l];
-                        
+            
                         pprpbz[idxpgto + nprim] = pprpz[idxpgto + nprim] - krz[l];
-                        
+            
                         // A Center
-                        
+            
                         pprax[idxpgto + nprim] = rax;
-                        
+            
                         ppray[idxpgto + nprim] = ray;
-                        
+            
                         ppraz[idxpgto + nprim] = raz;
-                        
+            
                         // B Center
-                        
+            
                         pprbx[idxpgto + nprim] = krx[l];
-                        
+            
                         pprby[idxpgto + nprim] = kry[l];
-                        
+            
                         pprbz[idxpgto + nprim] = krz[l];
-                        
+            
                         // R(AB) distances
-                        
+            
                         pprabx[idxpgto + nprim] = abx;
-                        
+            
                         ppraby[idxpgto + nprim] = aby;
-                        
+            
                         pprabz[idxpgto + nprim] = abz;
-                        
+            
                         // effective P coordinates
-                        
-                        auto cab = std::fabs(fan * knorm[l]);
-                        
+            
+                        auto cab = std::fabs(bfan * kfan);
+            
                         repx += cab * pprpx[idxpgto + nprim];
-                        
+            
                         repy += cab * pprpy[idxpgto + nprim];
-                        
+            
                         repz += cab * pprpz[idxpgto + nprim];
-                        
+            
                         epnrm += cab;
-                
-                        // update local primitives counter 
+                        
+                        // combine normalization factors
+            
+                        for (int32_t m = bcspos[i]; m < bcepos[i]; m++)
+                        {
+                            int32_t noff = (symbk && (i == j)) ? m : kcspos[j];
+                            
+                            auto bfact = bnorm[bfspos[m] + (k - bspos[i])];
+                            
+                            for (int32_t n = noff; n < kcepos[j]; n++)
+                            {
+                                auto kfact = knorm[kfspos[n] + (l - kspos[j])];
+                                
+                                bkfacts.push_back(bfact * kfact);
+                            }
+                        }
+                        
+                        // update local primitives counter
                         
                         nprim++;
                     }
@@ -406,55 +482,95 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
             
             // update numnber of orginal contracted pairs
             
-            _nOriginalContrPairs++;
+            _nOriginalRedContrPairs++;
             
+            _nOriginalContrPairs += bkcdim;
+
             // add contracted GTO data
-            
+
             if (nprim > 0)
             {
                 // pair position in primitive pairs vector
+
+                ppspos[idxrgto] = idxpgto;
+
+                ppepos[idxrgto] = idxpgto + nprim;
                 
-                ppspos[idxcgto] = idxpgto;
+                // pair position in contracted pairs vector
                 
-                ppepos[idxcgto] = idxpgto + nprim;
+                ppcspos[idxrgto] = idxcgto;
                 
-                // bra indexes of pair
-                
-                for (int32_t m = 0; m < bang; m++)
-                {
-                    auto bidx = braGtoBlock.getIdentifiers(m);
-                    
-                    auto cidx = ppidx.data(2 +  m);
-                    
-                    cidx[idxcgto] = bidx[i];
-                }
-                
-                // ket indexes of pair
-                
-                for (int32_t m = 0; m < kang; m++)
-                {
-                    auto kidx = ketGtoBlock.getIdentifiers(m);
-                    
-                    auto cidx = ppidx.data(2 + bang + m);
-                    
-                    cidx[idxcgto] = kidx[j];
-                }
+                ppcepos[idxrgto] = idxcgto + bkcdim;
                 
                 // effective P coordinates
                 
                 epnrm = 1.0 / epnrm;
                 
-                pcrpx[idxcgto] = epnrm * repx;
+                pcrpx[idxrgto] = epnrm * repx;
                 
-                pcrpy[idxcgto] = epnrm * repy;
+                pcrpy[idxrgto] = epnrm * repy;
                 
-                pcrpz[idxcgto] = epnrm * repz;
+                pcrpz[idxrgto] = epnrm * repz;
+                
+                // normalization factors
+                
+                for (int32_t k = 0; k < nprim; k++)
+                {
+                    for (int32_t l = 0; l < bkcdim; l++)
+                    {
+                        pnfacts.at(idxfact + l * nprim + k) = bkfacts[k * bkcdim + l];
+                    }
+                }
+
+                // indexing information
+                
+                int32_t iblock = 0;
+                
+                for (int32_t k = bcspos[i]; k < bcepos[i]; k++)
+                {
+                    int32_t loff = (symbk && (i == j)) ? k : kcspos[j];
+                    
+                    for (int32_t l = loff; l < kcepos[j]; l++)
+                    {
+                        ppfspos[idxcgto + iblock] = idxfact + iblock * nprim;
+                        
+                        ppfepos[idxcgto + iblock] = idxfact + (iblock + 1) * nprim;
+                        
+                        // bra indexes of pair
+                        
+                        for (int32_t m = 0; m < bang; m++)
+                        {
+                            auto bidx = braGtoBlock.getIdentifiers(m);
+                            
+                            auto cidx = pcidx.data(2 +  m);
+                            
+                            cidx[idxcgto + iblock] = bidx[k + iblock];
+                        }
+                        
+                        // ket indexes of pair
+                        
+                        for (int32_t m = 0; m < kang; m++)
+                        {
+                            auto kidx = ketGtoBlock.getIdentifiers(m);
+                            
+                            auto cidx = pcidx.data(2 + bang + m);
+                            
+                            cidx[idxcgto + iblock] = kidx[l + iblock];
+                        }
+                        
+                        iblock++;
+                    }
+                }
                 
                 // update indexes
-                
+
                 idxpgto += nprim;
+
+                idxrgto++;
                 
-                idxcgto++;
+                idxcgto += bkcdim;
+                
+                idxfact += bkcdim * nprim;
             }
         }
     }
@@ -463,15 +579,21 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     _nScreenedPrimPairs = idxpgto;
     
+    _nScreenedRedContrPairs = idxrgto;
+    
     _nScreenedContrPairs = idxcgto;
     
     // copy pairs data from temporary storage
     
     _pairFactors = ppfacts.slice(0, _nScreenedPrimPairs);
     
-    _contrPattern = ppidx.slice(0, _nScreenedContrPairs);
+    _contrPattern = ppidx.slice(0, _nScreenedRedContrPairs);
     
-    _contrFactors = pcfacts.slice(0, _nScreenedContrPairs);
+    _indexPattern = pcidx.slice(0, _nScreenedContrPairs);
+    
+    _contrFactors = pcfacts.slice(0, _nScreenedRedContrPairs);
+    
+    _normFactors = pnfacts.slice(0, idxfact);
 }
 
 CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& gtoBlock,
@@ -504,6 +626,10 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoPairsBlock& source)
 
     , _nScreenedPrimPairs(source._nScreenedPrimPairs)
 
+    , _nOriginalRedContrPairs(source._nOriginalRedContrPairs)
+
+    , _nScreenedRedContrPairs(source._nScreenedRedContrPairs)
+
     , _nOriginalContrPairs(source._nOriginalContrPairs)
 
     , _nScreenedContrPairs(source._nScreenedContrPairs)
@@ -532,6 +658,10 @@ CGtoPairsBlock::CGtoPairsBlock(CGtoPairsBlock&& source) noexcept
     , _nOriginalPrimPairs(std::move(source._nOriginalPrimPairs))
 
     , _nScreenedPrimPairs(std::move(source._nScreenedPrimPairs))
+
+    , _nOriginalRedContrPairs(std::move(source._nOriginalRedContrPairs))
+
+    , _nScreenedRedContrPairs(std::move(source._nScreenedRedContrPairs))
 
     , _nOriginalContrPairs(std::move(source._nOriginalContrPairs))
 
@@ -570,6 +700,10 @@ CGtoPairsBlock::operator=(const CGtoPairsBlock& source)
     
     _nScreenedPrimPairs = source._nScreenedPrimPairs;
     
+    _nOriginalRedContrPairs = source._nOriginalRedContrPairs;
+    
+    _nScreenedRedContrPairs = source._nScreenedRedContrPairs;
+    
     _nOriginalContrPairs = source._nOriginalContrPairs;
     
     _nScreenedContrPairs = source._nScreenedContrPairs;
@@ -602,6 +736,10 @@ CGtoPairsBlock::operator=(CGtoPairsBlock&& source) noexcept
     
     _nScreenedPrimPairs = std::move(source._nScreenedPrimPairs);
     
+    _nOriginalRedContrPairs = std::move(source._nOriginalRedContrPairs);
+    
+    _nScreenedRedContrPairs = std::move(source._nScreenedRedContrPairs);
+    
     _nOriginalContrPairs = std::move(source._nOriginalContrPairs);
     
     _nScreenedContrPairs = std::move(source._nScreenedContrPairs);
@@ -632,6 +770,10 @@ CGtoPairsBlock::operator==(const CGtoPairsBlock& other) const
     
     if (_nScreenedPrimPairs != other._nScreenedPrimPairs) return false;
     
+    if (_nOriginalRedContrPairs != other._nOriginalRedContrPairs) return false;
+    
+    if (_nScreenedRedContrPairs != other._nScreenedRedContrPairs) return false;
+    
     if (_nOriginalContrPairs != other._nOriginalContrPairs) return false;
     
     if (_nScreenedContrPairs != other._nScreenedContrPairs) return false;
@@ -652,9 +794,9 @@ CGtoPairsBlock::split(const int32_t nodes) const
     
     // determine number of batches
     
-    auto nbtch = _nScreenedContrPairs / batchSize;
+    auto nbtch = _nScreenedRedContrPairs / batchSize;
     
-    if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
+    if ((_nScreenedRedContrPairs % batchSize) != 0) nbtch++;
   
     auto ntsk = omp_get_max_threads(); 
      
@@ -666,18 +808,18 @@ CGtoPairsBlock::split(const int32_t nodes) const
     
     batchSize = _getBlockDimensions();
     
-    if ((_nScreenedContrPairs / nbtch) < batchSize)
+    if ((_nScreenedRedContrPairs / nbtch) < batchSize)
     {
-        nbtch = _nScreenedContrPairs / batchSize;
+        nbtch = _nScreenedRedContrPairs / batchSize;
         
-        if ((_nScreenedContrPairs % batchSize) != 0) nbtch++;
+        if ((_nScreenedRedContrPairs % batchSize) != 0) nbtch++;
     }
 
     // set up batches distribution pattern
     
     CMemBlock2D<int32_t> bblk(nbtch, 2);
     
-    mpi::batches_pattern(bblk.data(0), _nScreenedContrPairs, nbtch);
+    mpi::batches_pattern(bblk.data(0), _nScreenedRedContrPairs, nbtch);
     
     mathfunc::indexes(bblk.data(1), bblk.data(0), nbtch);
     
@@ -693,13 +835,25 @@ CGtoPairsBlock::split(const int32_t nodes) const
     
     auto epos = getEndPositions();
     
+    // contracted space start and end positions
+    
+    auto cspos = getContrStartPositions();
+    
+    auto cepos = getContrEndPositions();
+    
+    // normalization factors space start and end positions
+    
+    auto fnspos = getNormFactorsStartPositions();
+    
+    auto fnepos = getNormFactorsEndPositions();
+    
     // split GTOs pairs block
     
     std::vector<CGtoPairsBlock> ppvec;
     
     for (int32_t i = 0; i < nbtch; i++)
     {
-        // slice contracted GTOs pairs
+        // slice reduced contracted GTOs pairs
         
         auto cidx = boff[i];
         
@@ -717,21 +871,61 @@ CGtoPairsBlock::split(const int32_t nodes) const
         
         auto pdat = _pairFactors.slice(pidx, pdim);
         
-        // adjust primitive GTOs pairs indexing
+        // slice indexing pattern for GTOs pairs
+        
+        auto cgidx = cspos[cidx];
+        
+        auto cgdim = cepos[cidx + cdim - 1] - cgidx;
+        
+        auto cgdat = _indexPattern.slice(cgidx, cgdim);
+        
+        // adjust contraction pattern for GTOs pairs
         
         auto scurpos = cdat.data(0);
         
         auto ecurpos = cdat.data(1);
+        
+        auto cscurpos = cdat.data(2);
+        
+        auto cecurpos = cdat.data(3);
         
         for (int32_t j = 0; j < cdim; j++)
         {
             scurpos[j] = spos[cidx + j] - pidx;
             
             ecurpos[j] = epos[cidx + j] - pidx;
+            
+            cscurpos[j] = cspos[cidx + j] - cgidx;
+            
+            cecurpos[j] = cepos[cidx + j] - cgidx;
         }
         
-        ppvec.push_back(CGtoPairsBlock(cdat, cfac, pdat, _braAngularMomentum,
-                                       _ketAngularMomentum, _threshold));
+        // slice normalization factors for GTOs pairs
+        
+        auto cfnidx = fnspos[cspos[cidx]];
+        
+        auto cfndim = fnepos[cepos[cidx + cdim - 1] - 1] - cfnidx;
+        
+        auto cfndat = _normFactors.slice(cfnidx, cfndim);
+        
+        // adjust normalization factors indexing
+        
+        auto fnscurpos = cgdat.data(0);
+        
+        auto fnecurpos = cgdat.data(1);
+        
+        for (int32_t j = 0; j < cgdim; j++)
+        {
+            fnscurpos[j] = fnspos[cspos[cidx] + j] - cfnidx;
+            
+            fnecurpos[j] = fnepos[cspos[cidx] + j] - cfnidx;
+        }
+        
+        // slice normalization factors for GTOs pairs
+        
+        ppvec.push_back(CGtoPairsBlock(cdat, cgdat, cfac, pdat, cfndat,
+                                       _braAngularMomentum, _ketAngularMomentum,
+                                       _threshold));
     }
     
     return ppvec;
@@ -748,6 +942,18 @@ CGtoPairsBlock::pick(const int32_t iGtoPair) const
         
         auto epos = getEndPositions();
         
+        // contracted space start and end positions
+        
+        auto cspos = getContrStartPositions();
+        
+        auto cepos = getContrEndPositions();
+        
+        // normalization factors space start and end positions
+        
+        auto fnspos = getNormFactorsStartPositions();
+        
+        auto fnepos = getNormFactorsEndPositions();
+        
         // slice contracted GTOs pairs
         
         auto cdat = _contrPattern.slice(iGtoPair, 1);
@@ -762,18 +968,56 @@ CGtoPairsBlock::pick(const int32_t iGtoPair) const
         
         auto pdat = _pairFactors.slice(pidx, pdim);
         
-        // adjust primitive GTOs pairs indexing
+        // slice indexing pattern for GTOs pairs
+        
+        auto cgidx = cspos[iGtoPair];
+        
+        auto cgdim = cepos[iGtoPair] - cgidx;
+        
+        auto cgdat = _indexPattern.slice(cgidx, cgdim);
+        
+        // adjust contraction pattern for GTOs pairs
         
         auto scurpos = cdat.data(0);
         
         auto ecurpos = cdat.data(1);
         
+        auto cscurpos = cdat.data(2);
+        
+        auto cecurpos = cdat.data(3);
+        
         scurpos[0] = 0;
             
         ecurpos[0] = pdim;
         
-        return CGtoPairsBlock(cdat, cfac, pdat, _braAngularMomentum,
-                              _ketAngularMomentum, _threshold);
+        cscurpos[0] = 0;
+        
+        cecurpos[0] = cgdim;
+        
+        // slice normalization factors for GTOs pairs
+        
+        auto cfnidx = fnspos[cspos[iGtoPair]];
+        
+        auto cfndim = fnepos[cepos[iGtoPair] - 1] - cfnidx;
+        
+        auto cfndat = _normFactors.slice(cfnidx, cfndim);
+        
+        // adjust normalization factors indexing
+        
+        auto fnscurpos = cgdat.data(0);
+        
+        auto fnecurpos = cgdat.data(1);
+        
+        for (int32_t j = 0; j < cgdim; j++)
+        {
+            fnscurpos[j] = fnspos[cspos[iGtoPair] + j] - cfnidx;
+            
+            fnecurpos[j] = fnepos[cspos[iGtoPair] + j] - cfnidx;
+        }
+        
+        return CGtoPairsBlock(cdat, cgdat, cfac, pdat, cfndat,
+                              _braAngularMomentum, _ketAngularMomentum,
+                              _threshold);
     }
     
     return CGtoPairsBlock(); 
@@ -788,9 +1032,13 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     
     _contrPattern.zero();
     
+    _indexPattern.zero();
+    
     _contrFactors.zero();
     
     _pairFactors.zero();
+    
+    _normFactors.zero();
     
     // set up pointers to source of primitive data
     
@@ -890,11 +1138,27 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     
     auto sepos = source.getEndPositions();
     
+    auto scspos = source.getContrStartPositions();
+    
+    auto scepos = source.getContrEndPositions();
+    
+    auto sfspos = source.getNormFactorsStartPositions();
+    
+    auto sfepos = source.getNormFactorsEndPositions();
+    
     // set up pointers to destination contraction pattern
     
     auto dspos = _contrPattern.data(0);
     
     auto depos = _contrPattern.data(1);
+    
+    auto dcspos = _contrPattern.data(2);
+    
+    auto dcepos = _contrPattern.data(3);
+    
+    auto dfspos = _indexPattern.data(0);
+    
+    auto dfepos = _indexPattern.data(1);
     
     // set up pointers to source effective P coordinates
     
@@ -912,6 +1176,12 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     
     auto dcrpz = _contrFactors.data(2);
     
+    // set up pointers to normalization factors
+    
+    auto snfacts = source.getNormFactors(); 
+    
+    auto dnfacts = _normFactors.data();
+    
     // set up angular momentum data
     
     auto bang = angmom::to_SphericalComponents(source.getBraAngularMomentum());
@@ -922,7 +1192,11 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     
     int32_t nppairs = 0;
     
+    int32_t nrpairs = 0;
+    
     int32_t ncpairs = 0;
+    
+    int32_t nfpairs = 0;
     
     // generate set of screened pairs
     
@@ -932,7 +1206,9 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
         {
             // set start position
             
-            dspos[ncpairs] = nppairs;
+            dspos[nrpairs] = nppairs;
+            
+            dcspos[nrpairs] = ncpairs;
             
             // copy primitive data
             
@@ -1001,47 +1277,67 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
                 nppairs++;
             }
             
+            // copy indexing and normalization factors
+            
+            for (int32_t j = scspos[i]; j < scepos[i]; j++)
+            {
+                dfspos[ncpairs] = nfpairs;
+                
+                for (int32_t k = sfspos[j]; k < sfepos[j]; k++)
+                {
+                    dnfacts[nfpairs] = snfacts[k];
+                    
+                    nfpairs++;
+                }
+                
+                dfepos[ncpairs] = nfpairs;
+                
+                // bra indexes of pair
+                
+                for (int32_t k = 0; k < bang; k++)
+                {
+                    auto bidx = source.getBraIdentifiers(k);
+                    
+                    auto cidx = _indexPattern.data(2 +  k);
+                    
+                    cidx[ncpairs] = bidx[j];
+                }
+                
+                // ket indexes of pair
+                
+                for (int32_t k = 0; k < kang; k++)
+                {
+                    auto kidx = source.getKetIdentifiers(k);
+                    
+                    auto cidx = _indexPattern.data(2 + bang + k);
+                    
+                    cidx[ncpairs] = kidx[j];
+                }
+                
+                ncpairs++;
+            }
+            
             // set end position
             
-            depos[ncpairs] = nppairs;
+            depos[nrpairs] = nppairs;
             
-            // bra indexes of pair
-            
-            for (int32_t j = 0; j < bang; j++)
-            {
-                auto bidx = source.getBraIdentifiers(j);
-                
-                auto cidx = _contrPattern.data(2 +  j);
-                
-                cidx[ncpairs] = bidx[i];
-            }
-            
-            // ket indexes of pair
-            
-            for (int32_t j = 0; j < kang; j++)
-            {
-                auto kidx = source.getKetIdentifiers(j);
-                
-                auto cidx = _contrPattern.data(2 + bang + j);
-                
-                cidx[ncpairs] = kidx[i];
-            }
+            dcepos[nrpairs] = ncpairs;
             
             // effective P center
             
-            dcrpx[ncpairs] = scrpx[i];
+            dcrpx[nrpairs] = scrpx[i];
             
-            dcrpy[ncpairs] = scrpy[i];
+            dcrpy[nrpairs] = scrpy[i];
             
-            dcrpz[ncpairs] = scrpz[i];
+            dcrpz[nrpairs] = scrpz[i];
             
             // update contracted pairs counters
             
-            ncpairs++;
+            nrpairs++;
         }
     }
     
-    return ncpairs;
+    return nrpairs;
 }
 
 int32_t
@@ -1214,9 +1510,33 @@ CGtoPairsBlock::getEndPositions() const
 }
 
 const int32_t*
+CGtoPairsBlock::getContrStartPositions() const
+{
+    return _contrPattern.data(2);
+}
+
+const int32_t*
+CGtoPairsBlock::getContrEndPositions() const
+{
+    return _contrPattern.data(3);
+}
+
+const int32_t*
+CGtoPairsBlock::getNormFactorsStartPositions() const
+{
+    return _indexPattern.data(0);
+}
+
+const int32_t*
+CGtoPairsBlock::getNormFactorsEndPositions() const
+{
+    return _indexPattern.data(1);
+}
+
+const int32_t*
 CGtoPairsBlock::getBraIdentifiers(const int32_t iComponent) const
 {
-    return _contrPattern.data(2 + iComponent);
+    return _indexPattern.data(2 + iComponent);
 }
 
 const int32_t*
@@ -1224,13 +1544,19 @@ CGtoPairsBlock::getKetIdentifiers(const int32_t iComponent) const
 {
     auto bang = angmom::to_SphericalComponents(_braAngularMomentum);
     
-    return _contrPattern.data(2 + bang  + iComponent);
+    return _indexPattern.data(2 + bang  + iComponent);
+}
+
+const double*
+CGtoPairsBlock::getNormFactors() const
+{
+    return _normFactors.data();
 }
 
 CMemBlock2D<double>
 CGtoPairsBlock::getDistancesAB() const
 {
-    CMemBlock2D<double> rab(_nScreenedContrPairs, 3);
+    CMemBlock2D<double> rab(_nScreenedRedContrPairs, 3);
     
     // set up pointers to R(AB) distances in primitives data
     
@@ -1252,7 +1578,7 @@ CGtoPairsBlock::getDistancesAB() const
     
     auto spos = getStartPositions();
     
-    for (int32_t i = 0; i < _nScreenedContrPairs; i++)
+    for (int32_t i = 0; i < _nScreenedRedContrPairs; i++)
     {
         auto ppidx = spos[i];
         
@@ -1373,6 +1699,18 @@ int32_t
 CGtoPairsBlock::getNumberOfScreenedContrPairs() const
 {
     return _nScreenedContrPairs; 
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfOriginalRedContrPairs() const
+{
+    return _nOriginalRedContrPairs;
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfScreenedRedContrPairs() const
+{
+    return _nScreenedRedContrPairs;
 }
 
 int32_t
@@ -1540,6 +1878,10 @@ operator<<(      std::ostream&   output,
     output << "_nOriginalPrimPairs: " << source._nOriginalPrimPairs << std::endl;
     
     output << "_nScreenedPrimPairs: " << source._nScreenedPrimPairs << std::endl;
+    
+    output << "_nOriginalRedContrPairs: " << source._nOriginalRedContrPairs << std::endl;
+    
+    output << "_nScreenedRedContrPairs: " << source._nScreenedRedContrPairs << std::endl;
     
     output << "_nOriginalContrPairs: " << source._nOriginalContrPairs << std::endl;
     
