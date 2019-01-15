@@ -16,48 +16,48 @@ before_script:
 after_script:
   - echo "Done..."
 
-stages: 
+stages:
   - build
-  - test 
+  - test
 
 build_unit_test:
-  tags: 
+  tags:
     - vlx-test
   stage: build
-  script: 
+  script:
     - cd src
-    - cp ../config/Setup.Monkey Makefile.setup
+    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
     - cd ../unit_tests/
-    - make -j 6 release 
+    - make -j 6 release
 
 build_veloxchem_python3:
-  tags: 
+  tags:
    - vlx-test
   stage: build
   script:
-    - cd src 
-    - cp ../config/Setup.Monkey Makefile.setup 
-    - make -j 6 release 
+    - cd src
+    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
+    - make -j 6 release
 
-run_unit_test: 
-  tags: 
+run_unit_test:
+  tags:
     - vlx-test
   stage: test
-  script: 
+  script:
     - cd src
-    - cp ../config/Setup.Monkey Makefile.setup
+    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
     - cd ../unit_tests/
     - make -j 6 release
     - cd ../build/bin
     - ./UnitTestVeloxChemMP.x
 
-run_test_python3: 
-  tags: 
+run_test_python3:
+  tags:
     - vlx-test
   stage: test
-  script: 
+  script:
     - cd src
-    - cp ../config/Setup.Monkey Makefile.setup
+    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
     - make -j 6 release
     - cd ../python_tests/
     - export PYTHONPATH=$(pwd)/../build/python:$PYTHONPATH

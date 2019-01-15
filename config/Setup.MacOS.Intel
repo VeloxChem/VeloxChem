@@ -86,6 +86,7 @@ PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
 PYTHON_INC += -I$(PYBIND11_PATH)/include
+
 PYTHON_LD  := -L/opt/intel-2019/intelpython3/lib -lpython3.6m -ldl
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
