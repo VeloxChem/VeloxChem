@@ -103,7 +103,6 @@ namespace genfunc { // genfunc namespace
      @param primIndexes the primitive data vectors indexing pattern,
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTOs pair on bra side.
      */
@@ -115,7 +114,6 @@ namespace genfunc { // genfunc namespace
                   const std::vector<int32_t>& primIndexes,
                   const CGtoPairsBlock&       braGtoPairsBlock,
                   const CGtoPairsBlock&       ketGtoPairsBlock,
-                  const int32_t               nKetPrimPairs,
                   const int32_t               nKetContrPairs,
                   const int32_t               iContrPair);
     

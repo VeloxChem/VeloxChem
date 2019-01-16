@@ -244,10 +244,13 @@ contract(      CMemBlock2D<double>&  contrData,
          const std::vector<int32_t>& primIndexes,
          const CGtoPairsBlock&       braGtoPairsBlock,
          const CGtoPairsBlock&       ketGtoPairsBlock,
-         const int32_t               nKetPrimPairs,
-         const int32_t               nKetContrPairs,
+         const int32_t               nKetRedContrPairs,
          const int32_t               iContrPair)
 {
+    // zero contracted data
+    
+    contrData.zero();
+    
     // set up pointers to primitives data on bra side
     
     auto spos = braGtoPairsBlock.getStartPositions();
@@ -259,8 +262,6 @@ contract(      CMemBlock2D<double>&  contrData,
     // set up pointers to primitives data on ket side
     
     auto kspos = ketGtoPairsBlock.getStartPositions();
-    
-    auto kepos = ketGtoPairsBlock.getEndPositions();
     
     // set up pointers to contraction data on bra side
     
@@ -321,7 +322,7 @@ contract(      CMemBlock2D<double>&  contrData,
             {
                 auto bfact = bfnorm[sbfpos[j] + k];
                 
-                for (int32_t l = 0; l < krdim; l++)
+                for (int32_t l = 0; l < nKetRedContrPairs; l++)
                 {
                     auto srcoff = kspos[l];
                     
