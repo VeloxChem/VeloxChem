@@ -47,13 +47,11 @@ namespace distfock { // distfock namespace
         
         auto dcomp = angmom::to_SphericalComponents(dang);
         
-        // determine symmetry of angular components on bra side
+        // set up pointers to reference indexes on bra side
         
-        auto refp = (braGtoPairsBlock.getBraIdentifiers(0))[iContrPair];
+        auto prefp = braGtoPairsBlock.getBraIdentifiers(0);
         
-        auto refq = (braGtoPairsBlock.getKetIdentifiers(0))[iContrPair];
-        
-        bool symbra = (refp == refq);
+        auto prefq = braGtoPairsBlock.getKetIdentifiers(0);
         
         // set up pointers to reference indexes on ket side
         
@@ -79,122 +77,273 @@ namespace distfock { // distfock namespace
         
         auto ddim = fockContainer.getDimensionsD(iFockMatrix);
         
-        // loop over angular components on bra side
+        // set up pointers to contraction pattern on bra side
         
-        for (int32_t i = 0; i < acomp; i++)
+        auto cbspos = braGtoPairsBlock.getContrStartPositions();
+        
+        auto cbepos = braGtoPairsBlock.getContrEndPositions();
+        
+        // set up pointers to contraction pattern on ket side
+        
+        auto ckspos = ketGtoPairsBlock.getContrStartPositions();
+        
+        auto ckepos = ketGtoPairsBlock.getContrEndPositions();
+        
+        // dimensions of ket side
+        
+        auto ketdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs(nKetContrPairs - 1);
+        
+        // loop over integrals
+        
+        int32_t iblock = 0;
+        
+        for (int32_t i = cbspos[iContrPair]; i < cbepos[iContrPair]; i++)
         {
-            // set up index P for bra side
+            auto refp = prefp[i];
             
-            int32_t idp  = (braGtoPairsBlock.getBraIdentifiers(i))[iContrPair];
+            auto refq = prefq[i];
             
-            int32_t redp = idp - apos[i];
+            bool symbra = (refp == refq);
             
-            // starting angular index of Q
+            auto intoff = iblock * ketdim;
             
-            auto jstart = (symbra) ? i : 0;
+            // loop over angular components on bra side
             
-            for (int32_t j = jstart; j < bcomp; j++)
+            for (int32_t j = 0; j < acomp; j++)
             {
-                // set up index Q for bra side
+                // set up index P for bra side
                 
-                int32_t idq = (braGtoPairsBlock.getKetIdentifiers(j))[iContrPair];
+                int32_t idp  = (braGtoPairsBlock.getBraIdentifiers(j))[i];
                 
-                int32_t redq = idq - bpos[j];
+                int32_t redp = idp - apos[j];
                 
-                // angular offset from bra side
+                auto kstart = (symbra) ? j : 0;
                 
-                auto braoff = (i * bcomp + j) * ccomp * dcomp;
-                
-                // loop over angular components on ket side
-                
-                for (int32_t k = 0; k < ccomp; k++)
+                for (int32_t k = kstart; k < bcomp; k++)
                 {
-                    // set up pointer to R indexes on ket side
+                    // set up index Q for bra side
                     
-                    auto idxk = ketGtoPairsBlock.getBraIdentifiers(k);
+                    int32_t idq = (braGtoPairsBlock.getKetIdentifiers(k))[i];
                     
-                    for (int32_t l = 0; l < dcomp; l++)
+                    int32_t redq = idq - bpos[k];
+                    
+                    // angular offset from bra side
+                    
+                    auto braoff = (j * bcomp + k) * ccomp * dcomp;
+                    
+                    // loop over angular components on ket side
+                    
+                    for (int32_t l = 0; l < ccomp; l++)
                     {
-                        // set up pointer to S indexes on ket side
+                        // set up pointer to R indexes on ket side
                         
-                        auto idxl = ketGtoPairsBlock.getKetIdentifiers(l);
+                        auto idxk = ketGtoPairsBlock.getBraIdentifiers(l);
                         
-                        // set up pointer to integrals
-                        
-                        auto pints = spherInts.data(braoff + k * dcomp + l);
-                        
-                        // set up pointers to submatrices
-                        
-                        auto submat_pq = fockContainer.getSubMatrixData(iFockMatrix, 0, i * bcomp + j);
-                        
-                        auto submat_rs = fockContainer.getSubMatrixData(iFockMatrix, 1, k * dcomp + l);
-                        
-                        auto submat_pr = fockContainer.getSubMatrixData(iFockMatrix, 2, i * ccomp + k);
-                        
-                        auto submat_ps = fockContainer.getSubMatrixData(iFockMatrix, 3, i * dcomp + l);
-                        
-                        auto submat_qr = fockContainer.getSubMatrixData(iFockMatrix, 4, j * ccomp + k);
-                        
-                        auto submat_qs = fockContainer.getSubMatrixData(iFockMatrix, 5, j * dcomp + l);
-                        
-                        // loop over pairs on ket side
-                        
-                        for (int32_t m = 0; m < nKetContrPairs; m++)
+                        for (int32_t m = 0; m < dcomp; m++)
                         {
-                            // symmetry restriction for ket angular components
+                            // set up pointer to S indexes on ket side
                             
-                            auto refr = prefk[m];
+                            auto idxl = ketGtoPairsBlock.getKetIdentifiers(m);
                             
-                            auto refs = prefl[m];
+                            // set up pointer to integrals
                             
-                            if ((refr == refs) && (l < k)) continue;
+                            auto pints = spherInts.data(braoff + l * dcomp + m);
                             
-                            // symmetry restriction for bra/ket angular componets
+                            // set up pointers to submatrices
                             
-                            bool braeqket = (refp == refr) && (refq == refs);
+                            auto submat_pq = fockContainer.getSubMatrixData(iFockMatrix, 0, j * bcomp + k);
                             
-                            if  (((k * dcomp + l) < (i * bcomp + j)) && braeqket) continue;
-                
-                            // set up S and R indexes
+                            auto submat_rs = fockContainer.getSubMatrixData(iFockMatrix, 1, l * dcomp + m);
                             
-                            auto idr = idxk[m];
+                            auto submat_pr = fockContainer.getSubMatrixData(iFockMatrix, 2, j * ccomp + l);
                             
-                            auto ids = idxl[m];
+                            auto submat_ps = fockContainer.getSubMatrixData(iFockMatrix, 3, j * dcomp + m);
                             
-                            auto redr = idr - cpos[k];
+                            auto submat_qr = fockContainer.getSubMatrixData(iFockMatrix, 4, k * ccomp + l);
                             
-                            auto reds = ids - dpos[l];
+                            auto submat_qs = fockContainer.getSubMatrixData(iFockMatrix, 5, k * dcomp + m);
                             
-                            // scale integral value
+                            // loop over pairs on ket side
                             
-                            auto fval = pints[m];
-                                
-                            if (idp == idq) fval *= 0.5;
-                            
-                            if (idr == ids) fval *= 0.5;
-                            
-                            if ((idp == idr) && (idq == ids)) fval *= 0.5;
-                            
-                            // Coulomb contributions
-                            
-                            submat_pq[redp * bdim + redq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
-                                
-                            submat_rs[redr * ddim + reds] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
-                            
-                            // exchange contributions
-                            
-                            submat_pr[redp * cdim + redr] -= fval * densityMatrix[idq * nDensityColumns + ids];
-                            
-                            submat_ps[redp * ddim + reds] -= fval * densityMatrix[idq * nDensityColumns + idr];
-                            
-                            submat_qr[redq * cdim + redr] -= fval * densityMatrix[idp * nDensityColumns + ids];
-                                
-                            submat_qs[redq * ddim + reds] -= fval * densityMatrix[idp * nDensityColumns + idr];
+                            for (int32_t n = 0; n < nKetContrPairs; n++)
+                            {
+                                for (int32_t o = ckspos[n]; o < ckepos[n]; o++)
+                                {
+                                    // symmetry restriction for ket angular components
+                                    
+                                    auto refr = prefk[o];
+                                    
+                                    auto refs = prefl[o];
+                                    
+                                    if ((refr == refs) && (m < l)) continue;
+                                    
+                                    // symmetry restriction for bra/ket angular componets
+                                    
+                                    bool braeqket = (refp == refr) && (refq == refs);
+                                    
+                                    if  (((l * dcomp + m) < (j * bcomp + k)) && braeqket) continue;
+                                    
+                                    // set up S and R indexes
+                                    
+                                    auto idr = idxk[o];
+                                    
+                                    auto ids = idxl[o];
+                                    
+                                    auto redr = idr - cpos[l];
+                                    
+                                    auto reds = ids - dpos[m];
+                                    
+                                    // scale integral value
+                                    
+                                    auto fval = pints[o + intoff];
+                                    
+                                    if (idp == idq) fval *= 0.5;
+                                    
+                                    if (idr == ids) fval *= 0.5;
+                                    
+                                    if ((idp == idr) && (idq == ids)) fval *= 0.5;
+                                    
+                                    // Coulomb contributions
+                                    
+                                    submat_pq[redp * bdim + redq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+                                    
+                                    submat_rs[redr * ddim + reds] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+                                    
+                                    // exchange contributions
+                                    
+                                    submat_pr[redp * cdim + redr] -= fval * densityMatrix[idq * nDensityColumns + ids];
+                                    
+                                    submat_ps[redp * ddim + reds] -= fval * densityMatrix[idq * nDensityColumns + idr];
+                                    
+                                    submat_qr[redq * cdim + redr] -= fval * densityMatrix[idp * nDensityColumns + ids];
+                                    
+                                    submat_qs[redq * ddim + reds] -= fval * densityMatrix[idp * nDensityColumns + idr];
+                                }
+                            }
                         }
                     }
                 }
             }
+          
+            iblock++;
         }
+        
+//        // loop over angular components on bra side
+//
+//        for (int32_t i = 0; i < acomp; i++)
+//        {
+//            // set up index P for bra side
+//
+//            int32_t idp  = (braGtoPairsBlock.getBraIdentifiers(i))[iContrPair];
+//
+//            int32_t redp = idp - apos[i];
+//
+//            // starting angular index of Q
+//
+//            auto jstart = (symbra) ? i : 0;
+//
+//            for (int32_t j = jstart; j < bcomp; j++)
+//            {
+//                // set up index Q for bra side
+//
+//                int32_t idq = (braGtoPairsBlock.getKetIdentifiers(j))[iContrPair];
+//
+//                int32_t redq = idq - bpos[j];
+//
+//                // angular offset from bra side
+//
+//                auto braoff = (i * bcomp + j) * ccomp * dcomp;
+//
+//                // loop over angular components on ket side
+//
+//                for (int32_t k = 0; k < ccomp; k++)
+//                {
+//                    // set up pointer to R indexes on ket side
+//
+//                    auto idxk = ketGtoPairsBlock.getBraIdentifiers(k);
+//
+//                    for (int32_t l = 0; l < dcomp; l++)
+//                    {
+//                        // set up pointer to S indexes on ket side
+//
+//                        auto idxl = ketGtoPairsBlock.getKetIdentifiers(l);
+//
+//                        // set up pointer to integrals
+//
+//                        auto pints = spherInts.data(braoff + k * dcomp + l);
+//
+//                        // set up pointers to submatrices
+//
+//                        auto submat_pq = fockContainer.getSubMatrixData(iFockMatrix, 0, i * bcomp + j);
+//
+//                        auto submat_rs = fockContainer.getSubMatrixData(iFockMatrix, 1, k * dcomp + l);
+//
+//                        auto submat_pr = fockContainer.getSubMatrixData(iFockMatrix, 2, i * ccomp + k);
+//
+//                        auto submat_ps = fockContainer.getSubMatrixData(iFockMatrix, 3, i * dcomp + l);
+//
+//                        auto submat_qr = fockContainer.getSubMatrixData(iFockMatrix, 4, j * ccomp + k);
+//
+//                        auto submat_qs = fockContainer.getSubMatrixData(iFockMatrix, 5, j * dcomp + l);
+//
+//                        // loop over pairs on ket side
+//
+//                        for (int32_t m = 0; m < nKetContrPairs; m++)
+//                        {
+//                            // symmetry restriction for ket angular components
+//
+//                            auto refr = prefk[m];
+//
+//                            auto refs = prefl[m];
+//
+//                            if ((refr == refs) && (l < k)) continue;
+//
+//                            // symmetry restriction for bra/ket angular componets
+//
+//                            bool braeqket = (refp == refr) && (refq == refs);
+//
+//                            if  (((k * dcomp + l) < (i * bcomp + j)) && braeqket) continue;
+//
+//                            // set up S and R indexes
+//
+//                            auto idr = idxk[m];
+//
+//                            auto ids = idxl[m];
+//
+//                            auto redr = idr - cpos[k];
+//
+//                            auto reds = ids - dpos[l];
+//
+//                            // scale integral value
+//
+//                            auto fval = pints[m];
+//
+//                            if (idp == idq) fval *= 0.5;
+//
+//                            if (idr == ids) fval *= 0.5;
+//
+//                            if ((idp == idr) && (idq == ids)) fval *= 0.5;
+//
+//                            // Coulomb contributions
+//
+//                            submat_pq[redp * bdim + redq] += 4.0 * fval * densityMatrix[idr * nDensityColumns + ids];
+//
+//                            submat_rs[redr * ddim + reds] += 4.0 * fval * densityMatrix[idp * nDensityColumns + idq];
+//
+//                            // exchange contributions
+//
+//                            submat_pr[redp * cdim + redr] -= fval * densityMatrix[idq * nDensityColumns + ids];
+//
+//                            submat_ps[redp * ddim + reds] -= fval * densityMatrix[idq * nDensityColumns + idr];
+//
+//                            submat_qr[redq * cdim + redr] -= fval * densityMatrix[idp * nDensityColumns + ids];
+//
+//                            submat_qs[redq * ddim + reds] -= fval * densityMatrix[idp * nDensityColumns + idr];
+//                        }
+//                    }
+//                }
+//            }
+//        }
     }
     
 } // distfock namespace

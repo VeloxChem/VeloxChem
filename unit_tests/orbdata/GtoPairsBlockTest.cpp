@@ -997,14 +997,23 @@ TEST_F(CGtoPairsBlockTest, GetDistancesABWithNumberOfPairs)
     
     CMemBlock2D<double> rab(4, 3);
     
-    apairs.getDistancesAB(rab, 4);
+    CMemBlock2D<double> rab2(8, 3);
+    
+    apairs.getDistancesAB(rab, 4, 1);
     
     CMemBlock2D<double> refab({0.0, 0.0,  0.0, 0.0,
                                0.0, 0.0,  0.0, 0.0,
                                0.0, 0.0, -1.2, 0.0},
                                4, 3);
     
-    ASSERT_EQ(refab, rab);
+    apairs.getDistancesAB(rab2, 4, 2);
+    
+    CMemBlock2D<double> refab2({0.0, 0.0,  0.0, 0.0, 0.0, 0.0,  0.0, 0.0,
+                                0.0, 0.0,  0.0, 0.0, 0.0, 0.0,  0.0, 0.0,
+                                0.0, 0.0, -1.2, 0.0, 0.0, 0.0, -1.2, 0.0},
+                                8, 3);
+    
+    ASSERT_EQ(refab2, rab2);
 }
 
 TEST_F(CGtoPairsBlockTest, GetEffectiveCoordinatesPX)
@@ -1152,6 +1161,29 @@ TEST_F(CGtoPairsBlockTest, GetNumberOfScreenedContrPairs)
     ASSERT_EQ(3, bpairs.getNumberOfScreenedContrPairs());
 }
 
+TEST_F(CGtoPairsBlockTest, GetNumberOfScreenedContrPairsWithBoundary)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    ASSERT_EQ(1, apairs.getNumberOfScreenedContrPairs(0));
+    
+    ASSERT_EQ(2, apairs.getNumberOfScreenedContrPairs(1));
+    
+    ASSERT_EQ(3, apairs.getNumberOfScreenedContrPairs(2));
+    
+    ASSERT_EQ(4, apairs.getNumberOfScreenedContrPairs(3));
+    
+    ASSERT_EQ(5, apairs.getNumberOfScreenedContrPairs(4));
+    
+    ASSERT_EQ(6, apairs.getNumberOfScreenedContrPairs(5));
+}
+
 TEST_F(CGtoPairsBlockTest, GetNumberOfOriginalRedContrPairs)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
@@ -1248,6 +1280,19 @@ TEST_F(CGtoPairsBlockTest, GetNumberOfRowsInKetMatrix)
     CGtoPairsBlock apairs(agto, bgto, 1.0e-13);
     
     ASSERT_EQ(3, apairs.getNumberOfRowsInKetMatrix());
+}
+
+TEST_F(CGtoPairsBlockTest, GetMaxNumberContrPairs)
+{
+    CMolecularBasis bas = vlxbas::getGenContrBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    ASSERT_EQ(3, apairs.getMaxNumberContrPairs());
 }
 
 TEST_F(CGtoPairsBlockTest, GetPairType)

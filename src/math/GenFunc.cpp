@@ -290,10 +290,8 @@ contract(      CMemBlock2D<double>&  contrData,
     auto ekfpos = ketGtoPairsBlock.getNormFactorsEndPositions();
     
     // set up ket dimensions
-    
-    auto krdim = ketGtoPairsBlock.getNumberOfScreenedRedContrPairs();
-    
-    auto kcdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
+
+    auto kcdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs(nKetRedContrPairs - 1);
     
     // loop over set of data vectors
     
@@ -315,6 +313,8 @@ contract(      CMemBlock2D<double>&  contrData,
         // set up number angular components
         
         auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.third());
+        
+        int32_t gfoff = 0;
         
         for (int32_t j = sbcpos[iContrPair]; j < ebcpos[iContrPair]; j++)
         {
@@ -351,16 +351,18 @@ contract(      CMemBlock2D<double>&  contrData,
                             
                             if (k == 0)
                             {
-                                dstbuf[m] = bfact * fsum;
+                                dstbuf[gfoff + m] = bfact * fsum;
                             }
                             else
                             {
-                                dstbuf[m] += bfact * fsum;
+                                dstbuf[gfoff + m] += bfact * fsum;
                             }
                         }
                     }
                 }
             }
+            
+            gfoff += kcdim;
         }
         
         // first step: vertical summation over bra GTO

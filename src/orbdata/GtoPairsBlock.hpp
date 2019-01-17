@@ -512,10 +512,13 @@ public:
      contracted GTOs pairs.
 
      @param abDistances the vector of Cartesian distances.
-     @param nContrPairs the number of contracted pairs. 
+     @param nContrPairs the number of contracted pairs.
+     @param nReplicas the number of distances replicas in vector of Cartesian
+            distances.
      */
     void getDistancesAB(      CMemBlock2D<double>& abDistances,
-                        const int32_t              nContrPairs) const;
+                        const int32_t              nContrPairs,
+                        const int32_t              nReplicas) const;
     
     /**
      Gets contants vector to Cartesian X coordinates of effective P center of
@@ -565,7 +568,7 @@ public:
     /**
      Gets number of primitive pairs in set of contracted pairs ([0..iContrPair]).
 
-     @param iContrPair the index of lasr contracted pair.
+     @param iContrPair the index of last contracted pair.
      @return the number of primitive pairs.
      */
     int32_t getNumberOfPrimPairs(const int32_t iContrPair) const;
@@ -583,6 +586,15 @@ public:
      @return the number of contracted pairs.
      */
     int32_t getNumberOfScreenedContrPairs() const;
+    
+    /**
+     Gets number of screened contracted pairs generated up to specific contracted
+     GTOs pair.
+     
+     @param iContrPair the index of last contracted pair.
+     @return the number of contracted pairs.
+     */
+    int32_t getNumberOfScreenedContrPairs(const int32_t iContrPair) const;
     
     /**
      Gets number of initial reduced contracted pairs generated from input data.
@@ -629,6 +641,14 @@ public:
      @return the number of rows in submatrix.
      */
     int32_t getNumberOfRowsInKetMatrix() const;
+    
+    /**
+     Gets maximum number of contracted GTOs pairs associated with
+     set of primitive GTOs pairs.
+     
+     @return the maximum number of contracted GTOs pairs.
+     */
+    int32_t getMaxNumberContrPairs() const;
     
     /**
      Gets pair type string for GTOs pairs object.

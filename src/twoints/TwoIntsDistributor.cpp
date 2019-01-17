@@ -301,8 +301,8 @@ CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spher
 {
     // check if dimensions on bra and ket sides are correct
     
-    if ((braGtoPairsBlock.getNumberOfScreenedContrPairs() != 1) ||
-        (ketGtoPairsBlock.getNumberOfScreenedContrPairs() != 1))
+    if ((braGtoPairsBlock.getNumberOfScreenedRedContrPairs() != 1) ||
+        (ketGtoPairsBlock.getNumberOfScreenedRedContrPairs() != 1))
     {
         // error handling code...
         
@@ -318,6 +318,8 @@ CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spher
                                                 ketGtoPairsBlock.getKetAngularMomentum());
     
     //  determine maximum integral value in shell
+    
+    // FIX ME: for mixed contraction 
     
     auto mval = (spherInts.data(0))[0];
     

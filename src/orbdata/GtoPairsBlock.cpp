@@ -1594,7 +1594,8 @@ CGtoPairsBlock::getDistancesAB() const
 
 void
 CGtoPairsBlock::getDistancesAB(      CMemBlock2D<double>& abDistances,
-                               const int32_t              nContrPairs) const
+                               const int32_t              nContrPairs,
+                               const int32_t              nReplicas) const
 {
     // set up pointers to R(AB) distances in primitives data
     
@@ -1612,19 +1613,55 @@ CGtoPairsBlock::getDistancesAB(      CMemBlock2D<double>& abDistances,
     
     auto rabz = abDistances.data(2);
     
-    // set up pointer to starting positions
+    // set up pointer to starting positions in primitives space
     
     auto spos = getStartPositions();
+    
+    // set up pointer to contraction pattern
+    
+    auto cspos = getContrStartPositions();
+    
+    auto cepos = getContrEndPositions();
     
     for (int32_t i = 0; i < nContrPairs; i++)
     {
         auto ppidx = spos[i];
         
-        rabx[i] = abx[ppidx];
+        auto dabx = abx[ppidx];
         
-        raby[i] = aby[ppidx];
+        auto daby = aby[ppidx];
         
-        rabz[i] = abz[ppidx];
+        auto dabz = abz[ppidx];
+        
+        for (int32_t j = cspos[i]; j < cepos[i]; j++)
+        {
+            rabx[j] = dabx;
+            
+            raby[j] = daby;
+            
+            rabz[j] = dabz;
+        }
+    }
+    
+    // get number of contracted GTOs pairs
+    
+    auto ncdim = getNumberOfScreenedContrPairs(nContrPairs - 1);
+    
+    // generate replicas
+    
+    for (int32_t i = 1; i < nReplicas; i++)
+    {
+        auto vx = &rabx[i * ncdim];
+        
+        mathfunc::copy(vx, 0, rabx, 0, ncdim);
+        
+        auto vy = &raby[i * ncdim];
+        
+        mathfunc::copy(vy, 0, raby, 0, ncdim);
+        
+        auto vz = &rabz[i * ncdim];
+        
+        mathfunc::copy(vz, 0, rabz, 0, ncdim);
     }
 }
 
@@ -1699,6 +1736,14 @@ int32_t
 CGtoPairsBlock::getNumberOfScreenedContrPairs() const
 {
     return _nScreenedContrPairs; 
+}
+
+int32_t
+CGtoPairsBlock::getNumberOfScreenedContrPairs(const int32_t iContrPair) const
+{
+    auto epos = getContrEndPositions();
+ 
+    return epos[iContrPair]; 
 }
 
 int32_t
@@ -1785,6 +1830,25 @@ CGtoPairsBlock::getNumberOfRowsInKetMatrix() const
     }
     
     return 0;
+}
+
+int32_t
+CGtoPairsBlock::getMaxNumberContrPairs() const
+{
+    auto spos = getContrStartPositions();
+    
+    auto epos = getContrEndPositions();
+    
+    int32_t mdim = 0;
+    
+    for (int32_t i = 0; i < _nScreenedRedContrPairs; i++)
+    {
+        auto cdim = epos[i] - spos[i];
+        
+        if (cdim > mdim) mdim = cdim;
+    }
+    
+    return mdim;
 }
 
 std::string
