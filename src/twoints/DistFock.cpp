@@ -20,6 +20,7 @@ namespace distfock { // distfock namespace
                const CMemBlock2D<double>& spherInts,
                const CGtoPairsBlock&      braGtoPairsBlock,
                const CGtoPairsBlock&      ketGtoPairsBlock,
+               const bool                 isBraEqualKet,
                const int32_t              nKetContrPairs,
                const int32_t              iContrPair)
     {
@@ -167,7 +168,9 @@ namespace distfock { // distfock namespace
                             
                             for (int32_t n = 0; n < nKetContrPairs; n++)
                             {
-                                for (int32_t o = ckspos[n]; o < ckepos[n]; o++)
+                                int32_t oend = (isBraEqualKet && (n == iContrPair)) ? i + 1 : ckepos[n];
+                                
+                                for (int32_t o = ckspos[n]; o < oend; o++)
                                 {
                                     // symmetry restriction for ket angular components
                                     

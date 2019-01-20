@@ -377,7 +377,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                  _aoDensity->totalDensity(idden),
                                  _aoDensity->getNumberOfColumns(idden),
                                  spherInts, braGtoPairsBlock, ketGtoPairsBlock,
-                                 nKetContrPairs, iContrPair);
+                                 isBraEqualKet, nKetContrPairs, iContrPair);
         }
     }
 }

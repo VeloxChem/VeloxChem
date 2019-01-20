@@ -544,7 +544,7 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
                             
                             auto cidx = pcidx.data(2 +  m);
                             
-                            cidx[idxcgto + iblock] = bidx[k + iblock];
+                            cidx[idxcgto + iblock] = bidx[k];
                         }
                         
                         // ket indexes of pair
@@ -555,7 +555,7 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
                             
                             auto cidx = pcidx.data(2 + bang + m);
                             
-                            cidx[idxcgto + iblock] = kidx[l + iblock];
+                            cidx[idxcgto + iblock] = kidx[l];
                         }
                         
                         iblock++;

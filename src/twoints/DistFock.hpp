@@ -29,6 +29,8 @@ namespace distfock { // distfock namespace
      @param spherInts the spherical integrals buffer.
      @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param isBraEqualKet the flag indicating equality of GTOs pairs blocks on
+            bra and ket sides.
      @param nKetContrPairs the number of contracted GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
@@ -39,6 +41,7 @@ namespace distfock { // distfock namespace
                     const CMemBlock2D<double>& spherInts,
                     const CGtoPairsBlock&      braGtoPairsBlock,
                     const CGtoPairsBlock&      ketGtoPairsBlock,
+                    const bool                 isBraEqualKet,
                     const int32_t              nKetContrPairs,
                     const int32_t              iContrPair);
     
