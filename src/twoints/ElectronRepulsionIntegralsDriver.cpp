@@ -1906,7 +1906,7 @@ CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*
 {
     // determine number of contracted GTOs pairs
     
-    auto ngto = gtoPairsBlock.getNumberOfScreenedContrPairs();
+    auto ngto = gtoPairsBlock.getNumberOfScreenedRedContrPairs();
     
     // set up empty integrals screener
     
@@ -1935,7 +1935,7 @@ CElectronRepulsionIntegralsDriver::_getQValuesBuffer(const CGtoPairsContainer& g
     {
         auto cpairs = gtoPairsContainer.getGtoPairsBlock(i);
         
-        buffvec.push_back(CMemBlock<double>(cpairs.getNumberOfScreenedContrPairs()));
+        buffvec.push_back(CMemBlock<double>(cpairs.getNumberOfScreenedRedContrPairs()));
     }
     
     return buffvec;
