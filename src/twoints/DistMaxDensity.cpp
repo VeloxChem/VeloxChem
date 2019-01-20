@@ -49,11 +49,11 @@ namespace distmaxden { // distmaxden namespace
         
         // determine symmetry of angular components on bra side
         
-        auto refp = (braGtoPairsBlock.getBraIdentifiers(0))[iContrPair];
+        auto prefp = braGtoPairsBlock.getBraIdentifiers(0);
         
-        auto refq = (braGtoPairsBlock.getKetIdentifiers(0))[iContrPair];
+        auto prefq = braGtoPairsBlock.getKetIdentifiers(0);
         
-        bool symbra = (refp == refq);
+        //bool symbra = (refp == refq);
         
         // set up pointers to reference indexes on ket side
         
@@ -65,91 +65,119 @@ namespace distmaxden { // distmaxden namespace
         
         auto mdenvec = maxDensityElements.data();
         
-        // loop over angular components on bra side
+        // set up pointers to contraction pattern on bra side
         
-        for (int32_t i = 0; i < acomp; i++)
+        auto cbspos = braGtoPairsBlock.getContrStartPositions();
+        
+        auto cbepos = braGtoPairsBlock.getContrEndPositions();
+        
+        // set up pointers to contraction pattern on ket side
+        
+        auto ckspos = ketGtoPairsBlock.getContrStartPositions();
+        
+        auto ckepos = ketGtoPairsBlock.getContrEndPositions();
+        
+        for (int32_t i = cbspos[iContrPair]; i < cbepos[iContrPair]; i++)
         {
-            // set up index P for bra side
+            auto refp = prefp[i];
             
-            int32_t idp  = (braGtoPairsBlock.getBraIdentifiers(i))[iContrPair];
+            auto refq = prefq[i];
             
-            // starting angular index of Q
+            bool symbra = (refp == refq);
             
-            auto jstart = (symbra) ? i : 0;
+            // loop over angular components on bra side
             
-            for (int32_t j = jstart; j < bcomp; j++)
+            for (int32_t j = 0; j < acomp; j++)
             {
-                // set up index Q for bra side
+                // set up index P for bra side
                 
-                int32_t idq = (braGtoPairsBlock.getKetIdentifiers(j))[iContrPair];
+                int32_t idp  = (braGtoPairsBlock.getBraIdentifiers(j))[i];
                 
-                // loop over angular components on ket side
+                // starting angular index of Q
                 
-                for (int32_t k = 0; k < ccomp; k++)
+                auto kstart = (symbra) ? j : 0;
+                
+                for (int32_t k = kstart; k < bcomp; k++)
                 {
-                    // set up pointer to R indexes on ket side
+                    // set up index Q for bra side
                     
-                    auto idxk = ketGtoPairsBlock.getBraIdentifiers(k);
+                    int32_t idq = (braGtoPairsBlock.getKetIdentifiers(k))[i];
                     
-                    for (int32_t l = 0; l < dcomp; l++)
+                    // loop over angular components on ket side
+                    
+                    for (int32_t l = 0; l < ccomp; l++)
                     {
-                        // set up pointer to S indexes on ket side
+                        // set up pointer to R indexes on ket side
                         
-                        auto idxl = ketGtoPairsBlock.getKetIdentifiers(l);
+                        auto idxk = ketGtoPairsBlock.getBraIdentifiers(l);
                         
-                        // loop over pairs on ket side
-                        
-                        for (int32_t m = 0; m < nKetContrPairs; m++)
+                        for (int32_t m = 0; m < dcomp; m++)
                         {
-                            // symmetry restriction for ket angular components
+                            // set up pointer to S indexes on ket side
                             
-                            auto refr = prefk[m];
+                            auto idxl = ketGtoPairsBlock.getKetIdentifiers(m);
                             
-                            auto refs = prefl[m];
+                            // loop over pairs on ket side
                             
-                            if ((refr == refs) && (l < k)) continue;
-                            
-                            // symmetry restriction for bra/ket angular componets
-                            
-                            bool braeqket = (refp == refr) && (refq == refs);
-                            
-                            if  (((k * dcomp + l) < (i * bcomp + j)) && braeqket) continue;
-                            
-                            // set up S and R indexes
-                            
-                            auto idr = idxk[m];
-                            
-                            auto ids = idxl[m];
-                            
-                            // Coulomb contributions
-                            
-                            auto mden = 4.0 * std::fabs(densityMatrix[idr * nDensityColumns + ids]);
-                            
-                            auto cden = 4.0 * std::fabs(densityMatrix[idp * nDensityColumns + idq]);
-                            
-                            if (cden > mden) mden = cden;
-                            
-                            // exchange contributions
-                            
-                            cden = std::fabs(densityMatrix[idq * nDensityColumns + ids]);
-                            
-                            if (cden > mden) mden = cden;
-                            
-                            cden = std::fabs(densityMatrix[idq * nDensityColumns + idr]);
-                            
-                            if (cden > mden) mden = cden;
-                            
-                            cden = std::fabs(densityMatrix[idp * nDensityColumns + ids]);
-                            
-                            if (cden > mden) mden = cden;
-                            
-                            cden = std::fabs(densityMatrix[idp * nDensityColumns + idr]);
-                            
-                            if (cden > mden) mden = cden;
-                            
-                            // copy max. density element
-                            
-                            if (mden > mdenvec[m]) mdenvec[m] = mden;
+                            for (int32_t n = 0; n < nKetContrPairs; n++)
+                            {
+                                double mden = 0.0;
+                                
+                                for (int32_t o = ckspos[n]; o < ckepos[n]; o++)
+                                {
+                                    // symmetry restriction for ket angular components
+                                    
+                                    auto refr = prefk[o];
+                                    
+                                    auto refs = prefl[o];
+                                    
+                                    if ((refr == refs) && (m < l)) continue;
+                                    
+                                    // symmetry restriction for bra/ket angular componets
+                                    
+                                    bool braeqket = (refp == refr) && (refq == refs);
+                                    
+                                    if  (((l * dcomp + m) < (j * bcomp + k)) && braeqket) continue;
+                                    
+                                    // set up S and R indexes
+                                    
+                                    auto idr = idxk[o];
+                                    
+                                    auto ids = idxl[o];
+                                    
+                                    // Coulomb contributions
+                                    
+                                    auto cden = 4.0 * std::fabs(densityMatrix[idr * nDensityColumns + ids]);
+                                    
+                                    if (cden > mden) mden = cden;
+                                    
+                                    cden = 4.0 * std::fabs(densityMatrix[idp * nDensityColumns + idq]);
+                                    
+                                    if (cden > mden) mden = cden;
+                                    
+                                    // exchange contributions
+                                    
+                                    cden = std::fabs(densityMatrix[idq * nDensityColumns + ids]);
+                                    
+                                    if (cden > mden) mden = cden;
+                                    
+                                    cden = std::fabs(densityMatrix[idq * nDensityColumns + idr]);
+                                    
+                                    if (cden > mden) mden = cden;
+                                    
+                                    cden = std::fabs(densityMatrix[idp * nDensityColumns + ids]);
+                                    
+                                    if (cden > mden) mden = cden;
+                                    
+                                    cden = std::fabs(densityMatrix[idp * nDensityColumns + idr]);
+                                    
+                                    if (cden > mden) mden = cden;
+                                }
+                                
+                                // copy max. density element
+                                
+                                if (mden > mdenvec[n]) mdenvec[n] = mden;
+                            }
                         }
                     }
                 }

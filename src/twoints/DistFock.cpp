@@ -181,7 +181,7 @@ namespace distfock { // distfock namespace
                                     
                                     bool braeqket = (refp == refr) && (refq == refs);
                                     
-                                    if  (((l * dcomp + m) < (j * bcomp + k)) && braeqket) continue;
+                                    if (((l * dcomp + m) < (j * bcomp + k)) && braeqket) continue;
                                     
                                     // set up S and R indexes
                                     
