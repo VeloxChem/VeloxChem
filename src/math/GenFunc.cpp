@@ -364,37 +364,6 @@ contract(      CMemBlock2D<double>&  contrData,
             
             gfoff += kcdim;
         }
-        
-        // first step: vertical summation over bra GTO
-        
-//        for (int32_t j = 1; j < bdim; j++)
-//        {
-//            // accumulate summation over primitives on bra side
-//
-//            for (int32_t k = 0; k < ncomp; k++)
-//            {
-//                // summation buffer
-//
-//                auto sumbuf = primData.data(pidx + k);
-//
-//                // source buffer
-//
-//                auto srcbuf = primData.data(pidx + j * ncomp + k);
-//
-//                // loop over primitive GTOs on ket side
-//
-//                #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
-//                for (int32_t l = 0; l < nKetPrimPairs; l++)
-//                {
-//                    sumbuf[l] += srcbuf[l];
-//                }
-//            }
-//        }
-//
-//        // second step: direct contraction over ket side
-//
-//        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos,
-//                          nKetContrPairs, ncomp);
     }
 }
     

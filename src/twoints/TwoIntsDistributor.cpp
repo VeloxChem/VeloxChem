@@ -319,15 +319,29 @@ CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spher
     
     //  determine maximum integral value in shell
     
-    // FIX ME: for mixed contraction 
+    // set up pointers to contraction pattern on bra side
+    
+    auto cbdim = (braGtoPairsBlock.getContrEndPositions())[0];
+    
+    // set up pointers to contraction pattern on ket side
+    
+    auto ckdim = (ketGtoPairsBlock.getContrEndPositions())[0];
+    
+    // determine Q values
     
     auto mval = (spherInts.data(0))[0];
     
-    for (int32_t j = 1; j < ncomp; j++)
+    for (int32_t i = 0; i < cbdim; i++)
     {
-        auto fval = (spherInts.data(j))[0];
-        
-        if (fval > mval) mval = fval;
+        for (int32_t j = 1; j < ncomp; j++)
+        {
+            auto pfval = spherInts.data(j);
+            
+            for (int32_t k = 0; k < ckdim; k++)
+            {
+                if (pfval[k] > mval) mval = pfval[k];
+            }
+        }
     }
     
     // compute Q value for contracted pair
