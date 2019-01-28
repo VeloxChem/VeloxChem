@@ -263,7 +263,7 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     auto kang = angmom::to_SphericalComponents(_ketAngularMomentum);
     
-    CMemBlock2D<int32_t> ppidx(brgto * krgto, 4);
+    CMemBlock2D<int32_t> ppidx(brgto * krgto, 5);
     
     CMemBlock2D<int32_t> pcidx(bcgto * kcgto, 2 + bang + kang);
     
@@ -281,6 +281,8 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
     
     auto ppcepos = ppidx.data(3);
     
+    auto ppids = ppidx.data(4);
+    
     auto ppfspos = pcidx.data(0);
     
     auto ppfepos = pcidx.data(1);
@@ -295,9 +297,11 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
 
     // initialize number of pairs
     
-    //_nOriginalContrPairs = 0;
+    _nOriginalRedContrPairs = 0;
     
-    //_nOriginalPrimPairs  = 0;
+    _nOriginalContrPairs = 0;
+    
+    _nOriginalPrimPairs  = 0;
     
     // loop over contracted GTOs
     
@@ -501,6 +505,10 @@ CGtoPairsBlock::CGtoPairsBlock(const CGtoBlock& braGtoBlock,
                 ppcspos[idxrgto] = idxcgto;
                 
                 ppcepos[idxrgto] = idxcgto + bkcdim;
+                
+                // pair unique identifier in reduced contractes GTOs pairs space
+                
+                ppids[idxrgto] = idxrgto;
                 
                 // effective P coordinates
                 
@@ -1142,6 +1150,8 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     
     auto scepos = source.getContrEndPositions();
     
+    auto sppids = source.getRedPairsIdentifiers();
+    
     auto sfspos = source.getNormFactorsStartPositions();
     
     auto sfepos = source.getNormFactorsEndPositions();
@@ -1155,6 +1165,8 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
     auto dcspos = _contrPattern.data(2);
     
     auto dcepos = _contrPattern.data(3);
+    
+    auto dppids = _contrPattern.data(4);
     
     auto dfspos = _indexPattern.data(0);
     
@@ -1322,6 +1334,10 @@ CGtoPairsBlock::compress(const CGtoPairsBlock&     source,
             depos[nrpairs] = nppairs;
             
             dcepos[nrpairs] = ncpairs;
+            
+            // set up reduced pair identifier
+            
+            dppids[nrpairs] = sppids[i]; 
             
             // effective P center
             
@@ -1519,6 +1535,12 @@ const int32_t*
 CGtoPairsBlock::getContrEndPositions() const
 {
     return _contrPattern.data(3);
+}
+
+const int32_t*
+CGtoPairsBlock::getRedPairsIdentifiers() const
+{
+    return _contrPattern.data(4); 
 }
 
 const int32_t*

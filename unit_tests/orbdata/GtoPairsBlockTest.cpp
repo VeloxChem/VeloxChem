@@ -132,13 +132,13 @@ TEST_F(CGtoPairsBlockTest, Pick)
     
     auto p5pair = apairs.pick(5);
     
-    CMemBlock2D<int32_t> cpat00({ 0, 4, 0, 1}, 1, 4);
+    CMemBlock2D<int32_t> cpat00({ 0, 4, 0, 1, 0}, 1, 5);
     
-    CMemBlock2D<int32_t> cpat01({ 0, 2, 0, 1}, 1, 4);
+    CMemBlock2D<int32_t> cpat01({ 0, 2, 0, 1, 1}, 1, 5);
     
-    CMemBlock2D<int32_t> cpat02({ 0, 2, 0, 1}, 1, 4);
+    CMemBlock2D<int32_t> cpat02({ 0, 2, 0, 1, 2}, 1, 5);
     
-    CMemBlock2D<int32_t> cpat05({ 0, 1, 0, 1}, 1, 4);
+    CMemBlock2D<int32_t> cpat05({ 0, 1, 0, 1, 5}, 1, 5);
     
     CMemBlock2D<int32_t> cidx00({ 0, 4, 5, 8, 11, 5, 8, 11}, 1, 8);
     
@@ -295,8 +295,9 @@ TEST_F(CGtoPairsBlockTest, Compress)
     CMemBlock2D<int32_t> cpat({ 0,  2,  4, 0, 0, 0,
                                 2,  4,  5, 0, 0, 0,
                                 0,  1,  2, 0, 0, 0,
-                                1,  2,  3, 0, 0, 0},
-                                6, 4);
+                                1,  2,  3, 0, 0, 0,
+                                1,  2,  5, 0, 0, 0},
+                                6, 5);
     
     CMemBlock2D<int32_t> cidx({ 0,  2,  4, 0, 0, 0,
                                 2,  4,  5, 0, 0, 0,
@@ -381,8 +382,9 @@ TEST_F(CGtoPairsBlockTest, Compress)
     CMemBlock2D<int32_t> cpat0({ 0,  2, 0, 0, 0, 0,
                                  2,  4, 0, 0, 0, 0,
                                  0,  1, 0, 0, 0, 0,
+                                 1,  2, 0, 0, 0, 0,
                                  1,  2, 0, 0, 0, 0},
-                                6, 4);
+                                6, 5);
     
     CMemBlock2D<int32_t> cidx0({ 0,  2, 0, 0, 0, 0,
                                  2,  4, 0, 0, 0, 0,
@@ -888,6 +890,19 @@ TEST_F(CGtoPairsBlockTest, GetContrEndPositions)
     CGtoPairsBlock apairs(agto, 1.0e-13);
     
     vlxtest::compare({1, 2, 3, 4, 5, 6}, apairs.getContrEndPositions());
+}
+
+TEST_F(CGtoPairsBlockTest, GetRedPairsIdentifiers)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 1);
+    
+    CGtoPairsBlock apairs(agto, 1.0e-13);
+    
+    vlxtest::compare({0, 1, 2, 3, 4, 5}, apairs.getRedPairsIdentifiers());
 }
 
 TEST_F(CGtoPairsBlockTest, GetNormFactorsStartPositions)

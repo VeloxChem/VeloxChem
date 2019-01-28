@@ -459,6 +459,13 @@ public:
     const int32_t* getContrEndPositions() const;
     
     /**
+     Gets constant pointer to reduced contracted pair identifiers.
+
+     @return the reduced contracted pairs identifiers.
+     */
+    const int32_t* getRedPairsIdentifiers() const;
+    
+    /**
      Gets constant pointer to contracted pair start positions in normalization
      factors vector.
      

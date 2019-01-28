@@ -347,7 +347,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
         
         auto nqrdim = (symbk) ? i + 1 : rdim;
         
-        auto nqcdim = ketpairs.getNumberOfScreenedContrPairs(rdim - 1);
+        auto nqcdim = ketpairs.getNumberOfScreenedContrPairs(nqrdim - 1);
         
         // integrals screening: QQ or QQR scheme 
         

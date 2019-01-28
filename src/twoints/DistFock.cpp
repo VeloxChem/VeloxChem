@@ -94,6 +94,12 @@ namespace distfock { // distfock namespace
         
         auto ketdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs(nKetContrPairs - 1);
         
+        // set up reduced pairs identifiers
+        
+        auto bppids = (braGtoPairsBlock.getRedPairsIdentifiers())[iContrPair];
+        
+        auto kppids = ketGtoPairsBlock.getRedPairsIdentifiers();
+        
         // loop over integrals
         
         int32_t iblock = 0;
@@ -168,7 +174,14 @@ namespace distfock { // distfock namespace
                             
                             for (int32_t n = 0; n < nKetContrPairs; n++)
                             {
-                                int32_t oend = (isBraEqualKet && (n == iContrPair)) ? i + 1 : ckepos[n];
+                                // restriction for general contraction pairs
+                                
+                                auto oend = ckepos[n];
+                                
+                                if (isBraEqualKet && (kppids[n] == bppids))
+                                {
+                                    oend = ckspos[n] + iblock + 1;
+                                }
                                 
                                 for (int32_t o = ckspos[n]; o < oend; o++)
                                 {
