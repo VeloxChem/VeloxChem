@@ -1,0 +1,18 @@
+@jobs
+task: hf
+@end
+
+@method settings
+basis: cc-pvdz
+basis path: ../basis
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyz:
+H      -0.192038    1.152228    1.053600
+O       0.296786    0.678020    1.770400
+H      -1.152228    0.192038    2.946400
+O      -0.678020   -0.296786    2.229600
+@end 

@@ -20,29 +20,17 @@ class TestRHF(unittest.TestCase):
 
         return scf_drv.get_scf_energy()
 
-    def test_h2o(self):
+    def test_small_molecules(self):
 
-        e_scf = self.run_rhf("h2o")
+        mol_list = ["h2o", "nh3", "ch4",
+                    "c2h4", "h2o2", "h2se"]
 
-        self.assertAlmostEqual(e_scf, -75.922903268112, 10)
+        scf_ener = [-75.922903268112, -56.195395860545, -40.155481408646,
+                    -78.043152739545, -150.780178806731, -2400.704613197394]
 
-    def test_nh3(self):
-
-        e_scf = self.run_rhf("nh3")
-
-        self.assertAlmostEqual(e_scf, -56.195395860545, 10)
-
-    def test_ch4(self):
-
-        e_scf = self.run_rhf("ch4")
-
-        self.assertAlmostEqual(e_scf, -40.155481408646, 10)
-
-    def test_c2h4(self):
-
-        e_scf = self.run_rhf("c2h4")
-
-        self.assertAlmostEqual(e_scf, -78.043152739545, 10)
+        for mol_name, e_ref in zip(mol_list, scf_ener):
+            e_scf = self.run_rhf(mol_name)
+            self.assertAlmostEqual(e_scf, e_ref, 10)
 
 
 if __name__ == "__main__":
