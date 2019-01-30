@@ -74,15 +74,15 @@ TEST_F(CGenFuncTest, ContractWithGtoBlocks)
     
     genfunc::contract(cdat, pdat, 0, bgtos, kgtos, 0);
     
-    CMemBlock2D<double> tdat({ 1.435793960,  2.07580, 3.55160,
-                               1.366518120,  3.01720, 1.77580,
-                               3.987243760,  6.06880, 3.25860,
-                               3.972477504,  2.74140, 2.56880,
-                               4.119065640,  4.51720, 5.77580,
-                               4.010821880,  2.29300, 3.55160,
-                               4.584073960,  2.77580, 1.81020,
-                               0.775800000,  5.51720, 1.51720,
-                               1.429107396,  2.00000, 3.27236},
+    CMemBlock2D<double> tdat({ 4.0,  4.3, 8.0,
+                               2.2,  4.5, 4.0,
+                              17.0, 12.0, 4.0,
+                               9.4,  2.0, 8.5,
+                              14.0,  6.0, 8.0,
+                              12.0,  6.0, 8.0,
+                               7.0,  5.0, 7.0,
+                               3.0,  7.0, 3.0,
+                               1.3,  2.0, 5.2},
                              3, 9);
     
     ASSERT_EQ(cdat, tdat);
@@ -132,13 +132,13 @@ TEST_F(CGenFuncTest, ContractWithGtoBlockAndGtoPairsBlock)
 TEST_F(CGenFuncTest, ContractWithGtoPairsBlocks)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
-
+    
     auto lih = vlxmol::getMoleculeLiH();
-
+    
     CGtoBlock pbra(lih, bas, 1);
-
+    
     CGtoPairsBlock ppairs(pbra, 1.0e-13);
-
+    
     CMemBlock2D<double> pdat({1.0, 0.2, 3.0, 2.3, 0.0, 1.0, 0.7, 0.2, 3.1, 1.2, 0.8,
                               0.3, 0.5, 2.1, 0.5, 0.9, 2.1, 1.7, 3.4, 3.9, 2.7, 1.2,
                               3.1, 0.8, 0.4, 2.1, 2.7, 0.6, 2.0, 2.7, 1.7, 0.6, 0.3,
@@ -148,45 +148,41 @@ TEST_F(CGenFuncTest, ContractWithGtoPairsBlocks)
                               0.1, 1.8, 2.2, 0.5, 0.8, 2.2, 3.7, 1.2, 2.9, 1.7, 1.3,
                               4.1, 3.6, 0.7, 1.5, 3.2, 4.0, 1.7, 3.2, 0.7, 1.6, 2.1},
                              11, 8);
-
+    
     CVecThreeIndexes cvec({{0, 0, 0}, {0, 3, 1}, {0, 0, 1}});
-
+    
     std::vector<int32_t> cidx({3, 2, 0});
-
+    
     CVecThreeIndexes pvec({{0, 2, 3}, {0, 0, 0}, {0, 0, 1},  {0, 1, 0}});
-
+    
     std::vector<int32_t> pidx({7, 0, 8, 2});
-
-    auto p2dat = pdat;
-
+    
+    auto p2dat = pdat; 
+    
     CMemBlock2D<double> c2dat(2, 4);
-
+    
     genfunc::contract(c2dat, p2dat, cvec, cidx, pvec, pidx, ppairs, ppairs,
-                      2, 1);
-
-    CMemBlock2D<double> t2dat({2.82519809877360, 2.59775969200000,
-                               2.12539118726720, 3.24731448400000,
-                               3.92851946945040, 5.08565969200000,
-                               2.01849246605600, 2.59134000000000},
-                               2, 4);
-
+                      6, 2, 1);
+    
+    CMemBlock2D<double> t2dat({11.0,  6.6,
+                              10.5,  8.4,
+                              18.7, 10.2,
+                               9.9,  4.0},
+                              2, 4);
+    
     ASSERT_EQ(c2dat, t2dat);
-
+    
     CMemBlock2D<double> cdat(6, 4);
-
+    
     genfunc::contract(cdat, pdat, cvec, cidx, pvec, pidx, ppairs, ppairs,
-                      6, 1);
-
-    CMemBlock2D<double> tdat({2.82519809877360, 2.59775969200000, 5.73018792000000,
-                              0.93962000000000, 2.45516000000000, 2.87758000000000,
-                              2.12539118726720, 3.24731448400000, 2.83942573200000,
-                              3.44306000000000, 2.21720000000000, 1.68790000000000,
-                              3.92851946945040, 5.08565969200000, 4.01948271200000,
-                              0.98446000000000, 2.29822000000000, 2.15172000000000, 
-                              2.01849246605600, 2.59134000000000, 3.93815177200000,
-                              4.70166000000000, 3.01032000000000, 1.40688000000000},
+                      11, 6, 1);
+    
+    CMemBlock2D<double> tdat({11.0,  6.6, 11.6, 2.2, 2.9, 3.1,
+                              10.5,  8.4,  8.8, 5.0, 3.7, 2.8,
+                              18.7, 10.2,  8.0, 1.8, 4.3, 2.3,
+                               9.9,  4.0,  6.0, 7.0, 3.9, 2.0},
                              6, 4);
-
+    
     ASSERT_EQ(cdat, tdat);
 }
 

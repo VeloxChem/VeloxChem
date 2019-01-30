@@ -91,7 +91,7 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         
         _contrPattern = CMemBlock2D<int32_t>(nrdim, 5);
         
-        _indexPattern = CMemBlock2D<int32_t>(ncdim, 2 + angcomp);
+        _indexPattern = CMemBlock2D<int32_t>(ncdim, angcomp);
         
         // determine partial dimensions of AO basis
         
@@ -121,10 +121,6 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         
         auto idxatm = _contrPattern.data(2);
         
-        auto scpos = _contrPattern.data(3);
-        
-        auto ecpos = _contrPattern.data(4);
-        
         // primitives data
         
         auto gtoexps = _gtoPrimitives.data(0);
@@ -137,21 +133,11 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         
         auto gtonorms = _gtoNormFactors.data();
         
-        // indexing data
-        
-        auto sfpos = _indexPattern.data(0);
-        
-        auto efpos = _indexPattern.data(1);
-        
         // loop over atoms in molecule
         
         int32_t icgto = 0;
         
-        int32_t irgto = 0;
-        
         int32_t iprim = 0;
-        
-        int32_t ifact = 0;
         
         for (int32_t i = iAtom; i < (iAtom + nAtoms); i++)
         {
@@ -172,34 +158,19 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
             {
                 auto nprim = gtos[j].getNumberOfPrimitiveFunctions();
                 
-                auto ngfuncs = gtos[j].getNumberOfContractedFunctions();
-                
                 // set contraction pattern
                 
-                sppos[irgto] = iprim;
+                sppos[icgto] = iprim;
                 
-                eppos[irgto] = iprim + nprim;
+                eppos[icgto] = iprim + nprim;
                 
-                idxatm[irgto] = i;
+                idxatm[icgto] = i;
                 
-                scpos[irgto] = icgto;
-                
-                ecpos[irgto] = icgto + ngfuncs;
-                
-                for (int32_t k = 0; k < ngfuncs; k++)
+                for (int32_t k = 0; k < angcomp; k++)
                 {
-                    for (int32_t l = 0; l < angcomp; l++)
-                    {
-                        auto pgtoidx = _indexPattern.data(2 + l);
+                    auto pgtoidx = _indexPattern.data(k);
                     
-                        pgtoidx[icgto] = npartdim + l * ncfuncs + ncoff + icgto;
-                    }
-                    
-                    sfpos[icgto] = ifact + k * nprim;
-                    
-                    efpos[icgto] = ifact + (k + 1) * nprim;
-                    
-                    icgto++;
+                    pgtoidx[icgto] = npartdim + k * ncfuncs + ncoff + icgto;
                 }
                 
                 // retrieve primitve exponents, norm. factors
@@ -212,9 +183,11 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
                 
                 for (int32_t k = 0; k < nprim; k++)
                 {
-                    // assign exponent
+                    // assign exponent, norm. factor
                     
                     gtoexps[iprim + k] = pexp[k];
+                    
+                    gtonorms[iprim + k] = pnorm[k];
                     
                     // assign atom coordinates
                     
@@ -225,22 +198,11 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
                     coordsz[iprim + k] = rz;
                 }
                 
-                // set up normalization factors data
-                
-                for (int32_t k = 0; k <  ngfuncs * nprim; k++)
-                {
-                    // assign norm. factor
-                    
-                    gtonorms[ifact + k] = pnorm[k];
-                }
-                
                 // update indexes
                 
                 iprim += nprim;
                 
-                ifact += ngfuncs * nprim;
-                
-                irgto++;
+                icgto++;
             }
         }
     }
@@ -381,12 +343,6 @@ CGtoBlock::compress(const CGtoBlock&         source,
     
     auto sridxatm = source.getAtomicIdentifiers();
     
-    auto srcscpos = source.getContrStartPositions();
-    
-    auto srcecpos = source.getContrEndPositions();
-    
-    auto srcsfpos = source.getNormFactorsStartPositions();
-    
     // set up pointer to screening factors
     
     auto sfacts = screeningFactors.data();
@@ -417,21 +373,9 @@ CGtoBlock::compress(const CGtoBlock&         source,
     
     auto cidxatm = getAtomicIdentifiers();
     
-    auto cscpos = getContrStartPositions();
-    
-    auto cecpos = getContrEndPositions();
-    
-    auto csfpos = getNormFactorsStartPositions();
-    
-    auto cefpos = getNormFactorsEndPositions();
-    
     // primitive and contracted GTOs counters
     
     int32_t npgto = 0;
-    
-    int32_t ngfunc = 0;
-    
-    int32_t nrgto = 0;
     
     int32_t ncgto = 0;
     
@@ -439,8 +383,6 @@ CGtoBlock::compress(const CGtoBlock&         source,
     
     for (int32_t i = 0; i < _contrPattern.size(0); i++)
     {
-        auto cgfunc = srcecpos[i] - srcscpos[i];
-        
         int32_t cprim = 0;
         
         // add primite GTOs data
@@ -452,6 +394,8 @@ CGtoBlock::compress(const CGtoBlock&         source,
                 auto poff = npgto + cprim;
                 
                 pexps[poff] = srcexps[j];
+                
+                pfacts[poff] = srcfacts[j];
                 
                 prx[poff] = srcrx[j];
                 
@@ -467,73 +411,32 @@ CGtoBlock::compress(const CGtoBlock&         source,
         
         if (cprim > 0)
         {
+            cspos[ncgto] = npgto;
             
-            // contraction pattern
+            cepos[ncgto] = npgto + cprim;
             
-            cspos[nrgto] = npgto;
-            
-            cepos[nrgto] = npgto + cprim;
-            
-            cidxatm[nrgto] = sridxatm[i];
+            cidxatm[ncgto] = sridxatm[i];
            
-            cscpos[nrgto] = ncgto;
+            // store GTOs indexes
             
-            cecpos[nrgto] = ncgto + cgfunc;
-            
-            // indexing data
-            
-            for (int32_t j = srcscpos[i]; j < srcecpos[i]; j++)
+            for (int32_t j = 0; j < angcomp; j++)
             {
-                for (int32_t k = 0; k < angcomp; k++)
-                {
-                    auto srcidx = source.getIdentifiers(k);
+                auto srcidx = source.getIdentifiers(j);
             
-                    auto curidx = getIdentifiers(k);
+                auto curidx = getIdentifiers(j);
                 
-                    curidx[ncgto] = srcidx[j];
-                }
-                
-                csfpos[ncgto] = ngfunc + (j - srcscpos[i]) * cprim;
-                
-                cefpos[ncgto] = ngfunc + (j - srcscpos[i] + 1) * cprim;
-                
-                ncgto++;
-            }
-            
-            // normalization factors
-            
-            int32_t icprim = 0;
-            
-            for (int32_t j = srcspos[i]; j < srcepos[i]; j++)
-            {
-                if (sfacts[j] > screeningThreshold)
-                {
-                    auto joff = j - srcspos[i];
-                    
-                    for (int32_t k = srcscpos[i]; k < srcecpos[i]; k++)
-                    {
-                        auto koff = (k - srcscpos[i]) * cprim + icprim;
-                        
-                        auto soff = srcsfpos[k] + joff;
-                        
-                        pfacts[ngfunc + koff] = srcfacts[soff];
-                    }
-                    
-                    icprim++;
-                }
+                curidx[ncgto] = srcidx[i];
             }
             
             // update counters
             
             npgto += cprim;
             
-            ngfunc += cprim * cgfunc;
-            
-            nrgto++;
+            ncgto++;
         }
     }
     
-    return std::make_tuple(npgto, nrgto);
+    return std::make_tuple(npgto, ncgto);
 }
 
 int32_t
@@ -555,21 +458,9 @@ CGtoBlock::getNumberOfPrimGtos() const
 }
 
 int32_t
-CGtoBlock::getNumberOfNormFactors() const
-{
-    return _gtoNormFactors.size();
-}
-
-int32_t
-CGtoBlock::getNumberOfRedContrGtos() const
-{
-    return _contrPattern.size(0);
-}
-
-int32_t
 CGtoBlock::getNumberOfContrGtos() const
 {
-    return _indexPattern.size(0);
+    return _contrPattern.size(0);
 }
 
 const int32_t*
@@ -597,54 +488,6 @@ CGtoBlock::getEndPositions()
 }
 
 const int32_t*
-CGtoBlock::getContrStartPositions() const
-{
-    return _contrPattern.data(3);
-}
-
-int32_t*
-CGtoBlock::getContrStartPositions()
-{
-    return _contrPattern.data(3);
-}
-
-const int32_t*
-CGtoBlock::getContrEndPositions() const
-{
-    return _contrPattern.data(4);
-}
-
-int32_t*
-CGtoBlock::getContrEndPositions()
-{
-    return _contrPattern.data(4);
-}
-
-const int32_t*
-CGtoBlock::getNormFactorsStartPositions() const
-{
-    return _indexPattern.data(0);
-}
-
-int32_t*
-CGtoBlock::getNormFactorsStartPositions()
-{
-    return _indexPattern.data(0);
-}
-
-const int32_t*
-CGtoBlock::getNormFactorsEndPositions() const
-{
-    return _indexPattern.data(1);
-}
-
-int32_t*
-CGtoBlock::getNormFactorsEndPositions()
-{
-    return _indexPattern.data(1);
-}
-
-const int32_t*
 CGtoBlock::getAtomicIdentifiers() const
 {
     return _contrPattern.data(2);
@@ -661,7 +504,7 @@ CGtoBlock::getIdentifiers(const int32_t iComponent) const
 {
     if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
     {
-        return _indexPattern.data(2 + iComponent);
+        return _indexPattern.data(iComponent);
     }
     
     return nullptr; 
@@ -672,7 +515,7 @@ CGtoBlock::getIdentifiers(const int32_t iComponent)
 {
     if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
     {
-        return _indexPattern.data(2 + iComponent);
+        return _indexPattern.data(iComponent);
     }
     
     return nullptr;
@@ -747,7 +590,7 @@ CGtoBlock::getMaxContractionDepth() const
     
     auto epos = getEndPositions();
     
-    for (int32_t i = 0; i < getNumberOfRedContrGtos(); i++)
+    for (int32_t i = 0; i < getNumberOfContrGtos(); i++)
     {
         auto cdim = epos[i] - spos[i];
         
@@ -755,47 +598,6 @@ CGtoBlock::getMaxContractionDepth() const
     }
     
     return ndim; 
-}
-
-int32_t
-CGtoBlock::getMaxNumberContrFunctions() const
-{
-    int32_t ndim = 0;
-    
-    auto spos = getContrStartPositions();
-    
-    auto epos = getContrEndPositions();
-    
-    for (int32_t i = 0; i < getNumberOfRedContrGtos(); i++)
-    {
-        auto cdim = epos[i] - spos[i];
-        
-        if (cdim > ndim) ndim = cdim;
-    }
-    
-    return ndim;
-}
-
-double
-CGtoBlock::getMaxNormFactor(const int32_t iContrGto,
-                            const int32_t iPrimGto) const
-{
-    double mfact = 0.0;
-    
-    auto spos = getContrStartPositions();
-    
-    auto epos = getContrEndPositions();
-    
-    auto sfpos = getNormFactorsStartPositions();
-    
-    for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
-    {
-        auto cfact = std::fabs(_gtoNormFactors.at(sfpos[i] + iPrimGto));
-        
-        if (cfact > mfact) mfact = cfact;
-    }
-    
-    return mfact;
 }
 
 std::ostream&

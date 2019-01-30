@@ -11,7 +11,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "GtoBlock.hpp"
 
@@ -35,19 +34,13 @@ class CGtoPairsBlock
     
     /**
      The contraction scheme (contracted basis functions start/end position in
-     primitive Gaussian functions vector, contracted basis start/end positions
-     in indexing vector).
+     primitive Gaussian functions vector, contracted basis function pair
+     indexes).
      */
     CMemBlock2D<int32_t> _contrPattern;
     
     /**
-    The contraction scheme (contracted basis functions start/end position in
-    normalization factors vector, indexing vector).
-    */
-    CMemBlock2D<int32_t> _indexPattern;
-    
-    /**
-     The contracted Gaussian function pair factors data (A-B distances).
+     The contracted Gaussian function pair factors data (effective P coordinates).
      */
     CMemBlock2D<double> _contrFactors;
     
@@ -56,11 +49,6 @@ class CGtoPairsBlock
      PA and PB distances, etc).
      */
     CMemBlock2D<double> _pairFactors;
-    
-    /**
-     The normalization factors of primitive GTO pairs.
-     */
-    CMemBlock<double> _normFactors;
     
     /**
      The GTO pairs screening threshold.
@@ -78,16 +66,6 @@ class CGtoPairsBlock
     int32_t _nScreenedPrimPairs;
     
     /**
-     The number of unscreened reduced contracted GTO pairs.
-     */
-    int32_t _nOriginalRedContrPairs;
-    
-    /**
-     The number of screened reduced contracted GTO pairs.
-     */
-    int32_t _nScreenedRedContrPairs;
-    
-    /**
      The number of unscreened contracted GTO pairs.
      */
     int32_t _nOriginalContrPairs;
@@ -96,6 +74,7 @@ class CGtoPairsBlock
      The number of screened contracted GTO pairs.
      */
     int32_t _nScreenedContrPairs;
+    
     
     /**
      Determines recommended dimensions of GTOs pairs block.
@@ -115,24 +94,19 @@ public:
      Creates a GTOs pairs block object.
      
      @param contrPattern the contraction pattern (contracted basis functions
-            start/end position in primitive and contracted Gaussian functions
-            vectors).
-     @param indexPattern the indexing pattern (positions data for normalization
-            factors, indexes of contracted GTOs)
+            start/end position in primitive Gaussian functions
+            vector, basis functions indexes).
      @param contrFactors the various contracted pair factors (effective P
             coordintes)
      @param pairFactors the various primitive pair factors (overlap,
             P coordinates, PA and PB distances, etc)
-     @param normFactors the vector of normalization factors. 
      @param braAngularMomentum the angular momentum on bra side.
      @param ketAngularMomentum the angular momentum on ket side.
      @param threshold the primitive pairs screening threshold.
      */
     CGtoPairsBlock(const CMemBlock2D<int32_t>& contrPattern,
-                   const CMemBlock2D<int32_t>& indexPattern,
                    const CMemBlock2D<double>&  contrFactors,
                    const CMemBlock2D<double>&  pairFactors,
-                   const CMemBlock<double>&    normFactors,
                    const int32_t               braAngularMomentum,
                    const int32_t               ketAngularMomentum,
                    const double                threshold);
@@ -294,7 +268,7 @@ public:
     const double* getFactorsZeta() const;
     
     /**
-     Gets constant vector of primitive overlaps (s_mu | s_nu).
+     Gets constant vector of primitive overlaps c_mu * c_nu  (s_mu | s_nu).
      
      @return the vector of primitive overlaps.
      */
@@ -443,45 +417,6 @@ public:
     const int32_t* getEndPositions() const;
     
     /**
-     Gets constant pointer to contracted pair start positions in contracted
-     pairs vector.
-     
-     @return the start positions of contracted pairs.
-     */
-    const int32_t* getContrStartPositions() const;
-    
-    /**
-     Gets constant pointer to contracted pair end positions in contracted
-     pairs vector.
-     
-     @return the end positions of contracted pairs.
-     */
-    const int32_t* getContrEndPositions() const;
-    
-    /**
-     Gets constant pointer to reduced contracted pair identifiers.
-
-     @return the reduced contracted pairs identifiers.
-     */
-    const int32_t* getRedPairsIdentifiers() const;
-    
-    /**
-     Gets constant pointer to contracted pair start positions in normalization
-     factors vector.
-     
-     @return the start positions of contracted pairs.
-     */
-    const int32_t* getNormFactorsStartPositions() const;
-    
-    /**
-     Gets constant pointer to contracted pair end positions in normalization
-     factors vector.
-     
-     @return the end positions of contracted pairs.
-     */
-    const int32_t* getNormFactorsEndPositions() const;
-    
-    /**
      Gets constant pointer to contracted pairs bra indexes in full AO basis for
      specific angular momentum component.
      
@@ -500,13 +435,6 @@ public:
     const int32_t* getKetIdentifiers(const int32_t iComponent) const;
     
     /**
-     Gets constant vector of primitive normalization factors c_mu * c_nu.
-     
-     @return the vector of primitive normalization factors.
-     */
-    const double* getNormFactors() const;
-    
-    /**
      Gets vector with Cartesian R(AB) = A - B distances for contracted GTOs
      pairs.
 
@@ -519,13 +447,10 @@ public:
      contracted GTOs pairs.
 
      @param abDistances the vector of Cartesian distances.
-     @param nContrPairs the number of contracted pairs.
-     @param nReplicas the number of distances replicas in vector of Cartesian
-            distances.
+     @param nContrPairs the number of contracted pairs. 
      */
     void getDistancesAB(      CMemBlock2D<double>& abDistances,
-                        const int32_t              nContrPairs,
-                        const int32_t              nReplicas) const;
+                        const int32_t              nContrPairs) const;
     
     /**
      Gets contants vector to Cartesian X coordinates of effective P center of
@@ -575,7 +500,7 @@ public:
     /**
      Gets number of primitive pairs in set of contracted pairs ([0..iContrPair]).
 
-     @param iContrPair the index of last contracted pair.
+     @param iContrPair the index of lasr contracted pair.
      @return the number of primitive pairs.
      */
     int32_t getNumberOfPrimPairs(const int32_t iContrPair) const;
@@ -593,29 +518,6 @@ public:
      @return the number of contracted pairs.
      */
     int32_t getNumberOfScreenedContrPairs() const;
-    
-    /**
-     Gets number of screened contracted pairs generated up to specific contracted
-     GTOs pair.
-     
-     @param iContrPair the index of last contracted pair.
-     @return the number of contracted pairs.
-     */
-    int32_t getNumberOfScreenedContrPairs(const int32_t iContrPair) const;
-    
-    /**
-     Gets number of initial reduced contracted pairs generated from input data.
-     
-     @return the number of reduced contractes pairs.
-     */
-    int32_t getNumberOfOriginalRedContrPairs() const;
-    
-    /**
-     Gets number of screened reduced contracted pairs generated from input data.
-     
-     @return the number of reduced contracted pairs.
-     */
-    int32_t getNumberOfScreenedRedContrPairs() const;
     
     /**
      Gets starting position of submatrix along bra side of full matrix for
@@ -648,14 +550,6 @@ public:
      @return the number of rows in submatrix.
      */
     int32_t getNumberOfRowsInKetMatrix() const;
-    
-    /**
-     Gets maximum number of contracted GTOs pairs associated with
-     set of primitive GTOs pairs.
-     
-     @return the maximum number of contracted GTOs pairs.
-     */
-    int32_t getMaxNumberContrPairs() const;
     
     /**
      Gets pair type string for GTOs pairs object.

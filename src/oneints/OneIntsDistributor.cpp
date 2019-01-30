@@ -144,8 +144,6 @@ COneIntsDistribution::_distSpherIntsIntoBatch(const CMemBlock2D<double>& spherIn
                                               const CGtoBlock&           ketGtoBlock,
                                               const int32_t              iContrGto)
 {
-    
-    
     // set up number of angular components on bra and ket sides
     
     auto bcomp = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
@@ -158,43 +156,28 @@ COneIntsDistribution::_distSpherIntsIntoBatch(const CMemBlock2D<double>& spherIn
     
     auto nkgtos = ketGtoBlock.getNumberOfContrGtos();
     
-    // set up positions in contraction space
-    
-    auto sbpos = braGtoBlock.getContrStartPositions();
-    
-    auto ebpos = braGtoBlock.getContrEndPositions();
-    
     for (int32_t i = 0; i < bcomp; i++)
     {
-        int32_t igfunc = 0;
+        // offset in rows indexing space
         
-        for (int32_t j = sbpos[iContrGto]; j < ebpos[iContrGto]; j++)
+        auto ioff = (i * nbgtos + iContrGto) * _nColumns;
+        
+        for (int32_t j = 0; j < kcomp; j++)
         {
-            // offset in rows indexing space
-        
-            auto ioff = (i * nbgtos + j) * _nColumns;
-        
-            auto fvoff = igfunc * nkgtos;
+            // set up pointer to one electron integrals
             
-            for (int32_t k = 0; k < kcomp; k++)
+            auto fvals = spherInts.data(i * kcomp + j);
+            
+            // offset in full indexing space
+            
+            auto ijoff = ioff + j * nkgtos;
+            
+            // distribute integrals
+            
+            for (int32_t k = 0; k < nkgtos; k++)
             {
-                // set up pointer to one electron integrals
-            
-                auto fvals = spherInts.data(i * kcomp + k);
-            
-                // offset in full indexing space
-            
-                auto ijoff = ioff + k * nkgtos;
-            
-                // distribute integrals
-                
-                for (int32_t l = 0; l < nkgtos; l++)
-                {
-                    _intsData[ijoff + l] = fvals[fvoff + l];
-                }
+                _intsData[ijoff + k] = fvals[k];
             }
-            
-            igfunc++;
         }
     }
 }
@@ -216,53 +199,38 @@ COneIntsDistribution::_distSpherIntsIntoSymMatrix(const CMemBlock2D<double>& sph
     
     auto kdim = ketGtoBlock.getNumberOfContrGtos();
     
-    // set up positions in contraction space
-    
-    auto sbpos = braGtoBlock.getContrStartPositions();
-    
-    auto ebpos = braGtoBlock.getContrEndPositions();
-    
     for (int32_t i = 0; i < bcomp; i++)
     {
-        auto bidx = braGtoBlock.getIdentifiers(i);
+        auto bidx = (braGtoBlock.getIdentifiers(i))[iContrGto];
         
-        int32_t igfunc = 0;
+        // loop over ket components
         
-        for (int32_t j = sbpos[iContrGto]; j < ebpos[iContrGto]; j++)
+        for (int32_t j = 0; j < kcomp; j++)
         {
-            auto fvoff = igfunc * kdim;
+            // set up pointer to integrals
             
-            // loop over ket components
-        
-            for (int32_t k = 0; k < kcomp; k++)
+            auto fvals = spherInts.data(i * kcomp + j);
+            
+            auto kidx = ketGtoBlock.getIdentifiers(j);
+            
+            // loop over integrals
+            
+            if (isBraEqualKet)
             {
-                // set up pointer to integrals
-            
-                auto fvals = spherInts.data(i * kcomp + k);
-            
-                auto kidx = ketGtoBlock.getIdentifiers(k);
-            
-                // loop over integrals
-            
-                if (isBraEqualKet)
+                for (int32_t k = 0; k < kdim; k++)
                 {
-                    for (int32_t l = 0; l < kdim; l++)
-                    {
-                        _intsData[bidx[j] * _nColumns + kidx[l]] = fvals[fvoff + l];
-                    }
-                }
-                else
-                {
-                    for (int32_t l = 0; l < kdim; l++)
-                    {
-                        _intsData[bidx[j] * _nColumns + kidx[l]] = fvals[fvoff + l];
-                    
-                        _intsData[kidx[l] * _nColumns + bidx[j]] = fvals[fvoff + l];
-                    }
+                    _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
                 }
             }
-            
-            igfunc++;
+            else
+            {
+                for (int32_t k = 0; k < kdim; k++)
+                {
+                    _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
+                    
+                    _intsData[kidx[k] * _nColumns + bidx] = fvals[k];
+                }
+            }
         }
     }
 }
@@ -284,56 +252,41 @@ COneIntsDistribution::_distSpherIntsIntoAntiSymMatrix(const CMemBlock2D<double>&
     
     auto kdim = ketGtoBlock.getNumberOfContrGtos();
     
-    // set up positions in contraction space
-    
-    auto sbpos = braGtoBlock.getContrStartPositions();
-    
-    auto ebpos = braGtoBlock.getContrEndPositions();
-    
     for (int32_t i = 0; i < bcomp; i++)
     {
-        auto bidx = braGtoBlock.getIdentifiers(i);
+        auto bidx = (braGtoBlock.getIdentifiers(i))[iContrGto];
         
-        int32_t igfunc = 0;
+        // loop over ket components
         
-        for (int32_t j = sbpos[iContrGto]; j < ebpos[iContrGto]; j++)
+        for (int32_t j = 0; j < kcomp; j++)
         {
-            auto fvoff = igfunc * kdim;
-        
-            // loop over ket components
-        
-            for (int32_t k = 0; k < kcomp; k++)
+            // set up pointer to integrals
+            
+            auto fvals = spherInts.data(i * kcomp + j);
+            
+            auto kidx = ketGtoBlock.getIdentifiers(j);
+            
+            // loop over integrals
+            
+            if (isBraEqualKet)
             {
-                // set up pointer to integrals
-            
-                auto fvals = spherInts.data(i * kcomp + k);
-            
-                auto kidx = ketGtoBlock.getIdentifiers(k);
-            
-                // loop over integrals
-            
-                if (isBraEqualKet)
+                for (int32_t k = 0; k < kdim; k++)
                 {
-                    for (int32_t l = 0; l < kdim; l++)
-                    {
-                        _intsData[bidx[j] * _nColumns + kidx[l]] = fvals[fvoff + l];
-                    }
-                }
-                else
-                {
-                    // NOTE: assummes upper triangle computation in one-electron
-                    //       integrals driver
-                
-                    for (int32_t l = 0; l < kdim; l++)
-                    {
-                        _intsData[bidx[j] * _nColumns + kidx[l]] = -fvals[fvoff + l];
-                    
-                        _intsData[kidx[l] * _nColumns + bidx[j]] =  fvals[fvoff + l];
-                    }
+                    _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
                 }
             }
-            
-            igfunc++;
+            else
+            {
+                // NOTE: assummes upper triangle computation in one-electron
+                //       integrals driver
+                
+                for (int32_t k = 0; k < kdim; k++)
+                {
+                    _intsData[bidx * _nColumns + kidx[k]] = -fvals[k];
+                    
+                    _intsData[kidx[k] * _nColumns + bidx] =  fvals[k];
+                }
+            }
         }
     }
 }
@@ -354,41 +307,26 @@ COneIntsDistribution::_distSpherIntsIntoRectMatrix(const CMemBlock2D<double>& sp
     
     auto kdim = ketGtoBlock.getNumberOfContrGtos();
     
-    // set up positions in contraction space
-    
-    auto sbpos = braGtoBlock.getContrStartPositions();
-    
-    auto ebpos = braGtoBlock.getContrEndPositions();
-    
     for (int32_t i = 0; i < bcomp; i++)
     {
-        auto bidx = braGtoBlock.getIdentifiers(i);
+        auto bidx = (braGtoBlock.getIdentifiers(i))[iContrGto];
         
-        int32_t igfunc = 0;
+        // loop over ket components
         
-        for (int32_t j = sbpos[iContrGto]; j < ebpos[iContrGto]; j++)
+        for (int32_t j = 0; j < kcomp; j++)
         {
-            auto fvoff = igfunc * kdim;
-        
-            // loop over ket components
-        
-            for (int32_t k = 0; k < kcomp; k++)
+            // set up pointer to integrals
+            
+            auto fvals = spherInts.data(i * kcomp + j);
+            
+            auto kidx = ketGtoBlock.getIdentifiers(j);
+            
+            // loop over integrals
+            
+            for (int32_t k = 0; k < kdim; k++)
             {
-                // set up pointer to integrals
-            
-                auto fvals = spherInts.data(i * kcomp + k);
-            
-                auto kidx = ketGtoBlock.getIdentifiers(k);
-            
-                // loop over integrals
-            
-                for (int32_t l = 0; l < kdim; l++)
-                {
-                    _intsData[bidx[j] * _nColumns + kidx[l]] = fvals[fvoff + l];
-                }
+                _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
             }
-            
-            igfunc++;
         }
     }
 }

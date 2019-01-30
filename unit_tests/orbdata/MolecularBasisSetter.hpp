@@ -36,12 +36,9 @@ CMolecularBasis getMinimalBasisForNH3CH4();
 CMolecularBasis getTestBasisForLiH();
     
 CMolecularBasis getReducedTestBasisForLiH();
- 
+    
 CMolecularBasis getGenContrBasisForLiH();
 
-CMolecularBasis getMinimalBasisSegForLiH();
-    
-CMolecularBasis getMinimalBasisGenForLiH();
 } // vlxbas namespace
 
 #endif /* MolecularBasisSetter_hpp */

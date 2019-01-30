@@ -301,8 +301,8 @@ CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spher
 {
     // check if dimensions on bra and ket sides are correct
     
-    if ((braGtoPairsBlock.getNumberOfScreenedRedContrPairs() != 1) ||
-        (ketGtoPairsBlock.getNumberOfScreenedRedContrPairs() != 1))
+    if ((braGtoPairsBlock.getNumberOfScreenedContrPairs() != 1) ||
+        (ketGtoPairsBlock.getNumberOfScreenedContrPairs() != 1))
     {
         // error handling code...
         
@@ -319,29 +319,13 @@ CTwoIntsDistribution::_distSpherIntsIntoQValues(const CMemBlock2D<double>& spher
     
     //  determine maximum integral value in shell
     
-    // set up pointers to contraction pattern on bra side
-    
-    auto cbdim = (braGtoPairsBlock.getContrEndPositions())[0];
-    
-    // set up pointers to contraction pattern on ket side
-    
-    auto ckdim = (ketGtoPairsBlock.getContrEndPositions())[0];
-    
-    // determine Q values
-    
     auto mval = (spherInts.data(0))[0];
     
-    for (int32_t i = 0; i < cbdim; i++)
+    for (int32_t j = 1; j < ncomp; j++)
     {
-        for (int32_t j = 1; j < ncomp; j++)
-        {
-            auto pfval = spherInts.data(j);
-            
-            for (int32_t k = 0; k < ckdim; k++)
-            {
-                if (pfval[k] > mval) mval = pfval[k];
-            }
-        }
+        auto fval = (spherInts.data(j))[0];
+        
+        if (fval > mval) mval = fval;
     }
     
     // compute Q value for contracted pair
@@ -377,7 +361,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                  _aoDensity->totalDensity(idden),
                                  _aoDensity->getNumberOfColumns(idden),
                                  spherInts, braGtoPairsBlock, ketGtoPairsBlock,
-                                 isBraEqualKet, nKetContrPairs, iContrPair);
+                                 nKetContrPairs, iContrPair);
         }
     }
 }

@@ -50,11 +50,11 @@ CCauchySchwarzScreener::CCauchySchwarzScreener(const CMemBlock<double>& braQValu
     
     if (_screeningScheme == ericut::qqr)
     {
-        _braPairExtends = CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedRedContrPairs());
+        _braPairExtends = CMemBlock<double>(braGtoPairsBlock.getNumberOfScreenedContrPairs());
         
         _setPairsExtents(_braPairExtends, braGtoPairsBlock);
         
-        _ketPairExtends = CMemBlock<double>(ketGtoPairsBlock.getNumberOfScreenedRedContrPairs());
+        _ketPairExtends = CMemBlock<double>(ketGtoPairsBlock.getNumberOfScreenedContrPairs());
         
         _setPairsExtents(_ketPairExtends, ketGtoPairsBlock);
     }
@@ -355,7 +355,7 @@ CCauchySchwarzScreener::_setPairsExtents(      CMemBlock<double>& gtoPairExtents
     
     // set up dimensions of GTOs pairs vector
     
-    auto ndim = gtoPairsBlock.getNumberOfScreenedRedContrPairs();
+    auto ndim = gtoPairsBlock.getNumberOfScreenedContrPairs();
     
     // set up pointers to 1 / (e_a + e_b) factors
     

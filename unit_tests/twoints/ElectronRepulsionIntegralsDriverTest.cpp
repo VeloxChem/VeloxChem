@@ -7475,38 +7475,3 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForH2Se)
     //Row 37 Col 37 Diff= 1.13687e-13
     //Row 39 Col 39 Diff= 1.42109e-13
 }
-
-TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeERIForLiHWithGeneralContraction)
-{
-    auto lih = vlxmol::getMoleculeLiH();
-    
-    auto segbas = vlxbas::getMinimalBasisSegForLiH();
-    
-    auto genbas = vlxbas::getMinimalBasisGenForLiH();
-    
-    const int nrows = 3, ncols = 3;
-    
-    std::vector<double> denvals{ 1.0400, 0.3700,  0.1200,
-                                 0.3700, 0.8900,  0.2500,
-                                 1.2000, 0.2500, -0.2000};
-    
-    const CAODensityMatrix dmat({CDenseMatrix(denvals, nrows, ncols)}, denmat::rest);
-    
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
-    
-    auto segqq = eridrv.compute(ericut::qq, 1.0e-16, lih, segbas);
-    
-    CAOFockMatrix segfock(dmat);
-    
-    eridrv.compute(segfock, dmat, lih, segbas, segqq, MPI_COMM_WORLD);
-    
-    auto genqq = eridrv.compute(ericut::qq, 1.0e-16, lih, genbas);
-    
-    CAOFockMatrix genfock(dmat);
-    
-    eridrv.compute(genfock, dmat, lih, genbas, genqq, MPI_COMM_WORLD);
-    
-    ASSERT_EQ(segfock, genfock); 
-}

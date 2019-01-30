@@ -216,12 +216,6 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     CSphericalMomentum dmom(ketpairs.getKetAngularMomentum());
     
-    // set up pointers to bra contraction pattern
-    
-    auto bcspos = brapairs.getContrStartPositions();
-    
-    auto bcepos = brapairs.getContrEndPositions();
-    
     // allocate prefactors used in Obara-Saika recursion
     
     auto pdim = ketpairs.getNumberOfScreenedPrimPairs();
@@ -274,17 +268,13 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     nblk = _getIndexesForKetHRRIntegrals(khrridx, khrrvec);
     
-    auto rdim = ketpairs.getNumberOfScreenedRedContrPairs();
-    
     auto cdim = ketpairs.getNumberOfScreenedContrPairs();
     
-    auto mcgto = brapairs.getMaxNumberContrPairs();
-    
-    CMemBlock2D<double> khrrbuffer(cdim * mcgto, nblk);
+    CMemBlock2D<double> khrrbuffer(cdim, nblk);
     
     // initialize R(CD) = C - D distance for horizontal recursion
     
-    CMemBlock2D<double> rcd(cdim * mcgto, 3);
+    CMemBlock2D<double> rcd(cdim, 3);
     
     // set up horizontal recursion buffer for bra side
     
@@ -292,7 +282,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     nblk = _getIndexesForBraHRRIntegrals(bhrridx, bhrrvec);
     
-    CMemBlock2D<double> bhrrbuffer(cdim * mcgto, nblk);
+    CMemBlock2D<double> bhrrbuffer(cdim, nblk);
     
     // initialize R(AB) = A - B distance for horizontal recursion
     
@@ -305,7 +295,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
          * angmom::to_SphericalComponents(ketpairs.getBraAngularMomentum(),
                                           ketpairs.getKetAngularMomentum());
     
-    CMemBlock2D<double> spherbuffer(cdim * mcgto, nblk);
+    CMemBlock2D<double> spherbuffer(cdim, nblk);
     
     // initialize Boys function evaluator
     
@@ -325,29 +315,23 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     
     auto ddpairs = ketpairs;
     
-    CMemBlock<int32_t> qqvec(rdim);
+    CMemBlock<int32_t> qqvec(cdim);
     
-    CMemBlock<int32_t> qqidx(rdim);
+    CMemBlock<int32_t> qqidx(cdim);
     
-    CMemBlock<double> distpq(rdim);
+    CMemBlock<double> distpq(cdim);
     
-    CMemBlock<double> qqden(rdim);
+    CMemBlock<double> qqden(cdim);
     
     // loop over contracted GTOs ob bra side
     
-    for (int32_t i = 0; i < brapairs.getNumberOfScreenedRedContrPairs(); i++)
+    for (int32_t i = 0; i < brapairs.getNumberOfScreenedContrPairs(); i++)
     {
-        // determine number of contracted GTOs pairs on bra side
-        
-        auto curbcgto = bcepos[i] - bcspos[i];
-        
-        // determine GTOs pairs effective dimensions on ket side
+        // determine GTOs pairs  effective dimensions on ket side
         
         auto nqpdim = (symbk) ? ketpairs.getNumberOfPrimPairs(i) : pdim;
         
-        auto nqrdim = (symbk) ? i + 1 : rdim;
-        
-        auto nqcdim = ketpairs.getNumberOfScreenedContrPairs(nqrdim - 1);
+        auto nqcdim = (symbk) ? i + 1 : cdim;
         
         // integrals screening: QQ or QQR scheme 
         
@@ -363,21 +347,16 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
             
             intsScreener.setScreeningVector(qqvec, distpq, symbk, i);
             
-            mathfunc::ordering(qqidx.data(), qqvec.data(), nqrdim);
+            mathfunc::ordering(qqidx.data(), qqvec.data(), nqcdim);
             
-            nqrdim = qqpairs.compress(ketpairs, qqvec, nqrdim);
+            nqcdim = qqpairs.compress(ketpairs, qqvec, nqcdim);
             
-            if (nqrdim > 0)
-            {
-                nqpdim = qqpairs.getNumberOfPrimPairs(nqrdim - 1);
-                
-                nqcdim = qqpairs.getNumberOfScreenedContrPairs(nqrdim - 1);
-            }
+            if (nqcdim > 0) nqpdim = qqpairs.getNumberOfPrimPairs(nqcdim - 1);
         }
         
         // all integrals are vanishing in batch, skip computations
         
-        if (nqrdim == 0) continue;
+        if (nqcdim == 0) continue;
         
         // density based screeing of integrals batches
         
@@ -389,25 +368,20 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
                 (intsScreener.getScreeningScheme() == ericut::qqrden))
             {
                 distPattern.getMaxDensityElements(qqden, brapairs, qqpairs,
-                                                  symbk, nqrdim, i);
+                                                  symbk, nqcdim, i);
                 
                 intsScreener.setScreeningVector(qqvec, qqidx, qqden, distpq,
-                                                nqrdim, i);
+                                                nqcdim, i);
                 
-                nqrdim = ddpairs.compress(qqpairs, qqvec, nqrdim);
+                nqcdim = ddpairs.compress(qqpairs, qqvec, nqcdim);
                 
-                if (nqrdim > 0)
-                {
-                    nqpdim = ddpairs.getNumberOfPrimPairs(nqrdim - 1);
-                    
-                    nqcdim = ddpairs.getNumberOfScreenedContrPairs(nqrdim - 1);
-                }
+                if (nqcdim > 0) nqpdim = ddpairs.getNumberOfPrimPairs(nqcdim - 1);
             }
         }
         
         // all integrals are vanishing in batch, skip computations
         
-        if (nqrdim == 0) continue;
+        if (nqcdim == 0) continue;
         
         // density screened scheme
         
@@ -445,35 +419,35 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
             // contract primitive electron repulsion integrals
             
             genfunc::contract(khrrbuffer, pbuffer, khrrvec, khrridx, vrrvec,
-                              vrridx, brapairs, ddpairs, nqrdim, i);
+                              vrridx, brapairs, ddpairs, nqpdim, nqcdim, i);
             
             // apply horizontal recursion on ket side
             
-            ddpairs.getDistancesAB(rcd, nqrdim, curbcgto);
+            ddpairs.getDistancesAB(rcd, nqcdim);
             
-            _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, ddpairs,
-                           nqcdim * curbcgto, i);
+            _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, ddpairs, nqcdim,
+                           i);
             
             // transform ket side to spherical form
             
             genfunc::transform_ket(bhrrbuffer, khrrbuffer, cmom, dmom, bhrrvec,
-                                   bhrridx, khrrvec, khrridx, ddpairs,
-                                   nqcdim * curbcgto, i);
+                                   bhrridx, khrrvec, khrridx, ddpairs, nqcdim,
+                                   i);
             
             // apply horizontal recursion on bra side
             
-            _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, ddpairs,
-                           nqcdim * curbcgto, i);
+            _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, ddpairs, nqcdim,
+                           i);
             
             // transform bra side to spherical form
             
             genfunc::transform_bra(spherbuffer, bhrrbuffer, amom, bmom, bhrrvec,
-                                   bhrridx, ddpairs, nqcdim * curbcgto, i);
+                                   bhrridx, ddpairs, nqcdim, i);
             
             // distribute integrals: add distribution or Fock formation code
             
             distPattern.distribute(spherbuffer, brapairs, ddpairs, symbk,
-                                   nqrdim, i);
+                                   nqcdim, i);
         }
         else
         {
@@ -508,35 +482,35 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
             // contract primitive electron repulsion integrals
         
             genfunc::contract(khrrbuffer, pbuffer, khrrvec, khrridx, vrrvec,
-                              vrridx, brapairs, qqpairs, nqrdim, i);
+                              vrridx, brapairs, qqpairs, nqpdim, nqcdim, i);
         
             // apply horizontal recursion on ket side
         
-            qqpairs.getDistancesAB(rcd, nqrdim, curbcgto);
+            qqpairs.getDistancesAB(rcd, nqcdim);
         
-            _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, qqpairs,
-                           nqcdim * curbcgto, i);
+            _applyHRRonKet(khrrbuffer, khrrvec, khrridx, rcd, qqpairs, nqcdim,
+                           i);
         
             // transform ket side to spherical form
         
             genfunc::transform_ket(bhrrbuffer, khrrbuffer, cmom, dmom, bhrrvec,
-                                   bhrridx, khrrvec, khrridx, qqpairs,
-                                   nqcdim * curbcgto, i);
+                                   bhrridx, khrrvec, khrridx, qqpairs, nqcdim,
+                                   i);
         
             // apply horizontal recursion on bra side
         
-            _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, qqpairs,
-                           nqcdim * curbcgto, i);
+            _applyHRRonBra(bhrrbuffer, bhrrvec, bhrridx, rab, qqpairs, nqcdim,
+                           i);
         
             // transform bra side to spherical form
         
             genfunc::transform_bra(spherbuffer, bhrrbuffer, amom, bmom, bhrrvec,
-                                   bhrridx, qqpairs, nqcdim * curbcgto, i);
+                                   bhrridx, qqpairs, nqcdim, i);
         
             // distribute integrals: add distribution or Fock formation code
         
             distPattern.distribute(spherbuffer, brapairs, qqpairs, symbk,
-                                   nqrdim, i);
+                                   nqcdim, i);
         }
     }
 }
@@ -1906,7 +1880,7 @@ CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*
 {
     // determine number of contracted GTOs pairs
     
-    auto ngto = gtoPairsBlock.getNumberOfScreenedRedContrPairs();
+    auto ngto = gtoPairsBlock.getNumberOfScreenedContrPairs();
     
     // set up empty integrals screener
     
@@ -1935,7 +1909,7 @@ CElectronRepulsionIntegralsDriver::_getQValuesBuffer(const CGtoPairsContainer& g
     {
         auto cpairs = gtoPairsContainer.getGtoPairsBlock(i);
         
-        buffvec.push_back(CMemBlock<double>(cpairs.getNumberOfScreenedRedContrPairs()));
+        buffvec.push_back(CMemBlock<double>(cpairs.getNumberOfScreenedContrPairs()));
     }
     
     return buffvec;

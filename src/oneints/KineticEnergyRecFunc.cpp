@@ -28,11 +28,15 @@ namespace kinrecfunc { // kinrecfunc namespace
     {
         // set up pointers to primitives data on bra side
         
+        auto bnorm = braGtoBlock.getNormFactors();
+        
         auto spos = braGtoBlock.getStartPositions();
         
         auto epos = braGtoBlock.getEndPositions();
         
         // set up pointers to primitives data on ket side
+        
+        auto knorm = ketGtoBlock.getNormFactors();
         
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
         
@@ -66,18 +70,23 @@ namespace kinrecfunc { // kinrecfunc namespace
             
             auto fz = osFactors.data(4 * idx + 1);
             
+            auto fb = bnorm[i];
+            
             // set up primitives buffer data
             
             auto s_0_0 = primBuffer.data(soff + idx);
 
             auto t_0_0 = primBuffer.data(koff + idx);
             
-            #pragma omp simd aligned(s_0_0, t_0_0, fx, fz, abx, aby, abz: VLX_ALIGN)
+            #pragma omp simd aligned(s_0_0, t_0_0, fx, fz, knorm, abx, aby,\
+                                     abz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double r2ab = abx[j] * abx[j] + aby[j] * aby[j] + abz[j] * abz[j];
                 
-                s_0_0[j] = std::pow(fpi * fx[j], 1.5) * std::exp(-fz[j] * r2ab);
+                s_0_0[j] = fb * knorm[j] * std::pow(fpi * fx[j], 1.5)
+                
+                         * std::exp(-fz[j] * r2ab);
                 
                 t_0_0[j] = fz[j] * (3.0 - 2.0 * fz[j] * r2ab) * s_0_0[j];
             }

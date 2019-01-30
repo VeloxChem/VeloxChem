@@ -31,11 +31,15 @@ namespace epotrecfunc { // epotrecfunc namespace
     {
         // set up pointers to primitives data on bra side
         
+        auto bnorm = braGtoBlock.getNormFactors();
+        
         auto spos = braGtoBlock.getStartPositions();
         
         auto epos = braGtoBlock.getEndPositions();
         
         // set up pointers to primitives data on ket side
+        
+        auto knorm = ketGtoBlock.getNormFactors();
         
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
         
@@ -85,12 +89,14 @@ namespace epotrecfunc { // epotrecfunc namespace
             
             auto fib = osFactors.data(6 * idx + 4);
             
+            auto fb = bnorm[i];
+            
             // compute overlap scaling factor
             
-            #pragma omp simd aligned(fx, fia, fib, fargs: VLX_ALIGN)
+            #pragma omp simd aligned(fx, fia, fib, knorm, fargs: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                fargs[j] = fpi * std::sqrt(fx[j]) * fia[j] * fib[j];
+                fargs[j] = fb * knorm[j] * fpi * std::sqrt(fx[j]) * fia[j] * fib[j];
             }
             
             // distribute (S|g(r,r')|S) integrals

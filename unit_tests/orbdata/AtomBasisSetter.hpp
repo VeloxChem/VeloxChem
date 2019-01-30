@@ -36,16 +36,12 @@ CAtomBasis getNormalizedAtomBasisForSe();
 CAtomBasis getMinimalBasisForH();
 
 CAtomBasis getMinimalBasisForHe();
-    
-CAtomBasis getMinimalBasisForLi();
 
 CAtomBasis getMinimalBasisForC();
 
 CAtomBasis getMinimalBasisForN();
 
 CAtomBasis getMinimalBasisForO();
-    
-CAtomBasis getMinimalGenBasisForLi();
     
 CAtomBasis getGenContrBasisForLi();
     

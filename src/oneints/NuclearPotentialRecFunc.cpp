@@ -31,12 +31,16 @@ namespace npotrecfunc { // npotrecfunc namespace
                               const int32_t               iContrGto)
     {
         // set up pointers to primitives data on bra side
-    
+        
+        auto bnorm = braGtoBlock.getNormFactors();
+        
         auto spos = braGtoBlock.getStartPositions();
         
         auto epos = braGtoBlock.getEndPositions();
         
         // set up pointers to primitives data on ket side
+        
+        auto knorm = ketGtoBlock.getNormFactors();
         
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
         
@@ -88,16 +92,19 @@ namespace npotrecfunc { // npotrecfunc namespace
             
             auto fz = osFactors.data(3 * idx + 1);
             
+            auto fb = bnorm[i];
+            
             // fetch up pi values
             
             auto fpi = 2.0 * mathconst::getPiValue();
             
             // compute overlap scaling factor
 
-            #pragma omp simd aligned(fx, fz, abx, aby, abz, fargs: VLX_ALIGN)
+            #pragma omp simd aligned(fx, fz, knorm, abx, aby, abz,\
+                                     fargs: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                fargs[j] = fpi * fx[j]
+                fargs[j] = fb * knorm[j] * fpi * fx[j]
                 
                          * std::exp(-fz[j] * (abx[j] * abx[j] + aby[j] * aby[j] +
                                      

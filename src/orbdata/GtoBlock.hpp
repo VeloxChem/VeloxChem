@@ -48,7 +48,7 @@ class CGtoBlock
     CMemBlock2D<double> _gtoPrimitives;
     
     /**
-     The normalization factors of primitives Gaussian functions.
+     The normalization factors pf primitives Gaussian functions.
      */
     CMemBlock<double> _gtoNormFactors;
 
@@ -190,20 +190,6 @@ public:
     int32_t getNumberOfPrimGtos() const;
     
     /**
-     Gets number of normalization factors in GTOs block.
-
-     @return the number of normalization factors.
-     */
-    int32_t getNumberOfNormFactors() const;
-    
-    /**
-     Gets number of reduced contracted basis functions in GTOs block.
-     
-     @return the number of reduced contracted basis functions.
-     */
-    int32_t getNumberOfRedContrGtos() const;
-    
-    /**
      Gets number of contracted basis functions in GTOs block.
 
      @return the number of contracted basis functions.
@@ -241,70 +227,6 @@ public:
      @return the end positions of basis fucntions.
      */
     int32_t* getEndPositions();
-    
-    /**
-     Gets constant pointer to contracted basis function start positions in
-     indexing vector.
-     
-     @return the start positions of contracted basis fucntions.
-     */
-    const int32_t* getContrStartPositions() const;
-    
-    /**
-     Gets pointer to contarcted basis function start positions in indexing
-     vector.
-     
-     @return the start positions of contracted basis fucntions.
-     */
-    int32_t* getContrStartPositions();
-    
-    /**
-     Gets constant pointer to contracted basis function end positions in
-     indexing vector.
-     
-     @return the end positions of contracted basis fucntions.
-     */
-    const int32_t* getContrEndPositions() const;
-    
-    /**
-     Gets pointer to contracted basis function end positions in indexing
-     vector.
-     
-     @return the end positions of contracted basis fucntions.
-     */
-    int32_t* getContrEndPositions();
-    
-    /**
-     Gets constant pointer to normalization factors start positions in
-     normalization factors vector.
-     
-     @return the start positions of normalization factors.
-     */
-    const int32_t* getNormFactorsStartPositions() const;
-    
-    /**
-     Gets pointer to normalization factors start positions in normalization
-     factors vector.
-     
-     @return the start positions of normalization factors.
-     */
-    int32_t* getNormFactorsStartPositions();
-    
-    /**
-     Gets constant pointer to normalization factors end positions in
-     normalization factors vector.
-     
-     @return the end positions of normalization factors.
-     */
-    const int32_t* getNormFactorsEndPositions() const;
-    
-    /**
-     Gets pointer to normalization factors end positions in normalization
-     factors vector.
-     
-     @return the end positions of normalization factors.
-     */
-    int32_t* getNormFactorsEndPositions();
     
     /**
      Gets constant pointer to atomic identifiers vector.
@@ -420,25 +342,6 @@ public:
      @return the contraction depth.
      */
     int32_t getMaxContractionDepth() const;
-    
-    /**
-     Gets maximum number of contracted Gaussian functions associated with
-     set of primitive Gaussian functions.
-     
-     @return the maximum number of contracted Gaussian functions.
-     */
-    int32_t getMaxNumberContrFunctions() const;
-    
-    /**
-     Gets maximum absolute value of normalization factor for requested
-     primitive GTO in specific set of contracted GTOs.
-
-     @param iContrGto the identifier of contracted GTOs.
-     @param iPrimGto the index of primitive GTO.
-     @return the absolute value of normalization factor.
-     */
-    double getMaxNormFactor(const int32_t iContrGto,
-                            const int32_t iPrimGto) const;
     
     /**
      Converts GTOs block object to text output and insert it into output

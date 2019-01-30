@@ -7595,22 +7595,3 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForTwoBasis)
 
     ASSERT_EQ(ovlmat, COverlapMatrix(m));
 }
-
-TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForGenContrBasis)
-{
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
-                                   mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
-    
-    auto lih = vlxmol::getMoleculeLiH();
-    
-    auto segbas = vlxbas::getMinimalBasisSegForLiH();
-    
-    auto genbas = vlxbas::getMinimalBasisGenForLiH();
-    
-    auto ovlseg = ovldrv.compute(lih, segbas, MPI_COMM_WORLD);
-    
-    auto ovlgen = ovldrv.compute(lih, genbas, MPI_COMM_WORLD);
-    
-    EXPECT_EQ(ovlseg, ovlgen); 
-}
