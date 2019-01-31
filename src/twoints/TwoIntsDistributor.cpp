@@ -241,7 +241,7 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
         
         auto idden = _aoFock->getDensityIdentifier(i);
         
-        // closed shell restricted Hatree-Fock: J + K
+        // closed shell restricted Hatree-Fock: 2J + K
         
         if (fcktyp == fockmat::restjk)
         {
@@ -250,6 +250,28 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                         _aoDensity->getNumberOfColumns(idden),
                                         braGtoPairsBlock, ketGtoPairsBlock,
                                         nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted Hatree-Fock: J
+        
+        if (fcktyp == fockmat::restj)
+        {
+            distmaxden::getMaxRestDenJ(maxDensityElements,
+                                       _aoDensity->totalDensity(idden),
+                                       _aoDensity->getNumberOfColumns(idden),
+                                       braGtoPairsBlock, ketGtoPairsBlock,
+                                       nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted Hatree-Fock: K
+        
+        if (fcktyp == fockmat::restk)
+        {
+            distmaxden::getMaxRestDenK(maxDensityElements,
+                                       _aoDensity->totalDensity(idden),
+                                       _aoDensity->getNumberOfColumns(idden),
+                                       braGtoPairsBlock, ketGtoPairsBlock,
+                                       nKetContrPairs, iContrPair);
         }
     }
 }
@@ -353,7 +375,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
         
         auto idden = _aoFock->getDensityIdentifier(i);
         
-        // closed shell restricted Hatree-Fock: J + K
+        // closed shell restricted Hatree-Fock: 2J + K
         
         if (fcktyp == fockmat::restjk)
         {
@@ -362,6 +384,28 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                  _aoDensity->getNumberOfColumns(idden),
                                  spherInts, braGtoPairsBlock, ketGtoPairsBlock,
                                  nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted Hatree-Fock: J
+        
+        if (fcktyp == fockmat::restj)
+        {
+            distfock::distRestJ(_fockContainer, i,
+                                _aoDensity->totalDensity(idden),
+                                _aoDensity->getNumberOfColumns(idden),
+                                spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted Hatree-Fock: K
+        
+        if (fcktyp == fockmat::restj)
+        {
+            distfock::distRestK(_fockContainer, i,
+                                _aoDensity->totalDensity(idden),
+                                _aoDensity->getNumberOfColumns(idden),
+                                spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                nKetContrPairs, iContrPair);
         }
     }
 }

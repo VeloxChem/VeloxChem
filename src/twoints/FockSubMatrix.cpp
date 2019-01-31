@@ -305,6 +305,36 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
                          _startPositionsB, _startPositionsD,
                          _dimSubMatrixB, _dimSubMatrixD);
     }
+    
+    if (fockType == fockmat::restj)
+    {
+        _addContribution(aoFockMatrix, nColumns, 0,
+                         _startPositionsA, _startPositionsB,
+                         _dimSubMatrixA, _dimSubMatrixB);
+        
+        _addContribution(aoFockMatrix, nColumns, 1,
+                         _startPositionsC, _startPositionsD,
+                         _dimSubMatrixC, _dimSubMatrixD);
+    }
+    
+    if ((fockType == fockmat::restk) || (fockType == fockmat::restkx))
+    {
+        _addContribution(aoFockMatrix, nColumns, 0,
+                         _startPositionsA, _startPositionsC,
+                         _dimSubMatrixA, _dimSubMatrixC);
+        
+        _addContribution(aoFockMatrix, nColumns, 1,
+                         _startPositionsA, _startPositionsD,
+                         _dimSubMatrixA, _dimSubMatrixD);
+        
+        _addContribution(aoFockMatrix, nColumns, 2,
+                         _startPositionsB, _startPositionsC,
+                         _dimSubMatrixB, _dimSubMatrixC);
+        
+        _addContribution(aoFockMatrix, nColumns, 3,
+                         _startPositionsB, _startPositionsD,
+                         _dimSubMatrixB, _dimSubMatrixD);
+    }
 }
 
 double*

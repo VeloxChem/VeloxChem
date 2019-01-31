@@ -331,11 +331,15 @@ CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
+        // check if Fock matrix is square
+        
         if (_fockMatrices[iFockMatrix].getNumberOfRows() != _fockMatrices[iFockMatrix].getNumberOfColumns())
         {
             return false;
         }
     
+        // determine symmetry by Fock matrix type 
+        
         auto fcktyp = _fockTypes[iFockMatrix];
     
         if (fcktyp == fockmat::restjk) return true;
