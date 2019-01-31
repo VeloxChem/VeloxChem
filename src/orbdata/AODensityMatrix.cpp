@@ -132,6 +132,13 @@ CAODensityMatrix::getNumberOfDensityMatrices() const
         return static_cast<int32_t>(_denMatrices.size()) / 2;
     }
     
+    // restricted pair density matrix
+    
+    if (_denType == denmat::rmoij)
+    {
+        return static_cast<int32_t>(_denMatrices.size());
+    }
+    
     return 0;
 }
 
@@ -158,6 +165,11 @@ CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
         return _denMatrices[2 * iDensityMatrix].getNumberOfRows();
     }
     
+    if (_denType == denmat::rmoij && iDensityMatrix < getNumberOfDensityMatrices())
+    {
+        return _denMatrices[iDensityMatrix].getNumberOfRows();
+    }
+    
     return 0;
 }
 
@@ -178,6 +190,13 @@ CAODensityMatrix::getNumberOfColumns(const int32_t iDensityMatrix) const
         return _denMatrices[2 * iDensityMatrix].getNumberOfColumns();
     }
     
+    // restricted pair density matrix
+    
+    if (_denType == denmat::rmoij && iDensityMatrix < getNumberOfDensityMatrices())
+    {
+        return _denMatrices[iDensityMatrix].getNumberOfColumns();
+    }
+    
     return 0;
 }
 
@@ -196,6 +215,13 @@ CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
     if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix].getNumberOfElements();
+    }
+    
+    // restricted pair density matrix
+    
+    if (_denType == denmat::rmoij && iDensityMatrix < getNumberOfDensityMatrices())
+    {
+        return _denMatrices[iDensityMatrix].getNumberOfElements();
     }
     
     return 0;
@@ -229,6 +255,17 @@ CAODensityMatrix::betaDensity(const int32_t iDensityMatrix) const
     if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix + 1].values();
+    }
+    
+    return nullptr;
+}
+
+const double*
+CAODensityMatrix::getDensity(const int32_t iDensityMatrix) const
+{
+    if (iDensityMatrix < static_cast<int32_t>(_denMatrices.size()))
+    {
+        return _denMatrices[iDensityMatrix].values();
     }
     
     return nullptr;

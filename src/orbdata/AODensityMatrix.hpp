@@ -182,6 +182,15 @@ public:
     const double* betaDensity(const int32_t iDensityMatrix) const;
     
     /**
+     Gets constant pointer to first element of specific density matrix.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the constant pointer to first element of unrestricted beta density
+     matrix.
+     */
+    const double* getDensity(const int32_t iDensityMatrix) const;
+    
+    /**
      Gets string representation of density matrix object.
 
      @return the string representation.

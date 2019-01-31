@@ -136,6 +136,11 @@ void export_twoints(py::module& m)
         .value("restj",   fockmat::restj  )
         .value("restk",   fockmat::restk  )
         .value("restkx",  fockmat::restkx )
+        .value("rgenjk",  fockmat::rgenjk )
+        .value("rgenjkx", fockmat::rgenjkx)
+        .value("rgenj",   fockmat::rgenj  )
+        .value("rgenk",   fockmat::rgenk  )
+        .value("rgenkx",  fockmat::rgenkx )
     ;
 
     // ericut enum class

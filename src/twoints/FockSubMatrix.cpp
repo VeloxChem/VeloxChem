@@ -279,6 +279,8 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
                            const int32_t nColumns,
                            const fockmat fockType) const
 {
+    // restricted Coulomb + exchange matrix
+    
     if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx))
     {
         _addContribution(aoFockMatrix, nColumns, 0,
@@ -306,6 +308,8 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
                          _dimSubMatrixB, _dimSubMatrixD);
     }
     
+    // restricted Coulomb matrix
+    
     if (fockType == fockmat::restj)
     {
         _addContribution(aoFockMatrix, nColumns, 0,
@@ -316,6 +320,8 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
                          _startPositionsC, _startPositionsD,
                          _dimSubMatrixC, _dimSubMatrixD);
     }
+    
+    // restricted exchange matrix
     
     if ((fockType == fockmat::restk) || (fockType == fockmat::restkx))
     {
@@ -334,6 +340,27 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
         _addContribution(aoFockMatrix, nColumns, 3,
                          _startPositionsB, _startPositionsD,
                          _dimSubMatrixB, _dimSubMatrixD);
+    }
+    
+    // restricted general Coulomb matrix
+    
+    if (fockType == fockmat::rgenj)
+    {
+        _addContribution(aoFockMatrix, nColumns, 0,
+                         _startPositionsA, _startPositionsB,
+                         _dimSubMatrixA, _dimSubMatrixB);
+        
+        _addContribution(aoFockMatrix, nColumns, 1,
+                         _startPositionsB, _startPositionsA,
+                         _dimSubMatrixB, _dimSubMatrixA);
+        
+        _addContribution(aoFockMatrix, nColumns, 2,
+                         _startPositionsC, _startPositionsD,
+                         _dimSubMatrixC, _dimSubMatrixD);
+        
+        _addContribution(aoFockMatrix, nColumns, 3,
+                         _startPositionsD, _startPositionsC,
+                         _dimSubMatrixD, _dimSubMatrixC);
     }
 }
 
@@ -482,6 +509,27 @@ CFockSubMatrix::_allocSubMatrices(const fockmat fockType,
         matdim = _dimSubMatrixB * _dimSubMatrixD;
         
         ncomp  = nComponentsB * nComponentsD;
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+    }
+    
+    // restricted general Coulomb matrix
+    
+    if (fockType == fockmat::rgenj)
+    {
+        auto matdim = _dimSubMatrixA * _dimSubMatrixB;
+        
+        auto ncomp  = nComponentsA * nComponentsB;
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        matdim = _dimSubMatrixC * _dimSubMatrixD;
+        
+        ncomp  = nComponentsC * nComponentsD;
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
         
         _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
     }

@@ -58,6 +58,19 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
             _idDensityMatrices.push_back(i);
         }
         
+        // spin restricted AO to MO transformation
+        
+        if (dmtyp == denmat::rmoij)
+        {
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
+            
+            _fockTypes.push_back(fockmat::rgenj);
+            
+            _scaleFactors.push_back(1.0);
+            
+            _idDensityMatrices.push_back(i);
+        }
+        
         // FIX ME: Add unrestricted open-shell Hatree-Fock
     }
 }

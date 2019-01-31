@@ -20,6 +20,12 @@
  fockmat::restj   - the restricted Coulomb matrix
  fockmat::restk   - the restricted exchange matrix
  fockmat::restkx  - the restricted scaled exchange matrix
+ fockmat::rgenjk  - the restricted general Fock matrix (Coulomb + exchange)
+ fockmat::rgenjkx - the restricted scaled general Fock matrix (Coulomb + scaled exchange)
+ fockmat::rgenj   - the restricted general Coulomb matrix
+ fockmat::rgenk   - the restricted general exchange matrix
+ fockmat::rgenkx  - the restricted scaled general exchange matrix
+ 
  */
 enum class fockmat
 {
@@ -27,7 +33,12 @@ enum class fockmat
     restjkx,
     restj,
     restk,
-    restkx
+    restkx,
+    rgenjk,
+    rgenjkx,
+    rgenj,
+    rgenk,
+    rgenkx
 };
 
 /**
@@ -40,12 +51,12 @@ inline std::string to_string(const fockmat fockMatrix)
 {
     if (fockMatrix == fockmat::restjk)
     {
-        return std::string("Restricted J + K Matrix");
+        return std::string("Restricted 2J + K Matrix");
     }
    
     if (fockMatrix == fockmat::restjkx)
     {
-        return std::string("Restricted J + xK Matrix");
+        return std::string("Restricted 2J + xK Matrix");
     }
     
     if (fockMatrix == fockmat::restj)
@@ -61,6 +72,31 @@ inline std::string to_string(const fockmat fockMatrix)
     if (fockMatrix == fockmat::restkx)
     {
         return std::string("Restricted xK Matrix");
+    }
+    
+    if (fockMatrix == fockmat::rgenjk)
+    {
+        return std::string("Restricted general 2J + K Matrix");
+    }
+    
+    if (fockMatrix == fockmat::rgenjkx)
+    {
+        return std::string("Restricted general 2J + xK Matrix");
+    }
+    
+    if (fockMatrix == fockmat::rgenj)
+    {
+        return std::string("Restricted general J Matrix");
+    }
+    
+    if (fockMatrix == fockmat::rgenk)
+    {
+        return std::string("Restricted general K Matrix");
+    }
+    
+    if (fockMatrix == fockmat::rgenkx)
+    {
+        return std::string("Restricted general xK Matrix");
     }
     
     return std::string("UNKNOWN");
