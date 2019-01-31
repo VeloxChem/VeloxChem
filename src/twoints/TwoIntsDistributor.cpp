@@ -399,7 +399,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
         
         // closed shell restricted Hatree-Fock: K
         
-        if (fcktyp == fockmat::restj)
+        if (fcktyp == fockmat::restk)
         {
             distfock::distRestK(_fockContainer, i,
                                 _aoDensity->totalDensity(idden),

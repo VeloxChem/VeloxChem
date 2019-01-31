@@ -166,6 +166,13 @@ CAOFockMatrix::operator!=(const CAOFockMatrix& other) const
 }
 
 void
+CAOFockMatrix::setType(const fockmat& fockType,
+                       const int32_t  iFockMatrix)
+{
+    _fockTypes[iFockMatrix] = fockType;
+}
+
+void
 CAOFockMatrix::zero()
 {
     for (size_t i = 0; i < _fockMatrices.size(); i++)

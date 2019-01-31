@@ -124,6 +124,14 @@ public:
      */
     bool operator!=(const CAOFockMatrix& other) const;
     
+    /**
+     Sets type of specific fock matrix.
+
+     @param fockType the type of Fock matrix.
+     @param iFockMatrix the index of Fock matrix.
+     */
+    void setType(const fockmat& fockType,
+                 const int32_t  iFockMatrix); 
     
     /**
      Resets all elements of AO Fock matrix to zero.
