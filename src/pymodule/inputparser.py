@@ -164,6 +164,9 @@ class InputParser:
                 angl = to_angular_momentum(shell_title[0])
                 npgto = int(shell_title[1])
                 ncgto = int(shell_title[2])
+                
+                assert_msg_critical(ncgto == 1,
+                                    "General contraction currently is not supported")
 
                 expons = [0.0] * npgto
                 coeffs = [0.0] * npgto * ncgto
@@ -178,7 +181,7 @@ class InputParser:
                     for k in range(ncgto):
                         coeffs[k * npgto + i] = float(prims[k + 1])
 
-                bf = BasisFunction(expons, coeffs, ncgto, angl)
+                bf = BasisFunction(expons, coeffs, angl)
                 bf.normalize()
 
                 atom_basis.add_basis_function(bf)

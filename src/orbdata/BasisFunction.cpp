@@ -17,23 +17,18 @@
 
 CBasisFunction::CBasisFunction()
 
-    : _nContrVectors(0)
-
-    , _angularMomentum(-1)
+    : _angularMomentum(-1)
 {
 
 }
 
 CBasisFunction::CBasisFunction(const std::vector<double>& exponents,
                                const std::vector<double>& normFactors,
-                               const int32_t              nContrVectors,
                                const int32_t              angularMomentum)
 
     : _exponents(exponents)
 
     , _normFactors(normFactors)
-
-    , _nContrVectors(nContrVectors)
 
     , _angularMomentum(angularMomentum)
 
@@ -41,23 +36,11 @@ CBasisFunction::CBasisFunction(const std::vector<double>& exponents,
 
 }
 
-CBasisFunction::CBasisFunction(const std::vector<double>& exponents,
-                               const std::vector<double>& normFactors,
-                               const int32_t              angularMomentum)
-
-    : CBasisFunction(exponents, normFactors, 1, angularMomentum)
-
-{
-    
-}
-
 CBasisFunction::CBasisFunction(const CBasisFunction& source)
 
     : _exponents(source._exponents)
 
     , _normFactors(source._normFactors)
-
-    , _nContrVectors(source._nContrVectors)
 
     , _angularMomentum(source._angularMomentum)
 {
@@ -69,8 +52,6 @@ CBasisFunction::CBasisFunction(CBasisFunction&& source) noexcept
     : _exponents(std::move(source._exponents))
 
     , _normFactors(std::move(source._normFactors))
-
-    , _nContrVectors(std::move(source._nContrVectors))
 
     , _angularMomentum(std::move(source._angularMomentum))
 {
@@ -90,8 +71,6 @@ CBasisFunction::operator=(const CBasisFunction& source)
     _exponents = source._exponents;
 
     _normFactors = source._normFactors;
-    
-    _nContrVectors = source._nContrVectors;
 
     _angularMomentum = source._angularMomentum;
 
@@ -107,8 +86,6 @@ CBasisFunction::operator=(CBasisFunction&& source) noexcept
 
     _normFactors = std::move(source._normFactors);
     
-    _nContrVectors = std::move(source._nContrVectors);
-
     _angularMomentum = std::move(source._angularMomentum);
 
     return *this;
@@ -136,8 +113,6 @@ CBasisFunction::operator==(const CBasisFunction& other) const
             return false;
         }
     }
-
-    if (_nContrVectors != other._nContrVectors) return false;
     
     if (_angularMomentum != other._angularMomentum) return false;
 
@@ -172,8 +147,6 @@ void
 CBasisFunction::add(const double exponent,
                     const double normFactor)
 {
-    if (_nContrVectors == 0) _nContrVectors = 1;
-    
     _exponents.push_back(exponent);
 
     _normFactors.push_back(normFactor);
@@ -194,35 +167,29 @@ CBasisFunction::normalize()
 
     _rescale();
     
-    // renormalize contracted GTOs
+    // compute overlap
     
-    auto edim = static_cast<int32_t>(_exponents.size());
-
-    for (int32_t i = 0; i < _nContrVectors; i++)
+    auto sz = _exponents.size();
+    
+    double ovl = 0.0;
+    
+    for (size_t i = 0; i < sz; i++)
     {
-        // compute overlap
+        ovl += _overlap(i, i);
         
-        double ovl = 0.0;
-        
-        for (int32_t j = 0; j < edim; j++)
+        for (size_t j = i + 1; j < sz; j++)
         {
-            ovl += _overlap(j, j, i);
-            
-            for (int32_t k = j + 1; k < edim; k++)
-            {
-                ovl += 2.0 * _overlap(j, k, i);
-            }
+            ovl += 2.0 * _overlap(i, j);
         }
-        
-        ovl = 1.0 / std::sqrt(ovl);
-        
-        // renormaliza primitive BFs
-        
-        for (int32_t j = 0; j < edim; j++)
-        {
-            _normFactors[i * edim + j] *= ovl;
-        }
-        
+    }
+    
+    // renormaliza primitive BFs
+    
+    ovl = 1.0 / std::sqrt(ovl);
+    
+    for (size_t i = 0; i < sz; i++)
+    {
+        _normFactors[i] *= ovl;
     }
 }
 
@@ -238,26 +205,6 @@ CBasisFunction::getNormalizationFactors() const
     return _normFactors;
 }
 
-std::vector<double>
-CBasisFunction::getNormalizationFactors(const int32_t iContrVector) const
-{
-    std::vector<double> normfacts;
-    
-    if (iContrVector < _nContrVectors)
-    {
-        auto edim = static_cast<int32_t>(_exponents.size());
-        
-        auto coff = edim * iContrVector;
-        
-        for (int32_t i = 0; i < edim; i++)
-        {
-            normfacts.push_back(_normFactors[coff + i]);
-        }
-    }
-    
-    return normfacts;
-}
-
 int32_t
 CBasisFunction::getAngularMomentum() const
 {
@@ -270,47 +217,23 @@ CBasisFunction::getNumberOfPrimitiveFunctions() const
     return static_cast<int32_t>(_exponents.size());
 }
 
-int32_t
-CBasisFunction::getNumberOfContractedFunctions() const
-{
-    return _nContrVectors; 
-}
-
-int32_t
-CBasisFunction::getNumberOfNormalizationFactors() const
-{
-    return static_cast<int32_t>(_normFactors.size()); 
-}
-
 void
 CBasisFunction::_rescale()
 {
     auto fpi = 2.0 / mathconst::getPiValue();
-    
-    auto edim = static_cast<int32_t>(_exponents.size());
 
-    for (int32_t i = 0; i < edim; i++)
+    for (size_t i = 0; i < _exponents.size(); i++)
     {
-        auto fact = std::pow(_exponents[i] * fpi, 0.75);
-        
-        for (int32_t j = 0; j < _nContrVectors; j++)
-        {
-            _normFactors[j * edim + i] *= fact;
-        }
+        _normFactors[i] *= std::pow(_exponents[i] * fpi, 0.75);
     }
 
     if (_angularMomentum == 1)
     {
-        for (int32_t i = 0; i < edim; i++)
+        for (size_t i = 0; i < _exponents.size(); i++)
         {
-            auto fact = 2.0 * std::sqrt(_exponents[i]);
-            
-            for (int32_t j = 0; j < _nContrVectors; j++)
-            {
-                _normFactors[j * edim + i] *= fact;
-            }
+            _normFactors[i] *= 2.0 * std::sqrt(_exponents[i]);
         }
-        
+     
         return;
     }
 
@@ -318,14 +241,9 @@ CBasisFunction::_rescale()
     {
         double f = 2.0 / std::sqrt(3.0);
         
-        for (int32_t i = 0; i < edim; i++)
+        for (size_t i = 0; i < _exponents.size(); i++)
         {
-            auto fact = f * _exponents[i];
-            
-            for (int32_t j = 0; j < _nContrVectors; j++)
-            {
-                _normFactors[j * edim + i] *= fact;
-            }
+            _normFactors[i] *=  f * _exponents[i];
         }
 
         return;
@@ -335,14 +253,9 @@ CBasisFunction::_rescale()
     {
         double f = 4.0 / std::sqrt(15.0);
         
-        for (int32_t i = 0; i < edim; i++)
+        for (size_t i = 0; i < _exponents.size(); i++)
         {
-            auto fact = f * _exponents[i] * std::sqrt(_exponents[i]);
-            
-            for (int32_t j = 0; j < _nContrVectors; j++)
-            {
-                _normFactors[j * edim + i] *= fact;
-            }
+            _normFactors[i] *= f * _exponents[i] * std::sqrt(_exponents[i]);
         }
 
         return;
@@ -352,14 +265,9 @@ CBasisFunction::_rescale()
     {
         double f = 2.0 / std::sqrt(105.0);
         
-        for (int32_t i = 0; i < edim; i++)
+        for (size_t i = 0; i < _exponents.size(); i++)
         {
-            auto fact = f * _exponents[i] * _exponents[i];
-            
-            for (int32_t j = 0; j < _nContrVectors; j++)
-            {
-                _normFactors[j * edim + i] *= fact;
-            }
+            _normFactors[i] *=  f * _exponents[i] * _exponents[i];
         }
 
         return;
@@ -369,16 +277,11 @@ CBasisFunction::_rescale()
     {
         double f = 4.0 / std::sqrt(945.0);
         
-        for (int32_t i = 0; i < edim; i++)
+        for (size_t i = 0; i < _exponents.size(); i++)
         {
-            auto fact = f * _exponents[i] * _exponents[i]
+            _normFactors[i] *= f * _exponents[i] * _exponents[i]
             
-                      * std::sqrt(_exponents[i]);
-            
-            for (int32_t j = 0; j < _nContrVectors; j++)
-            {
-                _normFactors[j * edim + i] *= fact;
-            }
+                            * std::sqrt(_exponents[i]);
         }
 
         return;
@@ -388,16 +291,12 @@ CBasisFunction::_rescale()
     {
         double f = 4.0 / std::sqrt(10395.0);
         
-        for (int32_t i = 0; i < edim; i++)
+        for (size_t i = 0; i < _exponents.size(); i++)
         {
-            auto fact = f * _exponents[i] * _exponents[i]
-            
-                      * _exponents[i];
-            
-            for (int32_t j = 0; j < _nContrVectors; j++)
-            {
-                _normFactors[j * edim + i] *= fact;
-            }
+            _normFactors[i] *=  f * _exponents[i] * _exponents[i]
+
+                            * _exponents[i];
+
         }
 
         return;
@@ -405,15 +304,12 @@ CBasisFunction::_rescale()
 }
 
 double
-CBasisFunction::_overlap(const int32_t iComponent,
-                         const int32_t jComponent,
-                         const int32_t iContrVector) const
+CBasisFunction::_overlap(const size_t iComponent,
+                         const size_t jComponent) const
 {
     auto fab = 1.0 / (_exponents[iComponent] + _exponents[jComponent]);
 
-    auto coff = static_cast<int32_t>(_exponents.size()) * iContrVector;
-    
-    auto ovl = _normFactors[coff + iComponent] * _normFactors[coff + jComponent]
+    auto ovl = _normFactors[iComponent] * _normFactors[jComponent]
 
              * std::pow(mathconst::getPiValue() * fab, 1.5);
 
@@ -443,8 +339,6 @@ CBasisFunction::broadcast(int32_t  rank,
     if (ENABLE_MPI)
     {
         mpi::bcast(_angularMomentum, comm);
-        
-        mpi::bcast(_nContrVectors, comm);
 
         mpi::bcast(_exponents, rank, comm);
 
@@ -461,8 +355,6 @@ operator<<(      std::ostream&   output,
     output << "[CBasisFunction (Object):" << &source << "]" << std::endl;
 
     output << "_angularMomentum: " << source._angularMomentum << std::endl;
-    
-    output << "_nContrVectors: " << source._nContrVectors << std::endl;
 
     output << "_exponents: " << std::endl;
 

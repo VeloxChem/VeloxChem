@@ -110,24 +110,6 @@ TEST_F(CAtomBasisTest, GetNumberOfBasisFunctions)
     ASSERT_EQ(2, abas.getNumberOfBasisFunctions(1));
 }
 
-TEST_F(CAtomBasisTest, GetNumberOfReducedBasisFunctions)
-{
-    CAtomBasis abas = vlxbas::getGenContrBasisForLi();
-    
-    ASSERT_EQ(2, abas.getNumberOfReducedBasisFunctions(0));
-    
-    ASSERT_EQ(3, abas.getNumberOfBasisFunctions(0));
-    
-    ASSERT_EQ(1, abas.getNumberOfReducedBasisFunctions(1));
-    
-    ASSERT_EQ(1, abas.getNumberOfBasisFunctions(1));
-    
-    ASSERT_EQ(0, abas.getNumberOfReducedBasisFunctions(2));
-    
-    ASSERT_EQ(0, abas.getNumberOfBasisFunctions(2));
-    
-}
-
 TEST_F(CAtomBasisTest, GetNumberOfPrimitiveFunctions)
 {
     CAtomBasis abas = vlxbas::getAtomBasisForLi();
@@ -137,18 +119,6 @@ TEST_F(CAtomBasisTest, GetNumberOfPrimitiveFunctions)
     ASSERT_EQ(7, abas.getNumberOfPrimitiveFunctions(0));
 
     ASSERT_EQ(3, abas.getNumberOfPrimitiveFunctions(1));
-}
-
-TEST_F(CAtomBasisTest, GetNumberOfNormalizationFactors)
-{
-    CAtomBasis abas = vlxbas::getGenContrBasisForLi();
-    
-    ASSERT_EQ(7, abas.getNumberOfNormalizationFactors(0));
-    
-    ASSERT_EQ(1, abas.getNumberOfNormalizationFactors(1));
-    
-    ASSERT_EQ(0, abas.getNumberOfNormalizationFactors(2));
-    
 }
 
 TEST_F(CAtomBasisTest, GetContractionString)

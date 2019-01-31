@@ -231,33 +231,6 @@ CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
     return nbfuncs;
 }
 
-
-int32_t
-CMolecularBasis::getNumberOfReducedBasisFunctions(const CMolecule& molecule,
-                                                  const int32_t    angularMomentum) const
-{
-    return getNumberOfReducedBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(),
-                                            angularMomentum);
-}
-
-int32_t
-CMolecularBasis::getNumberOfReducedBasisFunctions(const CMolecule& molecule,
-                                                  const int32_t    iAtom,
-                                                  const int32_t    nAtoms,
-                                                  const int32_t    angularMomentum) const
-{
-    int32_t nbfuncs = 0;
-    
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        nbfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
-        
-                 * _atomicBasisSets[i].getNumberOfReducedBasisFunctions(angularMomentum);
-    }
-    
-    return nbfuncs;
-}
-
 int32_t
 CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
                                                     const int32_t    angularMomentum) const
@@ -282,32 +255,6 @@ CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
     }
     
     return npfuncs;
-}
-
-int32_t
-CMolecularBasis::getNumberOfNormalizationFactors(const CMolecule& molecule,
-                                                 const int32_t    angularMomentum) const
-{
-    return getNumberOfNormalizationFactors(molecule, 0, molecule.getNumberOfAtoms(),
-                                           angularMomentum);
-}
-
-int32_t
-CMolecularBasis::getNumberOfNormalizationFactors(const CMolecule& molecule,
-                                                 const int32_t    iAtom,
-                                                 const int32_t    nAtoms,
-                                                 const int32_t    angularMomentum) const
-{
-    int32_t nfacts = 0;
-    
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        nfacts += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
-        
-                * _atomicBasisSets[i].getNumberOfNormalizationFactors(angularMomentum);
-    }
-    
-    return nfacts;
 }
 
 int32_t

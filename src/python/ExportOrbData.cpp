@@ -216,7 +216,6 @@ void export_orbdata(py::module& m)
         .def(py::init<>())
         .def(py::init<const std::vector<double>&,
                       const std::vector<double>&,
-                      const int32_t,
                       const int32_t>())
         .def("normalize", &CBasisFunction::normalize)
     ;

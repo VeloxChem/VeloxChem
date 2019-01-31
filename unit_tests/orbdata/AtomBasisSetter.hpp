@@ -43,8 +43,6 @@ CAtomBasis getMinimalBasisForN();
 
 CAtomBasis getMinimalBasisForO();
     
-CAtomBasis getGenContrBasisForLi();
-    
 CAtomBasis getTestBasisForH();
     
 CAtomBasis getTestBasisForLi();

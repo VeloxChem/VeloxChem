@@ -485,29 +485,6 @@ getMinimalBasisForO()
     return bas;
 }
 
-CAtomBasis
-getGenContrBasisForLi()
-{
-    CAtomBasis bas;
-    
-    bas.setIdElemental(3);
-    
-    CBasisFunction bf1({1.400, 1.200, 0.300},
-                       {0.800, 0.200, 0.300, 0.400, -0.200, 0.900},
-                       2, 0);
-    
-    bas.addBasisFunction(bf1);
-    
-    CBasisFunction bf2({1.500}, {1.000}, 0);
-    
-    bas.addBasisFunction(bf2);
-    
-    CBasisFunction bf3({0.640}, {1.000}, 1);
-    
-    bas.addBasisFunction(bf3);
-    
-    return bas;
-}
     
 CAtomBasis
 getTestBasisForH()

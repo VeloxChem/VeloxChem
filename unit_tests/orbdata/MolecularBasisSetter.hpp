@@ -36,8 +36,6 @@ CMolecularBasis getMinimalBasisForNH3CH4();
 CMolecularBasis getTestBasisForLiH();
     
 CMolecularBasis getReducedTestBasisForLiH();
-    
-CMolecularBasis getGenContrBasisForLiH();
 
 } // vlxbas namespace
 

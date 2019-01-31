@@ -31,26 +31,15 @@ class CGtoBlock
 
     /**
      The contraction scheme (contracted basis functions start/end position in
-     primitive Gaussian functions vector, primitive to contracted Gaussian
-     functions mapping).
+     primitive Gaussian functions vector, contracted basis functions indexes).
      */
     CMemBlock2D<int32_t> _contrPattern;
-    
-    /**
-     The indexing scheme of contracted basis functions for each angular momentum
-     component.
-     */
-    CMemBlock2D<int32_t> _indexPattern;
 
     /**
-     The primitives Gaussian functions data (exponents and coordinates).
+     The primitives Gaussian functions data (exponents, norm. factors and
+     coordinates).
      */
     CMemBlock2D<double> _gtoPrimitives;
-    
-    /**
-     The normalization factors pf primitives Gaussian functions.
-     */
-    CMemBlock<double> _gtoNormFactors;
 
 public:
 
@@ -64,18 +53,13 @@ public:
      
      @param gtoPrimitives the primitives Gaussian functions data (exponents,
                           coordinates).
-     @param gtoNormFactors the normalization factiosn of primitive Gaussian
-                           functions.
      @param contrPattern the contraction pattern (contracted basis functions
                          start/end position in primitive Gaussian functions
                          vector, basis functions indexes).
-     @param indexPattern the indexing pattern for contracted basis functions.
      @param angularMomentum the angular momentum of contracted basis functions.
      */
     CGtoBlock(const CMemBlock2D<double>&  gtoPrimitives,
-              const CMemBlock<double>&    gtoNormFactors,
               const CMemBlock2D<int32_t>& contrPattern,
-              const CMemBlock2D<int32_t>& indexPattern,
               const int32_t               angularMomentum);
 
     /**

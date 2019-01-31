@@ -22,20 +22,14 @@ CGtoBlock::CGtoBlock()
 }
 
 CGtoBlock::CGtoBlock(const CMemBlock2D<double>&  gtoPrimitives,
-                     const CMemBlock<double>&    gtoNormFactors,
                      const CMemBlock2D<int32_t>& contrPattern,
-                     const CMemBlock2D<int32_t>& indexPattern,
                      const int32_t               angularMomentum)
 
     : _angularMomentum(angularMomentum)
 
     , _contrPattern(contrPattern)
 
-    , _indexPattern(indexPattern)
-
     , _gtoPrimitives(gtoPrimitives)
-
-    , _gtoNormFactors(gtoNormFactors)
 {
 
 }
@@ -65,15 +59,7 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
     
     if (npfuncs > 0)
     {
-        _gtoPrimitives = CMemBlock2D<double>(npfuncs, 4);
-        
-        // allocate normalization factors
-        
-        auto npfacts = basis.getNumberOfNormalizationFactors(molecule,
-                                                             iAtom, nAtoms,
-                                                             _angularMomentum);
-        
-        _gtoNormFactors = CMemBlock<double>(npfacts); 
+        _gtoPrimitives = CMemBlock2D<double>(npfuncs, 5);
         
         // allocate contraction data
         
@@ -85,13 +71,8 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         auto ncdim = basis.getNumberOfBasisFunctions(molecule, iAtom, nAtoms,
                                                      _angularMomentum);
         
-        auto nrdim = basis.getNumberOfReducedBasisFunctions(molecule,
-                                                            iAtom, nAtoms,
-                                                            _angularMomentum);
         
-        _contrPattern = CMemBlock2D<int32_t>(nrdim, 5);
-        
-        _indexPattern = CMemBlock2D<int32_t>(ncdim, angcomp);
+        _contrPattern = CMemBlock2D<int32_t>(ncdim, 3 + angcomp);
         
         // determine partial dimensions of AO basis
         
@@ -113,11 +94,11 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         
         auto idselem = molecule.getIdsElemental();
         
-        // contraction pattern for primitive GTOs
+        // contraction pattern data
         
-        auto sppos = _contrPattern.data(0);
+        auto spos = _contrPattern.data(0);
         
-        auto eppos = _contrPattern.data(1);
+        auto epos = _contrPattern.data(1);
         
         auto idxatm = _contrPattern.data(2);
         
@@ -125,13 +106,13 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         
         auto gtoexps = _gtoPrimitives.data(0);
         
-        auto coordsx = _gtoPrimitives.data(1);
+        auto gtonorms = _gtoPrimitives.data(1);
         
-        auto coordsy = _gtoPrimitives.data(2);
+        auto coordsx = _gtoPrimitives.data(2);
         
-        auto coordsz = _gtoPrimitives.data(3);
+        auto coordsy = _gtoPrimitives.data(3);
         
-        auto gtonorms = _gtoNormFactors.data();
+        auto coordsz = _gtoPrimitives.data(4);
         
         // loop over atoms in molecule
         
@@ -141,7 +122,6 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
         
         for (int32_t i = iAtom; i < (iAtom + nAtoms); i++)
         {
-            
             // get atom coordinates
             
             auto rx = molrx[i];
@@ -160,15 +140,15 @@ CGtoBlock::CGtoBlock(const CMolecule&       molecule,
                 
                 // set contraction pattern
                 
-                sppos[icgto] = iprim;
+                spos[icgto] = iprim;
                 
-                eppos[icgto] = iprim + nprim;
+                epos[icgto] = iprim + nprim;
                 
                 idxatm[icgto] = i;
                 
                 for (int32_t k = 0; k < angcomp; k++)
                 {
-                    auto pgtoidx = _indexPattern.data(k);
+                    auto pgtoidx = _contrPattern.data(3 + k);
                     
                     pgtoidx[icgto] = npartdim + k * ncfuncs + ncoff + icgto;
                 }
@@ -214,11 +194,7 @@ CGtoBlock::CGtoBlock(const CGtoBlock& source)
 
     , _contrPattern(source._contrPattern)
 
-    , _indexPattern(source._indexPattern)
-
     , _gtoPrimitives(source._gtoPrimitives)
-
-    , _gtoNormFactors(source._gtoNormFactors)
 {
 
 }
@@ -229,11 +205,7 @@ CGtoBlock::CGtoBlock(CGtoBlock&& source) noexcept
 
     , _contrPattern(std::move(source._contrPattern))
 
-    , _indexPattern(std::move(source._indexPattern))
-
     , _gtoPrimitives(std::move(source._gtoPrimitives))
-
-    , _gtoNormFactors(std::move(source._gtoNormFactors))
 {
 
 }
@@ -251,12 +223,8 @@ CGtoBlock::operator=(const CGtoBlock& source)
     _angularMomentum = source._angularMomentum;
 
     _contrPattern = source._contrPattern;
-    
-    _indexPattern = source._indexPattern;
 
     _gtoPrimitives = source._gtoPrimitives;
-    
-    _gtoNormFactors = source._gtoNormFactors;
 
     return *this;
 }
@@ -269,12 +237,8 @@ CGtoBlock::operator=(CGtoBlock&& source) noexcept
     _angularMomentum = std::move(source._angularMomentum);
 
     _contrPattern = std::move(source._contrPattern);
-    
-    _indexPattern = std::move(source._indexPattern);
 
     _gtoPrimitives = std::move(source._gtoPrimitives);
-    
-    _gtoNormFactors = std::move(source._gtoNormFactors);
 
     return *this;
 }
@@ -285,12 +249,8 @@ CGtoBlock::operator==(const CGtoBlock& other) const
     if (_angularMomentum != other._angularMomentum) return false;
 
     if (_contrPattern != other._contrPattern) return false;
-    
-    if (_indexPattern != other._indexPattern) return false;
 
     if (_gtoPrimitives != other._gtoPrimitives) return false;
-    
-    if (_gtoNormFactors != other._gtoNormFactors) return false;
 
     return true;
 }
@@ -315,11 +275,7 @@ CGtoBlock::compress(const CGtoBlock&         source,
     
     _gtoPrimitives.zero();
     
-    _gtoNormFactors.zero(); 
-    
     _contrPattern.zero();
-    
-    _indexPattern.zero(); 
     
     // set up pointers to primitives data source
     
@@ -504,7 +460,7 @@ CGtoBlock::getIdentifiers(const int32_t iComponent) const
 {
     if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
     {
-        return _indexPattern.data(iComponent);
+        return _contrPattern.data(3 + iComponent);
     }
     
     return nullptr; 
@@ -515,7 +471,7 @@ CGtoBlock::getIdentifiers(const int32_t iComponent)
 {
     if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
     {
-        return _indexPattern.data(iComponent);
+        return _contrPattern.data(3 + iComponent);
     }
     
     return nullptr;
@@ -536,49 +492,49 @@ CGtoBlock::getExponents()
 const double*
 CGtoBlock::getNormFactors() const
 {
-    return _gtoNormFactors.data();
+    return _gtoPrimitives.data(1);
 }
 
 double*
 CGtoBlock::getNormFactors()
 {
-    return _gtoNormFactors.data();
+    return _gtoPrimitives.data(1);
 }
 
 const double*
 CGtoBlock::getCoordinatesX() const
 {
-    return _gtoPrimitives.data(1);
+    return _gtoPrimitives.data(2);
 }
 
 double*
 CGtoBlock::getCoordinatesX()
 {
-    return _gtoPrimitives.data(1);
+    return _gtoPrimitives.data(2);
 }
 
 const double*
 CGtoBlock::getCoordinatesY() const
 {
-    return _gtoPrimitives.data(2);
+    return _gtoPrimitives.data(3);
 }
 
 double*
 CGtoBlock::getCoordinatesY()
 {
-    return _gtoPrimitives.data(2);
+    return _gtoPrimitives.data(3);
 }
 
 const double*
 CGtoBlock::getCoordinatesZ() const
 {
-    return _gtoPrimitives.data(3);
+    return _gtoPrimitives.data(4);
 }
 
 double*
 CGtoBlock::getCoordinatesZ()
 {
-    return _gtoPrimitives.data(3);
+    return _gtoPrimitives.data(4);
 }
 
 int32_t
@@ -611,12 +567,8 @@ operator<<(      std::ostream& output,
     output << "_angularMomentum: " << source._angularMomentum << std::endl;
 
     output << "_contrPattern: " << source._contrPattern << std::endl;
-    
-    output << "_indexPattern: " << source._indexPattern << std::endl;
 
     output << "_gtoPrimitives: " << source._gtoPrimitives << std::endl;
-    
-    output << "_gtoNormFactors: " << source._gtoNormFactors << std::endl;
     
     return output;
 }

@@ -193,33 +193,6 @@ public:
                                       const int32_t    nAtoms,
                                       const int32_t    angularMomentum) const;
     
-    
-    /**
-     Determines number of reduced basis functions with specific angular momentum
-     in molecular basis of selected molecule.
-     
-     @param molecule the molecule.
-     @param angularMomentum the angular momentum.
-     @return the number of reduced basis functions.
-     */
-    int32_t getNumberOfReducedBasisFunctions(const CMolecule& molecule,
-                                             const int32_t    angularMomentum) const;
-    
-    /**
-     Determines number of reduced basis functions with specific angular momentum
-     in molecular basis of list of atoms in selected molecule.
-     
-     @param molecule the molecule.
-     @param iAtom the index of first atom in list of atoms.
-     @param nAtoms the number of atoms in list of atoms.
-     @param angularMomentum the angular momentum.
-     @return the number of reduced basis functions.
-     */
-    int32_t getNumberOfReducedBasisFunctions(const CMolecule& molecule,
-                                             const int32_t    iAtom,
-                                             const int32_t    nAtoms,
-                                             const int32_t    angularMomentum) const;
-
     /**
      Determines number of primitive Gaussian functions with specific angular
      momentum in molecular basis of selected molecule.
@@ -247,32 +220,6 @@ public:
                                                const int32_t    nAtoms,
                                                const int32_t    angularMomentum) const;
 
-    /**
-     Determines number of primitive normalization factors with specific angular
-     momentum in molecular basis of selected molecule.
-     
-     @param molecule the molecule.
-     @param angularMomentum the angular momentum.
-     @return the number of primitive normalization factors.
-     */
-    int32_t getNumberOfNormalizationFactors(const CMolecule& molecule,
-                                            const int32_t    angularMomentum) const;
-    
-    /**
-     Determines number of primitive normalization factors with specific angular
-     momentum in molecular basis of list of atoms in selected molecule.
-     
-     @param molecule the molecule.
-     @param iAtom the index of first atom in list of atoms.
-     @param nAtoms the number of atoms in list of atoms.
-     @param angularMomentum the angular momentum.
-     @return the number of primitive normalization factors.
-     */
-    int32_t getNumberOfNormalizationFactors(const CMolecule& molecule,
-                                            const int32_t    iAtom,
-                                            const int32_t    nAtoms,
-                                            const int32_t    angularMomentum) const;
-    
     /**
      Determines size of contracted AO basis for selected molecule.
 
