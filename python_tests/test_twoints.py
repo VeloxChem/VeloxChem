@@ -139,7 +139,7 @@ class TestTwoInts(unittest.TestCase):
 
         ref_enuc = 34.0 / 2.8 + 34.0 / 2.8 + 1.0 / (2.8 * math.sqrt(2.0))
 
-        self.assertEqual(enuc, ref_enuc)
+        self.assertAlmostEqual(enuc, ref_enuc, 13)
 
         comm = task.mpi_comm
         rank = task.mpi_rank
