@@ -305,6 +305,8 @@ void export_orbdata(py::module& m)
                                                        const int32_t) const)
              &CMolecularOrbitals::getAODensity)
         .def("insert", &CMolecularOrbitals::insert)
+        .def("get_num_mos", &CMolecularOrbitals::getNumberOfColumns)
+        .def("get_num_aos", &CMolecularOrbitals::getNumberOfRows)
         .def(py::self == py::self)
     ;
 }
