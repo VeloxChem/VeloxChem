@@ -17,11 +17,15 @@
  Defines supported density matrix types:
  denmat::rest   - the restricted density matrix
  denmat::unrest - the unrestricted density matrix
+ denmat::rmoij  - the restricted C_i C_j^T matrix
+ denmat::umoij  - the unrestricted C_i C_j^T matrix
  */
 enum class denmat
 {
     rest,
-    unrest
+    unrest,
+    rmoij,
+    umoij
 };
 
 /**
@@ -47,6 +51,10 @@ inline denmat to_denmat(const int32_t keyValue)
     
     if (keyValue == to_int(denmat::unrest)) return denmat::unrest;
     
+    if (keyValue == to_int(denmat::rmoij)) return denmat::rmoij;
+    
+    if (keyValue == to_int(denmat::umoij)) return denmat::umoij;
+    
     return denmat::rest;
 }
 
@@ -66,6 +74,16 @@ inline std::string to_string(const denmat denMatrix)
     if (denMatrix == denmat::unrest)
     {
         return std::string("Unrestricted Density Matrix");
+    }
+    
+    if (denMatrix == denmat::rmoij)
+    {
+        return std::string("Restricted C_iC_j^T Density Matrix");
+    }
+    
+    if (denMatrix == denmat::umoij)
+    {
+        return std::string("Unrestricted C_iC_j^T Density Matrix");
     }
    
     return std::string("UNKNOWN");

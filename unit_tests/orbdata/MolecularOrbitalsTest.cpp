@@ -141,6 +141,66 @@ TEST_F(CMolecularOrbitalsTest, GetAODensityForUnrestrictedCase)
     ASSERT_EQ(moa.getAODensity(3, 2), CAODensityMatrix({ref03mata, ref02matb}, denmat::unrest));
 }
 
+TEST_F(CMolecularOrbitalsTest, getRestrictedPairDensitySinglePair)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0,
+                    -2.0,  5.0,  4.0,
+                     6.0,  4.0, -4.0},
+                    3, 3);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    
+    CDenseMatrix ref00mat({1.0, -2.0, 6.0, -2.0, 4.0, -12.0, 6.0, -12.0, 36.0},
+                          3, 3);
+    
+    ASSERT_EQ(moa.getRestrictedPairDensity(0, 0), CAODensityMatrix({ref00mat}, denmat::rmoij));
+    
+    CDenseMatrix ref11mat({1.0, -5.0, -4.0, -5.0, 25.0, 20.0, -4.0, 20.0, 16.0},
+                          3, 3);
+    
+    ASSERT_EQ(moa.getRestrictedPairDensity(1, 1), CAODensityMatrix({ref11mat}, denmat::rmoij));
+    
+    CDenseMatrix ref01mat({ -1.0, 5.0, 4.0, 2.0, -10.0, -8.0, -6.0, 30.0, 24.0},
+                          3, 3);
+    
+    ASSERT_EQ(moa.getRestrictedPairDensity(0, 1), CAODensityMatrix({ref01mat}, denmat::rmoij));
+    
+    CDenseMatrix ref10mat({ -1.0, 2.0, -6.0, 5.0, -10.0, 30.0, 4.0, -8.0, 24.0},
+                          3, 3);
+    
+    ASSERT_EQ(moa.getRestrictedPairDensity(1, 0), CAODensityMatrix({ref10mat}, denmat::rmoij));
+}
+
+TEST_F(CMolecularOrbitalsTest, getRestrictedPairDensityVectorOfPairs)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0,
+                    -2.0,  5.0,  4.0,
+                     6.0,  4.0, -4.0},
+                    3, 3);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    
+    CDenseMatrix ref00mat({1.0, -2.0, 6.0, -2.0, 4.0, -12.0, 6.0, -12.0, 36.0},
+                          3, 3);
+    
+    CDenseMatrix ref11mat({1.0, -5.0, -4.0, -5.0, 25.0, 20.0, -4.0, 20.0, 16.0},
+                          3, 3);
+    
+    CDenseMatrix ref01mat({ -1.0, 5.0, 4.0, 2.0, -10.0, -8.0, -6.0, 30.0, 24.0},
+                          3, 3);
+    
+    CDenseMatrix ref10mat({ -1.0, 2.0, -6.0, 5.0, -10.0, 30.0, 4.0, -8.0, 24.0},
+                          3, 3);
+    
+    ASSERT_EQ(moa.getRestrictedPairDensity({0, 1, 0, 1}, {0, 1, 1, 0}),
+              CAODensityMatrix({ref00mat, ref11mat, ref01mat, ref10mat},
+                               denmat::rmoij));
+}
+
 TEST_F(CMolecularOrbitalsTest, Insert)
 {
     auto mbas = vlxbas::getMolecularBasisForLiH();

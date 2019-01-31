@@ -318,6 +318,67 @@ CMolecularOrbitals::getAODensity(const int32_t nAlphaElectrons,
     return CAODensityMatrix();
 }
 
+CAODensityMatrix
+CMolecularOrbitals::getRestrictedPairDensity(const int32_t iMolecularOrbital,
+                                             const int32_t jMolecularOrbital) const
+{
+    auto nrow = _orbitals[0].getNumberOfRows();
+    
+    auto ncol = _orbitals[0].getNumberOfColumns();
+    
+    if ((iMolecularOrbital < ncol) && (jMolecularOrbital < ncol))
+    {
+        auto cmi = _orbitals[0].slice(0, iMolecularOrbital, nrow, 1);
+    
+        auto cmj = _orbitals[0].slice(0, jMolecularOrbital, nrow, 1);
+    
+        auto den = denblas::multABt(cmi, cmj);
+        
+        return CAODensityMatrix({den}, denmat::rmoij);
+    }
+    
+    return CAODensityMatrix();
+}
+
+CAODensityMatrix
+CMolecularOrbitals::getRestrictedPairDensity(const std::vector<int32_t>& iMolecularOrbitals,
+                                             const std::vector<int32_t>& jMolecularOrbitals) const
+{
+    auto nrow = _orbitals[0].getNumberOfRows();
+    
+    auto ncol = _orbitals[0].getNumberOfColumns();
+    
+    if (iMolecularOrbitals.size() == jMolecularOrbitals.size())
+    {
+        std::vector<CDenseMatrix> denvec;
+        
+        for (size_t i = 0; i < iMolecularOrbitals.size(); i++)
+        {
+            auto icol = iMolecularOrbitals[i];
+        
+            auto jcol = jMolecularOrbitals[i];
+        
+            if ((icol < ncol) && (jcol < ncol))
+            {
+                auto cmi = _orbitals[0].slice(0, icol, nrow, 1);
+                
+                auto cmj = _orbitals[0].slice(0, jcol, nrow, 1);
+                
+                denvec.push_back(denblas::multABt(cmi, cmj));
+            }
+            else
+            {
+                return CAODensityMatrix();
+            }
+        }
+        
+        return CAODensityMatrix(denvec, denmat::rmoij);
+    }
+    
+    return CAODensityMatrix();
+}
+
+
 std::ostream&
 operator<<(      std::ostream&       output,
            const CMolecularOrbitals& source)

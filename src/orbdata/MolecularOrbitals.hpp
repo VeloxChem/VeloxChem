@@ -206,6 +206,26 @@ public:
                                   const int32_t nBetaElectrons) const;
     
     /**
+     Computes restricted pair C_i C_j^T density matrix in AO basis.
+     
+     @param iMolecularOrbital the index of i-th molecular orbital C_i.
+     @param jMolecularOrbital the index of j-th molecular orbital C_j.
+     @return the AO pair density matrix.
+     */
+    CAODensityMatrix getRestrictedPairDensity(const int32_t iMolecularOrbital,
+                                              const int32_t jMolecularOrbital) const;
+    
+    /**
+     Computes set of restricted pair C_i C_j^T density matrices in AO basis.
+     
+     @param iMolecularOrbitals the vector of index of i-th molecular orbital C_i.
+     @param jMolecularOrbitals the vector of index of j-th molecular orbital C_j.
+     @return the AO pair density matrix.
+     */
+    CAODensityMatrix getRestrictedPairDensity(const std::vector<int32_t>& iMolecularOrbitals,
+                                              const std::vector<int32_t>& jMolecularOrbitals) const;
+    
+    /**
      Converts molecular orbitals object to text output and insert it into output
      text stream.
      
