@@ -306,6 +306,14 @@ void export_orbdata(py::module& m)
              (CAODensityMatrix (CMolecularOrbitals::*)(const int32_t,
                                                        const int32_t) const)
              &CMolecularOrbitals::getAODensity)
+        .def("get_pair_density",
+             (CAODensityMatrix (CMolecularOrbitals::*)(const std::vector<int32_t>&,
+                                                       const std::vector<int32_t>&) const)
+             &CMolecularOrbitals::getRestrictedPairDensity)
+        .def("get_pair_density",
+             (CAODensityMatrix (CMolecularOrbitals::*)(const int32_t,
+                                                       const int32_t) const)
+             &CMolecularOrbitals::getRestrictedPairDensity)
         .def("insert", &CMolecularOrbitals::insert)
         .def("get_num_mos", &CMolecularOrbitals::getNumberOfColumns)
         .def("get_num_aos", &CMolecularOrbitals::getNumberOfRows)

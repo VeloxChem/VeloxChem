@@ -29,5 +29,6 @@ from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
+from .mointsdriver import MOIntegralsDriver
 from .visualizationdriver import VisualizationDriver
 from .mpitask import MpiTask

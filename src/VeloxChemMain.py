@@ -34,6 +34,12 @@ def main():
             scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
             scf_drv.density.write_hdf5("density.h5")
 
+        # test multiple AO to MO matrices computation
+
+        moints_drv = vlx.MOIntegralsDriver()
+
+        moints_drv.compute_task(task, scf_drv.mol_orbs)
+
     # Cube
 
     elif task_type == 'cube':
