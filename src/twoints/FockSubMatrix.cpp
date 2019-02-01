@@ -362,6 +362,43 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
                          _startPositionsD, _startPositionsC,
                          _dimSubMatrixD, _dimSubMatrixC);
     }
+    
+    // restricted general exchange matrix
+    
+    if ((fockType == fockmat::rgenk) || (fockType == fockmat::rgenkx))
+    {
+        _addContribution(aoFockMatrix, nColumns, 0,
+                         _startPositionsA, _startPositionsC,
+                         _dimSubMatrixA, _dimSubMatrixC);
+        
+        _addContribution(aoFockMatrix, nColumns, 1,
+                         _startPositionsC, _startPositionsA,
+                         _dimSubMatrixC, _dimSubMatrixA);
+        
+        _addContribution(aoFockMatrix, nColumns, 2,
+                         _startPositionsA, _startPositionsD,
+                         _dimSubMatrixA, _dimSubMatrixD);
+        
+        _addContribution(aoFockMatrix, nColumns, 3,
+                         _startPositionsD, _startPositionsA,
+                         _dimSubMatrixD, _dimSubMatrixA);
+        
+        _addContribution(aoFockMatrix, nColumns, 4,
+                         _startPositionsB, _startPositionsC,
+                         _dimSubMatrixB, _dimSubMatrixC);
+        
+        _addContribution(aoFockMatrix, nColumns, 5,
+                         _startPositionsC, _startPositionsB,
+                         _dimSubMatrixC, _dimSubMatrixB);
+        
+        _addContribution(aoFockMatrix, nColumns, 6,
+                         _startPositionsB, _startPositionsD,
+                         _dimSubMatrixB, _dimSubMatrixD);
+        
+        _addContribution(aoFockMatrix, nColumns, 7,
+                         _startPositionsD, _startPositionsB,
+                         _dimSubMatrixD, _dimSubMatrixB);
+    }
 }
 
 double*
@@ -528,6 +565,43 @@ CFockSubMatrix::_allocSubMatrices(const fockmat fockType,
         matdim = _dimSubMatrixC * _dimSubMatrixD;
         
         ncomp  = nComponentsC * nComponentsD;
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+    }
+    
+    // restricted general exchange matrix
+    
+    if ((fockType == fockmat::rgenk) || (fockType == fockmat::rgenkx))
+    {
+        auto matdim = _dimSubMatrixA * _dimSubMatrixC;
+        
+        auto ncomp  = nComponentsA * nComponentsC;
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        matdim = _dimSubMatrixA * _dimSubMatrixD;
+        
+        ncomp  = nComponentsA * nComponentsD;
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        matdim = _dimSubMatrixB * _dimSubMatrixC;
+        
+        ncomp  = nComponentsB * nComponentsC;
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
+        
+        matdim = _dimSubMatrixB * _dimSubMatrixD;
+        
+        ncomp  = nComponentsB * nComponentsD;
         
         _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
         

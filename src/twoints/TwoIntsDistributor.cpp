@@ -279,7 +279,18 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
         if (fcktyp == fockmat::rgenj)
         {
             distmaxden::getMaxRestGenDenJ(maxDensityElements,
-                                          _aoDensity->totalDensity(idden),
+                                          _aoDensity->getDensity(idden),
+                                          _aoDensity->getNumberOfColumns(idden),
+                                          braGtoPairsBlock, ketGtoPairsBlock,
+                                          nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted general exchange: K
+        
+        if (fcktyp == fockmat::rgenk)
+        {
+            distmaxden::getMaxRestGenDenK(maxDensityElements,
+                                          _aoDensity->getDensity(idden),
                                           _aoDensity->getNumberOfColumns(idden),
                                           braGtoPairsBlock, ketGtoPairsBlock,
                                           nKetContrPairs, iContrPair);
@@ -424,6 +435,17 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
         if (fcktyp == fockmat::rgenj)
         {
             distfock::distRestGenJ(_fockContainer, i,
+                                   _aoDensity->getDensity(idden),
+                                   _aoDensity->getNumberOfColumns(idden),
+                                   spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                   nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted general exchange matrix: K
+        
+        if (fcktyp == fockmat::rgenk)
+        {
+            distfock::distRestGenK(_fockContainer, i,
                                    _aoDensity->getDensity(idden),
                                    _aoDensity->getNumberOfColumns(idden),
                                    spherInts, braGtoPairsBlock, ketGtoPairsBlock,

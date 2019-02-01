@@ -125,11 +125,11 @@ TEST_F(CAOFockMatrixTest, SetType)
                         fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
                         {0, 2, 3, 6});
     
-    fmata.setType(fockmat::restjkx, 0);
+    fmata.setFockType(fockmat::restjkx, 0);
     
-    fmata.setType(fockmat::restkx, 1);
+    fmata.setFockType(fockmat::restkx, 1);
     
-    fmata.setType(fockmat::restjk, 3);
+    fmata.setFockType(fockmat::restjk, 3);
     
     CAOFockMatrix fmatb({ma, ma, mb, mb}, {fockmat::restjkx, fockmat::restkx,
                         fockmat::restj, fockmat::restjk}, {1.0, 2.0, 0.0, 1.0},
