@@ -8525,6 +8525,8 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestGenJForH2O)
     
     CAOFockMatrix fock(dmat);
     
+    fock.setFockType(fockmat::rgenj, 0);
+    
     ASSERT_TRUE(fockmat::rgenj == fock.getFockType(0));
     
     eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
