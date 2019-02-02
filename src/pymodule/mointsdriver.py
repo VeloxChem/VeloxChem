@@ -18,11 +18,12 @@ class MOIntegralsDriver:
         
         # screening scheme
         self.qq_type = "QQ_DEN"
-        self.eri_thresh  = 1.0e-12
+        self.eri_thresh = 1.0e-12
     
         # mpi information
         self.rank = 0
         self.nodes = 1
+        self.dist_exec = False
     
         # Fock matrices
         self.num_mats = 0
@@ -34,10 +35,11 @@ class MOIntegralsDriver:
     
     def compute(self, molecule, ao_basis, mol_orbs, comm, ostream):
         
+        # start timer
         start_time = tm.time()
-       
-        self.rank = comm.Get_rank()
-        self.nodes = comm.Get_size()
+        
+        # mpi communicators
+        self.set_global_comm(comm)
         
         # set up bra and ket orbitals list
         
@@ -45,8 +47,8 @@ class MOIntegralsDriver:
         bra_ids = []
         ket_ids = []
         
-        for i in range(1):
-            for j in range(1):
+        for i in range(50):
+            for j in range(50):
                 bra_ids.append(i)
                 ket_ids.append(j)
     
@@ -103,6 +105,14 @@ class MOIntegralsDriver:
             ostream.print_blank()
             ostream.print_header(valstr.ljust(92))
             ostream.print_blank()
+    
+    def set_global_comm(self, comm):
+        
+        self.rank = comm.Get_rank()
+        self.nodes = comm.Get_size()
+    
+        if (self.nodes > 1):
+            self.dist_exec = True
 
     def get_qq_type(self):
         

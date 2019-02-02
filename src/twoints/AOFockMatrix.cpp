@@ -64,7 +64,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
         {
             _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
             
-            _fockTypes.push_back(fockmat::rgenj);
+            _fockTypes.push_back(fockmat::rgenk);
             
             _scaleFactors.push_back(1.0);
             

@@ -24,9 +24,77 @@ import math
 from collections import deque
 
 class ScfDriver:
+    """Implements SCF method (base class).
+        
+    Implements SCF method with C2-DIIS or two-level C2-DIIS convergence
+    accelerators.
+        
+    Attributes
+    ----------
+    den_guess
+        The initial density guess driver.
+    acc_type
+        The type of SCF convergence accelerator.
+    max_err_vecs
+        The maximum number of error vectors.
+    max_iter
+        The maximum number of SCF iterations.
+    first_step
+        The flag for first step in two-level C2-DIIS convergence acceleration.
+    qq_type
+        The electron repulsion integrals screening scheme.
+    qq_dyn
+        The flag for enabling dynamic thresholds in electron repulsion integrals
+        screening scheme.
+    qq_dden
+        The flag for use of density difference scheme in Fock/Kohn-Sham matrices
+        construction.
+    conv_thresh
+        The SCF convergence threshold.
+    eri_thresh
+        The electron repulsion integrals screening threshold.
+    ovl_thresh
+        The atomic orbitals linear dependency threshold.
+    diis_thresh
+        The C2-DIIS switch on threshold.
+    dden_thresh
+        The switch on threshold for difference of densities scheme.
+    use_level_shift
+        The flag for usage of level shifting in SCF iterations.
+    iter_data
+        The list of SCF iteration data (electronic energy, electronic energy
+        change, gradient, density change).
+    is_converged
+        The flag for SCF convergence.
+    skip_iter
+        The flag for SCF iteration data storage.
+    old_energy
+        The electronic energy of previous SCF iteration.
+    num_iter
+        The current number of SCF iterations.
+    fock_matrices
+        The list of stored Fock/Kohn-Sham matrices.
+    den_matrices
+        The list of stored density matrices.
+    density
+        The current density matrix.
+    mol_orbs
+        The current molecular orbitals.
+    nuc_energy
+        The nuclear repulsion energy of molecule.
+    rank
+        The rank of MPI process.
+    nodes
+        The number of MPI processes.
+    """
 
     def __init__(self):
-        
+        """Initializes SCF driver.
+            
+        Initializes SCF driver to default setup (convergence threshold, initial
+        guess, etc).
+        """
+    
         # density guess
         self.den_guess = DensityGuess("SAD")
         
@@ -48,6 +116,9 @@ class ScfDriver:
         self.diis_thresh = 0.2
         self.dden_thresh = 1.0e-3
         
+        # level shifting
+        self.use_level_shift = False
+        
         # iterations data
         self.iter_data = []
         self.is_converged = False
@@ -65,21 +136,47 @@ class ScfDriver:
         # molecular orbitals
         self.mol_orbs = MolecularOrbitals()
     
-        # nuclear-nuclear repulsion energy
+        # nuclear repulsion energy
         self.nuc_energy = 0.0
     
         # mpi information
         self.rank = 0
         self.nodes = 1
     
-
     def compute_task(self, task):
+        """Performs SCF calculation.
+            
+        Performs SCF calculation using data from MPI task.
+            
+        Parameters
+        ----------
+        task
+            The SCF input data as MPI task.
+        """
 
         self.compute(task.molecule, task.ao_basis, task.min_basis,
                      task.mpi_comm, task.ostream)
     
     def compute(self, molecule, ao_basis, min_basis, comm, ostream):
-       
+        """Performs SCF calculation.
+            
+        Performs SCF calculation using molecular data, MPI communicator and
+        output stream.
+        
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        ao_basis
+            The AO basis set.
+        min_basis
+            The minimal AO basis set.
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
+        
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
         
@@ -88,11 +185,11 @@ class ScfDriver:
         if self.rank == mpi_master():
             self.print_header(ostream)
     
-        # DIIS method
+        # C2-DIIS method
         if self.acc_type == "DIIS":
             self.comp_diis(molecule, ao_basis, min_basis, comm, ostream)
        
-        # Two level DIIS method
+        # two level C2-DIIS method
         if self.acc_type == "L2_DIIS":
         
             # first step
@@ -122,6 +219,24 @@ class ScfDriver:
             self.comp_diis(molecule, ao_basis, val_basis, comm, ostream)
 
     def comp_diis(self, molecule, ao_basis, min_basis, comm, ostream):
+        """Performs SCF calculation with C2-DIIS acceleration.
+            
+        Performs SCF calculation using molecular data, MPI communicator and
+        output stream.
+        
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        ao_basis
+            The AO basis set.
+        min_basis
+            The minimal AO basis set.
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
         
         start_time = tm.time()
 
@@ -232,6 +347,22 @@ class ScfDriver:
             self.print_scf_finish(start_time, ostream)
 
     def comp_one_ints(self, molecule, basis, comm, ostream):
+        """Computes one-electron integrals required for SCF calculation.
+            
+        Computes one-electron integrals (overlap, kinetic energy and nuclear
+        potential) using molecular data, MPI communicator and output stream.
+        
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        ao_basis
+            The AO basis set.
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
 
         t0 = tm.time()
         
@@ -270,6 +401,26 @@ class ScfDriver:
     
     def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat,
                            comm, ostream):
+        """Computes initial density guess for SCF calculation.
+            
+        Computes initial density guess for SCF using superposition of atomic
+        densities or molecular orbitals projection methods.
+        
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        ao_basis
+            The AO basis set.
+        min_basis
+            The minimal AO basis set.
+        ovl_mat
+            The overlap matrix between minimal and full AO basis.
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
 
         # guess: superposition of atomic densities
         if self.den_guess.guess_type == "SAD":
@@ -290,6 +441,18 @@ class ScfDriver:
         return AODensityMatrix()
 
     def set_skip_iter_flag(self, i, e_grad):
+        """Sets SCF iteration skiping flag.
+            
+        Sets SCF iteration skiping flag based on iteration number and C2-DIIS
+        switch on threshold.
+        
+        Parameters
+        ----------
+        i
+            The number of current SCF iteration.
+        e_grad
+            The electronic gradient at current SCF iteration.
+        """
         
         self.num_iter = i
         
@@ -304,10 +467,60 @@ class ScfDriver:
                 self.skip_iter = True
                     
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat, comm):
+        """Computes SCF energy components.
+            
+            Computes SCF energy components: electronic energy, kinetic energy,
+            and nuclear potential energy.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix (only 2e-part).
+        kin_mat
+            The kinetic energy matrix.
+        npot_mat
+            The nuclear potential matrix.
+        den_mat
+            The density matrix.
+        comm
+            The MPI communicator.
+        Returns
+        -------
+            The tuple (electronic energy, kinetic energy, nuclear potential
+            energy).
+        """
+        
         return (0.0, 0.0, 0.0)
     
     def comp_2e_fock(self, eri_drv, fock_mat, ref_fock_mat, den_mat, dden_fock,
                      molecule, ao_basis, qq_data, comm):
+        """Computes 2e part of Fock/Kohn-Sham matrix.
+            
+        Computes 2e part of Fock/Kohn-Sham matrix in parallel on given MPI
+        communicator.
+            
+        Parameters
+        ----------
+        eri_drv
+            The electron repulsion integrals driver.
+        fock_mat
+            The Fock/Kohn-Sham matrix (2e-part).
+        ref_fock_mat
+            The reference Fock/Kohn-Sham matrix (2e-part).
+        den_mat
+            The density matrix.
+        dden_fock
+            The flag for using density difference method in construction of
+            Fock/Kohn-Sham matrix (2e-part).
+        molecule
+            The moelcule.
+        ao_basis
+            The AO basis.
+        qq_data
+            The electron repulsion integrals screener.
+        comm
+            The MPI communicator.
+        """
         
         if dden_fock:
             dden_mat = den_mat.sub(self.density)
@@ -320,15 +533,79 @@ class ScfDriver:
     
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
+        """Computes full Fock/Kohn-Sham matrix.
+            
+        Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
+        Fock/Kohn-Sham matrix the kinetic energy and nucleat potential matrices.
+        
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix (2e-part).
+        kin_mat
+            The kinetic energy matrix.
+        npot_mat
+            The nuclear potential matrix.
+        """
+        
         return
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, comm):
+        """Computes electronic gradient.
+            
+        Computes electronic gradient using Fock/Kohn-Sham matrix.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        ovl_mat
+            The overlap matrix..
+        den_mat
+            The density matrix.
+        comm
+            The MPI communicator.
+        Returns
+        -------
+            The electronic gradient.
+        """
+        
         return 0.0
 
     def comp_density_change(self, den_mat, old_den_mat, comm):
+        """Computes norm of density change.
+            
+        Computes norm of density change between two density matrices.
+            
+        Parameters
+        ----------
+        den_mat
+            The current density matrix.
+        old_den_mat
+            The previous density matrix.
+        comm
+            The MPI communicator.
+        Returns
+        -------
+        The norm of change between two density matrices.
+        """
+        
         return 0.0
     
     def store_fock_mat(self, fock_mat):
+        """Stores Fock/Kohn-Sham matrix.
+            
+        Stores Fock/Kohn-Sham matrix needed for density difference construction
+        of Fock/Kohn-Sham matrix.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        Returns
+        -------
+            The Fock/Kohn-Sham matrix.
+        """
     
         if self.qq_dden and (not self.skip_iter):
             return AOFockMatrix(fock_mat)
@@ -336,18 +613,86 @@ class ScfDriver:
         return AOFockMatrix()
     
     def store_diis_data(self, i, fock_mat, den_mat):
+        """Stores Fock/Kohn-Sham and density matrices for current iteration.
+            
+        Stores Fock/Kohn-Sham and density matrices for current iteration.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        den_mat
+            The density matrix.
+        """
+        
         return
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
+        """Computes effective Fock/Kohn-Sham in OAO basis.
+            
+        Computes effective Fock/Kohn-Sham in OAO basis by applying Lowdin or
+        canonical orthogonalization to AO Fock/Kohn-Sham matrix.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        ovl_mat
+            The overlap matrix.
+        oao_mat
+            The orthogonalization matrix.
+        """
+        
         return None
 
     def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
+        """Generates molecular orbitals.
+            
+        Generates molecular orbital by diagonalizing Fock/Kohn-Sham matrix.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        oao_mat
+            The orthogonalization matrix.
+        ostream
+            The output stream.
+        Returns
+        -------
+            The molecular orbitals.
+        """
         return MolecularOrbitals()
 
     def gen_new_density(self, molecule):
+        """Generates density matrix.
+            
+        Generates density matrix from current molecular orbitals.
+            
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        Returns
+        -------
+            The density matrix.
+        """
         return AODensityMatrix()
 
     def get_dyn_threshold(self, e_grad):
+        """Computes screening threshold for electron repulsion integrals.
+            
+        Computes screening threshold for electron repulsion integrals based on
+        value of electronic gradient.
+            
+        Parameters
+        ----------
+        e_grad
+            The electronic gradient.
+        Returns
+        -------
+            The screening threshold.
+        """
 
         nteri = math.pow(10, math.floor(math.log10(e_grad)));
 
@@ -362,6 +707,24 @@ class ScfDriver:
         return nteri
     
     def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
+        """Adds SCF iteration data to SCF iterations list.
+            
+        Adds SCF iteration data (electronic energy, electronic energy change,
+        electronic gradient, density difference) to SCF iterations list
+            
+        Parameters
+        ----------
+        e_ee
+            The electronic energy.
+        e_kin
+            The kinetic energy.
+        e_en
+            The nuclear potential energy.
+        e_grad
+            The electronic energy gradient.
+        diff_den
+            The density change with respect to previous SCF iteration.
+        """
         
         e_elec = e_ee + e_kin + e_en + self.nuc_energy
 
@@ -372,6 +735,11 @@ class ScfDriver:
         self.old_energy = e_elec
 
     def check_convergence(self):
+        """Sets SCF convergence flag.
+            
+        Sets SCF convergence flag by checking if convergence condition for
+        electronic gradient is fullfiled.
+        """
         
         self.is_converged = False
         
@@ -383,10 +751,27 @@ class ScfDriver:
                 self.is_converged = True
 
     def get_scf_range(self):
+        """Creates range of SCF iterations.
+            
+        Creates range of SCF iterations from maximum number of SCF iterations.
+        
+        Returns
+        -------
+            The range of SCF iterations.
+        """
         
         return range(self.max_iter + 1)
 
     def print_header(self, ostream):
+        """Prints SCF setup header to output stream.
+            
+        Prints SCF calculation setup details to output stream,
+        
+        Parameters
+        ----------
+        ostream
+            The output stream.
+        """
         
         ostream.print_blank()
         ostream.print_header("Self Consistent Field Driver Setup")
@@ -422,6 +807,15 @@ class ScfDriver:
         ostream.print_blank()
 
     def print_scf_title(self, ostream):
+        """Prints SCF cycles header to output stream.
+            
+        Prints SCF cycles header to output stream,
+            
+        Parameters
+        ----------
+        ostream
+            The output stream.
+        """
         
         if self.first_step:
             ostream.print_info("Starting Reduced Basis SCF calculation...")
@@ -433,6 +827,17 @@ class ScfDriver:
             ostream.print_header(92 * "-")
 
     def print_scf_finish(self, start_time, ostream):
+        """Prints SCF calculation finish message to output stream.
+            
+        Prints SCF calculation finish message to output stream,
+            
+        Parameters
+        ----------
+        start_time
+            The start time of SCF calculation.
+        ostream
+            The output stream.
+        """
     
         if self.first_step:
             valstr = "...done. SCF energy: "
@@ -455,6 +860,17 @@ class ScfDriver:
             ostream.print_blank()
 
     def print_iter_data(self, i, ostream):
+        """Prints SCF iteration data to output stream.
+            
+        Prints SCF iteration data to output stream,
+            
+        Parameters
+        ----------
+        i
+            The current SCF iteration.
+        ostream
+            The output stream.
+        """
         
         if self.rank == mpi_master():
             # no output for first step in two level DIIS
@@ -481,12 +897,38 @@ class ScfDriver:
                 ostream.flush()
 
     def get_scf_energy(self):
+        """Gets SCF energy from previous SCF iteration.
+            
+        Gets SCF energy from previous SCF iteration.
+            
+        Returns
+        -------
+        The SCF energy.
+        """
+        
         return self.old_energy
 
     def get_scf_type(self):
+        """Gets string with type of SCF calculation.
+            
+        Gets string with type of SCF calculation (defined in derrived classes).
+            
+        Returns
+        -------
+            The string with type of SCF calculation.
+        """
         return "Undefined"
 
     def get_guess_type(self):
+        """Gets string with type of initial guess.
+            
+        Gets string with type of initial guess (superposition of atomic
+        densities or projection of molecular orbitals).
+            
+        Returns
+        -------
+            The string with type of initial guess.
+        """
         
         if self.den_guess.guess_type == "SAD":
             return "Superposition of Atomic Densities"
@@ -494,6 +936,15 @@ class ScfDriver:
         return "Undefined"
 
     def get_acc_type(self):
+        """Gets string type of SCF convergence accelerator.
+            
+        Gets string with type of SCF convergence accelerator (DIIS or two level
+        DIIS).
+            
+        Returns
+        -------
+        The string with type of SCF convergence accelerator.
+        """
         
         if self.acc_type == "DIIS":
             return "Direct Inversion of Iterative Subspace"
@@ -504,6 +955,17 @@ class ScfDriver:
         return "Undefined"
 
     def get_qq_type(self):
+        """Gets string with type of electron repulsion integrals screening
+        scheme.
+            
+        Gets string with type of electron repulsion integrals screening scheme
+        (Cauchy Schwarz and it's variations).
+            
+        Returns
+        -------
+        The string with type of electron repulsion integrals screening
+        scheme.
+        """
         
         if self.qq_type == "QQ":
             return "Cauchy Schwarz"
@@ -520,6 +982,17 @@ class ScfDriver:
         return "Undefined"
 
     def get_qq_dyn(self):
+        """Gets string with application method of electron repulsion integrals
+        screening.
+            
+        Gets string with application method (static or dynamic) of electron
+        repulsion integrals screening.
+            
+        Returns
+        -------
+        The string with application method of electron repulsion integrals
+        screening.
+        """
         
         if self.qq_dyn:
             return "Dynamic"
@@ -527,6 +1000,16 @@ class ScfDriver:
         return "Static"
 
     def need_min_basis(self):
+        """Determines if minimal AO basis is needed in SCF calculation.
+            
+        Determines if minimal AO basis is needed in SCF calculation. Usage of
+        two level DIIS accelerator or superposition of atomic densities initial
+        guess requires minimal AO basis.
+            
+        Returns
+        -------
+        The flag for need of minimal AO basis.
+        """
         
         if self.acc_type == "L2_DIIS":
             return True
@@ -537,6 +1020,14 @@ class ScfDriver:
         return False
 
     def get_qq_scheme(self):
+        """Converts screening scheme string to C++ enum.
+            
+        Converts screening scheme string to C++ enum.
+            
+        Returns
+        -------
+        The C++ enum with screening scheme.
+        """
         
         if self.qq_type == "QQ":
             return ericut.qq
@@ -553,6 +1044,17 @@ class ScfDriver:
         return None;
 
     def use_diff_density_fock(self, diff_den):
+        """Determines if density difference method will be used in construction
+        of Fock/Kohn-Sham matrix.
+            
+        Determines if density difference method will be used in construction
+        of Fock/Kohn-Sham matrix.
+            
+        Returns
+        -------
+        The flag for usage of density difference method in construction of
+        Fock/Kohn-Sham matrix.
+        """
         
         if self.skip_iter:
             return False
