@@ -43,7 +43,7 @@ inline std::string to_string(const moints moIntsType)
         return std::string("<oo|oo>");
     }
     
-    if (moIntsType == moints:oovv)
+    if (moIntsType == moints::oovv)
     {
         return std::string("<oo|vv>");
     }
@@ -53,12 +53,12 @@ inline std::string to_string(const moints moIntsType)
         return std::string("<ov|ov>");
     }
     
-    if (moIntsType == moints:ovvv)
+    if (moIntsType == moints::ovvv)
     {
         return std::string("<ov|vv>");
     }
     
-    if (moIntsType == moints:vvvv)
+    if (moIntsType == moints::vvvv)
     {
         return std::string("<vv|vv>");
     }

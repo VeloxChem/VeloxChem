@@ -91,6 +91,34 @@ CMolecularOrbitals::operator=(CMolecularOrbitals&& source) noexcept
     return *this;
 }
 
+bool
+CMolecularOrbitals::operator==(const CMolecularOrbitals& other) const
+{
+    if (_orbitalsType != other._orbitalsType) return false;
+    
+    if (_orbitals.size() != other._orbitals.size()) return false;
+    
+    for (size_t i = 0; i < _orbitals.size(); i++)
+    {
+        if (_orbitals[i] != other._orbitals[i]) return false;
+    }
+    
+    if (_energies.size() != other._energies.size()) return false;
+    
+    for (size_t i = 0; i < _energies.size(); i++)
+    {
+        if (_energies[i] != other._energies[i]) return false;
+    }
+    
+    return true;
+}
+
+bool
+CMolecularOrbitals::operator!=(const CMolecularOrbitals& other) const
+{
+    return !(*this == other);
+}
+
 CMolecularOrbitals
 CMolecularOrbitals::insert(const CMolecule&       molecule,
                            const CMolecularBasis& aoBasis,
@@ -202,6 +230,27 @@ CMolecularOrbitals::betaOrbitals() const
     return nullptr;
 }
 
+CDenseMatrix
+CMolecularOrbitals::alphaOrbitals(const int32_t iMolecularOrbital,
+                                  const int32_t nMolecularOrbitals) const
+{
+    return _orbitals[0].slice(0, iMolecularOrbital, getNumberOfRows(),
+                              nMolecularOrbitals);
+}
+
+CDenseMatrix
+CMolecularOrbitals::betaOrbitals(const int32_t iMolecularOrbital,
+                                 const int32_t nMolecularOrbitals) const
+{
+    if (_orbitalsType == molorb::unrest)
+    {
+        return _orbitals[1].slice(0, iMolecularOrbital, getNumberOfRows(),
+                                  nMolecularOrbitals);
+    }
+    
+    return CDenseMatrix(); 
+}
+
 const double*
 CMolecularOrbitals::alphaEnergies() const
 {
@@ -232,34 +281,6 @@ CMolecularOrbitals::getString() const
     }
 
     return orb_str;
-}
-
-bool
-CMolecularOrbitals::operator==(const CMolecularOrbitals& other) const
-{
-    if (_orbitalsType != other._orbitalsType) return false;
-
-    if (_orbitals.size() != other._orbitals.size()) return false;
-    
-    for (size_t i = 0; i < _orbitals.size(); i++)
-    {
-        if (_orbitals[i] != other._orbitals[i]) return false;
-    }
-    
-    if (_energies.size() != other._energies.size()) return false;
-
-    for (size_t i = 0; i < _energies.size(); i++)
-    {
-        if (_energies[i] != other._energies[i]) return false;
-    }
-
-    return true;
-}
-
-bool
-CMolecularOrbitals::operator!=(const CMolecularOrbitals& other) const
-{
-    return !(*this == other);
 }
 
 CAODensityMatrix

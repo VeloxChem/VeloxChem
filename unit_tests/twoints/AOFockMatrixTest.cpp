@@ -332,6 +332,25 @@ TEST_F(CAOFockMatrixTest, GetFock)
                                    {0, 2, 3, 6}));
 }
 
+TEST_F(CAOFockMatrixTest, GetReferenceToFock)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    const CAOFockMatrix fmata({ma, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                              fockmat::restj, fockmat::restk},
+                              {1.0, 2.0, 0.0, 1.0} , {0, 2, 3, 6});
+    
+    ASSERT_EQ(ma, fmata.getReferenceToFock(0));
+    
+    ASSERT_EQ(ma, fmata.getReferenceToFock(1));
+    
+    ASSERT_EQ(mb, fmata.getReferenceToFock(2));
+    
+    ASSERT_EQ(mb, fmata.getReferenceToFock(3));
+}
+
 TEST_F(CAOFockMatrixTest, GetFockType)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);

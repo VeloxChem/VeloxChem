@@ -222,6 +222,14 @@ public:
     double* getFock(const int32_t iFockMatrix);
     
     /**
+     Gets constant reference to specific Fock matrix.
+
+     @param iFockMatrix the index of Fock matrix.
+     @return the constant reference to Fock matrix.
+     */
+    const CDenseMatrix& getReferenceToFock(const int32_t iFockMatrix) const;
+    
+    /**
      Gets type of specific Fock matrix.
 
      @param iFockMatrix the index of Fock matrix.

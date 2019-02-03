@@ -179,6 +179,26 @@ public:
     const double* betaEnergies() const;
     
     /**
+     Gets alpha orbitals within specific range.
+     
+     @param iMolecularOrbital the index of starting orbital.
+     @param nMolecularOrbitals the number of molecular orbitals.
+     @return the alpha orbitals.
+     */
+    CDenseMatrix alphaOrbitals(const int32_t iMolecularOrbital,
+                               const int32_t nMolecularOrbitals) const;
+    
+    /**
+     Gets beta orbitals within specific range.
+     
+     @param iMolecularOrbital the index of starting orbital.
+     @param nMolecularOrbitals the number of molecular orbitals.
+     @return the beta orbitals.
+     */
+    CDenseMatrix betaOrbitals(const int32_t iMolecularOrbital,
+                              const int32_t nMolecularOrbitals) const;
+    
+    /**
      Gets string representation of density matrix object.
 
      @return the string representation.

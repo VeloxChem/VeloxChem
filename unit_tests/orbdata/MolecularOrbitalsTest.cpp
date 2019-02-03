@@ -11,6 +11,8 @@
 #include "MolecularOrbitals.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"
+#include "CheckFunctions.hpp"
+
 
 TEST_F(CMolecularOrbitalsTest, DefaultConstructor)
 {
@@ -79,6 +81,178 @@ TEST_F(CMolecularOrbitalsTest, MoveAssignment)
     CMolecularOrbitals mob = CMolecularOrbitals({ma}, {ea}, molorb::rest);
     
     ASSERT_EQ(moa, mob);
+}
+
+TEST_F(CMolecularOrbitalsTest, Insert)
+{
+    auto mbas = vlxbas::getMolecularBasisForLiH();
+    
+    auto vbas = mbas.reduceToValenceBasis();
+    
+    auto mlih = vlxmol::getTestLiH();
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0,
+                     -2.0,  5.0,  4.0,
+                      6.0,  4.0, -4.0,
+                      2.0,  3.0,  1.0,
+                      3.0, -6.0, -8.0},
+                    5, 3);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    
+    auto xbas = vlxbas::getMolecularBasisForLiHX();
+    
+    auto mob = moa.insert(mlih, xbas, vbas);
+    
+    CDenseMatrix mc({ 1.0, -1.0, -3.0,
+                     -2.0,  5.0,  4.0,
+                      6.0,  4.0, -4.0,
+                      0.0,  0.0,  0.0,
+                      2.0,  3.0,  1.0,
+                      3.0, -6.0, -8.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0},
+                    15, 3);
+    
+    CMolecularOrbitals moc({mc}, {ea}, molorb::rest);
+    
+    ASSERT_EQ(moc, mob);
+}
+
+TEST_F(CMolecularOrbitalsTest, GetNumberOfRows)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0});
+    
+    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    
+    ASSERT_EQ(3, moa.getNumberOfRows());
+}
+
+TEST_F(CMolecularOrbitalsTest, GetNumberOfColumns)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0});
+    
+    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    
+    ASSERT_EQ(2, moa.getNumberOfColumns());
+}
+
+TEST_F(CMolecularOrbitalsTest, AlphaOrbitals)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+  
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     moa.alphaOrbitals(), 1.0e-13);
+}
+
+TEST_F(CMolecularOrbitalsTest, BetaOrbitals)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, moa.betaOrbitals(),
+                     1.0e-13);
+}
+
+TEST_F(CMolecularOrbitalsTest, AlphaEnergies)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    vlxtest::compare(ea, moa.alphaEnergies(), 1.0e-13);
+}
+
+TEST_F(CMolecularOrbitalsTest, BetaEnergies)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    vlxtest::compare(eb, moa.betaEnergies(), 1.0e-13);
+}
+
+TEST_F(CMolecularOrbitalsTest, AlphaOrbitalsWithRange)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -2.0, 6.0}, 3, 1), moa.alphaOrbitals(0, 1));
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3),
+              moa.alphaOrbitals(0, 3));
+    
+    ASSERT_EQ(CDenseMatrix({-1.0, -3.0, 5.0, 4.0, 4.0, -4.0}, 3, 2),
+              moa.alphaOrbitals(1, 2));
+}
+
+TEST_F(CMolecularOrbitalsTest, BetaOrbitalsWithRange)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    ASSERT_EQ(CDenseMatrix({ -1.0, -2.0,  4.0}, 3, 1), moa.betaOrbitals(1, 1));
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2),
+              moa.betaOrbitals(0, 2));
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -3.0, 5.0}, 3, 1),
+              
+              moa.betaOrbitals(0, 1));
 }
 
 TEST_F(CMolecularOrbitalsTest, GetAODensityForRestrictedCase)
@@ -201,47 +375,3 @@ TEST_F(CMolecularOrbitalsTest, getRestrictedPairDensityVectorOfPairs)
                                denmat::rmoij));
 }
 
-TEST_F(CMolecularOrbitalsTest, Insert)
-{
-    auto mbas = vlxbas::getMolecularBasisForLiH();
-    
-    auto vbas = mbas.reduceToValenceBasis();
-    
-    auto mlih = vlxmol::getTestLiH();
-    
-    CDenseMatrix ma({ 1.0, -1.0, -3.0,
-                     -2.0,  5.0,  4.0,
-                      6.0,  4.0, -4.0,
-                      2.0,  3.0,  1.0,
-                      3.0, -6.0, -8.0},
-                    5, 3);
-    
-    std::vector<double> ea({1.0, 2.0, 4.0});
-    
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
-    
-    auto xbas = vlxbas::getMolecularBasisForLiHX();
-    
-    auto mob = moa.insert(mlih, xbas, vbas);
-    
-    CDenseMatrix mc({ 1.0, -1.0, -3.0,
-                     -2.0,  5.0,  4.0,
-                      6.0,  4.0, -4.0,
-                      0.0,  0.0,  0.0,
-                      2.0,  3.0,  1.0,
-                      3.0, -6.0, -8.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0,
-                      0.0,  0.0,  0.0},
-                    15, 3);
-    
-    CMolecularOrbitals moc({mc}, {ea}, molorb::rest);
-    
-    ASSERT_EQ(moc, mob); 
-}

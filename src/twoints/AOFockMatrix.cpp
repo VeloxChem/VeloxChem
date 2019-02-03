@@ -318,6 +318,12 @@ CAOFockMatrix::getFock(const int32_t iFockMatrix)
     return nullptr;
 }
 
+const CDenseMatrix&
+CAOFockMatrix::getReferenceToFock(const int32_t iFockMatrix) const
+{
+    return _fockMatrices[iFockMatrix];
+}
+
 fockmat
 CAOFockMatrix::getFockType(const int32_t iFockMatrix) const
 {
