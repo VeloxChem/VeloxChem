@@ -32,3 +32,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .visualizationdriver import VisualizationDriver
 from .mpitask import MpiTask
+
+# Python functions
+from .qqscheme import get_qq_type
+from .qqscheme import get_qq_scheme

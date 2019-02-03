@@ -8,6 +8,9 @@ from .veloxchemlib import molorb
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 
+from .qqscheme import get_qq_type
+from .qqscheme import get_qq_scheme
+
 import numpy as np
 import time as tm
 import math
@@ -69,7 +72,7 @@ class MOIntegralsDriver:
                                                    self.nodes,
                                                    comm)
             
-        qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
+        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
     
         # compute multiple Fock matrices
@@ -91,7 +94,7 @@ class MOIntegralsDriver:
         str_width = 80
         cur_str = "Number of Fock matrices      : " + str(self.num_mats)
         ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI screening scheme         : " + self.get_qq_type()
+        cur_str = "ERI screening scheme         : " + get_qq_type(self.qq_type)
         ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI Screening Threshold      : " + \
             "{:.1e}".format(self.eri_thresh)
@@ -113,36 +116,4 @@ class MOIntegralsDriver:
     
         if (self.nodes > 1):
             self.dist_exec = True
-
-    def get_qq_type(self):
-        
-        if self.qq_type == "QQ":
-            return "Cauchy Schwarz"
-        
-        if self.qq_type == "QQR":
-            return "Distance Dependent Cauchy Schwarz"
-        
-        if self.qq_type == "QQ_DEN":
-            return "Cauchy Schwarz + Density"
-        
-        if self.qq_type == "QQR_DEN":
-            return "Distance Dependent Cauchy Schwarz + Density"
-        
-        return "Undefined"
-
-    def get_qq_scheme(self):
-        
-        if self.qq_type == "QQ":
-            return ericut.qq
-        
-        if self.qq_type == "QQR":
-            return ericut.qqr
-        
-        if self.qq_type == "QQ_DEN":
-            return ericut.qqden
-
-        if self.qq_type == "QQR_DEN":
-            return ericut.qqrden
-
-        return None;
 

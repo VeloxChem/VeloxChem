@@ -14,8 +14,10 @@ from .veloxchemlib import molorb
 
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
-
 from .denguess import DensityGuess
+
+from .qqscheme import get_qq_type
+from .qqscheme import get_qq_scheme
 
 import numpy as np
 import time as tm
@@ -26,7 +28,7 @@ from collections import deque
 class ScfDriver:
     """Implements SCF method (base class).
         
-    Implements SCF method with C2-DIIS or two-level C2-DIIS convergence
+    Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
     accelerators.
         
     Attributes
@@ -273,7 +275,7 @@ class ScfDriver:
                                                    self.nodes,
                                                    comm)
                                                           
-        qq_data = eri_drv.compute(self.get_qq_scheme(), self.eri_thresh,
+        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
 
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
@@ -536,7 +538,7 @@ class ScfDriver:
         """Computes full Fock/Kohn-Sham matrix.
             
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
-        Fock/Kohn-Sham matrix the kinetic energy and nucleat potential matrices.
+        Fock/Kohn-Sham matrix the kinetic energy and nuclear potential matrices.
         
         Parameters
         ----------
@@ -619,6 +621,8 @@ class ScfDriver:
             
         Parameters
         ----------
+        i
+            The number of current SCF iteration.
         fock_mat
             The Fock/Kohn-Sham matrix.
         den_mat
@@ -628,10 +632,10 @@ class ScfDriver:
         return
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """Computes effective Fock/Kohn-Sham in OAO basis.
+        """Computes effective Fock/Kohn-Sham matrix in OAO basis.
             
-        Computes effective Fock/Kohn-Sham in OAO basis by applying Lowdin or
-        canonical orthogonalization to AO Fock/Kohn-Sham matrix.
+        Computes effective Fock/Kohn-Sham matrix in OAO basis by applying Lowdin
+        or canonical orthogonalization to AO Fock/Kohn-Sham matrix.
             
         Parameters
         ----------
@@ -794,7 +798,7 @@ class ScfDriver:
             "{:.1e}".format(self.conv_thresh)
         ostream.print_header(cur_str.ljust(str_width))
         
-        cur_str = "ERI screening scheme         : " + self.get_qq_type()
+        cur_str = "ERI screening scheme         : " + get_qq_type(self.qq_type)
         ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI screening mode           : " + self.get_qq_dyn()
         ostream.print_header(cur_str.ljust(str_width))
@@ -954,33 +958,6 @@ class ScfDriver:
         
         return "Undefined"
 
-    def get_qq_type(self):
-        """Gets string with type of electron repulsion integrals screening
-        scheme.
-            
-        Gets string with type of electron repulsion integrals screening scheme
-        (Cauchy Schwarz and it's variations).
-            
-        Returns
-        -------
-        The string with type of electron repulsion integrals screening
-        scheme.
-        """
-        
-        if self.qq_type == "QQ":
-            return "Cauchy Schwarz"
-        
-        if self.qq_type == "QQR":
-            return "Distance Dependent Cauchy Schwarz"
-        
-        if self.qq_type == "QQ_DEN":
-            return "Cauchy Schwarz + Density"
-        
-        if self.qq_type == "QQR_DEN":
-            return "Distance Dependent Cauchy Schwarz + Density"
-        
-        return "Undefined"
-
     def get_qq_dyn(self):
         """Gets string with application method of electron repulsion integrals
         screening.
@@ -1018,30 +995,6 @@ class ScfDriver:
             return True
         
         return False
-
-    def get_qq_scheme(self):
-        """Converts screening scheme string to C++ enum.
-            
-        Converts screening scheme string to C++ enum.
-            
-        Returns
-        -------
-        The C++ enum with screening scheme.
-        """
-        
-        if self.qq_type == "QQ":
-            return ericut.qq
-        
-        if self.qq_type == "QQR":
-            return ericut.qqr
-        
-        if self.qq_type == "QQ_DEN":
-            return ericut.qqden
-
-        if self.qq_type == "QQR_DEN":
-            return ericut.qqrden
-
-        return None;
 
     def use_diff_density_fock(self, diff_den):
         """Determines if density difference method will be used in construction

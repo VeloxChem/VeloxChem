@@ -1,24 +1,54 @@
 from .veloxchemlib import mpi_master
-
 from .veloxchemlib import MolecularOrbitals
-
 from .veloxchemlib import molorb
 
 from .aodensitymatrix import AODensityMatrix
-
 from .scfdriver import ScfDriver
-
 from .c2diis import CTwoDiis
 
 import numpy as np
 
 class ScfRestrictedDriver(ScfDriver):
+    """Implements spin restricted closed shell SCF method (derrived class).
+        
+        Implements spin restricted closed shell SCF method with C2-DIIS and
+        two-level C2-DIIS convergence accelerators.
+    """
 
     def __init__(self):
+        """Initializes spin restricted closed shell SCF driver.
+            
+        Initializes spin restricted closed shell SCF driver to default setup
+        (convergence threshold, initial guess, etc) by calling base class
+        constructor.
+        """
         
         super().__init__()
     
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat, comm):
+        """Computes spin restricted closed shell SCF energy components.
+            
+        Computes spin restricted closed shell SCF energy components: electronic
+        energy, kinetic energy, and nuclear potential energy. Overloaded base
+        class method.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix (only 2e-part).
+        kin_mat
+            The kinetic energy matrix.
+        npot_mat
+            The nuclear potential matrix.
+        den_mat
+            The density matrix.
+        comm
+            The MPI communicator.
+        Returns
+        -------
+            The tuple (electronic energy, kinetic energy, nuclear potential
+            energy).
+        """
         
         if self.rank == mpi_master():
             dmat = den_mat.total_to_numpy(0)
@@ -49,11 +79,45 @@ class ScfRestrictedDriver(ScfDriver):
         return (e_ee, e_kin, e_en)
     
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
+        """Computes full spin restricted closed shell Fock/Kohn-Sham matrix.
+            
+        Computes full spin restricted closed shell Fock/Kohn-Sham matrix by
+        adding to 2e-part of Fock/Kohn-Sham matrix the kinetic energy and
+        nuclear potential matrices. Overloaded base class method.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix (2e-part).
+        kin_mat
+            The kinetic energy matrix.
+        npot_mat
+            The nuclear potential matrix.
+        """
 
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, comm):
+        """Computes spin restricted closed shell electronic gradient.
+            
+        Computes spin restricted closed shell electronic gradient using
+        Fock/Kohn-Sham matrix. Overloaded base class method.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        ovl_mat
+            The overlap matrix..
+        den_mat
+            The density matrix.
+        comm
+            The MPI communicator.
+        Returns
+        -------
+            The electronic gradient.
+        """
         
         if self.rank == mpi_master():
             smat = ovl_mat.to_numpy()
@@ -72,6 +136,23 @@ class ScfRestrictedDriver(ScfDriver):
         return e_grad
 
     def comp_density_change(self, den_mat, old_den_mat, comm):
+        """Computes norm of spin restricted closed shell density change.
+            
+        Computes norm of spin restricted closed shell density change between
+        two density matrices. Overloaded base class method.
+            
+        Parameters
+        ----------
+        den_mat
+            The current density matrix.
+        old_den_mat
+            The previous density matrix.
+        comm
+            The MPI communicator.
+        Returns
+        -------
+            The norm of change between two density matrices.
+        """
         
         if self.rank == mpi_master():
             diff_mat = den_mat.sub(old_den_mat)
@@ -86,6 +167,21 @@ class ScfRestrictedDriver(ScfDriver):
         return diff_den
     
     def store_diis_data(self, i, fock_mat, den_mat):
+        """Stores spin restricted closed shell Fock/Kohn-Sham and density
+        matrices for current iteration.
+            
+        Stores spin restricted closed shell Fock/Kohn-Sham and density matrices
+        for current iteration. Overloaded base class method.
+            
+        Parameters
+        ----------
+        i
+            The number of current SCF iteration.
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        den_mat
+            The density matrix.
+        """
         
         if self.rank == mpi_master():
             
@@ -100,6 +196,22 @@ class ScfRestrictedDriver(ScfDriver):
                 self.den_matrices.append(np.copy(den_mat.total_to_numpy(0)))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
+        """Computes effective spin restricted closed shell Fock/Kohn-Sham
+        matrix in OAO basis.
+            
+        Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
+        in OAO basis by applying Lowdin or canonical orthogonalization to AO
+        Fock/Kohn-Sham matrix. Overloaded base class method.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        ovl_mat
+            The overlap matrix.
+        oao_mat
+            The orthogonalization matrix.
+        """
         
         if self.rank == mpi_master():
 
@@ -124,6 +236,19 @@ class ScfRestrictedDriver(ScfDriver):
         return None
     
     def get_scaled_fock(self, weights):
+        """Computes scaled spin restricted closed shell Fock/Kohn-Sham matrix.
+            
+        Computes effective spin restricted closed shell Fock/Kohn-Sham matrix by
+        summing Fock/Kohn-Sham matrices scalwd with weigths.
+            
+        Parameters
+        ----------
+        weights
+            The weights of Fock/Kohn-Sham matrices.
+        Returns
+        -------
+            The scaled Fock/Kohn-Sham matrix.
+        """
         
         effmat = np.zeros(self.fock_matrices[0].shape, dtype=float)
       
@@ -134,6 +259,24 @@ class ScfRestrictedDriver(ScfDriver):
         return effmat
     
     def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
+        """Generates spin restricted molecular orbitals.
+            
+        Generates spin restricted molecular orbital by diagonalizing
+        spin restricted closed shell Fock/Kohn-Sham matrix. Overloaded base
+        class method.
+            
+        Parameters
+        ----------
+        fock_mat
+            The Fock/Kohn-Sham matrix.
+        oao_mat
+            The orthogonalization matrix.
+        ostream
+            The output stream.
+        Returns
+        -------
+            The molecular orbitals.
+        """
         
         if self.rank == mpi_master():
             
@@ -149,6 +292,19 @@ class ScfRestrictedDriver(ScfDriver):
         return MolecularOrbitals()
     
     def gen_new_density(self, molecule):
+        """Generates spin restricted closed shell density matrix.
+            
+        Generates spin restricted closed shell density matrix from current
+        spin restricted molecular orbitals. Overloaded base class method.
+            
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        Returns
+        -------
+            The density matrix.
+        """
         
         if self.rank == mpi_master():
             
@@ -157,5 +313,14 @@ class ScfRestrictedDriver(ScfDriver):
         return AODensityMatrix()
     
     def get_scf_type(self):
+        """Gets string for spin restricted closed shell SCF calculation.
+            
+        Gets string for spin restricted closed shell SCF calculation. Overloaded
+        base class method.
+            
+        Returns
+        -------
+            The string for spin restricted closed shell SCF calculation.
+        """
         
         return "Spin-Restricted Hatree-Fock"
