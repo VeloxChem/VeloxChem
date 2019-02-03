@@ -6,8 +6,8 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef TwoIntsDistType_hpp
-#define TwoIntsDistType_hpp
+#ifndef MOIntsType_hpp
+#define MOIntsType_hpp
 
 #include <string>
 
@@ -66,4 +66,4 @@ inline std::string to_string(const moints moIntsType)
     return std::string("UNKNOWN");
 }
 
-#endif /* TwoIntsDistType_hpp */
+#endif /* MOIntsType_hpp */

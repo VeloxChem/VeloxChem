@@ -30,7 +30,7 @@ TEST_F(CMOIntsBatchTest, CopyConstructor)
     
     CMOIntsBatch mbatchb(mbatcha);
     
-    ASSERT_EQ(mbatcha, mbatcha);
+    ASSERT_EQ(mbatchb, mbatcha);
 }
 
 TEST_F(CMOIntsBatchTest, MoveConstructor)
@@ -45,7 +45,7 @@ TEST_F(CMOIntsBatchTest, MoveConstructor)
     CMOIntsBatch mbatchb(CMOIntsBatch({ma, ma, mb, mb}, {{0, 1}, {0, 1}, {0, 1},
                                       {0, 1}}, {2, 3}, moints::vvvv));
     
-    ASSERT_EQ(mbatcha, mbatcha);
+    ASSERT_EQ(mbatchb, mbatcha);
 }
 
 TEST_F(CMOIntsBatchTest, CopyAssignment)
@@ -59,7 +59,7 @@ TEST_F(CMOIntsBatchTest, CopyAssignment)
     
     CMOIntsBatch mbatchb = mbatcha;
     
-    ASSERT_EQ(mbatcha, mbatcha);
+    ASSERT_EQ(mbatchb, mbatcha);
 }
 
 TEST_F(CMOIntsBatchTest, MoveAssignment)
@@ -74,7 +74,37 @@ TEST_F(CMOIntsBatchTest, MoveAssignment)
     CMOIntsBatch mbatchb = CMOIntsBatch({ma, ma, mb, mb}, {{0, 1}, {0, 1},
                                         {0, 1}, {0, 1}}, {2, 3}, moints::vvvv);
     
-    ASSERT_EQ(mbatcha, mbatcha);
+    ASSERT_EQ(mbatchb, mbatcha);
+}
+
+TEST_F(CMOIntsBatchTest, Append)
+{
+    CDenseMatrix bvec({ 1.0, -1.0, -3.0,
+                       -2.0,  5.0,  4.0,
+                        6.0,  4.0, -4.0},
+                        3, 3);
+    
+    CDenseMatrix kvec({ 1.0, -1.0,
+                       -3.0, -2.0,
+                        5.0, 4.0},
+                        3, 2);
+    
+    CDenseMatrix ma({2.0, 3.0, -2.0,
+                    -2.0, 1.0,  2.0,
+                     2.0, 5.0,  1.0},
+                    3, 3);
+    
+    CAOFockMatrix fmata({ma}, {fockmat::restjk}, {1.0}, {0});
+    
+    CMOIntsBatch mbatcha;
+    
+    mbatcha.append(fmata, bvec, kvec, {0}, {1});
+    
+    CDenseMatrix mc({-75.0, -80.0, 10.0, 24.0, 103.0, 112.0}, 3, 2);
+    
+    CMOIntsBatch mbatchb({mc}, {{0, 1}}, {-1, -1}, moints::oooo);
+    
+    ASSERT_EQ(mbatchb, mbatcha);
 }
 
 TEST_F(CMOIntsBatchTest, SetBatchType)

@@ -19,6 +19,8 @@
 #include "EriScreenerType.hpp"
 #include "ScreeningContainer.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
+#include "MOIntsType.hpp"
+#include "MOIntsBatch.hpp"
 #include "ExportMath.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportTwoInts.hpp"
@@ -151,6 +153,16 @@ void export_twoints(py::module& m)
         .value("qqden",  ericut::qqden)
         .value("qqrden", ericut::qqrden)
     ;
+    
+    // moints enum class
+    
+    py::enum_<moints> (m, "moints")
+    .value("oooo", moints::oooo)
+    .value("oovv", moints::oovv)
+    .value("ovov", moints::ovov)
+    .value("ovvv", moints::ovvv)
+    .value("vvvv", moints::vvvv)
+    ;
 
     // CAOFockMatrix class
 
@@ -212,6 +224,18 @@ void export_twoints(py::module& m)
         .def(py::init(&CElectronRepulsionIntegralsDriver_create))
         .def("compute", &CElectronRepulsionIntegralsDriver_compute_1)
         .def("compute", &CElectronRepulsionIntegralsDriver_compute_2)
+    ;
+    
+    // CMOIntsBatch class
+    
+    py::class_< CMOIntsBatch, std::shared_ptr<CMOIntsBatch> >
+        (
+            m, "MOIntsBatch"
+         )
+        .def(py::init<>())
+        .def("append", &CMOIntsBatch::append)
+        .def("set_batch_type", &CMOIntsBatch::setBatchType)
+        .def("set_ext_indexes", &CMOIntsBatch::setExternalIndexes)
     ;
 }
 
