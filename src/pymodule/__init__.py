@@ -8,6 +8,8 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import SADGuessDriver
+from .veloxchemlib import TwoIndexes
+from .veloxchemlib import MOIntsBatch
 
 # C++ functions
 from .veloxchemlib import mpi_master
@@ -21,6 +23,7 @@ from .veloxchemlib import mathconst_pi
 from .veloxchemlib import denmat
 from .veloxchemlib import ericut
 from .veloxchemlib import molorb
+from .veloxchemlib import moints
 
 # Python classes
 from .inputparser import InputParser

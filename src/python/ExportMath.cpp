@@ -15,6 +15,7 @@
 
 #include "DenseMatrix.hpp"
 #include "MathConst.hpp"
+#include "TwoIndexes.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
@@ -118,6 +119,18 @@ void export_math(py::module& m)
         .def(py::self == py::self)
     ;
 
+    // CTwoIndexes class
+    
+    py::class_< CTwoIndexes, std::shared_ptr<CTwoIndexes> >
+        (
+            m, "TwoIndexes"
+        )
+        .def(py::init<>())
+        .def(py::init<const int32_t, const int32_t>())
+        .def("first", &CTwoIndexes::first)
+        .def("second", &CTwoIndexes::second)
+    ;
+    
     // exposing functions
 
     m.def("mathconst_pi", &mathconst::getPiValue);
