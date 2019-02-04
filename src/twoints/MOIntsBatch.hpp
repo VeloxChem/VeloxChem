@@ -150,6 +150,14 @@ public:
     void setExternalIndexes(const CTwoIndexes& externalIndexes);
     
     /**
+     Gets MO integrals batch.
+     
+     @param iBatchType the index of MO integrals batch.
+     @return the constant pointer to first element of MO integrals batch.
+     */
+    const double* getBatch(const int32_t iBatch);
+    
+    /**
      Converts MO integrals batch object to text output and insert it into output
      text stream.
      

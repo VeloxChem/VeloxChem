@@ -724,6 +724,10 @@ TEST_F(CMOIntsBatchTest, AppendForOOVV)
     CDenseMatrix bvec(cmo, 24, 19);
     
     CMOIntsBatch mbatcha;
+
+    mbatcha.setExternalIndexes({2, 3});
+
+    mbatcha.setBatchType(moints::oovv);
     
     mbatcha.append(fock, bvec, bvec, {0, 0}, {0, 1});
     
@@ -971,9 +975,7 @@ TEST_F(CMOIntsBatchTest, AppendForOOVV)
                                    0.0086438050751475,   0.0000000000000000,   0.0000000000000000,
                                   -0.0000000000000001};
     
-    CMOIntsBatch mbatchb({CDenseMatrix(intsvals00, 19, 19), CDenseMatrix(intsvals01, 19, 19)},
-                         {{0, 0}, {0, 1}}, {-1, -1}, moints::oooo);
-    
-    ASSERT_EQ(mbatchb, mbatcha);
-}
+    vlxtest::compare(intsvals00, mbatcha.getBatch(0), 1.0e-12);
 
+    vlxtest::compare(intsvals01, mbatcha.getBatch(1), 1.0e-12);
+}

@@ -156,6 +156,12 @@ CMOIntsBatch::setExternalIndexes(const CTwoIndexes& externalIndexes)
     _externalIndexes = externalIndexes; 
 }
 
+const double*
+CMOIntsBatch::getBatch(const int32_t iBatch)
+{
+    return _moIntegrals[iBatch].values();
+}
+
 std::ostream&
 operator<<(      std::ostream& output,
            const CMOIntsBatch& source)
