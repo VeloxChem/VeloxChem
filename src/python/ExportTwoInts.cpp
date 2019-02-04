@@ -158,6 +158,7 @@ void export_twoints(py::module& m)
     
     py::enum_<moints> (m, "moints")
     .value("oooo", moints::oooo)
+    .value("ooov", moints::ooov)
     .value("oovv", moints::oovv)
     .value("ovov", moints::ovov)
     .value("ovvv", moints::ovvv)

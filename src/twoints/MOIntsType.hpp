@@ -16,6 +16,7 @@
  
  Defines supported types of molecular integrals:
  moints::oooo - the <oo|oo> integrals
+ moints::ooov - the <oo|ov> integrals
  moints::oovv - the <oo|vv> integrals
  moints::ovov - the <ov|ov> integrals
  moints::ovvv - the <ov|vv> integrals
@@ -24,6 +25,7 @@
 enum class moints
 {
     oooo,
+    ooov,
     oovv,
     ovov,
     ovvv,
@@ -41,6 +43,11 @@ inline std::string to_string(const moints moIntsType)
     if (moIntsType == moints::oooo)
     {
         return std::string("<oo|oo>");
+    }
+
+    if (moIntsType == moints::ooov)
+    {
+        return std::string("<oo|ov>");
     }
     
     if (moIntsType == moints::oovv)
