@@ -315,8 +315,14 @@ void export_orbdata(py::module& m)
                                                        const int32_t) const)
              &CMolecularOrbitals::getRestrictedPairDensity)
         .def("insert", &CMolecularOrbitals::insert)
-        .def("get_num_mos", &CMolecularOrbitals::getNumberOfColumns)
-        .def("get_num_aos", &CMolecularOrbitals::getNumberOfRows)
+        .def("get_number_mos", &CMolecularOrbitals::getNumberOfColumns)
+        .def("get_number_aos", &CMolecularOrbitals::getNumberOfRows)
+        .def("alpha_orbitals", (CDenseMatrix (CMolecularOrbitals::*)(const int32_t,
+                                                                     const int32_t) const)
+             &CMolecularOrbitals::alphaOrbitals)
+        .def("beta_orbitals", (CDenseMatrix (CMolecularOrbitals::*)(const int32_t,
+                                                                    const int32_t) const)
+             &CMolecularOrbitals::betaOrbitals)
         .def(py::self == py::self)
     ;
 }
