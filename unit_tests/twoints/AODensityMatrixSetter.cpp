@@ -171,7 +171,7 @@ getCoccMatrixForH2O()
      0.0000000000000000,  -0.0000000000000000,  -0.0000000000000001,   0.0000000000000000,  -0.0187009995029124,
     -0.0009359431120262,  -0.0040334230672971,  -0.0000000000000002,  -0.0038089173912360,   0.0000000000000000};
 
-    return CDenseMatrix(occvals, 24, 5);
+    return CDenseMatrix(occvals, nrows, ncols);
 }
 
 CDenseMatrix
@@ -273,7 +273,7 @@ getCvirMatrixForH2O()
     -0.2941718065211867,   0.0000000000000002,   0.0000000000000003,  -0.1847207365382846,   1.1465414131956009,
      0.0000000000000609};
 
-    return CDenseMatrix(virvals, 24, 19);
+    return CDenseMatrix(virvals, nrows, ncols);
 }
 
 CAODensityMatrix
