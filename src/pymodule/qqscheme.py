@@ -56,5 +56,5 @@ def get_qq_scheme(qq_type):
     if qq_type == "QQR_DEN":
         return ericut.qqrden
 
-    return None;
+    return None
 
