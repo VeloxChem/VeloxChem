@@ -163,7 +163,7 @@ TEST_F(CMolecularOrbitalsTest, AlphaOrbitals)
     const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
   
     vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
-                     moa.alphaOrbitals(), 1.0e-13);
+                     moa.alphaOrbitals());
 }
 
 TEST_F(CMolecularOrbitalsTest, BetaOrbitals)
@@ -178,8 +178,7 @@ TEST_F(CMolecularOrbitalsTest, BetaOrbitals)
     
     const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
     
-    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, moa.betaOrbitals(),
-                     1.0e-13);
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, moa.betaOrbitals());
 }
 
 TEST_F(CMolecularOrbitalsTest, AlphaEnergies)
@@ -194,7 +193,7 @@ TEST_F(CMolecularOrbitalsTest, AlphaEnergies)
     
     const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
     
-    vlxtest::compare(ea, moa.alphaEnergies(), 1.0e-13);
+    vlxtest::compare(ea, moa.alphaEnergies());
 }
 
 TEST_F(CMolecularOrbitalsTest, BetaEnergies)
@@ -209,7 +208,7 @@ TEST_F(CMolecularOrbitalsTest, BetaEnergies)
     
     const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
     
-    vlxtest::compare(eb, moa.betaEnergies(), 1.0e-13);
+    vlxtest::compare(eb, moa.betaEnergies());
 }
 
 TEST_F(CMolecularOrbitalsTest, AlphaOrbitalsWithRange)
@@ -251,7 +250,6 @@ TEST_F(CMolecularOrbitalsTest, BetaOrbitalsWithRange)
               moa.betaOrbitals(0, 2));
     
     ASSERT_EQ(CDenseMatrix({1.0, -3.0, 5.0}, 3, 1),
-              
               moa.betaOrbitals(0, 1));
 }
 
