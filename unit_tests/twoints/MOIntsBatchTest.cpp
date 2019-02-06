@@ -150,6 +150,128 @@ TEST_F(CMOIntsBatchTest, SetExternalIndexes)
     ASSERT_EQ(mbatcha, mbatcha);
 }
 
+TEST_F(CMOIntsBatchTest, GetBatch)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({ma, ma, mb, mb}, {{0, 1}, {0, 1}, {0, 1}, {0, 1}},
+                         {2, 3}, moints::vvvv);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     mbatcha.getBatch(0), 1.0e-13);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     mbatcha.getBatch(1), 1.0e-13);
+    
+    vlxtest::compare({1.0, -2.0, -3.0, -2.0, 5.0, 4.0},
+                     mbatcha.getBatch(2), 1.0e-13);
+    
+    vlxtest::compare({1.0, -2.0, -3.0, -2.0, 5.0, 4.0},
+                     mbatcha.getBatch(3), 1.0e-13);
+}
+
+TEST_F(CMOIntsBatchTest, GetBatchWithGeneratorPair)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({ma, ma, mb, mb}, {{0, 1}, {1, 1}, {1, 3}, {0, 7}},
+                         {2, 3}, moints::vvvv);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     mbatcha.getBatch({0, 1}), 1.0e-13);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     mbatcha.getBatch({1, 1}), 1.0e-13);
+    
+    vlxtest::compare({1.0, -2.0, -3.0, -2.0, 5.0, 4.0},
+                     mbatcha.getBatch({1, 3}), 1.0e-13);
+    
+    vlxtest::compare({1.0, -2.0, -3.0, -2.0, 5.0, 4.0},
+                     mbatcha.getBatch({0, 7}), 1.0e-13);
+    
+    ASSERT_TRUE(mbatcha.getBatch({0, 4}) == nullptr);
+}
+
+TEST_F(CMOIntsBatchTest, GetBatchType)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({ma, ma, mb, mb}, {{0, 1}, {0, 1}, {0, 1}, {0, 1}},
+                         {2, 3}, moints::vvvv);
+    
+    ASSERT_TRUE(moints::vvvv == mbatcha.getBatchType());
+}
+
+TEST_F(CMOIntsBatchTest, GetExternalIndexes)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({ma, ma, mb, mb}, {{0, 1}, {0, 1}, {0, 1}, {0, 1}},
+                         {2, 3}, moints::vvvv);
+    
+    ASSERT_EQ(CTwoIndexes(2, 3), mbatcha.getExternalIndexes());
+}
+
+TEST_F(CMOIntsBatchTest, GetNumberOfBatches)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({ma, ma, mb, mb}, {{0, 1}, {0, 1}, {0, 1}, {0, 1}},
+                         {2, 3}, moints::vvvv);
+    
+    ASSERT_EQ(4, mbatcha.getNumberOfBatches());
+}
+
+TEST_F(CMOIntsBatchTest, GetGeneratorPairs)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({ma, ma, mb, mb}, {{0, 1}, {1, 1}, {2, 1}, {0, 3}},
+                         {2, 3}, moints::vvvv);
+    
+    auto vec_idx = mbatcha.getGeneratorPairs();
+    
+    ASSERT_EQ(4u, vec_idx.size());
+    
+    ASSERT_EQ(CTwoIndexes(0, 1), vec_idx[0]);
+    
+    ASSERT_EQ(CTwoIndexes(1, 1), vec_idx[1]);
+    
+    ASSERT_EQ(CTwoIndexes(2, 1), vec_idx[2]);
+    
+    ASSERT_EQ(CTwoIndexes(0, 3), vec_idx[3]);
+}
+
+TEST_F(CMOIntsBatchTest, GetNumberOfRows)
+{
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({mb, mb}, {{0, 1}, {1, 1}}, {2, 3}, moints::vvvv);
+    
+    ASSERT_EQ(3, mbatcha.getNumberOfRows());
+}
+
+TEST_F(CMOIntsBatchTest, GetNumberOfColumns)
+{
+    CDenseMatrix mb({1.0, -2.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CMOIntsBatch mbatcha({mb, mb}, {{0, 1}, {1, 1}}, {2, 3}, moints::vvvv);
+    
+    ASSERT_EQ(2, mbatcha.getNumberOfColumns());
+}
+
 TEST_F(CMOIntsBatchTest, AppendForOOVV)
 {
     auto mh2o = vlxmol::getMoleculeH2O();
