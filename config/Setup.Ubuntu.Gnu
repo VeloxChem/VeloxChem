@@ -46,10 +46,14 @@ endif
 
 # MKL header and library
 
-MKL_INCLUDES := $(MKLROOT)/include
-
-LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_rt
-LIB_LIST += -lmkl_gnu_thread -lgomp -lpthread -lm -ldl
+ifeq ($(USE_MKL),true)
+  MKL_INCLUDES := $(MKLROOT)/include
+  LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_rt
+  LIB_LIST += -lmkl_gnu_thread 
+else
+  LIB_LIST :=  -lopenblas -llapacke
+endif
+LIB_LIST += -lgomp -lpthread -lm -ldl
 
 # Google Test root directory
 
