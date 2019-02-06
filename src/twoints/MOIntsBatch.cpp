@@ -157,9 +157,27 @@ CMOIntsBatch::setExternalIndexes(const CTwoIndexes& externalIndexes)
 }
 
 const double*
-CMOIntsBatch::getBatch(const int32_t iBatch)
+CMOIntsBatch::getBatch(const int32_t iBatch) const
 {
     return _moIntegrals[iBatch].values();
+}
+
+int32_t
+CMOIntsBatch::getNumberOfBatches() const
+{
+    return static_cast<int32_t>(_moIntegrals.size());
+}
+
+int32_t
+CMOIntsBatch::getNumberOfRows(const int32_t iBatch) const
+{
+    return _moIntegrals[iBatch].getNumberOfRows();
+}
+
+int32_t
+CMOIntsBatch::getNumberOfColumns(const int32_t iBatch) const
+{
+    return _moIntegrals[iBatch].getNumberOfColumns();
 }
 
 std::ostream&

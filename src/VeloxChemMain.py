@@ -38,7 +38,9 @@ def main():
 
         moints_drv = vlx.MOIntegralsDriver()
 
-        moints_drv.compute_task(task, scf_drv.mol_orbs)
+        oovv = moints_drv.compute_task(task, scf_drv.mol_orbs, "OOVV")
+        #print(oovv.number_of_batches())
+        #print(oovv.to_numpy(0))
 
     # Cube
 

@@ -155,7 +155,30 @@ public:
      @param iBatchType the index of MO integrals batch.
      @return the constant pointer to first element of MO integrals batch.
      */
-    const double* getBatch(const int32_t iBatch);
+    const double* getBatch(const int32_t iBatch) const;
+    
+    /**
+     Gets number of batches.
+     
+     @return the number of batches.
+     */
+    int32_t getNumberOfBatches() const;
+    
+    /**
+     Gets number of rows in MO integrals batch.
+     
+     @param iBatchType the index of MO integrals batch.
+     @return the number of rows in MO integrals batch.
+     */
+    int32_t getNumberOfRows(const int32_t iBatch) const;
+    
+    /**
+     Gets number of columns in MO integrals batch.
+     
+     @param iBatchType the index of MO integrals batch.
+     @return the number of columns in MO integrals batch.
+     */
+    int32_t getNumberOfColumns(const int32_t iBatch) const;
     
     /**
      Converts MO integrals batch object to text output and insert it into output

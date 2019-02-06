@@ -125,7 +125,18 @@ CAOFockMatrix_reduce_sum(CAOFockMatrix& self,
         
     self.reduce_sum(rank, nodes, *comm_ptr);
 }
-    
+
+// Helper function for converting CMOIntsBatch to numpy array
+
+static py::array_t<double>
+CMOIntsBatch_to_numpy(const CMOIntsBatch& self,
+                      const int32_t iBatch)
+{
+    return vlx_general::pointer_to_numpy(self.getBatch(iBatch),
+                                         self.getNumberOfRows(iBatch),
+                                         self.getNumberOfColumns(iBatch));
+}
+
 // Exports classes/functions in src/twoints to python
 
 void export_twoints(py::module& m)
@@ -157,12 +168,12 @@ void export_twoints(py::module& m)
     // moints enum class
     
     py::enum_<moints> (m, "moints")
-    .value("oooo", moints::oooo)
-    .value("ooov", moints::ooov)
-    .value("oovv", moints::oovv)
-    .value("ovov", moints::ovov)
-    .value("ovvv", moints::ovvv)
-    .value("vvvv", moints::vvvv)
+        .value("oooo", moints::oooo)
+        .value("ooov", moints::ooov)
+        .value("oovv", moints::oovv)
+        .value("ovov", moints::ovov)
+        .value("ovvv", moints::ovvv)
+        .value("vvvv", moints::vvvv)
     ;
 
     // CAOFockMatrix class
@@ -235,6 +246,8 @@ void export_twoints(py::module& m)
             m, "MOIntsBatch"
          )
         .def(py::init<>())
+        .def("to_numpy", &CMOIntsBatch_to_numpy)
+        .def("number_of_batches", &CMOIntsBatch::getNumberOfBatches)
         .def("append", &CMOIntsBatch::append)
         .def("set_batch_type", &CMOIntsBatch::setBatchType)
         .def("set_ext_indexes", &CMOIntsBatch::setExternalIndexes)

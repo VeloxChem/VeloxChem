@@ -37,18 +37,15 @@ class MOIntegralsDriver:
         self.num_matrices = 0
         self.batch_size = 3000
     
-    def compute_task(self, task, mol_orbs):
+    def compute_task(self, task, mol_orbs, mints_type):
 
-        self.compute(task.molecule, task.ao_basis, mol_orbs, task.mpi_comm,
-                     task.ostream)
+        return self.compute(task.molecule, task.ao_basis, mol_orbs, mints_type,
+                            task.mpi_comm, task.ostream)
     
-    def compute(self, molecule, ao_basis, mol_orbs, comm, ostream):
+    def compute(self, molecule, ao_basis, mol_orbs, mints_type, comm, ostream):
         
         # start timer
         start_time = tm.time()
-        
-        # temporay hack
-        mints_type = "VVVV"
         
         # mpi communicators
         self.set_global_comm(comm)
@@ -104,6 +101,8 @@ class MOIntegralsDriver:
         
         if self.rank == mpi_master():
             self.print_finish(start_time, ostream)
+
+        return moints_batch
 
     def print_header(self, ostream):
         
