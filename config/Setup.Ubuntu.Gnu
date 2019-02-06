@@ -44,16 +44,24 @@ ifeq ($(USE_MKL),true)
   CPP_DEB_FLG += -DENABLE_MKL
 endif
 
-# MKL header and library
+# Math library
 
 ifeq ($(USE_MKL),true)
+
   MKL_INCLUDES := $(MKLROOT)/include
+
   LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_rt
-  LIB_LIST += -lmkl_gnu_thread 
+  LIB_LIST += -lmkl_gnu_thread -lgomp -lpthread -lm -ldl
+
 else
-  LIB_LIST :=  -lopenblas -llapacke
+
+  MKLROOT := /home/lixin/software/openblas
+  MKL_INCLUDES := $(MKLROOT)/include
+
+  LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas -lgfortran
+  LIB_LIST += -lgomp -lpthread -lm -ldl
+
 endif
-LIB_LIST += -lgomp -lpthread -lm -ldl
 
 # Google Test root directory
 

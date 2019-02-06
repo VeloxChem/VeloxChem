@@ -44,7 +44,7 @@ ifeq ($(USE_MKL),true)
   CPP_DEB_FLG += -DENABLE_MKL
 endif
 
-# MKL header and library
+# Math library
 
 MKLROOT := /home/lxin/software/openblas
 MKL_INCLUDES := $(MKLROOT)/include
