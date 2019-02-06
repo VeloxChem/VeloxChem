@@ -186,16 +186,16 @@ CMOIntsBatch::getExternalIndexes() const
     return _externalIndexes;
 }
 
-int32_t
-CMOIntsBatch::getNumberOfBatches() const
-{
-    return static_cast<int32_t>(_moIntegrals.size());
-}
-
 std::vector<CTwoIndexes>
 CMOIntsBatch::getGeneratorPairs() const
 {
     return _generatorPairs;
+}
+
+int32_t
+CMOIntsBatch::getNumberOfBatches() const
+{
+    return static_cast<int32_t>(_moIntegrals.size());
 }
 
 int32_t

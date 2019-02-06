@@ -39,8 +39,16 @@ def main():
         moints_drv = vlx.MOIntegralsDriver()
 
         oovv = moints_drv.compute_task(task, scf_drv.mol_orbs, "OOVV")
-        #print(oovv.number_of_batches())
-        #print(oovv.to_numpy(0))
+        """
+        print(oovv.number_of_batches())
+        print(oovv.number_of_rows(), oovv.number_of_columns())
+        pair_1 = oovv.to_numpy(1)
+        pair_01 = oovv.to_numpy(vlx.TwoIndexes(0,1))
+        assert (pair_1 == pair_01).all()
+        print(oovv.get_batch_type())
+        for pair in oovv.get_gen_pairs():
+            print("({}, {})".format(pair.first(), pair.second()))
+        """
 
     # Cube
 

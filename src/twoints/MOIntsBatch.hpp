@@ -181,6 +181,13 @@ public:
     CTwoIndexes getExternalIndexes() const;
     
     /**
+     Gets vector with generator pairs.
+
+     @return the vector of generator pairs.
+     */
+    std::vector<CTwoIndexes> getGeneratorPairs() const;
+    
+    /**
      Gets number of MO integrals batches.
 
      @return the number of batches.
@@ -201,13 +208,6 @@ public:
      */
     int32_t getNumberOfColumns() const;
 
-    /**
-     Gets vector with generator pairs.
-
-     @return the vector of generator pairs.
-     */
-    std::vector<CTwoIndexes> getGeneratorPairs() const;
-    
     /**
      Converts MO integrals batch object to text output and insert it into output
      text stream.

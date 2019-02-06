@@ -137,6 +137,15 @@ CMOIntsBatch_to_numpy(const CMOIntsBatch& self,
                                          self.getNumberOfColumns());
 }
 
+static py::array_t<double>
+CMOIntsBatch_to_numpy_2(const CMOIntsBatch& self,
+                        const CTwoIndexes& iGeneratorPair)
+{
+    return vlx_general::pointer_to_numpy(self.getBatch(iGeneratorPair),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
 // Exports classes/functions in src/twoints to python
 
 void export_twoints(py::module& m)
@@ -238,7 +247,7 @@ void export_twoints(py::module& m)
         .def("compute", &CElectronRepulsionIntegralsDriver_compute_1)
         .def("compute", &CElectronRepulsionIntegralsDriver_compute_2)
     ;
-    
+
     // CMOIntsBatch class
     
     py::class_< CMOIntsBatch, std::shared_ptr<CMOIntsBatch> >
@@ -247,10 +256,16 @@ void export_twoints(py::module& m)
          )
         .def(py::init<>())
         .def("to_numpy", &CMOIntsBatch_to_numpy)
+        .def("to_numpy", &CMOIntsBatch_to_numpy_2)
         .def("number_of_batches", &CMOIntsBatch::getNumberOfBatches)
+        .def("number_of_rows", &CMOIntsBatch::getNumberOfRows)
+        .def("number_of_columns", &CMOIntsBatch::getNumberOfColumns)
         .def("append", &CMOIntsBatch::append)
         .def("set_batch_type", &CMOIntsBatch::setBatchType)
         .def("set_ext_indexes", &CMOIntsBatch::setExternalIndexes)
+        .def("get_batch_type", &CMOIntsBatch::getBatchType)
+        .def("get_ext_indexes", &CMOIntsBatch::getExternalIndexes)
+        .def("get_gen_pairs", &CMOIntsBatch::getGeneratorPairs)
     ;
 }
 
