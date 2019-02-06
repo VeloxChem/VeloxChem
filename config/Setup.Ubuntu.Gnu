@@ -48,17 +48,17 @@ endif
 
 ifeq ($(USE_MKL),true)
 
-  MKL_INCLUDES := $(MKLROOT)/include
+  MATH_INC := $(MKLROOT)/include
 
   LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_rt
   LIB_LIST += -lmkl_gnu_thread -lgomp -lpthread -lm -ldl
 
 else
 
-  MKLROOT := /home/lixin/software/openblas
-  MKL_INCLUDES := $(MKLROOT)/include
+  MATH_ROOT := /home/lixin/software/openblas
+  MATH_INC := $(MATH_ROOT)/include
 
-  LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lopenblas -lgfortran
+  LIB_LIST := -L$(MATH_ROOT)/lib -Wl,-rpath,$(MATH_ROOT)/lib -lopenblas
   LIB_LIST += -lgomp -lpthread -lm -ldl
 
 endif
@@ -91,12 +91,12 @@ endif
 # Python interface
 
 PYTHON := python3
-PYBIND11_PATH := /home/lixin/software/pybind11
+PYBIND11_ROOT := /home/lixin/software/pybind11
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(PYBIND11_PATH)/include
+PYTHON_INC += -I$(PYBIND11_ROOT)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
 

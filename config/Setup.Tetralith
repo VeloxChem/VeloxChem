@@ -47,7 +47,7 @@ endif
 
 # MKL header and library
 
-MKL_INCLUDES := $(MKLROOT)/include
+MATH_INC := $(MKLROOT)/include
 
 LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_intel_lp64
 LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx512 -liomp5 -lpthread -lm -ldl
@@ -80,12 +80,12 @@ endif
 # Python interface
 
 PYTHON := python3
-PYBIND11_PATH := /home/x_lixin/Public/tetralith/pybind11
+PYBIND11_ROOT := /home/x_lixin/Public/tetralith/pybind11
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(PYBIND11_PATH)/include
+PYTHON_INC += -I$(PYBIND11_ROOT)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
 

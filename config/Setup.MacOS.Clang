@@ -45,12 +45,24 @@ ifeq ($(USE_MKL),true)
   CPP_DEB_FLG += -DENABLE_MKL
 endif
 
-# MKL header and library
+# Math library
 
-MKL_INCLUDES := $(MKLROOT)/include
+ifeq ($(USE_MKL),true)
 
-LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lmkl_intel_lp64
-LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx -lomp -lpthread -lm -ldl
+  MATH_INC := $(MKLROOT)/include
+
+  LIB_LIST := -L$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/lib -lmkl_intel_lp64
+  LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx -lomp -lpthread -lm -ldl
+
+else
+
+  MATH_ROOT := /usr/local/Cellar/openblas/0.3.3
+  MATH_INC := $(MATH_ROOT)/include
+
+  LIB_LIST := -L$(MATH_ROOT)/lib -Wl,-rpath,$(MATH_ROOT)/lib -lopenblas
+  LIB_LIST += -lomp -lpthread -lm -ldl
+
+endif
 
 # Google Test root directory
 
@@ -84,12 +96,12 @@ LIB_LIST += -undefined dynamic_lookup
 # Python interface
 
 PYTHON := python3
-PYBIND11_PATH := /Users/lixin/software/pybind11
+PYBIND11_ROOT := /Users/lixin/software/pybind11
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(PYBIND11_PATH)/include
+PYTHON_INC += -I$(PYBIND11_ROOT)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
 

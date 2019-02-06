@@ -34,7 +34,7 @@ NVCCFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
 vpath %.hpp $(VLX_INCLUDES)
 
 # Add MKL includes
-NVCCFLAGS += -I $(MKL_INCLUDES)
+NVCCFLAGS += -I $(MATH_INC)
 
 # Default rule for linking library
 debug: $(LOCAL_OBJ)

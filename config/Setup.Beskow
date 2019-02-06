@@ -46,7 +46,7 @@ endif
 
 # MKL header and library
 
-MKL_INCLUDES := $(MKLROOT)/include
+MATH_INC := $(MKLROOT)/include
 
 LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_intel_lp64
 LIB_LIST += -lmkl_gnu_thread -lmkl_core -lmkl_avx2 -lgomp -lpthread -lm -ldl
@@ -79,12 +79,12 @@ endif
 # Python interface
 
 PYTHON := python3
-PYBIND11_PATH := /cfs/klemming/nobackup/l/lxin/software/beskow/pybind11
+PYBIND11_ROOT := /cfs/klemming/nobackup/l/lxin/software/beskow/pybind11
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(PYBIND11_PATH)/include
+PYTHON_INC += -I$(PYBIND11_ROOT)/include
 
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
 

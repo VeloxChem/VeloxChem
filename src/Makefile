@@ -39,7 +39,7 @@ CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
 vpath %.hpp $(VLX_INCLUDES)
 
 # Add MKL includes
-CXXFLAGS += -I $(MKL_INCLUDES)
+CXXFLAGS += -I $(MATH_INC)
 
 # Add list of internal libraries
 ifeq ($(USE_GPU),true)
