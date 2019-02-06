@@ -162,22 +162,62 @@ CMOIntsBatch::getBatch(const int32_t iBatch) const
     return _moIntegrals[iBatch].values();
 }
 
+const double*
+CMOIntsBatch::getBatch(const CTwoIndexes& iGeneratorPair) const
+{
+    for (size_t i = 0; i < _moIntegrals.size(); i++)
+    {
+        if (iGeneratorPair == _generatorPairs[i])
+            return _moIntegrals[i].values(); 
+    }
+    
+    return nullptr;
+}
+
+moints
+CMOIntsBatch::getBatchType() const
+{
+    return _batchType;
+}
+
+CTwoIndexes
+CMOIntsBatch::getExternalIndexes() const
+{
+    return _externalIndexes;
+}
+
 int32_t
 CMOIntsBatch::getNumberOfBatches() const
 {
     return static_cast<int32_t>(_moIntegrals.size());
 }
 
-int32_t
-CMOIntsBatch::getNumberOfRows(const int32_t iBatch) const
+std::vector<CTwoIndexes>
+CMOIntsBatch::getGeneratorPairs() const
 {
-    return _moIntegrals[iBatch].getNumberOfRows();
+    return _generatorPairs;
 }
 
 int32_t
-CMOIntsBatch::getNumberOfColumns(const int32_t iBatch) const
+CMOIntsBatch::getNumberOfRows() const
 {
-    return _moIntegrals[iBatch].getNumberOfColumns();
+    if (_moIntegrals.size() > 0)
+    {
+        return _moIntegrals[0].getNumberOfRows();
+    }
+    
+    return 0;
+}
+
+int32_t
+CMOIntsBatch::getNumberOfColumns() const
+{
+    if (_moIntegrals.size() > 0)
+    {
+        return _moIntegrals[0].getNumberOfColumns();
+    }
+    
+    return 0;
 }
 
 std::ostream&

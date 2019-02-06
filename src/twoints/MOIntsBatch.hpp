@@ -152,14 +152,37 @@ public:
     /**
      Gets MO integrals batch.
      
-     @param iBatchType the index of MO integrals batch.
+     @param iBatch the index of MO integrals batch.
      @return the constant pointer to first element of MO integrals batch.
      */
     const double* getBatch(const int32_t iBatch) const;
     
     /**
-     Gets number of batches.
+     Gets MO integrals batch for specific generator pair.
      
+     @param iGeneratorPair the generator pair associated with MO integrals
+            batch.
+     @return the constant pointer to first element of MO integrals batch.
+     */
+    const double* getBatch(const CTwoIndexes& iGeneratorPair) const;
+    
+    /**
+     Gets MO integrals batch type.
+
+     @return the batch type.
+     */
+    moints getBatchType() const;
+    
+    /**
+     Gets pair of external indexes in MO integrals contraction.
+
+     @return the pair of external indexes.
+     */
+    CTwoIndexes getExternalIndexes() const;
+    
+    /**
+     Gets number of MO integrals batches.
+
      @return the number of batches.
      */
     int32_t getNumberOfBatches() const;
@@ -167,18 +190,23 @@ public:
     /**
      Gets number of rows in MO integrals batch.
      
-     @param iBatchType the index of MO integrals batch.
      @return the number of rows in MO integrals batch.
      */
-    int32_t getNumberOfRows(const int32_t iBatch) const;
+    int32_t getNumberOfRows() const;
     
     /**
      Gets number of columns in MO integrals batch.
      
-     @param iBatchType the index of MO integrals batch.
      @return the number of columns in MO integrals batch.
      */
-    int32_t getNumberOfColumns(const int32_t iBatch) const;
+    int32_t getNumberOfColumns() const;
+
+    /**
+     Gets vector with generator pairs.
+
+     @return the vector of generator pairs.
+     */
+    std::vector<CTwoIndexes> getGeneratorPairs() const;
     
     /**
      Converts MO integrals batch object to text output and insert it into output

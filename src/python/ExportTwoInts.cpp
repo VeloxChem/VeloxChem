@@ -133,8 +133,8 @@ CMOIntsBatch_to_numpy(const CMOIntsBatch& self,
                       const int32_t iBatch)
 {
     return vlx_general::pointer_to_numpy(self.getBatch(iBatch),
-                                         self.getNumberOfRows(iBatch),
-                                         self.getNumberOfColumns(iBatch));
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
 }
 
 // Exports classes/functions in src/twoints to python
