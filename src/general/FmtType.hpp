@@ -13,31 +13,41 @@
  Enumerate class fmt:
 
  Defines supported formatting keys:
- fmt::end    - the end of output line
  fmt::left   - the left alignment of output line
  fmt::center - the center alignment of output line
  fmt::right  - the right alignment of output line
- fmt::blank  - the empty output line terminated by fmt::end
- fmt::title  - the title style of output line
- fmt::tsep   - the separator output line terminated by fmt::end
- fmt::cerror - the critial error style of output line
- fmt::into   - the information message style of output line
- fmt::error  - the syntax error style of output line
- fmt::header - the header style of output line
  */
 enum class fmt
 {
-    end,
     left,
     center,
-    right,
-    blank,
-    title,
-    tsep,
-    cerror,
-    info,
-    error,
-    header
+    right
 };
+
+/**
+ Converts enumerate class value to it's string label.
+ 
+ @param formatKey the enumerate class value.
+ @return the label of enumerate class value.
+ */
+inline std::string to_string(const fmt formatKey)
+{
+    if (formatKey == fmt::left)
+    {
+        return std::string("Format Key: Left");
+    }
+    
+    if (formatKey == fmt::center)
+    {
+        return std::string("Format Key: Center");
+    }
+    
+    if (formatKey == fmt::right)
+    {
+        return std::string("Format Key: Right");
+    }
+    
+    return std::string("UNKNOWN");
+}
 
 #endif /* FmtType_hpp */
