@@ -36,9 +36,9 @@ def main():
 
         # test multiple AO to MO matrices computation
 
-        moints_drv = vlx.MOIntegralsDriver()
+#moints_drv = vlx.MOIntegralsDriver()
 
-        oovv = moints_drv.compute_task(task, scf_drv.mol_orbs, "OOVV")
+#oovv = moints_drv.compute_task(task, scf_drv.mol_orbs, "OOVV")
         """
         print(oovv.number_of_batches())
         print(oovv.number_of_rows(), oovv.number_of_columns())

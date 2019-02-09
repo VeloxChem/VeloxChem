@@ -142,7 +142,7 @@ class CTwoDiis:
             The normalized B-matrix eigenvector.
         """
     
-        fmin = 1.0e8
+        fmin = 1.0e+8
         wmin = weights[0]
         
         for w in weights:
@@ -159,5 +159,4 @@ class CTwoDiis:
                 wmin = w
     
         return wmin
-
     

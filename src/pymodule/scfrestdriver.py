@@ -98,7 +98,7 @@ class ScfRestrictedDriver(ScfDriver):
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
-    def comp_gradient(self, fock_mat, ovl_mat, den_mat, comm):
+    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat, comm):
         """Computes spin restricted closed shell electronic gradient.
             
         Computes spin restricted closed shell electronic gradient using
@@ -112,6 +112,8 @@ class ScfRestrictedDriver(ScfDriver):
             The overlap matrix..
         den_mat
             The density matrix.
+        oao_mat
+            The orthogonalization matrix.
         comm
             The MPI communicator.
         Returns
@@ -123,11 +125,15 @@ class ScfRestrictedDriver(ScfDriver):
             smat = ovl_mat.to_numpy()
             dmat = den_mat.total_to_numpy(0)
             fmat = fock_mat.to_numpy(0)
+            tmat = oao_mat.to_numpy()
         
             fa = np.matmul(fmat, np.matmul(dmat, smat))
             fb = np.matmul(smat, np.matmul(dmat, fmat))
-        
-            e_grad = 2.0 * np.linalg.norm(fa - fb)
+            
+            fx = np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat))
+            
+            e_grad = 2.0 * np.linalg.norm(np.matmul(tmat.transpose(),
+                                                    np.matmul(fa - fb, tmat)))
         else:
             e_grad = 0.0
 
@@ -228,7 +234,7 @@ class ScfRestrictedDriver(ScfDriver):
                                                ovl_mat, oao_mat)
             
                 weights = acc_diis.compute_weights()
-            
+                
                 return self.get_scaled_fock(weights)
         
             return np.copy(fock_mat.to_numpy(0))
@@ -285,6 +291,7 @@ class ScfRestrictedDriver(ScfDriver):
             fmo = np.matmul(tmat.transpose(), np.matmul(fock_mat, tmat))
         
             eigs, evecs = np.linalg.eigh(fmo)
+            
             orb_coefs = np.matmul(tmat, evecs)
         
             return MolecularOrbitals([orb_coefs], [eigs], molorb.rest)

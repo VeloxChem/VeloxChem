@@ -114,7 +114,7 @@ class ScfDriver:
         # thresholds
         self.conv_thresh = 1.0e-6
         self.eri_thresh  = 1.0e-12
-        self.ovl_thresh  = 1.0e-12
+        self.ovl_thresh  = 1.0e-4
         self.diis_thresh = 0.2
         self.dden_thresh = 1.0e-3
         
@@ -262,7 +262,7 @@ class ScfDriver:
             ncol = oao_mat.number_of_columns()
             if nrow != ncol:
                 ndim = nrow - ncol
-                ostream.print_info(" Removed %d linearly dependent vector%s."
+                ostream.print_info("Removed %d linearly dependent vector%s."
                                    % (ndim, '' if ndim ==1 else 's'))
                 ostream.print_blank()
 
@@ -279,7 +279,7 @@ class ScfDriver:
                                   molecule, ao_basis)
 
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
-                                          ovl_mat, comm, ostream)
+                                          ovl_mat, comm, ostream) 
                                           
         den_mat.broadcast(self.rank, comm)
 
@@ -308,7 +308,8 @@ class ScfDriver:
                 
             self.comp_full_fock(fock_mat, kin_mat, npot_mat)
                         
-            e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, comm)
+            e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, oao_mat,
+                                        comm)
         
             self.set_skip_iter_flag(i, e_grad)
                 
@@ -323,9 +324,9 @@ class ScfDriver:
             self.print_iter_data(i, ostream)
                 
             self.store_diis_data(i, fock_mat, den_mat)
-    
-            eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
+            eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
+            
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                         ostream)
             
@@ -552,7 +553,7 @@ class ScfDriver:
         
         return
 
-    def comp_gradient(self, fock_mat, ovl_mat, den_mat, comm):
+    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat, comm):
         """Computes electronic gradient.
             
         Computes electronic gradient using Fock/Kohn-Sham matrix.
@@ -562,9 +563,11 @@ class ScfDriver:
         fock_mat
             The Fock/Kohn-Sham matrix.
         ovl_mat
-            The overlap matrix..
+            The overlap matrix.
         den_mat
             The density matrix.
+        oao_mat
+            The orthogonalization matrix.
         comm
             The MPI communicator.
         Returns
@@ -697,7 +700,10 @@ class ScfDriver:
         -------
             The screening threshold.
         """
-
+        
+        if e_grad < 1.0e-6:
+            return self.eri_thresh
+        
         nteri = math.pow(10, math.floor(math.log10(e_grad)));
 
         nteri = 1.0e-8 * nteri
