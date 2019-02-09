@@ -114,7 +114,7 @@ class ScfDriver:
         # thresholds
         self.conv_thresh = 1.0e-6
         self.eri_thresh  = 1.0e-12
-        self.ovl_thresh  = 1.0e-4
+        self.ovl_thresh  = 1.0e-6
         self.diis_thresh = 0.2
         self.dden_thresh = 1.0e-3
         
@@ -1022,4 +1022,33 @@ class ScfDriver:
             return True
     
         return False
+
+    def delete_mos(self, mol_orbs, mol_eigs):
+        """Generates trimmed molecular orbitals.
+            
+        Generates trimmed molecular orbital by deleting MOs with coeficients
+        exceeding 1.0 / sqrt(ovl_thresh).
+            
+        Parameters
+        ----------
+        mol_orbs
+            The molecular orbitals.
+        mol_eigs
+            The eigenvalues of molecular orbitals.
+        Returns
+        -------
+            The tuple (trimmed molecular orbitals, eigenvalues).
+        """
+        
+        fmax = 1.0 / math.sqrt(self.ovl_thresh)
+        
+        mvec = np.amax(np.abs(mol_orbs), axis = 0)
+        
+        molist = []
+        for i in range(mvec.shape[0]):
+            if mvec[i] < fmax:
+                molist.append(i)
+        
+        return (mol_orbs[:, molist], mol_eigs[molist])
+
 
