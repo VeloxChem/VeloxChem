@@ -61,7 +61,7 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
     
     // generate GTOs pairs blocks for AO basis
     
-    CGtoPairsContainer kgtopairs(molecule, aoBasis, 1.0e-13);
+    CGtoPairsContainer kgtopairs(molecule, aoBasis, 1.0e-15);
     
     // split GTOs pairs into batches
     

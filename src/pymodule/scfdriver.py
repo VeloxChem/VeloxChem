@@ -113,7 +113,7 @@ class ScfDriver:
         
         # thresholds
         self.conv_thresh = 1.0e-6
-        self.eri_thresh  = 1.0e-12
+        self.eri_thresh  = 1.0e-15
         self.ovl_thresh  = 1.0e-6
         self.diis_thresh = 0.2
         self.dden_thresh = 1.0e-3
@@ -706,10 +706,10 @@ class ScfDriver:
         
         nteri = math.pow(10, math.floor(math.log10(e_grad)));
 
-        nteri = 1.0e-8 * nteri
+        nteri = 1.0e-10 * nteri
     
-        if nteri > 1.0e-8:
-            return 1.0e-8
+        if nteri > 1.0e-10:
+            return 1.0e-10
         
         if nteri < self.eri_thresh:
             return self.eri_thresh
