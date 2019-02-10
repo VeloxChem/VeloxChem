@@ -65,6 +65,7 @@ TEST_F(CDenseMatrixTest, MoveAssignment)
     ASSERT_EQ(ma, mb);
 }
 
+
 TEST_F(CDenseMatrixTest, GetNumberOfRows)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 2, 3);
@@ -172,6 +173,20 @@ TEST_F(CDenseMatrixTest, Symmetrize)
                     3, 3);
     
     ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CDenseMatrixTest, Transpose)
+{
+    CDenseMatrix ma({ 1.0, -1.0,
+                     -3.0, -2.0,
+                      5.0,  4.0},
+                      3, 2);
+    
+    CDenseMatrix mb({ 1.0, -3.0, 5.0,
+                     -1.0, -2.0, 4.0},
+                      2, 3);
+    
+    ASSERT_EQ(mb, ma.transpose());
 }
 
 TEST_F(CDenseMatrixTest, Slice)

@@ -32,7 +32,7 @@ CGtoPairsBlock::CGtoPairsBlock()
 
     , _pairFactors(CMemBlock2D<double>())
 
-    , _threshold(1.0e-13)
+    , _threshold(1.0e-16)
 
     , _nOriginalPrimPairs(0)
 

@@ -118,27 +118,36 @@ TEST_F(COverlapMatrixTest, GetOrthogonalizationMatrix)
     
     COverlapMatrix smata(ma);
     
-    CDenseMatrix refmat({ 0.5227351824567613, -0.4976329506165474, -0.1947637155486871,
-                         -0.4976329506165478,  1.8097622833751084,  0.0808312367804720,
-                         -0.1947637155486870,  0.0808312367804720,  0.6298490905403010},
-                        3, 3);
+    CDenseMatrix refmat({  0.659788099291142, 0.2545280076864466, 0.2423193899561403,
+                          -1.870627094622050, 0.1578026238399430, 0.0725559748124375,
+                          -0.205020511005960, -0.6206955232198551, 0.1178139554973027},
+                         3, 3);
     
-    ASSERT_EQ(refmat, smata.getOrthogonalizationMatrix(0.0));
+    auto o3mat = smata.getOrthogonalizationMatrix(0.0);
+    
+    auto pref3mat = refmat.values();
+    
+    auto psol3mat = o3mat.values();
+    
+    for (int32_t i = 0; i < o3mat.getNumberOfElements(); i++)
+    {
+        ASSERT_NEAR(std::fabs(pref3mat[i]), std::fabs(psol3mat[i]), 1.0e-13);
+    }
     
     CDenseMatrix submat({{ 0.2545280076864466, 0.2423193899561403,
                            0.1578026238399430, 0.0725559748124375,
                           -0.6206955232198551, 0.1178139554973027}},
                           3, 2);
     
-    auto omat = smata.getOrthogonalizationMatrix(0.5);
+    auto o2mat = smata.getOrthogonalizationMatrix(0.5);
     
-    auto prefmat = submat.values();
+    auto pref2mat = submat.values();
     
-    auto psolmat = omat.values();
+    auto psol2mat = o2mat.values();
     
-    for (int32_t i = 0; i < omat.getNumberOfElements(); i++)
+    for (int32_t i = 0; i < o2mat.getNumberOfElements(); i++)
     {
-        ASSERT_NEAR(std::fabs(prefmat[i]), std::fabs(psolmat[i]), 1.0e-13);
+        ASSERT_NEAR(std::fabs(pref2mat[i]), std::fabs(psol2mat[i]), 1.0e-13);
     }
 }
 

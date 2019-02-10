@@ -16,7 +16,7 @@ CSparseVector::CSparseVector()
 
     , _nElements(0)
 
-    , _threshold(1.0e-13)
+    , _threshold(1.0e-15)
 {
     
 }
