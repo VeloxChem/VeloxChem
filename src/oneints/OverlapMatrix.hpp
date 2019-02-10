@@ -9,10 +9,10 @@
 #ifndef OverlapMatrix_hpp
 #define OverlapMatrix_hpp
 
+#include <cstdint>
 #include <string>
 
 #include "DenseMatrix.hpp"
-#include "SystemClock.hpp"
 
 /**
  Class COverlapMatrix stores general one electron overlap matrix and provides

@@ -12,6 +12,7 @@
 
 #include "DenseDiagonalizer.hpp"
 #include "StringFormat.hpp"
+#include "SystemClock.hpp"
 
 COverlapMatrix::COverlapMatrix()
 {

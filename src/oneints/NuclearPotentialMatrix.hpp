@@ -9,6 +9,9 @@
 #ifndef NuclearPotentialMatrix_hpp
 #define NuclearPotentialMatrix_hpp
 
+#include <cstdint>
+#include <string>
+
 #include "DenseMatrix.hpp"
 
 /**

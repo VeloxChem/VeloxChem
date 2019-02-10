@@ -9,6 +9,9 @@
 #ifndef ElectronicPotentialMatrix_hpp
 #define ElectronicPotentialMatrix_hpp
 
+#include <cstdint>
+#include <string>
+
 #include "DenseMatrix.hpp"
 
 /**
