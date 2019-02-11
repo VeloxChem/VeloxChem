@@ -368,7 +368,7 @@ CMolecularOrbitals::getRestrictedPairDensity(const std::vector<int32_t>& iMolecu
     auto nrow = _orbitals[0].getNumberOfRows();
     
     auto ncol = _orbitals[0].getNumberOfColumns();
-    
+
     if (iMolecularOrbitals.size() == jMolecularOrbitals.size())
     {
         std::vector<CDenseMatrix> denvec;
@@ -399,6 +399,57 @@ CMolecularOrbitals::getRestrictedPairDensity(const std::vector<int32_t>& iMolecu
     return CAODensityMatrix();
 }
 
+void
+CMolecularOrbitals::broadcast(int32_t  rank,
+                              MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        // broadcast molecular orbital type
+
+        int32_t motyp = 0;
+
+        if (rank == mpi::master()) motyp = to_int(_orbitalsType);
+
+        mpi::bcast(motyp, comm);
+
+        if (rank != mpi::master()) _orbitalsType = to_molorb(motyp);
+
+        // broadcast molecular orbitals
+
+        int32_t norbs = static_cast<int32_t>(_orbitals.size());
+
+        mpi::bcast(norbs, comm);
+
+        for (int32_t i = 0; i < norbs; i++)
+        {
+            CDenseMatrix morb;
+
+            if (rank == mpi::master()) morb = _orbitals[i];
+
+            morb.broadcast(rank, comm);
+
+            if (rank != mpi::master()) _orbitals.push_back(morb);
+        }
+
+        // broadcast orbital energies
+
+        int32_t nvecs = static_cast<int32_t>(_energies.size());
+
+        mpi::bcast(nvecs, comm);
+
+        for (int32_t i = 0; i < nvecs; i++)
+        {
+            CMemBlock<double> vec;
+
+            if (rank == mpi::master()) vec = _energies[i];
+
+            vec.broadcast(rank, comm);
+
+            if (rank != mpi::master()) _energies.push_back(vec);
+        }
+    }
+}
 
 std::ostream&
 operator<<(      std::ostream&       output,

@@ -25,6 +25,32 @@ enum class molorb
 };
 
 /**
+ Converts key value of molecular orbitals type to integer number.
+ 
+ @param motyp the enumerate class value.
+ @return the integer number.
+ */
+inline int32_t to_int(const molorb motyp)
+{
+    return static_cast<int32_t>(motyp);
+}
+
+/**
+ Converts integer key value to molecular orbitals type.
+ 
+ @param keyValue the integer key value.
+ @return the molecular orbital matrix type.
+ */
+inline molorb to_molorb(const int32_t keyValue)
+{
+    if (keyValue == to_int(molorb::rest)) return molorb::rest;
+
+    if (keyValue == to_int(molorb::unrest)) return molorb::unrest;
+
+    return molorb::rest;
+}
+
+/**
  Converts enumerate class value to it's string label.
  
  @param molecularOrbitals the enumerate class value.

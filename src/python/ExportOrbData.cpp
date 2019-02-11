@@ -203,6 +203,18 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
             );
 }
 
+// Helper function for broadcasting CMolecularOrbitals object
+
+static void
+CMolecularOrbitals_broadcast(CMolecularOrbitals& self,
+                             int32_t             rank,
+                             py::object          py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    self.broadcast(rank, *comm_ptr);
+}
+
 // Exports classes/functions in src/orbdata to python
 
 void export_orbdata(py::module& m)
@@ -317,12 +329,15 @@ void export_orbdata(py::module& m)
         .def("insert", &CMolecularOrbitals::insert)
         .def("get_number_mos", &CMolecularOrbitals::getNumberOfColumns)
         .def("get_number_aos", &CMolecularOrbitals::getNumberOfRows)
-        .def("alpha_orbitals", (CDenseMatrix (CMolecularOrbitals::*)(const int32_t,
-                                                                     const int32_t) const)
+        .def("alpha_orbitals",
+             (CDenseMatrix (CMolecularOrbitals::*)(const int32_t,
+                                                   const int32_t) const)
              &CMolecularOrbitals::alphaOrbitals)
-        .def("beta_orbitals", (CDenseMatrix (CMolecularOrbitals::*)(const int32_t,
-                                                                    const int32_t) const)
+        .def("beta_orbitals",
+             (CDenseMatrix (CMolecularOrbitals::*)(const int32_t,
+                                                   const int32_t) const)
              &CMolecularOrbitals::betaOrbitals)
+        .def("broadcast", &CMolecularOrbitals_broadcast)
         .def(py::self == py::self)
     ;
 }

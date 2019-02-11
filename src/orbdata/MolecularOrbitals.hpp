@@ -244,6 +244,14 @@ public:
      */
     CAODensityMatrix getRestrictedPairDensity(const std::vector<int32_t>& iMolecularOrbitals,
                                               const std::vector<int32_t>& jMolecularOrbitals) const;
+
+    /**
+     Broadcasts molecular orbitals object within domain of MPI communicator.
+     
+     @param rank the rank of MPI process.
+     @param comm the MPI communicator.
+     */
+    void broadcast(int32_t rank, MPI_Comm comm);
     
     /**
      Converts molecular orbitals object to text output and insert it into output
