@@ -146,6 +146,106 @@ CMOIntsBatch_to_numpy_2(const CMOIntsBatch& self,
                                          self.getNumberOfColumns());
 }
 
+// Helper function for collecting CMOIntsBatch on global master node
+
+static void
+CMOIntsBatch_collectBatches(CMOIntsBatch& self,
+                            int32_t       cross_rank,
+                            int32_t       cross_nodes,
+                            py::object    py_cross_comm)
+{
+    MPI_Comm* cross_comm_ptr = vlx_general::get_mpi_comm(py_cross_comm);
+
+    int32_t nrows = self.getNumberOfRows();
+
+    int32_t ncols = self.getNumberOfColumns();
+
+    // master: receive data
+
+    if (cross_rank == mpi::master())
+    {
+        for (int32_t cross_id = 1; cross_id < cross_nodes; ++ cross_id)
+        {
+            int32_t tag_id = cross_id;
+
+            MPI_Status mstat;
+
+            int32_t numbatches = 0;
+
+            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++,
+                                   *cross_comm_ptr, &mstat);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+
+            std::vector<double> data(nrows * ncols);
+
+            for (int32_t ibatch = 0; ibatch < numbatches; ibatch++)
+            {
+                int32_t first = -1, second = -1;
+
+                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++,
+                                  *cross_comm_ptr, &mstat);
+
+                if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+
+                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++,
+                                  *cross_comm_ptr, &mstat);
+
+                if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+
+                merror = MPI_Recv(data.data(), nrows * ncols, MPI_DOUBLE, cross_id,
+                                  tag_id++, *cross_comm_ptr, &mstat);
+
+                if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+
+                self.appendMOInts(CDenseMatrix(data, nrows, ncols),
+                                  CTwoIndexes(first, second));
+
+            }
+        }
+    }
+
+    // worker process: send data
+
+    else
+    {
+        int32_t tag_id = cross_rank;
+
+        auto numbatches = self.getNumberOfBatches();
+
+        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++,
+                               *cross_comm_ptr);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+
+        auto genpairs = self.getGeneratorPairs();
+
+        for (int32_t ibatch = 0; ibatch < numbatches; ibatch++)
+        {
+            auto data = self.getBatch(ibatch);
+
+            auto first = genpairs[ibatch].first();
+
+            auto second = genpairs[ibatch].second();
+
+            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++,
+                              *cross_comm_ptr);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+
+            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++,
+                              *cross_comm_ptr);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+
+            merror = MPI_Send(data, nrows * ncols, MPI_DOUBLE, mpi::master(),
+                              tag_id++, *cross_comm_ptr);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
+        }
+    }
+}
+
 // Exports classes/functions in src/twoints to python
 
 void export_twoints(py::module& m)
@@ -266,6 +366,7 @@ void export_twoints(py::module& m)
         .def("get_batch_type", &CMOIntsBatch::getBatchType)
         .def("get_ext_indexes", &CMOIntsBatch::getExternalIndexes)
         .def("get_gen_pairs", &CMOIntsBatch::getGeneratorPairs)
+        .def("collect_batches", &CMOIntsBatch_collectBatches)
     ;
 }
 

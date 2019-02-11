@@ -136,6 +136,15 @@ public:
                 const std::vector<int32_t>& ketIndexes);
     
     /**
+     Adds mo integrals matrix to batch.
+
+     @param moIntegralMatrix the MO integrals matrix.
+     @param twoIndexes the indexes of the generator pair.
+     */
+    void appendMOInts(const CDenseMatrix& moIntegralMatrix,
+                      const CTwoIndexes&  twoIndexes);
+
+    /**
      Sets type of MO integrals batch.
      
      @param batchType the type of MO integrals batch.

@@ -145,6 +145,15 @@ CMOIntsBatch::append(const CAOFockMatrix&        aoFockMatrix,
 }
 
 void
+CMOIntsBatch::appendMOInts(const CDenseMatrix& moIntegralMatrix,
+                           const CTwoIndexes&  twoIndexes)
+{
+    _moIntegrals.push_back(moIntegralMatrix);
+
+    _generatorPairs.push_back(twoIndexes);
+}
+
+void
 CMOIntsBatch::setBatchType(const moints batchType)
 {
     _batchType = batchType; 
