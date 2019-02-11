@@ -137,6 +137,26 @@ CDenseMatrix::zero()
     mathfunc::zero(_values.data(), _nRows * _nColumns);
 }
 
+CDenseMatrix
+CDenseMatrix::transpose() const
+{
+    CDenseMatrix tmat(_nColumns, _nRows);
+    
+    auto cvals = _values.data();
+    
+    auto tvals = tmat.values();
+    
+    for (int32_t i = 0; i < _nRows; i++)
+    {
+        for (int32_t j = 0; j < _nColumns; j++)
+        {
+            tvals[j * _nRows + i] = cvals[ i * _nColumns + j]; 
+        }
+    }
+    
+    return tmat;
+}
+
 void
 CDenseMatrix::symmetrize()
 {

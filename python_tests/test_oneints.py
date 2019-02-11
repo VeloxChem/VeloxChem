@@ -28,20 +28,6 @@ class TestOneInts(unittest.TestCase):
         self.assertTrue((array == array2).all())
         self.assertEqual(matrix, matrix2)
 
-    def test_get_ortho_matrix(self):
-
-        arr = np.array([[1.0, 0.2, 0.1], [0.2, 2.0, 0.3], [0.1, 0.3, 3.0]])
-
-        mat = OverlapMatrix(arr)
-        ortho_1 = mat.get_ortho_matrix(1.0e-12).to_numpy()
-
-        evals, evecs = np.linalg.eigh(arr)
-        evals_sqrt_inv = np.diag([1.0 / math.sqrt(x) for x in evals])
-        ortho_2 = np.dot(evecs, np.dot(evals_sqrt_inv, evecs.T))
-
-        diff = np.max(np.abs(ortho_1 - ortho_2))
-        self.assertAlmostEqual(0., diff, 13)
-
     def test_kinetic_energy_matrix(self):
 
         array = np.array([[1.0, 0.2], [0.2, 1.0]])

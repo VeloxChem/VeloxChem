@@ -131,6 +131,13 @@ public:
     void zero();
     
     /**
+     Creates transpose dense matrix.
+
+     @return the transpose dense matrix.
+     */
+    CDenseMatrix transpose() const;
+    
+    /**
      Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).
      */
     void symmetrize();

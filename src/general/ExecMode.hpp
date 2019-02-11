@@ -28,12 +28,34 @@ enum class execmode : int32_t
 /**
  Converts key value of job execution mode to integer number.
  
- @param execmodekey the key value of job execution mode.
+ @param execModeKey the key value of job execution mode.
  @return the integer number.
  */
-inline int32_t to_int(const execmode execmodekey)
+inline int32_t to_int(const execmode execModeKey)
 {
-    return static_cast<int32_t>(execmodekey);
+    return static_cast<int32_t>(execModeKey);
 }
+
+/**
+ Converts enumerate class value to it's string label.
+ 
+ @param execModeKey the enumerate class value.
+ @return the label of enumerate class value.
+ */
+inline std::string to_string(const execmode execModeKey)
+{
+    if (execModeKey == execmode::cpu)
+    {
+        return std::string("Execution Mode: CPU");
+    }
+    
+    if (execModeKey == execmode::cpu_gpu)
+    {
+        return std::string("Execution Mode: CPU-GPU");
+    }
+    
+    return std::string("UNKNOWN");
+}
+
 
 #endif /* ExecMode_hpp */

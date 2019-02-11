@@ -25,7 +25,7 @@ CDensityGridDriver::CDensityGridDriver(const int32_t  globRank,
 
     , _isLocalMode(false)
 
-    , _thresholdOfDensity(1.0e-13)
+    , _thresholdOfDensity(1.0e-15)
 
     , _thresholdOfPrimGTOs(1.0e-15)
 

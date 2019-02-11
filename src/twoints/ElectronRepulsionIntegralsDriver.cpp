@@ -59,7 +59,7 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
     
     // generate GTOs pairs blocks for AO basis on bra side
     
-    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-13);
+    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-15);
     
     // split GTOs pairs into batches on bra side
     
@@ -85,7 +85,7 @@ CElectronRepulsionIntegralsDriver::compute(const ericut           screeningSchem
     
     // generate GTOs pairs blocks for AO basis on bra side
     
-    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-13);
+    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-15);
     
     // split GTOs pairs into batches on bra side
     

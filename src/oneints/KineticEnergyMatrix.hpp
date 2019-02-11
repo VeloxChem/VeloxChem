@@ -9,6 +9,10 @@
 #ifndef KineticEnergyMatrix_hpp
 #define KineticEnergyMatrix_hpp
 
+#include <cstdint>
+#include <string>
+
+
 #include "DenseMatrix.hpp"
 
 /**

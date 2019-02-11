@@ -122,7 +122,7 @@ class DensityGuess:
         if self._guess_type == "PRCMO":
 
             proj_orbs = red_orbs.insert(molecule, ao_basis, red_basis)
-        
+            
             return proj_orbs.get_density(molecule)
 
         return AODensityMatrix()

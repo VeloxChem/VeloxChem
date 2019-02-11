@@ -12,6 +12,7 @@
 
 #include "DenseDiagonalizer.hpp"
 #include "StringFormat.hpp"
+#include "SystemClock.hpp"
 
 COverlapMatrix::COverlapMatrix()
 {
@@ -117,37 +118,28 @@ COverlapMatrix::getOrthogonalizationMatrix(const double threshold) const
     
     diagdrv.diagonalize(_matrix);
     
-    CDenseMatrix omat;
-    
-    if (diagdrv.isLinearlyDependentBasis(threshold))
+    auto omat = diagdrv.getEigenVectors(threshold);
+        
+    auto eigs = diagdrv.getEigenValues(threshold);
+        
+    // set up dimensions
+        
+    auto ncol = eigs.size();
+        
+    auto nrow = omat.getNumberOfRows();
+        
+    // loop over matrix columns
+        
+    auto mdat = omat.values();
+        
+    for (int32_t i = 0; i < ncol; i++)
     {
-        omat = diagdrv.getEigenVectors(threshold);
-        
-        auto eigs = diagdrv.getEigenValues(threshold);
-        
-        // set up dimensions
-        
-        auto ncol = eigs.size();
-        
-        auto nrow = omat.getNumberOfRows();
-        
-        // loop over matrix columns
-        
-        auto mdat = omat.values();
-        
-        for (int32_t i = 0; i < ncol; i++)
-        {
-            auto fact = 1.0 / std::sqrt(eigs.at(i));
+        auto fact = 1.0 / std::sqrt(eigs.at(i));
             
-            for (int32_t j = 0; j < nrow; j++)
-            {
-                mdat[j * ncol + i] *= fact; 
-            }
+        for (int32_t j = 0; j < nrow; j++)
+        {
+            mdat[j * ncol + i] *= fact;
         }
-    }
-    else
-    {
-        omat = diagdrv.getInvertedSqrtMatrix();
     }
     
     return omat;
