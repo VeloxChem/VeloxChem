@@ -6,6 +6,7 @@ import veloxchem as vlx
 import sys
 import os.path
 import time
+import numpy as np
 
 
 def main():
@@ -20,7 +21,7 @@ def main():
 
     # Hartree-Fock
 
-    if task_type == 'hf':
+    if task_type in ['hf', 'mp2', 'cube']:
 
         # initialize scf driver and run scf
 
@@ -34,25 +35,57 @@ def main():
             scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
             scf_drv.density.write_hdf5("density.h5")
 
-        # test multiple AO to MO matrices computation
+    if task_type == 'mp2':
+
+        # molecular orbitals
+
+        if task.mpi_rank == vlx.mpi_master():
+            mol_orbs = scf_drv.mol_orbs
+        else:
+            mol_orbs = vlx.MolecularOrbitals()
+
+        # AO to MO matrices computation
 
         moints_drv = vlx.MOIntegralsDriver()
 
-        oovv = moints_drv.compute_task(task, scf_drv.mol_orbs, "OOVV")
-        """
-        print(oovv.number_of_batches())
-        print(oovv.number_of_rows(), oovv.number_of_columns())
-        pair_1 = oovv.to_numpy(1)
-        pair_01 = oovv.to_numpy(vlx.TwoIndexes(0,1))
-        assert (pair_1 == pair_01).all()
-        print(oovv.get_batch_type())
-        for pair in oovv.get_gen_pairs():
-            print("({}, {})".format(pair.first(), pair.second()))
-        """
+        oovv = moints_drv.compute_task(task, mol_orbs, "OOVV")
+
+        # important: collect MO integrals on the master node
+        oovv = moints_drv.collect_moints_batches(oovv)
+
+        if task.mpi_rank == vlx.mpi_master():
+
+            nmo = mol_orbs.get_number_mos()
+            nocc = task.molecule.number_of_alpha_electrons()
+            nvir = nmo - nocc
+
+            orb_ene = mol_orbs.ea_to_numpy()
+            eocc = orb_ene[:nocc]
+            evir = orb_ene[nocc:]
+
+            oovv_phys = np.zeros((nocc, nocc, nvir, nvir))
+
+            for i in range(nocc):
+                for j in range(nocc):
+                    ij = oovv.to_numpy(vlx.TwoIndexes(i, j))
+                    oovv_phys[i, j, :, :] = ij[:, :]
+
+            e_denom = 1 / (eocc.reshape(-1, 1, 1, 1) -
+                           evir.reshape(-1, 1, 1) + eocc.reshape(-1, 1) - evir)
+
+            ovov_chem = oovv_phys.swapaxes(1, 2)
+            e_os = np.einsum('iajb,iajb,iajb->', ovov_chem, ovov_chem, e_denom)
+            e_ss = np.einsum('iajb,iajb,iajb->', ovov_chem -
+                             ovov_chem.swapaxes(1, 3), ovov_chem, e_denom)
+            e_mp2 = e_os + e_ss
+
+            mp2_str = "*** MP2 correlation energy: %20.12f a.u." % e_mp2
+            task.ostream.print_header(mp2_str.ljust(92))
+            task.ostream.print_blank()
 
     # Cube
 
-    elif task_type == 'cube':
+    if task_type == 'cube':
 
         # generate cube file
 
