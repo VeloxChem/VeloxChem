@@ -168,6 +168,48 @@ class MOIntegralsDriver:
 
         return moints_batch
 
+    def compute_mp2_energy(self, mol_orbs, nocc, moints_batch):
+
+        mints_type = moints_batch.get_batch_type()
+
+        if mints_type != moints.oovv:
+            return None
+
+        global_master = (self.global_comm.Get_rank() == mpi_master())
+        local_master = (self.local_comm.Get_rank() == mpi_master())
+
+        cross_comm = self.cross_comm
+        cross_rank = cross_comm.Get_rank()
+        cross_nodes = cross_comm.Get_size()
+
+        if local_master:
+            orb_ene = mol_orbs.ea_to_numpy()
+            nmo = mol_orbs.get_number_mos()
+            nvir = nmo - nocc
+
+            local_e_mp2 = 0.0
+
+            for pair in moints_batch.get_gen_pairs():
+                ei = orb_ene[pair.first()]
+                ej = orb_ene[pair.second()]
+                ij = moints_batch.to_numpy(pair)
+
+                for a in range(nvir):
+                    for b in range(nvir):
+                        ijab = ij[a][b]
+                        ijba = ij[b][a]
+                        ea = orb_ene[nocc + a]
+                        eb = orb_ene[nocc + b]
+                        denom = ei + ej - ea - eb
+                        local_e_mp2 += ijab * (2.0 * ijab - ijba) / denom
+
+            local_e_mp2 = self.cross_comm.gather(local_e_mp2, root=mpi_master())
+
+        if global_master:
+            return sum(local_e_mp2)
+        else:
+            return None
+
     def print_header(self, ostream):
         
         ostream.print_blank()

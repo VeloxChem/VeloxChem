@@ -44,41 +44,17 @@ def main():
         else:
             mol_orbs = vlx.MolecularOrbitals()
 
-        # AO to MO matrices computation
+        # MO integrals
 
         moints_drv = vlx.MOIntegralsDriver()
-
         oovv = moints_drv.compute_task(task, mol_orbs, "OOVV")
 
-        # important: collect MO integrals on the master node
-        oovv = moints_drv.collect_moints_batches(oovv)
+        # MP2 energy
+
+        nocc = task.molecule.number_of_alpha_electrons()
+        e_mp2 = moints_drv.compute_mp2_energy(mol_orbs, nocc, oovv)
 
         if task.mpi_rank == vlx.mpi_master():
-
-            nmo = mol_orbs.get_number_mos()
-            nocc = task.molecule.number_of_alpha_electrons()
-            nvir = nmo - nocc
-
-            orb_ene = mol_orbs.ea_to_numpy()
-            eocc = orb_ene[:nocc]
-            evir = orb_ene[nocc:]
-
-            oovv_phys = np.zeros((nocc, nocc, nvir, nvir))
-
-            for i in range(nocc):
-                for j in range(nocc):
-                    ij = oovv.to_numpy(vlx.TwoIndexes(i, j))
-                    oovv_phys[i, j, :, :] = ij[:, :]
-
-            e_denom = 1 / (eocc.reshape(-1, 1, 1, 1) -
-                           evir.reshape(-1, 1, 1) + eocc.reshape(-1, 1) - evir)
-
-            ovov_chem = oovv_phys.swapaxes(1, 2)
-            e_os = np.einsum('iajb,iajb,iajb->', ovov_chem, ovov_chem, e_denom)
-            e_ss = np.einsum('iajb,iajb,iajb->', ovov_chem -
-                             ovov_chem.swapaxes(1, 3), ovov_chem, e_denom)
-            e_mp2 = e_os + e_ss
-
             mp2_str = "*** MP2 correlation energy: %20.12f a.u." % e_mp2
             task.ostream.print_header(mp2_str.ljust(92))
             task.ostream.print_blank()
