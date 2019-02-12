@@ -18,6 +18,9 @@
 #include "MoleculeSetter.hpp"
 #include "CheckFunctions.hpp"
 #include "EriScreenerType.hpp"
+#include "DenseLinearAlgebra.hpp"
+#include "MOIntsType.hpp"
+#include "TwoIndexes.hpp"
 
 TEST_F(CMOIntsBatchTest, DefaultConstructor)
 {
@@ -108,6 +111,36 @@ TEST_F(CMOIntsBatchTest, Append)
     CMOIntsBatch mbatcha;
     
     mbatcha.append(fmata, bvec, kvec, {0}, {1});
+    
+    CDenseMatrix mc({-75.0, -80.0, 10.0, 24.0, 103.0, 112.0}, 3, 2);
+    
+    CMOIntsBatch mbatchb({mc}, {{0, 1}}, {-1, -1}, moints::oooo);
+    
+    ASSERT_EQ(mbatchb, mbatcha);
+}
+
+TEST_F(CMOIntsBatchTest, AppendMOInts)
+{
+    CDenseMatrix bvec({ 1.0, -1.0, -3.0,
+                       -2.0,  5.0,  4.0,
+                        6.0,  4.0, -4.0},
+                        3, 3);
+    
+    CDenseMatrix kvec({ 1.0, -1.0,
+                       -3.0, -2.0,
+                        5.0, 4.0},
+                        3, 2);
+    
+    CDenseMatrix ma({2.0, 3.0, -2.0,
+                    -2.0, 1.0,  2.0,
+                     2.0, 5.0,  1.0},
+                    3, 3);
+
+    auto momat = denblas::multAtB(bvec, denblas::multAB(ma, kvec));
+    
+    CMOIntsBatch mbatcha;
+    
+    mbatcha.appendMOInts(momat, CTwoIndexes(0, 1));
     
     CDenseMatrix mc({-75.0, -80.0, 10.0, 24.0, 103.0, 112.0}, 3, 2);
     

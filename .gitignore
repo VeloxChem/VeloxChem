@@ -8,6 +8,8 @@ build
 *.out
 *.log
 *.pyc
+*.gcno
+*.gcda
 *~
 dummy.*
 __pycache__

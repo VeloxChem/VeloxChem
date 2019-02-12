@@ -77,7 +77,7 @@ class InputParser:
             if 'molecule' in self.input_dict.keys():
                 if 'units' in self.input_dict['molecule'].keys():
                     units = self.input_dict['molecule']['units']
-                    if units in ['au', 'bohr', 'bohrs']:
+                    if units.lower() in ['au', 'bohr', 'bohrs']:
                         need_convert_units = False
 
             if need_convert_units:

@@ -184,24 +184,20 @@ class MOIntegralsDriver:
 
         if local_master:
             orb_ene = mol_orbs.ea_to_numpy()
-            nmo = mol_orbs.get_number_mos()
-            nvir = nmo - nocc
+            eocc = orb_ene[:nocc]
+            evir = orb_ene[nocc:]
+            eab = evir.reshape(-1, 1) + evir
 
             local_e_mp2 = 0.0
 
             for pair in moints_batch.get_gen_pairs():
-                ei = orb_ene[pair.first()]
-                ej = orb_ene[pair.second()]
-                ij = moints_batch.to_numpy(pair)
+                eij = orb_ene[pair.first()] + orb_ene[pair.second()]
+                denom = eij - eab
 
-                for a in range(nvir):
-                    for b in range(nvir):
-                        ijab = ij[a][b]
-                        ijba = ij[b][a]
-                        ea = orb_ene[nocc + a]
-                        eb = orb_ene[nocc + b]
-                        denom = ei + ej - ea - eb
-                        local_e_mp2 += ijab * (2.0 * ijab - ijba) / denom
+                ij = moints_batch.to_numpy(pair)
+                ij_asym = ij - ij.T
+
+                local_e_mp2 += np.sum(ij * (ij + ij_asym) / denom)
 
             local_e_mp2 = self.cross_comm.gather(local_e_mp2, root=mpi_master())
 
@@ -228,6 +224,7 @@ class MOIntegralsDriver:
             "{:.1e}".format(self.eri_thresh)
         ostream.print_header(cur_str.ljust(str_width))
         ostream.print_blank()
+        ostream.flush()
 
     def print_finish(self, start_time, ostream):
         
