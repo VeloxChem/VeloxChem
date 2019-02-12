@@ -224,6 +224,7 @@ class MOIntegralsDriver:
             "{:.1e}".format(self.eri_thresh)
         ostream.print_header(cur_str.ljust(str_width))
         ostream.print_blank()
+        ostream.flush()
 
     def print_finish(self, start_time, ostream):
         
