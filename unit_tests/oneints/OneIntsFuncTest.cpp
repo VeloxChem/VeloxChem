@@ -355,8 +355,7 @@ TEST_F(COneIntsFuncTest, CompDistancesPBFromP)
     ASSERT_EQ(rpb, refpb);
 }
 
-
-TEST_F(COneIntsFuncTest, CompDistancesPCFromP)
+TEST_F(COneIntsFuncTest, CompDistancesPCFromPWithCharges)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
     
@@ -392,6 +391,44 @@ TEST_F(COneIntsFuncTest, CompDistancesPCFromP)
                                       -3.0000,
                                       -1.0000,      -1.00000,        -1.0000,
                                -0.1400/1.1000}, 4, 6);
+    
+    ASSERT_EQ(rpc, refpc);
+}
+
+TEST_F(COneIntsFuncTest, CompDistancesPCFromP)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoBlock pket(lih, bas, 1);
+    
+    CMemBlock2D<double> facts(4, 4);
+    
+    intsfunc::compFactorsForOverlap(facts, pbra, pket, 0);
+    
+    CMemBlock2D<double> rp(4, 6);
+    
+    intsfunc::compCoordinatesForP(rp, facts, 2, pbra, pket, 0);
+    
+    CMemBlock2D<double> rpc(4, 6);
+    
+    intsfunc::compDistancesPC(rpc, rp, 2.0, 1.5, 0.0, pbra, pket, 0);
+    
+    CMemBlock2D<double> refpc({     -2.0000,      -2.00000,       -2.0000,
+                                    -2.0000,
+                                    -1.5000,      -1.50000,       -1.5000,
+                                    -1.5000,
+                                     0.0000,       0.00000,        0.0000,
+                              0.9600/2.2500,
+                                    -2.0000,      -2.00000,       -2.0000,
+                                    -2.0000,
+                                    -1.5000,      -1.50000,       -1.5000,
+                                    -1.5000,
+                                     0.0000,       0.00000,        0.0000,
+                              0.9600/1.1000}, 4, 6);
     
     ASSERT_EQ(rpc, refpc);
 }

@@ -674,6 +674,30 @@ namespace intsfunc { // intsfunc namespace
                     const int32_t              iContrGto,
                     const int32_t              iPointCharge)
     {
+        // set up coordinates of point charges
+        
+        double crx = (cCoordinates.data(0))[iPointCharge];
+        
+        double cry = (cCoordinates.data(1))[iPointCharge];
+        
+        double crz = (cCoordinates.data(2))[iPointCharge];
+        
+        // compute PC distances : R(PC) = P - C
+        
+        intsfunc::compDistancesPC(pcDistances, pCoordinates, crx, cry, crz,
+                                  braGtoBlock, ketGtoBlock, iContrGto);
+    }
+    
+    void
+    compDistancesPC(      CMemBlock2D<double>& pcDistances,
+                    const CMemBlock2D<double>& pCoordinates,
+                    const double               xCoordinateC,
+                    const double               yCoordinateC,
+                    const double               zCoordinateC,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoBlock&           ketGtoBlock,
+                    const int32_t              iContrGto)
+    {
         // set up pointers to primitives data on bra side
         
         auto spos = braGtoBlock.getStartPositions();
@@ -683,14 +707,6 @@ namespace intsfunc { // intsfunc namespace
         // set up pointers to primitives data on ket side
         
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-        
-        // set up coordinates of point charges
-        
-        double crx = (cCoordinates.data(0))[iPointCharge];
-        
-        double cry = (cCoordinates.data(1))[iPointCharge];
-        
-        double crz = (cCoordinates.data(2))[iPointCharge];
         
         // loop over contracted GTO on bra side
         
@@ -717,11 +733,11 @@ namespace intsfunc { // intsfunc namespace
             #pragma omp simd aligned(px, py, pz, pcx, pcy, pcz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                pcx[j] = px[j] - crx;
+                pcx[j] = px[j] - xCoordinateC;
                 
-                pcy[j] = py[j] - cry;
+                pcy[j] = py[j] - yCoordinateC;
                 
-                pcz[j] = pz[j] - crz;
+                pcz[j] = pz[j] - zCoordinateC;
             }
             
             idx++;

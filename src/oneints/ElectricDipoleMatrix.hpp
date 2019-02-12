@@ -71,9 +71,9 @@ public:
             integrals.
      @param zMatrix the dense matrix with Z component of electric dipole
             integrals.
-     @param xOrigin the X coordinate of electric dipole origin.
-     @param yOrigin the Y coordinate of electric dipole origin.
-     @param zOrigin the Z coordinate of electric dipole origin.
+     @param xOrigin the Cartesian X coordinate of electric dipole origin.
+     @param yOrigin the Cartesian Y coordinate of electric dipole origin.
+     @param zOrigin the Cartesian Z coordinate of electric dipole origin.
      */
     CElectricDipoleMatrix(const CDenseMatrix& xMatrix,
                           const CDenseMatrix& yMatrix,

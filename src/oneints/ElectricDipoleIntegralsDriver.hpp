@@ -55,6 +55,21 @@ class CElectricDipoleIntegralsDriver
     bool _isLocalMode;
     
     /**
+     The Cartesian X coordinate of electric dipole origin.
+     */
+    double _xOrigin;
+    
+    /**
+     The Cartesian Y coordinate of electric dipole origin.
+     */
+    double _yOrigin;
+    
+    /**
+     The Cartesian Z coordinate of electric dipole origin.
+     */
+    double _zOrigin;
+    
+    /**
      Comutes electric dipole integrals for pair of GTOs containers.
 
      @param braGtoContainer the GTOs container for bra side.
@@ -74,12 +89,18 @@ class CElectricDipoleIntegralsDriver
             pattern.
      @param distPatternZ the pointer to Z component of integrals distribution
             pattern.
+     @param xOrigin the Cartesian X coordinate of electric dipole origin.
+     @param yOrigin the Cartesian Y coordinate of electric dipole origin.
+     @param zOrigin the Cartesian Z coordinate of electric dipole origin.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
     void _compElectricDipoleForGtoBlocks(      COneIntsDistribution* distPatternX,
                                                COneIntsDistribution* distPatternY,
                                                COneIntsDistribution* distPatternZ,
+                                         const double                xOrigin,
+                                         const double                yOrigin,
+                                         const double                zOrigin,
                                          const CGtoBlock&            braGtoBlock,
                                          const CGtoBlock&            ketGtoBlock) const;
     
@@ -98,17 +119,19 @@ class CElectricDipoleIntegralsDriver
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
+     @param pcDistances the vector of distances R(PC) = P - C.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
     void _compPrimElectricDipoleInts(      CMemBlock2D<double>&  primBuffer,
-                                     const CVecTwoIndexes&       recPattern,
+                                     const CVecThreeIndexes&     recPattern,
                                      const std::vector<int32_t>& recIndexes,
                                      const CMemBlock2D<double>&  osFactors,
                                      const CMemBlock2D<double>&  abDistances,
                                      const CMemBlock2D<double>&  paDistances,
                                      const CMemBlock2D<double>&  pbDistances,
+                                     const CMemBlock2D<double>&  pcDistances,
                                      const CGtoBlock&            braGtoBlock,
                                      const CGtoBlock&            ketGtoBlock,
                                      const int32_t               iContrGto) const;
@@ -121,8 +144,8 @@ class CElectricDipoleIntegralsDriver
      @param ketGtoBlock the GTOs block on ket side.
      @return the vector of two indexes object with recursion pattern.
      */
-    CVecTwoIndexes _getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                        const CGtoBlock& ketGtoBlock) const;
+    CVecThreeIndexes _getRecursionPattern(const CGtoBlock& braGtoBlock,
+                                          const CGtoBlock& ketGtoBlock) const;
     
     /**
      Gets vector of unified indexes of primitive GTOs buffer for specific
@@ -136,7 +159,7 @@ class CElectricDipoleIntegralsDriver
      @return the total number of blocks in recursion pattern.
      */
     int32_t _getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                           const CVecTwoIndexes&       recPattern,
+                                           const CVecThreeIndexes&     recPattern,
                                            const int32_t               maxPrimGtos) const;
     
 public:

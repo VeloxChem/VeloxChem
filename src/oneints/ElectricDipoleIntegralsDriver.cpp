@@ -14,6 +14,7 @@
 #include "MemBlock.hpp"
 #include "OneIntsFunc.hpp"
 #include "OneIntsDistributor.hpp"
+#include "ElectricDipoleRecFunc.hpp"
 
 CElectricDipoleIntegralsDriver::CElectricDipoleIntegralsDriver(const int32_t  globRank,
                                                                const int32_t  globNodes,
@@ -24,6 +25,12 @@ CElectricDipoleIntegralsDriver::CElectricDipoleIntegralsDriver(const int32_t  gl
     , _globNodes(globNodes)
 
     , _isLocalMode(false)
+
+    , _xOrigin(0.0)
+
+    , _yOrigin(0.0)
+
+    , _zOrigin(0.0)
 {
     _locRank  = mpi::rank(comm);
     
@@ -160,8 +167,8 @@ CElectricDipoleIntegralsDriver::compute(      double*    intsBatchX,
     
     // compute electric dipole integrals
     
-    _compElectricDipoleForGtoBlocks(&distx, &disty, &distz, braGtoBlock,
-                                    ketGtoBlock);
+    _compElectricDipoleForGtoBlocks(&distx, &disty, &distz, _xOrigin, _yOrigin,
+                                    _zOrigin, braGtoBlock, ketGtoBlock);
 }
 
 CElectricDipoleMatrix
@@ -193,15 +200,24 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
     COneIntsDistribution* distpatx = new COneIntsDistribution(dipxmat.values(),
                                                               nrow, ncol, dstyp);
     
-    COneIntsDistribution* distpaty = new COneIntsDistribution(dipxmat.values(),
+    COneIntsDistribution* distpaty = new COneIntsDistribution(dipymat.values(),
                                                               nrow, ncol, dstyp);
     
-    COneIntsDistribution* distpatz = new COneIntsDistribution(dipxmat.values(),
+    COneIntsDistribution* distpatz = new COneIntsDistribution(dipzmat.values(),
                                                               nrow, ncol, dstyp);
+    
+    // copy origin coordinates
+    
+    auto origx = _xOrigin;
+    
+    auto origy = _yOrigin;
+    
+    auto origz = _zOrigin;
     
     // compute overlap integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpatx, distpaty, distpatz, symbk)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpatx,\
+                                distpaty, distpatz, origx, origy, origz, symbk)
     {
         #pragma omp single nowait
         {
@@ -226,7 +242,8 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
                         auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
                         _compElectricDipoleForGtoBlocks(distpatx, distpaty,
-                                                        distpatz, bgtos, kgtos);
+                                                        distpatz, origx, origy,
+                                                        origz, bgtos, kgtos);
                     }
                 }
             }
@@ -241,13 +258,17 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
     
     delete distpatz;
     
-    return CElectricDipoleMatrix(dipxmat, dipymat, dipzmat, 0.0, 0.0, 0.0);
+    return CElectricDipoleMatrix(dipxmat, dipymat, dipzmat, _xOrigin, _yOrigin,
+                                 _zOrigin);
 }
 
 void
 CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDistribution* distPatternX,
                                                                       COneIntsDistribution* distPatternY,
                                                                       COneIntsDistribution* distPatternZ,
+                                                                const double                xOrigin,
+                                                                const double                yOrigin,
+                                                                const double                zOrigin, 
                                                                 const CGtoBlock&            braGtoBlock,
                                                                 const CGtoBlock&            ketGtoBlock) const
 {
@@ -281,9 +302,13 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
     
     CMemBlock2D<double> rfacts(pdim, 2 * pmax);
     
+    CMemBlock2D<double> rp(pdim, 3 * pmax);
+    
     CMemBlock2D<double> rpa(pdim, 3 * pmax);
     
     CMemBlock2D<double> rpb(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rpc(pdim, 3 * pmax);
     
     // generate recursion pattern
     
@@ -301,8 +326,6 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
     
     auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
     
-    auto pidx = genfunc::findPairIndex(recidx, recvec, {bang, kang});
-    
     // allocate primitives integrals buffer
     
     CMemBlock2D<double> pbuffer(pdim, nblk);
@@ -315,13 +338,29 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
     
     auto ncart = angmom::to_CartesianComponents(bang, kang);
     
-    CMemBlock2D<double> cartbuffer(kdim, ncart);
+    CMemBlock2D<double> cartbufferx(kdim, ncart);
+    
+    CMemBlock2D<double> cartbuffery(kdim, ncart);
+    
+    CMemBlock2D<double> cartbufferz(kdim, ncart);
     
     // allocate contracted spherical integrals buffer
     
     auto nspher = angmom::to_SphericalComponents(bang, kang);
     
-    CMemBlock2D<double> spherbuffer(kdim, nspher);
+    CMemBlock2D<double> spherbufferx(kdim, nspher);
+    
+    CMemBlock2D<double> spherbuffery(kdim, nspher);
+    
+    CMemBlock2D<double> spherbufferz(kdim, nspher);
+    
+    // set up indexes for contraction
+    
+    auto pidx = genfunc::findTripleIndex(recidx, recvec, {bang, kang, 0});
+    
+    auto spos = braGtoBlock.getStartPositions();
+    
+    auto epos = braGtoBlock.getEndPositions();
     
     // determine bra and ket sides symmetry
     
@@ -329,6 +368,12 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
 
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
+        // compute bra dimensions and shift
+        
+        auto bdim = epos[i] - spos[i];
+        
+        auto poff = bdim * ncart;
+        
         // compute distances: R(AB) = A - B
         
         intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
@@ -337,65 +382,91 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
         
         intsfunc::compFactorsForOverlap(rfacts, bragtos, ketgtos, i);
         
+        // compute coordinates of center P
+        
+        intsfunc::compCoordinatesForP(rp, rfacts, 2, bragtos, ketgtos, i);
+        
         // compute distances: R(PA) = P - A
         
-        intsfunc::compDistancesPA(rpa, rab, rfacts, 2, bragtos, ketgtos, i);
+        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
         
         // compute distances: R(PB) = P - B
         
-        intsfunc::compDistancesPB(rpb, rab, rfacts, 2, bragtos, ketgtos, i);
+        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
         
-        // compite primitive electric dipole integrals
+        // compute distances: R(PC) = P - C
         
-        _compPrimElectricDipoleInts(pbuffer, recvec, recidx, rfacts, rab, rpa, rpb,
-                                    bragtos, ketgtos, i);
+        intsfunc::compDistancesPC(rpc, rp, _xOrigin, _yOrigin, _zOrigin,
+                                  bragtos, ketgtos, i);
+        
+        // compute primitive electric dipole integrals
+        
+        _compPrimElectricDipoleInts(pbuffer, recvec, recidx, rfacts, rab, rpa,
+                                    rpb, rpc, bragtos, ketgtos, i);
         
         // contract primitive overlap integrals
         
-        genfunc::contract(cartbuffer, pbuffer, pidx, bragtos, ketgtos, i);
+        genfunc::contract(cartbufferx, pbuffer, pidx, bragtos, ketgtos, i);
+        
+        genfunc::contract(cartbuffery, pbuffer, pidx + poff, bragtos,
+                          ketgtos, i);
+        
+        genfunc::contract(cartbufferz, pbuffer, pidx + 2 * poff, bragtos,
+                          ketgtos, i);
         
         // transform Cartesian to spherical integrals
         
-        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0, kdim);
+        genfunc::transform(spherbufferx, cartbufferx, bmom, kmom, 0, 0, kdim);
+        
+        genfunc::transform(spherbuffery, cartbuffery, bmom, kmom, 0, 0, kdim);
+        
+        genfunc::transform(spherbufferz, cartbufferz, bmom, kmom, 0, 0, kdim);
         
         // add batch of integrals to integrals matrix
         
-        distpatx.distribute(spherbuffer, bragtos, ketgtos, symbk, i);
+        distpatx.distribute(spherbufferx, bragtos, ketgtos, symbk, i);
         
-        // add y and z components
+        distpaty.distribute(spherbuffery, bragtos, ketgtos, symbk, i);
+        
+        distpatz.distribute(spherbufferz, bragtos, ketgtos, symbk, i);
     }
 }
 
 void
 CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<double>&  primBuffer,
-                                                            const CVecTwoIndexes&       recPattern,
+                                                            const CVecThreeIndexes&     recPattern,
                                                             const std::vector<int32_t>& recIndexes,
                                                             const CMemBlock2D<double>&  osFactors,
                                                             const CMemBlock2D<double>&  abDistances,
                                                             const CMemBlock2D<double>&  paDistances,
                                                             const CMemBlock2D<double>&  pbDistances,
+                                                            const CMemBlock2D<double>&  pcDistances,
                                                             const CGtoBlock&            braGtoBlock,
                                                             const CGtoBlock&            ketGtoBlock,
                                                             const int32_t               iContrGto) const
 {
-   
-
+    // compute (s|M|s) integrals
+    
+    ediprecfunc::compElectricDipoleForSS(primBuffer, recPattern, recIndexes,
+                                         osFactors, abDistances, pcDistances,
+                                         braGtoBlock, ketGtoBlock, iContrGto);
+    
     // NOTE: add l > 4 recursion here
 }
 
-CVecTwoIndexes
+CVecThreeIndexes
 CElectricDipoleIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                                     const CGtoBlock& ketGtoBlock) const
+                                                    const CGtoBlock& ketGtoBlock) const
 {
     // set up angular momentum
     
     auto bang = braGtoBlock.getAngularMomentum();
     
     auto kang = ketGtoBlock.getAngularMomentum();
- 
+    
     // set up recursion buffer
     
-    CVecTwoIndexes recvec;
+    CVecThreeIndexes recvec;
     
     recvec.reserve((bang + 1) * (kang + 1));
     
@@ -407,7 +478,7 @@ CElectricDipoleIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBloc
     
     // set up initial state of recursion buffer
     
-    recvec.push_back(CTwoIndexes(bang, kang));
+    recvec.push_back(CThreeIndexes(bang, kang, 0));
     
     while (true)
     {
@@ -419,47 +490,106 @@ CElectricDipoleIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBloc
         
         for (int32_t i = spos; i < epos; i++)
         {
-            CTwoIndexes cidx(recvec[i]);
-        
-            if (cidx.first() != 0)
+            CThreeIndexes cidx(recvec[i]);
+            
+            if (cidx.third() == 0)
             {
-                // general recursion for bra and ket sides
+                // electric dipole recursion
                 
-                // (a - 1 | b) term
-            
-                CTwoIndexes t1idx(cidx.first() - 1,  cidx.second());
-            
-                if (genfunc::addValidAndUniquePair(recvec, t1idx)) nterms++;
-            
-                // (a - 2 | b) term
-            
-                CTwoIndexes t2idx(cidx.first() - 2,  cidx.second());
-            
-                if (genfunc::addValidAndUniquePair(recvec, t2idx)) nterms++;
-            
-                // (a - 1 | b - 1) term
-            
-                CTwoIndexes tkidx(cidx.first() - 1,  cidx.second() - 1);
-            
-                if (genfunc::addValidAndUniquePair(recvec, tkidx)) nterms++;
+                if (cidx.first() != 0)
+                {
+                    // general recursion for bra and ket sides
+                    
+                    // (a - 1 |M| b) term
+                    
+                    CThreeIndexes t1idx(cidx.first() - 1,  cidx.second(), 0);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
+                    
+                    // (a - 2 |M| b) term
+                    
+                    CThreeIndexes t2idx(cidx.first() - 2,  cidx.second(), 0);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
+                    
+                    // (a - 1 |M| b - 1) term
+                    
+                    CThreeIndexes tkidx(cidx.first() - 1,  cidx.second() - 1, 0);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, tkidx)) nterms++;
+                    
+                    // (a - 1| b) term
+                    
+                    CThreeIndexes s0idx(cidx.first() - 1,  cidx.second(), 1);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, s0idx)) nterms++;
+                }
+                else
+                {
+                    // reduced recursion for ket side
+                    
+                    // (0 |M| b - 1) term
+                    
+                    CThreeIndexes t1idx(cidx.first(),  cidx.second() - 1, 0);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
+                    
+                    // (0 |M| b - 2) term
+                    
+                    CThreeIndexes t2idx(cidx.first(),  cidx.second() - 2, 0);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
+                    
+                    // (0 | b - 1) term
+                    
+                    CThreeIndexes s0idx(cidx.first(),  cidx.second() - 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, s0idx)) nterms++;
+                }
             }
             else
             {
-                // reduced recursion for ket side
+                // overlap recursion
                 
-                // (0 | b - 1) term
-                
-                CTwoIndexes t1idx(cidx.first(),  cidx.second() - 1);
-                
-                if (genfunc::addValidAndUniquePair(recvec, t1idx)) nterms++;
-                
-                // (0 | b - 2) term
-                
-                CTwoIndexes t2idx(cidx.first(),  cidx.second() - 2);
-                
-                if (genfunc::addValidAndUniquePair(recvec, t2idx)) nterms++;
+                if (cidx.first() != 0)
+                {
+                    // general recursion for bra and ket sides
+                    
+                    // (a - 1 | b) term
+                    
+                    CThreeIndexes t1idx(cidx.first() - 1,  cidx.second(), 1);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
+                    
+                    // (a - 2 | b) term
+                    
+                    CThreeIndexes t2idx(cidx.first() - 2,  cidx.second(), 1);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
+                    
+                    // (a - 1 | b - 1) term
+                    
+                    CThreeIndexes tkidx(cidx.first() - 1,  cidx.second() - 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, tkidx)) nterms++;
+                }
+                else
+                {
+                    // reduced recursion for ket side
+                    
+                    // (0 | b - 1) term
+                    
+                    CThreeIndexes t1idx(cidx.first(),  cidx.second() - 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
+                    
+                    // (0 | b - 2) term
+                    
+                    CThreeIndexes t2idx(cidx.first(),  cidx.second() - 2, 1);
+                    
+                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
+                }
             }
-            
         }
         
         // break loop, all recursion terms are generrated
@@ -472,14 +602,17 @@ CElectricDipoleIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBloc
         
         epos += nterms;
     }
+   
+    // allways compute overlap (s|s)
+    
+    genfunc::addValidAndUniqueTriple(recvec, CThreeIndexes(0, 0, 1));
     
     return recvec;
 }
 
-
 int32_t
 CElectricDipoleIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                                               const CVecTwoIndexes&       recPattern,
+                                                               const CVecThreeIndexes&     recPattern,
                                                                const int32_t               maxPrimGtos) const
 {
     // clear vector and reserve memory
@@ -487,7 +620,7 @@ CElectricDipoleIntegralsDriver::_getIndexesForRecursionPattern(      std::vector
     recIndexes.clear();
     
     recIndexes.reserve(recPattern.size() + 1);
- 
+    
     // loop over recursion pattern
     
     int32_t nblk = 0;
@@ -496,9 +629,19 @@ CElectricDipoleIntegralsDriver::_getIndexesForRecursionPattern(      std::vector
     {
         recIndexes.push_back(nblk);
         
-        nblk += maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
-                                                             recPattern[i].second());
+        auto cblk = maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
+                                                                 recPattern[i].second());
+        
+        if (recPattern[i].third() == 0)
+        {
+            nblk += 3 * cblk;
+        }
+        else
+        {
+            nblk += cblk;
+        }
     }
     
     return nblk;
 }
+

@@ -200,6 +200,30 @@ namespace intsfunc { // intsfunc namespace
                          const int32_t              iContrGto,
                          const int32_t              iPointCharge);
     
+    /**
+     Computes vector of distances between center P of combined primitive GTOs
+     and center C.
+     
+     @param pcDistances the vector of Cartesian R(PB) = P - C distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+     functions.
+     @param xCoordinateC the Cartesian X coordinate of center C.
+     @param yCoordinateC the Cartesian Y coordinate of center C.
+     @param zCoordinateC the Cartesian Z coordinate of center C.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     coordinates.
+     */
+    void compDistancesPC(      CMemBlock2D<double>& pcDistances,
+                         const CMemBlock2D<double>& pCoordinates,
+                         const double               xCoordinateC,
+                         const double               yCoordinateC,
+                         const double               zCoordinateC,
+                         const CGtoBlock&           braGtoBlock,
+                         const CGtoBlock&           ketGtoBlock,
+                         const int32_t              iContrGto);
+    
 } // intsfunc namespace
 
 #endif /* OneIntsFunc_hpp */
