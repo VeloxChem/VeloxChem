@@ -19,6 +19,7 @@
 #include "CheckFunctions.hpp"
 #include "EriScreenerType.hpp"
 #include "DenseLinearAlgebra.hpp"
+#include "MOIntsType.hpp"
 #include "TwoIndexes.hpp"
 
 TEST_F(CMOIntsBatchTest, DefaultConstructor)
@@ -135,11 +136,11 @@ TEST_F(CMOIntsBatchTest, AppendMOInts)
                      2.0, 5.0,  1.0},
                     3, 3);
 
-    auto moints = denblas::multAtB(bvec, denblas::multAB(ma, kvec));
+    auto momat = denblas::multAtB(bvec, denblas::multAB(ma, kvec));
     
     CMOIntsBatch mbatcha;
     
-    mbatcha.appendMOInts(moints, CTwoIndexes(0, 1));
+    mbatcha.appendMOInts(momat, CTwoIndexes(0, 1));
     
     CDenseMatrix mc({-75.0, -80.0, 10.0, 24.0, 103.0, 112.0}, 3, 2);
     
