@@ -115,7 +115,7 @@ class ScfDriver:
         self.conv_thresh = 1.0e-6
         self.eri_thresh  = 1.0e-15
         self.ovl_thresh  = 1.0e-6
-        self.diis_thresh = 0.2
+        self.diis_thresh = 1000.0
         self.dden_thresh = 1.0e-3
         
         # level shifting
@@ -210,8 +210,6 @@ class ScfDriver:
             # second step
             self.first_step = False
 
-            self.diis_thresh = 1000.0
-        
             self.conv_thresh = old_thresh
             
             self.max_iter = old_max_iter
