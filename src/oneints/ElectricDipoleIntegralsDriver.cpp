@@ -451,6 +451,30 @@ CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<do
                                          osFactors, abDistances, pcDistances,
                                          braGtoBlock, ketGtoBlock, iContrGto);
     
+    // compute (s|M|p) integrals
+    
+    ediprecfunc::compElectricDipoleForSP(primBuffer, recPattern, recIndexes,
+                                         osFactors, pbDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (s|M|d) integrals
+    
+    ediprecfunc::compElectricDipoleForSD(primBuffer, recPattern, recIndexes,
+                                         osFactors, pbDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (s|M|f) integrals
+    
+    ediprecfunc::compElectricDipoleForSF(primBuffer, recPattern, recIndexes,
+                                         osFactors, pbDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (s|M|g) integrals
+    
+    ediprecfunc::compElectricDipoleForSG(primBuffer, recPattern, recIndexes,
+                                         osFactors, pbDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
     // NOTE: add l > 4 recursion here
 }
 
