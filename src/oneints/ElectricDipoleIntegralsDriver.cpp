@@ -457,10 +457,40 @@ CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<do
                                          osFactors, pbDistances, braGtoBlock,
                                          ketGtoBlock, iContrGto);
     
+    // compute (p|M|s) integrals
+    
+    ediprecfunc::compElectricDipoleForPS(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (p|M|p) integrals
+    
+    ediprecfunc::compElectricDipoleForPP(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, pbDistances,
+                                         braGtoBlock, ketGtoBlock, iContrGto);
+    
     // compute (s|M|d) integrals
     
     ediprecfunc::compElectricDipoleForSD(primBuffer, recPattern, recIndexes,
                                          osFactors, pbDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (d|M|s) integrals
+    
+    ediprecfunc::compElectricDipoleForDS(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (p|M|d) integrals
+    
+    ediprecfunc::compElectricDipoleForPD(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, pbDistances,
+                                         braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (d|M|p) integrals
+    
+    ediprecfunc::compElectricDipoleForDP(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
                                          ketGtoBlock, iContrGto);
     
     // compute (s|M|f) integrals
@@ -469,10 +499,100 @@ CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<do
                                          osFactors, pbDistances, braGtoBlock,
                                          ketGtoBlock, iContrGto);
     
+    // compute (f|M|s) integrals
+    
+    ediprecfunc::compElectricDipoleForFS(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (d|M|d) integrals
+    
+    ediprecfunc::compElectricDipoleForDD(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (p|M|f) integrals
+    
+    ediprecfunc::compElectricDipoleForPF(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, pbDistances,
+                                         braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (f|M|p) integrals
+    
+    ediprecfunc::compElectricDipoleForFP(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
     // compute (s|M|g) integrals
     
     ediprecfunc::compElectricDipoleForSG(primBuffer, recPattern, recIndexes,
                                          osFactors, pbDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (g|M|s) integrals
+    
+    ediprecfunc::compElectricDipoleForGS(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (d|M|f) integrals
+    
+    ediprecfunc::compElectricDipoleForDF(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (f|M|d) integrals
+    
+    ediprecfunc::compElectricDipoleForFD(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (f|M|f) integrals
+    
+    ediprecfunc::compElectricDipoleForFF(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (p|M|g) integrals
+    
+    ediprecfunc::compElectricDipoleForPG(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, pbDistances,
+                                         braGtoBlock, ketGtoBlock, iContrGto);
+    
+    // compute (g|M|p) integrals
+    
+    ediprecfunc::compElectricDipoleForGP(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (d|M|g) integrals
+    
+    ediprecfunc::compElectricDipoleForDG(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (g|M|d) integrals
+    
+    ediprecfunc::compElectricDipoleForGD(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (f|M|g) integrals
+    
+    ediprecfunc::compElectricDipoleForFG(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (g|M|f) integrals
+    
+    ediprecfunc::compElectricDipoleForGF(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
+                                         ketGtoBlock, iContrGto);
+    
+    // compute (g|M|g) integrals
+    
+    ediprecfunc::compElectricDipoleForGG(primBuffer, recPattern, recIndexes,
+                                         osFactors, paDistances, braGtoBlock,
                                          ketGtoBlock, iContrGto);
     
     // NOTE: add l > 4 recursion here
