@@ -65,7 +65,6 @@ TEST_F(CDenseMatrixTest, MoveAssignment)
     ASSERT_EQ(ma, mb);
 }
 
-
 TEST_F(CDenseMatrixTest, GetNumberOfRows)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 2, 3);
