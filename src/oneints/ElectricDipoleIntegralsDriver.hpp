@@ -181,6 +181,17 @@ public:
     ~CElectricDipoleIntegralsDriver();
     
     /**
+     Sets origin of electric dipole.
+
+     @param xOrigin the Cartesian X coordinate of electric dipole origin.
+     @param yOrigin the Cartesian Y coordinate of electric dipole origin.
+     @param zOrigin the Cartesian Z coordinate of electric dipole origin.
+     */
+    void setElectricDipoleOrigin(const double xOrigin,
+                                 const double yOrigin,
+                                 const double zOrigin);
+    
+    /**
      Computes electric dipole integrals for molecule in specific basis set and
      stores results in electric dipole matrix object.
 

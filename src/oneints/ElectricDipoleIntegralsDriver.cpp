@@ -44,6 +44,18 @@ CElectricDipoleIntegralsDriver::~CElectricDipoleIntegralsDriver()
     
 }
 
+void
+CElectricDipoleIntegralsDriver::setElectricDipoleOrigin(const double xOrigin,
+                                                        const double yOrigin,
+                                                        const double zOrigin)
+{
+    _xOrigin = xOrigin;
+    
+    _yOrigin = yOrigin;
+    
+    _zOrigin = zOrigin; 
+}
+
 CElectricDipoleMatrix
 CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
                                         const CMolecularBasis& basis,
