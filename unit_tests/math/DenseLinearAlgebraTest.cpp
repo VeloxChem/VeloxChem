@@ -171,3 +171,32 @@ TEST_F(CDenseLinearAlgebraTest, AddAB)
     
     ASSERT_EQ(matab, refab);
 }
+
+TEST_F(CDenseLinearAlgebraTest, MultABtWithAddition)
+{
+    CDenseMatrix mata({ 2.0, 3.0, 4.0,
+                       -3.0, 3.0, 1.0,
+                        6.0, 2.3, 7.0,
+                        1.0, 2.0, 4.0},
+                      4, 3);
+    
+    CDenseMatrix matb({ 1.0,  2.0, 5.0,
+                        2.0, -3.0, 3.0},
+                      2, 3);
+    
+    CDenseMatrix matc({1.0, 4.0,
+                       2.0, 6.0,
+                       8.0, 1.0,
+                       2.0, 5.0},
+                      4, 2);
+    
+    denblas::multABt(matc, 2.0, mata, matb);
+    
+    CDenseMatrix refc({ 57.0,   18.0,
+                        18.0,  -18.0,
+                        99.2,   53.2,
+                        52.0,   21.0},
+                        4, 2);
+    
+    ASSERT_EQ(matc, refc);
+}

@@ -10,6 +10,8 @@
 
 #include <utility>
 
+#include "DenseLinearAlgebra.hpp"
+
 CExcitationVector::CExcitationVector()
 
     : _excitationType(szblock::aa)
@@ -20,7 +22,8 @@ CExcitationVector::CExcitationVector()
 CExcitationVector::CExcitationVector(const szblock               excitationType,
                                      const std::vector<int32_t>& braIndexes,
                                      const std::vector<int32_t>& ketIndexes,
-                                     const std::vector<double>&  coefficients)
+                                     const std::vector<double>&  zCoefficients,
+                                     const std::vector<double>&  yCoefficients)
 
     : _excitationType(excitationType)
 
@@ -28,9 +31,50 @@ CExcitationVector::CExcitationVector(const szblock               excitationType,
 
     , _ketIndexes(CMemBlock<int32_t>(ketIndexes))
 
-    , _coefficents(CMemBlock<double>(coefficients))
+    , _zCoefficents(CMemBlock<double>(zCoefficients))
+
+    , _yCoefficents(CMemBlock<double>(yCoefficients))
 {
     
+}
+
+CExcitationVector::CExcitationVector(const szblock excitationType,
+                                     const int32_t braStartPosition,
+                                     const int32_t braEndPosition,
+                                     const int32_t ketStartPosition,
+                                     const int32_t ketEndPosition)
+
+    : _excitationType(excitationType)
+{
+    auto nbra = braEndPosition - braStartPosition;
+    
+    auto nket = ketEndPosition - ketStartPosition;
+    
+    _braIndexes = CMemBlock<int32_t>(nket * nbra);
+    
+    _ketIndexes = CMemBlock<int32_t>(nket * nbra);
+    
+    _zCoefficents = CMemBlock<double>(nket * nbra);
+    
+    _yCoefficents = CMemBlock<double>(nket * nbra);
+    
+    _zCoefficents.zero();
+    
+    _yCoefficents.zero();
+    
+    int32_t idx = 0;
+    
+    for (int32_t i = braStartPosition; i < braEndPosition; i++)
+    {
+        for (int32_t j = ketStartPosition; j < ketEndPosition; j++)
+        {
+            _braIndexes.at(idx) = i;
+            
+            _ketIndexes.at(idx) = j; 
+            
+            idx++;
+        }
+    }
 }
 
 CExcitationVector::CExcitationVector(const CExcitationVector& source)
@@ -41,7 +85,9 @@ CExcitationVector::CExcitationVector(const CExcitationVector& source)
 
     , _ketIndexes(source._ketIndexes)
 
-    , _coefficents(source._coefficents)
+    , _zCoefficents(source._zCoefficents)
+
+    , _yCoefficents(source._yCoefficents)
 {
     
 }
@@ -54,7 +100,9 @@ CExcitationVector::CExcitationVector(CExcitationVector&& source) noexcept
 
     , _ketIndexes(std::move(source._ketIndexes))
 
-    , _coefficents(std::move(source._coefficents))
+    , _zCoefficents(std::move(source._zCoefficents))
+
+    , _yCoefficents(std::move(source._yCoefficents))
 {
     
 }
@@ -75,7 +123,9 @@ CExcitationVector::operator=(const CExcitationVector& source)
     
     _ketIndexes = source._ketIndexes;
     
-    _coefficents = source._coefficents;
+    _zCoefficents = source._zCoefficents;
+    
+    _yCoefficents = source._yCoefficents;
     
     return *this;
 }
@@ -91,7 +141,9 @@ CExcitationVector::operator=(CExcitationVector&& source) noexcept
     
     _ketIndexes = std::move(source._ketIndexes);
     
-    _coefficents = std::move(source._coefficents);
+    _zCoefficents = std::move(source._zCoefficents);
+    
+    _yCoefficents = std::move(source._yCoefficents);
     
     return *this;
 }
@@ -105,7 +157,9 @@ CExcitationVector::operator==(const CExcitationVector& other) const
     
     if (_ketIndexes != other._ketIndexes) return false;
     
-    if (_coefficents != other._coefficents) return false;
+    if (_zCoefficents != other._zCoefficents) return false;
+    
+    if (_yCoefficents != other._yCoefficents) return false;
     
     return true;
 }
@@ -114,6 +168,102 @@ bool
 CExcitationVector::operator!=(const CExcitationVector& other) const
 {
     return !(*this == other);
+}
+
+void
+CExcitationVector::setCoefficientsZY(const CMemBlock<double>& zCoefficients,
+                                     const CMemBlock<double>& yCoefficients)
+{
+    _zCoefficents = zCoefficients;
+    
+    _yCoefficents = yCoefficients; 
+}
+
+double*
+CExcitationVector::getCoefficientsZ()
+{
+    return _zCoefficents.data();
+}
+
+const double*
+CExcitationVector::getCoefficientsZ() const
+{
+    return _zCoefficents.data();
+}
+
+double*
+CExcitationVector::getCoefficientsY()
+{
+    return _yCoefficents.data();
+}
+
+const double*
+CExcitationVector::getCoefficientsY() const
+{
+    return _yCoefficents.data();
+}
+
+int32_t
+CExcitationVector::getNumberOfExcitations() const
+{
+    return _zCoefficents.size();
+}
+
+CAODensityMatrix
+CExcitationVector::getTransformedDensity(const CMolecularOrbitals& molecularOrbitals) const
+{
+    auto ndim = molecularOrbitals.getNumberOfRows();
+    
+    CDenseMatrix mden(ndim, ndim);
+    
+    mden.zero();
+    
+    for (int32_t i = 0; i < _zCoefficents.size(); i++)
+    {
+        auto bcmo = _getBraOrbital(molecularOrbitals, i);
+        
+        auto kcmo = _getKetOrbital(molecularOrbitals, i);
+        
+        denblas::multABt(mden, _zCoefficents.at(i) , bcmo, kcmo);
+        
+        denblas::multABt(mden, -(_yCoefficents.at(i)) , kcmo, bcmo);
+    }
+    
+    return CAODensityMatrix({mden}, denmat::rgen);
+}
+
+CDenseMatrix
+CExcitationVector::_getBraOrbital(const CMolecularOrbitals& molecularOrbitals,
+                                  const int32_t             iParticleExcitation) const
+{
+    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ab))
+    {
+        return molecularOrbitals.alphaOrbitals(_braIndexes.at(iParticleExcitation), 1);
+    }
+    
+    if ((_excitationType == szblock::ba) || (_excitationType == szblock::bb))
+    {
+        return molecularOrbitals.betaOrbitals(_braIndexes.at(iParticleExcitation), 1);
+    }
+    
+    return CDenseMatrix();
+}
+
+CDenseMatrix
+CExcitationVector::_getKetOrbital(const CMolecularOrbitals& molecularOrbitals,
+                                  const int32_t             iParticleExcitation) const
+{
+    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ba))
+    {
+        return molecularOrbitals.alphaOrbitals(_ketIndexes.at(iParticleExcitation), 1);
+    }
+    
+    if ((_excitationType == szblock::ab) || (_excitationType == szblock::bb))
+    {
+        return molecularOrbitals.betaOrbitals(_ketIndexes.at(iParticleExcitation), 1);
+    }
+    
+    return CDenseMatrix();
 }
 
 std::ostream&
@@ -130,7 +280,9 @@ operator<<(      std::ostream&  output,
     
     output << "_ketIndexes: " << source._ketIndexes <<  std::endl;
     
-    output << "_coefficents: " << source._coefficents <<  std::endl;
+    output << "_zCoefficents: " << source._zCoefficents <<  std::endl;
+    
+    output << "_yCoefficents: " << source._yCoefficents <<  std::endl;
     
     return output;
 }

@@ -19,13 +19,15 @@
  denmat::unrest - the unrestricted density matrix
  denmat::rmoij  - the restricted C_i C_j^T matrix
  denmat::umoij  - the unrestricted C_i C_j^T matrix
+ denmat::rgen   - the general non-symmetric restricted density matrix
  */
 enum class denmat
 {
     rest,
     unrest,
     rmoij,
-    umoij
+    umoij,
+    rgen
 };
 
 /**
@@ -54,6 +56,8 @@ inline denmat to_denmat(const int32_t keyValue)
     if (keyValue == to_int(denmat::rmoij)) return denmat::rmoij;
     
     if (keyValue == to_int(denmat::umoij)) return denmat::umoij;
+   
+    if (keyValue == to_int(denmat::rgen)) return denmat::rgen;
     
     return denmat::rest;
 }
@@ -84,6 +88,11 @@ inline std::string to_string(const denmat denMatrix)
     if (denMatrix == denmat::umoij)
     {
         return std::string("Unrestricted C_iC_j^T Density Matrix");
+    }
+    
+    if (denMatrix == denmat::rgen)
+    {
+        return std::string("General Non-Symmetric Restricted Density Matrix");
     }
    
     return std::string("UNKNOWN");

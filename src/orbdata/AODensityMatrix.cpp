@@ -139,6 +139,13 @@ CAODensityMatrix::getNumberOfDensityMatrices() const
         return static_cast<int32_t>(_denMatrices.size());
     }
     
+    // general non-symmetric restricted density matrix
+    
+    if (_denType == denmat::rgen)
+    {
+        return static_cast<int32_t>(_denMatrices.size());
+    }
+    
     return 0;
 }
 
@@ -170,6 +177,13 @@ CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
         return _denMatrices[iDensityMatrix].getNumberOfRows();
     }
     
+    // general non-symmetric restricted density matrix
+    
+    if (_denType == denmat::rgen && iDensityMatrix < getNumberOfDensityMatrices())
+    {
+        return _denMatrices[iDensityMatrix].getNumberOfRows();
+    }
+    
     return 0;
 }
 
@@ -197,6 +211,13 @@ CAODensityMatrix::getNumberOfColumns(const int32_t iDensityMatrix) const
         return _denMatrices[iDensityMatrix].getNumberOfColumns();
     }
     
+    // general non-symmetric restricted density matrix
+    
+    if (_denType == denmat::rgen && iDensityMatrix < getNumberOfDensityMatrices())
+    {
+        return _denMatrices[iDensityMatrix].getNumberOfColumns();
+    }
+    
     return 0;
 }
 
@@ -220,6 +241,13 @@ CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
     // restricted pair density matrix
     
     if (_denType == denmat::rmoij && iDensityMatrix < getNumberOfDensityMatrices())
+    {
+        return _denMatrices[iDensityMatrix].getNumberOfElements();
+    }
+    
+    // general non-symmetric restricted density matrix
+    
+    if (_denType == denmat::rgen && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[iDensityMatrix].getNumberOfElements();
     }

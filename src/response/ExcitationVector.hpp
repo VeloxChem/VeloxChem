@@ -15,6 +15,8 @@
 
 #include "SpinBlock.hpp"
 #include "MemBlock.hpp"
+#include "AODensityMatrix.hpp"
+#include "MolecularOrbitals.hpp"
 
 /**
 Class CExcitationVector class stores information on one particle excitation and
@@ -40,9 +42,36 @@ class CExcitationVector
     CMemBlock<int32_t> _ketIndexes;
     
     /**
-     The vector of coefficients associated with one particle excitations.
+     The vector of Z coefficients associated with one particle excitations.
      */
-    CMemBlock<double> _coefficents;
+    CMemBlock<double> _zCoefficents;
+    
+    /**
+     The vector of Y coefficients associated with one particle excitations.
+     */
+    CMemBlock<double> _yCoefficents;
+    
+    /**
+     Gets the bra molecular orbital associated with specific one particle
+     excitation.
+
+     @param molecularOrbitals the molecular orbitals.
+     @param iParticleExcitation the index of one particle excitation.
+     @return the molecular orbital.
+     */
+    CDenseMatrix _getBraOrbital(const CMolecularOrbitals& molecularOrbitals,
+                                const int32_t             iParticleExcitation) const;
+    
+    /**
+     Gets the ket molecular orbital associated with specific one particle
+     excitation.
+     
+     @param molecularOrbitals the molecular orbitals.
+     @param iParticleExcitation the index of one particle excitation.
+     @return the molecular orbital.
+     */
+    CDenseMatrix _getKetOrbital(const CMolecularOrbitals& molecularOrbitals,
+                                const int32_t             iParticleExcitation) const;
     
 public:
     
@@ -57,13 +86,35 @@ public:
      @param excitationType the single particle excitation type.
      @param braIndexes the vector of molecular orbital indexes on bra side.
      @param ketIndexes the vector of molecular orbital indexes on ket side.
-     @param coefficients the vector of coefficients associates with single
+     @param zCoefficients the vector of Z coefficients associates with single
             particle excitations.
+     @param yCoefficients the vector of Y coefficients associates with single
+            particle de-excitations.
      */
     CExcitationVector(const szblock               excitationType,
                       const std::vector<int32_t>& braIndexes,
                       const std::vector<int32_t>& ketIndexes,
-                      const std::vector<double>&  coefficients);
+                      const std::vector<double>&  zCoefficients,
+                      const std::vector<double>&  yCoefficients);
+    
+    /**
+     Creates a excitation vector object.
+     
+     @param excitationType the single particle excitation type.
+     @param braStartPosition the start position in molecular orbital space on
+            bra side.
+     @param braEndPosition the end position in molecular orbital space on bra
+            side.
+     @param ketStartPosition the start position in molecular orbital space on
+            ket side.
+     @param ketEndPosition the end position in molecular orbital space on ket
+            side.
+     */
+    CExcitationVector(const szblock excitationType,
+                      const int32_t braStartPosition,
+                      const int32_t braEndPosition,
+                      const int32_t ketStartPosition,
+                      const int32_t ketEndPosition);
     
     /**
      Creates a excitation vector object by copying other excitation vector object.
@@ -113,6 +164,59 @@ public:
      @return true if excitation vector objects are not equal, false otherwise.
      */
     bool operator!=(const CExcitationVector& other) const;
+    
+    /**
+     Sets Z and Y coefficient vectors.
+
+     @param zCoefficients the Z coefficients vector.
+     @param yCoefficients the Y coefficients vector.
+     */
+    void setCoefficientsZY(const CMemBlock<double>& zCoefficients,
+                           const CMemBlock<double>& yCoefficients);
+    
+    /**
+     Gets pointer to first element of Z coefficients vector.
+
+     @return the pointer to first element of Z coefficients vector.
+     */
+    double* getCoefficientsZ();
+    
+    /**
+     Gets constant pointer to first element of Z coefficients vector.
+     
+     @return the constant pointer to first element of Z coefficients vector.
+     */
+    const double* getCoefficientsZ() const;
+    
+    /**
+     Gets pointer to first element of Y coefficients vector.
+     
+     @return the pointer to first element of Y coefficients vector.
+     */
+    double* getCoefficientsY();
+    
+    /**
+     Gets constant pointer to first element of Y coefficients vector.
+     
+     @return the constant pointer to first element of Y coefficients vector.
+     */
+    const double* getCoefficientsY() const;
+    
+    /**
+     Gets number of one particle excitations in excitations vector.
+
+     @return the number of one particle excitations.
+     */
+    int32_t getNumberOfExcitations() const;
+    
+    /**
+     Generates AO density matrix by applying Z and Y coefficients transformation
+     to AO basis (see Eq. 27 in Chem. Phys. 119 (1988) 297-306)
+
+     @param molecularOrbitals the molecular orbitals.
+     @return the AO density matrix.
+     */
+    CAODensityMatrix getTransformedDensity(const CMolecularOrbitals& molecularOrbitals) const;
     
     /**
      Converts excitation vector object to text output and insert it into output

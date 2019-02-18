@@ -86,6 +86,19 @@ namespace denblas { // denblas namespace
                        const CDenseMatrix& matrixB,
                        const double        factor);
     
+    /**
+     Computes matrix multiplication: C = C + alpha * A * B^T.
+     
+     @param matrixC the matrix C.
+     @param alpha the scaling factor for A * B^T.
+     @param matrixA the matrix A.
+     @param matrixB the matrix B
+     */
+    void multABt(      CDenseMatrix& matrixC,
+                 const double        alpha,
+                 const CDenseMatrix& matrixA,
+                 const CDenseMatrix& matrixB);
+    
 } // denblas namespace
 
 #endif /* DenseLinearAlgebra_hpp */

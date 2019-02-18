@@ -254,6 +254,48 @@ namespace denblas { // denblas namespace
         
         return mat;
     }
+    
+    void
+    multABt(      CDenseMatrix& matrixC,
+            const double        alpha,
+            const CDenseMatrix& matrixA,
+            const CDenseMatrix& matrixB)
+    {
+        // set up dimensions of matrix A
+        
+        auto narow = matrixA.getNumberOfRows();
+        
+        auto nacol = matrixA.getNumberOfColumns();
+        
+        // set up dimensions of matrix B
+        
+        auto nbrow = matrixB.getNumberOfRows();
+        
+        auto nbcol = matrixB.getNumberOfColumns();
+        
+        errors::assertMsgCritical(
+                nacol == nbcol,
+                "denblas::multABt - Inconsistent sizes in matrix multiplication"
+                );
+        
+        errors::assertMsgCritical(
+                narow == matrixC.getNumberOfRows(),
+                "denblas::multABt - Inconsistent sizes in matrix multiplication"
+                );
+        
+        errors::assertMsgCritical(
+                nbrow == matrixC.getNumberOfColumns(),
+                "denblas::multABt - Inconsistent sizes in matrix multiplication"
+                                  );
+        
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                    narow, nbrow, nacol,
+                    alpha,
+                    matrixA.values(), nacol,
+                    matrixB.values(), nbcol,
+                    1.0,
+                    matrixC.values(), nbrow);
+    }
 
     
 } // denblas namespace
