@@ -373,3 +373,43 @@ TEST_F(CMolecularOrbitalsTest, getRestrictedPairDensityVectorOfPairs)
                                denmat::rmoij));
 }
 
+TEST_F(CMolecularOrbitalsTest, Transform)
+{
+    CDenseMatrix ma({1.0, -1.0,
+                    -2.0,  5.0,
+                     6.0,  4.0},
+                    3, 2);
+    
+    std::vector<double> ea({1.0, 2.0});
+    
+    CDenseMatrix mb({2.0,  4.0,
+                    -1.0,  2.0,
+                     3.0,  5.0},
+                     3, 2);
+    
+    std::vector<double> eb({1.0, 1.0});
+    
+    CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    CDenseMatrix aomat({2.0,  3.0, -1.0,
+                        4.0,  1.0,  2.0,
+                        5.0, -2.0,  4.0},
+                       3, 3);
+    
+    CDenseMatrix refmaa({160.0, -3.0, 212.0, 40.0}, 2, 2);
+    
+    ASSERT_EQ(refmaa, moa.transform(aomat, szblock::aa));
+    
+    CDenseMatrix refmab({116.0, 169.0, 163.0, 275.0}, 2, 2);
+    
+    ASSERT_EQ(refmab, moa.transform(aomat, szblock::ab));
+    
+    CDenseMatrix refmba({65.0, 12.0, 153.0, 59.0}, 2, 2);
+    
+    ASSERT_EQ(refmba, moa.transform(aomat, szblock::ba));
+    
+    CDenseMatrix refmbb({55.0, 98.0, 138.0, 272.0}, 2, 2);
+    
+    ASSERT_EQ(refmbb, moa.transform(aomat, szblock::bb));
+}
+

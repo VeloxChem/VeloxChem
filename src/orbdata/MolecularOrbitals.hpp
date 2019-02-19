@@ -17,6 +17,7 @@
 #include "MemBlock.hpp"
 #include "AODensityMatrix.hpp"
 #include "MolecularBasis.hpp"
+#include "SpinBlock.hpp"
 
 /**
  Class CMolecularOrbitals stores data about molecular orbitals and provides set
@@ -244,6 +245,18 @@ public:
      */
     CAODensityMatrix getRestrictedPairDensity(const std::vector<int32_t>& iMolecularOrbitals,
                                               const std::vector<int32_t>& jMolecularOrbitals) const;
+    
+    
+    /**
+     Transforms matrix in AO basis to matrix in MO basis using selected
+     molecular orbitals.
+
+     @param aoMatrix the matrix in AO basis.
+     @param spinPair the spin block of molecular orbitals.
+     @return the matrix in MO basis.
+     */
+    CDenseMatrix transform(const CDenseMatrix& aoMatrix,
+                           const szblock       spinPair) const;
 
     /**
      Broadcasts molecular orbitals object within domain of MPI communicator.

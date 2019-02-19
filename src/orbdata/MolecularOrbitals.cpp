@@ -399,6 +399,45 @@ CMolecularOrbitals::getRestrictedPairDensity(const std::vector<int32_t>& iMolecu
     return CAODensityMatrix();
 }
 
+CDenseMatrix
+CMolecularOrbitals::transform(const CDenseMatrix& aoMatrix,
+                              const szblock       spinPair) const
+{
+    // alpha - alpha
+    
+    if (spinPair == szblock::aa)
+    {
+        return denblas::multAtB(_orbitals[0],
+                                denblas::multAB(aoMatrix, _orbitals[0]));
+    }
+    
+    // alpha - beta
+    
+    if (spinPair == szblock::ab)
+    {
+        return denblas::multAtB(_orbitals[0],
+                                denblas::multAB(aoMatrix, _orbitals[1]));
+    }
+    
+    // beta - alpha
+    
+    if (spinPair == szblock::ba)
+    {
+        return denblas::multAtB(_orbitals[1],
+                                denblas::multAB(aoMatrix, _orbitals[0]));
+    }
+    
+    // beta - beta 
+    
+    if (spinPair == szblock::bb)
+    {
+        return denblas::multAtB(_orbitals[1],
+                                denblas::multAB(aoMatrix, _orbitals[1]));
+    }
+    
+    return CDenseMatrix();
+}
+
 void
 CMolecularOrbitals::broadcast(int32_t  rank,
                               MPI_Comm comm)
