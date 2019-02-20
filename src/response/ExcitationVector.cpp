@@ -218,53 +218,9 @@ CExcitationVector::getTransformedDensity(const CMolecularOrbitals& molecularOrbi
     
     mden.zero();
     
-    for (int32_t i = 0; i < _zCoefficents.size(); i++)
-    {
-        auto bcmo = _getBraOrbital(molecularOrbitals, i);
-        
-        auto kcmo = _getKetOrbital(molecularOrbitals, i);
-        
-        denblas::multABt(mden, _zCoefficents.at(i) , bcmo, kcmo);
-        
-        denblas::multABt(mden, -(_yCoefficents.at(i)) , kcmo, bcmo);
-    }
-    
     return CAODensityMatrix({mden}, denmat::rgen);
 }
 
-CDenseMatrix
-CExcitationVector::_getBraOrbital(const CMolecularOrbitals& molecularOrbitals,
-                                  const int32_t             iParticleExcitation) const
-{
-    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ab))
-    {
-        return molecularOrbitals.alphaOrbitals(_braIndexes.at(iParticleExcitation), 1);
-    }
-    
-    if ((_excitationType == szblock::ba) || (_excitationType == szblock::bb))
-    {
-        return molecularOrbitals.betaOrbitals(_braIndexes.at(iParticleExcitation), 1);
-    }
-    
-    return CDenseMatrix();
-}
-
-CDenseMatrix
-CExcitationVector::_getKetOrbital(const CMolecularOrbitals& molecularOrbitals,
-                                  const int32_t             iParticleExcitation) const
-{
-    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ba))
-    {
-        return molecularOrbitals.alphaOrbitals(_ketIndexes.at(iParticleExcitation), 1);
-    }
-    
-    if ((_excitationType == szblock::ab) || (_excitationType == szblock::bb))
-    {
-        return molecularOrbitals.betaOrbitals(_ketIndexes.at(iParticleExcitation), 1);
-    }
-    
-    return CDenseMatrix();
-}
 
 std::ostream&
 operator<<(      std::ostream&  output,

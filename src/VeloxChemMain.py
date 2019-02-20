@@ -21,7 +21,7 @@ def main():
 
     # Hartree-Fock
 
-    if task_type in ['hf', 'mp2', 'cube']:
+    if task_type in ['hf', 'mp2', 'cube', 'response']:
 
         # initialize scf driver and run scf
 
@@ -34,6 +34,23 @@ def main():
         if task.mpi_rank == vlx.mpi_master() and scf_drv.is_converged:
             scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
             scf_drv.density.write_hdf5("density.h5")
+
+    # Response
+    
+    if task_type == 'response':
+    
+        # molecular orbitals
+    
+        if task.mpi_rank == vlx.mpi_master():
+            mol_orbs = scf_drv.mol_orbs
+        else:
+            mol_orbs = vlx.MolecularOrbitals()
+
+        rsp_drv = vlx.ResponseDriver()
+
+        rsp_drv.compute_task(mol_orbs, task)
+    
+    # MP2 perturbation theory
 
     if task_type == 'mp2':
 

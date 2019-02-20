@@ -47,31 +47,9 @@ class CExcitationVector
     CMemBlock<double> _zCoefficents;
     
     /**
-     The vector of Y coefficients associated with one particle excitations.
+     The vector of Y coefficients associated with one particle deexcitations.
      */
     CMemBlock<double> _yCoefficents;
-    
-    /**
-     Gets the bra molecular orbital associated with specific one particle
-     excitation.
-
-     @param molecularOrbitals the molecular orbitals.
-     @param iParticleExcitation the index of one particle excitation.
-     @return the molecular orbital.
-     */
-    CDenseMatrix _getBraOrbital(const CMolecularOrbitals& molecularOrbitals,
-                                const int32_t             iParticleExcitation) const;
-    
-    /**
-     Gets the ket molecular orbital associated with specific one particle
-     excitation.
-     
-     @param molecularOrbitals the molecular orbitals.
-     @param iParticleExcitation the index of one particle excitation.
-     @return the molecular orbital.
-     */
-    CDenseMatrix _getKetOrbital(const CMolecularOrbitals& molecularOrbitals,
-                                const int32_t             iParticleExcitation) const;
     
 public:
     

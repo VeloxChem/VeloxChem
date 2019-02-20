@@ -211,3 +211,51 @@ TEST_F(CDenseMatrixTest, Slice)
     
     ASSERT_EQ(refm21, ma.slice(0, 0, 2, 1));
 }
+
+TEST_F(CDenseMatrixTest, SelectByColumn)
+{
+    CDenseMatrix ma({ 1.0, -1.0, 3.0, 5.0,
+                     -3.0, -2.0, 1.0, 2.0,
+                      5.0,  4.0, 7.0, 5.0},
+                    3, 4);
+    
+    CDenseMatrix refx({ 1.0, -1.0, 5.0,
+                       -3.0, -2.0, 2.0,
+                        5.0,  4.0, 5.0},
+                      3, 3);
+    
+    ASSERT_EQ(refx, ma.selectByColumn({0, 1, 3}));
+    
+    CDenseMatrix refy({ -1.0, 5.0,
+                        -2.0, 2.0,
+                         4.0, 5.0},
+                    3, 2);
+    
+    ASSERT_EQ(refy, ma.selectByColumn({1, 3}));
+    
+    ASSERT_EQ(CDenseMatrix(), ma.selectByColumn({})); 
+}
+
+TEST_F(CDenseMatrixTest, SelectByRow)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0,
+                    -2.0,  5.0,  4.0,
+                     1.0,  2.0,  3.0,
+                     2.0,  1.0,  4.0},
+                    4, 3);
+    
+    CDenseMatrix refx({1.0, -1.0, -3.0,
+                      -2.0,  5.0,  4.0,
+                       2.0,  1.0,  4.0},
+                    3, 3);
+    
+    ASSERT_EQ(refx, ma.selectByRow({0, 1, 3}));
+    
+    CDenseMatrix refy({-2.0,  5.0,  4.0,
+                        2.0,  1.0,  4.0},
+                    2, 3);
+    
+    ASSERT_EQ(refy, ma.selectByRow({1, 3}));
+    
+    ASSERT_EQ(CDenseMatrix(), ma.selectByRow({}));
+}

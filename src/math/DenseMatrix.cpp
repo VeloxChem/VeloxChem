@@ -216,6 +216,61 @@ CDenseMatrix::slice(const int32_t iRow,
     return CDenseMatrix();
 }
 
+CDenseMatrix
+CDenseMatrix::selectByColumn(const std::vector<int32_t>& iColumns) const
+{
+    auto ncol = static_cast<int32_t>(iColumns.size());
+    
+    if ((ncol > 0) && (ncol <= _nColumns))
+    {
+        CDenseMatrix mat(_nRows, ncol);
+        
+        for (int32_t i = 0; i < _nRows; i++)
+        {
+            auto sdat = row(i);
+            
+            auto ddat = mat.row(i);
+            
+            for (int32_t j = 0; j < ncol; j++)
+            {
+                ddat[j] = sdat[iColumns[j]];
+            }
+        }
+        
+        return mat; 
+    }
+    
+    return CDenseMatrix();
+}
+
+CDenseMatrix
+CDenseMatrix::selectByRow(const std::vector<int32_t> &iRows) const
+{
+    auto nrow = static_cast<int32_t>(iRows.size());
+    
+    if ((nrow > 0) && (nrow <= _nRows))
+    {
+        CDenseMatrix mat(nrow, _nColumns);
+        
+        for (int32_t i = 0; i < nrow; i++)
+        {
+            auto sdat = row(iRows[i]);
+            
+            auto ddat = mat.row(i);
+            
+            #pragma omp simd
+            for (int32_t j = 0; j < _nColumns; j++)
+            {
+                ddat[j] = sdat[j];
+            }
+        }
+        
+        return mat;
+    }
+    
+    return CDenseMatrix();
+}
+
 int32_t
 CDenseMatrix::getNumberOfRows() const
 {

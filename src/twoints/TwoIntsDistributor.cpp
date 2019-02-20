@@ -295,6 +295,18 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                           braGtoPairsBlock, ketGtoPairsBlock,
                                           nKetContrPairs, iContrPair);
         }
+        
+        // closed shell restricted general Fock: 2J - K
+        
+        if (fcktyp == fockmat::rgenjk)
+        {
+            distmaxden::getMaxRestGenDenJK(maxDensityElements,
+                                           _aoDensity->getDensity(idden),
+                                           _aoDensity->getNumberOfColumns(idden),
+                                           braGtoPairsBlock, ketGtoPairsBlock,
+                                           nKetContrPairs, iContrPair);
+        }
+        
     }
 }
 
@@ -450,6 +462,17 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                    _aoDensity->getNumberOfColumns(idden),
                                    spherInts, braGtoPairsBlock, ketGtoPairsBlock,
                                    nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted general Fock matrix: 2J - K
+        
+        if (fcktyp == fockmat::rgenjk)
+        {
+            distfock::distRestGenJK(_fockContainer, i,
+                                    _aoDensity->getDensity(idden),
+                                    _aoDensity->getNumberOfColumns(idden),
+                                    spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                    nKetContrPairs, iContrPair);
         }
     }
 }

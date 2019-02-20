@@ -170,6 +170,22 @@ public:
                        const int32_t nColumns) const;
     
     /**
+     Creates dense matrix from selected colums in this dense matrix object.
+
+     @param iColumns the indexes of selected columns.
+     @return the dense matrix.
+     */
+    CDenseMatrix selectByColumn(const std::vector<int32_t>& iColumns) const;
+    
+    /**
+     Creates dense matrix from selected rows im this dense matrix object.
+
+     @param iRows the indexes of selected rows.
+     @return the dense matrix.
+     */
+    CDenseMatrix selectByRow(const std::vector<int32_t>& iRows) const;
+    
+    /**
      Gets number of rows in dense matrix.
 
      @return the number of rows.

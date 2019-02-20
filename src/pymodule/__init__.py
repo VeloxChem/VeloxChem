@@ -34,6 +34,7 @@ from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .visualizationdriver import VisualizationDriver
+from .rspdriver import ResponseDriver
 from .mpitask import MpiTask
 
 # Python functions
