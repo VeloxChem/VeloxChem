@@ -103,6 +103,35 @@ TEST_F(CExcitationVectorTest, SetCoefficientsZY)
     ASSERT_EQ(ma, mb);
 }
 
+TEST_F(CExcitationVectorTest, SetCoefficientZ)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0});
+    
+    ma.setCoefficientZ(1.0, 0);
+    
+    ma.setCoefficientZ(3.4, 2);
+    
+    
+    CExcitationVector mb(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, 0.0, 3.4}, {0.0, 0.0, 0.0});
+    
+    ASSERT_EQ(ma, mb);
+}
+
+TEST_F(CExcitationVectorTest, SetCoefficientY)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0});
+    
+    ma.setCoefficientY(3.1, 1);
+    
+    CExcitationVector mb(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {0.0, 0.0, 0.0}, {0.0, 3.1, 0.0});
+    
+    ASSERT_EQ(ma, mb);
+}
+
 TEST_F(CExcitationVectorTest, GetCoefficientsZ)
 {
     CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
@@ -252,4 +281,38 @@ TEST_F(CExcitationVectorTest, GetDensityY)
     CAODensityMatrix refden({mden}, denmat::rgen);
     
     ASSERT_EQ(refden, mvec.getDensityY(mos));
+}
+
+TEST_F(CExcitationVectorTest, DotCoefficientsZ)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CExcitationVector mb(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {2.0, 4.0, 1.0}, {2.0, 3.0, -2.0});
+    
+    ASSERT_NEAR(11.0, ma.dotCoefficientsZ(ma), 1.0e-13);
+    
+    ASSERT_NEAR(-5.0, ma.dotCoefficientsZ(mb), 1.0e-13);
+    
+    ASSERT_NEAR(-5.0, mb.dotCoefficientsZ(ma), 1.0e-13);
+    
+    ASSERT_NEAR(21.0, mb.dotCoefficientsZ(mb), 1.0e-13);
+}
+
+TEST_F(CExcitationVectorTest, DotCoefficientsY)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CExcitationVector mb(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {2.0, 4.0, 1.0}, {1.0, 3.0, 1.0});
+    
+    ASSERT_NEAR(17.0, ma.dotCoefficientsY(ma), 1.0e-13);
+    
+    ASSERT_NEAR(9.0, ma.dotCoefficientsY(mb), 1.0e-13);
+    
+    ASSERT_NEAR(9.0, mb.dotCoefficientsY(ma), 1.0e-13);
+    
+    ASSERT_NEAR(11.0, mb.dotCoefficientsY(mb), 1.0e-13);
 }

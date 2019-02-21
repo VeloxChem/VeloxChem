@@ -226,6 +226,24 @@ public:
                          const int32_t iCoefficient);
     
     /**
+     Computes dot product between Z coefficients of two excitation vector
+     objects.
+
+     @param other the other excitation vector object.
+     @return the dot product of Z coefficients.
+     */
+    double dotCoefficientsZ(const CExcitationVector& other) const;
+    
+    /**
+     Computes dot product between Y coefficients of two excitation vector
+     objects.
+     
+     @param other the other excitation vector object.
+     @return the dot product of Y coefficients.
+     */
+    double dotCoefficientsY(const CExcitationVector& other) const;
+    
+    /**
      Gets pointer to first element of Z coefficients vector.
 
      @return the pointer to first element of Z coefficients vector.

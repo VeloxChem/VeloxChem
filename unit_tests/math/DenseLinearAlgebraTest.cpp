@@ -200,3 +200,18 @@ TEST_F(CDenseLinearAlgebraTest, MultABtWithAddition)
     
     ASSERT_EQ(matc, refc);
 }
+
+TEST_F(CDenseLinearAlgebraTest, Dot)
+{
+    CMemBlock<double> veca({2.0, 3.0, 4.0});
+    
+    CMemBlock<double> vecb({1.0, 2.0, -1.5});
+    
+    ASSERT_NEAR(2.0, denblas::dot(veca, vecb), 1.0e-13);
+    
+    ASSERT_NEAR(2.0, denblas::dot(vecb, veca), 1.0e-13);
+    
+    ASSERT_NEAR(29.0, denblas::dot(veca, veca), 1.0e-13);
+    
+    ASSERT_NEAR(7.25, denblas::dot(vecb, vecb), 1.0e-13);
+}

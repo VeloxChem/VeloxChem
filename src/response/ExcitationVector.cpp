@@ -235,6 +235,18 @@ CExcitationVector::getCoefficientsY() const
     return _yCoefficents.data();
 }
 
+double
+CExcitationVector::dotCoefficientsZ(const CExcitationVector& other) const
+{
+    return denblas::dot(_zCoefficents, other._zCoefficents);
+}
+
+double
+CExcitationVector::dotCoefficientsY(const CExcitationVector& other) const
+{
+    return denblas::dot(_yCoefficents, other._yCoefficents);
+}
+
 int32_t
 CExcitationVector::getNumberOfExcitations() const
 {

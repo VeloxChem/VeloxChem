@@ -92,12 +92,22 @@ namespace denblas { // denblas namespace
      @param matrixC the matrix C.
      @param alpha the scaling factor for A * B^T.
      @param matrixA the matrix A.
-     @param matrixB the matrix B
+     @param matrixB the matrix B.
      */
     void multABt(      CDenseMatrix& matrixC,
                  const double        alpha,
                  const CDenseMatrix& matrixA,
                  const CDenseMatrix& matrixB);
+    
+    /**
+     Computes dot product of two vectors.
+
+     @param vectorA the vector A.
+     @param vectorB the vector B.
+     @return the dot product of A and B.
+     */
+    double dot(const CMemBlock<double>& vectorA,
+               const CMemBlock<double>& vectorB);
     
 } // denblas namespace
 
