@@ -17,6 +17,7 @@
 #include "ErrorHandler.hpp"
 #include "Codata.hpp"
 #include "StringFormat.hpp"
+#include "SpinBlock.hpp"
 #include "ExportGeneral.hpp"
 
 namespace py = pybind11;
@@ -74,6 +75,15 @@ void export_general(py::module& m)
     std::string errmpi4py("mpi4py: failed to import mpi4py");
 
     errors::assertMsgCritical(err == 0, errmpi4py);
+    
+    // szblock enum class
+    
+    py::enum_<szblock> (m, "szblock")
+        .value("aa", szblock::aa)
+        .value("ab", szblock::ab)
+        .value("ba", szblock::ba)
+        .value("bb", szblock::bb)
+    ;
 
     // exposing functions
 

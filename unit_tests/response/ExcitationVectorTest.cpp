@@ -33,6 +33,20 @@ TEST_F(CExcitationVectorTest, ConstructorWithPairs)
     ASSERT_EQ(ma, mb);
 }
 
+TEST_F(CExcitationVectorTest, ConstructorWithPairsForTDA)
+{
+    CExcitationVector ma(szblock::aa, 0, 2, 2, 5, true);
+    
+    std::vector<double> coefz({0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    
+    std::vector<double> coefy;
+    
+    CExcitationVector mb(szblock::aa, {0, 0, 0, 1, 1, 1}, {2, 3, 4, 2, 3, 4},
+                         coefz, coefy);
+    
+    ASSERT_EQ(ma, mb);
+}
+
 TEST_F(CExcitationVectorTest, CopyConstructor)
 {
     CExcitationVector ma(szblock::aa, {0, 0, 1}, {2, 3, 2},

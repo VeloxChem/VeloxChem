@@ -18,6 +18,7 @@
 #include "ExportSolvers.hpp"
 #include "ExportExciton.hpp"
 #include "ExportVisualization.hpp"
+#include "ExportResponse.hpp"
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
@@ -40,4 +41,6 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_exciton::export_exciton(m);
 
     vlx_visualization::export_visualization(m);
+    
+    vlx_rsp::export_response(m); 
 }

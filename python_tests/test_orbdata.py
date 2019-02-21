@@ -113,11 +113,11 @@ class TestOrbData(unittest.TestCase):
         self.assertEqual(molorb.rest, orb_rest.get_orbitals_type())
         self.assertEqual(molorb.unrest, orb_unrest.get_orbitals_type())
         
-        self.assertEqual(2, orb_rest.get_number_mos())
-        self.assertEqual(2, orb_unrest.get_number_mos())
+        self.assertEqual(2, orb_rest.number_mos())
+        self.assertEqual(2, orb_unrest.number_mos())
         
-        self.assertEqual(3, orb_rest.get_number_aos())
-        self.assertEqual(3, orb_unrest.get_number_aos())
+        self.assertEqual(3, orb_rest.number_aos())
+        self.assertEqual(3, orb_unrest.number_aos())
 
         # hdf5 read/write tests
 

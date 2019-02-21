@@ -10,6 +10,7 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
+from .veloxchemlib import ExcitationVector
 
 # C++ functions
 from .veloxchemlib import mpi_master

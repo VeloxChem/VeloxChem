@@ -9,8 +9,10 @@
 #include "ExcitationVector.hpp"
 
 #include <set>
+#include <sstream>
 
 #include "DenseLinearAlgebra.hpp"
+#include "StringFormat.hpp"
 
 CExcitationVector::CExcitationVector()
 
@@ -42,7 +44,8 @@ CExcitationVector::CExcitationVector(const szblock excitationType,
                                      const int32_t braStartPosition,
                                      const int32_t braEndPosition,
                                      const int32_t ketStartPosition,
-                                     const int32_t ketEndPosition)
+                                     const int32_t ketEndPosition,
+                                     const bool    isTammDancoff)
 
     : _excitationType(excitationType)
 {
@@ -56,11 +59,14 @@ CExcitationVector::CExcitationVector(const szblock excitationType,
     
     _zCoefficents = CMemBlock<double>(nket * nbra);
     
-    _yCoefficents = CMemBlock<double>(nket * nbra);
-    
     _zCoefficents.zero();
     
-    _yCoefficents.zero();
+    if (!isTammDancoff)
+    {
+        _yCoefficents = CMemBlock<double>(nket * nbra);
+        
+        _yCoefficents.zero();
+    }
     
     int32_t idx = 0;
     
@@ -75,6 +81,18 @@ CExcitationVector::CExcitationVector(const szblock excitationType,
             idx++;
         }
     }
+}
+
+CExcitationVector::CExcitationVector(const szblock excitationType,
+                                     const int32_t braStartPosition,
+                                     const int32_t braEndPosition,
+                                     const int32_t ketStartPosition,
+                                     const int32_t ketEndPosition)
+
+    : CExcitationVector(excitationType, braStartPosition, braEndPosition,
+                        ketStartPosition, ketEndPosition, false)
+{
+    
 }
 
 CExcitationVector::CExcitationVector(const CExcitationVector& source)
@@ -177,6 +195,20 @@ CExcitationVector::setCoefficientsZY(const CMemBlock<double>& zCoefficients,
     _zCoefficents = zCoefficients;
     
     _yCoefficents = yCoefficients; 
+}
+
+void
+CExcitationVector::setCoefficientZ(const double  zValue,
+                                   const int32_t iCoefficient)
+{
+    _zCoefficents.at(iCoefficient) = zValue;
+}
+
+void
+CExcitationVector::setCoefficientY(const double  yValue,
+                                   const int32_t iCoefficient)
+{
+    _yCoefficents.at(iCoefficient) = yValue;
 }
 
 double*
@@ -354,6 +386,48 @@ CExcitationVector::getDensityY(const CMolecularOrbitals& molecularOrbitals) cons
     auto tden = denblas::multAB(tmv, denblas::multABt(ymat, tmo));
     
     return CAODensityMatrix({tden}, denmat::rgen);
+}
+
+std::string
+CExcitationVector::getString() const
+{
+    std::stringstream sst("");
+    
+    sst << "Z Vector [Dimension " << _zCoefficents.size() << "]\n";
+    
+    for (int32_t i = 0; i < _zCoefficents.size(); i++)
+    {
+        sst << fstr::to_string(_braIndexes.at(i), 6, fmt::right);
+      
+        sst << " -> ";
+        
+        sst << fstr::to_string(_ketIndexes.at(i), 6, fmt::right);
+        
+        sst << " : ";
+        
+        sst << fstr::to_string(_zCoefficents.at(i), 8, 15, fmt::right);
+        
+        sst << "\n";
+    }
+    
+    sst << "Y Vector [Dimension " << _yCoefficents.size() << "]\n";
+    
+    for (int32_t i = 0; i < _yCoefficents.size(); i++)
+    {
+        sst << fstr::to_string(_ketIndexes.at(i), 6, fmt::right);
+        
+        sst << " -> ";
+        
+        sst << fstr::to_string(_braIndexes.at(i), 6, fmt::right);
+        
+        sst << " : ";
+        
+        sst << fstr::to_string(_yCoefficents.at(i), 8, 15, fmt::right);
+        
+        sst << "\n";
+    }
+    
+    return sst.str();
 }
 
 int32_t

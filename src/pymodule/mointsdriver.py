@@ -267,7 +267,7 @@ class MOIntegralsDriver:
     def get_num_orbitals(self, mol_orbs, molecule):
 
         nocc = molecule.number_of_alpha_electrons()
-        nvirt = mol_orbs.get_number_mos() - nocc
+        nvirt = mol_orbs.number_mos() - nocc
 
         return (nocc, nvirt)
 

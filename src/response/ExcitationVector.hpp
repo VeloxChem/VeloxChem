@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <vector>
+#include <string>
 
 #include "SpinBlock.hpp"
 #include "MemBlock.hpp"
@@ -120,6 +121,27 @@ public:
             ket side.
      @param ketEndPosition the end position in molecular orbital space on ket
             side.
+     @param isTammDancoff the flag for enabling Tamm-Dancoff approximation.
+     */
+    CExcitationVector(const szblock excitationType,
+                      const int32_t braStartPosition,
+                      const int32_t braEndPosition,
+                      const int32_t ketStartPosition,
+                      const int32_t ketEndPosition,
+                      const bool    isTammDancoff);
+    
+    /**
+     Creates a excitation vector object.
+     
+     @param excitationType the single particle excitation type.
+     @param braStartPosition the start position in molecular orbital space on
+            bra side.
+     @param braEndPosition the end position in molecular orbital space on bra
+            side.
+     @param ketStartPosition the start position in molecular orbital space on
+            ket side.
+     @param ketEndPosition the end position in molecular orbital space on ket
+            side.
      */
     CExcitationVector(const szblock excitationType,
                       const int32_t braStartPosition,
@@ -184,6 +206,24 @@ public:
      */
     void setCoefficientsZY(const CMemBlock<double>& zCoefficients,
                            const CMemBlock<double>& yCoefficients);
+    
+    /**
+     Sets specific element of Z coefficients vector.
+
+     @param zValue the value of Z coefficient.
+     @param iCoefficient the index of Z coefficient.
+     */
+    void setCoefficientZ(const double  zValue,
+                         const int32_t iCoefficient);
+    
+    /**
+     Sets specific element of Y coefficients vector.
+     
+     @param yValue the value of Y coefficient.
+     @param iCoefficient the index of Y coefficient.
+     */
+    void setCoefficientY(const double  yValue,
+                         const int32_t iCoefficient);
     
     /**
      Gets pointer to first element of Z coefficients vector.
@@ -263,6 +303,13 @@ public:
      @return the AO density matrix.
      */
     CAODensityMatrix getDensityY(const CMolecularOrbitals& molecularOrbitals) const;
+    
+    /**
+     Converts excitation vector object to it's string representation.
+
+     @return the string representation of excitation vector object.
+     */
+    std::string getString() const;
     
     /**
      Converts excitation vector object to text output and insert it into output
