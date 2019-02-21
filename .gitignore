@@ -13,3 +13,4 @@ build
 *~
 dummy.*
 __pycache__
+venv*
