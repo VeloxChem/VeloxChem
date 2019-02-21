@@ -253,6 +253,48 @@ TEST_F(CMolecularOrbitalsTest, BetaOrbitalsWithRange)
               moa.betaOrbitals(0, 1));
 }
 
+TEST_F(CMolecularOrbitalsTest, AlphaOrbitalsWithList)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -2.0, 6.0}, 3, 1), moa.alphaOrbitals(0, 1));
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3),
+              moa.alphaOrbitals({0, 1, 2}));
+    
+    ASSERT_EQ(CDenseMatrix({-1.0, -3.0, 5.0, 4.0, 4.0, -4.0}, 3, 2),
+              moa.alphaOrbitals({1, 2}));
+}
+
+TEST_F(CMolecularOrbitalsTest, BetaOrbitalsWithList)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0});
+    
+    std::vector<double> eb({3.0, 5.0});
+    
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    
+    ASSERT_EQ(CDenseMatrix({ -1.0, -2.0,  4.0}, 3, 1), moa.betaOrbitals({1}));
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2),
+              moa.betaOrbitals({0, 1}));
+    
+    ASSERT_EQ(CDenseMatrix({1.0, -3.0, 5.0}, 3, 1),
+              moa.betaOrbitals({0}));
+}
+
 TEST_F(CMolecularOrbitalsTest, GetAODensityForRestrictedCase)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);

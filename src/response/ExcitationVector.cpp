@@ -8,7 +8,7 @@
 
 #include "ExcitationVector.hpp"
 
-#include <utility>
+#include <set>
 
 #include "DenseLinearAlgebra.hpp"
 
@@ -209,18 +209,200 @@ CExcitationVector::getNumberOfExcitations() const
     return _zCoefficents.size();
 }
 
-CAODensityMatrix
-CExcitationVector::getTransformedDensity(const CMolecularOrbitals& molecularOrbitals) const
+std::vector<int32_t>
+CExcitationVector::getBraUniqueIndexes() const
 {
-    auto ndim = molecularOrbitals.getNumberOfRows();
+    std::set<int32_t> exlist;
     
-    CDenseMatrix mden(ndim, ndim);
+    for (int32_t i = 0; i < _braIndexes.size(); i++)
+    {
+        exlist.insert(_braIndexes.at(i));
+    }
     
-    mden.zero();
-    
-    return CAODensityMatrix({mden}, denmat::rgen);
+    return std::vector<int32_t>(exlist.cbegin(), exlist.cend());
 }
 
+std::vector<int32_t>
+CExcitationVector::getKetUniqueIndexes() const
+{
+    std::set<int32_t> exlist;
+    
+    for (int32_t i = 0; i < _ketIndexes.size(); i++)
+    {
+        exlist.insert(_ketIndexes.at(i));
+    }
+    
+    return std::vector<int32_t>(exlist.cbegin(), exlist.cend());
+}
+
+CDenseMatrix
+CExcitationVector::getMatrixZ() const
+{
+    // get unique indexes vectors
+    
+    auto bidx = getBraUniqueIndexes();
+    
+    auto kidx = getKetUniqueIndexes();
+    
+    //  determine dimension
+    
+    auto nrow = static_cast<int32_t>(bidx.size());
+    
+    auto ncol = static_cast<int32_t>(kidx.size());
+    
+    // allocate and initialize matrix
+    
+    CDenseMatrix zmat(nrow, ncol);
+    
+    zmat.zero();
+    
+    auto zvals = zmat.values();
+    
+    for (int32_t i = 0; i < getNumberOfExcitations(); i++)
+    {
+        auto irow = _convertIdentifier(bidx, _braIndexes.at(i));
+        
+        auto icol = _convertIdentifier(kidx, _ketIndexes.at(i));
+        
+        zvals[irow * ncol + icol] = _zCoefficents.at(i); 
+    }
+    
+    return zmat;
+}
+
+CDenseMatrix
+CExcitationVector::getMatrixY() const
+{
+    // get unique indexes vectors
+    
+    auto bidx = getBraUniqueIndexes();
+    
+    auto kidx = getKetUniqueIndexes();
+    
+    //  determine dimension
+    
+    auto nrow = static_cast<int32_t>(kidx.size());
+    
+    auto ncol = static_cast<int32_t>(bidx.size());
+    
+    // allocate and initialize matrix
+    
+    CDenseMatrix zmat(nrow, ncol);
+    
+    zmat.zero();
+    
+    auto zvals = zmat.values();
+    
+    for (int32_t i = 0; i < getNumberOfExcitations(); i++)
+    {
+        auto irow = _convertIdentifier(kidx, _ketIndexes.at(i));
+        
+        auto icol = _convertIdentifier(bidx, _braIndexes.at(i));
+        
+        zvals[irow * ncol + icol] = _yCoefficents.at(i);
+    }
+    
+    return zmat;
+}
+
+CAODensityMatrix
+CExcitationVector::getDensityZ(const CMolecularOrbitals& molecularOrbitals) const
+{
+    // convert Z vector to matrix
+    
+    auto zmat = getMatrixZ();
+    
+    // set up appropiate molecular orbitals blocks
+    
+    auto bidx = getBraUniqueIndexes();
+    
+    std::cout << "bra:";
+    for (size_t i = 0; i < bidx.size(); i++)
+        std::cout << " " << bidx[i];
+    std::cout << std::endl;
+    
+    auto tmo = _getBraOrbitals(molecularOrbitals, getBraUniqueIndexes());
+    
+    auto tmv = _getKetOrbitals(molecularOrbitals, getKetUniqueIndexes());
+    
+    std::cout << "tmo:" << tmo.getString();
+    
+    std::cout << "tmv:" << tmv.getString();
+    
+    // compute transformed density
+    
+    auto tden = denblas::multAB(tmo, denblas::multABt(zmat, tmv));
+
+    return CAODensityMatrix({tden}, denmat::rgen);
+}
+
+CAODensityMatrix
+CExcitationVector::getDensityY(const CMolecularOrbitals& molecularOrbitals) const
+{
+    // convert Y vector to matrix
+    
+    auto ymat = getMatrixY();
+    
+    // set up appropiate molecular orbitals blocks
+    
+    auto tmo = _getBraOrbitals(molecularOrbitals, getBraUniqueIndexes());
+    
+    auto tmv = _getBraOrbitals(molecularOrbitals, getKetUniqueIndexes());
+    
+    // compute transformed density
+    
+    auto tden = denblas::multAB(tmv, denblas::multABt(ymat, tmo));
+    
+    return CAODensityMatrix({tden}, denmat::rgen);
+}
+
+int32_t
+CExcitationVector::_convertIdentifier(const std::vector<int32_t>& identifiers,
+                                      const int32_t               index) const
+{
+    auto dim = static_cast<int32_t>(identifiers.size());
+    
+    for (int32_t i = 0; i < dim; i++)
+    {
+        if (identifiers[i] == index) return i;
+    }
+    
+    return -1;
+}
+
+CDenseMatrix
+CExcitationVector::_getBraOrbitals(const CMolecularOrbitals&   molecularOrbitals,
+                                   const std::vector<int32_t>& identifiers) const
+{
+    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ab))
+    {
+        return molecularOrbitals.alphaOrbitals(identifiers);
+    }
+    
+    if ((_excitationType == szblock::bb) || (_excitationType == szblock::ba))
+    {
+        return molecularOrbitals.betaOrbitals(identifiers);
+    }
+    
+    return CDenseMatrix();
+}
+
+CDenseMatrix
+CExcitationVector::_getKetOrbitals(const CMolecularOrbitals&   molecularOrbitals,
+                                   const std::vector<int32_t>& identifiers) const
+{
+    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ba))
+    {
+        return molecularOrbitals.alphaOrbitals(identifiers);
+    }
+    
+    if ((_excitationType == szblock::bb) || (_excitationType == szblock::ab))
+    {
+        return molecularOrbitals.betaOrbitals(identifiers);
+    }
+    
+    return CDenseMatrix();
+}
 
 std::ostream&
 operator<<(      std::ostream&  output,

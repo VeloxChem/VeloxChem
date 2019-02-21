@@ -200,6 +200,22 @@ public:
                               const int32_t nMolecularOrbitals) const;
     
     /**
+     Gets alpha orbitals within given vector of molecular orbital indexes.
+
+     @param iMolecularOrbitals the vector of molecular orbital indexes.
+     @return the alpha orbitals.
+     */
+    CDenseMatrix alphaOrbitals(const std::vector<int32_t>& iMolecularOrbitals) const;
+    
+    /**
+     Gets beta orbitals within given vector of molecular orbital indexes.
+     
+     @param iMolecularOrbitals the vector of molecular orbital indexes.
+     @return the beta orbitals.
+     */
+    CDenseMatrix betaOrbitals(const std::vector<int32_t>& iMolecularOrbitals) const;
+    
+    /**
      Gets string representation of density matrix object.
 
      @return the string representation.

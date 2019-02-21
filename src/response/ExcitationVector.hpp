@@ -17,6 +17,7 @@
 #include "MemBlock.hpp"
 #include "AODensityMatrix.hpp"
 #include "MolecularOrbitals.hpp"
+#include "DenseMatrix.hpp"
 
 /**
 Class CExcitationVector class stores information on one particle excitation and
@@ -50,6 +51,38 @@ class CExcitationVector
      The vector of Y coefficients associated with one particle deexcitations.
      */
     CMemBlock<double> _yCoefficents;
+    
+    /**
+     Converts index of molecular orbital to unified index of Z or Y matrix.
+
+     @param identifiers the vector of molecular orbital indexes.
+     @param index the index of molecular orbital.
+     @return the converted index.
+     */
+    int32_t _convertIdentifier(const std::vector<int32_t>& identifiers,
+                               const int32_t               index) const;
+    
+    /**
+     Gets subset of molecular orbitals corresponding to unique list of
+     anihilation operators from molecular orbitals object.
+
+     @param molecularOrbitals the molecular orbitals.
+     @param identifiers the vector of molecular orbital indexes.
+     @return the dense matrix with selected molecular orbitals
+     */
+    CDenseMatrix _getBraOrbitals(const CMolecularOrbitals&   molecularOrbitals,
+                                 const std::vector<int32_t>& identifiers) const;
+    
+    /**
+     Gets subset of molecular orbitals corresponding to unique list of creation
+     operators from molecular orbitals object.
+     
+     @param molecularOrbitals the molecular orbitals.
+     @param identifiers the vector of molecular orbital indexes.
+     @return the dense matrix with selected molecular orbitals
+     */
+    CDenseMatrix _getKetOrbitals(const CMolecularOrbitals&   molecularOrbitals,
+                                 const std::vector<int32_t>& identifiers) const;
     
 public:
     
@@ -188,13 +221,48 @@ public:
     int32_t getNumberOfExcitations() const;
     
     /**
-     Generates AO density matrix by applying Z and Y coefficients transformation
-     to AO basis (see Eq. 27 in Chem. Phys. 119 (1988) 297-306)
+     Gets vector of unique molecular orbitals indexes associated with creation
+     operator in one particle excitations vector.
 
-     @param molecularOrbitals the molecular orbitals.
+     @return the vector of unique indexes.
+     */
+    std::vector<int32_t> getBraUniqueIndexes() const;
+    
+    /**
+     Gets vector of unique molecular orbitals indexes associated with
+     anihilation operator in one particle excitations vector.
+     
+     @return the vector of unique indexes.
+     */
+    std::vector<int32_t> getKetUniqueIndexes() const;
+    
+    /**
+     Transforms Z vector to matrix (occ, virt) format.
+
+     @return the dense matrix.
+     */
+    CDenseMatrix getMatrixZ() const;
+    
+    /**
+     Transforms Y vector to matrix (virt, occ) format.
+     
+     @return the dense matrix.
+     */
+    CDenseMatrix getMatrixY() const;
+    
+    /**
+     Transforms Z vector to AO density matrix.
+     
      @return the AO density matrix.
      */
-    CAODensityMatrix getTransformedDensity(const CMolecularOrbitals& molecularOrbitals) const;
+    CAODensityMatrix getDensityZ(const CMolecularOrbitals& molecularOrbitals) const;
+    
+    /**
+     Transforms Y vector to AO density matrix.
+     
+     @return the AO density matrix.
+     */
+    CAODensityMatrix getDensityY(const CMolecularOrbitals& molecularOrbitals) const;
     
     /**
      Converts excitation vector object to text output and insert it into output

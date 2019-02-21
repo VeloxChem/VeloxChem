@@ -251,6 +251,23 @@ CMolecularOrbitals::betaOrbitals(const int32_t iMolecularOrbital,
     return CDenseMatrix(); 
 }
 
+CDenseMatrix
+CMolecularOrbitals::alphaOrbitals(const std::vector<int32_t>& iMolecularOrbitals) const
+{
+    return _orbitals[0].selectByColumn(iMolecularOrbitals);
+}
+
+CDenseMatrix
+CMolecularOrbitals::betaOrbitals(const std::vector<int32_t>& iMolecularOrbitals) const
+{
+    if (_orbitalsType == molorb::unrest)
+    {
+        return _orbitals[1].selectByColumn(iMolecularOrbitals);
+    }
+    
+    return CDenseMatrix();
+}
+
 const double*
 CMolecularOrbitals::alphaEnergies() const
 {

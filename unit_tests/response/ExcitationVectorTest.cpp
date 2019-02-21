@@ -147,3 +147,95 @@ TEST_F(CExcitationVectorTest, GetNumberOfExcitations)
     
     ASSERT_EQ(25, ma.getNumberOfExcitations());
 }
+
+TEST_F(CExcitationVectorTest, GetBraUniqueIndexes)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    vlxtest::compare({0, 1}, ma.getBraUniqueIndexes());
+}
+
+TEST_F(CExcitationVectorTest, GetKetUniqueIndexes)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {4, 3, 4},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    vlxtest::compare({3, 4}, ma.getKetUniqueIndexes());
+}
+
+TEST_F(CExcitationVectorTest, GetMatrixZ)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 3},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CDenseMatrix refz({1.0, -1.0, 0.0, -3.0}, 2, 2);
+    
+    ASSERT_EQ(refz, ma.getMatrixZ());
+}
+
+TEST_F(CExcitationVectorTest, GetMatrixY)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 3},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CDenseMatrix refy({2.0, 0.0, 3.0, -2.0}, 2, 2);
+    
+    ASSERT_EQ(refy, ma.getMatrixY());
+}
+
+TEST_F(CExcitationVectorTest, GetDensityZ)
+{
+    CExcitationVector mvec(szblock::aa, {0, 0, 1}, {2, 3, 3},
+                           {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0, -2.0,
+                      5.0,  4.0,  6.0,  4.0,
+                     -4.0,  1.0,  2.0,  3.0,
+                      2.0, -2.0,  5.0,  1.0,
+                      5.0,  3.0,  1.0,  6.0},
+                    5, 4);
+
+    std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
+    
+    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    
+    CDenseMatrix mden({  -7.0,  14.0,   8.0,   7.0,  13.0,
+                         19.0, -38.0, -41.0,   8.0, -97.0,
+                         10.0, -20.0,  -5.0, -19.0,   2.0,
+                        -14.0,  28.0,  16.0,  14.0,  26.0,
+                         13.0, -26.0, -32.0,  11.0, -79.0},
+                       5, 5);
+    
+    CAODensityMatrix refden({mden}, denmat::rgen);
+    
+    ASSERT_EQ(refden, mvec.getDensityZ(mos));
+}
+
+TEST_F(CExcitationVectorTest, GetDensityY)
+{
+    CExcitationVector mvec(szblock::aa, {0, 0, 1}, {2, 3, 3},
+                           {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0, -2.0,
+                      5.0,  4.0,  6.0,  4.0,
+                     -4.0,  1.0,  2.0,  3.0,
+                      2.0, -2.0,  5.0,  1.0,
+                      5.0,  3.0,  1.0,  6.0},
+                    5, 4);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
+    
+    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    
+    CDenseMatrix mden({ -16.0, -44.0,   52.0, -32.0, -48.0,
+                         32.0,  88.0, -104.0,  64.0,  96.0,
+                         19.0,  41.0,  -58.0,  38.0,  47.0,
+                         15.0,  57.0,  -54.0,  30.0,  59.0,
+                         32.0,  52.0,  -92.0,  64.0,  64.0},
+                      5, 5);
+    
+    CAODensityMatrix refden({mden}, denmat::rgen);
+    
+    ASSERT_EQ(refden, mvec.getDensityY(mos));
+}
