@@ -7,10 +7,17 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+#include <mpi.h>
 
 #include "ExportResponse.hpp"
 
 #include "ExcitationVector.hpp"
+#include "TDASigmaVectorDriver.hpp"
+#include "ScreeningContainer.hpp"
+#include "ExportGeneral.hpp"
+#include "ExportMath.hpp"
 
 namespace py = pybind11;
 
@@ -24,6 +31,39 @@ static std::string
 CExcitationVector_str(const CExcitationVector& self)
 {
     return self.getString();
+}
+    
+// Helper function for CTDASigmaVectorDriver constructor
+    
+static std::shared_ptr<CTDASigmaVectorDriver>
+CTDASigmaVectorDriver_create(int32_t    globRank,
+                             int32_t    globNodes,
+                             py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        
+    return std::shared_ptr<CTDASigmaVectorDriver>(
+        new CTDASigmaVectorDriver(globRank, globNodes, *comm_ptr)
+        );
+    
+}
+    
+// Helper functions for overloading CTDASigmaVectorDriver::compute
+
+std::vector<CDenseMatrix>
+CTDASigmaVectorDriver_compute(
+          CTDASigmaVectorDriver&          self,
+    const std::vector<CExcitationVector>& zVectors,
+    const CScreeningContainer&            screeningContainer,
+    const CMolecularOrbitals&             molecularOrbitals,
+    const CMolecule&                      molecule,
+    const CMolecularBasis&                basis,
+          py::object                      py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return self.compute(zVectors, screeningContainer, molecularOrbitals,
+                        molecule, basis, *comm_ptr);
 }
 
 void export_response(py::module& m)
@@ -63,6 +103,26 @@ void export_response(py::module& m)
         .def("get_ymatrix", &CExcitationVector::getMatrixY)
         .def("get_zdensity", &CExcitationVector::getDensityZ)
         .def("get_ydensity", &CExcitationVector::getDensityY)
+        .def("small_energy_identifiers", &CExcitationVector::getSmallEnergyIdentifiers)
+        .def("dot_z_vector", (double (CExcitationVector::*)(const CExcitationVector&) const)
+                              &CExcitationVector::dotCoefficientsZ)
+        .def("dot_y_vector", (double (CExcitationVector::*)(const CExcitationVector&) const)
+                              &CExcitationVector::dotCoefficientsY)
+        .def("dot_z_matrix", (double (CExcitationVector::*)(const CDenseMatrix&) const)
+                              &CExcitationVector::dotCoefficientsZ)
+        .def("dot_y_matrix", (double (CExcitationVector::*)(const CDenseMatrix&) const)
+                              &CExcitationVector::dotCoefficientsY)
+    ;
+    
+     // CTDASigmaVectorDriver class
+
+    py::class_< CTDASigmaVectorDriver,
+                std::shared_ptr<CTDASigmaVectorDriver> >
+        (
+            m, "TDASigmaVectorDriver"
+        )
+        .def(py::init(&CTDASigmaVectorDriver_create))
+        .def("compute", &CTDASigmaVectorDriver_compute)
     ;
 }
     

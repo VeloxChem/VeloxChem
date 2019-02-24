@@ -1,9 +1,13 @@
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import ScreeningContainer
+from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
 from .veloxchemlib import ericut
 from .veloxchemlib import molorb
+from .veloxchemlib import szblock
+
+from .tdaexcidriver import TDAExciDriver
 
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
@@ -30,8 +34,11 @@ class ResponseDriver:
         Initializes Response driver to default setup.
         """
         
+        # calculation type
+        self.prop_type = "SINGEX_TDA"
+        
         # convergence information
-        self.max_iter = 50
+        self.max_iter = 2
         
         # screening scheme
         self.qq_type = "QQ_DEN"
@@ -40,12 +47,15 @@ class ResponseDriver:
         self.conv_thresh = 1.0e-4
         self.eri_thresh  = 1.0e-15
         
+        # excited states information
+        self.nstates = 3
+        
         # mpi information
         self.rank = 0
         self.nodes = 1
     
     def compute_task(self, mol_orbs, task):
-        """Performs molecular propery calculation using response theory.
+        """Performs molecular property calculation using response theory.
             
         Performs molecular property calculation using data from MPI task.
             
@@ -61,7 +71,7 @@ class ResponseDriver:
                      task.ostream)
     
     def compute(self, mol_orbs, molecule, ao_basis, comm, ostream):
-        """Performs SCF calculation.
+        """Performs molecular property calculation.
             
         Performs molecular property calculation using molecular data, MPI
         communicator and output stream.
@@ -95,6 +105,28 @@ class ResponseDriver:
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
 
+        # TDA singlet/triplet excited states
+        
+        if self.prop_type in ["SINGEX_TDA", "TRIPEX_TDA"]:
+            tda_exci = TDAExciDriver(self.rank, self.nodes)
+            
+            tda_exci.set_number_states(self.nstates)
+            tda_exci.set_eri_threshold(self.eri_thresh)
+            tda_exci.set_solver(self.conv_thresh, self.max_iter)
+            
+            tda_exci.compute(qq_data, mol_orbs, molecule, ao_basis, comm,
+                             ostream)
+        
+        
+        #if self.rank == mpi_master():
+        #    nocc = molecule.number_of_electrons() // 2
+        #    norb = mol_orbs.number_mos()
+        #    zyvec = ExcitationVector(szblock.aa, 0, nocc, nocc, norb)
+        #    print(zyvec)
+        #    zvec = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+        #    zvec.set_zcoefficient(1.0, 0)
+        #    print(zvec)
+
     def print_header(self, ostream):
         """Prints response driver setup header to output stream.
             
@@ -113,6 +145,14 @@ class ResponseDriver:
         
         str_width = 80
        
+        cur_str = "Molecular Property Type      : " + self.prop_str()
+        ostream.print_header(cur_str.ljust(str_width))
+        if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
+            cur_str = "Number Of Excited States     : " + str(self.nstates)
+            ostream.print_header(cur_str.ljust(str_width))
+        if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
+            cur_str = "Response Equations Type      : Tamm-Dancoff"
+            ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
         ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold        : " + \
@@ -125,6 +165,21 @@ class ResponseDriver:
             "{:.1e}".format(self.eri_thresh)
         ostream.print_header(cur_str.ljust(str_width))
 
+    def prop_str(self):
+        """Gets string with type of molecular property calculation.
+            
+        Gets string with type of molecular property calculation (Excited states,
+        linear and non-linear spectroscopies).
+            
+        Returns
+        -------
+        The string with type of molecular property calculation.
+        """
+        
+        if self.prop_type == "SINGEX_TDA":
+            return "Singlet Excited States"
+
+        return "Undefined"
 
 
 

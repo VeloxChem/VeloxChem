@@ -308,6 +308,18 @@ namespace denblas { // denblas namespace
         
         return cblas_ddot(vectorA.size(), vectorA.data(), 1, vectorB.data(), 1); 
     }
+    
+    double
+    dot(const CMemBlock<double>& vectorA,
+        const CDenseMatrix&      matrixB)
+    {
+        errors::assertMsgCritical(
+                vectorA.size() == matrixB.getNumberOfElements(),
+                "denblas::dot - Inconsistent sizes in dot product of vector and column matrix"
+                                  );
+        
+        return cblas_ddot(vectorA.size(), vectorA.data(), 1, matrixB.values(), 1);
+    }
 
     
 } // denblas namespace

@@ -207,6 +207,22 @@ TEST_F(CExcitationVectorTest, GetKetUniqueIndexes)
     vlxtest::compare({3, 4}, ma.getKetUniqueIndexes());
 }
 
+TEST_F(CExcitationVectorTest, GetBraIndexes)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    vlxtest::compare({0, 0, 1}, ma.getBraIndexes());
+}
+
+TEST_F(CExcitationVectorTest, GetKetIndexes)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    vlxtest::compare({2, 3, 2}, ma.getKetIndexes());
+}
+
 TEST_F(CExcitationVectorTest, GetMatrixZ)
 {
     CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 3},
@@ -315,4 +331,87 @@ TEST_F(CExcitationVectorTest, DotCoefficientsY)
     ASSERT_NEAR(9.0, mb.dotCoefficientsY(ma), 1.0e-13);
     
     ASSERT_NEAR(11.0, mb.dotCoefficientsY(mb), 1.0e-13);
+}
+
+TEST_F(CExcitationVectorTest, DotCoefficientsZWithMatrix)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CDenseMatrix mat({2.0, 4.0, 1.0}, 3, 1);
+    
+    ASSERT_NEAR(-5.0, ma.dotCoefficientsZ(mat), 1.0e-13);
+}
+
+TEST_F(CExcitationVectorTest, DotCoefficientsYWithMatrix)
+{
+    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
+    
+    CDenseMatrix mat({1.0, 3.0, 1.0}, 3, 1);
+    
+    ASSERT_NEAR(9.0, ma.dotCoefficientsY(mat), 1.0e-13);
+}
+
+TEST_F(CExcitationVectorTest, GetBraEnergies)
+{
+    CExcitationVector mvec(szblock::ab, {0, 0, 1, 1}, {2, 3, 2, 3},
+                           {1.0, -1.0, -3.0, 3.0}, {2.0, 3.0, -2.0, 1.0});
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0, -2.0,
+                      5.0,  4.0,  6.0,  4.0,
+                     -4.0,  1.0,  2.0,  3.0,
+                      2.0, -2.0,  5.0,  1.0,
+                      5.0,  3.0,  1.0,  6.0},
+                    5, 4);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
+    
+    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    
+    vlxtest::compare(ea, mvec.getBraEnergies(mos));
+}
+
+TEST_F(CExcitationVectorTest, GetKetEnergies)
+{
+    CExcitationVector mvec(szblock::ba, {0, 0, 1, 1}, {2, 3, 2, 3},
+                           {1.0, -1.0, -3.0, 3.0}, {2.0, 3.0, -2.0, 1.0});
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0, -2.0,
+                      5.0,  4.0,  6.0,  4.0,
+                     -4.0,  1.0,  2.0,  3.0,
+                      2.0, -2.0,  5.0,  1.0,
+                      5.0,  3.0,  1.0,  6.0},
+                    5, 4);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
+    
+    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    
+    vlxtest::compare(ea, mvec.getKetEnergies(mos));
+}
+
+TEST_F(CExcitationVectorTest, GetSmallEnergyIdentifiers)
+{
+    CExcitationVector mvec(szblock::aa, {0, 0, 1, 1}, {2, 3, 2, 3},
+                           {1.0, -1.0, -3.0, 3.0}, {2.0, 3.0, -2.0, 1.0});
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0, -2.0,
+                      5.0,  4.0,  6.0,  4.0,
+                     -4.0,  1.0,  2.0,  3.0,
+                      2.0, -2.0,  5.0,  1.0,
+                      5.0,  3.0,  1.0,  6.0},
+                    5, 4);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
+    
+    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    
+    std::vector<int32_t> refidx4({0, 1, 2, 3});
+    
+    vlxtest::compare(refidx4, mvec.getSmallEnergyIdentifiers(mos, 4));
+    
+    std::vector<int32_t> refidx2({3, 1});
+    
+    vlxtest::compare(refidx2, mvec.getSmallEnergyIdentifiers(mos, 2));
 }

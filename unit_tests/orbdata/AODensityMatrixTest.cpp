@@ -68,6 +68,40 @@ TEST_F(CAODensityMatrixTest, MoveAssignment)
     ASSERT_EQ(dmata, dmatb);
 }
 
+TEST_F(CAODensityMatrixTest, SetDensityType)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CAODensityMatrix dmata({ma}, denmat::rest);
+    
+    dmata.setDensityType(denmat::rmoij);
+    
+    CAODensityMatrix dmatb = CAODensityMatrix({ma}, denmat::rmoij);
+    
+    ASSERT_EQ(dmata, dmatb);
+}
+
+TEST_F(CAODensityMatrixTest, Append)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CAODensityMatrix dmata({ma}, denmat::rest);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAODensityMatrix dmatb({ma, ma, mb, mb}, denmat::rgen);
+    
+    dmata.append(dmatb);
+    
+    ASSERT_EQ(dmata, CAODensityMatrix({ma}, denmat::rest));
+    
+    dmata.setDensityType(denmat::rgen);
+    
+    dmata.append(dmatb);
+    
+    ASSERT_EQ(dmata, CAODensityMatrix({ma, ma, ma, mb, mb}, denmat::rgen));
+}
+
 TEST_F(CAODensityMatrixTest, Sub)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);

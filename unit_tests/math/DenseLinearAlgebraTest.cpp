@@ -215,3 +215,12 @@ TEST_F(CDenseLinearAlgebraTest, Dot)
     
     ASSERT_NEAR(7.25, denblas::dot(vecb, vecb), 1.0e-13);
 }
+
+TEST_F(CDenseLinearAlgebraTest, DotVectorMatrix)
+{
+    CMemBlock<double> veca({2.0, 3.0, 4.0});
+    
+    CDenseMatrix matb({1.0, 2.0, -1.5}, 3, 1);
+    
+    ASSERT_NEAR(2.0, denblas::dot(veca, matb), 1.0e-13);
+}

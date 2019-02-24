@@ -109,6 +109,16 @@ namespace denblas { // denblas namespace
     double dot(const CMemBlock<double>& vectorA,
                const CMemBlock<double>& vectorB);
     
+    /**
+     Computes dot product of vector and column vector.
+     
+     @param vectorA the vector A.
+     @param matrixB the column matrix B.
+     @return the dot product of vector A and column matrix B.
+     */
+    double dot(const CMemBlock<double>& vectorA,
+               const CDenseMatrix&      matrixB);
+    
 } // denblas namespace
 
 #endif /* DenseLinearAlgebra_hpp */

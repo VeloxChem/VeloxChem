@@ -70,6 +70,15 @@ namespace mathfunc { // mathfunc namespace
         return isum;
     }
     
+    void
+    scale(      double* vector,
+          const double  factor,
+          const int32_t nElements)
+    {
+        #pragma omp simd aligned(vector: VLX_ALIGN)
+        for (int32_t i = 0; i < nElements; i++) vector[i] *= factor;
+    }
+    
     double
     max(const double* vector,
         const int32_t nElements)

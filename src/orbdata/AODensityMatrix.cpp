@@ -102,6 +102,24 @@ CAODensityMatrix::operator!=(const CAODensityMatrix& other) const
     return !(*this == other);
 }
 
+void
+CAODensityMatrix::setDensityType(const denmat denType)
+{
+    _denType = denType;
+}
+
+void
+CAODensityMatrix::append(const CAODensityMatrix& other)
+{
+    if (_denType == other._denType)
+    {
+        for (size_t i = 0; i < other._denMatrices.size(); i++)
+        {
+            _denMatrices.push_back(other._denMatrices[i]); 
+        }
+    }
+}
+
 CAODensityMatrix
 CAODensityMatrix::sub(const CAODensityMatrix& other) const
 {

@@ -95,6 +95,39 @@ CExcitationVector::CExcitationVector(const szblock excitationType,
     
 }
 
+CExcitationVector::CExcitationVector(const std::vector<double>&            factors,
+                                     const std::vector<CExcitationVector>& sources)
+{
+    auto nvecs = static_cast<int32_t>(factors.size());
+    
+    if (nvecs > 0)
+    {
+        // copy first excitation vector
+        
+        _excitationType = sources[0]._excitationType;
+        
+        _braIndexes = sources[0]._braIndexes;
+        
+        _ketIndexes = sources[0]._ketIndexes;
+        
+        _zCoefficents = sources[0]._zCoefficents;
+        
+        _yCoefficents = sources[0]._yCoefficents;
+        
+        // set up pointers to Z and Y vectors
+        
+        auto zdat = _zCoefficents.data();
+        
+        auto ydat = _yCoefficents.data();
+        
+        // scale first excitation vector with factor
+        
+        auto bdim = _zCoefficents.size();
+        
+        auto kdim = _yCoefficents.size();
+    }
+}
+
 CExcitationVector::CExcitationVector(const CExcitationVector& source)
 
     : _excitationType(source._excitationType)
@@ -247,10 +280,34 @@ CExcitationVector::dotCoefficientsY(const CExcitationVector& other) const
     return denblas::dot(_yCoefficents, other._yCoefficents);
 }
 
+double
+CExcitationVector::dotCoefficientsZ(const CDenseMatrix& matrix) const
+{
+    return denblas::dot(_zCoefficents, matrix);
+}
+
+double
+CExcitationVector::dotCoefficientsY(const CDenseMatrix& matrix) const
+{
+    return denblas::dot(_yCoefficents, matrix);
+}
+
 int32_t
 CExcitationVector::getNumberOfExcitations() const
 {
     return _zCoefficents.size();
+}
+
+const int32_t*
+CExcitationVector::getBraIndexes() const
+{
+    return _braIndexes.data();
+}
+
+const int32_t*
+CExcitationVector::getKetIndexes() const
+{
+    return _ketIndexes.data();
 }
 
 std::vector<int32_t>
@@ -360,23 +417,14 @@ CExcitationVector::getDensityZ(const CMolecularOrbitals& molecularOrbitals) cons
     
     auto bidx = getBraUniqueIndexes();
     
-    std::cout << "bra:";
-    for (size_t i = 0; i < bidx.size(); i++)
-        std::cout << " " << bidx[i];
-    std::cout << std::endl;
-    
     auto tmo = _getBraOrbitals(molecularOrbitals, getBraUniqueIndexes());
     
     auto tmv = _getKetOrbitals(molecularOrbitals, getKetUniqueIndexes());
     
-    std::cout << "tmo:" << tmo.getString();
-    
-    std::cout << "tmv:" << tmv.getString();
-    
     // compute transformed density
     
     auto tden = denblas::multAB(tmo, denblas::multABt(zmat, tmv));
-
+    
     return CAODensityMatrix({tden}, denmat::rgen);
 }
 
@@ -398,6 +446,90 @@ CExcitationVector::getDensityY(const CMolecularOrbitals& molecularOrbitals) cons
     auto tden = denblas::multAB(tmv, denblas::multABt(ymat, tmo));
     
     return CAODensityMatrix({tden}, denmat::rgen);
+}
+
+const double*
+CExcitationVector::getBraEnergies(const CMolecularOrbitals& molecularOrbitals) const
+{
+    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ab))
+    {
+        return molecularOrbitals.alphaEnergies();
+    }
+    
+    if ((_excitationType == szblock::bb) || (_excitationType == szblock::ba))
+    {
+        return molecularOrbitals.betaEnergies();
+    }
+    
+    return nullptr;
+}
+
+const double*
+CExcitationVector::getKetEnergies(const CMolecularOrbitals& molecularOrbitals) const
+{
+    if ((_excitationType == szblock::aa) || (_excitationType == szblock::ba))
+    {
+        return molecularOrbitals.alphaEnergies();
+    }
+    
+    if ((_excitationType == szblock::bb) || (_excitationType == szblock::ab))
+    {
+        return molecularOrbitals.betaEnergies();
+    }
+    
+    return nullptr;
+}
+
+std::vector<int32_t>
+CExcitationVector::getSmallEnergyIdentifiers(const CMolecularOrbitals& molecularOrbitals,
+                                             const int32_t             nExcitations) const
+{
+    auto ntot = getNumberOfExcitations();
+    
+    std::vector<int32_t> idxvec;
+    
+    if (ntot > nExcitations)
+    {
+        auto beigs = getBraEnergies(molecularOrbitals);
+        
+        auto keigs = getKetEnergies(molecularOrbitals);
+     
+        std::vector<double> exvals;
+        
+        for (int32_t i = 0; i < nExcitations; i++)
+        {
+            idxvec.push_back(i);
+            
+            exvals.push_back(keigs[_ketIndexes.at(i)] - beigs[_braIndexes.at(i)]);
+        }
+        
+        auto tmax = _getMaxElement(exvals);
+        
+        for (int32_t i = nExcitations; i < ntot; i++)
+        {
+            auto ceval = keigs[_ketIndexes.at(i)] - beigs[_braIndexes.at(i)];
+            
+            if (std::get<1>(tmax) > ceval)
+            {
+                auto midx = std::get<0>(tmax);
+                
+                exvals[midx] = ceval;
+                
+                idxvec[midx] = i;
+                
+                tmax = _getMaxElement(exvals); 
+            }
+        }
+    }
+    else
+    {
+        for (int32_t i = 0; i < ntot; i++)
+        {
+            idxvec.push_back(i);
+        }
+    }
+    
+    return idxvec;
 }
 
 std::string
@@ -488,6 +620,28 @@ CExcitationVector::_getKetOrbitals(const CMolecularOrbitals&   molecularOrbitals
     }
     
     return CDenseMatrix();
+}
+
+std::tuple<int32_t, double>
+CExcitationVector::_getMaxElement(const std::vector<double>& vectorA) const
+{
+    int32_t midx = 0;
+    
+    double mval = vectorA[0];
+    
+    for (int32_t i = 1; i < static_cast<int32_t>(vectorA.size()); i++)
+    {
+        auto cval = vectorA[i];
+        
+        if (mval < cval)
+        {
+            mval = cval;
+            
+            midx = i;
+        }
+    }
+    
+    return std::make_tuple(midx, mval);
 }
 
 std::ostream&

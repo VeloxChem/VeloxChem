@@ -36,6 +36,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .visualizationdriver import VisualizationDriver
 from .rspdriver import ResponseDriver
+from .tdaexcidriver import TDAExciDriver
 from .mpitask import MpiTask
 
 # Python functions

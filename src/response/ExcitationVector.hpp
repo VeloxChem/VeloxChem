@@ -13,6 +13,7 @@
 #include <ostream>
 #include <vector>
 #include <string>
+#include <tuple>
 
 #include "SpinBlock.hpp"
 #include "MemBlock.hpp"
@@ -85,6 +86,14 @@ class CExcitationVector
     CDenseMatrix _getKetOrbitals(const CMolecularOrbitals&   molecularOrbitals,
                                  const std::vector<int32_t>& identifiers) const;
     
+    /**
+     Determines maximum element in vector of real numbers.
+
+     @param vectorA the vector of real numbers.
+     @return the tuple (index, max. value).
+     */
+    std::tuple<int32_t, double> _getMaxElement(const std::vector<double>& vectorA) const;
+    
 public:
     
     /**
@@ -148,6 +157,16 @@ public:
                       const int32_t braEndPosition,
                       const int32_t ketStartPosition,
                       const int32_t ketEndPosition);
+    
+    /**
+     Creates a excitation vector object by summing set of excitation vector
+     object with specified scaling factors.
+     
+     @param factors the set of scaling factors.
+     @param sources the set of excitation vector objects.
+     */
+    CExcitationVector(const std::vector<double>&            factors,
+                      const std::vector<CExcitationVector>& sources);
     
     /**
      Creates a excitation vector object by copying other excitation vector object.
@@ -244,6 +263,22 @@ public:
     double dotCoefficientsY(const CExcitationVector& other) const;
     
     /**
+     Computes dot product between Z coefficients and column matrix.
+     
+     @param matrix the column matrix.
+     @return the dot product of Z coefficients and column matrix.
+     */
+    double dotCoefficientsZ(const CDenseMatrix& matrix) const;
+    
+    /**
+     Computes dot product between Y coefficients and column matrix.
+     
+     @param matrix the column matrix.
+     @return the dot product of Y coefficients and column matrix.
+     */
+    double dotCoefficientsY(const CDenseMatrix& matrix) const;
+    
+    /**
      Gets pointer to first element of Z coefficients vector.
 
      @return the pointer to first element of Z coefficients vector.
@@ -279,6 +314,22 @@ public:
     int32_t getNumberOfExcitations() const;
     
     /**
+     Gets constant point to indexes of molecular orbitals associated with
+     anihilation operators.
+
+     @return the constant pointer to indexes of molecular orbitals.
+     */
+    const int32_t* getBraIndexes() const;
+    
+    /**
+     Gets constant point to indexes of molecular orbitals associated with
+     creation operators.
+     
+     @return the constant pointer to indexes of molecular orbitals.
+     */
+    const int32_t* getKetIndexes() const;
+    
+    /**
      Gets vector of unique molecular orbitals indexes associated with creation
      operator in one particle excitations vector.
 
@@ -311,6 +362,7 @@ public:
     /**
      Transforms Z vector to AO density matrix.
      
+     @param molecularOrbitals the molecular orbitals.
      @return the AO density matrix.
      */
     CAODensityMatrix getDensityZ(const CMolecularOrbitals& molecularOrbitals) const;
@@ -318,9 +370,39 @@ public:
     /**
      Transforms Y vector to AO density matrix.
      
+     @param molecularOrbitals the molecular orbitals.
      @return the AO density matrix.
      */
     CAODensityMatrix getDensityY(const CMolecularOrbitals& molecularOrbitals) const;
+    
+    /**
+     Gets contant pointer to molecular orbital energies associated with
+     anihilation operators.
+     
+     @param molecularOrbitals the molecular orbitals.
+     @return the constant pointer to moelcular orbital energies.
+     */
+    const double* getBraEnergies(const CMolecularOrbitals& molecularOrbitals) const;
+    
+    /**
+     Gets contant pointer to molecular orbital energies associated with creation
+     operators.
+     
+     @param molecularOrbitals the molecular orbitals.
+     @return the constant pointer to moelcular orbital energies.
+     */
+    const double* getKetEnergies(const CMolecularOrbitals& molecularOrbitals) const;
+    
+    /**
+     Determines indexes of single particle excitation operators associated with
+     smallest approximate excitation energies i.e. e_a - e_i.
+
+     @param molecularOrbitals the molecular orbitals.
+     @param nExcitations the number of excitations.
+     @return the vector of identifiers.
+     */
+    std::vector<int32_t> getSmallEnergyIdentifiers(const CMolecularOrbitals& molecularOrbitals,
+                                                   const int32_t             nExcitations) const;
     
     /**
      Converts excitation vector object to it's string representation.

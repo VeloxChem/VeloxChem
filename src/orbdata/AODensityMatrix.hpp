@@ -104,6 +104,20 @@ public:
     bool operator!=(const CAODensityMatrix& other) const;
     
     /**
+     Sets AO density matrix type.
+
+     @param denType the density matrix type.
+     */
+    void setDensityType(const denmat denType);
+    
+    /**
+     Appends AO density matrix object to current AO density matrix object.
+
+     @param other the AO density matrix object.
+     */
+    void append(const CAODensityMatrix& other);
+    
+    /**
      Creates difference AO density matrix between this AO density matrix and
      given AO density matrix.
 
