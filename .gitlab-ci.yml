@@ -61,4 +61,5 @@ run_test_python3:
     - make -j 6 release
     - cd ../python_tests/
     - export PYTHONPATH=$(pwd)/../build/python:$PYTHONPATH
-    - python3 run_tests.py -v
+    - python3 -m pytest -v --cov=../build/python/veloxchem
+
