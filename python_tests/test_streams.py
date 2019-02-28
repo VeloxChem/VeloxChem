@@ -7,13 +7,21 @@ import unittest
 
 class TestStreams(unittest.TestCase):
 
-    def test_get_state(self):
+    def test_file(self):
 
         ostream = OutputStream("inputs/dummy.out")
         ostream.print_blank()
         self.assertTrue(ostream.get_state())
 
+    def test_stdout(self):
+
         ostream = OutputStream("")
+        ostream.print_blank()
+        self.assertTrue(ostream.get_state())
+
+    def test_none(self):
+
+        ostream = OutputStream()
         ostream.print_blank()
         self.assertFalse(ostream.get_state())
 
