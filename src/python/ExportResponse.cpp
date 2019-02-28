@@ -32,6 +32,35 @@ CExcitationVector_str(const CExcitationVector& self)
 {
     return self.getString();
 }
+
+// Helper function for converting Z vector to numpy array
+        
+static py::array_t<double>
+CExcitationVector_zvector_to_numpy(const CExcitationVector& self)
+{
+    return vlx_general::pointer_to_numpy(self.getCoefficientsZ(),
+                                         self.getNumberOfExcitations(), 1);
+}
+    
+// Helper function for converting Y vector to numpy array
+    
+static py::array_t<double>
+CExcitationVector_yvector_to_numpy(const CExcitationVector& self)
+{
+    return vlx_general::pointer_to_numpy(self.getCoefficientsY(),
+                                         self.getNumberOfExcitations(), 1);
+}
+    
+// Helper function for converting approximate diagonal of A matrix to numpy array
+    
+static py::array_t<double>
+CExcitationVector_diagonal_to_numpy(const CExcitationVector&  self,
+                                    const CMolecularOrbitals& molecularOrbitals)
+{
+    auto diagmat = self.getApproximateDiagonal(molecularOrbitals);
+    
+    return vlx_general::pointer_to_numpy(diagmat.data(), diagmat.size(), 1);
+}
     
 // Helper function for CTDASigmaVectorDriver constructor
     
@@ -50,7 +79,7 @@ CTDASigmaVectorDriver_create(int32_t    globRank,
     
 // Helper functions for overloading CTDASigmaVectorDriver::compute
 
-std::vector<CDenseMatrix>
+static std::vector<CDenseMatrix>
 CTDASigmaVectorDriver_compute(
           CTDASigmaVectorDriver&          self,
     const std::vector<CExcitationVector>& zVectors,
@@ -92,6 +121,8 @@ void export_response(py::module& m)
                       const int32_t,
                       const int32_t,
                       const int32_t>())
+        .def(py::init<const std::vector<double>&,
+                      const std::vector<CExcitationVector>&>())
         .def(py::init<const CExcitationVector&>())
         .def("__str__", &CExcitationVector_str)
         .def("set_zcoefficient", &CExcitationVector::setCoefficientZ)
@@ -104,6 +135,9 @@ void export_response(py::module& m)
         .def("get_zdensity", &CExcitationVector::getDensityZ)
         .def("get_ydensity", &CExcitationVector::getDensityY)
         .def("small_energy_identifiers", &CExcitationVector::getSmallEnergyIdentifiers)
+        .def("zvector_to_numpy", &CExcitationVector_zvector_to_numpy)
+        .def("yvector_to_numpy", &CExcitationVector_yvector_to_numpy)
+        .def("diagonal_to_numpy", &CExcitationVector_diagonal_to_numpy)
         .def("dot_z_vector", (double (CExcitationVector::*)(const CExcitationVector&) const)
                               &CExcitationVector::dotCoefficientsZ)
         .def("dot_y_vector", (double (CExcitationVector::*)(const CExcitationVector&) const)

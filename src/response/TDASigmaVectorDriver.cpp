@@ -89,17 +89,11 @@ CTDASigmaVectorDriver::_addCanonicalFockContribution(      std::vector<CDenseMat
 {
     for (size_t i = 0; i < sigmaVectors.size(); i++)
     {
-        // set up pointers to canonical Fock eigenvalues
+        // compute approximate diagonal of A matrix
         
-        auto beigs = zVectors[i].getBraEnergies(molecularOrbitals);
+        auto diagmat = zVectors[i].getApproximateDiagonal(molecularOrbitals);
         
-        auto keigs = zVectors[i].getKetEnergies(molecularOrbitals);
-        
-        // set up pointers to creation/anihilation operator indexes
-        
-        auto bidx = zVectors[i].getBraIndexes();
-        
-        auto kidx = zVectors[i].getKetIndexes();
+        auto devals = diagmat.data();
         
         // set up pointer to sigma and Z vector values
         
@@ -111,9 +105,10 @@ CTDASigmaVectorDriver::_addCanonicalFockContribution(      std::vector<CDenseMat
         
         auto ndim = sigmaVectors[i].getNumberOfRows();
         
+        #pragma omp simd aligned(sigdat, devals, zdat)
         for (int32_t j = 0; j < ndim; j++)
         {
-            sigdat[j] += (keigs[kidx[j]] - beigs[bidx[j]]) * zdat[j];
+            sigdat[j] += devals[j] * zdat[j];
         }
     }
 }

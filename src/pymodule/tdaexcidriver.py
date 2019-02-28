@@ -8,6 +8,8 @@ from .veloxchemlib import ericut
 from .veloxchemlib import molorb
 from .veloxchemlib import szblock
 
+from .blockdavidson import BlockDavidsonSolver
+
 import numpy as np
 
 class TDAExciDriver:
@@ -37,7 +39,9 @@ class TDAExciDriver:
         self.conv_thesh = 1.0-4
         
         # solver setup
-        self.max_iter = 2
+        self.max_iter = 50
+        self.solver = None
+        self.is_converged = False
         
         # mpi information
         self.rank = rank
@@ -65,38 +69,46 @@ class TDAExciDriver:
             The output stream.
         """
        
-        # set up excitation vectors on master node
+        # set up trial excitation vectors on master node
         
-        trial_vecs = self.gen_zvectors(mol_orbs, molecule)
-    
+        diag_mat, trial_vecs = self.gen_trial_vectors(mol_orbs, molecule)
+        
         # initalize sigma vectors driver
         
         a2x_drv = TDASigmaVectorDriver(self.rank, self.nodes, comm)
 
-        # block Davidson algorithm
+        # block Davidson algorithm setup
         
-        sig_vecs = []
-        evecs = []
-        evals = []
+        self.solver = BlockDavidsonSolver(len(trial_vecs), 5)
         
         for i in range(self.max_iter):
             
-            a2x_vecs = a2x_drv.compute(trial_vecs, qq_data, mol_orbs, molecule,
+            sig_vecs = a2x_drv.compute(trial_vecs, qq_data, mol_orbs, molecule,
                                        ao_basis, comm)
-            
-            sig_vecs.extend(a2x_vecs)
-            evecs.extend(trial_vecs)
-            
-            rl_mat = self.comp_rayleigh_matrix(sig_vecs, evecs)
-            print("Rayleight matrix:")
-            print(rl_mat)
-            self.comp_ritz_vector(rl_mat)
 
+            sig_mat = self.convert_to_sigma_matrix(sig_vecs)
+            trial_mat = self.convert_to_trial_matrix(trial_vecs)
 
+            self.solver.add_iteration_data(sig_mat, trial_mat, i)
+                                       
+            zvecs = self.solver.compute(diag_mat)
+            
+            self.check_convergence(comm)
+            
+            self.print_iter_data(i, ostream)
+            
+            if self.is_converged:
+                break
+            
+            self.update_trial_vectors(trial_vecs, zvecs)
+
+        # print converged excited states
         
-    def gen_zvectors(self, mol_orbs, molecule):
+    def gen_trial_vectors(self, mol_orbs, molecule):
         
         trial_vecs = []
+        
+        diag_mat = None
         
         if self.rank == mpi_master():
         
@@ -105,14 +117,31 @@ class TDAExciDriver:
         
             zvec = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
             exci_list = zvec.small_energy_identifiers(mol_orbs, self.nstates)
-
+            
+            diag_mat = zvec.diagonal_to_numpy(mol_orbs)
 
             for i in exci_list:
                 trial_vecs.append(ExcitationVector(szblock.aa, 0, nocc, nocc,
                                                norb, True))
                 trial_vecs[-1].set_zcoefficient(1.0, i)
 
-        return trial_vecs
+        return (diag_mat, trial_vecs)
+
+    def update_trial_vectors(self, trial_vecs, zvecs):
+    
+        if self.rank == mpi_master():
+            for i in range(zvecs.shape[1]):
+                for j in range(zvecs.shape[0]):
+                    trial_vecs[i].set_zcoefficient(zvecs[j,i], j)
+
+    def check_convergence(self, comm):
+        
+        if self.rank == mpi_master():
+            self.is_converged = self.solver.check_convergence(self.conv_thresh)
+        else:
+            self.is_converged = False
+    
+        self.is_converged = comm.bcast(self.is_converged, root=mpi_master())
 
     def set_number_states(self, nstates):
         self.nstates = nstates
@@ -124,33 +153,55 @@ class TDAExciDriver:
         self.conv_thresh = conv_thresh
         self.max_iter = max_iter
 
-    def comp_rayleigh_matrix(self, sig_vecs, evecs):
+    def convert_to_sigma_matrix(self, sig_vecs):
+    
+        nvecs = len(sig_vecs)
+        
+        if nvecs > 0:
 
-        rdim = len(sig_vecs)
-    
-        rmat = np.zeros(shape=(rdim, rdim), dtype=float)
-        ridx = np.triu_indices(rdim)
-    
-        for i, j in zip(ridx[0], ridx[1]):
+            sig_mat = sig_vecs[0].to_numpy()
             
-            fij = evecs[i].dot_z_matrix(sig_vecs[j])
-        
-            rmat[i][j] = fij
-            rmat[j][i] = fij
-        
-        return rmat
+            for i in range(1, nvecs):
+                sig_mat = np.hstack((sig_mat, sig_vecs[i].to_numpy()))
 
-    def comp_ritz_vector(self, rl_mat):
+            return sig_mat
+    
+        return None
+    
+    def convert_to_trial_matrix(self, trial_vecs):
+    
+        nvecs = len(trial_vecs)
+    
+        if nvecs > 0:
+    
+            trial_mat = trial_vecs[0].zvector_to_numpy()
+            
+            for i in range(1, nvecs):
+                trial_mat = np.hstack((trial_mat, trial_vecs[i].zvector_to_numpy()))
 
-        eigs, evecs = np.linalg.eigh(rl_mat)
+            return trial_mat
 
-        print("Solve Rayleigh matrix:")
-        print(evecs)
-        print("EigenValues: ", eigs[0 : self.nstates])
+        return None
 
-        for i in range(self.nstates):
-            print("EigenVector(", i, "):")
-            print(evecs[:, i])
+    def print_iter_data(self, iter, ostream):
+    
+        if self.rank == mpi_master():
+            
+            exec_str  = " *** Iteration: " + (str(iter + 1)).rjust(3)
+            exec_str += " * Reduced Space: "
+            exec_str += (str(self.solver.red_space_size())).rjust(4)
+            rmin, rmax = self.solver.max_min_residues()
+            exec_str += " * Residues (Max,Min): {:.2e} and {:.2e}".format(rmax,rmin)
+            ostream.print_header(exec_str)
+            ostream.print_blank()
+            
+            reigs, rnorms = self.solver.get_eigenvalues()
+            for i in range(reigs.shape[0]):
+                exec_str = "State {:2d}: {:5.8f} au Residue Norm: {:3.8f}".format(i + 1, reigs[i], rnorms[i])
+                ostream.print_header(exec_str.ljust(84))
+            
+            ostream.print_blank()
+            ostream.flush()
 
 
 

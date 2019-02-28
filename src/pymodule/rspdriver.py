@@ -38,13 +38,13 @@ class ResponseDriver:
         self.prop_type = "SINGEX_TDA"
         
         # convergence information
-        self.max_iter = 2
+        self.max_iter = 50
         
         # screening scheme
         self.qq_type = "QQ_DEN"
         
         # thresholds
-        self.conv_thresh = 1.0e-4
+        self.conv_thresh = 1.0e-3
         self.eri_thresh  = 1.0e-15
         
         # excited states information
@@ -116,17 +116,7 @@ class ResponseDriver:
             
             tda_exci.compute(qq_data, mol_orbs, molecule, ao_basis, comm,
                              ostream)
-        
-        
-        #if self.rank == mpi_master():
-        #    nocc = molecule.number_of_electrons() // 2
-        #    norb = mol_orbs.number_mos()
-        #    zyvec = ExcitationVector(szblock.aa, 0, nocc, nocc, norb)
-        #    print(zyvec)
-        #    zvec = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        #    zvec.set_zcoefficient(1.0, 0)
-        #    print(zvec)
-
+    
     def print_header(self, ostream):
         """Prints response driver setup header to output stream.
             
@@ -147,12 +137,15 @@ class ResponseDriver:
        
         cur_str = "Molecular Property Type      : " + self.prop_str()
         ostream.print_header(cur_str.ljust(str_width))
+        
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
             cur_str = "Number Of Excited States     : " + str(self.nstates)
             ostream.print_header(cur_str.ljust(str_width))
+        
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
             cur_str = "Response Equations Type      : Tamm-Dancoff"
             ostream.print_header(cur_str.ljust(str_width))
+        
         cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
         ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold        : " + \
@@ -164,6 +157,7 @@ class ResponseDriver:
         cur_str = "ERI Screening Threshold      : " + \
             "{:.1e}".format(self.eri_thresh)
         ostream.print_header(cur_str.ljust(str_width))
+        ostream.print_blank()
 
     def prop_str(self):
         """Gets string with type of molecular property calculation.

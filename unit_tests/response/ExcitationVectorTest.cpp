@@ -47,6 +47,44 @@ TEST_F(CExcitationVectorTest, ConstructorWithPairsForTDA)
     ASSERT_EQ(ma, mb);
 }
 
+TEST_F(CExcitationVectorTest, ConstructorWithListForTDA)
+{
+    CExcitationVector ma(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {});
+    
+    CExcitationVector mb(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {2.0,  3.0, 4.0}, {});
+    
+    CExcitationVector mc(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {-2.0, 2.0, 2.0}, {});
+    
+    CExcitationVector md({2.0, 1.0, 3.0}, {ma, mb, mc});
+    
+    CExcitationVector mr(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {-2.0, 7.0, 4.0}, {});
+    
+    ASSERT_EQ(mr, md);
+}
+
+TEST_F(CExcitationVectorTest, ConstructorWithList)
+{
+    CExcitationVector ma(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {1.0, -1.0, -3.0}, {2.0, 3.0, 5.0});
+    
+    CExcitationVector mb(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {2.0,  3.0, 4.0}, {1.0, -2.0, 2.0});
+    
+    CExcitationVector mc(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {-2.0, 2.0, 2.0}, {3.0, 4.0, 2.0});
+    
+    CExcitationVector md({2.0, 1.0, 3.0}, {ma, mb, mc});
+    
+    CExcitationVector mr(szblock::aa, {0, 0, 1}, {2, 3, 2},
+                         {-2.0, 7.0, 4.0}, {14.0, 16.0, 18.0});
+    
+    ASSERT_EQ(mr, md);
+}
+
 TEST_F(CExcitationVectorTest, CopyConstructor)
 {
     CExcitationVector ma(szblock::aa, {0, 0, 1}, {2, 3, 2},
@@ -414,4 +452,25 @@ TEST_F(CExcitationVectorTest, GetSmallEnergyIdentifiers)
     std::vector<int32_t> refidx2({3, 1});
     
     vlxtest::compare(refidx2, mvec.getSmallEnergyIdentifiers(mos, 2));
+}
+
+TEST_F(CExcitationVectorTest, GetApproximateDiagonal)
+{
+    CExcitationVector mvec(szblock::aa, {0, 0, 1, 1}, {2, 3, 2, 3},
+                           {1.0, -1.0, -3.0, 3.0}, {2.0, 3.0, -2.0, 1.0});
+    
+    CDenseMatrix ma({ 1.0, -1.0, -3.0, -2.0,
+                      5.0,  4.0,  6.0,  4.0,
+                     -4.0,  1.0,  2.0,  3.0,
+                      2.0, -2.0,  5.0,  1.0,
+                      5.0,  3.0,  1.0,  6.0},
+                    5, 4);
+    
+    std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
+    
+    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    
+    CMemBlock<double> diagmat({3.0, 1.0, 2.0, 0.0});
+    
+    ASSERT_EQ(diagmat, mvec.getApproximateDiagonal(mos));
 }

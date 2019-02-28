@@ -79,6 +79,19 @@ namespace mathfunc { // mathfunc namespace
         for (int32_t i = 0; i < nElements; i++) vector[i] *= factor;
     }
     
+    void
+    add_scaled(      double* aVector,
+               const double* bVector,
+               const double  factor,
+               const int32_t nElements)
+    {
+        #pragma omp simd aligned(aVector, bVector: VLX_ALIGN)
+        for (int32_t i = 0; i < nElements; i++)
+        {
+            aVector[i] += factor * bVector[i];
+        }
+    }
+    
     double
     max(const double* vector,
         const int32_t nElements)
