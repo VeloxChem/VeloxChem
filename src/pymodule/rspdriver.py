@@ -7,6 +7,7 @@ from .veloxchemlib import ericut
 from .veloxchemlib import molorb
 from .veloxchemlib import szblock
 
+from .outputstream import OutputStream
 from .tdaexcidriver import TDAExciDriver
 
 from .qqscheme import get_qq_type
@@ -70,7 +71,8 @@ class ResponseDriver:
         self.compute(mol_orbs, task.molecule, task.ao_basis, task.mpi_comm,
                      task.ostream)
     
-    def compute(self, mol_orbs, molecule, ao_basis, comm, ostream):
+    def compute(self, mol_orbs, molecule, ao_basis, comm,
+                ostream=OutputStream("")):
         """Performs molecular property calculation.
             
         Performs molecular property calculation using molecular data, MPI

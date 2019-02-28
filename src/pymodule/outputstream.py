@@ -1,14 +1,24 @@
+import sys
 import time as tm
 from .veloxchemlib import assert_msg_critical
 
 
 class OutputStream:
 
-    def __init__(self, filename, width=122):
-        self.state = False
+    def __init__(self, filename=None, width=122):
         self.width = width
         self.buffer_lines = []
-        if len(filename):
+
+        # filename is...
+        #   None:      stream is None
+        #   string:    stream is file handle
+        #   "" or "-": stream is sys.stdout
+
+        if filename is None:
+            self.stream = None
+            self.state = False
+
+        elif filename and filename != '-':
             try:
                 self.stream = open(filename, 'w')
             except OSError:
@@ -16,11 +26,16 @@ class OutputStream:
                 assert_msg_critical(False, errio)
             self.state = True
 
+        else:
+            self.stream = sys.stdout
+            self.state = True
+
     def __del__(self):
         if self.state:
             if self.buffer_lines:
                 self.flush()
-            self.stream.close()
+            if self.stream is not sys.stdout:
+                self.stream.close()
 
     def get_state(self):
         return self.state

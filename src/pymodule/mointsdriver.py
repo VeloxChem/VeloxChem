@@ -10,6 +10,7 @@ from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 
+from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 
@@ -43,7 +44,8 @@ class MOIntegralsDriver:
         return self.compute(task.molecule, task.ao_basis, mol_orbs, mints_type,
                             task.mpi_comm, task.ostream)
     
-    def compute(self, molecule, ao_basis, mol_orbs, mints_type, global_comm, ostream):
+    def compute(self, molecule, ao_basis, mol_orbs, mints_type, global_comm,
+                ostream=OutputStream("")):
         
         # start timer
         start_time = tm.time()

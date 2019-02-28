@@ -23,18 +23,24 @@ class MpiTask:
         self.mpi_size = mpi_comm.Get_size()
 
         # input/output files
+        # on master node:  output_fname is string:    ostream is file handle
+        #                  output_fname is "" or "-": ostream is sys.stdout
+        # on worker nodes: output_fname is None:      ostream is None
 
-        input_fname = ''
-        output_fname = ''
+        input_fname = None
+        output_fname = None
 
         if self.mpi_rank == mpi_master():
 
             assert_msg_critical(
-                len(fname_list) >= 2,
-                "MpiTask: Need input and output file names")
+                len(fname_list) >= 1,
+                "MpiTask: Need input file name")
 
             input_fname = fname_list[0]
-            output_fname = fname_list[1]
+
+            output_fname = ""
+            if len(fname_list) >= 2:
+                output_fname = fname_list[1]
 
             assert_msg_critical(
                 isfile(input_fname),

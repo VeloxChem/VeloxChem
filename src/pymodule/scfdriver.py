@@ -12,6 +12,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import ericut
 from .veloxchemlib import molorb
 
+from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .denguess import DensityGuess
@@ -159,7 +160,8 @@ class ScfDriver:
         self.compute(task.molecule, task.ao_basis, task.min_basis,
                      task.mpi_comm, task.ostream)
     
-    def compute(self, molecule, ao_basis, min_basis, comm, ostream):
+    def compute(self, molecule, ao_basis, min_basis, comm,
+                ostream=OutputStream("")):
         """Performs SCF calculation.
             
         Performs SCF calculation using molecular data, MPI communicator and
