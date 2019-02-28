@@ -68,7 +68,6 @@ class TDAExciDriver:
         self.rank = rank
         self.nodes = nodes
     
-<<<<<<< HEAD
     def set_number_states(self, nstates):
         """Sets number of excited states determined by solver.
             
@@ -92,6 +91,7 @@ class TDAExciDriver:
         eri_thresh
             The threshold for computation of electron repulsion integrals.
         """
+
         self.eri_thresh = eri_thresh
     
     def set_solver(self, conv_thresh, max_iter):
@@ -381,10 +381,4 @@ class TDAExciDriver:
         ostream.print_blank()
         ostream.print_header(valstr.ljust(92))
         ostream.print_blank()
-
-
-
-
-
-
 
