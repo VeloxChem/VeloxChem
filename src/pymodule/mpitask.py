@@ -1,5 +1,3 @@
-from .veloxchemlib import Molecule
-from .veloxchemlib import MolecularBasis
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import ChemicalElement
@@ -8,6 +6,8 @@ from .veloxchemlib import assert_msg_critical
 from .veloxchemlib import to_angular_momentum
 from .inputparser import InputParser
 from .outputstream import OutputStream
+from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 
 from os.path import isfile
 
@@ -63,13 +63,10 @@ class MpiTask:
 
             # read input file
 
-            input_parser = InputParser(input_fname)
-            input_dict = input_parser.get_dict()
-
-            self.input_dict = input_dict
+            self.input_dict = InputParser(input_fname).get_dict()
 
             self.ostream.print_info(
-                "Found %d control groups." % len(input_dict.keys()))
+                "Found %d control groups." % len(self.input_dict.keys()))
             self.ostream.print_info("...done.")
             self.ostream.print_blank()
 
@@ -79,7 +76,7 @@ class MpiTask:
             self.ostream.print_info("...done.")
             self.ostream.print_blank()
 
-            self.molecule = input_parser.create_molecule()
+            self.molecule = Molecule.from_dict(self.input_dict['molecule'])
 
             self.ostream.print_block(self.molecule.get_string())
 
@@ -89,26 +86,17 @@ class MpiTask:
             self.ostream.print_info("...done.")
             self.ostream.print_blank()
 
-            basis_path = input_dict["method_settings"]["basis_path"]
-            basis_label = input_dict["method_settings"]["basis"].upper()
-            basis_fname = basis_path + '/' + basis_label
+            basis_path = self.input_dict["method_settings"]["basis_path"]
+            basis_name = self.input_dict["method_settings"]["basis"].upper()
 
-            basis_parser = InputParser(basis_fname)
-            basis_dict = basis_parser.get_dict()
+            self.ao_basis = MolecularBasis.read(
+                self.molecule, basis_name, basis_path)
 
-            assert_msg_critical(
-                basis_label == basis_dict['basis_set_name'].upper(),
-                "basis set name")
-
-            self.ao_basis = basis_parser.create_basis_set(self.molecule)
+            self.min_basis = MolecularBasis.read(
+                self.molecule, "MIN-CC-PVDZ", basis_path)
 
             self.ostream.print_block(
                 self.ao_basis.get_string("Atomic Basis", self.molecule))
-
-            min_basis_fname = basis_path + '/MIN-CC-PVDZ'
-            min_basis_parser = InputParser(min_basis_fname)
-
-            self.min_basis = min_basis_parser.create_basis_set(self.molecule)
 
             self.ostream.flush()
 

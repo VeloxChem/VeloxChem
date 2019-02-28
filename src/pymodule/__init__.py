@@ -1,6 +1,4 @@
 # C++ classes
-from .veloxchemlib import Molecule
-from .veloxchemlib import MolecularBasis
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import OverlapIntegralsDriver
@@ -29,6 +27,8 @@ from .veloxchemlib import moints
 # Python classes
 from .inputparser import InputParser
 from .outputstream import OutputStream
+from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
