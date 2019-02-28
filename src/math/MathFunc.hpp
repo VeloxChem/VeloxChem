@@ -86,6 +86,19 @@ namespace mathfunc { // mathfunc namespace
                const int32_t nElements);
     
     /**
+     Adds vector scaled by factor to other vector i.e. va = va + f * vb.
+     
+     @param aVector the vector of real numbers.
+     @param bVector the vector of real numbers.
+     @param factor the scaling factor.
+     @param nElements the number of elements in vector.
+     */
+    void add_scaled(      double* aVector,
+                    const double* bVector,
+                    const double  factor,
+                    const int32_t nElements);
+    
+    /**
      Determines largest element in real numbers vector.
 
      @param vector the vector of real numbers.

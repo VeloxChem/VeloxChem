@@ -80,6 +80,19 @@ TEST_F(CMathFuncTest, Scale)
     vlxtest::compare(veca, vecb, 5);
 }
 
+TEST_F(CMathFuncTest, Add_Scaled)
+{
+    double veca[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};
+    
+    double vecb[5] __attribute__ ((aligned(VLX_ALIGN))) = {1.0, 3.0,  2.0, 4.0, 5.0};
+    
+    double vecc[5] __attribute__ ((aligned(VLX_ALIGN))) = {7.0, 14.0, 3.0, 11.0, 14.0};
+    
+    mathfunc::add_scaled(veca, vecb, 2.0, 5);
+    
+    vlxtest::compare(veca, vecc, 5);
+}
+
 TEST_F(CMathFuncTest, MaxReal)
 {
     double vec[5] __attribute__ ((aligned(VLX_ALIGN))) = {5.0, 8.0, -1.0, 3.0, 4.0};

@@ -114,17 +114,22 @@ CExcitationVector::CExcitationVector(const std::vector<double>&            facto
         
         _yCoefficents = sources[0]._yCoefficents;
         
-        // set up pointers to Z and Y vectors
+        // scale first excitation vector
         
-        auto zdat = _zCoefficents.data();
+        mathfunc::scale(_zCoefficents.data(), factors[0], _zCoefficents.size());
         
-        auto ydat = _yCoefficents.data();
+        mathfunc::scale(_yCoefficents.data(), factors[0], _yCoefficents.size());
         
-        // scale first excitation vector with factor
+        // add remaining scaled excitation vectors
         
-        auto bdim = _zCoefficents.size();
-        
-        auto kdim = _yCoefficents.size();
+        for (int32_t i = 1; i < nvecs; i++)
+        {
+            mathfunc::add_scaled(_zCoefficents.data(), sources[i]._zCoefficents.data(),
+                                 factors[i], _zCoefficents.size());
+            
+            mathfunc::add_scaled(_yCoefficents.data(), sources[i]._yCoefficents.data(),
+                                 factors[i], _yCoefficents.size());
+        }
     }
 }
 
@@ -530,6 +535,29 @@ CExcitationVector::getSmallEnergyIdentifiers(const CMolecularOrbitals& molecular
     }
     
     return idxvec;
+}
+
+CMemBlock<double>
+CExcitationVector::getApproximateDiagonal(const CMolecularOrbitals& molecularOrbitals) const
+{
+    auto ndim = getNumberOfExcitations();
+    
+    CMemBlock<double> diagmat(ndim);
+    
+    auto beigs = getBraEnergies(molecularOrbitals);
+    
+    auto keigs = getKetEnergies(molecularOrbitals);
+    
+    auto bidx = _braIndexes.data();
+    
+    auto kidx = _ketIndexes.data();
+    
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        diagmat.at(i) = keigs[kidx[i]] - beigs[bidx[i]];
+    }
+    
+    return diagmat;
 }
 
 std::string

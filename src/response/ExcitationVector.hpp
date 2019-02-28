@@ -405,6 +405,14 @@ public:
                                                    const int32_t             nExcitations) const;
     
     /**
+     Gets approximate diagonal of A matrix.
+
+     @param molecularOrbitals the molecular orbitals.
+     @return the vector with approximate diagonal.
+     */
+    CMemBlock<double> getApproximateDiagonal(const CMolecularOrbitals& molecularOrbitals) const;
+    
+    /**
      Converts excitation vector object to it's string representation.
 
      @return the string representation of excitation vector object.

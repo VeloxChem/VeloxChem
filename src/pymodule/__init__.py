@@ -37,6 +37,7 @@ from .mointsdriver import MOIntegralsDriver
 from .visualizationdriver import VisualizationDriver
 from .rspdriver import ResponseDriver
 from .tdaexcidriver import TDAExciDriver
+from .blockdavidson import BlockDavidsonSolver
 from .mpitask import MpiTask
 
 # Python functions
