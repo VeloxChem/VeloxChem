@@ -23,6 +23,9 @@ class MpiTask:
         self.mpi_size = mpi_comm.Get_size()
 
         # input/output files
+        # on master node:  output_fname is string:    ostream is file handle
+        #                  output_fname is "" or "-": ostream is sys.stdout
+        # on worker nodes: output_fname is None:      ostream is None
 
         input_fname = None
         output_fname = None

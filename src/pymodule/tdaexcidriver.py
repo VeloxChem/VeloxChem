@@ -8,6 +8,7 @@ from .veloxchemlib import ericut
 from .veloxchemlib import molorb
 from .veloxchemlib import szblock
 
+from .outputstream import OutputStream
 from .blockdavidson import BlockDavidsonSolver
 
 import numpy as np
@@ -47,7 +48,8 @@ class TDAExciDriver:
         self.rank = rank
         self.nodes = nodes
     
-    def compute(self, qq_data, mol_orbs, molecule, ao_basis, comm, ostream):
+    def compute(self, qq_data, mol_orbs, molecule, ao_basis, comm,
+                ostream=OutputStream("")):
         """Performs TDA excited states calculation.
             
         Performs TDA excited states calculation using molecular data, MPI

@@ -9,6 +9,11 @@ class OutputStream:
         self.width = width
         self.buffer_lines = []
 
+        # filename is...
+        #   None:      stream is None
+        #   string:    stream is file handle
+        #   "" or "-": stream is sys.stdout
+
         if filename is None:
             self.stream = None
             self.state = False
