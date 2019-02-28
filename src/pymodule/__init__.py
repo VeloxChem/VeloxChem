@@ -43,3 +43,11 @@ from .mpitask import MpiTask
 # Python functions
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+
+# Environment variable: basis set path
+
+import os
+
+if 'VLXBASISPATH' not in os.environ:
+    module_path = os.path.dirname(os.path.abspath(__file__))
+    os.environ['VLXBASISPATH'] = module_path + '/../../../basis'

@@ -92,7 +92,10 @@ class MpiTask:
             self.ostream.print_info("...done.")
             self.ostream.print_blank()
 
-            basis_path = self.input_dict["method_settings"]["basis_path"]
+            basis_path = '.'
+            if "basis_path" in self.input_dict["method_settings"]:
+                basis_path = self.input_dict["method_settings"]["basis_path"]
+
             basis_name = self.input_dict["method_settings"]["basis"].upper()
 
             self.ao_basis = MolecularBasis.read(
