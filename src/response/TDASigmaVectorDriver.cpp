@@ -8,6 +8,7 @@
 
 #include "TDASigmaVectorDriver.hpp"
 
+#include "DensityMatrixType.hpp"
 #include "AOFockMatrix.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
 
@@ -126,24 +127,24 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(      std::vector<CDenseMa
     
     // create first order transformed density
     
-    CAODensityMatrix denmat;
+    CAODensityMatrix dmat;
     
-    denmat.setDensityType(denmat::rgen); 
+    dmat.setDensityType(denmat::rgen);
     
     for (int32_t i = 0; i < nvecs; i++)
     {
-        denmat.append(zVectors[i].getDensityZ(molecularOrbitals));
+        dmat.append(zVectors[i].getDensityZ(molecularOrbitals));
     }
     
-    denmat.broadcast(_locRank, comm);
+    dmat.broadcast(_locRank, comm);
     
     // compute AO Fock matrices
     
-    CAOFockMatrix faomat(denmat);
+    CAOFockMatrix faomat(dmat);
     
     CElectronRepulsionIntegralsDriver eri_drv(_locRank, _locNodes, comm);
     
-    eri_drv.compute(faomat, denmat, molecule, basis, screeningContainer, comm);
+    eri_drv.compute(faomat, dmat, molecule, basis, screeningContainer, comm);
     
     faomat.reduce_sum(_locRank, _locNodes, comm);
     

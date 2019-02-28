@@ -31,51 +31,51 @@ CElectricDipoleMatrix::CElectricDipoleMatrix(const CDenseMatrix& xMatrix,
                                              const double        yOrigin,
                                              const double        zOrigin)
 
-    : _xMatrix(xMatrix)
-
-    , _yMatrix(yMatrix)
-
-    , _zMatrix(zMatrix)
-
-    , _xOrigin(xOrigin)
+    : _xOrigin(xOrigin)
 
     , _yOrigin(yOrigin)
 
     , _zOrigin(zOrigin)
+
+    , _xMatrix(xMatrix)
+
+    , _yMatrix(yMatrix)
+
+    , _zMatrix(zMatrix)
 {
     
 }
 
 CElectricDipoleMatrix::CElectricDipoleMatrix(const CElectricDipoleMatrix& source)
 
-    : _xMatrix(source._xMatrix)
-
-    , _yMatrix(source._yMatrix)
-
-    , _zMatrix(source._zMatrix)
-
-    , _xOrigin(source._xOrigin)
+    : _xOrigin(source._xOrigin)
 
     , _yOrigin(source._yOrigin)
 
     , _zOrigin(source._zOrigin)
+
+    , _xMatrix(source._xMatrix)
+
+    , _yMatrix(source._yMatrix)
+
+    , _zMatrix(source._zMatrix)
 {
     
 }
 
 CElectricDipoleMatrix::CElectricDipoleMatrix(CElectricDipoleMatrix&& source) noexcept
 
-    : _xMatrix(std::move(source._xMatrix))
-
-    , _yMatrix(std::move(source._yMatrix))
-
-    , _zMatrix(std::move(source._zMatrix))
-
-    , _xOrigin(std::move(source._xOrigin))
+    : _xOrigin(std::move(source._xOrigin))
 
     , _yOrigin(std::move(source._yOrigin))
 
     , _zOrigin(std::move(source._zOrigin))
+
+    , _xMatrix(std::move(source._xMatrix))
+
+    , _yMatrix(std::move(source._yMatrix))
+
+    , _zMatrix(std::move(source._zMatrix))
 {
     
 }
