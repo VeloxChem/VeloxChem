@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace vlx_rsp { // vlx_rsp namespace
+namespace vlx_response { // vlx_response namespace
     
 /**
  Exports classes/functions in src/response to python.
 */
 void export_response(py::module& m);
         
-} // vlx_rsp namespace
+} // vlx_response namespace
 
 #endif /* ExportResponse_hpp */
