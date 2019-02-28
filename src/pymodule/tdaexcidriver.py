@@ -42,7 +42,7 @@ class TDAExciDriver:
         # solver setup
         self.max_iter = 50
         self.solver = None
-        self.is_converged = False
+        self.is_converged = None
         
         # mpi information
         self.rank = rank
@@ -81,36 +81,43 @@ class TDAExciDriver:
 
         # block Davidson algorithm setup
         
-        self.solver = BlockDavidsonSolver(len(trial_vecs), 5)
+        self.solver = BlockDavidsonSolver()
         
         for i in range(self.max_iter):
+            
+            # perform linear transformation of trial vectors
             
             sig_vecs = a2x_drv.compute(trial_vecs, qq_data, mol_orbs, molecule,
                                        ao_basis, comm)
 
-            sig_mat = self.convert_to_sigma_matrix(sig_vecs)
-            trial_mat = self.convert_to_trial_matrix(trial_vecs)
+            # solve eigenvalues problem on master node
+            
+            if self.rank == mpi_master():
+            
+                sig_mat = self.convert_to_sigma_matrix(sig_vecs)
+                trial_mat = self.convert_to_trial_matrix(trial_vecs)
 
-            self.solver.add_iteration_data(sig_mat, trial_mat, i)
+                self.solver.add_iteration_data(sig_mat, trial_mat, i)
                                        
-            zvecs = self.solver.compute(diag_mat)
+                zvecs = self.solver.compute(diag_mat)
+            
+                self.print_iter_data(i, ostream)
+                    
+            # check convergence
             
             self.check_convergence(comm)
-            
-            self.print_iter_data(i, ostream)
             
             if self.is_converged:
                 break
             
-            self.update_trial_vectors(trial_vecs, zvecs)
+            # update trial vectors on master node
+            
+            if self.rank == mpi_master():
+                self.update_trial_vectors(trial_vecs, zvecs)
 
         # print converged excited states
         
     def gen_trial_vectors(self, mol_orbs, molecule):
-        
-        trial_vecs = []
-        
-        diag_mat = None
         
         if self.rank == mpi_master():
         
@@ -122,19 +129,21 @@ class TDAExciDriver:
             
             diag_mat = zvec.diagonal_to_numpy(mol_orbs)
 
+            trial_vecs = []
             for i in exci_list:
                 trial_vecs.append(ExcitationVector(szblock.aa, 0, nocc, nocc,
                                                norb, True))
                 trial_vecs[-1].set_zcoefficient(1.0, i)
 
-        return (diag_mat, trial_vecs)
+            return (diag_mat, trial_vecs)
+    
+        return (None, [])
 
     def update_trial_vectors(self, trial_vecs, zvecs):
     
-        if self.rank == mpi_master():
-            for i in range(zvecs.shape[1]):
-                for j in range(zvecs.shape[0]):
-                    trial_vecs[i].set_zcoefficient(zvecs[j,i], j)
+        for i in range(zvecs.shape[1]):
+            for j in range(zvecs.shape[0]):
+                trial_vecs[i].set_zcoefficient(zvecs[j,i], j)
 
     def check_convergence(self, comm):
         
@@ -187,23 +196,22 @@ class TDAExciDriver:
 
     def print_iter_data(self, iter, ostream):
     
-        if self.rank == mpi_master():
+        exec_str  = " *** Iteration: " + (str(iter + 1)).rjust(3)
+        exec_str += " * Reduced Space: "
+        exec_str += (str(self.solver.reduced_space_size())).rjust(4)
+        rmin, rmax = self.solver.max_min_residual_norms()
+        exec_str += " * Residues (Max,Min): {:.2e} and {:.2e}".format(rmax,rmin)
+        ostream.print_header(exec_str)
+        ostream.print_blank()
             
-            exec_str  = " *** Iteration: " + (str(iter + 1)).rjust(3)
-            exec_str += " * Reduced Space: "
-            exec_str += (str(self.solver.red_space_size())).rjust(4)
-            rmin, rmax = self.solver.max_min_residues()
-            exec_str += " * Residues (Max,Min): {:.2e} and {:.2e}".format(rmax,rmin)
-            ostream.print_header(exec_str)
-            ostream.print_blank()
+        reigs, rnorms = self.solver.get_eigenvalues()
+        for i in range(reigs.shape[0]):
+            exec_str  = "State {:2d}: {:5.8f} ".format(i + 1, reigs[i])
+            exec_str += "au Residual Norm: {:3.8f}".format(rnorms[i])
+            ostream.print_header(exec_str.ljust(84))
             
-            reigs, rnorms = self.solver.get_eigenvalues()
-            for i in range(reigs.shape[0]):
-                exec_str = "State {:2d}: {:5.8f} au Residue Norm: {:3.8f}".format(i + 1, reigs[i], rnorms[i])
-                ostream.print_header(exec_str.ljust(84))
-            
-            ostream.print_blank()
-            ostream.flush()
+        ostream.print_blank()
+        ostream.flush()
 
 
 
