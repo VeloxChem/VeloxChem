@@ -1,7 +1,8 @@
 from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
 from veloxchem.inputparser import InputParser
-from veloxchem.veloxchemlib import Molecule
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
@@ -105,8 +106,8 @@ class TestOneInts(unittest.TestCase):
 
         # one molecule, one basis set
 
-        mol_1 = InputParser.create_molecule_from_xyz('inputs/h2o.xyz')
-        bas_1 = InputParser(bas_path + '/DEF2-SVP').create_basis_set(mol_1)
+        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
+        bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
 
         S11 = ovldrv.compute(mol_1, bas_1, comm)
         T11 = kindrv.compute(mol_1, bas_1, comm)
@@ -133,9 +134,9 @@ class TestOneInts(unittest.TestCase):
 
         # one molecule, two basis sets
 
-        mol_1 = InputParser.create_molecule_from_xyz('inputs/h2o.xyz')
-        bas_1 = InputParser(bas_path + '/DEF2-SVP').create_basis_set(mol_1)
-        bas_2 = InputParser(bas_path + '/CC-PVDZ').create_basis_set(mol_1)
+        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
+        bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
+        bas_2 = MolecularBasis.read(mol_1, 'cc-pvdz', bas_path)
 
         S12 = ovldrv.compute(mol_1, bas_1, bas_2, comm)
         T12 = kindrv.compute(mol_1, bas_1, bas_2, comm)
@@ -159,10 +160,10 @@ class TestOneInts(unittest.TestCase):
 
         # two molecules, one basis set
 
-        mol_1 = InputParser.create_molecule_from_xyz('inputs/h2o.xyz')
-        mol_2 = InputParser.create_molecule_from_xyz('inputs/nh3.xyz')
+        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
+        mol_2 = Molecule.read_xyz('inputs/nh3.xyz')
         mol = Molecule(mol_1, mol_2)
-        bas = InputParser(bas_path + '/DEF2-SVP').create_basis_set(mol)
+        bas = MolecularBasis.read(mol, 'def2-svp', bas_path)
 
         S12 = ovldrv.compute(mol_1, mol_2, bas, comm)
         T12 = kindrv.compute(mol_1, mol_2, bas, comm)
@@ -186,11 +187,11 @@ class TestOneInts(unittest.TestCase):
 
         # two molecules, two basis sets
 
-        mol_1 = InputParser.create_molecule_from_xyz('inputs/h2o.xyz')
-        mol_2 = InputParser.create_molecule_from_xyz('inputs/nh3.xyz')
+        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
+        mol_2 = Molecule.read_xyz('inputs/nh3.xyz')
         mol = Molecule(mol_1, mol_2)
-        bas_1 = InputParser(bas_path + '/DEF2-SVP').create_basis_set(mol_1)
-        bas_2 = InputParser(bas_path + '/CC-PVDZ').create_basis_set(mol_2)
+        bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
+        bas_2 = MolecularBasis.read(mol_2, 'cc-pvdz', bas_path)
 
         S12 = ovldrv.compute(mol_1, mol_2, bas_1, bas_2, comm)
         T12 = kindrv.compute(mol_1, mol_2, bas_1, bas_2, comm)

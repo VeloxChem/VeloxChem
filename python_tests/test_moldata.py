@@ -1,6 +1,6 @@
 from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
-from veloxchem.veloxchemlib import Molecule
+from veloxchem.molecule import Molecule
 from veloxchem.veloxchemlib import ChemicalElement
 from veloxchem.veloxchemlib import bohr_in_angstroms
 

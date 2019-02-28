@@ -1,7 +1,5 @@
 from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
-from veloxchem.veloxchemlib import Molecule
-from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver

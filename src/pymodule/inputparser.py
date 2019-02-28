@@ -1,11 +1,4 @@
-from .veloxchemlib import Molecule
-from .veloxchemlib import MolecularBasis
-from .veloxchemlib import AtomBasis
-from .veloxchemlib import BasisFunction
-from .veloxchemlib import ChemicalElement
-from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import assert_msg_critical
-from .veloxchemlib import to_angular_momentum
 
 import re
 
@@ -67,134 +60,10 @@ class InputParser:
             self.groupsplit()
             self.convert_dict()
 
-            if self.is_basis_set:
-                return
-
-            # converting angstroms to atomic units, if needed
-
-            need_convert_units = True
-
-            if 'molecule' in self.input_dict.keys():
-                if 'units' in self.input_dict['molecule'].keys():
-                    units = self.input_dict['molecule']['units']
-                    if units.lower() in ['au', 'bohr', 'bohrs']:
-                        need_convert_units = False
-
-            if need_convert_units:
-                self.convert_units()
-
     def get_dict(self):
         """ Gets the input dictonary """
 
         return self.input_dict
-
-    # defining molecule and basis set readers
-
-    @staticmethod
-    def create_molecule_from_xyz(xyzfile, charge=0, spinmult=1):
-
-        atom_labels = []
-        x_coords = []
-        y_coords = []
-        z_coords = []
-
-        with open(xyzfile, 'r') as f_xyz:
-            natoms = int(f_xyz.readline().split()[0])
-            f_xyz.readline()
-            for a in range(natoms):
-                content = f_xyz.readline().split()
-                atom_labels.append(content[0])
-                x_coords.append(float(content[1]) / bohr_in_angstroms())
-                y_coords.append(float(content[2]) / bohr_in_angstroms())
-                z_coords.append(float(content[3]) / bohr_in_angstroms())
-
-        mol = Molecule(atom_labels, x_coords, y_coords, z_coords)
-        mol.set_charge(charge)
-        mol.set_multiplicity(spinmult)
-        mol.check_multiplicity()
-        mol.check_proximity(0.1)
-
-        return mol
-
-    def create_molecule(self):
-
-        mol_dict = self.input_dict
-
-        mol = Molecule(mol_dict['molecule']['atom_labels'],
-                       mol_dict['molecule']['x_coords'],
-                       mol_dict['molecule']['y_coords'],
-                       mol_dict['molecule']['z_coords'])
-
-        if 'charge' in mol_dict['molecule'].keys():
-            mol.set_charge(int(mol_dict['molecule']['charge']))
-
-        if 'multiplicity' in mol_dict['molecule'].keys():
-            mol.set_multiplicity(int(mol_dict['molecule']['multiplicity']))
-
-        mol.check_multiplicity()
-        mol.check_proximity(0.1)
-
-        return mol
-
-    def create_basis_set(self, mol):
-
-        basis_dict = self.input_dict
-
-        mol_basis = MolecularBasis()
-
-        elem_comp = mol.get_elemental_composition()
-
-        for elem_id in elem_comp:
-
-            elem = ChemicalElement()
-            err = elem.set_atom_type(elem_id)
-            assert_msg_critical(err, "ChemicalElement.set_atom_type")
-
-            basis_key = 'atombasis_%s' % elem.get_name().lower()
-            basis_list = [entry for entry in basis_dict[basis_key]]
-
-            atom_basis = AtomBasis()
-
-            while basis_list:
-                shell_title = basis_list.pop(0).split()
-                assert_msg_critical(
-                    len(shell_title) == 3,
-                    "Basis set parser (shell): %s" % ' '.join(shell_title))
-
-                angl = to_angular_momentum(shell_title[0])
-                npgto = int(shell_title[1])
-                ncgto = int(shell_title[2])
-                
-                assert_msg_critical(ncgto == 1,
-                                    "General contraction currently is not supported")
-
-                expons = [0.0] * npgto
-                coeffs = [0.0] * npgto * ncgto
-
-                for i in range(npgto):
-                    prims = basis_list.pop(0).split()
-                    assert_msg_critical(
-                        len(prims) == ncgto + 1,
-                        "Basis set parser (primitive): %s" % ' '.join(prims))
-
-                    expons[i] = float(prims[0])
-                    for k in range(ncgto):
-                        coeffs[k * npgto + i] = float(prims[k + 1])
-
-                bf = BasisFunction(expons, coeffs, angl)
-                bf.normalize()
-
-                atom_basis.add_basis_function(bf)
-
-            atom_basis.set_elemental_id(elem_id)
-
-            mol_basis.add_atom_basis(atom_basis)
-
-        basis_label = basis_dict['basis_set_name'].upper()
-
-        mol_basis.set_label(basis_label)
-
-        return mol_basis
 
     # defining subordinated functions
 
@@ -272,44 +141,33 @@ class InputParser:
 
             for entry in group[1:]:
                 if ':' in entry:
+                    # save input settings in local_dict
+                    # except for xyz strings and atomic basis functions
                     key = entry.split(':')[0].strip()
                     key = '_'.join(key.split())
                     val = entry.split(':')[1].strip()
                     if key.lower() != 'xyz':
                         local_dict[key.lower()] = val
                 else:
+                    # save xyz strings or atomic basis functions in local_list
                     local_list.append(entry)
 
             group_key = group[0]
             group_key = '_'.join(group_key.split())
 
             if self.is_basis_set:
+                # for basis set, local_list contains atomic basis functions
                 self.input_dict[group_key.lower()] = local_list
             else:
+                # for input file, local_dict contains input settings
                 self.input_dict[group_key.lower()] = local_dict
                 if group_key.lower() == 'molecule':
-                    self.atom_list = local_list
+                    # local_list contains xyz strings of the molecule
+                    xyzstr = '\n'.join(local_list)
+                    self.input_dict['molecule']['xyzstr'] = xyzstr
+                    # also set the default value for units
+                    if 'units' not in self.input_dict['molecule'].keys():
+                        self.input_dict['molecule']['units'] = 'angs'
 
         if self.is_basis_set:
             self.input_dict['basis_set_name'] = self.basis_set_name
-            return
-
-        self.input_dict['molecule']['atom_labels'] = []
-        self.input_dict['molecule']['x_coords'] = []
-        self.input_dict['molecule']['y_coords'] = []
-        self.input_dict['molecule']['z_coords'] = []
-        for atom in self.atom_list:
-            axyz = atom.split()
-            self.input_dict['molecule']['atom_labels'].append(axyz[0])
-            self.input_dict['molecule']['x_coords'].append(float(axyz[1]))
-            self.input_dict['molecule']['y_coords'].append(float(axyz[2]))
-            self.input_dict['molecule']['z_coords'].append(float(axyz[3]))
-
-    def convert_units(self):
-        """ Converting molecule coordinates from angstroms to atomic units. """
-
-        coords = ['x_coords', 'y_coords', 'z_coords']
-        angstroms_in_bohr = 1.0 / bohr_in_angstroms()
-        for n in coords:
-            for p in range(len(self.input_dict['molecule'][n])):
-                self.input_dict['molecule'][n][p] *= angstroms_in_bohr
