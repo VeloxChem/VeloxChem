@@ -285,18 +285,6 @@ CExcitationVector::dotCoefficientsY(const CExcitationVector& other) const
     return denblas::dot(_yCoefficents, other._yCoefficents);
 }
 
-double
-CExcitationVector::dotCoefficientsZ(const CDenseMatrix& matrix) const
-{
-    return denblas::dot(_zCoefficents, matrix);
-}
-
-double
-CExcitationVector::dotCoefficientsY(const CDenseMatrix& matrix) const
-{
-    return denblas::dot(_yCoefficents, matrix);
-}
-
 int32_t
 CExcitationVector::getNumberOfExcitations() const
 {

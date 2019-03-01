@@ -263,22 +263,6 @@ public:
     double dotCoefficientsY(const CExcitationVector& other) const;
     
     /**
-     Computes dot product between Z coefficients and column matrix.
-     
-     @param matrix the column matrix.
-     @return the dot product of Z coefficients and column matrix.
-     */
-    double dotCoefficientsZ(const CDenseMatrix& matrix) const;
-    
-    /**
-     Computes dot product between Y coefficients and column matrix.
-     
-     @param matrix the column matrix.
-     @return the dot product of Y coefficients and column matrix.
-     */
-    double dotCoefficientsY(const CDenseMatrix& matrix) const;
-    
-    /**
      Gets pointer to first element of Z coefficients vector.
 
      @return the pointer to first element of Z coefficients vector.

@@ -138,14 +138,6 @@ void export_response(py::module& m)
         .def("zvector_to_numpy", &CExcitationVector_zvector_to_numpy)
         .def("yvector_to_numpy", &CExcitationVector_yvector_to_numpy)
         .def("diagonal_to_numpy", &CExcitationVector_diagonal_to_numpy)
-        .def("dot_z_vector", (double (CExcitationVector::*)(const CExcitationVector&) const)
-                              &CExcitationVector::dotCoefficientsZ)
-        .def("dot_y_vector", (double (CExcitationVector::*)(const CExcitationVector&) const)
-                              &CExcitationVector::dotCoefficientsY)
-        .def("dot_z_matrix", (double (CExcitationVector::*)(const CDenseMatrix&) const)
-                              &CExcitationVector::dotCoefficientsZ)
-        .def("dot_y_matrix", (double (CExcitationVector::*)(const CDenseMatrix&) const)
-                              &CExcitationVector::dotCoefficientsY)
     ;
     
      // CTDASigmaVectorDriver class

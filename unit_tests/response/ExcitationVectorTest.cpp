@@ -371,26 +371,6 @@ TEST_F(CExcitationVectorTest, DotCoefficientsY)
     ASSERT_NEAR(11.0, mb.dotCoefficientsY(mb), 1.0e-13);
 }
 
-TEST_F(CExcitationVectorTest, DotCoefficientsZWithMatrix)
-{
-    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
-                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
-    
-    CDenseMatrix mat({2.0, 4.0, 1.0}, 3, 1);
-    
-    ASSERT_NEAR(-5.0, ma.dotCoefficientsZ(mat), 1.0e-13);
-}
-
-TEST_F(CExcitationVectorTest, DotCoefficientsYWithMatrix)
-{
-    CExcitationVector ma(szblock::bb, {0, 0, 1}, {2, 3, 2},
-                         {1.0, -1.0, -3.0}, {2.0, 3.0, -2.0});
-    
-    CDenseMatrix mat({1.0, 3.0, 1.0}, 3, 1);
-    
-    ASSERT_NEAR(9.0, ma.dotCoefficientsY(mat), 1.0e-13);
-}
-
 TEST_F(CExcitationVectorTest, GetBraEnergies)
 {
     CExcitationVector mvec(szblock::ab, {0, 0, 1, 1}, {2, 3, 2, 3},
