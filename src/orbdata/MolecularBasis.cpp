@@ -359,6 +359,62 @@ CMolecularBasis::getBasisFunctions(const int32_t idElemental,
     return std::vector<CBasisFunction>();
 }
 
+std::vector<std::string>
+CMolecularBasis::getAOBasisMap(const CMolecule& molecule) const
+{
+    std::vector<std::string> strmap;
+    
+    auto natoms = molecule.getNumberOfAtoms();
+    
+    auto idselm = molecule.getIdsElemental();
+    
+    for (int32_t i = 0; i <= _maxAngularMomentum; i++)
+    {
+        for (int32_t j = 0; j < angmom::to_SphericalComponents(i); j++)
+        {
+            for (int32_t k = 0; k < natoms; k++)
+            {
+                auto gtos = getBasisFunctions(idselm[k], i);
+                
+                auto ngtos = static_cast<int32_t>(gtos.size());
+                
+                for (int32_t l = 0; l < ngtos; l++)
+                {
+                    std::stringstream st;
+                    
+                    st.setf(std::ios::fixed);
+                    
+                    st.width(4);
+                    
+                    st << k + 1;
+                    
+                    st << " ";
+                    
+                    auto lbl = molecule.getLabel(k);
+                    
+                    st << lbl;
+                    
+                    if (lbl.size() == 1) st << " ";
+                    
+                    st << " ";
+                    
+                    st.setf(std::ios::fixed);
+                    
+                    st.width(2);
+                    
+                    st << l + 1;
+                    
+                    st << angmom::getStringOfAngularMomentum(i, j); 
+                    
+                    strmap.push_back(st.str()); 
+                }
+            }
+        }
+    }
+    
+    return strmap;
+}
+
 std::string
 CMolecularBasis::printBasis(const char*      title,
                             const CMolecule& molecule) const

@@ -10,7 +10,9 @@
 
 #include "Molecule.hpp"
 #include "MoleculeSetter.hpp"
+#include "MolecularBasisSetter.hpp"
 #include "CheckFunctions.hpp"
+
 
 TEST_F(CMoleculeTest, DefaultConstructor)
 {
@@ -199,6 +201,19 @@ TEST_F(CMoleculeTest, GetNuclearRepulsionEnergy)
     
     ASSERT_NEAR(9.34363815797054450919, mol.getNuclearRepulsionEnergy(),
                 1.0e-13);
+}
+
+TEST_F(CMoleculeTest, GetLabel)
+{
+    CMolecule mol = vlxmol::getMoleculeH2O();
+    
+    ASSERT_EQ(std::string("O"), mol.getLabel(0));
+    
+    ASSERT_EQ(std::string("H"), mol.getLabel(1));
+    
+    ASSERT_EQ(std::string("H"), mol.getLabel(2));
+    
+    ASSERT_EQ(std::string(), mol.getLabel(3));
 }
 
 TEST_F(CMoleculeTest, GetSubMolecule)

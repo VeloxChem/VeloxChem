@@ -13,6 +13,7 @@
 #include <ostream>
 #include <vector>
 #include <set>
+#include <string>
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
@@ -287,6 +288,14 @@ public:
     double getNuclearRepulsionEnergy() const;
     
     /**
+     Gets labele of specific atom.
+
+     @param iAtom the index of atom.
+     @return the label of atom.
+     */
+    std::string getLabel(const int32_t iAtom) const;
+    
+    /**
      Prints geometry of molecule as table to output stream.
 
      @return the output string.
@@ -299,7 +308,6 @@ public:
      which are to close.
 
      @param minDistance the minimal distance.
-     @param oStream the output stream.
      @return true if proximity condition is not violated, false otherwise.
      */
     bool checkProximity(const double minDistance) const;

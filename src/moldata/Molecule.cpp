@@ -524,6 +524,17 @@ CMolecule::getNuclearRepulsionEnergy() const
 }
 
 std::string
+CMolecule::getLabel(const int32_t iAtom) const
+{
+    if (iAtom < getNumberOfAtoms())
+    {
+        return _atomLabels[iAtom];
+    }
+    
+    return std::string();
+}
+
+std::string
 CMolecule::printGeometry() const
 {
     std::stringstream ss;

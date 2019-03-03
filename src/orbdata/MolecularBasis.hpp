@@ -265,6 +265,14 @@ public:
      */
     std::vector<CBasisFunction> getBasisFunctions(const int32_t idElemental,
                                                   const int32_t angularMomentum) const;
+    
+    /**
+     Creates string representation map of basis functions.
+
+     @param molecule the molecule.
+     @return the string map of basis functions.
+     */
+    std::vector<std::string> getAOBasisMap(const CMolecule& molecule) const;
 
     /**
      Prints AO basis information to output stream for selected molecule.
@@ -274,7 +282,7 @@ public:
      */
     std::string printBasis(const char*      title,
                            const CMolecule& molecule) const;
-
+    
     /**
      Broadcasts molecular basis object within domain of MPI communicator.
      

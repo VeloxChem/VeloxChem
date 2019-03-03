@@ -10,6 +10,7 @@
 #define AngularMomentum_hpp
 
 #include <cstdint>
+#include <string>
 
 namespace angmom { // angmom namespace
 
@@ -48,6 +49,16 @@ int32_t to_CartesianComponents(const int32_t angularMomentum);
  */
 int32_t to_CartesianComponents(const int32_t angularMomentumA,
                                const int32_t angularMomentumB);
+    
+/**
+ Gets string representation of spherical angular momentum component.
+
+ @param angularMomentum the angular momentum.
+ @param sphericalComponent the spherical component of angular momentum.
+ @return the string of angular momentum component.
+ */
+std::string getStringOfAngularMomentum(const int32_t angularMomentum,
+                                       const int32_t sphericalComponent);
 
 } // angmom namespace
 

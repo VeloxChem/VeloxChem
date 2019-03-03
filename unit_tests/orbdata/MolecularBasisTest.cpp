@@ -357,3 +357,42 @@ TEST_F(CMolecularBasisTest, GetBasisFunctions)
 
     ASSERT_EQ(0u, bfa.size());
 }
+
+TEST_F(CMolecularBasisTest, GetAOBasisMap)
+{
+    CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    auto strmap = ambas.getAOBasisMap(lih);
+    
+    ASSERT_EQ(14, strmap.size());
+    
+    ASSERT_EQ(std::string("   1 Li  1s  "), strmap[0]);
+    
+    ASSERT_EQ(std::string("   1 Li  2s  "), strmap[1]);
+    
+    ASSERT_EQ(std::string("   1 Li  3s  "), strmap[2]);
+    
+    ASSERT_EQ(std::string("   2 H   1s  "), strmap[3]);
+    
+    ASSERT_EQ(std::string("   2 H   2s  "), strmap[4]);
+    
+    ASSERT_EQ(std::string("   1 Li  1p-1"), strmap[5]);
+    
+    ASSERT_EQ(std::string("   1 Li  2p-1"), strmap[6]);
+    
+    ASSERT_EQ(std::string("   2 H   1p-1"), strmap[7]);
+    
+    ASSERT_EQ(std::string("   1 Li  1p0 "), strmap[8]);
+    
+    ASSERT_EQ(std::string("   1 Li  2p0 "), strmap[9]);
+    
+    ASSERT_EQ(std::string("   2 H   1p0 "), strmap[10]);
+    
+    ASSERT_EQ(std::string("   1 Li  1p+1"), strmap[11]);
+    
+    ASSERT_EQ(std::string("   1 Li  2p+1"), strmap[12]);
+    
+    ASSERT_EQ(std::string("   2 H   1p+1"), strmap[13]);
+}
