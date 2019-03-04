@@ -2,9 +2,97 @@ from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
 from .veloxchemlib import assert_msg_critical
 
+from .outputstream import OutputStream
+
 import h5py
 import numpy as np
+import math
 
+def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
+                    ostream=OutputStream("")):
+
+    nocc = molecule.number_of_electrons() // 2
+    norb = self.number_mos()
+    
+    ao_map = ao_basis.get_ao_basis_map(molecule)
+    
+    if all_orbs:
+        nstart = 0
+        nend = norb
+    else:
+        if nocc > 5:
+            nstart = nocc - 5
+        else:
+            nstart = 0
+        if (nocc + 5) > norb:
+            nend = norb
+        else:
+            nend = nocc + 5
+
+    if self.get_orbitals_type() == molorb.rest:
+    
+        ostream.print_blank()
+        
+        ostream.print_header("Spin Restricted Orbitals")
+        ostream.print_header("------------------------")
+
+        rvecs = self.alpha_to_numpy()
+        reigs = self.ea_to_numpy()
+        rnocc = [2.0 if x < nocc else 0.0 for x in range(nstart, nend)]
+        
+        for i in range(nend-nstart):
+            _print_coefficients(reigs[nstart+i], rnocc[i], nstart+i,
+                                rvecs[:,nstart+i], ao_map, 0.15, ostream)
+
+    elif self.get_orbitals_type() == molorb.unrest:
+        
+        ostream.print_blank()
+
+        ostream.print_header("Spin Unrestricted Alpha Orbitals")
+        ostream.print_header("--------------------------------")
+        
+        # FIX ME
+
+        ostream.print_blank()
+
+        ostream.print_header("Spin Unrestricted Beta Orbitals")
+        ostream.print_header("-------------------------------")
+
+        # FIX ME
+
+    else:
+    
+        errmsg = "MolecularOrbitals.get_density:"
+        errmsg += " Invalid molecular orbitals type"
+        assert_msg_critical(False, errmsg)
+
+def _print_coefficients(eval, focc, iorb, coeffs, ao_map, thresh, ostream):
+    ostream.print_blank()
+    
+    valstr = "Molecular Orbital No.{:4d}:".format(iorb + 1)
+    ostream.print_header(valstr.ljust(92))
+    valstr = 26 * "-"
+    ostream.print_header(valstr.ljust(92))
+    
+    valstr = "Occupation: {:.1f} Energy: {:10.5f} au.".format(focc, eval)
+    ostream.print_header(valstr.ljust(92))
+    
+    valstr = ""
+    curidx = 0
+    
+    for i in range(coeffs.shape[0]):
+        
+        if math.fabs(coeffs[i]) > thresh:
+            valstr += "(" + ao_map[i] + ": {:8.2f}".format(coeffs[i]) + ") "
+            curidx += 1
+        
+        if curidx == 3:
+            ostream.print_header(valstr.ljust(92))
+            curidx = 0
+            valstr = ""
+
+    if curidx > 0:
+        ostream.print_header(valstr.ljust(92))
 
 def _get_density(self, molecule):
 
@@ -83,3 +171,4 @@ def _read_hdf5(fname):
 MolecularOrbitals.get_density = _get_density
 MolecularOrbitals.write_hdf5 = _write_hdf5
 MolecularOrbitals.read_hdf5 = _read_hdf5
+MolecularOrbitals.print_orbitals = _print_orbitals

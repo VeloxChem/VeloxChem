@@ -320,6 +320,25 @@ class ScfRestrictedDriver(ScfDriver):
             return self.mol_orbs.get_density(molecule)
 
         return AODensityMatrix()
+
+    def print_scf_energy(self, molecule, ostream):
+        """Prints SCF energy information to output stream.
+        
+        Prints SCF energy information to output stream.
+        
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        ostream
+            The output stream.
+        """
+        
+        ostream.print_header("Spin-Restricted Hatree-Fock:".ljust(92))
+        ostream.print_header("----------------------------".ljust(92))
+        self.print_energy_components(molecule, ostream)
+            
+        return
     
     def get_scf_type(self):
         """Gets string for spin restricted closed shell SCF calculation.
