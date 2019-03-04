@@ -1,10 +1,10 @@
 //
-//                     V.E.L.O.X. C.H.E.M. MP
+//                             VELOXCHEM
 //      ---------------------------------------------------
-//           An Electronic Structure Code for Nanoscale
+//                     An Electronic Structure Code
 //
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Copyright © 2019 by VeloxChem developers. All rights reserved.
 
 #ifndef ExportMath_hpp
 #define ExportMath_hpp
