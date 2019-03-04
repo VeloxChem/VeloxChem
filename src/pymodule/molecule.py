@@ -3,7 +3,7 @@ from .veloxchemlib import bohr_in_angstroms
 
 
 @staticmethod
-def _Molecule_read_str(xyzstr, units='angs', charge=0, spinmult=1):
+def _Molecule_read_str(xyzstr, units='angs', charge=0, multiplicity=1):
 
     scale = 1.0 / bohr_in_angstroms()
     if units.lower() in ['au', 'bohr', 'bohrs']:
@@ -23,7 +23,7 @@ def _Molecule_read_str(xyzstr, units='angs', charge=0, spinmult=1):
 
     mol = Molecule(atom_labels, x_coords, y_coords, z_coords)
     mol.set_charge(charge)
-    mol.set_multiplicity(spinmult)
+    mol.set_multiplicity(multiplicity)
     mol.check_multiplicity()
     mol.check_proximity(0.1)
 
@@ -31,7 +31,7 @@ def _Molecule_read_str(xyzstr, units='angs', charge=0, spinmult=1):
 
 
 @staticmethod
-def _Molecule_read_xyz(xyzfile, charge=0, spinmult=1):
+def _Molecule_read_xyz(xyzfile, charge=0, multiplicity=1):
 
     xyzstr = ""
 
@@ -53,15 +53,15 @@ def _Molecule_from_dict(mol_dict):
     if 'charge' in mol_dict.keys():
         charge = int(mol_dict['charge'])
 
-    spinmult = 1
+    multiplicity = 1
     if 'multiplicity' in mol_dict.keys():
-        spinmult = int(mol_dict['multiplicity'])
+        multiplicity = int(mol_dict['multiplicity'])
 
     units = 'angs'
     if 'units' in mol_dict.keys():
         units = mol_dict['units'].lower()
 
-    return Molecule.read_str(xyzstr, units, charge, spinmult)
+    return Molecule.read_str(xyzstr, units, charge, multiplicity)
 
 
 Molecule.read_str = _Molecule_read_str
