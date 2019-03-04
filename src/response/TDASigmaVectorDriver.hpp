@@ -1,9 +1,9 @@
 //
-//                     V.E.L.O.X. C.H.E.M. MP
+//                             VELOXCHEM
 //      ---------------------------------------------------
-//           An Electronic Structure Code for Nanoscale
+//                     An Electronic Structure Code
 //
-//  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+//  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef TDASigmaVectorDriver_hpp
@@ -115,6 +115,27 @@ public:
     
     /**
      Computes sigma = A * Z vectors.
+     
+     @param zVectors the vector of excitation vectors.
+     @param isTripletStates the flag indicating A matrix construction for
+            triplet excited states, instead of default singlet excited states.
+     @param screeningContainer the electron repulsion integrals screeners
+     container.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param comm the MPI communication.
+     @return the vector of sigma vectors.
+     */
+    std::vector<CDenseMatrix> compute(const std::vector<CExcitationVector>& zVectors,
+                                      const bool                            isTripletStates,
+                                      const CScreeningContainer&            screeningContainer,
+                                      const CMolecularOrbitals&             molecularOrbitals,
+                                      const CMolecule&                      molecule,
+                                      const CMolecularBasis&                basis,
+                                            MPI_Comm                        comm) const;
+    
+    /**
+     Computes sigma = A * Z vectors.
 
      @param zVectors the vector of excitation vectors.
      @param screeningContainer the electron repulsion integrals screeners
@@ -130,6 +151,8 @@ public:
                                       const CMolecule&                      molecule,
                                       const CMolecularBasis&                basis,
                                             MPI_Comm                        comm) const;
+    
+    
 };
 
 #endif /* TDASigmaVectorDriver_hpp */
