@@ -321,7 +321,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return AODensityMatrix()
 
-    def print_scf_energy(self, molecule, ostream):
+    def print_scf_energy(self, ostream):
         """Prints SCF energy information to output stream.
         
         Prints SCF energy information to output stream.
@@ -336,7 +336,7 @@ class ScfRestrictedDriver(ScfDriver):
         
         ostream.print_header("Spin-Restricted Hatree-Fock:".ljust(92))
         ostream.print_header("----------------------------".ljust(92))
-        self.print_energy_components(molecule, ostream)
+        self.print_energy_components(ostream)
             
         return
     

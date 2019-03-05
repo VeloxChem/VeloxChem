@@ -10,6 +10,22 @@ import unittest
 
 class TestMolData(unittest.TestCase):
 
+    def test_constructors(self):
+
+        mol_1 = Molecule(
+            [ "N", "H", "H", "H" ],
+            [ -3.710, -3.702, -4.704, -4.780 ],
+            [  3.019,  4.942,  2.415,  2.569 ],
+            [ -0.037,  0.059,  1.497, -1.573 ])
+
+        mol_2 = Molecule.read_str("""
+            N   -3.710    3.019   -0.037
+            H   -3.702    4.942    0.059
+            H   -4.704    2.415    1.497
+            H   -4.780    2.569   -1.573""", units="au")
+
+        self.assertEqual(mol_1, mol_2)
+
     def test_get_sub_molecule(self):
 
         task = MpiTask(["inputs/dimer.inp", "inputs/dimer.out"], MPI.COMM_WORLD)

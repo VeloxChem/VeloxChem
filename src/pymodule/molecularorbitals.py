@@ -8,27 +8,14 @@ import h5py
 import numpy as np
 import math
 
+
 def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
                     ostream=OutputStream("")):
 
-    nocc = molecule.number_of_electrons() // 2
     norb = self.number_mos()
     
     ao_map = ao_basis.get_ao_basis_map(molecule)
     
-    if all_orbs:
-        nstart = 0
-        nend = norb
-    else:
-        if nocc > 5:
-            nstart = nocc - 5
-        else:
-            nstart = 0
-        if (nocc + 5) > norb:
-            nend = norb
-        else:
-            nend = nocc + 5
-
     if self.get_orbitals_type() == molorb.rest:
     
         ostream.print_blank()
@@ -36,13 +23,20 @@ def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
         ostream.print_header("Spin Restricted Orbitals")
         ostream.print_header("------------------------")
 
+        nocc = molecule.number_of_electrons() // 2
+        
+        if all_orbs:
+            nstart, nend = 0, norb
+        else:
+            nstart, nend = max(0, nocc - 5), min(norb, nocc + 5)
+
         rvecs = self.alpha_to_numpy()
         reigs = self.ea_to_numpy()
-        rnocc = [2.0 if x < nocc else 0.0 for x in range(nstart, nend)]
+        rnocc = [2.0 if x < nocc else 0.0 for x in range(norb)]
         
-        for i in range(nend-nstart):
-            _print_coefficients(reigs[nstart+i], rnocc[i], nstart+i,
-                                rvecs[:,nstart+i], ao_map, 0.15, ostream)
+        for i in range(nstart, nend):
+            _print_coefficients(reigs[i], rnocc[i], i, rvecs[:, i], ao_map,
+                                0.15, ostream)
 
     elif self.get_orbitals_type() == molorb.unrest:
         
@@ -66,7 +60,8 @@ def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
         errmsg += " Invalid molecular orbitals type"
         assert_msg_critical(False, errmsg)
 
-def _print_coefficients(eval, focc, iorb, coeffs, ao_map, thresh, ostream):
+
+def _print_coefficients(eigval, focc, iorb, coeffs, ao_map, thresh, ostream):
     ostream.print_blank()
     
     valstr = "Molecular Orbital No.{:4d}:".format(iorb + 1)
@@ -74,7 +69,7 @@ def _print_coefficients(eval, focc, iorb, coeffs, ao_map, thresh, ostream):
     valstr = 26 * "-"
     ostream.print_header(valstr.ljust(92))
     
-    valstr = "Occupation: {:.1f} Energy: {:10.5f} au".format(focc, eval)
+    valstr = "Occupation: {:.1f} Energy: {:10.5f} au".format(focc, eigval)
     ostream.print_header(valstr.ljust(92))
     
     valstr = ""
@@ -93,6 +88,7 @@ def _print_coefficients(eval, focc, iorb, coeffs, ao_map, thresh, ostream):
 
     if curidx > 0:
         ostream.print_header(valstr.ljust(92))
+
 
 def _get_density(self, molecule):
 

@@ -221,7 +221,7 @@ class ScfDriver:
             self.comp_diis(molecule, ao_basis, val_basis, comm, ostream)
 
         if self.rank == mpi_master():
-            self.print_scf_energy(molecule, ostream)
+            self.print_scf_energy(ostream)
             self.print_ground_state(molecule, ostream)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False, ostream)
 
@@ -777,7 +777,7 @@ class ScfDriver:
         
         return range(self.max_iter + 1)
     
-    def print_scf_energy(self, molecule, ostream):
+    def print_scf_energy(self, ostream):
         """Prints SCF energy information to output stream.
             
         Prints SCF energy information to output stream.
@@ -1089,21 +1089,21 @@ class ScfDriver:
         ostream.print_header("Ground State Information".ljust(92))
         ostream.print_header("------------------------".ljust(92))
         
-        f = molecule.get_charge()
-        valstr = "Charge of Molecule           :{:5.1f}".format(f)
+        chg = molecule.get_charge()
+        valstr = "Charge of Molecule           :{:5.1f}".format(chg)
         ostream.print_header(valstr.ljust(92))
         
-        f = molecule.get_multiplicity()
-        valstr = "Multiplicity (2S+1)          :{:5.1f}".format(f)
+        mult = molecule.get_multiplicity()
+        valstr = "Multiplicity (2S+1)          :{:5.1f}".format(mult)
         ostream.print_header(valstr.ljust(92))
         
-        f = 0.5 * (f - 1.0)
-        valstr = "Magnetic Quantum Number (S_z):{:5.1f}".format(f)
+        sz = 0.5 * (mult - 1.0)
+        valstr = "Magnetic Quantum Number (S_z):{:5.1f}".format(sz)
         ostream.print_header(valstr.ljust(92))
     
         ostream.print_blank()
 
-    def print_energy_components(self, molecule, ostream):
+    def print_energy_components(self, ostream):
         """Prints SCF energy components to output stream.
             
         Prints SCF energy components to output stream.
@@ -1116,25 +1116,23 @@ class ScfDriver:
             The output stream.
         """
         
-        fz = molecule.nuclear_repulsion_energy()
+        enuc = self.nuc_energy
         
-        fe = self.iter_data[-1][0]
+        etot = self.iter_data[-1][0]
 
-        valstr = "Total Energy                       :{:20.10f} au".format(fe + fz)
+        e_el = etot - enuc
+
+        valstr = "Total Energy                       :{:20.10f} au".format(etot)
         ostream.print_header(valstr.ljust(92))
     
-        valstr = "Electronic Energy                  :{:20.10f} au".format(fe)
+        valstr = "Electronic Energy                  :{:20.10f} au".format(e_el)
         ostream.print_header(valstr.ljust(92))
     
-        valstr = "Nuclear Repulsion Energy           :{:20.10f} au".format(fz)
+        valstr = "Nuclear Repulsion Energy           :{:20.10f} au".format(enuc)
         ostream.print_header(valstr.ljust(92))
 
         ostream.print_header("------------------------------------".ljust(92))
     
-        fe = self.iter_data[-1][2]
-        valstr = "Gradient Norm                      :{:20.10f} au".format(fe)
+        grad = self.iter_data[-1][2]
+        valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
         ostream.print_header(valstr.ljust(92))
-
-
-
-
