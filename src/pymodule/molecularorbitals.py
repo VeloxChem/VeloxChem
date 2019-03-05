@@ -1,6 +1,7 @@
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
 from .veloxchemlib import assert_msg_critical
+from .veloxchemlib import to_angular_momentum
 
 from .outputstream import OutputStream
 
@@ -73,13 +74,12 @@ def _print_coefficients(eigval, focc, iorb, coeffs, ao_map, thresh, ostream):
     ostream.print_header(valstr.ljust(92))
     
     tuplist = []
-    angldict = { 's': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6 }
 
     for i in range(coeffs.shape[0]):
         
         if math.fabs(coeffs[i]) > thresh:
             atomidx = int(ao_map[i].split()[0])
-            anglmom = angldict[ao_map[i][-3]]
+            anglmom = to_angular_momentum(ao_map[i][-3].upper())
             valstr = "(" + ao_map[i] + ": {:8.2f}".format(coeffs[i]) + ") "
             tuplist.append((atomidx, anglmom, valstr))
 
