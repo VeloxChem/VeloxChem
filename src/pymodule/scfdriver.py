@@ -811,7 +811,7 @@ class ScfDriver:
         str_width = 80
         cur_str = "Wave Function Model          : " + self.get_scf_type()
         ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Initial Guess Model          : " + self.den_guess.guess_type
+        cur_str = "Initial Guess Model          : " + self.get_guess_type()
         ostream.print_header(cur_str.ljust(str_width))
         
         cur_str = "Convergence Accelerator      : " + self.get_acc_type()
