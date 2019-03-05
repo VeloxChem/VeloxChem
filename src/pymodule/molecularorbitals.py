@@ -72,19 +72,28 @@ def _print_coefficients(eigval, focc, iorb, coeffs, ao_map, thresh, ostream):
     valstr = "Occupation: {:.1f} Energy: {:10.5f} au".format(focc, eigval)
     ostream.print_header(valstr.ljust(92))
     
-    valstr = ""
-    curidx = 0
-    
+    tuplist = []
+    angldict = { 's': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6 }
+
     for i in range(coeffs.shape[0]):
         
         if math.fabs(coeffs[i]) > thresh:
-            valstr += "(" + ao_map[i] + ": {:8.2f}".format(coeffs[i]) + ") "
-            curidx += 1
-        
+            atomidx = int(ao_map[i].split()[0])
+            anglmom = angldict[ao_map[i][-3]]
+            valstr = "(" + ao_map[i] + ": {:8.2f}".format(coeffs[i]) + ") "
+            tuplist.append((atomidx, anglmom, valstr))
+
+    valstr = ""
+    curidx = 0
+
+    for t in sorted(tuplist):
+        valstr += t[-1]
+        curidx += 1
+
         if curidx == 3:
             ostream.print_header(valstr.ljust(92))
-            curidx = 0
             valstr = ""
+            curidx = 0
 
     if curidx > 0:
         ostream.print_header(valstr.ljust(92))
