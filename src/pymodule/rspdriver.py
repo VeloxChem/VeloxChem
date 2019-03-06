@@ -135,28 +135,28 @@ class ResponseDriver:
         ostream.print_header(23 * "=")
         ostream.print_blank()
         
-        str_width = 80
+        str_width = 60
        
-        cur_str = "Molecular Property Type      : " + self.prop_str()
+        cur_str = "Molecular Property Type   : " + self.prop_str()
         ostream.print_header(cur_str.ljust(str_width))
         
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
-            cur_str = "Number Of Excited States     : " + str(self.nstates)
+            cur_str = "Number Of Excited States  : " + str(self.nstates)
             ostream.print_header(cur_str.ljust(str_width))
         
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
-            cur_str = "Response Equations Type      : Tamm-Dancoff"
+            cur_str = "Response Equations Type   : Tamm-Dancoff"
             ostream.print_header(cur_str.ljust(str_width))
         
-        cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
+        cur_str = "Max. Number Of Iterations : " + str(self.max_iter)
         ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold        : " + \
+        cur_str = "Convergence Threshold     : " + \
             "{:.1e}".format(self.conv_thresh)
         ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI screening scheme         : " + get_qq_type(self.qq_type)
+        cur_str = "ERI screening scheme      : " + get_qq_type(self.qq_type)
         ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold      : " + \
+        cur_str = "ERI Screening Threshold   : " + \
             "{:.1e}".format(self.eri_thresh)
         ostream.print_header(cur_str.ljust(str_width))
         ostream.print_blank()

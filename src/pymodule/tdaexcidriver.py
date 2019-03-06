@@ -169,6 +169,8 @@ class TDAExciDriver:
                 zvecs = self.solver.compute(diag_mat)
             
                 self.print_iter_data(i, ostream)
+            
+                self.update_trial_vectors(trial_vecs, zvecs)
                     
             # check convergence
             
@@ -176,16 +178,11 @@ class TDAExciDriver:
             
             if self.is_converged:
                 break
-            
-            # update trial vectors on master node
-            
-            if self.rank == mpi_master():
-                self.update_trial_vectors(trial_vecs, zvecs)
-
+          
         # print converged excited states
 
         if self.rank == mpi_master():
-            self.print_excited_states(start_time, ostream)
+            self.print_excited_states(trial_vecs, start_time, ostream)
         
     def gen_trial_vectors(self, mol_orbs, molecule):
         """Generates set of TDA trial vectors.
@@ -341,7 +338,7 @@ class TDAExciDriver:
         exec_str  = " *** Iteration: " + (str(iter + 1)).rjust(3)
         exec_str += " * Reduced Space: "
         exec_str += (str(self.solver.reduced_space_size())).rjust(4)
-        rmin, rmax = self.solver.max_min_residual_norms()
+        rmax, rmin = self.solver.max_min_residual_norms()
         exec_str += " * Residues (Max,Min): {:.2e} and {:.2e}".format(rmax,rmin)
         ostream.print_header(exec_str)
         ostream.print_blank()
@@ -358,7 +355,7 @@ class TDAExciDriver:
         ostream.print_blank()
         ostream.flush()
 
-    def print_excited_states(self, start_time, ostream):
+    def print_excited_states(self, trial_vecs, start_time, ostream):
         """Prints excited states information to output stream.
         
         Prints excited states information to output stream.
@@ -371,6 +368,8 @@ class TDAExciDriver:
             The output stream.
         """
         
+        ostream.print_blank()
+        
         valstr = "*** {:d} excited states ".format(self.nstates)
         if self.is_converged:
             valstr += "converged"
@@ -378,7 +377,40 @@ class TDAExciDriver:
             valstr += "not converged"
         valstr += " in {:d} iterations. ".format(self.cur_iter + 1)
         valstr += "Time: {:.2f}".format(tm.time() - start_time) + " sec."
-        ostream.print_blank()
         ostream.print_header(valstr.ljust(92))
+        
+        reigs, rnorms = self.solver.get_eigenvalues()
+
+        for i in range(reigs.shape[0]):
+            self.print_state_information(i, reigs[i], trial_vecs[i], rnorms[i],
+                                         ostream)
+
+    def print_state_information(self, iter, eval, evec, rnorm, ostream):
+
         ostream.print_blank()
+        
+        valstr = "Excited State No.{:3d}:".format(iter + 1)
+        ostream.print_header(valstr.ljust(92))
+        valstr = 21 * "-"
+        ostream.print_header(valstr.ljust(92))
+
+        valstr = "Excitation Type   : "
+        if self.triplet:
+            valstr += "Triplet"
+        else:
+            valstr += "Singlet"
+        ostream.print_header(valstr.ljust(92))
+        
+        valstr = "Excitation Energy : {:5.8f} au".format(eval)
+        ostream.print_header(valstr.ljust(92))
+
+        valstr = "Residual Norm     : {:3.8f} au".format(rnorm)
+        ostream.print_header(valstr.ljust(92))
+
+        ostream.print_blank()
+
+
+
+
+
 

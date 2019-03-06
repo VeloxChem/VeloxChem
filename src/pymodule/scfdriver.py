@@ -1090,15 +1090,15 @@ class ScfDriver:
         ostream.print_header("------------------------".ljust(92))
         
         chg = molecule.get_charge()
-        valstr = "Charge of Molecule           :{:5.1f}".format(chg)
+        valstr = "Charge of Molecule            :{:5.1f}".format(chg)
         ostream.print_header(valstr.ljust(92))
         
         mult = molecule.get_multiplicity()
-        valstr = "Multiplicity (2S+1)          :{:5.1f}".format(mult)
+        valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
         ostream.print_header(valstr.ljust(92))
         
         sz = 0.5 * (mult - 1.0)
-        valstr = "Magnetic Quantum Number (S_z):{:5.1f}".format(sz)
+        valstr = "Magnetic Quantum Number (S_z) :{:5.1f}".format(sz)
         ostream.print_header(valstr.ljust(92))
     
         ostream.print_blank()
