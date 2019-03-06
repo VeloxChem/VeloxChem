@@ -1,4 +1,4 @@
-from .veloxchemlib import assert_msg_critical
+from .errorhandler import assert_msg_critical
 
 import re
 

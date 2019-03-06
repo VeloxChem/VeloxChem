@@ -1,6 +1,7 @@
+from .errorhandler import assert_msg_critical
+
 import sys
 import time as tm
-from .veloxchemlib import assert_msg_critical
 
 
 class OutputStream:

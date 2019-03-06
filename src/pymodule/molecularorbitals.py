@@ -1,9 +1,9 @@
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
-from .veloxchemlib import assert_msg_critical
 from .veloxchemlib import to_angular_momentum
 
 from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
 import h5py
 import numpy as np
