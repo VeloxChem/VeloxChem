@@ -13,6 +13,7 @@ from .blockdavidson import BlockDavidsonSolver
 
 import numpy as np
 import time as tm
+import sys
 
 class TDAExciDriver:
     """Implements TDA excited states computation driver.
@@ -112,7 +113,7 @@ class TDAExciDriver:
         self.max_iter = max_iter
  
     def compute(self, qq_data, mol_orbs, molecule, ao_basis, comm,
-                ostream=OutputStream("")):
+                ostream=OutputStream(sys.stdout)):
         """Performs TDA excited states calculation.
             
         Performs TDA excited states calculation using molecular data, MPI

@@ -16,6 +16,7 @@ from .qqscheme import get_qq_scheme
 import numpy as np
 import time as tm
 import math
+import sys
 
 class ResponseDriver:
     """Implements response driver.
@@ -72,7 +73,7 @@ class ResponseDriver:
                      task.ostream)
     
     def compute(self, mol_orbs, molecule, ao_basis, comm,
-                ostream=OutputStream("")):
+                ostream=OutputStream(sys.stdout)):
         """Performs molecular property calculation.
             
         Performs molecular property calculation using molecular data, MPI

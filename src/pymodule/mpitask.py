@@ -10,6 +10,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
 from os.path import isfile
+import sys
 
 
 class MpiTask:
@@ -38,7 +39,7 @@ class MpiTask:
 
             input_fname = fname_list[0]
 
-            output_fname = ""
+            output_fname = sys.stdout
             if len(fname_list) >= 2:
                 output_fname = fname_list[1]
 

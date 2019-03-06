@@ -3,6 +3,7 @@ from veloxchem.outputstream import OutputStream
 
 import numpy as np
 import unittest
+import sys
 
 
 class TestStreams(unittest.TestCase):
@@ -15,7 +16,7 @@ class TestStreams(unittest.TestCase):
 
     def test_stdout(self):
 
-        ostream = OutputStream("")
+        ostream = OutputStream(sys.stdout)
         ostream.print_blank()
         self.assertTrue(ostream.get_state())
 

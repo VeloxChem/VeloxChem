@@ -20,6 +20,7 @@ from .qqscheme import get_qq_scheme
 import numpy as np
 import time as tm
 import math
+import sys
 
 class MOIntegralsDriver:
 
@@ -45,7 +46,7 @@ class MOIntegralsDriver:
                             task.mpi_comm, task.ostream)
     
     def compute(self, molecule, ao_basis, mol_orbs, mints_type, global_comm,
-                ostream=OutputStream("")):
+                ostream=OutputStream(sys.stdout)):
         
         # start timer
         start_time = tm.time()

@@ -23,6 +23,7 @@ from .qqscheme import get_qq_scheme
 import numpy as np
 import time as tm
 import math
+import sys
 
 from collections import deque
 
@@ -161,7 +162,7 @@ class ScfDriver:
                      task.mpi_comm, task.ostream)
     
     def compute(self, molecule, ao_basis, min_basis, comm,
-                ostream=OutputStream("")):
+                ostream=OutputStream(sys.stdout)):
         """Performs SCF calculation.
             
         Performs SCF calculation using molecular data, MPI communicator and

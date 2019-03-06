@@ -8,10 +8,11 @@ from .outputstream import OutputStream
 import h5py
 import numpy as np
 import math
+import sys
 
 
 def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
-                    ostream=OutputStream("")):
+                    ostream=OutputStream(sys.stdout)):
 
     norb = self.number_mos()
     
