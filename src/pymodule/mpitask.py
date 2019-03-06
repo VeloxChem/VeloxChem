@@ -2,14 +2,16 @@ from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import ChemicalElement
 from .veloxchemlib import mpi_master
-from .veloxchemlib import assert_msg_critical
 from .veloxchemlib import to_angular_momentum
+
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .errorhandler import assert_msg_critical
 
 from os.path import isfile
+import sys
 
 
 class MpiTask:
@@ -38,7 +40,7 @@ class MpiTask:
 
             input_fname = fname_list[0]
 
-            output_fname = ""
+            output_fname = sys.stdout
             if len(fname_list) >= 2:
                 output_fname = fname_list[1]
 

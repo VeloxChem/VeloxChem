@@ -2,9 +2,10 @@ from .veloxchemlib import MolecularBasis
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import ChemicalElement
-from .veloxchemlib import assert_msg_critical
 from .veloxchemlib import to_angular_momentum
+
 from .inputparser import InputParser
+from .errorhandler import assert_msg_critical
 
 import os
 

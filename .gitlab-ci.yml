@@ -1,10 +1,10 @@
 #
-#                      V.E.L.O.X. C.H.E.M. MP
+#                             VELOXCHEM
 #      ---------------------------------------------------
-#           An Electronic Structure Code for Nanoscale
+#                     An Electronic Structure Code
 #
-#  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-#  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+#  Copyright © 2019 by VeloxChem developers. All rights reserved.
+#  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 before_script:
   - source /opt/intel/bin/compilervars.sh intel64
@@ -14,52 +14,27 @@ before_script:
   - export OMP_NUM_THREADS=6
 
 after_script:
-  - echo "Done..."
+  - echo "Done!"
 
 stages:
   - build
   - test
 
-build_unit_test:
+velxochem_build:
   tags:
     - vlx-test
   stage: build
   script:
-    - cd src
-    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
-    - cd ../unit_tests/
-    - make -j 6 release
+    - cp config/Setup.Ubuntu.Intel src/Makefile.setup
+    - make -j 6 -C src release && make -j 6 -C unit_tests release
 
-build_veloxchem_python3:
-  tags:
-   - vlx-test
-  stage: build
-  script:
-    - cd src
-    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
-    - make -j 6 release
-
-run_unit_test:
+veloxchem_test:
   tags:
     - vlx-test
   stage: test
   script:
-    - cd src
-    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
-    - cd ../unit_tests/
-    - make -j 6 release
-    - cd ../build/bin
-    - ./UnitTestVeloxChemMP.x
-
-run_test_python3:
-  tags:
-    - vlx-test
-  stage: test
-  script:
-    - cd src
-    - cp ../config/Setup.Ubuntu.Intel Makefile.setup
-    - make -j 6 release
-    - cd ../python_tests/
-    - export PYTHONPATH=$(pwd)/../build/python:$PYTHONPATH
-    - python3 -m pytest -v --cov=../build/python/veloxchem
-
+    - cp config/Setup.Ubuntu.Intel src/Makefile.setup
+    - make -j 6 -C src release && make -j 6 -C unit_tests release
+    - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
+    - cd python_tests
+    - ../build/bin/UnitTestVeloxChemMP.x && python3 -m pytest -v --cov=../build/python/veloxchem

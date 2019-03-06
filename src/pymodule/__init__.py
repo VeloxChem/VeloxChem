@@ -13,7 +13,6 @@ from .veloxchemlib import ExcitationVector
 # C++ functions
 from .veloxchemlib import mpi_master
 from .veloxchemlib import mpi_initialized
-from .veloxchemlib import assert_msg_critical
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import mathconst_pi
@@ -41,6 +40,7 @@ from .blockdavidson import BlockDavidsonSolver
 from .mpitask import MpiTask
 
 # Python functions
+from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 
