@@ -5,28 +5,28 @@ from .veloxchemlib import assert_msg_critical
 
 class OutputStream:
 
-    def __init__(self, filehandle=None, width=122):
+    def __init__(self, filename=None, width=122):
         self.width = width
         self.buffer_lines = []
 
-        # filehandle is...
-        #   None:       stream is None
-        #   sys.stdout: stream is sys.stdout
-        #   string:     stream is file handle
+        # filename is...
+        #   None or empty:  stream is None
+        #   sys.stdout:     stream is sys.stdout
+        #   string:         stream is file handle
 
-        if filehandle is None:
+        if not filename:
             self.stream = None
             self.state = False
 
-        elif filehandle is sys.stdout:
+        elif filename is sys.stdout:
             self.stream = sys.stdout
             self.state = True
 
         else:
             try:
-                self.stream = open(filehandle, 'w')
+                self.stream = open(filename, 'w')
             except OSError:
-                errio = "OutputStream: cannot open output file %s" % filehandle
+                errio = "OutputStream: cannot open output file %s" % filename
                 assert_msg_critical(False, errio)
             self.state = True
 
