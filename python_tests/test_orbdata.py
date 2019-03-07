@@ -130,18 +130,43 @@ class TestOrbData(unittest.TestCase):
 
     def test_rest_density(self):
 
+        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+
         arr = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
-        ene = [.7, .8, .9]
+        ene = np.array([.7, .8, .9])
 
         orb_rest = MolecularOrbitals([arr], [ene], molorb.rest)
-
-        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
         den_rest = orb_rest.get_density(mol).total_to_numpy(0)
 
         arr_occ = arr[:, :1]
         den_ref = np.dot(arr_occ, arr_occ.T)
 
         self.assertTrue((den_ref == den_rest).all())
+
+    def test_unrest_density(self):
+
+        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+
+        arr_a = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
+        ene_a = np.array([.7, .8, .9])
+
+        arr_b = arr_a * 0.9
+        ene_b = ene_a * 0.8
+
+        orb_unrest = MolecularOrbitals([arr_a, arr_b], [ene_a, ene_b],
+                                       molorb.unrest)
+        den_unrest = orb_unrest.get_density(mol)
+        den_a = den_unrest.alpha_to_numpy(0)
+        den_b = den_unrest.beta_to_numpy(0)
+
+        arr_occ_a = arr_a[:, :1]
+        den_ref_a = np.dot(arr_occ_a, arr_occ_a.T)
+
+        arr_occ_b = arr_b[:, :1]
+        den_ref_b = np.dot(arr_occ_b, arr_occ_b.T)
+
+        self.assertTrue((den_ref_a == den_a).all())
+        self.assertTrue((den_ref_b == den_b).all())
 
 
 if __name__ == "__main__":

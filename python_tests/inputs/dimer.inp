@@ -4,6 +4,7 @@ task: hf
 
 @method settings
 basis: def2-svp
+basis path: ../basis
 @end
 
 @molecule
