@@ -6,7 +6,7 @@ import numpy as np
 
 
 @staticmethod
-def _Molecule_read_str(xyzstr, units='angs', charge=0.0, multiplicity=1):
+def _Molecule_read_str(xyzstr, units='angs'):
 
     labels = []
     coords = []
@@ -17,17 +17,11 @@ def _Molecule_read_str(xyzstr, units='angs', charge=0.0, multiplicity=1):
             labels.append(content[0])
             coords.append([float(x) for x in content[1:4]])
 
-    mol = Molecule(labels, coords, units)
-    mol.set_charge(charge)
-    mol.set_multiplicity(multiplicity)
-    mol.check_multiplicity()
-    mol.check_proximity(0.1)
-
-    return mol
+    return Molecule(labels, coords, units)
 
 
 @staticmethod
-def _Molecule_read_xyz(xyzfile, charge=0.0, multiplicity=1):
+def _Molecule_read_xyz(xyzfile):
 
     xyzstr = ''
 
@@ -37,13 +31,17 @@ def _Molecule_read_xyz(xyzfile, charge=0.0, multiplicity=1):
         for a in range(natoms):
             xyzstr += f_xyz.readline().strip() + '\n'
 
-    return Molecule.read_str(xyzstr, 'angs', charge, multiplicity)
+    return Molecule.read_str(xyzstr, 'angs')
 
 
 @staticmethod
 def _Molecule_from_dict(mol_dict):
 
     xyzstr = mol_dict['xyzstr']
+
+    units = 'angs'
+    if 'units' in mol_dict:
+        units = mol_dict['units'].lower()
 
     charge = 0.0
     if 'charge' in mol_dict:
@@ -53,11 +51,13 @@ def _Molecule_from_dict(mol_dict):
     if 'multiplicity' in mol_dict:
         multiplicity = int(mol_dict['multiplicity'])
 
-    units = 'angs'
-    if 'units' in mol_dict:
-        units = mol_dict['units'].lower()
+    mol = Molecule.read_str(xyzstr, units)
+    mol.set_charge(charge)
+    mol.set_multiplicity(multiplicity)
+    mol.check_multiplicity()
+    mol.check_proximity(0.1)
 
-    return Molecule.read_str(xyzstr, units, charge, multiplicity)
+    return mol
 
 
 Molecule.read_str = _Molecule_read_str

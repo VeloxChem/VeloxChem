@@ -142,7 +142,7 @@ class TestMolData(unittest.TestCase):
                Br   0.0   0.0   8.0
                Ag   0.0   0.0   9.0
                Au   0.0   0.0  10.0
-               Hg   0.0   0.0  11.0""", 'angs', 0, 2)
+               Hg   0.0   0.0  11.0""")
 
         atom_radii = mol.vdw_radii_to_numpy()
 
