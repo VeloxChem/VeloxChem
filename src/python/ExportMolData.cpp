@@ -99,7 +99,7 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 static std::shared_ptr<CMolecule>
 CMolecule_from_list(const std::vector<std::string>& labels,
                     const std::vector<py::list>&    py_coords,
-                    const std::string&              units)
+                    const std::string&              units=std::string("angs"))
 {
     // NOTE:
     // The Python Molecule constructor expects the coordinates as a 2d list,
@@ -133,16 +133,9 @@ CMolecule_from_list(const std::vector<std::string>& labels,
 }
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_list_2(const std::vector<std::string>& labels,
-                      const std::vector<py::list>&    py_coords)
-{
-    return CMolecule_from_list(labels, py_coords, std::string("angs"));
-}
-
-static std::shared_ptr<CMolecule>
 CMolecule_from_array(const std::vector<std::string>& labels,
                      const py::array_t<double>&      py_coords,
-                     const std::string&              units)
+                     const std::string&              units=std::string("angs"))
 {
     // NOTE:
     // The Python Molecule constructor expects the coordinates as a 2d numpy array,
@@ -188,11 +181,45 @@ CMolecule_from_array(const std::vector<std::string>& labels,
     return CMolecule_from_coords(labels, coords, units);
 }
 
-static std::shared_ptr<CMolecule>
-CMolecule_from_array_2(const std::vector<std::string>& labels,
-                       const py::array_t<double>&      py_coords)
+static std::vector<std::string>
+ids_to_labels(const std::vector<int32_t>& idselem)
 {
-    return CMolecule_from_array(labels, py_coords, std::string("angs"));
+    std::vector<std::string> labels;
+
+    std::string errelm("ids_to_labels: Unsupported element id");
+
+    for (int32_t i = 0; i < idselem.size(); i++)
+    {
+        CChemicalElement chemelm;
+
+        auto err = chemelm.setAtomType(idselem[i]);
+
+        errors::assertMsgCritical(err, errelm);
+
+        labels.push_back(chemelm.getName());
+    }
+
+    return labels;
+}
+
+static std::shared_ptr<CMolecule>
+CMolecule_from_list_2(const std::vector<int32_t>&  idselem,
+                      const std::vector<py::list>& py_coords,
+                      const std::string&           units=std::string("angs"))
+{
+    auto labels = ids_to_labels(idselem);
+
+    return CMolecule_from_list(labels, py_coords, units);
+}
+
+static std::shared_ptr<CMolecule>
+CMolecule_from_array_2(const std::vector<int32_t>& idselem,
+                       const py::array_t<double>&  py_coords,
+                       const std::string&          units=std::string("angs"))
+{
+    auto labels = ids_to_labels(idselem);
+
+    return CMolecule_from_array(labels, py_coords, units);
 }
 
 // Helper function for getting number of alpha/beta electrons
@@ -371,10 +398,14 @@ void export_moldata(py::module& m)
         .def(py::init<>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
-        .def(py::init(&CMolecule_from_list))
-        .def(py::init(&CMolecule_from_list_2))
-        .def(py::init(&CMolecule_from_array))
-        .def(py::init(&CMolecule_from_array_2))
+        .def(py::init(&CMolecule_from_list),
+             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
+        .def(py::init(&CMolecule_from_list_2),
+             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
+        .def(py::init(&CMolecule_from_array),
+             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
+        .def(py::init(&CMolecule_from_array_2),
+             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)

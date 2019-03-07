@@ -56,11 +56,18 @@ class TestMolData(unittest.TestCase):
         mol_5 = Molecule(labels, array_angs)
         mol_6 = Molecule(labels, array_angs, 'angs')
 
+        mol_7 = Molecule([7, 1, 1, 1], array, 'au')
+        mol_8 = Molecule([7, 1, 1, 1], array_angs, 'angs')
+        mol_9 = Molecule([7, 1, 1, 1], array_angs)
+
         self.assertEqual(mol_1, mol_2)
         self.assertEqual(mol_1, mol_3)
         self.assertEqual(mol_1, mol_4)
         self.assertEqual(mol_1, mol_5)
         self.assertEqual(mol_1, mol_6)
+        self.assertEqual(mol_1, mol_7)
+        self.assertEqual(mol_1, mol_8)
+        self.assertEqual(mol_1, mol_9)
 
     def test_get_sub_molecule(self):
 
