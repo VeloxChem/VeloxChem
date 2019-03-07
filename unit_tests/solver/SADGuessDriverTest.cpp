@@ -269,6 +269,8 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     ASSERT_EQ(dsad, dref);
 
+    ASSERT_EQ(dsad.alphaDensity(0), dsad.betaDensity(0));
+
     // out of bounds test
 
     ASSERT_EQ(0, dsad.getNumberOfRows(1));
@@ -277,9 +279,7 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     ASSERT_EQ(0, dsad.getNumberOfElements(1));
 
-    ASSERT_EQ(nullptr, dsad.totalDensity(1));
+    ASSERT_EQ(nullptr, dsad.alphaDensity(1));
 
-    ASSERT_EQ(nullptr, dsad.alphaDensity(0));
-
-    ASSERT_EQ(nullptr, dsad.betaDensity(0));
+    ASSERT_EQ(nullptr, dsad.betaDensity(1));
 }

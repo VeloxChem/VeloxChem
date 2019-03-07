@@ -38,7 +38,7 @@ class TestSolvers(unittest.TestCase):
         # matrix to numpy
 
         overlap = S22.to_numpy()
-        density = D.total_to_numpy(0)
+        density = D.alpha_to_numpy(0)
 
         if (rank == mpi_master()):
 
@@ -66,7 +66,7 @@ class TestSolvers(unittest.TestCase):
 
         D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
-        density_a = D.total_to_numpy(0)
+        density_a = D.alpha_to_numpy(0)
 
         if (rank == mpi_master()):
 
@@ -83,7 +83,7 @@ class TestSolvers(unittest.TestCase):
 
         D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, comm)
 
-        density_a = D.total_to_numpy(0)
+        density_a = D.alpha_to_numpy(0)
 
         if (rank == mpi_master()):
 

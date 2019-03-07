@@ -192,20 +192,13 @@ CVisualizationDriver::compute(const CMolecule&          molecule,
 
     errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
 
-    const bool morest = (mo.getOrbitalsType() == molorb::rest);
+    const bool alphaspin = (mospin == std::string("alpha") ||
+                            mospin == std::string("a"));
 
-    const bool alphaspin = (mospin == std::string("alpha")
-                         || mospin == std::string("a"));
-
-    const bool betaspin  = (mospin == std::string("beta")
-                         || mospin == std::string("b"));
+    const bool betaspin  = (mospin == std::string("beta") ||
+                            mospin == std::string("b"));
 
     errors::assertMsgCritical(alphaspin || betaspin, errspin);
-
-    if (betaspin)
-    {
-        errors::assertMsgCritical(!morest, errspin);
-    }
 
     auto mocoefs = alphaspin ? mo.alphaOrbitals() : mo.betaOrbitals();
 
@@ -251,24 +244,16 @@ CVisualizationDriver::compute(const CMolecule&        molecule,
 
     errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
 
-    const bool denrest = (density.getDensityType() == denmat::rest);
+    const bool alphaspin = (denspin == std::string("alpha") ||
+                            denspin == std::string("a"));
 
-    const bool alphaspin = (denspin == std::string("alpha")
-                         || denspin == std::string("a"));
-
-    const bool betaspin  = (denspin == std::string("beta")
-                         || denspin == std::string("b"));
+    const bool betaspin  = (denspin == std::string("beta") ||
+                            denspin == std::string("b"));
 
     errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
-    if (betaspin)
-    {
-        errors::assertMsgCritical(!denrest, errspin);
-    }
-
-    auto rho = (denrest ? density.totalDensity(denidx) :
-                (alphaspin ? density.alphaDensity(denidx) :
-                 density.betaDensity(denidx)));
+    auto rho = alphaspin ? density.alphaDensity(denidx) :
+               density.betaDensity(denidx);
 
     for (int32_t iao = 0; iao < nao; iao++)
     {

@@ -144,38 +144,34 @@ public:
     int32_t getNumberOfColumns() const;
     
     /**
-     Gets constant pointer to first element of specific unrestricted alpha
-     molecular orbital matrix.
+     Gets constant pointer to first element of specific alpha molecular orbital
+     matrix.
      
-     @return the constant pointer to first element of unrestricted alpha
-     molecular orbital matrix.
+     @return the constant pointer to first element of alpha molecular orbital
+     matrix.
      */
     const double* alphaOrbitals() const;
     
     /**
-     Gets constant pointer to first element of specific unrestricted beta
-     molecular orbital matrix.
+     Gets constant pointer to first element of specific beta molecular orbital
+     matrix.
      
-     @return the constant pointer to first element of unrestricted beta
-     molecular orbital matrix.
+     @return the constant pointer to first element of beta molecular orbital
+     matrix.
      */
     const double* betaOrbitals() const;
     
     /**
-     Gets constant pointer to first element of specific unrestricted alpha
-     energy eigenvalues.
+     Gets constant pointer to first element of specific alpha energy eigenvalues.
      
-     @return the constant pointer to first element of unrestricted alpha
-     energy eigenvalues.
+     @return the constant pointer to first element of alpha energy eigenvalues.
      */
     const double* alphaEnergies() const;
     
     /**
-     Gets constant pointer to first element of specific unrestricted beta
-     energy eigenvalues.
+     Gets constant pointer to first element of specific beta energy eigenvalues.
      
-     @return the constant pointer to first element of unrestricted beta
-     energy eigenvalues.
+     @return the constant pointer to first element of beta energy eigenvalues.
      */
     const double* betaEnergies() const;
     

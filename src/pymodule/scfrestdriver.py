@@ -51,7 +51,7 @@ class ScfRestrictedDriver(ScfDriver):
         """
         
         if self.rank == mpi_master():
-            dmat = den_mat.total_to_numpy(0)
+            dmat = den_mat.alpha_to_numpy(0)
         
             # electronic energy
             gmat = fock_mat.to_numpy(0)
@@ -123,7 +123,7 @@ class ScfRestrictedDriver(ScfDriver):
         
         if self.rank == mpi_master():
             smat = ovl_mat.to_numpy()
-            dmat = den_mat.total_to_numpy(0)
+            dmat = den_mat.alpha_to_numpy(0)
             fmat = fock_mat.to_numpy(0)
             tmat = oao_mat.to_numpy()
         
@@ -162,7 +162,7 @@ class ScfRestrictedDriver(ScfDriver):
         
         if self.rank == mpi_master():
             diff_mat = den_mat.sub(old_den_mat)
-            ddmat = diff_mat.total_to_numpy(0)
+            ddmat = diff_mat.alpha_to_numpy(0)
         
             diff_den = np.linalg.norm(ddmat)
         else:
@@ -199,7 +199,7 @@ class ScfRestrictedDriver(ScfDriver):
                     self.den_matrices.popleft()
             
                 self.fock_matrices.append(np.copy(fock_mat.to_numpy(0)))
-                self.den_matrices.append(np.copy(den_mat.total_to_numpy(0)))
+                self.den_matrices.append(np.copy(den_mat.alpha_to_numpy(0)))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """Computes effective spin restricted closed shell Fock/Kohn-Sham

@@ -28,11 +28,13 @@ class TestOrbData(unittest.TestCase):
         d_rest = AODensityMatrix([data_a], denmat.rest)
         d_unrest = AODensityMatrix([data_a, data_b], denmat.unrest)
 
-        den_a1 = d_rest.total_to_numpy(0)
+        den_a1 = d_rest.alpha_to_numpy(0)
+        den_b1 = d_rest.beta_to_numpy(0)
         den_a2 = d_unrest.alpha_to_numpy(0)
         den_b2 = d_unrest.beta_to_numpy(0)
 
         self.assertTrue((data_a == den_a1).all())
+        self.assertTrue((data_a == den_b1).all())
         self.assertTrue((data_a == den_a2).all())
         self.assertTrue((data_b == den_b2).all())
 
@@ -51,7 +53,7 @@ class TestOrbData(unittest.TestCase):
         den_2 = AODensityMatrix([arr_2], denmat.rest)
         den_diff = den_1.sub(den_2)
 
-        diff = np.max(np.abs(den_diff.total_to_numpy(0) - (arr_1 - arr_2)))
+        diff = np.max(np.abs(den_diff.alpha_to_numpy(0) - (arr_1 - arr_2)))
         self.assertAlmostEqual(0., diff, 13)
 
     def test_density_hdf5(self):
@@ -136,12 +138,15 @@ class TestOrbData(unittest.TestCase):
         ene = np.array([.7, .8, .9])
 
         orb_rest = MolecularOrbitals([arr], [ene], molorb.rest)
-        den_rest = orb_rest.get_density(mol).total_to_numpy(0)
+        den_rest = orb_rest.get_density(mol)
+        den_a = den_rest.alpha_to_numpy(0)
+        den_b = den_rest.beta_to_numpy(0)
 
         arr_occ = arr[:, :1]
         den_ref = np.dot(arr_occ, arr_occ.T)
 
-        self.assertTrue((den_ref == den_rest).all())
+        self.assertTrue((den_ref == den_a).all())
+        self.assertTrue((den_ref == den_b).all())
 
     def test_unrest_density(self):
 
