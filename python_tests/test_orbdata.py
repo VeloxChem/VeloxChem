@@ -137,7 +137,7 @@ class TestOrbData(unittest.TestCase):
 
         orb_rest = MolecularOrbitals([arr], [ene], molorb.rest)
 
-        mol = Molecule(["H", "H"], [0.0, 0.0], [0.0, 0.0], [0.0, 1.4])
+        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
         den_rest = orb_rest.get_density(mol).total_to_numpy(0)
 
         arr_occ = arr[:, :1]

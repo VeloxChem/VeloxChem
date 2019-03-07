@@ -15,6 +15,7 @@
 #include <vector>
 #include <string>
 
+#include "Codata.hpp"
 #include "Molecule.hpp"
 #include "VdwRadii.hpp"
 #include "ErrorHandler.hpp"
@@ -30,32 +31,40 @@ namespace vlx_moldata { // vlx_moldata namespace
 // Helper function for CMolecule constructor
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_xyz(const std::vector<std::string>& labels,
-                   const std::vector<double>& x_coords,
-                   const std::vector<double>& y_coords,
-                   const std::vector<double>& z_coords)
+CMolecule_from_coords(const std::vector<std::string>& labels,
+                      const std::vector<double>&      coords_raw,
+                      const std::string&              units)
 {
-    // form coordinate vector
+    // NOTE:
+    // The C++ Molecule constructor expects the coordinates to be arranged as 3 x natoms,
+    // namely {x1, x2, x3, x4, ..., y1, y2, y3, y4, ..., z1, z2, z3, z4, ...}
 
-    std::string errmol("Molecule.from_xyz: Inconsistent lengths of lists");
+    // sanity check
 
-    errors::assertMsgCritical(x_coords.size() == labels.size(), errmol);
+    std::string errmol("CMolecule_from_coords: Inconsistent lengths of lists");
 
-    errors::assertMsgCritical(y_coords.size() == labels.size(), errmol);
+    errors::assertMsgCritical(coords_raw.size() == labels.size() * 3, errmol);
 
-    errors::assertMsgCritical(z_coords.size() == labels.size(), errmol);
+    // scaling factor
 
-    std::vector<double> coords;
+    auto scale = 1.0 / units::getBohrValueInAngstroms();
 
-    coords.insert(coords.end(), x_coords.begin(), x_coords.end());
+    if (fstr::upcase(units) == "AU" || fstr::upcase(units) == "BOHR" ||
+        fstr::upcase(units) == "BOHRS")
+    {
+        scale = 1.0;
+    }
 
-    coords.insert(coords.end(), y_coords.begin(), y_coords.end());
+    std::vector<double> coords_au(coords_raw.size());
 
-    coords.insert(coords.end(), z_coords.begin(), z_coords.end());
+    for (size_t i = 0; i < coords_au.size(); i++)
+    {
+        coords_au[i] = coords_raw[i] * scale;
+    }
 
     // form charge, mass, label and elemental ID vectors
 
-    std::string errelm("Molecule.from_xyz: Unsupported chemical element");
+    std::string errelm("CMolecule_from_coords: Unsupported chemical element");
 
     std::vector<double> charges;
 
@@ -83,8 +92,107 @@ CMolecule_from_xyz(const std::vector<std::string>& labels,
     // form molecule
 
     return std::shared_ptr<CMolecule>(
-            new CMolecule(coords, charges, masses, labels, idselem)
+            new CMolecule(coords_au, charges, masses, labels, idselem)
             );
+}
+
+static std::shared_ptr<CMolecule>
+CMolecule_from_list(const std::vector<std::string>& labels,
+                    const std::vector<py::list>&    py_coords,
+                    const std::string&              units)
+{
+    // NOTE:
+    // The Python Molecule constructor expects the coordinates as a 2d list,
+    // namely [[x1, y1, z1], [x2, y2, z2], [x3, y3, z3], [x4, y4, z4], ...]
+
+    // sanity check
+
+    std::string errmol("CMolecule_from_list: Inconsistent lengths of lists");
+
+    errors::assertMsgCritical(py_coords.size() == labels.size(), errmol);
+
+    for (size_t a = 0; a < labels.size(); a++)
+    {
+        errors::assertMsgCritical(py::len(py_coords[a]) == 3, errmol);
+    }
+
+    // form coordinate vector
+
+    std::vector<double> coords;
+
+    for (size_t d = 0; d < 3; d++)
+    {
+        for (size_t a = 0; a < labels.size(); a++)
+        {
+            // need to transpose py_coords for the C++ Molecule contructor
+            coords.push_back(py::cast<double>(py_coords[a][d]));
+        }
+    }
+
+    return CMolecule_from_coords(labels, coords, units);
+}
+
+static std::shared_ptr<CMolecule>
+CMolecule_from_list_2(const std::vector<std::string>& labels,
+                      const std::vector<py::list>&    py_coords)
+{
+    return CMolecule_from_list(labels, py_coords, std::string("angs"));
+}
+
+static std::shared_ptr<CMolecule>
+CMolecule_from_array(const std::vector<std::string>& labels,
+                     const py::array_t<double>&      py_coords,
+                     const std::string&              units)
+{
+    // NOTE:
+    // The Python Molecule constructor expects the coordinates as a 2d numpy array,
+    // namely np.array([[x1, y1, z1], [x2, y2, z2], [x3, y3, z3], [x4, y4, z4], ...])
+
+    // sanity check
+
+    std::string errsrc("CMolecule_from_array: need a contiguous numpy array");
+
+    auto c_style = py::detail::check_flags(py_coords.ptr(), py::array::c_style);
+
+    auto f_style = py::detail::check_flags(py_coords.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style ^ f_style, errsrc);
+
+    std::string errmol("CMolecule_from_array: Inconsistent size");
+
+    errors::assertMsgCritical(py_coords.shape(0) == labels.size(), errmol);
+
+    errors::assertMsgCritical(py_coords.shape(1) == 3, errmol);
+
+    // form coordinate vector
+
+    std::vector<double> coords(py_coords.size());
+
+    if (c_style)
+    {
+        for (size_t d = 0; d < 3; d++)
+        {
+            for (size_t a = 0; a < labels.size(); a++)
+            {
+                // need to transpose py_coords for the C++ Molecule contructor
+                coords[d * labels.size() + a] = py_coords.data()[a * 3 + d];
+            }
+        }
+    }
+    else if (f_style)
+    {
+        // no need to transpose py_coords for fortran style numpy array
+        std::memcpy(coords.data(), py_coords.data(), py_coords.size() * sizeof(double));
+    }
+
+    return CMolecule_from_coords(labels, coords, units);
+}
+
+static std::shared_ptr<CMolecule>
+CMolecule_from_array_2(const std::vector<std::string>& labels,
+                       const py::array_t<double>&      py_coords)
+{
+    return CMolecule_from_array(labels, py_coords, std::string("angs"));
 }
 
 // Helper function for getting number of alpha/beta electrons
@@ -263,7 +371,10 @@ void export_moldata(py::module& m)
         .def(py::init<>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
-        .def(py::init(&CMolecule_from_xyz))
+        .def(py::init(&CMolecule_from_list))
+        .def(py::init(&CMolecule_from_list_2))
+        .def(py::init(&CMolecule_from_array))
+        .def(py::init(&CMolecule_from_array_2))
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)

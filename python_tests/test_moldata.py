@@ -10,21 +10,57 @@ import unittest
 
 class TestMolData(unittest.TestCase):
 
+    def nh3_labels(self):
+
+        return ["N", "H", "H", "H"]
+
+    def nh3_coords(self):
+
+        return [[-3.710, 3.019, -0.037], [-3.702, 4.942, 0.059],
+                [-4.704, 2.415, 1.497], [-4.780, 2.569, -1.573]]
+
+    def nh3_xyzstr(self):
+
+        return """N  -3.710   3.019  -0.037
+                  H  -3.702   4.942   0.059
+                  H  -4.704   2.415   1.497
+                  H  -4.780   2.569  -1.573"""
+
+    def nh3_molecule(self):
+
+        labels = self.nh3_labels()
+        coords = self.nh3_coords()
+
+        return Molecule(labels, coords, 'au')
+
     def test_constructors(self):
 
-        mol_1 = Molecule(
-            [ "N", "H", "H", "H" ],
-            [ -3.710, -3.702, -4.704, -4.780 ],
-            [  3.019,  4.942,  2.415,  2.569 ],
-            [ -0.037,  0.059,  1.497, -1.573 ])
+        labels = self.nh3_labels()
+        coords = self.nh3_coords()
+        xyzstr = self.nh3_xyzstr()
 
-        mol_2 = Molecule.read_str("""
-            N   -3.710    3.019   -0.037
-            H   -3.702    4.942    0.059
-            H   -4.704    2.415    1.497
-            H   -4.780    2.569   -1.573""", units="au")
+        mol_1 = Molecule(labels, coords, 'au')
+        mol_2 = Molecule.read_str(xyzstr, 'au')
+
+        array = np.array(coords)
+        arrayT = np.zeros((array.shape[1], array.shape[0]))
+        for i in range(array.shape[0]):
+            for j in range(array.shape[1]):
+                arrayT[j][i] = array[i][j]
+
+        mol_3 = Molecule(labels, array, 'au')
+        mol_4 = Molecule(labels, arrayT.T, 'au')
+
+        array_angs = array * bohr_in_angstroms()
+
+        mol_5 = Molecule(labels, array_angs)
+        mol_6 = Molecule(labels, array_angs, 'angs')
 
         self.assertEqual(mol_1, mol_2)
+        self.assertEqual(mol_1, mol_3)
+        self.assertEqual(mol_1, mol_4)
+        self.assertEqual(mol_1, mol_5)
+        self.assertEqual(mol_1, mol_6)
 
     def test_get_sub_molecule(self):
 
@@ -35,11 +71,7 @@ class TestMolData(unittest.TestCase):
         mol_2 = molecule.get_sub_molecule(0, 9)
         mol_3 = mol_2.get_sub_molecule(0, 4)
 
-        mol_4 = Molecule(
-            [ "N", "H", "H", "H" ],
-            [ -3.710, -3.702, -4.704, -4.780 ],
-            [  3.019,  4.942,  2.415,  2.569 ],
-            [ -0.037,  0.059,  1.497, -1.573 ])
+        mol_4 = self.nh3_molecule()
 
         self.assertEqual(mol_1, mol_3)
         self.assertEqual(mol_1, mol_4)
@@ -47,19 +79,15 @@ class TestMolData(unittest.TestCase):
 
     def test_coordinates_to_numpy(self):
 
-        x_list = [ -3.710, -3.702, -4.704, -4.780 ]
-        y_list = [  3.019,  4.942,  2.415,  2.569 ]
-        z_list = [ -0.037,  0.059,  1.497, -1.573 ]
-
-        mol = Molecule([ "N", "H", "H", "H" ], x_list, y_list, z_list)
-
-        x_arr = np.array(x_list)
-        y_arr = np.array(y_list)
-        z_arr = np.array(z_list)
+        mol = self.nh3_molecule()
 
         x = mol.x_to_numpy()
         y = mol.y_to_numpy()
         z = mol.z_to_numpy()
+
+        x_arr = np.array([-3.710, -3.702, -4.704, -4.780])
+        y_arr = np.array([3.019, 4.942, 2.415, 2.569])
+        z_arr = np.array([-0.037, 0.059, 1.497, -1.573])
 
         self.assertTrue((x == x_arr).all())
         self.assertTrue((y == y_arr).all())
@@ -67,17 +95,13 @@ class TestMolData(unittest.TestCase):
 
     def test_setters_and_getters(self):
 
-        mol = Molecule(
-            [ "N", "H", "H", "H" ],
-            [ -3.710, -3.702, -4.704, -4.780 ],
-            [  3.019,  4.942,  2.415,  2.569 ],
-            [ -0.037,  0.059,  1.497, -1.573 ])
+        mol = self.nh3_molecule()
 
         mol.set_charge(-1)
-        self.assertEqual(-1, mol.get_charge())
+        self.assertEqual(-1.0, mol.get_charge())
 
         mol.set_multiplicity(2)
-        self.assertEqual(2, mol.get_multiplicity())
+        self.assertEqual(2.0, mol.get_multiplicity())
 
         mol.check_multiplicity()
         mol.check_proximity(0.1)
@@ -87,11 +111,7 @@ class TestMolData(unittest.TestCase):
 
     def test_number_of_atoms(self):
 
-        mol = Molecule(
-            [ "N", "H", "H", "H" ],
-            [ -3.710, -3.702, -4.704, -4.780 ],
-            [  3.019,  4.942,  2.415,  2.569 ],
-            [ -0.037,  0.059,  1.497, -1.573 ])
+        mol = self.nh3_molecule()
 
         self.assertEqual(mol.number_of_atoms(1), 3)
         self.assertEqual(mol.number_of_atoms(7), 1)
@@ -103,17 +123,26 @@ class TestMolData(unittest.TestCase):
 
         # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
 
-        mol = Molecule(
-            [ "H", "Li", "C", "N", "O", "S", "Cu", "Zn",
-              "Br", "Ag", "Au", "Hg", ],
-            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0 ],
-            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0 ],
-            [ 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0 ])
+        mol = Molecule.read_str(
+            """H    0.0   0.0   0.0
+               Li   0.0   0.0   1.0
+               C    0.0   0.0   2.0
+               N    0.0   0.0   3.0
+               O    0.0   0.0   4.0
+               S    0.0   0.0   5.0
+               Cu   0.0   0.0   6.0
+               Zn   0.0   0.0   7.0
+               Br   0.0   0.0   8.0
+               Ag   0.0   0.0   9.0
+               Au   0.0   0.0  10.0
+               Hg   0.0   0.0  11.0""", 'angs', 0, 2)
 
         atom_radii = mol.vdw_radii_to_numpy()
 
-        ref_radii = np.array([ 1.09, 1.82, 1.70, 1.55, 1.52, 1.80, 1.40, 1.39,
-                               1.85, 1.72, 1.66, 1.55 ])
+        ref_radii = np.array([
+            1.09, 1.82, 1.70, 1.55, 1.52, 1.80, 1.40, 1.39, 1.85, 1.72, 1.66,
+            1.55
+        ])
 
         ref_radii /= bohr_in_angstroms()
 
@@ -121,7 +150,7 @@ class TestMolData(unittest.TestCase):
 
         elem_ids = mol.elem_ids_to_numpy()
 
-        ref_ids = np.array([ 1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80 ])
+        ref_ids = np.array([1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80])
 
         self.assertTrue((elem_ids == ref_ids).all())
 
