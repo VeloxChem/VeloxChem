@@ -67,7 +67,7 @@ class CTwoDiis:
     
         bmat = self.comp_bmatrix()
         
-        beigs, bvecs = np.linalg.eigh(bmat);
+        beigs, bvecs = np.linalg.eigh(bmat)
         
         weights = self.pick_weights(self.norm_bvectors(bvecs))
         
@@ -121,7 +121,7 @@ class CTwoDiis:
         for i in range(len(sum_vecs)):
             
             if abs(sum_vecs[i]) > 1.0e-6:
-                norm_vecs.append(bvectors[:,i] / sum_vecs[i]);
+                norm_vecs.append(bvectors[:,i] / sum_vecs[i])
     
         return norm_vecs
 

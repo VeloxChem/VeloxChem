@@ -57,7 +57,7 @@ class TDAExciDriver:
         
         # thresholds
         self.eri_thresh = 1.0e-15
-        self.conv_thesh = 1.0-4
+        self.conv_thesh = 1.0e-4
         
         # solver setup
         self.max_iter = 50

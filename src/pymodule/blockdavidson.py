@@ -183,12 +183,12 @@ class BlockDavidsonSolver:
         tvecs = self.residual_matrices.copy()
         for i in range(self.neigenpairs):
             pmat = np.full(diag_mat.shape, self.residual_eigs[i]) - diag_mat
-            pmat[:,0] = 1.0/pmat[:,0]
-            tvecs[:, i] *= pmat[:,0]
+            pmat[:, 0] = 1.0 / pmat[:, 0]
+            tvecs[:, i] *= pmat[:, 0]
         
         self.norm_vectors(tvecs)
         
-        return tvecs;
+        return tvecs
 
     def project_trial_vectors(self, tvecs):
         """Projects out trial vector components already present in reduced

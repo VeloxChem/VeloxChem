@@ -31,7 +31,8 @@ class OutputStream:
             try:
                 self.stream = open(filename, 'w')
             except OSError:
-                errio = "OutputStream: cannot open output file %s" % filename
+                errio = "OutputStream: cannot open output file "
+                errio += "{}".format(filename)
                 assert_msg_critical(False, errio)
             self.state = True
 

@@ -39,11 +39,11 @@ class InputParser:
             self.empty_group_check()
 
         except FileNotFoundError:
-            errmsg = 'input parser: cannot open file %s' % self.filename
+            errmsg = 'input parser: cannot open file {}'.format(self.filename)
             self.success_monitor = False
 
         except SyntaxError:
-            errmsg = 'input parser: bad syntax in file %s' % self.filename
+            errmsg = 'input parser: bad syntax in file {}'.format(self.filename)
             errmsg += '\n     You may check for incomplete or empty groups.'
             self.success_monitor = False
 
@@ -166,7 +166,7 @@ class InputParser:
                     xyzstr = '\n'.join(local_list)
                     self.input_dict['molecule']['xyzstr'] = xyzstr
                     # also set the default value for units
-                    if 'units' not in self.input_dict['molecule'].keys():
+                    if 'units' not in self.input_dict['molecule']:
                         self.input_dict['molecule']['units'] = 'angs'
 
         if self.is_basis_set:

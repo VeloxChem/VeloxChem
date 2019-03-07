@@ -269,7 +269,7 @@ class ScfDriver:
             if nrow != ncol:
                 ndim = nrow - ncol
                 ostream.print_info("Removed %d linearly dependent vector%s."
-                                   % (ndim, '' if ndim ==1 else 's'))
+                                   % (ndim, '' if ndim == 1 else 's'))
                 ostream.print_blank()
 
             ostream.flush()
@@ -710,7 +710,7 @@ class ScfDriver:
         if e_grad < 1.0e-6:
             return self.eri_thresh
         
-        nteri = math.pow(10, math.floor(math.log10(e_grad)));
+        nteri = math.pow(10, math.floor(math.log10(e_grad)))
 
         nteri = 1.0e-10 * nteri
     

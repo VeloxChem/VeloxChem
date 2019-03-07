@@ -43,7 +43,7 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.'):
         err = elem.set_atom_type(elem_id)
         assert_msg_critical(err, "ChemicalElement.set_atom_type")
 
-        basis_key = 'atombasis_%s' % elem.get_name().lower()
+        basis_key = 'atombasis_{}'.format(elem.get_name().lower())
         basis_list = [entry for entry in basis_dict[basis_key]]
 
         atom_basis = AtomBasis()
@@ -52,7 +52,7 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.'):
             shell_title = basis_list.pop(0).split()
             assert_msg_critical(
                 len(shell_title) == 3,
-                "Basis set parser (shell): %s" % ' '.join(shell_title))
+                "Basis set parser (shell): {}".format(' '.join(shell_title)))
 
             angl = to_angular_momentum(shell_title[0])
             npgto = int(shell_title[1])
@@ -67,7 +67,7 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.'):
                 prims = basis_list.pop(0).split()
                 assert_msg_critical(
                     len(prims) == ncgto + 1,
-                    "Basis set parser (primitive): %s" % ' '.join(prims))
+                    "Basis set parser (primitive): {}".format(' '.join(prims)))
 
                 expons[i] = float(prims[0])
                 for k in range(ncgto):

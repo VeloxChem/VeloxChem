@@ -46,15 +46,15 @@ def _Molecule_from_dict(mol_dict):
     xyzstr = mol_dict['xyzstr']
 
     charge = 0.0
-    if 'charge' in mol_dict.keys():
+    if 'charge' in mol_dict:
         charge = float(mol_dict['charge'])
 
     multiplicity = 1
-    if 'multiplicity' in mol_dict.keys():
+    if 'multiplicity' in mol_dict:
         multiplicity = int(mol_dict['multiplicity'])
 
     units = 'angs'
-    if 'units' in mol_dict.keys():
+    if 'units' in mol_dict:
         units = mol_dict['units'].lower()
 
     return Molecule.read_str(xyzstr, units, charge, multiplicity)
