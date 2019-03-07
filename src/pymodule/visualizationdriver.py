@@ -88,6 +88,8 @@ def _write_cube(self, mol, basis, mol_orbs, mo_idx, mo_spin, v):
 
             outfile.write("\n")
 
+    outfile.close()
+
 
 def _write_cube_dens(self, mol, basis, density, dens_idx, dens_spin, v):
 
@@ -145,6 +147,8 @@ def _write_cube_dens(self, mol, basis, density, dens_idx, dens_spin, v):
                     outfile.write("\n")
 
             outfile.write("\n")
+
+    outfile.close()
 
 
 VisualizationDriver.gen_grid = _gen_grid

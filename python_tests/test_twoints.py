@@ -14,6 +14,7 @@ from veloxchem.veloxchemlib import mpi_master
 
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
+from veloxchem.qqscheme import get_qq_scheme
 
 import numpy as np
 import math
@@ -24,8 +25,8 @@ class TestTwoInts(unittest.TestCase):
 
     def test_fock_matrix(self):
 
-        data_j = [[ 1., .2, ], [ .2, 1., ]]
-        data_k = [[ .9, .5, ], [ .5, .9, ]]
+        data_j = [[1., .2], [.2, 1.]]
+        data_k = [[.9, .5], [.5, .9]]
 
         arr_j = np.array(data_j)
         arr_k = np.array(data_k)
@@ -37,8 +38,8 @@ class TestTwoInts(unittest.TestCase):
 
         fock = AOFockMatrix(
             [arr_jk, arr_jkx, arr_j, arr_k, arr_kx],
-            [fockmat.restjk, fockmat.restjkx,
-                fockmat.restj, fockmat.restk, fockmat.restkx],
+            [fockmat.restjk, fockmat.restjkx, fockmat.restj, fockmat.restk,
+             fockmat.restkx],
             [1.0, x, 1.0, 1.0, x],
             [0, 0, 0, 0, 0])
 
@@ -58,9 +59,9 @@ class TestTwoInts(unittest.TestCase):
 
     def test_add_hcore(self):
 
-        arr_t = np.array([[  3., .2, ], [ .2,  3., ]])
-        arr_v = np.array([[ -9., .5, ], [ .5, -9., ]])
-        arr_jk = np.array([[  5., .1, ], [ .1,  5., ]])
+        arr_t = np.array([[3., .2], [.2, 3.]])
+        arr_v = np.array([[-9., .5], [.5, -9.]])
+        arr_jk = np.array([[5., .1], [.1, 5.]])
         arr_fock = arr_jk + arr_t - arr_v
 
         kin = KineticEnergyMatrix(arr_t)
@@ -73,8 +74,8 @@ class TestTwoInts(unittest.TestCase):
 
     def test_add_fock(self):
 
-        arr_1 = np.array([[ 1., .2, ], [ .2,  1., ]])
-        arr_2 = np.array([[ .9, .5, ], [ .5,  .9, ]])
+        arr_1 = np.array([[1., .2], [.2, 1.]])
+        arr_2 = np.array([[.9, .5], [.5, .9]])
 
         fock_1 = AOFockMatrix([arr_1], [fockmat.restjk], [1.0], [0])
         fock_2 = AOFockMatrix([arr_2], [fockmat.restjk], [1.0], [0])
@@ -87,7 +88,7 @@ class TestTwoInts(unittest.TestCase):
 
     def test_fock_density(self):
 
-        data_a = [[ 1., .2, ], [ .2, 1., ]]
+        data_a = [[1., .2], [.2, 1.]]
 
         d_rest = AODensityMatrix([data_a], denmat.rest)
 
@@ -99,10 +100,10 @@ class TestTwoInts(unittest.TestCase):
 
     def test_fock_hdf5(self):
 
-        data_a = [[ 1., .2, ], [ .2, 1., ]]
-        data_b = [[ .9, .5, ], [ .5, .9, ]]
-        data_c = [[ .8, .6, ], [ .6, .8, ]]
-        data_d = [[ .7, .5, ], [ .5, .7, ]]
+        data_a = [[1., .2], [.2, 1.]]
+        data_b = [[.9, .5], [.5, .9]]
+        data_c = [[.8, .6], [.6, .8]]
+        data_d = [[.7, .5], [.5, .7]]
 
         types = [fockmat.restk, fockmat.restjkx, fockmat.restk, fockmat.restjk]
 
@@ -110,8 +111,8 @@ class TestTwoInts(unittest.TestCase):
 
         indices = [0, 0, 1, 0]
 
-        f_rest = AOFockMatrix([data_a, data_b, data_c, data_d],
-                              types, factors, indices)
+        f_rest = AOFockMatrix([data_a, data_b, data_c, data_d], types, factors,
+                              indices)
 
         # hdf5 read/write tests
 
@@ -159,6 +160,11 @@ class TestTwoInts(unittest.TestCase):
         eridrv = ElectronRepulsionIntegralsDriver(rank, size, comm)
 
         qqdata = eridrv.compute(ericut.qqden, 1.0e-12, molecule, ao_basis)
+
+        self.assertEqual(get_qq_scheme("QQ"), ericut.qq)
+        self.assertEqual(get_qq_scheme("QQR"), ericut.qqr)
+        self.assertEqual(get_qq_scheme("QQ_DEN"), ericut.qqden)
+        self.assertEqual(get_qq_scheme("QQR_DEN"), ericut.qqrden)
 
         num_screeners = qqdata.number_of_screeners()
         self.assertTrue(num_screeners > 0)

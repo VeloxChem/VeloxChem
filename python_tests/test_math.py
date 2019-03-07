@@ -9,7 +9,7 @@ class TestMath(unittest.TestCase):
 
     def test_matrix_numpy(self):
 
-        data = [[ 1., 2., 3. ], [ 4., 5., 6. ]]
+        data = [[1., 2., 3.], [4., 5., 6.]]
 
         array = np.array(data)
         matrix = DenseMatrix(array)
@@ -35,20 +35,20 @@ class TestMath(unittest.TestCase):
 
     def test_symmetrize(self):
 
-        matrix = DenseMatrix(np.array([[ 1., 2. ], [ 3., 4. ]]))
+        matrix = DenseMatrix(np.array([[1., 2.], [3., 4.]]))
 
         matrix.symmetrize()
-        self.assertEqual(matrix, DenseMatrix([[ 2., 5. ], [ 5., 8. ]]))
+        self.assertEqual(matrix, DenseMatrix([[2., 5.], [5., 8.]]))
 
     def test_slice_matrix(self):
 
-        matrix = DenseMatrix([[ 1., 2., 3. ], [ 4., 5., 6. ]])
+        matrix = DenseMatrix([[1., 2., 3.], [4., 5., 6.]])
 
-        self.assertEqual(matrix.slice(0, 0, 2, 2),
-                         DenseMatrix([[ 1., 2. ], [ 4., 5. ]]))
+        self.assertEqual(
+            matrix.slice(0, 0, 2, 2), DenseMatrix([[1., 2.], [4., 5.]]))
 
-        self.assertEqual(matrix.slice(0, 1, 2, 2),
-                         DenseMatrix([[ 2., 3. ], [ 5., 6. ]]))
+        self.assertEqual(
+            matrix.slice(0, 1, 2, 2), DenseMatrix([[2., 3.], [5., 6.]]))
 
 
 if __name__ == "__main__":

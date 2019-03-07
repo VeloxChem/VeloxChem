@@ -18,14 +18,12 @@ class TestOrbData(unittest.TestCase):
     def test_get_label(self):
 
         task = MpiTask(["inputs/dimer.inp", "inputs/dimer.out"], MPI.COMM_WORLD)
-        basis = task.ao_basis
-
-        self.assertEqual(basis.get_label(), "DEF2-SVP")
+        self.assertEqual(task.ao_basis.get_label(), "DEF2-SVP")
 
     def test_density_matrix(self):
 
-        data_a = [[ 1., .2, ], [ .2, 1., ]]
-        data_b = [[ .9, .5, ], [ .5, .9, ]]
+        data_a = [[1., .2], [.2, 1.]]
+        data_b = [[.9, .5], [.5, .9]]
 
         d_rest = AODensityMatrix([data_a], denmat.rest)
         d_unrest = AODensityMatrix([data_a, data_b], denmat.unrest)
@@ -46,8 +44,8 @@ class TestOrbData(unittest.TestCase):
 
     def test_density_sub(self):
 
-        arr_1 = np.array([[ 1., .2, ], [ .2,  1., ]])
-        arr_2 = np.array([[ .9, .5, ], [ .5,  .9, ]])
+        arr_1 = np.array([[1., .2], [.2, 1.]])
+        arr_2 = np.array([[.9, .5], [.5, .9]])
 
         den_1 = AODensityMatrix([arr_1], denmat.rest)
         den_2 = AODensityMatrix([arr_2], denmat.rest)
@@ -58,15 +56,15 @@ class TestOrbData(unittest.TestCase):
 
     def test_density_hdf5(self):
 
-        data_a = [[ 1., .2, ], [ .2, 1., ]]
-        data_b = [[ .9, .5, ], [ .5, .9, ]]
-        data_c = [[ .8, .6, ], [ .6, .8, ]]
-        data_d = [[ .7, .5, ], [ .5, .7, ]]
+        data_a = [[1., .2], [.2, 1.]]
+        data_b = [[.9, .5], [.5, .9]]
+        data_c = [[.8, .6], [.6, .8]]
+        data_d = [[.7, .5], [.5, .7]]
 
         d_rest = AODensityMatrix([data_a, data_b], denmat.rest)
 
-        d_unrest = AODensityMatrix(
-            [data_a, data_b, data_c, data_d], denmat.unrest)
+        d_unrest = AODensityMatrix([data_a, data_b, data_c, data_d],
+                                   denmat.unrest)
 
         # hdf5 read/write tests
 
@@ -82,16 +80,16 @@ class TestOrbData(unittest.TestCase):
 
     def test_orbitals_matrix(self):
 
-        data_a = [[ .9, .2, ], [ .1, .3, ], [ .4, .9, ]]
-        data_b = [[ .8, .3, ], [ .2, .4, ], [ .5, .8, ]]
+        data_a = [[.9, .2], [.1, .3], [.4, .9]]
+        data_b = [[.8, .3], [.2, .4], [.5, .8]]
 
         ener_a = [0.5, 0.9]
         ener_b = [0.3, 0.6]
 
         orb_rest = MolecularOrbitals([data_a], [ener_a], molorb.rest)
 
-        orb_unrest = MolecularOrbitals(
-            [data_a, data_b], [ener_a, ener_b], molorb.unrest)
+        orb_unrest = MolecularOrbitals([data_a, data_b], [ener_a, ener_b],
+                                       molorb.unrest)
 
         orb_a1 = orb_rest.alpha_to_numpy()
         orb_a2 = orb_unrest.alpha_to_numpy()
@@ -111,10 +109,10 @@ class TestOrbData(unittest.TestCase):
 
         self.assertEqual(molorb.rest, orb_rest.get_orbitals_type())
         self.assertEqual(molorb.unrest, orb_unrest.get_orbitals_type())
-        
+
         self.assertEqual(2, orb_rest.number_mos())
         self.assertEqual(2, orb_unrest.number_mos())
-        
+
         self.assertEqual(3, orb_rest.number_aos())
         self.assertEqual(3, orb_unrest.number_aos())
 
