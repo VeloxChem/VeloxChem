@@ -15,9 +15,13 @@ class OutputStream:
         #   sys.stdout:     stream is sys.stdout
         #   string:         stream is file handle
 
-        if not filename:
+        if filename is None:
             self.stream = None
             self.state = False
+
+        elif not filename or filename == '-':
+            errio = "OutputStream: invalid argument"
+            assert_msg_critical(False, errio)
 
         elif filename is sys.stdout:
             self.stream = sys.stdout

@@ -9,7 +9,7 @@ class TestMP2(unittest.TestCase):
     def run_mp2(self, molname):
 
         comm = MPI.COMM_WORLD
-        task = vlx.MpiTask(["inputs/" + molname + ".inp", ""], comm)
+        task = vlx.MpiTask(["inputs/" + molname + ".inp"], comm)
 
         # scf
         scf_drv = vlx.ScfRestrictedDriver()
