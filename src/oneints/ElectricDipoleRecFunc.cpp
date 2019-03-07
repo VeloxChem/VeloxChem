@@ -198,7 +198,7 @@ namespace ediprecfunc { // ediprecfunc namespace
             #pragma omp simd aligned(pbx, pby, pbz, dx_0_x, dx_0_y, dx_0_z, dy_0_x,\
                                      dy_0_y, dy_0_z, dz_0_x, dz_0_y, dz_0_z, dx_0_0,\
                                      dy_0_0, dz_0_0, s_0_0: VLX_ALIGN)
-             for (int32_t j = 0; j < nprim; j++)
+            for (int32_t j = 0; j < nprim; j++)
             {
                 // scaled prefactor
 

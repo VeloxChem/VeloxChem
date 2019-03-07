@@ -10,9 +10,6 @@
 
 #include <cmath>
 
-#include "StringFormat.hpp"
-#include "SystemClock.hpp"
-
 CElectricDipoleMatrix::CElectricDipoleMatrix()
 
     : _xOrigin(0.0)
