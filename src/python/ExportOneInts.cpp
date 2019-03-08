@@ -23,6 +23,8 @@
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "NuclearPotentialMatrix.hpp"
 #include "NuclearPotentialIntegralsDriver.hpp"
+#include "ElectricDipoleMatrix.hpp"
+#include "ElectricDipoleIntegralsDriver.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportOneInts.hpp"
@@ -340,6 +342,111 @@ CNuclearPotentialMatrix_from_numpy(const py::array_t<double>& arr)
     return std::shared_ptr<CNuclearPotentialMatrix>(new CNuclearPotentialMatrix(*mp));
 }
 
+// Helper function for printing CElectricDipoleMatrix
+
+static std::string
+CElectricDipoleMatrix_str (const CElectricDipoleMatrix& self)
+{
+    return self.getStringForComponentX() +
+           self.getStringForComponentY() +
+           self.getStringForComponentZ();
+}
+
+// Helper function for converting CNuclearPotentialMatrix to numpy array
+
+static py::array_t<double>
+CElectricDipoleMatrix_x_to_numpy(const CElectricDipoleMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.xvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CElectricDipoleMatrix_y_to_numpy(const CElectricDipoleMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.yvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CElectricDipoleMatrix_z_to_numpy(const CElectricDipoleMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.zvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+// Helper function for CElectricDipoleIntegralsDriver constructor
+
+static std::shared_ptr<CElectricDipoleIntegralsDriver>
+CElectricDipoleIntegralsDriver_create(int32_t    globRank,
+                                      int32_t    globNodes,
+                                      py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CElectricDipoleIntegralsDriver>(
+        new CElectricDipoleIntegralsDriver(globRank, globNodes, *comm_ptr)
+        );
+}
+
+// Helper functions for overloading CElectricDipoleIntegralsDriver::compute
+
+static CElectricDipoleMatrix
+CElectricDipoleIntegralsDriver_compute_1(
+          CElectricDipoleIntegralsDriver& self,
+    const CMolecule&                      molecule,
+    const CMolecularBasis&                basis,
+          py::object                      py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return self.compute(molecule, basis, *comm_ptr);
+}
+
+static CElectricDipoleMatrix
+CElectricDipoleIntegralsDriver_compute_2(
+          CElectricDipoleIntegralsDriver& self,
+    const CMolecule&                      molecule,
+    const CMolecularBasis&                braBasis,
+    const CMolecularBasis&                ketBasis,
+          py::object                      py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return self.compute(molecule, braBasis, ketBasis, *comm_ptr);
+}
+
+static CElectricDipoleMatrix
+CElectricDipoleIntegralsDriver_compute_3(
+          CElectricDipoleIntegralsDriver& self,
+    const CMolecule&                      braMolecule,
+    const CMolecule&                      ketMolecule,
+    const CMolecularBasis&                basis,
+          py::object                      py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return self.compute(braMolecule, ketMolecule, basis, *comm_ptr);
+}
+
+static CElectricDipoleMatrix
+CElectricDipoleIntegralsDriver_compute_4(
+          CElectricDipoleIntegralsDriver& self,
+    const CMolecule&                      braMolecule,
+    const CMolecule&                      ketMolecule,
+    const CMolecularBasis&                braBasis,
+    const CMolecularBasis&                ketBasis,
+          py::object                      py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
+                        *comm_ptr);
+}
+
 // Exports classes/functions in src/oneints to python
 
 void export_oneints(py::module& m)
@@ -431,6 +538,42 @@ void export_oneints(py::module& m)
         .def("compute", &CNuclearPotentialIntegralsDriver_compute_2)
         .def("compute", &CNuclearPotentialIntegralsDriver_compute_3)
         .def("compute", &CNuclearPotentialIntegralsDriver_compute_4)
+    ;
+
+    // CElectricDipoleMatrix class
+
+    py::class_< CElectricDipoleMatrix,
+                std::shared_ptr<CElectricDipoleMatrix> >
+        (
+            m, "ElectricDipoleMatrix"
+        )
+        .def(py::init<>())
+        .def(py::init<const CDenseMatrix&,
+                      const CDenseMatrix&,
+                      const CDenseMatrix&,
+                      const double,
+                      const double,
+                      const double>())
+        .def("__str__", &CElectricDipoleMatrix_str)
+        .def("x_to_numpy", &CElectricDipoleMatrix_x_to_numpy)
+        .def("y_to_numpy", &CElectricDipoleMatrix_y_to_numpy)
+        .def("z_to_numpy", &CElectricDipoleMatrix_z_to_numpy)
+        .def(py::self == py::self)
+    ;
+
+    // CElectricDipoleIntegralsDriver class
+
+    py::class_< CElectricDipoleIntegralsDriver,
+                std::shared_ptr<CElectricDipoleIntegralsDriver> >
+        (
+            m, "ElectricDipoleIntegralsDriver"
+        )
+        .def(py::init(&CElectricDipoleIntegralsDriver_create))
+        .def("set_origin", &CElectricDipoleIntegralsDriver::setElectricDipoleOrigin)
+        .def("compute", &CElectricDipoleIntegralsDriver_compute_1)
+        .def("compute", &CElectricDipoleIntegralsDriver_compute_2)
+        .def("compute", &CElectricDipoleIntegralsDriver_compute_3)
+        .def("compute", &CElectricDipoleIntegralsDriver_compute_4)
     ;
 }
 
