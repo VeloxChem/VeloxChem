@@ -35,7 +35,7 @@ class InputParser:
 
             # checking for syntax correctness of the input file
 
-            self.incomp_group_check()
+            self.incomplete_group_check()
             self.empty_group_check()
 
         except FileNotFoundError:
@@ -44,7 +44,7 @@ class InputParser:
 
         except SyntaxError:
             errmsg = 'input parser: bad syntax in file {}'.format(self.filename)
-            errmsg += '\n     You may check for incomplete or empty groups.'
+            errmsg += '\n     You may check for incorrect, incomplete or empty groups.'
             self.success_monitor = False
 
         assert_msg_critical(self.success_monitor, errmsg)
@@ -77,7 +77,7 @@ class InputParser:
 
                 # remove comment and extra white spaces
                 line = line.strip()
-                line = re.sub('!.*', '', line)
+                line = re.sub(r'!.*', '', line)
                 line = ' '.join(line.split())
 
                 # skip first line if reading basis set
@@ -94,37 +94,33 @@ class InputParser:
                 if line:
                     self.content += line + '\n'
 
-    def incomp_group_check(self):
+    def incomplete_group_check(self):
         """ Checking for any incomplete groups. """
 
-        if re.findall(
-                r'@(?!end[\s])[^@]*@(?!end(?![\w]))|@end\s[^@]*@end(?![\w])',
-                self.content) != []:
+        if re.findall(r'@(?!end)[^@]*@(?!end)|@end[^@]*@end',
+                      self.content) != []:
             raise SyntaxError
 
-        last_lines = self.content.split('@end')[-1].split('\n')
-        for line in last_lines:
-            line = line.strip()
-            if len(line) > 0 and line[0] == '@':
-                raise SyntaxError
+        last_lines = self.content.split('@end')[-1]
+        if re.findall(r'@(?!end)[^@]*', last_lines) != []:
+            raise SyntaxError
 
     def empty_group_check(self):
         """ Checking for any empty groups. """
 
-        if re.findall(r'@[\w ]*\n\s*@end(?![\w])', self.content) != []:
+        if re.findall(r'@\w[\w ]*\n\s*@end', self.content) != []:
             raise SyntaxError
 
     def clear_interspace(self):
         """ Deleting content, that's not within a group. """
 
-        self.content = re.sub(r'@end\s[^@]*@', '@end\n@', self.content)
+        self.content = re.sub(r'@end[^@]*@', '@end\n@', self.content)
 
     def groupsplit(self):
         """ Creating a list in which every element is a list itself containing
         every line of a group, while deleting '@' and '@end' tags. """
 
-        self.grouplist = re.findall(r'@(?!end[\s])\s*\w+[^@]*@end(?![\w])',
-                                    self.content)
+        self.grouplist = re.findall(r'@(?!end)[^@]*@end', self.content)
         for i in range(len(self.grouplist)):
             self.grouplist[i] = self.grouplist[i].strip().replace('@', '')
             self.grouplist[i] = self.grouplist[i].split('\n')[:-1]
