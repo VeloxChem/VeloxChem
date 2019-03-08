@@ -97,42 +97,6 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 }
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_list(const std::vector<std::string>& labels,
-                    const std::vector<py::list>&    py_coords,
-                    const std::string&              units=std::string("angs"))
-{
-    // NOTE:
-    // The Python Molecule constructor expects the coordinates as a 2d list,
-    // namely [[x1, y1, z1], [x2, y2, z2], [x3, y3, z3], [x4, y4, z4], ...]
-
-    // sanity check
-
-    std::string errmol("CMolecule_from_list: Inconsistent lengths of lists");
-
-    errors::assertMsgCritical(py_coords.size() == labels.size(), errmol);
-
-    for (size_t a = 0; a < labels.size(); a++)
-    {
-        errors::assertMsgCritical(py::len(py_coords[a]) == 3, errmol);
-    }
-
-    // form coordinate vector
-
-    std::vector<double> coords;
-
-    for (size_t d = 0; d < 3; d++)
-    {
-        for (size_t a = 0; a < labels.size(); a++)
-        {
-            // need to transpose py_coords for the C++ Molecule contructor
-            coords.push_back(py::cast<double>(py_coords[a][d]));
-        }
-    }
-
-    return CMolecule_from_coords(labels, coords, units);
-}
-
-static std::shared_ptr<CMolecule>
 CMolecule_from_array(const std::vector<std::string>& labels,
                      const py::array_t<double>&      py_coords,
                      const std::string&              units=std::string("angs"))
@@ -181,12 +145,14 @@ CMolecule_from_array(const std::vector<std::string>& labels,
     return CMolecule_from_coords(labels, coords, units);
 }
 
-static std::vector<std::string>
-ids_to_labels(const std::vector<int32_t>& idselem)
+static std::shared_ptr<CMolecule>
+CMolecule_from_array_2(const std::vector<int32_t>& idselem,
+                       const py::array_t<double>&  py_coords,
+                       const std::string&          units=std::string("angs"))
 {
     std::vector<std::string> labels;
 
-    std::string errelm("ids_to_labels: Unsupported element id");
+    std::string errelm("CMolecule_from_array: Unsupported element id");
 
     for (int32_t i = 0; i < idselem.size(); i++)
     {
@@ -198,26 +164,6 @@ ids_to_labels(const std::vector<int32_t>& idselem)
 
         labels.push_back(chemelm.getName());
     }
-
-    return labels;
-}
-
-static std::shared_ptr<CMolecule>
-CMolecule_from_list_2(const std::vector<int32_t>&  idselem,
-                      const std::vector<py::list>& py_coords,
-                      const std::string&           units=std::string("angs"))
-{
-    auto labels = ids_to_labels(idselem);
-
-    return CMolecule_from_list(labels, py_coords, units);
-}
-
-static std::shared_ptr<CMolecule>
-CMolecule_from_array_2(const std::vector<int32_t>& idselem,
-                       const py::array_t<double>&  py_coords,
-                       const std::string&          units=std::string("angs"))
-{
-    auto labels = ids_to_labels(idselem);
 
     return CMolecule_from_array(labels, py_coords, units);
 }
@@ -283,15 +229,11 @@ CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 static py::array
 CMolecule_elem_ids_to_numpy(const CMolecule& self)
 {
-    auto natoms = self.getNumberOfAtoms();
-
-    auto idselem = self.getIdsElemental();
-
     py::list ids;
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
     {
-        ids.append(idselem[i]);
+        ids.append(self.getIdsElemental()[i]);
     }
 
     return py::array(ids);
@@ -372,10 +314,6 @@ void export_moldata(py::module& m)
         .def(py::init<>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
-        .def(py::init(&CMolecule_from_list),
-             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
-        .def(py::init(&CMolecule_from_list_2),
-             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
         .def(py::init(&CMolecule_from_array),
              py::arg(), py::arg(), py::arg("units")=std::string("angs"))
         .def(py::init(&CMolecule_from_array_2),
