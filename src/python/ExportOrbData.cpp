@@ -130,27 +130,15 @@ CMolecularOrbitals_beta_orbitals_to_numpy(const CMolecularOrbitals& self)
 static py::array_t<double>
 CMolecularOrbitals_alpha_energies_to_numpy(const CMolecularOrbitals& self)
 {
-    py::list ea;
-
-    for (int32_t i = 0; i < self.getNumberOfColumns(); i++)
-    {
-        ea.append(self.alphaEnergies()[i]);
-    }
-
-    return py::array_t<double>(ea);
+    return vlx_general::pointer_to_numpy(self.alphaEnergies(),
+                                         self.getNumberOfColumns());
 }
 
 static py::array_t<double>
 CMolecularOrbitals_beta_energies_to_numpy(const CMolecularOrbitals& self)
 {
-    py::list eb;
-
-    for (int32_t i = 0; i < self.getNumberOfColumns(); i++)
-    {
-        eb.append(self.betaEnergies()[i]);
-    }
-
-    return py::array_t<double>(eb);
+    return vlx_general::pointer_to_numpy(self.betaEnergies(),
+                                         self.getNumberOfColumns());
 }
 
 // Helper function for CMolecularOrbitals constructor

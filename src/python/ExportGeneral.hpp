@@ -30,6 +30,26 @@ MPI_Comm* get_mpi_comm(py::object py_comm);
  Gets numpy array from double pointer and dimension.
 
  @param ptr the double pointer.
+ @param dimension the shape of numpy array.
+ @return numpy array.
+ */
+py::array_t<double> pointer_to_numpy(const double*               ptr,
+                                     const std::vector<int32_t>& dimension);
+
+/**
+ Gets 1d numpy array from double pointer and dimension.
+
+ @param ptr the double pointer.
+ @param nElements number of elements.
+ @return numpy array.
+ */
+py::array_t<double> pointer_to_numpy(const double* ptr,
+                                     const int32_t nElements);
+
+/**
+ Gets 2d numpy array from double pointer and dimension.
+
+ @param ptr the double pointer.
  @param nRows number of rows.
  @param nColumns number of columns.
  @return numpy array.

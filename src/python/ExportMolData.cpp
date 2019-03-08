@@ -246,62 +246,36 @@ CMolecule_beta_elec(const CMolecule& self)
 
 // Helper function for getting coordinates as numpy array
 
-static py::array
+static py::array_t<double>
 CMolecule_x_to_numpy(const CMolecule& self)
 {
-    py::list rx;
-
-    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
-    {
-        rx.append(self.getCoordinatesX()[i]);
-    }
-
-    return py::array(rx);
+    return vlx_general::pointer_to_numpy(self.getCoordinatesX(),
+                                         self.getNumberOfAtoms());
 }
 
-static py::array
+static py::array_t<double>
 CMolecule_y_to_numpy(const CMolecule& self)
 {
-    py::list ry;
-
-    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
-    {
-        ry.append(self.getCoordinatesY()[i]);
-    }
-
-    return py::array(ry);
+    return vlx_general::pointer_to_numpy(self.getCoordinatesY(),
+                                         self.getNumberOfAtoms());
 }
 
-static py::array
+static py::array_t<double>
 CMolecule_z_to_numpy(const CMolecule& self)
 {
-    py::list rz;
-
-    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
-    {
-        rz.append(self.getCoordinatesZ()[i]);
-    }
-
-    return py::array(rz);
+    return vlx_general::pointer_to_numpy(self.getCoordinatesZ(),
+                                         self.getNumberOfAtoms());
 }
 
 // Helper function for getting VDW radii for molecule
 
-static py::array
+static py::array_t<double>
 CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 {
-    auto natoms = self.getNumberOfAtoms();
-
     auto atomradii = vdwradii::getRadii(self);
 
-    py::list radii;
-
-    for (int32_t i = 0; i < natoms; i++)
-    {
-        radii.append(atomradii[i]);
-    }
-
-    return py::array(radii);
+    return vlx_general::pointer_to_numpy(atomradii.data(),
+                                         self.getNumberOfAtoms());
 }
 
 // Helper function for getting nuclear charges for molecule

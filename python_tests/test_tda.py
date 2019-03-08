@@ -8,7 +8,7 @@ class TestTDA(unittest.TestCase):
     def run_scf(self, molname):
 
         comm = MPI.COMM_WORLD
-        task = vlx.MpiTask(["inputs/" + molname + ".inp"], comm)
+        task = vlx.MpiTask(["inputs/" + molname + ".inp", None], comm)
 
         # scf
         scf_drv = vlx.ScfRestrictedDriver()

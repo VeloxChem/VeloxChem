@@ -43,13 +43,40 @@ get_mpi_comm(py::object py_comm)
 // Not a static function; used in other files
 
 py::array_t<double>
+pointer_to_numpy(const double*               ptr,
+                 const std::vector<int32_t>& dimension)
+{
+    std::vector<ssize_t> shape, strides;
+
+    for (size_t i = 0; i < dimension.size(); i++)
+    {
+        shape.push_back(static_cast<ssize_t>(dimension[i]));
+
+        ssize_t s = 1;
+
+        for (ssize_t j = i + 1; j < dimension.size(); j++)
+        {
+            s *= static_cast<ssize_t>(dimension[j]);
+        }
+
+        strides.push_back(sizeof(double) * s);
+    }
+
+    return py::array_t<double>(shape, strides, ptr);
+}
+
+py::array_t<double>
+pointer_to_numpy(const double* ptr, int32_t nElements)
+{
+    return pointer_to_numpy(ptr, std::vector<int32_t>({nElements}));
+}
+
+py::array_t<double>
 pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns)
 {
-    return py::array_t<double>({ nRows, nColumns },
-                               { sizeof(double) * nColumns, sizeof(double) * 1 },
-                               ptr);
+    return pointer_to_numpy(ptr, std::vector<int32_t>({nRows, nColumns}));
 }
-    
+
 // Helper function for converting angular momentum
 
 static std::string
