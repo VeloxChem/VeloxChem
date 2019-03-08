@@ -56,7 +56,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 1s elements.
 
-     @param occupation number of 1s orbital.
+     @param occ number of 1s orbital.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc1s(double occ) const;
@@ -64,7 +64,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 2s elements.
 
-     @param occupation number of 2s orbital.
+     @param occ number of 2s orbital.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc2s(double occ) const;
@@ -72,7 +72,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 2p elements.
 
-     @param occupation number of 2s2p orbitals.
+     @param occ number of 2s2p orbitals.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc2s2p(double occ) const;
@@ -80,7 +80,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 3s elements.
 
-     @param occupation number of 3s orbital.
+     @param occ number of 3s orbital.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc3s(double occ) const;
@@ -88,7 +88,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 3p elements.
 
-     @param occupation number of 3s3p orbitals.
+     @param occ number of 3s3p orbitals.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc3s3p(double occ) const;
@@ -96,7 +96,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 4s elements.
 
-     @param occupation number of 4s orbital.
+     @param occ number of 4s orbital.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc4s(double occ) const;
@@ -104,7 +104,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 3d elements.
 
-     @param occupation number of 3d orbitals.
+     @param occ number of 3d orbitals.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc3d(double occ) const;
@@ -112,7 +112,7 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 4p elements.
 
-     @param occupation number of 4s4p orbitals.
+     @param occ number of 4s4p orbitals.
      @return vector of occupation numbers.
      */
     std::vector<double> _getOcc4s4p(double occ) const;
