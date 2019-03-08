@@ -77,8 +77,6 @@ public:
      
      @param molecule the molecule.
      @param basis the basis set for the molecule.
-     @param molorb the molecular orbitals of the molecule.
-     @param moidx the index of the molecular orbital (0-based).
      @param xp the X coordinate of the grid point.
      @param yp the Y coordinate of the grid point.
      @param zp the Z coordinate of the grid point.
