@@ -54,15 +54,6 @@ CAODensityMatrix_str (const CAODensityMatrix& self)
 // Helper function for converting CAODensityMatrix to numpy array
 
 static py::array_t<double>
-CAODensityMatrix_total_density_to_numpy(const CAODensityMatrix& self,
-                                        const int32_t iDensityMatrix)
-{
-    return vlx_general::pointer_to_numpy(self.totalDensity(iDensityMatrix),
-                                         self.getNumberOfRows(iDensityMatrix),
-                                         self.getNumberOfColumns(iDensityMatrix));
-}
-
-static py::array_t<double>
 CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self,
                                         const int32_t iDensityMatrix)
 {
@@ -279,7 +270,6 @@ void export_orbdata(py::module& m)
         .def(py::init<const CAODensityMatrix&>())
         .def(py::init(&CAODensityMatrix_from_numpy_list))
         .def("__str__", &CAODensityMatrix_str)
-        .def("total_to_numpy", &CAODensityMatrix_total_density_to_numpy)
         .def("alpha_to_numpy", &CAODensityMatrix_alpha_density_to_numpy)
         .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy)
         .def("number_of_density_matrices",

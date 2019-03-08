@@ -274,19 +274,13 @@ CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
 }
 
 const double*
-CAODensityMatrix::totalDensity(const int32_t iDensityMatrix) const
+CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
 {
     if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[iDensityMatrix].values();
     }
-    
-    return nullptr;
-}
 
-const double*
-CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
-{
     if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix].values();
@@ -298,6 +292,11 @@ CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
 const double*
 CAODensityMatrix::betaDensity(const int32_t iDensityMatrix) const
 {
+    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
+    {
+        return _denMatrices[iDensityMatrix].values();
+    }
+
     if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
     {
         return _denMatrices[2 * iDensityMatrix + 1].values();

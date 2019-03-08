@@ -26,7 +26,7 @@ def _write_hdf5(self, fname):
 
     for i in range(self.number_of_fock_matrices()):
         index = self.get_density_identifier(i)
-        name = str(i) + "_" + focktype[self.get_fock_type(i)] + "_" + str(index)
+        name = "{}_{}_{}".format(i, focktype[self.get_fock_type(i)], index)
         array = self.to_numpy(i)
         hf.create_dataset(name, data=array, compression="gzip")
 

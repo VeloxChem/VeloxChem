@@ -35,8 +35,7 @@ class MpiTask:
         if self.mpi_rank == mpi_master():
 
             assert_msg_critical(
-                len(fname_list) >= 1,
-                "MpiTask: Need input file name")
+                len(fname_list) >= 1, "MpiTask: Need input file name")
 
             input_fname = fname_list[0]
 
@@ -46,7 +45,7 @@ class MpiTask:
 
             assert_msg_critical(
                 isfile(input_fname),
-                "MpiTask: input file %s does not exist" % input_fname)
+                "MpiTask: input file {} does not exist".format(input_fname))
 
             assert_msg_critical(
                 input_fname != output_fname,
@@ -67,14 +66,15 @@ class MpiTask:
 
             self.start_time = self.ostream.print_start_header(self.mpi_size)
 
-            self.ostream.print_info("Reading input file %s..." % input_fname)
+            self.ostream.print_info(
+                "Reading input file {}...".format(input_fname))
 
             # read input file
 
             self.input_dict = InputParser(input_fname).get_dict()
 
             self.ostream.print_info(
-                "Found %d control groups." % len(self.input_dict.keys()))
+                "Found {} control groups.".format(len(self.input_dict)))
             self.ostream.print_info("...done.")
             self.ostream.print_blank()
 
@@ -100,11 +100,11 @@ class MpiTask:
 
             basis_name = self.input_dict["method_settings"]["basis"].upper()
 
-            self.ao_basis = MolecularBasis.read(
-                self.molecule, basis_name, basis_path)
+            self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
+                                                basis_path)
 
-            self.min_basis = MolecularBasis.read(
-                self.molecule, "MIN-CC-PVDZ", basis_path)
+            self.min_basis = MolecularBasis.read(self.molecule, "MIN-CC-PVDZ",
+                                                 basis_path)
 
             self.ostream.print_block(
                 self.ao_basis.get_string("Atomic Basis", self.molecule))

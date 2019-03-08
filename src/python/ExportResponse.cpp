@@ -50,7 +50,21 @@ CExcitationVector_yvector_to_numpy(const CExcitationVector& self)
     return vlx_general::pointer_to_numpy(self.getCoefficientsY(),
                                          self.getNumberOfExcitations(), 1);
 }
-    
+
+// Helper function for setting Z and Y vectors
+
+static void
+CExcitationVector_set_yzcoefficients(      CExcitationVector&   self,
+                                     const std::vector<double>& z_coef,
+                                     const std::vector<double>& y_coef)
+{
+    CMemBlock<double> zCoefficients (z_coef);
+
+    CMemBlock<double> yCoefficients (y_coef);
+
+    self.setCoefficientsZY(zCoefficients, yCoefficients);
+}
+
 // Helper function for converting approximate diagonal of A matrix to numpy array
     
 static py::array_t<double>
@@ -127,6 +141,7 @@ void export_response(py::module& m)
         .def("__str__", &CExcitationVector_str)
         .def("set_zcoefficient", &CExcitationVector::setCoefficientZ)
         .def("set_ycoefficient", &CExcitationVector::setCoefficientY)
+        .def("set_yzcoefficients", &CExcitationVector_set_yzcoefficients)
         .def("number_excitations", &CExcitationVector::getNumberOfExcitations)
         .def("bra_unique_indexes", &CExcitationVector::getBraUniqueIndexes)
         .def("ket_unique_indexes", &CExcitationVector::getKetUniqueIndexes)

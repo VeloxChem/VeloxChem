@@ -222,6 +222,11 @@ CMolecularOrbitals::alphaOrbitals() const
 const double*
 CMolecularOrbitals::betaOrbitals() const
 {
+    if (_orbitalsType == molorb::rest)
+    {
+        return alphaOrbitals();
+    }
+
     if (_orbitalsType == molorb::unrest)
     {
         return _orbitals[1].values();
@@ -242,6 +247,11 @@ CDenseMatrix
 CMolecularOrbitals::betaOrbitals(const int32_t iMolecularOrbital,
                                  const int32_t nMolecularOrbitals) const
 {
+    if (_orbitalsType == molorb::rest)
+    {
+        return alphaOrbitals(iMolecularOrbital, nMolecularOrbitals);
+    }
+
     if (_orbitalsType == molorb::unrest)
     {
         return _orbitals[1].slice(0, iMolecularOrbital, getNumberOfRows(),
@@ -260,6 +270,11 @@ CMolecularOrbitals::alphaOrbitals(const std::vector<int32_t>& iMolecularOrbitals
 CDenseMatrix
 CMolecularOrbitals::betaOrbitals(const std::vector<int32_t>& iMolecularOrbitals) const
 {
+    if (_orbitalsType == molorb::rest)
+    {
+        return alphaOrbitals(iMolecularOrbitals);
+    }
+
     if (_orbitalsType == molorb::unrest)
     {
         return _orbitals[1].selectByColumn(iMolecularOrbitals);
@@ -277,6 +292,11 @@ CMolecularOrbitals::alphaEnergies() const
 const double*
 CMolecularOrbitals::betaEnergies() const
 {
+    if (_orbitalsType == molorb::rest)
+    {
+        return alphaEnergies();
+    }
+
     if (_orbitalsType == molorb::unrest)
     {
         return _energies[1].data();

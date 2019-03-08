@@ -4,6 +4,7 @@ from .veloxchemlib import BasisFunction
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import TwoIndexes

@@ -28,11 +28,13 @@ class TestOrbData(unittest.TestCase):
         d_rest = AODensityMatrix([data_a], denmat.rest)
         d_unrest = AODensityMatrix([data_a, data_b], denmat.unrest)
 
-        den_a1 = d_rest.total_to_numpy(0)
+        den_a1 = d_rest.alpha_to_numpy(0)
+        den_b1 = d_rest.beta_to_numpy(0)
         den_a2 = d_unrest.alpha_to_numpy(0)
         den_b2 = d_unrest.beta_to_numpy(0)
 
         self.assertTrue((data_a == den_a1).all())
+        self.assertTrue((data_a == den_b1).all())
         self.assertTrue((data_a == den_a2).all())
         self.assertTrue((data_b == den_b2).all())
 
@@ -51,7 +53,7 @@ class TestOrbData(unittest.TestCase):
         den_2 = AODensityMatrix([arr_2], denmat.rest)
         den_diff = den_1.sub(den_2)
 
-        diff = np.max(np.abs(den_diff.total_to_numpy(0) - (arr_1 - arr_2)))
+        diff = np.max(np.abs(den_diff.alpha_to_numpy(0) - (arr_1 - arr_2)))
         self.assertAlmostEqual(0., diff, 13)
 
     def test_density_hdf5(self):
@@ -130,18 +132,46 @@ class TestOrbData(unittest.TestCase):
 
     def test_rest_density(self):
 
+        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+
         arr = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
-        ene = [.7, .8, .9]
+        ene = np.array([.7, .8, .9])
 
         orb_rest = MolecularOrbitals([arr], [ene], molorb.rest)
-
-        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-        den_rest = orb_rest.get_density(mol).total_to_numpy(0)
+        den_rest = orb_rest.get_density(mol)
+        den_a = den_rest.alpha_to_numpy(0)
+        den_b = den_rest.beta_to_numpy(0)
 
         arr_occ = arr[:, :1]
         den_ref = np.dot(arr_occ, arr_occ.T)
 
-        self.assertTrue((den_ref == den_rest).all())
+        self.assertTrue((den_ref == den_a).all())
+        self.assertTrue((den_ref == den_b).all())
+
+    def test_unrest_density(self):
+
+        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+
+        arr_a = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
+        ene_a = np.array([.7, .8, .9])
+
+        arr_b = arr_a * 0.9
+        ene_b = ene_a * 0.8
+
+        orb_unrest = MolecularOrbitals([arr_a, arr_b], [ene_a, ene_b],
+                                       molorb.unrest)
+        den_unrest = orb_unrest.get_density(mol)
+        den_a = den_unrest.alpha_to_numpy(0)
+        den_b = den_unrest.beta_to_numpy(0)
+
+        arr_occ_a = arr_a[:, :1]
+        den_ref_a = np.dot(arr_occ_a, arr_occ_a.T)
+
+        arr_occ_b = arr_b[:, :1]
+        den_ref_b = np.dot(arr_occ_b, arr_occ_b.T)
+
+        self.assertTrue((den_ref_a == den_a).all())
+        self.assertTrue((den_ref_b == den_b).all())
 
 
 if __name__ == "__main__":

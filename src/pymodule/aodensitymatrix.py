@@ -16,18 +16,18 @@ def _write_hdf5(self, fname):
     for index in range(self.number_of_density_matrices()):
 
         if self.get_density_type() == denmat.rest:
-            name = str(count) + "_total_" + str(index)
-            array = self.total_to_numpy(index)
-            hf.create_dataset(name, data=array, compression="gzip")
-            count += 1
-
-        else:
-            name = str(count) + "_alpha_" + str(index)
+            name = str(count) + "_rest.alpha_" + str(index)
             array = self.alpha_to_numpy(index)
             hf.create_dataset(name, data=array, compression="gzip")
             count += 1
 
-            name = str(count) + "_beta_" + str(index)
+        else:
+            name = str(count) + "_unrest.alpha_" + str(index)
+            array = self.alpha_to_numpy(index)
+            hf.create_dataset(name, data=array, compression="gzip")
+            count += 1
+
+            name = str(count) + "_unrest.beta_" + str(index)
             array = self.beta_to_numpy(index)
             hf.create_dataset(name, data=array, compression="gzip")
             count += 1
@@ -39,9 +39,9 @@ def _write_hdf5(self, fname):
 def _read_hdf5(fname):
 
     dentype = {
-        "total": denmat.rest,
-        "alpha": denmat.unrest,
-        "beta": denmat.unrest
+        "rest.alpha": denmat.rest,
+        "unrest.alpha": denmat.unrest,
+        "unrest.beta": denmat.unrest
     }
 
     hf = h5py.File(fname, 'r')

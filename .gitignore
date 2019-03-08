@@ -8,6 +8,7 @@ build
 *.out
 *.log
 *.pyc
+*.cube
 *.gcno
 *.gcda
 *~

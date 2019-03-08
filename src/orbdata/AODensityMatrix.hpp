@@ -166,18 +166,7 @@ public:
     int32_t getNumberOfElements(const int32_t iDensityMatrix) const;
     
     /**
-     Gets constant pointer to first element of specific restricted density
-     matrix.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the constant pointer to first element of restricted density
-     matrix.
-     */
-    const double* totalDensity(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets constant pointer to first element of specific unrestricted alpha
-     density matrix.
+     Gets constant pointer to first element of specific alpha density matrix.
      
      @param iDensityMatrix the index of density matrix.
      @return the constant pointer to first element of unrestricted alpha density
@@ -186,8 +175,7 @@ public:
     const double* alphaDensity(const int32_t iDensityMatrix) const;
     
     /**
-     Gets constant pointer to first element of specific unrestricted beta
-     density matrix.
+     Gets constant pointer to first element of specific beta density matrix.
      
      @param iDensityMatrix the index of density matrix.
      @return the constant pointer to first element of unrestricted beta density

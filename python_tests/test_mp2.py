@@ -9,7 +9,7 @@ class TestMP2(unittest.TestCase):
     def run_mp2(self, molname):
 
         comm = MPI.COMM_WORLD
-        task = vlx.MpiTask(["inputs/" + molname + ".inp"], comm)
+        task = vlx.MpiTask(["inputs/" + molname + ".inp", None], comm)
 
         # scf
         scf_drv = vlx.ScfRestrictedDriver()
@@ -25,6 +25,8 @@ class TestMP2(unittest.TestCase):
         # MO integrals
         moints_drv = vlx.MOIntegralsDriver()
         oovv = moints_drv.compute_task(task, mol_orbs, "OOVV")
+
+        oooo = moints_drv.compute_task(task, mol_orbs, "OOOO")
 
         self.assertEqual(moints_drv.get_moints_type("OOOO"), vlx.moints.oooo)
         self.assertEqual(moints_drv.get_moints_type("OOOV"), vlx.moints.ooov)
@@ -52,6 +54,8 @@ class TestMP2(unittest.TestCase):
                 denom = eocc[pair.first()] + eocc[pair.second()] - eab
                 master_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
             self.assertEqual(e_mp2, master_e_mp2)
+
+        task.finish()
 
         return e_mp2
 
