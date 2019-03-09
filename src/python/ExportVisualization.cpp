@@ -19,46 +19,18 @@ namespace py = pybind11;
 
 namespace vlx_visualization { // vlx_visualization namespace
 
-// Helper functions for CVisualizationDriver::compute
-
+// Helper function for converting cubic grid values to 3d numpy array
+    
 static py::array_t<double>
-CVisualizationDriver_compute_mo(      CVisualizationDriver& self,
-                                const CMolecule&            molecule,
-                                const CMolecularBasis&      basis,
-                                const CMolecularOrbitals&   mo,
-                                const int32_t               moidx,
-                                const std::string&          mospin,
-                                const CCubicGrid&           grid)
+CCubicGrid_values_to_numpy(const CCubicGrid& self)
 {
-    auto psi_data = self.compute(molecule, basis, mo, moidx, mospin, grid);
+    auto nx = self.numPointsX();
 
-    auto nx = grid.numPointsX();
+    auto ny = self.numPointsY();
 
-    auto ny = grid.numPointsY();
+    auto nz = self.numPointsZ();
 
-    auto nz = grid.numPointsZ();
-
-    return vlx_general::pointer_to_numpy(psi_data.data(), {nx, ny, nz});
-}
-
-static py::array_t<double>
-CVisualizationDriver_compute_density(      CVisualizationDriver& self,
-                                     const CMolecule&            molecule,
-                                     const CMolecularBasis&      basis,
-                                     const CAODensityMatrix&     density,
-                                     const int32_t               denidx,
-                                     const std::string&          denspin,
-                                     const CCubicGrid&           grid)
-{
-    auto psi_data = self.compute(molecule, basis, density, denidx, denspin, grid);
-
-    auto nx = grid.numPointsX();
-
-    auto ny = grid.numPointsY();
-
-    auto nz = grid.numPointsZ();
-
-    return vlx_general::pointer_to_numpy(psi_data.data(), {nx, ny, nz});
+    return vlx_general::pointer_to_numpy(self.values(), {nx, ny, nz});
 }
 
 // Exports classes/functions in src/visualization to python
@@ -84,6 +56,7 @@ void export_visualization(py::module& m)
         .def("x_num_points", &CCubicGrid::numPointsX)
         .def("y_num_points", &CCubicGrid::numPointsY)
         .def("z_num_points", &CCubicGrid::numPointsZ)
+        .def("values_to_numpy", &CCubicGrid_values_to_numpy)
     ;
 
     // CVisualizationDriver class
@@ -93,8 +66,22 @@ void export_visualization(py::module& m)
             m, "VisualizationDriver"
         )
         .def(py::init<>())
-        .def("compute", &CVisualizationDriver_compute_mo)
-        .def("compute", &CVisualizationDriver_compute_density)
+        .def("compute",
+             (void (CVisualizationDriver::*)(const CMolecule&,
+                                             const CMolecularBasis&,
+                                             const CMolecularOrbitals&,
+                                             const int32_t,
+                                             const std::string&,
+                                                   CCubicGrid&) const)
+             &CVisualizationDriver::compute)
+        .def("compute",
+             (void (CVisualizationDriver::*)(const CMolecule&,
+                                             const CMolecularBasis&,
+                                             const CAODensityMatrix&,
+                                             const int32_t,
+                                             const std::string&,
+                                                   CCubicGrid&) const)
+             &CVisualizationDriver::compute)
     ;
 }
 

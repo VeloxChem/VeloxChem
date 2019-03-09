@@ -12,6 +12,8 @@
 #include <vector>
 #include <cstdint>
 
+#include "MemBlock.hpp"
+
 /**
  Class CCubicGrid contains cubic grid points.
  
@@ -33,6 +35,11 @@ class CCubicGrid
      Number of points in three dimensions.
      */
     std::vector<int32_t> _numPoints;
+
+    /**
+     Values at the grid points.
+     */
+    CMemBlock<double> _values;
 
 public:
 
@@ -160,6 +167,20 @@ public:
      @return number of points in Z direction.
      */
     int32_t numPointsZ() const;
+     
+    /**
+     Gets constant pointer to first element of cubic grid values.
+     
+     @return the constant pointer to first element of cubic grid values.
+     */
+    const double* values() const;
+     
+    /**
+     Gets pointer to first element of cubic grid values.
+     
+     @return the pointer to first element of cubic grid values.
+     */
+    double* values();
 };
 
 #endif /* CubicGrid_hpp */

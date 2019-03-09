@@ -36,8 +36,7 @@ def _VisualizationDriver_gen_grid(molecule, n_x=80, n_y=80, n_z=80):
 
 
 @staticmethod
-def _VisualizationDriver_write_data(cubefile, molecule, flag, index, spin, grid,
-                                    data):
+def _VisualizationDriver_write_data(cubefile, molecule, flag, index, spin, grid):
 
     f_cube = open(cubefile, 'w')
 
@@ -75,6 +74,8 @@ def _VisualizationDriver_write_data(cubefile, molecule, flag, index, spin, grid,
     if flag == 'mo':
         f_cube.write('{:5d}{:5d}\n'.format(1, index + 1))
 
+    data = grid.values_to_numpy()
+
     for ix in range(nx):
         for iy in range(ny):
             for iz in range(nz):
@@ -99,9 +100,9 @@ def _VisualizationDriver_write_cube(self, cubefile, molecule, basis,
         errmsg = 'VisualizationDriver.write_cube: invalide argument'
         assert_msg_critical(False, errmsg)
 
-    data = self.compute(molecule, basis, mo_or_density, index, spin, grid)
+    self.compute(molecule, basis, mo_or_density, index, spin, grid)
 
-    self.write_data(cubefile, molecule, flag, index, spin, grid, data)
+    self.write_data(cubefile, molecule, flag, index, spin, grid)
 
 
 VisualizationDriver.gen_grid = _VisualizationDriver_gen_grid

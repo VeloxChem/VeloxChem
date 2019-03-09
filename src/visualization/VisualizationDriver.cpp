@@ -165,13 +165,13 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
     return phi;
 }
 
-CMemBlock<double>
+void
 CVisualizationDriver::compute(const CMolecule&          molecule,
                               const CMolecularBasis&    basis,
                               const CMolecularOrbitals& mo,
                               const int32_t             moidx,
                               const std::string&        mospin,
-                              const CCubicGrid&         grid) const
+                                    CCubicGrid&         grid) const
 {
     // grid information
 
@@ -215,8 +215,6 @@ CVisualizationDriver::compute(const CMolecule&          molecule,
 
     // calculate psi on grid points
 
-    CMemBlock<double> psi_data(nx * ny * nz);
-
     #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
@@ -249,21 +247,19 @@ CVisualizationDriver::compute(const CMolecule&          molecule,
 
                 int32_t index = xstride + ystride + zstride;
 
-                psi_data.data()[index] = psi;
+                grid.values()[index] = psi;
             }
         }
     }
-
-    return psi_data;
 }
 
-CMemBlock<double>
+void
 CVisualizationDriver::compute(const CMolecule&        molecule,
                               const CMolecularBasis&  basis,
                               const CAODensityMatrix& density,
                               const int32_t           denidx,
                               const std::string&      denspin,
-                              const CCubicGrid&       grid) const
+                                    CCubicGrid&       grid) const
 {
     // grid information
 
@@ -309,8 +305,6 @@ CVisualizationDriver::compute(const CMolecule&        molecule,
 
     // calculate densities on grid points
 
-    CMemBlock<double> psi_data(nx * ny * nz);
-
     #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
@@ -344,10 +338,8 @@ CVisualizationDriver::compute(const CMolecule&        molecule,
 
                 int32_t index = xstride + ystride + zstride;
 
-                psi_data.data()[index] = psi;
+                grid.values()[index] = psi;
             }
         }
     }
-
-    return psi_data;
 }

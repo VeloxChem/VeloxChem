@@ -64,7 +64,7 @@ public:
     ~CVisualizationDriver();
     
     /**
-     Computes molecular orbital at a given grid point.
+     Computes molecular orbital values at cubic grid points.
      
      @param molecule the molecule.
      @param basis the basis set for the molecule.
@@ -72,18 +72,17 @@ public:
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('a' or 'b').
      @param grid the cubic grid.
-     @return psi value of the molecular orbital at the grid point.
      */
-    CMemBlock<double>
+    void
     compute(const CMolecule&          molecule,
             const CMolecularBasis&    basis,
             const CMolecularOrbitals& molorb,
             const int32_t             moidx,
             const std::string&        mospin,
-            const CCubicGrid&         grid) const;
+                  CCubicGrid&         grid) const;
 
     /**
-     Computes electronic density at a given grid point.
+     Computes electronic densities at cubic grid points.
      
      @param molecule the molecule.
      @param basis the basis set for the molecule.
@@ -91,15 +90,14 @@ public:
      @param densityIndex the index of the density matrix (0-based).
      @param densitySpin the spin of the density matrix ('a' or 'b').
      @param grid the cubic grid.
-     @return electronic density at the grid point.
      */
-    CMemBlock<double>
+    void
     compute(const CMolecule&        molecule,
             const CMolecularBasis&  basis,
             const CAODensityMatrix& density,
             const int32_t           densityIndex,
             const std::string&      densitySpin,
-            const CCubicGrid&       grid) const;
+                  CCubicGrid&       grid) const;
 };
 
 #endif /* VisualizationDriver_hpp */

@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 
+#include "MemBlock.hpp"
 #include "ErrorHandler.hpp"
 
 CCubicGrid::CCubicGrid()
@@ -20,6 +21,8 @@ CCubicGrid::CCubicGrid()
     , _stepSize(std::vector<double>({0.0, 0.0, 0.0}))
 
     , _numPoints(std::vector<int32_t>({0, 0, 0}))
+
+    , _values(CMemBlock<double>())
 {
     
 }
@@ -41,6 +44,8 @@ CCubicGrid::CCubicGrid(const std::vector<double>&  origin,
     errors::assertMsgCritical(_stepSize.size() == 3, errmsg);
 
     errors::assertMsgCritical(_numPoints.size() == 3, errmsg);
+
+    _values = CMemBlock<double>(numPoints[0] * numPoints[1] * numPoints[2]);
 }
 
 CCubicGrid::CCubicGrid(const CCubicGrid& source)
@@ -50,6 +55,8 @@ CCubicGrid::CCubicGrid(const CCubicGrid& source)
     , _stepSize(source._stepSize)
 
     , _numPoints(source._numPoints)
+
+    , _values(source._values)
 {
     
 }
@@ -61,6 +68,8 @@ CCubicGrid::CCubicGrid(CCubicGrid&& source) noexcept
     , _stepSize(std::move(source._stepSize))
 
     , _numPoints(std::move(source._numPoints))
+
+    , _values(std::move(source._values))
 {
     
 }
@@ -81,6 +90,8 @@ CCubicGrid::operator=(const CCubicGrid& source)
     
     _numPoints = source._numPoints;
     
+    _values = source._values;
+    
     return *this;
 }
 
@@ -95,6 +106,8 @@ CCubicGrid::operator=(CCubicGrid&& source) noexcept
   
     _numPoints = std::move(source._numPoints);
   
+    _values = std::move(source._values);
+  
     return *this;
 }
 
@@ -106,6 +119,8 @@ CCubicGrid::operator==(const CCubicGrid& other) const
     if (_stepSize != other._stepSize) return false;
     
     if (_numPoints != other._numPoints) return false;
+    
+    if (_values != other._values) return false;
     
     return true;
 }
@@ -168,4 +183,16 @@ int32_t
 CCubicGrid::numPointsZ() const
 {
     return _numPoints[2];
+}
+
+const double*
+CCubicGrid::values() const
+{
+    return _values.data();
+}
+
+double*
+CCubicGrid::values()
+{
+    return _values.data();
 }

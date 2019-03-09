@@ -8,13 +8,19 @@
 
 #include "CubicGridTest.hpp"
 
+#include <cstring>
 #include <vector>
 
 #include "CubicGrid.hpp"
+#include "CheckFunctions.hpp"
 
 TEST_F(CCubicGridTest, Getters)
 {
     CCubicGrid grid({0.1, 0.2, 0.3}, {1.0, 2.0, 3.0}, {1, 2, 3});
+
+    std::vector<double> data({0.55, 0.32, 0.97, 0.18, 0.33, 0.26});
+
+    std::memcpy(grid.values(), data.data(), data.size() * sizeof(double));
 
     ASSERT_EQ(0.1, grid.originX());
 
@@ -33,11 +39,17 @@ TEST_F(CCubicGridTest, Getters)
     ASSERT_EQ(2, grid.numPointsY());
 
     ASSERT_EQ(3, grid.numPointsZ());
+
+    vlxtest::compare(data, grid.values());
 }
 
 TEST_F(CCubicGridTest, CopyMoveConstructor)
 {
     CCubicGrid grid({0.1, 0.2, 0.3}, {1.0, 2.0, 3.0}, {1, 2, 3});
+
+    std::vector<double> data({0.55, 0.32, 0.97, 0.18, 0.33, 0.26});
+
+    std::memcpy(grid.values(), data.data(), data.size() * sizeof(double));
 
     CCubicGrid grid2(grid);
 
@@ -51,6 +63,10 @@ TEST_F(CCubicGridTest, CopyMoveConstructor)
 TEST_F(CCubicGridTest, CopyMoveAssignment)
 {
     CCubicGrid grid({0.1, 0.2, 0.3}, {1.0, 2.0, 3.0}, {1, 2, 3});
+
+    std::vector<double> data({0.55, 0.32, 0.97, 0.18, 0.33, 0.26});
+
+    std::memcpy(grid.values(), data.data(), data.size() * sizeof(double));
 
     CCubicGrid grid2;
 
