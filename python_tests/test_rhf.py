@@ -14,7 +14,7 @@ class TestRHF(unittest.TestCase):
         scf_drv = vlx.ScfRestrictedDriver()
         scf_drv.compute_task(task)
 
-        #TODO: add real test for VisualizationDriver
+        # TODO: add real test for VisualizationDriver
         vis_drv = vlx.VisualizationDriver()
 
         if task.mpi_rank == vlx.mpi_master():
@@ -25,10 +25,10 @@ class TestRHF(unittest.TestCase):
             homo = nelec // 2 - 1
 
             vis_grid = vis_drv.gen_grid(task.molecule, 3, 3, 3)
-            vis_drv.write_cube(task.molecule, task.ao_basis, mol_orbs, homo,
-                               "alpha", vis_grid)
-            vis_drv.write_cube_dens(task.molecule, task.ao_basis, density, 0,
-                                    "alpha", vis_grid)
+            vis_drv.write_cube("homo.cube", task.molecule, task.ao_basis,
+                               mol_orbs, homo, "alpha", vis_grid)
+            vis_drv.write_cube("density.cube", task.molecule, task.ao_basis,
+                               density, 0, "alpha", vis_grid)
 
         task.finish()
 

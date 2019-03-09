@@ -14,6 +14,9 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularOrbitals.hpp"
+#include "AODensityMatrix.hpp"
+#include "CubicGrid.hpp"
+#include "MemBlock.hpp"
 
 /**
  Class CVisualizationDriver computes wavefunction or density on grid points.
@@ -31,6 +34,16 @@ class CVisualizationDriver
     std::vector<std::vector<int32_t>>
     _buildCartesianAngularMomentum(int angl) const;
 
+    /**
+     Computes atomic orbitals at a given grid point.
+
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param xp the X cooridnate of the grid point.
+     @param yp the Y cooridnate of the grid point.
+     @param zp the Z cooridnate of the grid point.
+     @return phi values of the atomic orbitals at the grid point.
+     */
     std::vector<double>
     _compPhiAtomicOrbitals(const CMolecule&       molecule,
                            const CMolecularBasis& basis,
@@ -41,7 +54,7 @@ class CVisualizationDriver
 public:
 
     /**
-     Creates a visualization driver object using MPI info.
+     Creates a visualization driver object.
      */
     CVisualizationDriver();
     
@@ -51,51 +64,42 @@ public:
     ~CVisualizationDriver();
     
     /**
-     Calculates molecular orbital at a given grid point.
+     Computes molecular orbital at a given grid point.
      
      @param molecule the molecule.
      @param basis the basis set for the molecule.
      @param molorb the molecular orbitals of the molecule.
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('a' or 'b').
-     @param xp the X coordinate of the grid point.
-     @param yp the Y coordinate of the grid point.
-     @param zp the Z coordinate of the grid point.
-     @return psi value of the molecular orbital.
+     @param grid the cubic grid.
+     @return psi value of the molecular orbital at the grid point.
      */
-    double
+    CMemBlock<double>
     compute(const CMolecule&          molecule,
             const CMolecularBasis&    basis,
             const CMolecularOrbitals& molorb,
             const int32_t             moidx,
             const std::string&        mospin,
-            const double              xp,
-            const double              yp,
-            const double              zp) const;
+            const CCubicGrid&         grid) const;
 
     /**
-     Calculates electronic density at a given grid point.
+     Computes electronic density at a given grid point.
      
      @param molecule the molecule.
      @param basis the basis set for the molecule.
      @param density the density matrix of the molecule.
      @param densityIndex the index of the density matrix (0-based).
      @param densitySpin the spin of the density matrix ('a' or 'b').
-     @param xp the X coordinate of the grid point.
-     @param yp the Y coordinate of the grid point.
-     @param zp the Z coordinate of the grid point.
-     @return psi value of the molecular orbital.
+     @param grid the cubic grid.
+     @return electronic density at the grid point.
      */
-    double
+    CMemBlock<double>
     compute(const CMolecule&        molecule,
             const CMolecularBasis&  basis,
             const CAODensityMatrix& density,
             const int32_t           densityIndex,
             const std::string&      densitySpin,
-            const double            xp,
-            const double            yp,
-            const double            zp) const;
-
+            const CCubicGrid&       grid) const;
 };
 
 #endif /* VisualizationDriver_hpp */

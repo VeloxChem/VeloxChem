@@ -1,15 +1,22 @@
 from .veloxchemlib import VisualizationDriver
+from .veloxchemlib import CubicGrid
+
+from .molecularorbitals import MolecularOrbitals
+from .aodensitymatrix import AODensityMatrix
+
+import multiprocessing as mp
 import numpy as np
+import os
 
 
 @staticmethod
-def _gen_grid(mol, n_x=80, n_y=80, n_z=80):
+def _VisualizationDriver_gen_grid(molecule, n_x=80, n_y=80, n_z=80):
 
-    x = mol.x_to_numpy()
-    y = mol.y_to_numpy()
-    z = mol.z_to_numpy()
+    x = molecule.x_to_numpy()
+    y = molecule.y_to_numpy()
+    z = molecule.z_to_numpy()
 
-    atom_radii = mol.vdw_radii_to_numpy()
+    atom_radii = molecule.vdw_radii_to_numpy()
 
     x_max = np.max(x + atom_radii * 2.0)
     x_min = np.min(x - atom_radii * 2.0)
@@ -24,133 +31,79 @@ def _gen_grid(mol, n_x=80, n_y=80, n_z=80):
     y_step = (y_max - y_min) / float(n_y)
     z_step = (z_max - z_min) / float(n_z)
 
-    v = [x_min, y_min, z_min, x_step, y_step, z_step, n_x, n_y, n_z]
+    return CubicGrid([x_min, y_min, z_min], [x_step, y_step, z_step],
+                     [n_x, n_y, n_z])
 
-    return v
 
+@staticmethod
+def _VisualizationDriver_write_data(cubefile, molecule, flag, index, spin, grid,
+                                    data):
 
-def _write_cube(self, mol, basis, mol_orbs, mo_idx, mo_spin, v):
+    f_cube = open(cubefile, 'w')
 
-    # TODO: take cube filename from input parser
+    x = molecule.x_to_numpy()
+    y = molecule.y_to_numpy()
+    z = molecule.z_to_numpy()
 
-    outfile = open("outfilename.cube", 'w')
+    natoms = molecule.number_of_atoms()
+    elem_ids = molecule.elem_ids_to_numpy()
 
-    x = mol.x_to_numpy()
-    y = mol.y_to_numpy()
-    z = mol.z_to_numpy()
+    x0, y0, z0 = grid.x_origin(), grid.y_origin(), grid.z_origin()
+    dx, dy, dz = grid.x_step_size(), grid.y_step_size(), grid.z_step_size()
+    nx, ny, nz = grid.x_num_points(), grid.y_num_points(), grid.z_num_points()
 
-    natoms = mol.number_of_atoms()
+    f_cube.write('VeloxChem Cube File\n')
 
-    elem_ids = mol.elem_ids_to_numpy()
+    if flag == 'mo':
+        f_cube.write('MO {:d}, {:s} spin\n'.format(index + 1, spin))
+        f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}\n'.format(
+            -natoms, x0, y0, z0, 1))
 
-    x_min = v[0]
-    y_min = v[1]
-    z_min = v[2]
+    elif flag == 'density':
+        f_cube.write('Electron density, {:s} spin\n'.format(spin))
+        f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}\n'.format(
+            natoms, x0, y0, z0, 1))
 
-    x_step = v[3]
-    y_step = v[4]
-    z_step = v[5]
-
-    n_x = v[6]
-    n_y = v[7]
-    n_z = v[8]
-
-    outfile.write('VeloxChem Cube File\n')
-    outfile.write('MO %d, %s spin\n' % (mo_idx + 1, mo_spin))
-    outfile.write('%5d%12.6f%12.6f%12.6f%5d\n' %
-                  (-natoms, x_min, y_min, z_min, 1))
-
-    outfile.write('%5d%12.6f%12.6f%12.6f\n' % (n_x, x_step, 0, 0))
-    outfile.write('%5d%12.6f%12.6f%12.6f\n' % (n_y, 0, y_step, 0))
-    outfile.write('%5d%12.6f%12.6f%12.6f\n' % (n_z, 0, 0, z_step))
+    f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(nx, dx, 0, 0))
+    f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(ny, 0, dy, 0))
+    f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(nz, 0, 0, dz))
 
     for a in range(natoms):
-        outfile.write('%5d%12.6f%12.6f%12.6f%12.6f\n' %
-                      (elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]))
+        f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+            elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]))
 
-    outfile.write('%5d%5d\n' % (1, mo_idx + 1))
+    if flag == 'mo':
+        f_cube.write('{:5d}{:5d}\n'.format(1, index + 1))
 
-    for ix in range(n_x):
-        rx = x_min + x_step * ix
-
-        for iy in range(n_y):
-            ry = y_min + y_step * iy
-
-            for iz in range(n_z):
-                rz = z_min + z_step * iz
-
-                psi = self.compute(mol, basis, mol_orbs, mo_idx, mo_spin,
-                                   rx, ry, rz)
-
-                outfile.write(' %12.5E' % psi)
+    for ix in range(nx):
+        for iy in range(ny):
+            for iz in range(nz):
+                f_cube.write(' {:12.5E}'.format(data[ix, iy, iz]))
                 if iz % 6 == 5:
-                    outfile.write("\n")
+                    f_cube.write("\n")
+            f_cube.write("\n")
 
-            outfile.write("\n")
-
-    outfile.close()
-
-
-def _write_cube_dens(self, mol, basis, density, dens_idx, dens_spin, v):
-
-    # TODO: take cube filename from input parser
-
-    outfile = open("outfilename_dens.cube", 'w')
-
-    x = mol.x_to_numpy()
-    y = mol.y_to_numpy()
-    z = mol.z_to_numpy()
-
-    natoms = mol.number_of_atoms()
-
-    elem_ids = mol.elem_ids_to_numpy()
-
-    x_min = v[0]
-    y_min = v[1]
-    z_min = v[2]
-
-    x_step = v[3]
-    y_step = v[4]
-    z_step = v[5]
-
-    n_x = v[6]
-    n_y = v[7]
-    n_z = v[8]
-
-    outfile.write('VeloxChem Cube File\n')
-    outfile.write('Electron density, %s spin\n' % dens_spin)
-    outfile.write('%5d%12.6f%12.6f%12.6f%5d\n' %
-                  (natoms, x_min, y_min, z_min, 1))
-
-    outfile.write('%5d%12.6f%12.6f%12.6f\n' % (n_x, x_step, 0, 0))
-    outfile.write('%5d%12.6f%12.6f%12.6f\n' % (n_y, 0, y_step, 0))
-    outfile.write('%5d%12.6f%12.6f%12.6f\n' % (n_z, 0, 0, z_step))
-
-    for a in range(natoms):
-        outfile.write('%5d%12.6f%12.6f%12.6f%12.6f\n' %
-                      (elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]))
-
-    for ix in range(n_x):
-        rx = x_min + x_step * ix
-
-        for iy in range(n_y):
-            ry = y_min + y_step * iy
-
-            for iz in range(n_z):
-                rz = z_min + z_step * iz
-
-                dens = self.compute(mol, basis, density, dens_idx, dens_spin,
-                                    rx, ry, rz)
-
-                outfile.write(' %12.5E' % (dens))
-                if iz % 6 == 5:
-                    outfile.write("\n")
-
-            outfile.write("\n")
-
-    outfile.close()
+    f_cube.close()
 
 
-VisualizationDriver.gen_grid = _gen_grid
-VisualizationDriver.write_cube = _write_cube
-VisualizationDriver.write_cube_dens = _write_cube_dens
+def _VisualizationDriver_write_cube(self, cubefile, molecule, basis,
+                                    mo_or_density, index, spin, grid):
+
+    if isinstance(mo_or_density, MolecularOrbitals):
+        flag = 'mo'
+
+    elif isinstance(mo_or_density, AODensityMatrix):
+        flag = 'density'
+
+    else:
+        errmsg = 'VisualizationDriver.write_cube: invalide argument'
+        assert_msg_critical(False, errmsg)
+
+    data = self.compute(molecule, basis, mo_or_density, index, spin, grid)
+
+    self.write_data(cubefile, molecule, flag, index, spin, grid, data)
+
+
+VisualizationDriver.gen_grid = _VisualizationDriver_gen_grid
+VisualizationDriver.write_data = _VisualizationDriver_write_data
+VisualizationDriver.write_cube = _VisualizationDriver_write_cube

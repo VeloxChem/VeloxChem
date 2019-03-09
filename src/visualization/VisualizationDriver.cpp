@@ -14,15 +14,18 @@
 #include "BasisFunction.hpp"
 #include "MolecularBasis.hpp"
 #include "ErrorHandler.hpp"
+#include "StringFormat.hpp"
+#include "CubicGrid.hpp"
+#include "MemBlock.hpp"
 
 CVisualizationDriver::CVisualizationDriver()
 {
-    
+
 }
 
 CVisualizationDriver::~CVisualizationDriver()
 {
-    
+
 }
 
 std::vector<std::vector<int32_t>>
@@ -162,106 +165,189 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
     return phi;
 }
 
-double
+CMemBlock<double>
 CVisualizationDriver::compute(const CMolecule&          molecule,
                               const CMolecularBasis&    basis,
                               const CMolecularOrbitals& mo,
                               const int32_t             moidx,
                               const std::string&        mospin,
-                              const double              xp,
-                              const double              yp,
-                              const double              zp) const
+                              const CCubicGrid&         grid) const
 {
-    double psi = 0.0;
+    // grid information
 
-    auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
 
-    const int32_t nao = (int32_t)(phi.size());
+    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
+
+    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
+
+    // sanity check
+
+    std::string erridx("VisualizationDriver: invalid index of MO");
+
+    std::string errspin("VisualizationDriver: invalid spin of MO");
+
+    std::string errnao("VisualizationDriver: inconsistent number of AOs");
 
     auto morows = mo.getNumberOfRows();
 
     auto mocols = mo.getNumberOfColumns();
 
-    std::string errnao  ("getPsiMolecularOrbital - Inconsistent number of AOs");
+    errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
 
-    std::string erridx  ("getPsiMolecularOrbital - Invalid MO index");
+    bool alphaspin = fstr::upcase(mospin) == std::string("ALPHA") |
+                     fstr::upcase(mospin) == std::string("A");
 
-    std::string errspin ("getPsiMolecularOrbital - Invalid MO spin");
+    bool betaspin  = fstr::upcase(mospin) == std::string("BETA") |
+                     fstr::upcase(mospin) == std::string("B");
+
+    errors::assertMsgCritical(alphaspin | betaspin, errspin);
+
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
+
+    auto nao = static_cast<int32_t>(phi0.size());
 
     errors::assertMsgCritical(morows == nao, errnao);
 
-    errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
-
-    const bool alphaspin = (mospin == std::string("alpha") ||
-                            mospin == std::string("a"));
-
-    const bool betaspin  = (mospin == std::string("beta") ||
-                            mospin == std::string("b"));
-
-    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+    // target MO
 
     auto mocoefs = alphaspin ? mo.alphaOrbitals() : mo.betaOrbitals();
 
-    for (int32_t aoidx = 0; aoidx < nao; aoidx++)
-    {
-        double mocoef = mocoefs[aoidx * mocols + moidx];
+    // calculate psi on grid points
 
-        psi += mocoef * phi[aoidx];
+    CMemBlock<double> psi_data(nx * ny * nz);
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int32_t ix = 0; ix < nx; ix++)
+    {
+        double xp = x0 + dx * ix;
+
+        int32_t xstride = ix * ny * nz;
+
+        for (int32_t iy = 0; iy < ny; iy++)
+        {
+            double yp = y0 + dy * iy;
+
+            int32_t ystride = iy * nz;
+
+            for (int32_t iz = 0; iz < nz; iz++)
+            {
+                double zp = z0 + dz * iz;
+
+                int32_t zstride = iz;
+
+                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+
+                double psi = 0.0;
+
+                for (int32_t aoidx = 0; aoidx < nao; aoidx++)
+                {
+                    double mocoef = mocoefs[aoidx * mocols + moidx];
+
+                    psi += mocoef * phi[aoidx];
+                }
+
+                int32_t index = xstride + ystride + zstride;
+
+                psi_data.data()[index] = psi;
+            }
+        }
     }
 
-    return psi;
+    return psi_data;
 }
 
-double
+CMemBlock<double>
 CVisualizationDriver::compute(const CMolecule&        molecule,
                               const CMolecularBasis&  basis,
                               const CAODensityMatrix& density,
                               const int32_t           denidx,
                               const std::string&      denspin,
-                              const double            xp,
-                              const double            yp,
-                              const double            zp) const
+                              const CCubicGrid&       grid) const
 {
-    double psi = 0.0;
+    // grid information
 
-    auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
 
-    int32_t nao = (int32_t)(phi.size());
+    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
 
-    auto denrows = density.getNumberOfRows(denidx);
+    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
 
-    auto dencols = density.getNumberOfColumns(denidx);
+    // sanity check
 
-    std::string errnao  ("getPsiDensity - Inconsistent number of AOs");
+    std::string erridx("VisualizationDriver.compute: invalid index of density matrix");
 
-    std::string erridx  ("getPsiDensity - Invalid density matrix index");
+    std::string errspin("VisualizationDriver.compute: invalid spin of density matrix");
 
-    std::string errspin ("getPsiDensity - Invalid density matrix spin");
-
-    errors::assertMsgCritical(denrows == nao && dencols == nao, errnao);
+    std::string errnao("VisualizationDriver.compute: inconsistent number of AOs");
 
     auto numdens = density.getNumberOfDensityMatrices();
 
     errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
 
-    const bool alphaspin = (denspin == std::string("alpha") ||
-                            denspin == std::string("a"));
+    bool alphaspin = fstr::upcase(denspin) == std::string("ALPHA") |
+                     fstr::upcase(denspin) == std::string("A");
 
-    const bool betaspin  = (denspin == std::string("beta") ||
-                            denspin == std::string("b"));
+    bool betaspin  = fstr::upcase(denspin) == std::string("BETA") |
+                     fstr::upcase(denspin) == std::string("B");
 
-    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+    errors::assertMsgCritical(alphaspin | betaspin, errspin);
 
-    auto rho = alphaspin ? density.alphaDensity(denidx) :
-               density.betaDensity(denidx);
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
 
-    for (int32_t iao = 0; iao < nao; iao++)
+    const int32_t nao = static_cast<int32_t>(phi0.size());
+
+    auto denrows = density.getNumberOfRows(denidx);
+
+    auto dencols = density.getNumberOfColumns(denidx);
+
+    errors::assertMsgCritical(denrows == nao & dencols == nao, errnao);
+
+    // target density
+
+    auto rho = alphaspin ? density.alphaDensity(denidx) : density.betaDensity(denidx);
+
+    // calculate densities on grid points
+
+    CMemBlock<double> psi_data(nx * ny * nz);
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int32_t ix = 0; ix < nx; ix++)
     {
-        for (int32_t jao = 0; jao < nao; jao++)
+        double xp = x0 + dx * ix;
+
+        int32_t xstride = ix * ny * nz;
+
+        for (int32_t iy = 0; iy < ny; iy++)
         {
-            psi += phi[iao] * rho[iao * nao + jao] * phi[jao];
+            double yp = y0 + dy * iy;
+
+            int32_t ystride = iy * nz;
+
+            for (int32_t iz = 0; iz < nz; iz++)
+            {
+                double zp = z0 + dz * iz;
+
+                int32_t zstride = iz;
+
+                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+
+                double psi = 0.0;
+
+                for (int32_t iao = 0; iao < nao; iao++)
+                {
+                    for (int32_t jao = 0; jao < nao; jao++)
+                    {
+                        psi += phi[iao] * rho[iao * nao + jao] * phi[jao];
+                    }
+                }
+
+                int32_t index = xstride + ystride + zstride;
+
+                psi_data.data()[index] = psi;
+            }
         }
     }
 
-    return psi;
+    return psi_data;
 }
