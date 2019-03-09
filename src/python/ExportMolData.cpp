@@ -117,7 +117,8 @@ CMolecule_from_array(const std::vector<std::string>& labels,
 
     std::string errmol("CMolecule_from_array: Inconsistent size");
 
-    errors::assertMsgCritical(py_coords.shape(0) == labels.size(), errmol);
+    errors::assertMsgCritical(
+        py_coords.shape(0) == static_cast<ssize_t>(labels.size()), errmol);
 
     errors::assertMsgCritical(py_coords.shape(1) == 3, errmol);
 
@@ -154,7 +155,7 @@ CMolecule_from_array_2(const std::vector<int32_t>& idselem,
 
     std::string errelm("CMolecule_from_array: Unsupported element id");
 
-    for (int32_t i = 0; i < idselem.size(); i++)
+    for (size_t i = 0; i < idselem.size(); i++)
     {
         CChemicalElement chemelm;
 

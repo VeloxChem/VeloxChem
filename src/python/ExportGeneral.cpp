@@ -52,14 +52,14 @@ pointer_to_numpy(const double*               ptr,
     {
         shape.push_back(static_cast<ssize_t>(dimension[i]));
 
-        ssize_t s = 1;
+        size_t strd = 1;
 
-        for (ssize_t j = i + 1; j < dimension.size(); j++)
+        for (size_t j = i + 1; j < dimension.size(); j++)
         {
-            s *= static_cast<ssize_t>(dimension[j]);
+            strd *= dimension[j];
         }
 
-        strides.push_back(sizeof(double) * s);
+        strides.push_back(static_cast<ssize_t>(strd * sizeof(double)));
     }
 
     return py::array_t<double>(shape, strides, ptr);
