@@ -318,11 +318,83 @@ CElectricFieldIntegralsDriver::_compElectricFieldIntegrals(const CMemBlock2D<dou
                                                            const CGtoContainer*       braGtoContainer,
                                                            const CGtoContainer*       ketGtoContainer) const
 {
-    CElectricFieldMatrix efieldmat;
+    // check if GTOs containers are same on bra and ket sides
     
-    // FIX ME:
+    auto symbk = ((*braGtoContainer) == (*ketGtoContainer));
     
-    return efieldmat;
+    // determine dimensions of overlap matrix
+    
+    auto nrow = braGtoContainer->getNumberOfAtomicOrbitals();
+    
+    auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
+    
+    // allocate dense matrix for electric field integrals
+    
+    CDenseMatrix efxmat(nrow, ncol);
+    
+    CDenseMatrix efymat(nrow, ncol);
+    
+    CDenseMatrix efzmat(nrow, ncol);
+    
+    // set up distributio pattern
+    
+    dist1e dstyp = (symbk) ? dist1e::symsq : dist1e::rect;
+    
+    COneIntsDistribution* distpatx = new COneIntsDistribution(efxmat.values(),
+                                                              nrow, ncol, dstyp);
+    
+    COneIntsDistribution* distpaty = new COneIntsDistribution(efymat.values(),
+                                                              nrow, ncol, dstyp);
+    
+    COneIntsDistribution* distpatz = new COneIntsDistribution(efzmat.values(),
+                                                              nrow, ncol, dstyp);
+    
+    // compute electric field integral blocks
+    
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, dipoles,\
+                                coordinates, distpatx, distpaty, distpatz, symbk)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs blocks in bra/ket sides
+            
+            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+            
+            auto nket = ketGtoContainer->getNumberOfGtoBlocks();
+            
+            // loop over pairs of GTOs blocks
+            
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+                
+                auto joff = (symbk) ? i : 0;
+                
+                for (int32_t j = joff; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(j)
+                    {
+                        auto kgtos = ketGtoContainer->getGtoBlock(j);
+                        
+                        _compElectricFieldForGtoBlocks(distpatx, distpaty,
+                                                       distpatz, dipoles,
+                                                       coordinates, bgtos,
+                                                       kgtos);
+                    }
+                }
+            }
+        }
+    }
+    
+    // deallocate distribution pattern
+    
+    delete distpatx;
+    
+    delete distpaty;
+    
+    delete distpatz;
+    
+    return CElectricFieldMatrix(efxmat, efymat, efzmat);
 }
 
 void
@@ -334,5 +406,118 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
                                                               const CGtoBlock&            braGtoBlock,
                                                               const CGtoBlock&            ketGtoBlock) const
 {
-    // FIX ME:
+    // copy GTOs blocks for bra and ket sides
+    
+    auto bragtos = braGtoBlock;
+    
+    auto ketgtos = ketGtoBlock;
+    
+    // copy distribution pattern
+    
+    auto distpatx = *distPatternX;
+    
+    auto distpaty = *distPatternY;
+    
+    auto distpatz = *distPatternZ;
+    
+    // copy dipoles and their coordinates
+    
+    auto dipvalues = *dipoles;
+    
+    auto dipcoords = *coordinates;
+    
+    // set up spherical angular momentum for bra and ket sides
+    
+    CSphericalMomentum bmom(bragtos.getAngularMomentum());
+    
+    CSphericalMomentum kmom(ketgtos.getAngularMomentum());
+    
+    // allocate prefactors used in Obara-Saika recursion
+    
+    auto pdim = ketgtos.getNumberOfPrimGtos();
+    
+    CMemBlock2D<double> rab(pdim, 3);
+    
+    auto pmax = bragtos.getMaxContractionDepth();
+    
+    CMemBlock2D<double> rfacts(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rp(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rpa(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rpb(pdim, 3 * pmax);
+    
+    CMemBlock2D<double> rpc(pdim, 3 * pmax);
+    
+    // generate recursion pattern
+    
+    auto recvec = _getRecursionPattern(bragtos, ketgtos);
+    
+    
+}
+
+CVecFourIndexes
+CElectricFieldIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock,
+                                                    const CGtoBlock& ketGtoBlock) const
+{
+    // set up angular momentum
+    
+    auto bang = braGtoBlock.getAngularMomentum();
+    
+    auto kang = ketGtoBlock.getAngularMomentum();
+    
+    // set up recursion buffer
+    
+    CVecFourIndexes recvec;
+    
+    recvec.reserve((bang + 1) * (kang + 1));
+    
+    // set up indexing counters
+    
+    int32_t spos = 0;
+    
+    int32_t epos = 1;
+    
+    // set up initial state of recursion buffer
+    
+    recvec.push_back(CFourIndexes(bang, kang, 0, 0));
+    
+    while (true)
+    {
+        // internal new recursion terms counter
+        
+        int32_t nterms = 0;
+        
+        // generate bra and ket Obara-Saika recursion terms
+        
+        for (int32_t i = spos; i < epos; i++)
+        {
+            CFourIndexes cidx(recvec[i]);
+            
+            if (cidx.fourth() == 0)
+            {
+                // electric field integrals
+                
+                
+            }
+            else
+            {
+                // nuclear repulsion integrals
+                
+            }
+        }
+        
+        // break loop, all recursion terms are generrated
+        
+        if (nterms == 0) break;
+        
+        // update counters
+        
+        spos  = epos;
+        
+        epos += nterms;
+    }
+    
+    return recvec;
 }
