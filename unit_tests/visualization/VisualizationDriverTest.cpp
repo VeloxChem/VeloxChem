@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "VisualizationDriver.hpp"
+#include "CubicGrid.hpp"
 #include "MathConst.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
@@ -82,11 +83,11 @@ TEST_F(CVisualizationDriverTest, Helium)
 
     double r2 = xp * xp + yp * yp + zp * zp;
 
-    double mypsi = 0.0;
+    double refpsi = 0.0;
 
     for (size_t i = 0; i < expons.size(); i++)
     {
-        mypsi += mocoef * coefs[i] * std::exp(-expons[i] * r2);
+        refpsi += mocoef * coefs[i] * std::exp(-expons[i] * r2);
     }
 
     // psi from getPsiMolecularOrbital
@@ -95,11 +96,13 @@ TEST_F(CVisualizationDriverTest, Helium)
     
     auto basis = vlxbas::getMinimalBasisForHeAtom();
 
+    CCubicGrid point({xp, yp, zp}, {0.0, 0.0, 0.0}, {1, 1, 1});
+
     CVisualizationDriver visdrv;
 
-    auto psi = visdrv.compute(mol, basis, moa, 0, "a", xp, yp, zp);
+    visdrv.compute(point, mol, basis, moa, 0, "a");
 
-    ASSERT_NEAR(mypsi, psi, 1.0e-13);
+    ASSERT_NEAR(refpsi, point.values()[0], 1.0e-13);
 
     // density matrix
 
@@ -107,7 +110,7 @@ TEST_F(CVisualizationDriverTest, Helium)
     
     CAODensityMatrix dena({da}, denmat::rest);
 
-    auto psi2 = visdrv.compute(mol, basis, dena, 0, "a", xp, yp, zp);
+    visdrv.compute(point, mol, basis, dena, 0, "a");
 
-    ASSERT_NEAR(psi*psi, psi2, 1.0e-13);
+    ASSERT_NEAR(refpsi * refpsi, point.values()[0], 1.0e-13);
 }

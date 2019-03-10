@@ -36,11 +36,11 @@ def main():
             scf_drv.density.write_hdf5("density.h5")
 
     # Response
-    
+
     if task_type == 'response':
-    
+
         # molecular orbitals
-    
+
         if task.mpi_rank == vlx.mpi_master():
             mol_orbs = scf_drv.mol_orbs
         else:
@@ -49,7 +49,7 @@ def main():
         rsp_drv = vlx.ResponseDriver()
 
         rsp_drv.compute_task(mol_orbs, task)
-    
+
     # MP2 perturbation theory
 
     if task_type == 'mp2':
@@ -91,11 +91,11 @@ def main():
             nelec = task.molecule.number_of_electrons()
             homo = nelec // 2 - 1
 
-            vis_grid = vis_drv.gen_grid(task.molecule)
-            vis_drv.write_cube(task.molecule, task.ao_basis, mol_orbs, homo,
-                               "alpha", vis_grid)
-            vis_drv.write_cube_dens(task.molecule, task.ao_basis, density, 0,
-                                    "alpha", vis_grid)
+            cubic_grid = vis_drv.gen_cubic_grid(task.molecule)
+            vis_drv.write_cube('homo.cube', cubic_grid, task.molecule,
+                               task.ao_basis, mol_orbs, homo, "alpha")
+            vis_drv.write_cube('density.cube', cubic_grid, task.molecule,
+                               task.ao_basis, density, 0, "alpha")
 
     # all done, print finish header to output stream
 
