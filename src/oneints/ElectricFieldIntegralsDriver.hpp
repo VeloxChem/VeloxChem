@@ -99,6 +99,45 @@ class CElectricFieldIntegralsDriver
     CVecFourIndexes _getRecursionPattern(const CGtoBlock& braGtoBlock,
                                          const CGtoBlock& ketGtoBlock) const;
     
+    /**
+     Gets vector of unified indexes of primitive GTOs buffer for specific
+     Obara-Saika recursion pattern.
+     
+     @param recIndexes the vector of starting indexes of data blocks in recursion
+     pattern.
+     @param recPattern the recursion pattern.
+     @param maxPrimGtos the maximum number of primitive GTOs in contracted
+     GTO on bra side.
+     @return the total number of blocks in recursion pattern.
+     */
+    int32_t _getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
+                                           const CVecFourIndexes&      recPattern,
+                                           const int32_t               maxPrimGtos) const;
+    
+    /**
+     Adds single point dipole contribution from primitives recursion buffer to
+     primitives accumulation buffer, which contains primitive electric field
+     integrals.
+     
+     @param accBuffer the primitive integrals accumulation buffer.
+     @param primBuffer the primitives recursion buffer.
+     @param primIndex the index of specific integrals in primitives recursion
+     buffer.
+     @param dipoles the vector of point dipoles.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     @param iPointDipole the index of point dipole in vector point dipoles.
+     */
+    void _addPointDipoleContribution(      CMemBlock2D<double>& accBuffer,
+                                     const CMemBlock2D<double>& primBuffer,
+                                     const int32_t              primIndex,
+                                     const CMemBlock2D<double>& dipoles,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto,
+                                     const int32_t              iPointDipole) const;
+    
 public:
     
     /**

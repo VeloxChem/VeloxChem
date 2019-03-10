@@ -440,7 +440,8 @@ namespace genfunc { // genfunc namespace
     
     /**
      Gets maximum order of indexes pair in vector of triple indexes objects,
-     where third index in triple object is used to store order information.
+     where third index in three indexes object is used to store order
+     information.
 
      @param vector the vector of three indexes objects.
      @param firstIndex the first index of indexes pair.
@@ -450,6 +451,19 @@ namespace genfunc { // genfunc namespace
     int32_t maxOrderOfPair(const CVecThreeIndexes& vector,
                            const int32_t           firstIndex,
                            const int32_t           secondIndex);
+    
+    /**
+    Gets maximum order of indexes pair in vector of quadruple indexes objects,
+    where third index in four indexes object is used to store order information.
+    
+    @param vector the vector of four indexes objects.
+    @param firstIndex the first index of indexes pair.
+    @param secondIndex the second index of indexes pair.
+    @return the maximum order.
+    */
+    int32_t maxOrderOfPair(const CVecFourIndexes& vector,
+                           const int32_t          firstIndex,
+                           const int32_t          secondIndex);
     
     /**
      Creates vector of three indexes objects of (x,y,0) type coresponding to

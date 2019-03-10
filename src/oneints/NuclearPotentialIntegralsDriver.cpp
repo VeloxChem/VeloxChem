@@ -724,43 +724,43 @@ CNuclearPotentialIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBl
                                      cidx.third() + 1);
                 
                 if (genfunc::addValidAndUniqueTriple(recvec, tk1idx)) nterms++;
-                }
-                else
-                {
-                    // simplified recursion for ket sides
+            }
+            else
+            {
+                // simplified recursion for ket sides
                     
-                    // (0 |A(0)| b - 1)^(m) term
+                // (0 |A(0)| b - 1)^(m) term
                     
-                    CThreeIndexes t10idx(cidx.first(),  cidx.second() - 1,
-                                         
-                                         cidx.third());
+                CThreeIndexes t10idx(cidx.first(),  cidx.second() - 1,
+                                     
+                                     cidx.third());
                     
-                    if (genfunc::addValidAndUniqueTriple(recvec, t10idx)) nterms++;
+                if (genfunc::addValidAndUniqueTriple(recvec, t10idx)) nterms++;
                     
-                    // (0 |A(0)| b - 1)^(m+1) term
+                // (0 |A(0)| b - 1)^(m+1) term
                     
-                    CThreeIndexes t11idx(cidx.first(),  cidx.second() - 1,
-                                         
-                                         cidx.third() + 1);
+                CThreeIndexes t11idx(cidx.first(),  cidx.second() - 1,
+                                     
+                                     cidx.third() + 1);
                     
-                    if (genfunc::addValidAndUniqueTriple(recvec, t11idx)) nterms++;
+                if (genfunc::addValidAndUniqueTriple(recvec, t11idx)) nterms++;
                     
-                    // (0 |A(0)| b - 2)^(m) term
+                // (0 |A(0)| b - 2)^(m) term
                     
-                    CThreeIndexes t20idx(cidx.first(),  cidx.second() - 2,
-                                         
-                                         cidx.third());
+                CThreeIndexes t20idx(cidx.first(),  cidx.second() - 2,
+                                     
+                                     cidx.third());
                     
-                    if (genfunc::addValidAndUniqueTriple(recvec, t20idx)) nterms++;
+                if (genfunc::addValidAndUniqueTriple(recvec, t20idx)) nterms++;
                     
-                    // (0 |A(0)| b - 2)^(m+1) term
+                // (0 |A(0)| b - 2)^(m+1) term
                     
-                    CThreeIndexes t21idx(cidx.first(),  cidx.second() - 2,
-                                         
-                                         cidx.third() + 1);
+                CThreeIndexes t21idx(cidx.first(),  cidx.second() - 2,
+                                     
+                                     cidx.third() + 1);
                     
-                    if (genfunc::addValidAndUniqueTriple(recvec, t21idx)) nterms++;
-                }
+                if (genfunc::addValidAndUniqueTriple(recvec, t21idx)) nterms++;
+            }
         }
         
         // break loop, all recursion terms are generrated
