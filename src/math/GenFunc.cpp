@@ -937,6 +937,27 @@ maxOrderOfPair(const CVecFourIndexes& vector,
     return iord;
 }
     
+int32_t
+maxOrderOfTriple(const CVecFourIndexes& vector,
+                 const int32_t          firstIndex,
+                 const int32_t          secondIndex,
+                 const int32_t          thirdIndex)
+{
+    int32_t iord = -1;
+        
+    for (size_t i = 0; i < vector.size(); i++)
+    {
+        if ((vector[i].first()  == firstIndex)  &&
+            (vector[i].second() == secondIndex) &&
+            (vector[i].fourth() == thirdIndex))
+            {
+                if (vector[i].third() > iord) iord = vector[i].third();
+            }
+    }
+        
+    return iord;
+}
+    
 CVecThreeIndexes
 getPairsFromTripleIndexes(const CVecThreeIndexes& vector)
 {

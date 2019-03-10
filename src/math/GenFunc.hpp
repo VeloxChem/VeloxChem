@@ -466,6 +466,21 @@ namespace genfunc { // genfunc namespace
                            const int32_t          secondIndex);
     
     /**
+     Gets maximum order of indexes triple in vector of quadruple indexes objects,
+     where third index in four indexes object is used to store order information.
+     
+     @param vector the vector of four indexes objects.
+     @param firstIndex the first index of indexes triple.
+     @param secondIndex the second index of indexes triple.
+     @param thirdIndex the third index of indexes triple.
+     @return the maximum order.
+     */
+    int32_t maxOrderOfTriple(const CVecFourIndexes& vector,
+                             const int32_t          firstIndex,
+                             const int32_t          secondIndex,
+                             const int32_t          thirdIndex);
+    
+    /**
      Creates vector of three indexes objects of (x,y,0) type coresponding to
      all three index objects of (x,0,y) type found in vector of three indexes
      objects.

@@ -10,8 +10,8 @@
 
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
-#include "BoysFunction.hpp"
 #include "OneIntsFunc.hpp"
+#include "ElectricFieldRecFunc.hpp"
 
 CElectricFieldIntegralsDriver::CElectricFieldIntegralsDriver(const int32_t  globRank,
                                                              const int32_t  globNodes,
@@ -565,9 +565,9 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
             
             // compute primitive integrals
             
-            //_compPrimNuclearPotentialInts(pbuffer, recvec, recidx, bftab, bargs,
-            //                              bvals, bord, rfacts, rab, rpa, rpb,
-            //                              rpc, bragtos, ketgtos, i);
+            _compPrimElectricFieldInts(pbuffer, recvec, recidx, bftab, bargs,
+                                       bvals, bord, rfacts, rab, rpa, rpb,
+                                       rpc, bragtos, ketgtos, i);
             
             // add scaled contribution to accumulation buffer
             
@@ -948,4 +948,32 @@ CElectricFieldIntegralsDriver::_addPointDipoleContribution(      CMemBlock2D<dou
             }
         }
     }
+}
+
+void
+CElectricFieldIntegralsDriver::_compPrimElectricFieldInts(      CMemBlock2D<double>&  primBuffer,
+                                                          const CVecFourIndexes&      recPattern,
+                                                          const std::vector<int32_t>& recIndexes,
+                                                          const CBoysFunction&        bfTable,
+                                                                CMemBlock<double>&    bfArguments,
+                                                                CMemBlock2D<double>&  bfValues,
+                                                          const int32_t               bfOrder,
+                                                          const CMemBlock2D<double>&  osFactors,
+                                                          const CMemBlock2D<double>&  abDistances,
+                                                          const CMemBlock2D<double>&  paDistances,
+                                                          const CMemBlock2D<double>&  pbDistances,
+                                                          const CMemBlock2D<double>&  pcDistances,
+                                                          const CGtoBlock&            braGtoBlock,
+                                                          const CGtoBlock&            ketGtoBlock,
+                                                          const int32_t               iContrGto) const
+{
+    // compute (s|A(1)|s) integrals
+    
+    efieldrecfunc::compElectricFieldForSS(primBuffer, recPattern, recIndexes,
+                                          bfTable, bfArguments, bfValues,
+                                          bfOrder, osFactors, abDistances,
+                                          pcDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+    
+    // FIX ME: ...
 }

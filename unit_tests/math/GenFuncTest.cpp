@@ -855,6 +855,27 @@ TEST_F(CGenFuncTest, MaxOrderOfPairForFourIndexes)
     ASSERT_EQ( 2, genfunc::maxOrderOfPair(vec, 7, -1));
 }
 
+TEST_F(CGenFuncTest, MaxOrderOfTriple)
+{
+    CVecFourIndexes vec{{0, 1, 1, 2}, {0, 1, 3, 1}, {7, -1, 2, 0}, {0, 1, 4, 2}};
+    
+    ASSERT_EQ(-1, genfunc::maxOrderOfTriple(vec, 0, 0, 0));
+    
+    ASSERT_EQ(-1, genfunc::maxOrderOfTriple(vec, 0, 1, 0));
+    
+    ASSERT_EQ( 3, genfunc::maxOrderOfTriple(vec, 0, 1, 1));
+    
+    ASSERT_EQ( 4, genfunc::maxOrderOfTriple(vec, 0, 1, 2));
+    
+    ASSERT_EQ(-1, genfunc::maxOrderOfTriple(vec, 0, 1, 3));
+    
+    ASSERT_EQ(-1, genfunc::maxOrderOfTriple(vec, 4, 2, 1));
+    
+    ASSERT_EQ( 2, genfunc::maxOrderOfTriple(vec, 7, -1, 0));
+    
+    ASSERT_EQ(-1, genfunc::maxOrderOfTriple(vec, 7, -1, 1));
+}
+
 TEST_F(CGenFuncTest, GetPairsFromTripleIndexes)
 {
     CVecThreeIndexes vec{{0, 0, 1}, {2, 4, 3}, {7, 0, 2}, {8, -2, 4}};
