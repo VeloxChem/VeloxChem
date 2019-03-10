@@ -67,20 +67,20 @@ void export_visualization(py::module& m)
         )
         .def(py::init<>())
         .def("compute",
-             (void (CVisualizationDriver::*)(const CMolecule&,
+             (void (CVisualizationDriver::*)(      CCubicGrid&,
+                                             const CMolecule&,
                                              const CMolecularBasis&,
                                              const CMolecularOrbitals&,
                                              const int32_t,
-                                             const std::string&,
-                                                   CCubicGrid&) const)
+                                             const std::string&) const)
              &CVisualizationDriver::compute)
         .def("compute",
-             (void (CVisualizationDriver::*)(const CMolecule&,
+             (void (CVisualizationDriver::*)(      CCubicGrid&,
+                                             const CMolecule&,
                                              const CMolecularBasis&,
                                              const CAODensityMatrix&,
                                              const int32_t,
-                                             const std::string&,
-                                                   CCubicGrid&) const)
+                                             const std::string&) const)
              &CVisualizationDriver::compute)
     ;
 }

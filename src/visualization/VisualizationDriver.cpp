@@ -166,12 +166,12 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
 }
 
 void
-CVisualizationDriver::compute(const CMolecule&          molecule,
+CVisualizationDriver::compute(      CCubicGrid&         grid,
+                              const CMolecule&          molecule,
                               const CMolecularBasis&    basis,
                               const CMolecularOrbitals& mo,
                               const int32_t             moidx,
-                              const std::string&        mospin,
-                                    CCubicGrid&         grid) const
+                              const std::string&        mospin) const
 {
     // grid information
 
@@ -254,12 +254,12 @@ CVisualizationDriver::compute(const CMolecule&          molecule,
 }
 
 void
-CVisualizationDriver::compute(const CMolecule&        molecule,
+CVisualizationDriver::compute(      CCubicGrid&       grid,
+                              const CMolecule&        molecule,
                               const CMolecularBasis&  basis,
                               const CAODensityMatrix& density,
                               const int32_t           denidx,
-                              const std::string&      denspin,
-                                    CCubicGrid&       grid) const
+                              const std::string&      denspin) const
 {
     // grid information
 

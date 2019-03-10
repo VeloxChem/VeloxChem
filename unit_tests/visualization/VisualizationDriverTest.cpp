@@ -100,7 +100,7 @@ TEST_F(CVisualizationDriverTest, Helium)
 
     CVisualizationDriver visdrv;
 
-    visdrv.compute(mol, basis, moa, 0, "a", point);
+    visdrv.compute(point, mol, basis, moa, 0, "a");
 
     ASSERT_NEAR(refpsi, point.values()[0], 1.0e-13);
 
@@ -110,7 +110,7 @@ TEST_F(CVisualizationDriverTest, Helium)
     
     CAODensityMatrix dena({da}, denmat::rest);
 
-    visdrv.compute(mol, basis, dena, 0, "a", point);
+    visdrv.compute(point, mol, basis, dena, 0, "a");
 
     ASSERT_NEAR(refpsi * refpsi, point.values()[0], 1.0e-13);
 }

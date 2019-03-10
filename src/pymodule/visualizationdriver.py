@@ -10,7 +10,7 @@ import os
 
 
 @staticmethod
-def _VisualizationDriver_gen_grid(molecule, n_x=80, n_y=80, n_z=80):
+def _VisualizationDriver_gen_cubic_grid(molecule, n_x=80, n_y=80, n_z=80):
 
     x = molecule.x_to_numpy()
     y = molecule.y_to_numpy()
@@ -36,7 +36,8 @@ def _VisualizationDriver_gen_grid(molecule, n_x=80, n_y=80, n_z=80):
 
 
 @staticmethod
-def _VisualizationDriver_write_data(cubefile, molecule, flag, index, spin, grid):
+def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
+                                    spin):
 
     f_cube = open(cubefile, 'w')
 
@@ -87,8 +88,8 @@ def _VisualizationDriver_write_data(cubefile, molecule, flag, index, spin, grid)
     f_cube.close()
 
 
-def _VisualizationDriver_write_cube(self, cubefile, molecule, basis,
-                                    mo_or_density, index, spin, grid):
+def _VisualizationDriver_write_cube(self, cubefile, grid, molecule, basis,
+                                    mo_or_density, index, spin):
 
     if isinstance(mo_or_density, MolecularOrbitals):
         flag = 'mo'
@@ -100,11 +101,11 @@ def _VisualizationDriver_write_cube(self, cubefile, molecule, basis,
         errmsg = 'VisualizationDriver.write_cube: invalide argument'
         assert_msg_critical(False, errmsg)
 
-    self.compute(molecule, basis, mo_or_density, index, spin, grid)
+    self.compute(grid, molecule, basis, mo_or_density, index, spin)
 
-    self.write_data(cubefile, molecule, flag, index, spin, grid)
+    self.write_data(cubefile, grid, molecule, flag, index, spin)
 
 
-VisualizationDriver.gen_grid = _VisualizationDriver_gen_grid
+VisualizationDriver.gen_cubic_grid = _VisualizationDriver_gen_cubic_grid
 VisualizationDriver.write_data = _VisualizationDriver_write_data
 VisualizationDriver.write_cube = _VisualizationDriver_write_cube

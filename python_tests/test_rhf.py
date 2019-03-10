@@ -24,11 +24,11 @@ class TestRHF(unittest.TestCase):
             nelec = task.molecule.number_of_electrons()
             homo = nelec // 2 - 1
 
-            vis_grid = vis_drv.gen_grid(task.molecule, 3, 3, 3)
-            vis_drv.write_cube("homo.cube", task.molecule, task.ao_basis,
-                               mol_orbs, homo, "alpha", vis_grid)
-            vis_drv.write_cube("density.cube", task.molecule, task.ao_basis,
-                               density, 0, "alpha", vis_grid)
+            cubic_grid = vis_drv.gen_cubic_grid(task.molecule, 3, 3, 3)
+            vis_drv.write_cube("homo.cube", cubic_grid, task.molecule,
+                               task.ao_basis, mol_orbs, homo, "alpha")
+            vis_drv.write_cube("density.cube", cubic_grid, task.molecule,
+                               task.ao_basis, density, 0, "alpha")
 
         task.finish()
 
