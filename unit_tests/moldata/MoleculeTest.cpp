@@ -10,7 +10,6 @@
 
 #include "Molecule.hpp"
 #include "MoleculeSetter.hpp"
-#include "MolecularBasisSetter.hpp"
 #include "CheckFunctions.hpp"
 
 

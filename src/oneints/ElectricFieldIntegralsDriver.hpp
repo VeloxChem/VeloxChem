@@ -17,6 +17,7 @@
 #include "GtoContainer.hpp"
 #include "ElectricFieldMatrix.hpp"
 #include "OneIntsDistributor.hpp"
+#include "VecIndexes.hpp"
 
 /**
  Class CElectricFieldIntegralsDriver computes one-electron electric field
@@ -86,6 +87,17 @@ class CElectricFieldIntegralsDriver
                                         const CMemBlock2D<double>*  coordinates,
                                         const CGtoBlock&            braGtoBlock,
                                         const CGtoBlock&            ketGtoBlock) const;
+    
+    /**
+     Gets Obara-Saika recursion pattern for specific combination of GTOs blocks
+     on bra and ket sides.
+     
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @return the vector of four indexes object with recursion pattern.
+     */
+    CVecFourIndexes _getRecursionPattern(const CGtoBlock& braGtoBlock,
+                                         const CGtoBlock& ketGtoBlock) const;
     
 public:
     

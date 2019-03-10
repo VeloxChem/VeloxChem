@@ -256,7 +256,8 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialIntegrals(const CMemBlock
     
     // compute nuclear potential integral blocks
     
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat, symbk)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, charges,\
+                                coordinates, distpat, symbk)
     {
         #pragma omp single nowait
         {

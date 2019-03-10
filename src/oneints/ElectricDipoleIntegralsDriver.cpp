@@ -197,7 +197,7 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
     
     auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
     
-    // allocate dense matrix for overlap integrals
+    // allocate dense matrix for electric dipole integrals
     
     CDenseMatrix dipxmat(nrow, ncol);
     
@@ -226,7 +226,7 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
     
     auto origz = _zOrigin;
     
-    // compute overlap integral blocks
+    // compute electric dipole integral blocks
     
     #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpatx,\
                                 distpaty, distpatz, origx, origy, origz, symbk)
@@ -612,7 +612,7 @@ CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<do
 
 CVecThreeIndexes
 CElectricDipoleIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                                    const CGtoBlock& ketGtoBlock) const
+                                                     const CGtoBlock& ketGtoBlock) const
 {
     // set up angular momentum
     
