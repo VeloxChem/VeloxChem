@@ -853,7 +853,7 @@ class ScfDriver:
     def print_checkpoint_info(self, checkpoint_file, ostream):
         """Prints checkpoint file name.
 
-        Prints the name of the checkpoint file name to output stream.
+        Prints the name of the checkpoint file to output stream.
 
         Parameters
         ----------

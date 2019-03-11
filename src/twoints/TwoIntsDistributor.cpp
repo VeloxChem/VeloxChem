@@ -306,7 +306,6 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                            braGtoPairsBlock, ketGtoPairsBlock,
                                            nKetContrPairs, iContrPair);
         }
-        
     }
 }
 
