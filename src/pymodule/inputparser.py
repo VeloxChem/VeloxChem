@@ -166,4 +166,13 @@ class InputParser:
                         self.input_dict['molecule']['units'] = 'angs'
 
         if self.is_basis_set:
+            # for basis set, save basis set file name
             self.input_dict['basis_set_name'] = self.basis_set_name
+        else:
+            # for input file, save input file name and checkpoint file name
+            if '.' in self.filename:
+                checkpoint = '.'.join(self.filename.split('.')[:-1]) + ".h5"
+            else:
+                checkpoint = self.filename + ".h5"
+            self.input_dict["input_file"]= self.filename
+            self.input_dict["checkpoint_file"] = checkpoint

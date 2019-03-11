@@ -68,13 +68,6 @@ class MpiTask:
 
             self.input_dict = InputParser(input_fname).get_dict()
 
-            if '.' in input_fname:
-                checkpoint_fname = '.'.join(input_fname.split('.')[:-1]) + ".h5"
-            else:
-                checkpoint_fname = input_fname + ".h5"
-            self.input_dict["input_file"]= input_fname
-            self.input_dict["checkpoint_file"] = checkpoint_fname
-
             self.ostream.print_info(
                 "Found {} control groups.".format(len(self.input_dict)))
             self.ostream.print_info("...done.")

@@ -154,14 +154,16 @@ class ScfDriver:
         self.restart = True
 
     def read_checkpoint(self, checkpoint_file, ostream):
-        """Read checkpoint file.
+        """Reads checkpoint file.
 
-        Read molecular orbitals from checkpoint file.
+        Reads molecular orbitals from checkpoint file.
 
         Parameters
         ----------
         checkpoint_file
-            The name of the molecular orbitals checkpoint file.
+            The name of the checkpoint file.
+        ostream
+            The output stream.
         """
 
         if self.rank == mpi_master():
@@ -176,14 +178,14 @@ class ScfDriver:
             self.mol_orbs = MolecularOrbitals.read_hdf5(checkpoint_file)
 
     def write_checkpoint(self, checkpoint_file):
-        """Write checkpoint file.
+        """Writes checkpoint file.
 
-        Write molecular orbitals from checkpoint file.
+        Writes molecular orbitals to checkpoint file.
 
         Parameters
         ----------
         checkpoint_file
-            The name of the molecular orbitals checkpoint file.
+            The name of the checkpoint file.
         """
 
         if self.rank == mpi_master():
@@ -849,6 +851,17 @@ class ScfDriver:
         return range(self.max_iter + 1)
 
     def print_checkpoint_info(self, checkpoint_file, ostream):
+        """Prints checkpoint file name.
+
+        Prints the name of the checkpoint file name to output stream.
+
+        Parameters
+        ----------
+        checkpoint_file
+            The name of the checkpoint file.
+        ostream
+            The output stream.
+        """
 
         if not (checkpoint_file and isinstance(checkpoint_file, str) and
                 isfile(checkpoint_file)):
