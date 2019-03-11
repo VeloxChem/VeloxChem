@@ -40,6 +40,8 @@ def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
             _print_coefficients(reigs[i], rnocc[i], i, rvecs[:, i], ao_map,
                                 0.15, ostream)
 
+        ostream.print_blank()
+
     elif self.get_orbitals_type() == molorb.unrest:
         
         ostream.print_blank()

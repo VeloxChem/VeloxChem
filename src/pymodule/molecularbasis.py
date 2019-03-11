@@ -5,13 +5,15 @@ from .veloxchemlib import ChemicalElement
 from .veloxchemlib import to_angular_momentum
 
 from .inputparser import InputParser
+from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
 import os
 
 
 @staticmethod
-def _MolecularBasis_read(mol, basis_name, basis_path='.'):
+def _MolecularBasis_read(mol, basis_name, basis_path='.',
+                         ostream=OutputStream()):
 
     err_gc = "MolcularBasis.read_file: "
     err_gc += "General contraction currently is not supported"
@@ -26,6 +28,10 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.'):
         basis_file = './' + basis_name.upper()
     if not os.path.isfile(basis_file) and 'VLXBASISPATH' in os.environ:
         basis_file = os.environ['VLXBASISPATH'] + '/' + basis_name.upper()
+
+    basis_info = "Reading basis set: " + basis_file
+    ostream.print_info(basis_info)
+    ostream.print_blank()
 
     basis_dict = InputParser(basis_file).input_dict
 

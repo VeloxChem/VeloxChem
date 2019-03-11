@@ -24,11 +24,6 @@ class MpiTask:
         self.mpi_rank = mpi_comm.Get_rank()
         self.mpi_size = mpi_comm.Get_size()
 
-        # input/output files
-        # on master node:  output_fname is string:    ostream is file handle
-        #                  output_fname is "" or "-": ostream is sys.stdout
-        # on worker nodes: output_fname is None:      ostream is None
-
         input_fname = None
         output_fname = None
 
@@ -73,6 +68,13 @@ class MpiTask:
 
             self.input_dict = InputParser(input_fname).get_dict()
 
+            if '.' in input_fname:
+                checkpoint_fname = '.'.join(input_fname.split('.')[:-1]) + ".h5"
+            else:
+                checkpoint_fname = input_fname + ".h5"
+            self.input_dict["input_file"]= input_fname
+            self.input_dict["checkpoint_file"] = checkpoint_fname
+
             self.ostream.print_info(
                 "Found {} control groups.".format(len(self.input_dict)))
             self.ostream.print_info("...done.")
@@ -101,7 +103,7 @@ class MpiTask:
             basis_name = self.input_dict["method_settings"]["basis"].upper()
 
             self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
-                                                basis_path)
+                                                basis_path, self.ostream)
 
             self.min_basis = MolecularBasis.read(self.molecule, "MIN-CC-PVDZ",
                                                  basis_path)

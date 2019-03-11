@@ -29,12 +29,6 @@ def main():
 
         scf_drv.compute_task(task)
 
-        # write hdf5 files after convergence
-
-        if task.mpi_rank == vlx.mpi_master() and scf_drv.is_converged:
-            scf_drv.mol_orbs.write_hdf5("mol_orbs.h5")
-            scf_drv.density.write_hdf5("density.h5")
-
     # Response
 
     if task_type == 'response':
@@ -82,11 +76,11 @@ def main():
 
         # generate cube file
 
-        vis_drv = vlx.VisualizationDriver()
-
         if task.mpi_rank == vlx.mpi_master():
-            mol_orbs = vlx.MolecularOrbitals.read_hdf5("mol_orbs.h5")
-            density = vlx.AODensityMatrix.read_hdf5("density.h5")
+            vis_drv = vlx.VisualizationDriver()
+
+            mol_orbs = scf_drv.mol_orbs
+            density = scf_drv.density
 
             nelec = task.molecule.number_of_electrons()
             homo = nelec // 2 - 1

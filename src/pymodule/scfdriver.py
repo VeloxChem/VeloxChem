@@ -1,10 +1,10 @@
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import OverlapMatrix
 from .veloxchemlib import KineticEnergyMatrix
 from .veloxchemlib import NuclearPotentialMatrix
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
+from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import ScreeningContainer
@@ -20,6 +20,7 @@ from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 
+from os.path import isfile
 import numpy as np
 import time as tm
 import math
@@ -90,6 +91,8 @@ class ScfDriver:
         The rank of MPI process.
     nodes
         The number of MPI processes.
+    restart
+        The flag for restarting from checkpoint file
     """
 
     def __init__(self):
@@ -146,6 +149,48 @@ class ScfDriver:
         # mpi information
         self.rank = 0
         self.nodes = 1
+
+        # restart information
+        self.restart = True
+
+    def read_checkpoint(self, checkpoint_file, ostream):
+        """Read checkpoint file.
+
+        Read molecular orbitals from checkpoint file.
+
+        Parameters
+        ----------
+        checkpoint_file
+            The name of the molecular orbitals checkpoint file.
+        """
+
+        if self.rank == mpi_master():
+            if not (checkpoint_file and isinstance(checkpoint_file, str) and
+                    isfile(checkpoint_file)):
+                return
+
+            restart_info = "Restarting from checkpoint file: " + checkpoint_file
+            ostream.print_info(restart_info)
+            ostream.print_blank()
+
+            self.mol_orbs = MolecularOrbitals.read_hdf5(checkpoint_file)
+
+    def write_checkpoint(self, checkpoint_file):
+        """Write checkpoint file.
+
+        Write molecular orbitals from checkpoint file.
+
+        Parameters
+        ----------
+        checkpoint_file
+            The name of the molecular orbitals checkpoint file.
+        """
+
+        if self.rank == mpi_master():
+            if not (checkpoint_file and isinstance(checkpoint_file, str)):
+                return
+
+            self.mol_orbs.write_hdf5(checkpoint_file)
     
     def compute_task(self, task):
         """Performs SCF calculation.
@@ -158,11 +203,13 @@ class ScfDriver:
             The SCF input data as MPI task.
         """
 
+        checkpoint_file = task.input_dict["checkpoint_file"]
+
         self.compute(task.molecule, task.ao_basis, task.min_basis,
-                     task.mpi_comm, task.ostream)
+                     task.mpi_comm, task.ostream, checkpoint_file)
     
     def compute(self, molecule, ao_basis, min_basis, comm,
-                ostream=OutputStream(sys.stdout)):
+                ostream=OutputStream(sys.stdout), checkpoint_file=None):
         """Performs SCF calculation.
             
         Performs SCF calculation using molecular data, MPI communicator and
@@ -184,19 +231,26 @@ class ScfDriver:
         
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
-        
+
         self.nuc_energy = molecule.nuclear_repulsion_energy()
         
         if self.rank == mpi_master():
             self.print_header(ostream)
-    
+
+        # checkpoint file
+        self.checkpoint_file = checkpoint_file
+        self.restart = (self.restart and self.checkpoint_file and
+                        isfile(self.checkpoint_file))
+        if self.restart:
+            self.read_checkpoint(self.checkpoint_file, ostream)
+
         # C2-DIIS method
         if self.acc_type == "DIIS":
             self.comp_diis(molecule, ao_basis, min_basis, comm, ostream)
        
         # two level C2-DIIS method
         if self.acc_type == "L2_DIIS":
-        
+
             # first step
             self.first_step = True
             
@@ -206,9 +260,10 @@ class ScfDriver:
             old_max_iter = self.max_iter
             self.max_iter = 5
             
-            val_basis = ao_basis.get_valence_basis()
+            if not self.restart:
+                val_basis = ao_basis.get_valence_basis()
             
-            self.comp_diis(molecule, val_basis, min_basis, comm, ostream)
+                self.comp_diis(molecule, val_basis, min_basis, comm, ostream)
             
             # second step
             self.first_step = False
@@ -217,14 +272,19 @@ class ScfDriver:
             
             self.max_iter = old_max_iter
 
-            self.den_guess.guess_type = "PRCMO"
+            if not self.restart:
+                self.den_guess.guess_type = "PRCMO"
 
-            self.comp_diis(molecule, ao_basis, val_basis, comm, ostream)
+                self.comp_diis(molecule, ao_basis, val_basis, comm, ostream)
+
+            else:
+                self.comp_diis(molecule, ao_basis, min_basis, comm, ostream)
 
         if self.rank == mpi_master():
             self.print_scf_energy(ostream)
             self.print_ground_state(molecule, ostream)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False, ostream)
+            self.print_checkpoint_info(self.checkpoint_file, ostream)
 
     def comp_diis(self, molecule, ao_basis, min_basis, comm, ostream):
         """Performs SCF calculation with C2-DIIS acceleration.
@@ -284,9 +344,16 @@ class ScfDriver:
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
 
-        den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
-                                          ovl_mat, comm, ostream) 
-                                          
+        if not self.restart:
+            den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
+                                              ovl_mat, comm, ostream) 
+
+        else:
+            if self.rank == mpi_master():
+                den_mat = self.mol_orbs.get_density(molecule)
+            else:
+                den_mat = AODensityMatrix()
+
         den_mat.broadcast(self.rank, comm)
 
         self.density = AODensityMatrix(den_mat)
@@ -336,6 +403,9 @@ class ScfDriver:
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                         ostream)
             
+            if not self.first_step:
+                self.write_checkpoint(self.checkpoint_file)
+
             self.density = AODensityMatrix(den_mat)
 
             den_mat = self.gen_new_density(molecule)
@@ -777,6 +847,16 @@ class ScfDriver:
         """
         
         return range(self.max_iter + 1)
+
+    def print_checkpoint_info(self, checkpoint_file, ostream):
+
+        if not (checkpoint_file and isinstance(checkpoint_file, str) and
+                isfile(checkpoint_file)):
+            return
+
+        checkpoint_info = "Checkpoint written to file: " + checkpoint_file
+        ostream.print_info(checkpoint_info)
+        ostream.print_blank()
     
     def print_scf_energy(self, ostream):
         """Prints SCF energy information to output stream.
@@ -902,14 +982,14 @@ class ScfDriver:
         ostream
             The output stream.
         """
-        
+
         if self.rank == mpi_master():
             # no output for first step in two level DIIS
             if self.first_step:
                 return
         
             # DIIS or second step in two level DIIS
-            if i > 0:
+            if i > 0 or self.restart:
 
                 if len(self.iter_data) > 0:
                     te, diff_te, e_grad, diff_den = self.iter_data[-1]
@@ -918,7 +998,10 @@ class ScfDriver:
                     diff_te = 0.0
                     diff_den = 0.0
             
-                exec_str  = " " + (str(i)).rjust(3) + 4 * " "
+                if self.restart:
+                    exec_str  = " " + (str(i + 1)).rjust(3) + 4 * " "
+                else:
+                    exec_str  = " " + (str(i)).rjust(3) + 4 * " "
                 exec_str += ("{:7.12f}".format(te)).center(27) + 3 * " "
                 exec_str += ("{:5.10f}".format(diff_te)).center(17) + 3 * " "
                 exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
