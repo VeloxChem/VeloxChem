@@ -9,6 +9,9 @@
 #include "ElectricFieldIntegralsDriver.hpp"
 
 #include "AngularMomentum.hpp"
+#include "GenFunc.hpp"
+#include "OneIntsFunc.hpp"
+#include "ElectricFieldRecFunc.hpp"
 
 CElectricFieldIntegralsDriver::CElectricFieldIntegralsDriver(const int32_t  globRank,
                                                              const int32_t  globNodes,
@@ -454,7 +457,148 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
     
     auto recvec = _getRecursionPattern(bragtos, ketgtos);
     
+    // set up angular momentum data
     
+    auto bang = bragtos.getAngularMomentum();
+    
+    auto kang = ketgtos.getAngularMomentum();
+    
+    // set up primitives buffer indexes
+    
+    std::vector<int32_t> recidx;
+    
+    auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
+    
+    // allocate primitives integrals buffer
+    
+    CMemBlock2D<double> pbuffer(pdim, nblk);
+    
+    // allocate accumulation buffer
+    
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
+    
+    CMemBlock2D<double> accbuffer(pdim, 3 * ncart * pmax);
+    
+    // set up contracted GTOs dimensions
+    
+    auto kdim = ketgtos.getNumberOfContrGtos();
+    
+    // allocate contracted Cartesian integrals buffer
+    
+    CMemBlock2D<double> cartbufferx(kdim, ncart);
+    
+    CMemBlock2D<double> cartbuffery(kdim, ncart);
+    
+    CMemBlock2D<double> cartbufferz(kdim, ncart);
+    
+    // allocate contracted spherical integrals buffer
+    
+    auto nspher = angmom::to_SphericalComponents(bang, kang);
+    
+    CMemBlock2D<double> spherbufferx(kdim, nspher);
+    
+    CMemBlock2D<double> spherbuffery(kdim, nspher);
+    
+    CMemBlock2D<double> spherbufferz(kdim, nspher);
+    
+    // set up indexes for contraction
+    
+    auto pidx = genfunc::findQuadrupleIndex(recidx, recvec, {bang, kang, 0, 0});
+    
+    auto spos = braGtoBlock.getStartPositions();
+    
+    auto epos = braGtoBlock.getEndPositions();
+    
+    // initialize Boys function evaluator
+    
+    auto bord = genfunc::maxOrderOfPair(recvec, 0, 0);
+    
+    CBoysFunction bftab(bord);
+    
+    CMemBlock<double> bargs(pdim);
+    
+    CMemBlock2D<double> bvals(pdim, bord + 1);
+    
+    // determine bra and ket sides symmetry
+    
+    bool symbk = (bragtos == ketgtos);
+    
+    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    {
+        // compute bra dimensions and shift
+        
+        auto bdim = epos[i] - spos[i];
+        
+        auto poff = bdim * ncart;
+        
+        // compute distances: R(AB) = A - B
+        
+        intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
+        
+        // compute Obara-Saika recursion factors
+        
+        intsfunc::compFactorsForNuclearPotential(rfacts, bragtos, ketgtos, i);
+        
+        // compute coordinates of center P
+        
+        intsfunc::compCoordinatesForP(rp, rfacts, 3, bragtos, ketgtos, i);
+        
+        // compute distances: R(PA) = P - A
+        
+        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
+        
+        // compute distances: R(PB) = P - B
+        
+        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
+        
+        // reset accumulation buffer
+        
+        accbuffer.zero();
+        
+        // loop over charges
+        
+        for (int32_t j = 0; j < dipvalues.size(0); j++)
+        {
+            // compute distances: R(PC) = P - C
+            
+            intsfunc::compDistancesPC(rpc, rp, dipcoords, bragtos, ketgtos, i, j);
+            
+            // compute primitive integrals
+            
+            _compPrimElectricFieldInts(pbuffer, recvec, recidx, bftab, bargs,
+                                       bvals, bord, rfacts, rab, rpa, rpb,
+                                       rpc, bragtos, ketgtos, i);
+            
+            // add scaled contribution to accumulation buffer
+            
+            _addPointDipoleContribution(accbuffer, pbuffer, pidx, dipvalues,
+                                        bragtos, ketgtos, i, j);
+        }
+        
+        // contract primitive overlap integrals
+        
+        genfunc::contract(cartbufferx, accbuffer, 0, bragtos, ketgtos, i);
+        
+        genfunc::contract(cartbuffery, accbuffer, poff, bragtos, ketgtos, i);
+        
+        genfunc::contract(cartbufferz, accbuffer, 2 * poff, bragtos, ketgtos, i);
+        
+        // transform Cartesian to spherical integrals
+        
+        genfunc::transform(spherbufferx, cartbufferx, bmom, kmom, 0, 0, kdim);
+        
+        genfunc::transform(spherbuffery, cartbuffery, bmom, kmom, 0, 0, kdim);
+        
+        genfunc::transform(spherbufferz, cartbufferz, bmom, kmom, 0, 0, kdim);
+        
+        // add batch of integrals to integrals matrix
+        
+        distpatx.distribute(spherbufferx, bragtos, ketgtos, symbk, i);
+        
+        distpaty.distribute(spherbuffery, bragtos, ketgtos, symbk, i);
+        
+        distpatz.distribute(spherbufferz, bragtos, ketgtos, symbk, i);
+    }
 }
 
 CVecFourIndexes
@@ -497,14 +641,205 @@ CElectricFieldIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock
             
             if (cidx.fourth() == 0)
             {
-                // electric field integrals
+                // electric field recursion
                 
+                if (cidx.first() != 0)
+                {
+                    // general recursion for bra and ket sides
                 
+                    // (a - 1 |A(1)| b)^(m) term
+                
+                    CFourIndexes t10idx(cidx.first() - 1,  cidx.second(),
+                                        
+                                        cidx.third(), 0);
+                
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t10idx)) nterms++;
+                
+                    // (a - 1 |A(1)| b)^(m+1) term
+                
+                    CFourIndexes t11idx(cidx.first() - 1,  cidx.second(),
+                                        
+                                        cidx.third() + 1, 0);
+                
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t11idx)) nterms++;
+                
+                    // (a - 2 |A(1)| b)^(m) term
+                
+                    CFourIndexes t20idx(cidx.first() - 2,  cidx.second(),
+                                        
+                                        cidx.third(), 0);
+                
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t20idx)) nterms++;
+                
+                    // (a - 2 |A(1)| b)^(m+1) term
+                
+                    CFourIndexes t21idx(cidx.first() - 2,  cidx.second(),
+                                        
+                                        cidx.third() + 1, 0);
+                
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t21idx)) nterms++;
+                
+                    // (a - 1 |A(1)| b - 1)^(m) term
+                
+                    CFourIndexes tk0idx(cidx.first() - 1,  cidx.second() - 1,
+                                        
+                                        cidx.third(), 0);
+                
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, tk0idx)) nterms++;
+                
+                    // (a - 1 |A(1)| b - 1)^(m+1) term
+                
+                    CFourIndexes tk1idx(cidx.first() - 1,  cidx.second() - 1,
+                                        
+                                        cidx.third() + 1, 0);
+                
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, tk1idx)) nterms++;
+                
+                    // (a - 1 |A(0)| b)^(m+1) term
+                
+                    CFourIndexes s10idx(cidx.first() - 1,  cidx.second(),
+                                        
+                                        cidx.third() + 1, 1);
+                
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
+                }
+                else
+                {
+                    // simplified recursion for ket sides
+                    
+                    // (0 |A(1)| b - 1)^(m) term
+                    
+                    CFourIndexes t10idx(cidx.first(),  cidx.second() - 1,
+                                        
+                                        cidx.third(), 0);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t10idx)) nterms++;
+                    
+                    // (0 |A(1)| b - 1)^(m+1) term
+                    
+                    CFourIndexes t11idx(cidx.first(),  cidx.second() - 1,
+                                        
+                                        cidx.third() + 1, 0);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t11idx)) nterms++;
+                    
+                    // (0 |A(1)| b - 2)^(m) term
+                    
+                    CFourIndexes t20idx(cidx.first(),  cidx.second() - 2,
+                                         
+                                         cidx.third(), 0);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t20idx)) nterms++;
+                    
+                    // (0 |A(1)| b - 2)^(m+1) term
+                    
+                    CFourIndexes t21idx(cidx.first(),  cidx.second() - 2,
+                                         
+                                        cidx.third() + 1, 0);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, t21idx)) nterms++;
+                    
+                    // (0 |A(0)| b - 1)^(m+1) term
+                    
+                    CFourIndexes s10idx(cidx.first(),  cidx.second() - 1,
+                                        
+                                        cidx.third() + 1 , 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
+                }
             }
             else
             {
-                // nuclear repulsion integrals
+                // nuclear repulsion recursion
                 
+                if (cidx.first() != 0)
+                {
+                    // general recursion for bra and ket sides
+                    
+                    // (a - 1 |A(0)| b)^(m) term
+                    
+                    CFourIndexes s10idx(cidx.first() - 1,  cidx.second(),
+                                        
+                                        cidx.third(), 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
+                    
+                    // (a - 1 |A(0)| b)^(m+1) term
+                    
+                    CFourIndexes s11idx(cidx.first() - 1,  cidx.second(),
+                                        
+                                        cidx.third() + 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s11idx)) nterms++;
+                    
+                    // (a - 2 |A(0)| b)^(m) term
+                    
+                    CFourIndexes s20idx(cidx.first() - 2,  cidx.second(),
+                                        
+                                        cidx.third(), 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s20idx)) nterms++;
+                    
+                    // (a - 2 |A(0)| b)^(m+1) term
+                    
+                    CFourIndexes s21idx(cidx.first() - 2,  cidx.second(),
+                                        
+                                        cidx.third() + 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s21idx)) nterms++;
+                    
+                    // (a - 1 |A(0)| b - 1)^(m) term
+                    
+                    CFourIndexes sk0idx(cidx.first() - 1,  cidx.second() - 1,
+                                        
+                                        cidx.third(), 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, sk0idx)) nterms++;
+                    
+                    // (a - 1 |A(0)| b - 1)^(m+1) term
+                    
+                    CFourIndexes sk1idx(cidx.first() - 1,  cidx.second() - 1,
+                                        
+                                        cidx.third() + 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, sk1idx)) nterms++;
+                }
+                else
+                {
+                    // simplified recursion for ket sides
+                    
+                    // (0 |A(0)| b - 1)^(m) term
+                    
+                    CFourIndexes s10idx(cidx.first(),  cidx.second() - 1,
+                                        
+                                        cidx.third(), 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
+                    
+                    // (0 |A(0)| b - 1)^(m+1) term
+                    
+                    CFourIndexes s11idx(cidx.first(),  cidx.second() - 1,
+                                        
+                                        cidx.third() + 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s11idx)) nterms++;
+                    
+                    // (0 |A(0)| b - 2)^(m) term
+                    
+                    CFourIndexes s20idx(cidx.first(),  cidx.second() - 2,
+                                        
+                                        cidx.third(), 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s20idx)) nterms++;
+                    
+                    // (0 |A(0)| b - 2)^(m+1) term
+                    
+                    CFourIndexes s21idx(cidx.first(),  cidx.second() - 2,
+                                        
+                                        cidx.third() + 1, 1);
+                    
+                    if (genfunc::addValidAndUniqueQuadruple(recvec, s21idx)) nterms++;
+                }
             }
         }
         
@@ -520,4 +855,125 @@ CElectricFieldIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock
     }
     
     return recvec;
+}
+
+int32_t
+CElectricFieldIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
+                                                              const CVecFourIndexes&     recPattern,
+                                                              const int32_t              maxPrimGtos) const
+{
+    // clear vector and reserve memory
+    
+    recIndexes.clear();
+    
+    recIndexes.reserve(recPattern.size() + 1);
+    
+    // loop over recursion pattern
+    
+    int32_t nblk = 0;
+    
+    for (size_t i = 0; i < recPattern.size(); i++)
+    {
+        recIndexes.push_back(nblk);
+        
+        auto cblk = maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
+                                                                 recPattern[i].second());
+        
+        if (recPattern[i].fourth() == 0)
+        {
+            nblk += 3 * cblk;
+        }
+        else
+        {
+            nblk += cblk;
+        }
+    }
+    
+    return nblk;
+}
+
+void
+CElectricFieldIntegralsDriver::_addPointDipoleContribution(      CMemBlock2D<double>& accBuffer,
+                                                           const CMemBlock2D<double>& primBuffer,
+                                                           const int32_t              primIndex,
+                                                           const CMemBlock2D<double>& dipoles,
+                                                           const CGtoBlock&           braGtoBlock,
+                                                           const CGtoBlock&           ketGtoBlock,
+                                                           const int32_t              iContrGto,
+                                                           const int32_t              iPointDipole) const
+{
+    // set up angular momentum for bra and ket sides
+    
+    auto bang = braGtoBlock.getAngularMomentum();
+    
+    auto kang = ketGtoBlock.getAngularMomentum();
+    
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
+    
+    // set up pointers to primitives data on bra side
+    
+    auto spos = braGtoBlock.getStartPositions();
+    
+    auto epos = braGtoBlock.getEndPositions();
+    
+    auto bdim = epos[iContrGto] - spos[iContrGto];
+    
+    // set up pointers to primitives data on ket side
+    
+    auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+    
+    for (int32_t i = 0; i < 3; i++)
+    {
+        // set up point dipole factor
+        
+        auto fact = (dipoles.data(i))[iPointDipole];
+        
+        // set up electric field component offset
+        
+        auto poff = i * bdim * ncart;
+        
+        for (int32_t j = 0; j < bdim; j++)
+        {
+            for (int32_t k = 0; k < ncart; k++)
+            {
+                auto abuf = accBuffer.data(poff + j * ncart + k);
+                
+                auto pbuf = primBuffer.data(primIndex + poff + j * ncart + k);
+                
+                #pragma omp simd aligned(abuf, pbuf: VLX_ALIGN)
+                for (int32_t l = 0; l < nprim; l++)
+                {
+                    abuf[l] += fact * pbuf[l];
+                }
+            }
+        }
+    }
+}
+
+void
+CElectricFieldIntegralsDriver::_compPrimElectricFieldInts(      CMemBlock2D<double>&  primBuffer,
+                                                          const CVecFourIndexes&      recPattern,
+                                                          const std::vector<int32_t>& recIndexes,
+                                                          const CBoysFunction&        bfTable,
+                                                                CMemBlock<double>&    bfArguments,
+                                                                CMemBlock2D<double>&  bfValues,
+                                                          const int32_t               bfOrder,
+                                                          const CMemBlock2D<double>&  osFactors,
+                                                          const CMemBlock2D<double>&  abDistances,
+                                                          const CMemBlock2D<double>&  paDistances,
+                                                          const CMemBlock2D<double>&  pbDistances,
+                                                          const CMemBlock2D<double>&  pcDistances,
+                                                          const CGtoBlock&            braGtoBlock,
+                                                          const CGtoBlock&            ketGtoBlock,
+                                                          const int32_t               iContrGto) const
+{
+    // compute (s|A(1)|s) integrals
+    
+    efieldrecfunc::compElectricFieldForSS(primBuffer, recPattern, recIndexes,
+                                          bfTable, bfArguments, bfValues,
+                                          bfOrder, osFactors, abDistances,
+                                          pcDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+    
+    // FIX ME: ...
 }

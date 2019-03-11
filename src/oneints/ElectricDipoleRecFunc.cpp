@@ -91,7 +91,8 @@ namespace ediprecfunc { // ediprecfunc namespace
             auto fdipz = primBuffer.data(doff + 2 * bdim + idx);
             
             #pragma omp simd aligned(fovl, fx, fz, knorm, abx, aby,\
-                                     abz: VLX_ALIGN)
+                                     abz, fdipx, fdipy, fdipz, pcx,\
+                                     pcy, pcz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 fovl[j] = fb * knorm[j] * std::pow(fpi * fx[j], 1.5)
