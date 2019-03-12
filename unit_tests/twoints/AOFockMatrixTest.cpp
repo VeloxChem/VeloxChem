@@ -408,6 +408,29 @@ TEST_F(CAOFockMatrixTest, GetDensityIdentifier)
     ASSERT_EQ(6, fmata.getDensityIdentifier(3));
 }
 
+TEST_F(CAOFockMatrixTest, AddOneElectronProperty)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAOFockMatrix fmata({ma, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                         fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
+    
+    CDenseMatrix mc({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+   
+    fmata.addOneElectronMatrix(mc, 0);
+    
+    CDenseMatrix md({2.0, -2.0, -6.0, -4.0, 10.0, 8.0, 12.0, 8.0, -8.0}, 3, 3);
+    
+    CAOFockMatrix fmatb({md, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                        fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
+    
+    ASSERT_EQ(fmata, fmatb);
+}
+
 TEST_F(CAOFockMatrixTest, IsSymmetric)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);

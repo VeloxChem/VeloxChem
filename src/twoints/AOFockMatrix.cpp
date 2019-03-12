@@ -257,6 +257,29 @@ CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMa
 }
 
 void
+CAOFockMatrix::addOneElectronMatrix(const CDenseMatrix& oneElectronMatrix,
+                                    const int32_t       iFockMatrix)
+{
+    // set up pointer to one electron matrix
+    
+    auto pone = oneElectronMatrix.values();
+    
+    // set up pointer to Fock matrix
+    
+    auto pfock = _fockMatrices[iFockMatrix].values();
+    
+    // add one electron operator contribution contributions
+    
+    auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
+    
+    #pragma omp simd aligned(pfock, pone: VLX_ALIGN)
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        pfock[i] += pone[i];
+    }
+}
+
+void
 CAOFockMatrix::reduce_sum(int32_t  rank,
                           int32_t  nodes,
                           MPI_Comm comm)

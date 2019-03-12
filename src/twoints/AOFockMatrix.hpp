@@ -155,12 +155,21 @@ public:
      specific Fock matrix.
 
      @param kineticEnergyMatrix the kinetic energy matrix.
-     @param nuclearPotentialMatrix the nuclear potential
+     @param nuclearPotentialMatrix the nuclear potential.
      @param iFockMatrix the index of Fock matrix.
      */
     void addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMatrix,
                             const CNuclearPotentialMatrix& nuclearPotentialMatrix,
                             const int32_t                  iFockMatrix);
+    
+    /**
+    Adds one electron operator matrix to specific Fock matrix.
+    
+    @param oneElectronMatrix the nuclear potential.
+    @param iFockMatrix the index of Fock matrix.
+    */
+    void addOneElectronMatrix(const CDenseMatrix& oneElectronMatrix,
+                              const int32_t       iFockMatrix);
     
     /**
      Reduces AO Fock matrix objects from all MPI process within domain of MPI
