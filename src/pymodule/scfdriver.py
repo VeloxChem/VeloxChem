@@ -118,10 +118,11 @@ class ScfDriver:
         
         # thresholds
         self.conv_thresh = 1.0e-6
-        self.eri_thresh  = 1.0e-15
         self.ovl_thresh  = 1.0e-6
         self.diis_thresh = 1000.0
         self.dden_thresh = 1.0e-3
+        self.eri_thresh  = 1.0e-12
+        self.eri_thresh_tight = 1.0e-15
         
         # level shifting
         self.use_level_shift = False
@@ -316,29 +317,48 @@ class ScfDriver:
     
         ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis,
                                                         comm, ostream)
+
+        ovl_info = None
                                                         
         if self.rank == mpi_master():
             t0 = tm.time()
 
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
 
-            ostream.print_info("Orthogonalization matrix computed in %.2f sec."
-                               % (tm.time() - t0))
+            ostream.print_info("Orthogonalization matrix computed in" +
+                               " {:.2f} sec.".format(tm.time() - t0))
             ostream.print_blank()
 
             nrow = oao_mat.number_of_rows()
             ncol = oao_mat.number_of_columns()
             if nrow != ncol:
                 ndim = nrow - ncol
-                ostream.print_info("Removed %d linearly dependent vector%s."
-                                   % (ndim, '' if ndim == 1 else 's'))
+                ostream.print_info(
+                    "Removed " + str(ndim) + " linearly dependent" +
+                    " vector{:s}.".format('' if ndim == 1 else 's'))
                 ostream.print_blank()
+
+                ovl_info = {"linear_dependency": True}
+
+            else:
+                ovl_info = {"linear_dependency": False}
 
             ostream.flush()
 
         else:
             oao_mat = None
-    
+
+        ovl_info = comm.bcast(ovl_info, root=mpi_master())
+
+        if (ovl_info["linear_dependency"] and
+            self.eri_thresh > self.eri_thresh_tight):
+            self.eri_thresh = self.eri_thresh_tight
+
+            if self.rank == mpi_master():
+                ostream.print_info("ERI screening threshold tightened to" +
+                                   " {:.1e}.".format(self.eri_thresh))
+                ostream.print_blank()
+
         eri_drv = ElectronRepulsionIntegralsDriver(self.rank,
                                                    self.nodes,
                                                    comm)
@@ -464,16 +484,16 @@ class ScfDriver:
 
         if self.rank == mpi_master():
 
-            ostream.print_info("Overlap matrix computed in %.2f sec."
-                               % (t1 - t0))
+            ostream.print_info("Overlap matrix computed in" +
+                               " {:.2f} sec.".format(t1 - t0))
             ostream.print_blank()
 
-            ostream.print_info("Kinetic energy matrix computed in %.2f sec."
-                               % (t2 - t1))
+            ostream.print_info("Kinetic energy matrix computed in" +
+                               " {:.2f} sec.".format(t2 - t1))
             ostream.print_blank()
 
-            ostream.print_info("Nuclear potential matrix computed in %.2f sec."
-                               % (t3 - t2))
+            ostream.print_info("Nuclear potential matrix computed in" +
+                               " {:.2f} sec.".format(t3 - t2))
             ostream.print_blank()
 
             ostream.flush()
