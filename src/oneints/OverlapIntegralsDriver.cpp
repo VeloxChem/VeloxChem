@@ -13,7 +13,6 @@
 #include "OverlapRecFunc.hpp"
 #include "GenFunc.hpp"
 #include "MemBlock.hpp"
-#include "SystemClock.hpp"
 #include "StringFormat.hpp"
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
@@ -43,8 +42,6 @@ COverlapIntegralsDriver::compute(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
                                        MPI_Comm         comm) const 
 {
-    CSystemClock timer;
-    
     COverlapMatrix ovlmat;
     
     if (_locRank == mpi::master())

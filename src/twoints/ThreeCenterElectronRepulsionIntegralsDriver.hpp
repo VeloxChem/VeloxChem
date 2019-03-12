@@ -20,7 +20,6 @@
 #include "GtoContainer.hpp"
 #include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
-#include "SystemClock.hpp"
 
 /**
  Class CThreeCenterElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -121,25 +120,6 @@ class CThreeCenterElectronRepulsionIntegralsDriver
                                          const CMemBlock2D<double>&  cdDistances,
                                          const CGtoBlock&            braGtoBlock,
                                          const CGtoPairsBlock&       ketGtoPairsBlock) const;
-    
-    /**
-     Prints start header for computation of three-center electron repulsion
-     integrals.
-     
-     @param gtoPairs the GTOs pairs container on ket side.
-     @return the output string.
-     */
-    std::string _startHeader(const CGtoPairsContainer& gtoPairs) const;
-    
-    /**
-     Prints timing statistics for evaluation of electron repulsion integrals.
-
-     @param molecule the molecule.
-     @param timer the timer.
-     @return the output string.
-     */
-    std::string _printTiming(const CMolecule&    molecule,
-                             const CSystemClock& timer) const;
     
     /**
      Creates atoms list splitting pattern for generation of GTO blocks on each

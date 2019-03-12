@@ -40,8 +40,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& basis,
                                              MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CKineticEnergyMatrix kinmat;
     
     if (_locRank == mpi::master())
@@ -64,8 +62,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& ketBasis,
                                              MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CKineticEnergyMatrix kinmat;
     
     if (_locRank == mpi::master())
@@ -90,8 +86,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecularBasis& basis,
                                              MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CKineticEnergyMatrix kinmat;
     
     if (_locRank == mpi::master())
@@ -117,8 +111,6 @@ CKineticEnergyIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecularBasis& ketBasis,
                                              MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CKineticEnergyMatrix kinmat;
     
     if (_locRank == mpi::master())

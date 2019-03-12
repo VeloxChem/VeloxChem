@@ -41,8 +41,6 @@ CElectronicPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                              const CMolecularBasis& basis,
                                                    MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CElectronicPotentialMatrix epotmat;
     
     if (_locRank == mpi::master())

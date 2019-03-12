@@ -57,8 +57,6 @@ CThreeCenterElectronRepulsionIntegralsDriver::compute(const CMolecule&       mol
                                                       const double           threshold, 
                                                             MPI_Comm         comm) const
 {
-    CSystemClock eritim;
-    
     // generate GTOs pairs blocks for AO basis
     
     CGtoPairsContainer kgtopairs(molecule, aoBasis, 1.0e-15);
@@ -658,91 +656,6 @@ CThreeCenterElectronRepulsionIntegralsDriver::_compContrElectronRepulsionInts(  
     
     t3hrrfunc::compElectronRepulsionForXGG(contrBuffer, recPattern, recIndexes,
                                            cdDistances, bang, ketGtoPairsBlock);
-}
-
-std::string
-CThreeCenterElectronRepulsionIntegralsDriver::_startHeader(const CGtoPairsContainer& gtoPairs) const
-{
-    std::stringstream ss;
-
-    ss << "Three-Center Electron Repulsion Integrals\n";
-    
-    ss << std::string(43, '=') << "\n\n";
-    
-    // GTO pairs screening information
-    
-    ss << gtoPairs.printScreeningInfo();
-    
-    return ss.str();
-}
-
-std::string
-CThreeCenterElectronRepulsionIntegralsDriver::_printTiming(const CMolecule&    molecule,
-                                                           const CSystemClock& timer) const
-{
-    // NOTE: Silent for local execution mode
-    
-    if (_isLocalMode) return std::string("");
-    
-    // collect timing data from MPI nodes
-    
-    auto tsec = timer.getElapsedTimeInSeconds();
-    
-    CMemBlock<double> tvec;
-    
-    if (_globRank == mpi::master()) tvec = CMemBlock<double>(_globNodes);
-    
-    mpi::gather(tvec.data(), tsec, _globRank, MPI_COMM_WORLD);
-    
-    // print timing data
-    
-    std::stringstream ss;
-
-    if (_globRank == mpi::master())
-    {
-        auto natoms = molecule.getNumberOfAtoms();
-        
-        std::string str("Three-Center Integrals Evaluation Timings: ");
-        
-        ss << fstr::format(str, 80, fmt::left) << "\n\n";
-        
-        for (int32_t i = 0; i < _globNodes; i++)
-        {
-            // node information
-            
-            str.assign("MPI Node: ");
-            
-            str.append(fstr::to_string(i, 3, fmt::left));
-            
-            // atom batches information
-            
-            auto nodatm = mpi::batch_size(natoms, i, _globNodes);
-            
-            auto nodoff = mpi::batch_offset(natoms, i, _globNodes);
-            
-            str.append(" Atoms in batch: ");
-            
-            std::string bstr(std::to_string(nodoff));
-            
-            bstr.append("-");
-            
-            bstr.append(std::to_string(nodoff + nodatm));
-            
-            str.append(fstr::format(bstr, 8, fmt::left));
-            
-            // evaluation time info
-            
-            str.append(" Time: ");
-            
-            str.append(fstr::to_string(tvec.at(i), 2));
-            
-            str.append(" sec.");
-            
-            ss << fstr::format(str, 80, fmt::left) << "\n";
-        }
-    }
-
-    return ss.str();
 }
 
 CMemBlock2D<int32_t>

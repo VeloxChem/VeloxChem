@@ -10,7 +10,6 @@
 
 #include <cmath>
 
-#include "SystemClock.hpp"
 #include "OMPTasks.hpp"
 #include "GtoRecFunc.hpp"
 #include "GenFunc.hpp"
@@ -50,8 +49,6 @@ CDensityGridDriver::generate(const CMolecule&       molecule,
                              const xcfun            xcFunctional, 
                                    MPI_Comm         comm)
 {
-    CSystemClock tim;
-    
     // execution mode: CPU
     
     if (_runMode == execmode::cpu)
@@ -66,11 +63,9 @@ CDensityGridDriver::generate(const CMolecule&       molecule,
     {
         // TODO: implement CPU/GPU code
     }
-    
-    printf("Density Grid: rank %i points: %i time %lf s.\n",
-           _locRank, molGrid.getNumberOfGridPoints(), tim.getElapsedTimeInSeconds());
-    
-    return;
+
+    //printf("Density Grid: rank %i points: %i\n",
+    //       _locRank, molGrid.getNumberOfGridPoints());
 }
 
 void
@@ -230,7 +225,7 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
         
     }
     
-    printf("task: size: %i pos %i\n", nGridPoints, gridOffset);
+    //printf("task: size: %i pos %i\n", nGridPoints, gridOffset);
 }
 
 void

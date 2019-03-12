@@ -12,7 +12,6 @@
 
 #include "DenseDiagonalizer.hpp"
 #include "StringFormat.hpp"
-#include "SystemClock.hpp"
 
 COverlapMatrix::COverlapMatrix()
 {
@@ -112,8 +111,6 @@ COverlapMatrix::values() const
 CDenseMatrix
 COverlapMatrix::getOrthogonalizationMatrix(const double threshold) const
 {
-    CSystemClock timer;
-    
     CDenseDiagonalizer diagdrv;
     
     diagdrv.diagonalize(_matrix);

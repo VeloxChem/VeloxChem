@@ -16,7 +16,6 @@
 #include "Molecule.hpp"
 #include "ExecMode.hpp"
 #include "MolecularGrid.hpp"
-#include "SystemClock.hpp"
 
 /**
  Class CGridDriver generates grid points data for usage in numerical
@@ -93,12 +92,10 @@ class CGridDriver
     /**
      Prints finish header with grid generation settings to output stream.
 
-     @param time the time clock object.
      @param molecularGrid the molecular grid object.
      @return the output string.
      */
-    std::string _finishHeader(const CSystemClock&   time,
-                              const CMolecularGrid& molecularGrid) const;
+    std::string _finishHeader(const CMolecularGrid& molecularGrid) const;
     
     /**
      Creates molecular grid on master node by generating fraction of grid

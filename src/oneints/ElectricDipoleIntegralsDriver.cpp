@@ -8,7 +8,6 @@
 
 #include "ElectricDipoleIntegralsDriver.hpp"
 
-#include "SystemClock.hpp"
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
 #include "MemBlock.hpp"
@@ -61,8 +60,6 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
                                         const CMolecularBasis& basis,
                                               MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CElectricDipoleMatrix dipmat;
     
     if (_locRank == mpi::master())

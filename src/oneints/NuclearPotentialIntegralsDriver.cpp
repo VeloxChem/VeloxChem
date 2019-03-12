@@ -41,8 +41,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecularBasis& basis,
                                                 MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CNuclearPotentialMatrix npotmat;
     
     if (_locRank == mpi::master())
@@ -72,8 +70,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecule&       pchgMolecule,
                                                 MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CNuclearPotentialMatrix npotmat;
     
     if (_locRank == mpi::master())
@@ -104,8 +100,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecule&       pchgMolecule,
                                                 MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CNuclearPotentialMatrix npotmat;
     
     if (_locRank == mpi::master())
@@ -138,8 +132,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecule&       pchgMolecule,
                                                 MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CNuclearPotentialMatrix npotmat;
     
     if (_locRank == mpi::master())
@@ -173,8 +165,6 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecule&       pchgMolecule,
                                                 MPI_Comm         comm) const
 {
-    CSystemClock timer;
-    
     CNuclearPotentialMatrix npotmat;
     
     if (_locRank == mpi::master())

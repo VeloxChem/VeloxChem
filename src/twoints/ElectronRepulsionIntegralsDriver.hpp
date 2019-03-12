@@ -25,7 +25,6 @@
 #include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
 #include "GtoPairsContainer.hpp"
-#include "SystemClock.hpp"
 #include "TwoIntsDistributor.hpp"
 #include "ScreeningContainer.hpp"
 #include "VecMemBlocks.hpp"
@@ -223,45 +222,6 @@ class CElectronRepulsionIntegralsDriver
                         const CGtoPairsBlock&       ketGtoPairsBlock,
                         const int32_t               nKetContrPairs,
                         const int32_t               iContrPair) const;
-    
-    /**
-     Prints start header for computation of two-electron repulsion
-     integrals.
-     
-     @param gtoPairs the GTOs pairs container on ket side.
-     @return the output string.
-     */
-    std::string _startHeader(const CGtoPairsContainer& gtoPairs) const;
-    
-    /**
-     Prints timing statistics for evaluation of electron repulsion integrals.
-     
-     @param molecule the molecule.
-     @param timer the timer.
-     @return the output string.
-     */
-    std::string _printTiming(const CMolecule&    molecule,
-                             const CSystemClock& timer) const;
-    
-    /**
-     Prints timing statistics for evaluation of AO Fock matrix.
-     
-     @param fockMatrix the AO Fock matrix.
-     @param timer the timer.
-     @return the output string.
-     */
-    std::string _printFockTiming(const CAOFockMatrix& fockMatrix,
-                                 const CSystemClock&  timer) const;
-    
-    /**
-     Prints timing statistics for evaluation of Q values.
-     
-     @param molecule the molecule.
-     @param timer the timer.
-     @return the output string.
-     */
-    std::string _printQValuesTiming(const CMolecule&    molecule,
-                                   const CSystemClock& timer) const;
     
     /**
      Comutes electron repulsion integrals and stores them into AO Fock matrix

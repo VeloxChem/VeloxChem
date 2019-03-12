@@ -8,7 +8,6 @@
 
 #include "SADGuessDriver.hpp"
 
-#include "SystemClock.hpp"
 #include "StringFormat.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DenseDiagonalizer.hpp"
@@ -244,8 +243,6 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
                          const COverlapMatrix&  S22,
                                MPI_Comm         comm) const 
 {
-    CSystemClock timer;
-    
     CAODensityMatrix dsad;
     
     if (_locRank == mpi::master())

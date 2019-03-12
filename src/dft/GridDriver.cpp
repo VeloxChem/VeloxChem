@@ -70,8 +70,6 @@ CMolecularGrid
 CGridDriver::generate(const CMolecule& molecule,
                             MPI_Comm   comm) const
 {
-    CSystemClock time;
-    
     // initialize molecular grid
     
     CMolecularGrid molgrid;
@@ -262,8 +260,7 @@ CGridDriver::_startHeader(const CMolecule& molecule) const
 }
 
 std::string
-CGridDriver::_finishHeader(const CSystemClock&   time,
-                           const CMolecularGrid& molecularGrid) const
+CGridDriver::_finishHeader(const CMolecularGrid& molecularGrid) const
 {
     std::stringstream ss;
 
@@ -273,12 +270,6 @@ CGridDriver::_finishHeader(const CSystemClock&   time,
     
     ss << fstr::format(str, 54, fmt::left) << "\n";
     
-    str.assign("Generation Time : ");
-    
-    str.append(time.getElapsedTime());
-    
-    ss << fstr::format(str, 54, fmt::left) << "\n";
-
     return ss.str();
 }
 
