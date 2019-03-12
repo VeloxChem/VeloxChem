@@ -171,8 +171,8 @@ class InputParser:
         else:
             # for input file, save input file name and checkpoint file name
             if '.' in self.filename:
-                checkpoint = '.'.join(self.filename.split('.')[:-1]) + ".h5"
+                checkpoint = '.'.join(self.filename.split('.')[:-1]) + ".scf.h5"
             else:
-                checkpoint = self.filename + ".h5"
+                checkpoint = self.filename + ".scf.h5"
             self.input_dict["input_file"]= self.filename
             self.input_dict["checkpoint_file"] = checkpoint
