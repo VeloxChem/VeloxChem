@@ -76,6 +76,36 @@ CExcitationVector_diagonal_to_numpy(const CExcitationVector&  self,
     return vlx_general::pointer_to_numpy(diagmat.data(), diagmat.size(), 1);
 }
     
+static py::array
+CExcitationVector_bra_indexes_to_numpy(const CExcitationVector& self)
+{
+    py::list ids;
+    
+    auto pdat = self.getBraIndexes();
+    
+    for (int32_t i = 0; i < self.getNumberOfExcitations(); i++)
+    {
+        ids.append(pdat[i]);
+    }
+    
+    return py::array(ids);
+}
+
+static py::array
+CExcitationVector_ket_indexes_to_numpy(const CExcitationVector& self)
+{
+    py::list ids;
+    
+    auto pdat = self.getKetIndexes();
+    
+    for (int32_t i = 0; i < self.getNumberOfExcitations(); i++)
+    {
+        ids.append(pdat[i]);
+    }
+    
+    return py::array(ids);
+}
+    
 // Helper function for CTDASigmaVectorDriver constructor
     
 static std::shared_ptr<CTDASigmaVectorDriver>
@@ -147,6 +177,8 @@ void export_response(py::module& m)
         .def("number_excitations", &CExcitationVector::getNumberOfExcitations)
         .def("bra_unique_indexes", &CExcitationVector::getBraUniqueIndexes)
         .def("ket_unique_indexes", &CExcitationVector::getKetUniqueIndexes)
+        .def("bra_indexes", &CExcitationVector_bra_indexes_to_numpy)
+        .def("ket_indexes", &CExcitationVector_ket_indexes_to_numpy)
         .def("get_zmatrix", &CExcitationVector::getMatrixZ)
         .def("get_ymatrix", &CExcitationVector::getMatrixY)
         .def("get_zdensity", &CExcitationVector::getDensityZ)

@@ -163,21 +163,21 @@ to_AngularMomentum(const std::string& label)
 }
 
 std::string
-to_AngularMomentum(const int32_t angularmomentum)
+to_AngularMomentum(const int32_t angularMomentum)
 {
-    if (angularmomentum == 0) return std::string("S");
+    if (angularMomentum == 0) return std::string("S");
 
-    if (angularmomentum == 1) return std::string("P");
+    if (angularMomentum == 1) return std::string("P");
 
-    if (angularmomentum == 2) return std::string("D");
+    if (angularMomentum == 2) return std::string("D");
 
-    if (angularmomentum == 3) return std::string("F");
+    if (angularMomentum == 3) return std::string("F");
 
-    if (angularmomentum == 4) return std::string("G");
+    if (angularMomentum == 4) return std::string("G");
 
-    if (angularmomentum == 5) return std::string("H");
+    if (angularMomentum == 5) return std::string("H");
 
-    if (angularmomentum == 6) return std::string("I");
+    if (angularMomentum == 6) return std::string("I");
 
     return std::string();
 }
