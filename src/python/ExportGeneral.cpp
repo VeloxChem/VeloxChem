@@ -39,19 +39,28 @@ get_mpi_comm(py::object py_comm)
     return comm_ptr;
 }
 
-// Gets numpy array from double pointer and dimensions
-// Not a static function; used in other files
+// Helper functions for getting shape and strides from int32_t dimension
 
-py::array_t<double>
-pointer_to_numpy(const double*               ptr,
-                 const std::vector<int32_t>& dimension)
+static std::vector<ssize_t>
+dimension_to_shape(const std::vector<int32_t>& dimension)
 {
-    std::vector<ssize_t> shape, strides;
+    std::vector<ssize_t> shape;
 
     for (size_t i = 0; i < dimension.size(); i++)
     {
         shape.push_back(static_cast<ssize_t>(dimension[i]));
+    }
 
+    return shape;
+}
+
+static std::vector<ssize_t>
+dimension_to_strides(const std::vector<int32_t>& dimension, size_t sizeoftype)
+{
+    std::vector<ssize_t> strides;
+
+    for (size_t i = 0; i < dimension.size(); i++)
+    {
         size_t strd = 1;
 
         for (size_t j = i + 1; j < dimension.size(); j++)
@@ -59,10 +68,22 @@ pointer_to_numpy(const double*               ptr,
             strd *= dimension[j];
         }
 
-        strides.push_back(static_cast<ssize_t>(strd * sizeof(double)));
+        strides.push_back(static_cast<ssize_t>(strd * sizeoftype));
     }
 
-    return py::array_t<double>(shape, strides, ptr);
+    return strides;
+}
+
+// Gets numpy array from double pointer and int32_t dimensions
+// Not static functions; used in other files
+
+py::array_t<double>
+pointer_to_numpy(const double*               ptr,
+                 const std::vector<int32_t>& dimension)
+{
+    return py::array_t<double>(dimension_to_shape(dimension),
+                               dimension_to_strides(dimension, sizeof(double)),
+                               ptr);
 }
 
 py::array_t<double>
@@ -73,6 +94,30 @@ pointer_to_numpy(const double* ptr, int32_t nElements)
 
 py::array_t<double>
 pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns)
+{
+    return pointer_to_numpy(ptr, std::vector<int32_t>({nRows, nColumns}));
+}
+
+// Gets numpy array from int32_t pointer and dimensions
+// Not static functions; used in other files
+
+py::array_t<int32_t>
+pointer_to_numpy(const int32_t*              ptr,
+                 const std::vector<int32_t>& dimension)
+{
+    return py::array_t<int32_t>(dimension_to_shape(dimension),
+                                dimension_to_strides(dimension, sizeof(int32_t)),
+                                ptr);
+}
+
+py::array_t<int32_t>
+pointer_to_numpy(const int32_t* ptr, int32_t nElements)
+{
+    return pointer_to_numpy(ptr, std::vector<int32_t>({nElements}));
+}
+
+py::array_t<int32_t>
+pointer_to_numpy(const int32_t* ptr, int32_t nRows, int32_t nColumns)
 {
     return pointer_to_numpy(ptr, std::vector<int32_t>({nRows, nColumns}));
 }

@@ -27,7 +27,7 @@ namespace vlx_general { // vlx_general namespace
 MPI_Comm* get_mpi_comm(py::object py_comm);
 
 /**
- Gets numpy array from double pointer and dimension.
+ Gets numpy array from double pointer and int32_t dimension.
 
  @param ptr the double pointer.
  @param dimension the shape of numpy array.
@@ -37,7 +37,7 @@ py::array_t<double> pointer_to_numpy(const double*               ptr,
                                      const std::vector<int32_t>& dimension);
 
 /**
- Gets 1d numpy array from double pointer and dimension.
+ Gets 1d numpy array from double pointer and int32_t dimension.
 
  @param ptr the double pointer.
  @param nElements number of elements.
@@ -47,7 +47,7 @@ py::array_t<double> pointer_to_numpy(const double* ptr,
                                      const int32_t nElements);
 
 /**
- Gets 2d numpy array from double pointer and dimension.
+ Gets 2d numpy array from double pointer and int32_t dimension.
 
  @param ptr the double pointer.
  @param nRows number of rows.
@@ -57,6 +57,38 @@ py::array_t<double> pointer_to_numpy(const double* ptr,
 py::array_t<double> pointer_to_numpy(const double* ptr,
                                      const int32_t nRows,
                                      const int32_t nColumns);
+
+/**
+ Gets numpy array from int32_t pointer and dimension.
+
+ @param ptr the int32_t pointer.
+ @param dimension the shape of numpy array.
+ @return numpy array.
+ */
+py::array_t<int32_t> pointer_to_numpy(const int32_t*              ptr,
+                                      const std::vector<int32_t>& dimension);
+
+/**
+ Gets 1d numpy array from int32_t pointer and dimension.
+
+ @param ptr the int32_t pointer.
+ @param nElements number of elements.
+ @return numpy array.
+ */
+py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr,
+                                      const int32_t  nElements);
+
+/**
+ Gets 2d numpy array from int32_t pointer and dimension.
+
+ @param ptr the int32_t pointer.
+ @param nRows number of rows.
+ @param nColumns number of columns.
+ @return numpy array.
+ */
+py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr,
+                                      const int32_t  nRows,
+                                      const int32_t  nColumns);
 
 /**
  Exports classes/functions in src/general to python.

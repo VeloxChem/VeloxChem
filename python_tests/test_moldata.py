@@ -157,6 +157,8 @@ class TestMolData(unittest.TestCase):
 
         elem_ids = mol.elem_ids_to_numpy()
 
+        self.assertTrue(elem_ids.dtype.type is np.int32)
+
         ref_ids = np.array([1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80])
 
         self.assertTrue((elem_ids == ref_ids).all())

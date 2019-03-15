@@ -227,17 +227,11 @@ CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 
 // Helper function for getting nuclear charges for molecule
 
-static py::array
+static py::array_t<int32_t>
 CMolecule_elem_ids_to_numpy(const CMolecule& self)
 {
-    py::list ids;
-
-    for (int32_t i = 0; i < self.getNumberOfAtoms(); i++)
-    {
-        ids.append(self.getIdsElemental()[i]);
-    }
-
-    return py::array(ids);
+    return vlx_general::pointer_to_numpy(self.getIdsElemental(),
+                                         self.getNumberOfAtoms());
 }
 
 // Helper function for getting elemental composition

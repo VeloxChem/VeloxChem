@@ -76,34 +76,18 @@ CExcitationVector_diagonal_to_numpy(const CExcitationVector&  self,
     return vlx_general::pointer_to_numpy(diagmat.data(), diagmat.size(), 1);
 }
     
-static py::array
+static py::array_t<int32_t>
 CExcitationVector_bra_indexes_to_numpy(const CExcitationVector& self)
 {
-    py::list ids;
-    
-    auto pdat = self.getBraIndexes();
-    
-    for (int32_t i = 0; i < self.getNumberOfExcitations(); i++)
-    {
-        ids.append(pdat[i]);
-    }
-    
-    return py::array(ids);
+    return vlx_general::pointer_to_numpy(self.getBraIndexes(),
+                                         self.getNumberOfExcitations());
 }
 
-static py::array
+static py::array_t<int32_t>
 CExcitationVector_ket_indexes_to_numpy(const CExcitationVector& self)
 {
-    py::list ids;
-    
-    auto pdat = self.getKetIndexes();
-    
-    for (int32_t i = 0; i < self.getNumberOfExcitations(); i++)
-    {
-        ids.append(pdat[i]);
-    }
-    
-    return py::array(ids);
+    return vlx_general::pointer_to_numpy(self.getKetIndexes(),
+                                         self.getNumberOfExcitations());
 }
     
 // Helper function for CTDASigmaVectorDriver constructor
