@@ -224,6 +224,14 @@ namespace intsfunc { // intsfunc namespace
                          const CGtoBlock&           ketGtoBlock,
                          const int32_t              iContrGto);
     
+    /**
+     Gets number of components in distances tensor.
+
+     @param tensorOrder the order of distances tensor.
+     @return the number of components in distances tensor.
+     */
+    int32_t getNumberOfComponentsInDistancesTensor(const int32_t tensorOrder);
+    
 } // intsfunc namespace
 
 #endif /* OneIntsFunc_hpp */

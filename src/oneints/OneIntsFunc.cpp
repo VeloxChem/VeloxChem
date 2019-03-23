@@ -9,6 +9,7 @@
 #include "OneIntsFunc.hpp"
 
 #include "MathFunc.hpp"
+#include "AngularMomentum.hpp"
 
 namespace intsfunc { // intsfunc namespace
     
@@ -742,6 +743,19 @@ namespace intsfunc { // intsfunc namespace
             
             idx++;
         }
+    }
+    
+    int32_t
+    getNumberOfComponentsInDistancesTensor(const int32_t tensorOrder)
+    {
+        int32_t ncomps = 0;
+        
+        for (int32_t i = 1; i <= tensorOrder; i++)
+        {
+            ncomps += angmom::to_CartesianComponents(i); 
+        }
+        
+        return ncomps;
     }
     
 } // intsfunc namespace

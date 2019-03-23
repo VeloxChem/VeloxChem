@@ -499,6 +499,37 @@ namespace genfunc { // genfunc namespace
      @return the vector of three indexes objects of (x,y,z) type.
      */
     CVecThreeIndexes getTriplesFromQuadrupleIndexes(const CVecFourIndexes& vector);
+    
+    /**
+     Computes second order tensor from vector in set of tensors.
+
+     @param tensor the set of tensors.
+     @param iVectorPosition the position of vector (first order tensor) in set
+            of tensors.
+     @param iTensorPosition the position of second order tensor in set of tensors.
+     */
+    void compTensorTwoFromVector(      CMemBlock2D<double>& tensor,
+                                 const int32_t              iVectorPosition,
+                                 const int32_t              iTensorPosition);
+    
+    /**
+     Computes higher order tensor from vector and lower order tensor in set of
+     tensors.
+     
+     @param tensor the set of tensors.
+     @param iVectorPosition the position of vector (first order tensor) in set
+            of tensors.
+     @param iTensorOnePosition the position of lower order tensor in set of
+            tensors.
+     @param iTensorTwoPosition the position of higher order tensor in set of
+            tensors.
+     @param tensorOrder the order of tensor.
+     */
+    void compTensorFromVectorAndTensor(      CMemBlock2D<double>& tensor,
+                                       const int32_t              iVectorPosition,
+                                       const int32_t              iTensorOnePosition,
+                                       const int32_t              iTensorTwoPosition,
+                                       const int32_t              tensorOrder);
 
 } // genfunc namespace
 

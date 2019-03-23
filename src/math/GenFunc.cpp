@@ -992,4 +992,131 @@ getTriplesFromQuadrupleIndexes(const CVecFourIndexes& vector)
 }
     
     
+void
+compTensorTwoFromVector(      CMemBlock2D<double>& tensor,
+                        const int32_t              iVectorPosition,
+                        const int32_t              iTensorPosition)
+{
+    // set up pointers to vector x, y, z
+    
+    auto rx = tensor.data(iVectorPosition);
+    
+    auto ry = tensor.data(iVectorPosition + 1);
+    
+    auto rz = tensor.data(iVectorPosition + 2);
+    
+    // set up second order tensor components
+    
+    auto rxx = tensor.data(iTensorPosition);
+    
+    auto rxy = tensor.data(iTensorPosition + 1);
+    
+    auto rxz = tensor.data(iTensorPosition + 2);
+    
+    auto ryy = tensor.data(iTensorPosition + 3);
+    
+    auto ryz = tensor.data(iTensorPosition + 4);
+    
+    auto rzz = tensor.data(iTensorPosition + 5);
+    
+    // compute second order tensor
+    
+    auto ndim = tensor.size(iVectorPosition);
+    
+    #pragma omp simd aligned(rx, ry, rz, rxx, rxy, rxz, ryy, ryz, rzz: VLX_ALIGN)
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        // leading x component
+        
+        rxx[i] = rx[i] * rx[i];
+        
+        rxy[i] = rx[i] * ry[i];
+        
+        rxz[i] = rx[i] * rz[i];
+        
+        // leading y component
+        
+        ryy[i] = ry[i] * ry[i];
+        
+        ryz[i] = ry[i] * rz[i];
+        
+        // leading x component
+        
+        rzz[i] = rz[i] * rz[i];
+    }
+}
+    
+void
+compTensorFromVectorAndTensor(      CMemBlock2D<double>& tensor,
+                              const int32_t              iVectorPosition,
+                              const int32_t              iTensorOnePosition,
+                              const int32_t              iTensorTwoPosition,
+                              const int32_t              tensorOrder)
+{
+    if (tensorOrder > 2)
+    {
+        // set up pointers to vector x, y, z
+    
+        auto rx = tensor.data(iVectorPosition);
+    
+        auto ry = tensor.data(iVectorPosition + 1);
+    
+        auto rz = tensor.data(iVectorPosition + 2);
+        
+        // set up dimensions of lower order tensors
+        
+        auto curdim = angmom::to_CartesianComponents(tensorOrder);
+        
+        auto lowdim = angmom::to_CartesianComponents(tensorOrder - 1);
+        
+        auto reddim = angmom::to_CartesianComponents(tensorOrder - 2);
+        
+        // leading x component
+        
+        auto ndim = tensor.size(iVectorPosition);
+        
+        for (int32_t i = 0; i < lowdim; i++)
+        {
+            auto rdst = tensor.data(iTensorTwoPosition + i);
+            
+            auto rsrc = tensor.data(iTensorOnePosition + i);
+            
+            #pragma omp simd aligned(rx, rdst, rsrc: VLX_ALIGN)
+            for (int32_t j = 0; j < ndim; j++)
+            {
+                rdst[j] = rx[j] * rsrc[j];
+            }
+        }
+        
+        // leading y component
+        
+        auto yoff = lowdim - reddim;
+        
+        for (int32_t i = reddim; i < lowdim; i++)
+        {
+            auto rdst = tensor.data(iTensorTwoPosition + yoff + i);
+            
+            auto rsrc = tensor.data(iTensorOnePosition + i);
+            
+            #pragma omp simd aligned(ry, rdst, rsrc: VLX_ALIGN)
+            for (int32_t j = 0; j < ndim; j++)
+            {
+                rdst[j] = ry[j] * rsrc[j];
+            }
+        }
+        
+        // leading z component
+        
+        auto rdst = tensor.data(iTensorTwoPosition + curdim - 1);
+        
+        auto rsrc = tensor.data(iTensorOnePosition + lowdim - 1);
+        
+        #pragma omp simd aligned(rz, rdst, rsrc: VLX_ALIGN)
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            rdst[i] = rz[i] * rsrc[i];
+        }
+    }
+}
+    
 } // genfunc namespace

@@ -433,5 +433,23 @@ TEST_F(COneIntsFuncTest, CompDistancesPCFromP)
     ASSERT_EQ(rpc, refpc);
 }
 
-
-
+TEST_F(COneIntsFuncTest, GetNumberOfComponentsInDistancesTensor)
+{
+    ASSERT_EQ(0, intsfunc::getNumberOfComponentsInDistancesTensor(0));
+    
+    ASSERT_EQ(3, intsfunc::getNumberOfComponentsInDistancesTensor(1));
+    
+    ASSERT_EQ(9, intsfunc::getNumberOfComponentsInDistancesTensor(2));
+    
+    ASSERT_EQ(19, intsfunc::getNumberOfComponentsInDistancesTensor(3));
+    
+    ASSERT_EQ(34, intsfunc::getNumberOfComponentsInDistancesTensor(4));
+    
+    ASSERT_EQ(55, intsfunc::getNumberOfComponentsInDistancesTensor(5));
+    
+    ASSERT_EQ(83, intsfunc::getNumberOfComponentsInDistancesTensor(6));
+    
+    ASSERT_EQ(119, intsfunc::getNumberOfComponentsInDistancesTensor(7));
+    
+    ASSERT_EQ(164, intsfunc::getNumberOfComponentsInDistancesTensor(8));
+}
