@@ -18,7 +18,6 @@
 #include "ExecMode.hpp"
 #include "OverlapMatrix.hpp"
 #include "GtoContainer.hpp"
-#include "VecIndexes.hpp"
 #include "OneIntsDistributor.hpp"
 
 /**
@@ -83,9 +82,8 @@ class COverlapIntegralsDriver
      Batch size: (one contracted GTO on bra side) x (all contracted GTOs on ket
      side).
      
-     @param primBuffer the primitives buffer.
-     @param recPattern the recursion pattern.
-     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param primBuffer the primitive integrals buffer.
+     @param auxBuffer the auxilary integrals buffer.
      @param osFactors the Obara-Saika recursion factors.
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
@@ -95,8 +93,7 @@ class COverlapIntegralsDriver
      @param iContrGto the index of contracted GTO on bra side.
      */
     void _compPrimOverlapInts(      CMemBlock2D<double>&  primBuffer,
-                              const CVecTwoIndexes&       recPattern,
-                              const std::vector<int32_t>& recIndexes,
+                                    CMemBlock2D<double>&  auxBuffer,
                               const CMemBlock2D<double>&  osFactors,
                               const CMemBlock2D<double>&  abDistances,
                               const CMemBlock2D<double>&  paDistances,
@@ -104,32 +101,6 @@ class COverlapIntegralsDriver
                               const CGtoBlock&            braGtoBlock,
                               const CGtoBlock&            ketGtoBlock,
                               const int32_t               iContrGto) const;
-    
-    /**
-     Gets Obara-Saika recursion pattern for specific combination of GTOs blocks
-     on bra and ket sides.
-
-     @param braGtoBlock the GTOs block on bra side.
-     @param ketGtoBlock the GTOs block on ket side.
-     @return the vector of two indexes object with recursion pattern.
-     */
-    CVecTwoIndexes _getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                        const CGtoBlock& ketGtoBlock) const;
-    
-    /**
-     Gets vector of unified indexes of primitive GTOs buffer for specific
-     Obara-Saika recursion pattern.
-
-     @param recIndexes the vector of starting indexes of data blocks in recursion
-            pattern.
-     @param recPattern the recursion pattern.
-     @param maxPrimGtos the maximum number of primitive GTOs in contracted
-            GTO on bra side.
-     @return the total number of blocks in recursion pattern.
-     */
-    int32_t _getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                           const CVecTwoIndexes&       recPattern,
-                                           const int32_t               maxPrimGtos) const;
     
 public:
     
