@@ -10,6 +10,7 @@
 
 #include "MathFunc.hpp"
 #include "AngularMomentum.hpp"
+#include "GenFunc.hpp"
 
 namespace intsfunc { // intsfunc namespace
     
@@ -385,6 +386,102 @@ namespace intsfunc { // intsfunc namespace
     }
     
     void
+    compTensorsPA(      CMemBlock2D<double>& paDistances,
+                  const CMemBlock2D<double>& abDistances,
+                  const CMemBlock2D<double>& osFactors,
+                  const int32_t              nFactors,
+                  const CGtoBlock&           braGtoBlock,
+                  const CGtoBlock&           ketGtoBlock,
+                  const int32_t              iContrGto)
+    {
+        // set up angular momentum of bra side
+        
+        auto bang = braGtoBlock.getAngularMomentum();
+        
+        if (bang > 0)
+        {
+            // set up pointers to primitives data on bra side
+        
+            auto spos = braGtoBlock.getStartPositions();
+        
+            auto epos = braGtoBlock.getEndPositions();
+        
+            // set up pointers to primitives data on ket side
+        
+            auto kexp = ketGtoBlock.getExponents();
+        
+            auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+            // set up pointers to R(AB) distances
+        
+            auto abx = abDistances.data(0);
+        
+            auto aby = abDistances.data(1);
+        
+            auto abz = abDistances.data(2);
+            
+            // determine number of tensor components
+            
+            auto tcomps = intsfunc::getNumberOfComponentsInDistancesTensor(bang);
+        
+            // loop over contracted GTO on bra side
+        
+            int32_t idx = 0;
+        
+            for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+            {
+                // set up pointers to prefactor
+            
+                auto fx = osFactors.data(nFactors * idx);
+            
+                // set up pointers to distances R(PA)
+            
+                auto poff = tcomps * idx;
+            
+                auto pax = paDistances.data(poff);
+            
+                auto pay = paDistances.data(poff + 1);
+            
+                auto paz = paDistances.data(poff + 2);
+            
+                // compute R(PA) distances
+            
+                #pragma omp simd aligned(kexp, abx, aby, abz, fx, pax, pay, \
+                                         paz: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++)
+                {
+                    double fact = -kexp[j] * fx[j];
+                
+                    pax[j] = fact * abx[j];
+                
+                    pay[j] = fact * aby[j];
+                
+                    paz[j] = fact * abz[j];
+                }
+            
+                // compute higher order reduced R(PA) tensors
+            
+                if (bang > 1)
+                {
+                    genfunc::compTensorTwoFromVector(paDistances, poff, poff + 3);
+                
+                    for (int32_t j = 3; j <= bang; j++)
+                    {
+                        auto t10ff = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 2);
+                        
+                        auto t2off = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 1);
+                        
+                        genfunc::compTensorFromVectorAndTensor(paDistances, poff,
+                                                               t10ff,  t2off, j);
+                    }
+                }
+            
+                idx++;
+            }
+        }
+    }
+    
+    void
     compDistancesPB(      CMemBlock2D<double>& pbDistances,
                     const CMemBlock2D<double>& abDistances,
                     const CMemBlock2D<double>& osFactors,
@@ -451,6 +548,104 @@ namespace intsfunc { // intsfunc namespace
             }
             
             idx++;
+        }
+    }
+    
+    void
+    compTensorsPB(      CMemBlock2D<double>& pbDistances,
+                  const CMemBlock2D<double>& abDistances,
+                  const CMemBlock2D<double>& osFactors,
+                  const int32_t              nFactors,
+                  const CGtoBlock&           braGtoBlock,
+                  const CGtoBlock&           ketGtoBlock,
+                  const int32_t              iContrGto)
+    {
+        // set up angular momentum of ket side
+        
+        auto kang = ketGtoBlock.getAngularMomentum();
+        
+        if (kang > 0)
+        {
+            // set up pointers to primitives data on bra side
+        
+            auto bexp = braGtoBlock.getExponents();
+        
+            auto spos = braGtoBlock.getStartPositions();
+        
+            auto epos = braGtoBlock.getEndPositions();
+        
+            // set up pointers to primitives data on ket side
+        
+            auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+            // set up pointers to R(AB) distances
+        
+            auto abx = abDistances.data(0);
+        
+            auto aby = abDistances.data(1);
+        
+            auto abz = abDistances.data(2);
+            
+            // determine number of tensor components
+            
+            auto tcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
+        
+            // loop over contracted GTO on bra side
+        
+            int32_t idx = 0;
+        
+            for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+            {
+                // set up pointers to prefactors
+            
+                auto fx = osFactors.data(nFactors * idx);
+            
+                auto fb = bexp[i];
+            
+                // set up pointers to distances R(PB)
+            
+                auto poff = tcomps * idx;
+                
+                auto pbx = pbDistances.data(poff);
+            
+                auto pby = pbDistances.data(poff + 1);
+            
+                auto pbz = pbDistances.data(poff + 2);
+                
+                // compute R(PB) distances
+            
+                #pragma omp simd aligned(abx, aby, abz, fx, pbx, pby,\
+                                         pbz: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++)
+                {
+                    double fact = fb * fx[j];
+                
+                    pbx[j] = fact * abx[j];
+                
+                    pby[j] = fact * aby[j];
+                
+                    pbz[j] = fact * abz[j];
+                }
+                
+                // compute higher order reduced R(PB) tensors
+                
+                if (kang > 1)
+                {
+                    genfunc::compTensorTwoFromVector(pbDistances, poff, poff + 3);
+                    
+                    for (int32_t j = 3; j <= kang; j++)
+                    {
+                        auto t10ff = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 2);
+                        
+                        auto t2off = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 1);
+                        
+                        genfunc::compTensorFromVectorAndTensor(pbDistances, poff,
+                                                               t10ff,  t2off, j);
+                    }
+                }
+            
+                idx++;
+            }
         }
     }
     

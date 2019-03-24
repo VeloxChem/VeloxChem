@@ -138,6 +138,13 @@ public:
     bool operator!=(const CGtoBlock& other) const;
     
     /**
+     Set angular momentum of GTOs block.
+     
+     @param angularMomentum the angular momentum.
+     */
+    void setAngularMomentum(const int32_t angularMomentum);
+    
+    /**
      Compresses other GTOs block data into GTOs block object without changing
      dimensions of GTOs block object. Compression is performed using specified
      screening pattern.

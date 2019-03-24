@@ -233,6 +233,21 @@ TEST_F(CGtoBlockTest, MoveAssignment)
     ASSERT_EQ(agto, bgto);
 }
 
+TEST_F(CGtoBlockTest, SetAngularMomentum)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock agto(lih, bas, 0);
+    
+    ASSERT_EQ(0, agto.getAngularMomentum());
+    
+    agto.setAngularMomentum(1); 
+    
+    ASSERT_EQ(1, agto.getAngularMomentum());
+}
+
 TEST_F(CGtoBlockTest, GetAngularMomentum)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

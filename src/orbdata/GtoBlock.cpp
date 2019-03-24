@@ -261,6 +261,12 @@ CGtoBlock::operator!=(const CGtoBlock& other) const
     return !(*this == other);
 }
 
+void
+CGtoBlock::setAngularMomentum(const int32_t angularMomentum)
+{
+    _angularMomentum = angularMomentum; 
+}
+
 std::tuple<int32_t, int32_t>
 CGtoBlock::compress(const CGtoBlock&         source,
                     const CMemBlock<double>& screeningFactors,
