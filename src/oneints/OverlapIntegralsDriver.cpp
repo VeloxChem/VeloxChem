@@ -10,10 +10,17 @@
 
 #include "OneIntsFunc.hpp"
 #include "AngularMomentum.hpp"
-#include "OverlapRecFunc.hpp"
 #include "GenFunc.hpp"
 #include "MemBlock.hpp"
 #include "StringFormat.hpp"
+
+#include "OverlapRecFuncForSX.hpp"
+#include "OverlapRecFuncForPX.hpp"
+#include "OverlapRecFuncForDX.hpp"
+#include "OverlapRecFuncForFF.hpp"
+#include "OverlapRecFuncForFG.hpp"
+#include "OverlapRecFuncForGF.hpp"
+#include "OverlapRecFuncForGG.hpp"
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
                                                  const int32_t  globNodes,
