@@ -11,8 +11,15 @@
 #include "GenFunc.hpp"
 #include "AngularMomentum.hpp"
 #include "OneIntsFunc.hpp"
-#include "KineticEnergyRecFunc.hpp"
 #include "StringFormat.hpp"
+
+#include "KineticEnergyRecFuncForSX.hpp"
+#include "KineticEnergyRecFuncForPX.hpp"
+#include "KineticEnergyRecFuncForDX.hpp"
+#include "KineticEnergyRecFuncForFF.hpp"
+#include "KineticEnergyRecFuncForFG.hpp"
+#include "KineticEnergyRecFuncForGF.hpp"
+#include "KineticEnergyRecFuncForGG.hpp"
 
 CKineticEnergyIntegralsDriver::CKineticEnergyIntegralsDriver(const int32_t  globRank,
                                                              const int32_t  globNodes,
@@ -233,11 +240,17 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
     
     auto distpat = *distPattern;
     
+    // set up angular momentum data
+    
+    auto bang = bragtos.getAngularMomentum();
+    
+    auto kang = ketgtos.getAngularMomentum();
+    
     // set up spherical angular momentum for bra and ket sides
     
-    CSphericalMomentum bmom(bragtos.getAngularMomentum());
+    CSphericalMomentum bmom(bang);
     
-    CSphericalMomentum kmom(ketgtos.getAngularMomentum());
+    CSphericalMomentum kmom(kang);
     
     // allocate prefactors used in Obara-Saika recursion
     
@@ -249,39 +262,27 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
     
     CMemBlock2D<double> rfacts(pdim, 4 * pmax);
     
-    CMemBlock2D<double> rpa(pdim, 3 * pmax);
+    // set up tensors of PA and PB distances
     
-    CMemBlock2D<double> rpb(pdim, 3 * pmax);
+    auto btcomps = intsfunc::getNumberOfComponentsInDistancesTensor(bang);
     
-    // generate recursion pattern
+    auto ktcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
     
-    auto recvec = _getRecursionPattern(bragtos, ketgtos);
+    auto rpa = (btcomps > 0) ? CMemBlock2D<double>(pdim, btcomps * pmax) : CMemBlock2D<double>();
     
-    // set up angular momentum data
+    auto rpb = (ktcomps > 0) ? CMemBlock2D<double>(pdim, ktcomps * pmax) : CMemBlock2D<double>();
     
-    auto bang = bragtos.getAngularMomentum();
+    // allocate primitives and auxilary integrals buffer
     
-    auto kang = ketgtos.getAngularMomentum();
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
     
-    // set up primitives buffer indexes
+    CMemBlock2D<double> primbuffer(pdim, ncart * pmax);
     
-    std::vector<int32_t> recidx;
-    
-    auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
-    
-    auto pidx = genfunc::findTripleIndex(recidx, recvec, {bang, kang, 0});
-        
-    // allocate primitives integrals buffer
-    
-    CMemBlock2D<double> pbuffer(pdim, nblk);
-    
-    // set up contracted GTOs dimensions
-    
-    auto kdim = ketgtos.getNumberOfContrGtos();
+    CMemBlock2D<double> auxbuffer(pdim, 2 * pmax);
     
     // allocate contracted Cartesian integrals buffer
     
-    auto ncart = angmom::to_CartesianComponents(bang, kang);
+    auto kdim = ketgtos.getNumberOfContrGtos();
     
     CMemBlock2D<double> cartbuffer(kdim, ncart);
     
@@ -305,22 +306,22 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
         
         intsfunc::compFactorsForKineticEnergy(rfacts, bragtos, ketgtos, i);
         
-        // compute distances: R(PA) = P - A
+        // compute tensors of distances: R(PA) = P - A
         
-        intsfunc::compDistancesPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
+        intsfunc::compTensorsPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
         
-        // compute distances: R(PB) = P - B
+        // compute tensors of distances: R(PB) = P - B
         
-        intsfunc::compDistancesPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
+        intsfunc::compTensorsPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
         
         // compite primitive kinetic energy integrals
         
-        _compPrimKineticEnergyInts(pbuffer, recvec, recidx, rfacts, rab, rpa,
+        _compPrimKineticEnergyInts(primbuffer, auxbuffer, rfacts, rab, rpa,
                                    rpb, bragtos, ketgtos, i);
         
         // contract primitive kinetic energy integrals
         
-        genfunc::contract(cartbuffer, pbuffer, pidx, bragtos, ketgtos, i);
+        genfunc::contract(cartbuffer, primbuffer, 0, bragtos, ketgtos, i);
         
         // transform Cartesian to spherical integrals
         
@@ -334,8 +335,7 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
 
 void
 CKineticEnergyIntegralsDriver::_compPrimKineticEnergyInts(      CMemBlock2D<double>&  primBuffer,
-                                                          const CVecThreeIndexes&     recPattern,
-                                                          const std::vector<int32_t>& recIndexes,
+                                                                CMemBlock2D<double>&  auxBuffer,
                                                           const CMemBlock2D<double>&  osFactors,
                                                           const CMemBlock2D<double>&  abDistances,
                                                           const CMemBlock2D<double>&  paDistances,
@@ -344,345 +344,282 @@ CKineticEnergyIntegralsDriver::_compPrimKineticEnergyInts(      CMemBlock2D<doub
                                                           const CGtoBlock&            ketGtoBlock,
                                                           const int32_t               iContrGto) const
 {
-    // compute (s|t|s) integrals
-    
-    kinrecfunc::compKineticEnergyForSS(primBuffer, recPattern, recIndexes,
-                                       osFactors, abDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (s|p) integrals
-    
-    kinrecfunc::compKineticEnergyForSP(primBuffer, recPattern, recIndexes,
-                                       osFactors, pbDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (p|s) integrals
-    
-    kinrecfunc::compKineticEnergyForPS(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (p|p) integrals
-    
-    kinrecfunc::compKineticEnergyForPP(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (s|d) integrals
-    
-    kinrecfunc::compKineticEnergyForSD(primBuffer, recPattern, recIndexes,
-                                       osFactors, pbDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (d|s) integrals
-    
-    kinrecfunc::compKineticEnergyForDS(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (p|d) integrals
-    
-    kinrecfunc::compKineticEnergyForPD(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (d|p) integrals
-    
-    kinrecfunc::compKineticEnergyForDP(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (d|d) integrals
-    
-    kinrecfunc::compKineticEnergyForDD(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (s|f) integrals
-    
-    kinrecfunc::compKineticEnergyForSF(primBuffer, recPattern, recIndexes,
-                                       osFactors, pbDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (f|s) integrals
-    
-    kinrecfunc::compKineticEnergyForFS(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (p|f) integrals
-    
-    kinrecfunc::compKineticEnergyForPF(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (f|p) integrals
-    
-    kinrecfunc::compKineticEnergyForFP(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (d|f) integrals
-    
-    kinrecfunc::compKineticEnergyForDF(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (f|d) integrals
-    
-    kinrecfunc::compKineticEnergyForFD(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (f|f) integrals
-    
-    kinrecfunc::compKineticEnergyForFF(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (s|g) integrals
-    
-    kinrecfunc::compKineticEnergyForSG(primBuffer, recPattern, recIndexes,
-                                       osFactors, pbDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (g|s) integrals
-    
-    kinrecfunc::compKineticEnergyForGS(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (p|g) integrals
-    
-    kinrecfunc::compKineticEnergyForPG(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (g|p) integrals
-    
-    kinrecfunc::compKineticEnergyForGP(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (d|g) integrals
-    
-    kinrecfunc::compKineticEnergyForDG(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (g|d) integrals
-    
-    kinrecfunc::compKineticEnergyForGD(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (f|g) integrals
-    
-    kinrecfunc::compKineticEnergyForFG(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (g|f) integrals
-    
-    kinrecfunc::compKineticEnergyForGF(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // compute (g|g) integrals
-    
-    kinrecfunc::compKineticEnergyForGG(primBuffer, recPattern, recIndexes,
-                                       osFactors, paDistances, braGtoBlock,
-                                       ketGtoBlock, iContrGto);
-    
-    // NOTE: add l > 4 recursion here
-}
-
-CVecThreeIndexes
-CKineticEnergyIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                                    const CGtoBlock& ketGtoBlock) const
-{
-    // set up angular momentum
+    // set up angular momentum on bra and ket sides
     
     auto bang = braGtoBlock.getAngularMomentum();
     
     auto kang = ketGtoBlock.getAngularMomentum();
- 
-    // set up recursion buffer
     
-    CVecThreeIndexes recvec;
+    // compute (s|T|s) auxilary integrals
     
-    recvec.reserve((bang + 1) * (kang + 1));
+    kinrecfunc::compKineticEnergyForSS(primBuffer, auxBuffer, osFactors,
+                                       abDistances, braGtoBlock, ketGtoBlock,
+                                       iContrGto);
     
-    // set up indexing counters
+    // compute (s|T|p) auxilary integrals
     
-    int32_t spos = 0;
-    
-    int32_t epos = 1;
-    
-    // set up initial state of recursion buffer
-    
-    recvec.push_back(CThreeIndexes(bang, kang, 0));
-    
-    while (true)
+    if ((bang == 0) && (kang == 1))
     {
-        // internal new recursion terms counter
+       kinrecfunc::compKineticEnergyForSP(primBuffer, auxBuffer, osFactors,
+                                          pbDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
         
-        int32_t nterms = 0;
-        
-        // generate bra and ket Obara-Saika recursion terms
-        
-        for (int32_t i = spos; i < epos; i++)
-        {
-            CThreeIndexes cidx(recvec[i]);
-            
-            if (cidx.third() == 0)
-            {
-                // kinetic energy recursion
-                
-                if (cidx.first() != 0)
-                {
-                    // general recursion for bra and ket sides
-                    
-                    // (a - 1 |t| b) term
-                    
-                    CThreeIndexes t1idx(cidx.first() - 1,  cidx.second(), 0);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
-                    
-                    // (a - 2 |t| b) term
-                    
-                    CThreeIndexes t2idx(cidx.first() - 2,  cidx.second(), 0);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
-                    
-                    // (a - 1 |t| b - 1) term
-                    
-                    CThreeIndexes tkidx(cidx.first() - 1,  cidx.second() - 1, 0);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, tkidx)) nterms++;
-                    
-                    // (a | b) term
-                    
-                    CThreeIndexes s0idx(cidx.first(),  cidx.second(), 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, s0idx)) nterms++;
-                    
-                    // (a - 2 | b) term
-                    
-                    CThreeIndexes s2idx(cidx.first() - 2,  cidx.second(), 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, s2idx)) nterms++;
-                }
-                else
-                {
-                    // reduced recursion for ket side
-                    
-                    // (0 |t| b - 1) term
-                    
-                    CThreeIndexes t1idx(cidx.first(),  cidx.second() - 1, 0);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
-                    
-                    // (0 |t| b - 2) term
-                    
-                    CThreeIndexes t2idx(cidx.first(),  cidx.second() - 2, 0);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
-                    
-                    // (0 | b) term
-                    
-                    CThreeIndexes s0idx(cidx.first(),  cidx.second(), 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, s0idx)) nterms++;
-                    
-                    // (0 | b - 2) term
-                    
-                    CThreeIndexes s2idx(cidx.first(),  cidx.second() - 2, 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, s2idx)) nterms++;
-                }
-            }
-            else
-            {
-                // overlap recursion
-             
-                if (cidx.first() != 0)
-                {
-                    // general recursion for bra and ket sides
-                    
-                    // (a - 1 | b) term
-                    
-                    CThreeIndexes t1idx(cidx.first() - 1,  cidx.second(), 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
-                    
-                    // (a - 2 | b) term
-                    
-                    CThreeIndexes t2idx(cidx.first() - 2,  cidx.second(), 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
-                    
-                    // (a - 1 | b - 1) term
-                    
-                    CThreeIndexes tkidx(cidx.first() - 1,  cidx.second() - 1, 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, tkidx)) nterms++;
-                }
-                else
-                {
-                    // reduced recursion for ket side
-                    
-                    // (0 | b - 1) term
-                    
-                    CThreeIndexes t1idx(cidx.first(),  cidx.second() - 1, 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t1idx)) nterms++;
-                    
-                    // (0 | b - 2) term
-                    
-                    CThreeIndexes t2idx(cidx.first(),  cidx.second() - 2, 1);
-                    
-                    if (genfunc::addValidAndUniqueTriple(recvec, t2idx)) nterms++;
-                }
-            }
-        }
-        
-        // break loop, all recursion terms are generrated
-        
-        if (nterms == 0) break;
-        
-        // update counters
-        
-        spos  = epos;
-        
-        epos += nterms;
+        return;
     }
     
-    return recvec;
+    // compute (s|T|d) auxilary integrals
+    
+    if ((bang == 0) && (kang == 2))
+    {
+       kinrecfunc::compKineticEnergyForSD(primBuffer, auxBuffer, osFactors,
+                                          pbDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+        
+        return;
+    }
+    
+    // compute (s|T|f) auxilary integrals
+    
+    if ((bang == 0) && (kang == 3))
+    {
+       kinrecfunc::compKineticEnergyForSF(primBuffer, auxBuffer, osFactors,
+                                          pbDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+        
+        return;
+    }
+    
+    // compute (s|T|g) auxilary integrals
+    
+    if ((bang == 0) && (kang == 4))
+    {
+       kinrecfunc::compKineticEnergyForSG(primBuffer, auxBuffer, osFactors,
+                                          pbDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+        
+        return;
+    }
+    
+    // compute (p|T|s) auxilary integrals
+    
+    if ((bang == 1) && (kang == 0))
+    {
+       kinrecfunc::compKineticEnergyForPS(primBuffer, auxBuffer, osFactors,
+                                          paDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+        
+        return;
+    }
+    
+    // compute (d|T|s) auxilary integrals
+    
+    if ((bang == 2) && (kang == 0))
+    {
+       kinrecfunc::compKineticEnergyForDS(primBuffer, auxBuffer, osFactors,
+                                          paDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+        
+        return;
+    }
+    
+    // compute (f|T|s) auxilary integrals
+    
+    if ((bang == 3) && (kang == 0))
+    {
+       kinrecfunc::compKineticEnergyForFS(primBuffer, auxBuffer, osFactors,
+                                          paDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+        
+        return;
+    }
+    
+    // compute (g|T|s) auxilary integrals
+    
+    if ((bang == 4) && (kang == 0))
+    {
+       kinrecfunc::compKineticEnergyForGS(primBuffer, auxBuffer, osFactors,
+                                          paDistances, braGtoBlock, ketGtoBlock,
+                                          iContrGto);
+        
+        return;
+    }
+    
+    // compute (p|T|p) auxilary integrals
+    
+    if ((bang == 1) && (kang == 1))
+    {
+        kinrecfunc::compKineticEnergyForPP(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (p|T|d) auxilary integrals
+    
+    if ((bang == 1) && (kang == 2))
+    {
+        kinrecfunc::compKineticEnergyForPD(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (d|T|p) auxilary integrals
+    
+    if ((bang == 2) && (kang == 1))
+    {
+        kinrecfunc::compKineticEnergyForDP(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (p|T|f) auxilary integrals
+    
+    if ((bang == 1) && (kang == 3))
+    {
+        kinrecfunc::compKineticEnergyForPF(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (f|T|p) auxilary integrals
+    
+    if ((bang == 3) && (kang == 1))
+    {
+        kinrecfunc::compKineticEnergyForFP(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (p|T|g) auxilary integrals
+    
+    if ((bang == 1) && (kang == 4))
+    {
+        kinrecfunc::compKineticEnergyForPG(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (g|T|p) auxilary integrals
+    
+    if ((bang == 4) && (kang == 1))
+    {
+        kinrecfunc::compKineticEnergyForGP(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (d|T|d) auxilary integrals
+    
+    if ((bang == 2) && (kang == 2))
+    {
+        kinrecfunc::compKineticEnergyForDD(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (d|T|f) auxilary integrals
+    
+    if ((bang == 2) && (kang == 3))
+    {
+        kinrecfunc::compKineticEnergyForDF(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (f|T|d) auxilary integrals
+    
+    if ((bang == 3) && (kang == 2))
+    {
+        kinrecfunc::compKineticEnergyForFD(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (d|T|g) auxilary integrals
+    
+    if ((bang == 2) && (kang == 4))
+    {
+        kinrecfunc::compKineticEnergyForDG(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (g|T|d) auxilary integrals
+    
+    if ((bang == 4) && (kang == 2))
+    {
+        kinrecfunc::compKineticEnergyForGD(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (f|T|f) auxilary integrals
+    
+    if ((bang == 3) && (kang == 3))
+    {
+        kinrecfunc::compKineticEnergyForFF(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (f|T|g) auxilary integrals
+    
+    if ((bang == 3) && (kang == 4))
+    {
+        kinrecfunc::compKineticEnergyForFG(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (g|T|f) auxilary integrals
+    
+    if ((bang == 4) && (kang == 3))
+    {
+        kinrecfunc::compKineticEnergyForGF(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (g|T|g) auxilary integrals
+    
+    if ((bang == 4) && (kang == 4))
+    {
+        kinrecfunc::compKineticEnergyForGG(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // NOTE: Add l > 4 terms if needed
 }
 
-int32_t
-CKineticEnergyIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                                              const CVecThreeIndexes&     recPattern,
-                                                              const int32_t               maxPrimGtos) const
-{
-    // clear vector and reserve memory
-    
-    recIndexes.clear();
-    
-    recIndexes.reserve(recPattern.size() + 1);
-    
-    // loop over recursion pattern
-    
-    int32_t nblk = 0;
-    
-    for (size_t i = 0; i < recPattern.size(); i++)
-    {
-        recIndexes.push_back(nblk);
-        
-        nblk += maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
-                                                             recPattern[i].second());
-    }
-    
-    return nblk;
-}
