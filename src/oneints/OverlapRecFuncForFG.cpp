@@ -8,6 +8,8 @@
 
 #include "OverlapRecFuncForFG.hpp"
 
+#include "OverlapVecFuncForFG.hpp"
+
 namespace ovlrecfunc { // ovlrecfunc namespace
 
     void
@@ -473,41 +475,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xxx_xxxx, t_xxx_xxxy, t_xxx_xxxz, t_xxx_xxyy, t_xxx_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxx_xxxx[j] = (5.625 * pa_x[j] * fx[j] * fx[j] * fx[j] + 7.5 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xxx_xxxx[j] = ovlvecfunc::fvec_xxx_xxxx_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]);
 
-                                0.75 * pa_xxx[j] * fx[j] * fx[j] + 9.0 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xxx_xxxy[j] = ovlvecfunc::fvec_xxx_xxxy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]);
 
-                                13.5 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 3.0 * fx[j] * fx[j] * pb_xxx[j] + 3.0 * pa_xxx[j] * pb_xx[j] * fx[j] + 
+                t_xxx_xxxz[j] = ovlvecfunc::fvec_xxx_xxxz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]);
 
-                                6.0 * pa_xx[j] * fx[j] * pb_xxx[j] + 1.5 * pa_x[j] * fx[j] * pb_xxxx[j] + pa_xxx[j] * pb_xxxx[j]) * s_0_0[j];
+                t_xxx_xxyy[j] = ovlvecfunc::fvec_xxx_xxyy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_x[j], pb_xx[j], pb_xxyy[j], pb_xyy[j], pb_yy[j], s_0_0[j]);
 
-                t_xxx_xxxy[j] = (1.875 * fx[j] * fx[j] * fx[j] * pb_y[j] + 2.25 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                6.75 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 2.25 * fx[j] * fx[j] * pb_xxy[j] + 1.5 * pa_xxx[j] * pb_xy[j] * fx[j] + 
-
-                                4.5 * pa_xx[j] * fx[j] * pb_xxy[j] + 1.5 * pa_x[j] * fx[j] * pb_xxxy[j] + pa_xxx[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_xxx_xxxz[j] = (1.875 * fx[j] * fx[j] * fx[j] * pb_z[j] + 2.25 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                6.75 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 2.25 * fx[j] * fx[j] * pb_xxz[j] + 1.5 * pa_xxx[j] * pb_xz[j] * fx[j] + 
-
-                                4.5 * pa_xx[j] * fx[j] * pb_xxz[j] + 1.5 * pa_x[j] * fx[j] * pb_xxxz[j] + pa_xxx[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_xxx_xxyy[j] = (1.125 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.25 * pa_xxx[j] * fx[j] * fx[j] + 1.5 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                2.25 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 1.5 * fx[j] * fx[j] * pb_xyy[j] + 
-
-                                0.5 * pa_xxx[j] * pb_xx[j] * fx[j] + 0.5 * pa_xxx[j] * fx[j] * pb_yy[j] + 3.0 * pa_xx[j] * fx[j] * pb_xyy[j] + 
-
-                                1.5 * pa_x[j] * fx[j] * pb_xxyy[j] + pa_xxx[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_xxx_xxyz[j] = (2.25 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 1.5 * fx[j] * fx[j] * pb_xyz[j] + 
-
-                                0.5 * pa_xxx[j] * fx[j] * pb_yz[j] + 3.0 * pa_xx[j] * fx[j] * pb_xyz[j] + 1.5 * pa_x[j] * fx[j] * pb_xxyz[j] + 
-
-                                pa_xxx[j] * pb_xxyz[j]) * s_0_0[j];
+                t_xxx_xxyz[j] = ovlvecfunc::fvec_xxx_xxyz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xxyz[j], pb_xyz[j], pb_yz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (1) = (5,10)
@@ -517,39 +493,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xxx_xxzz, t_xxx_xyyy, t_xxx_xyyz, t_xxx_xyzz, t_xxx_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxx_xxzz[j] = (1.125 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xxx_xxzz[j] = ovlvecfunc::fvec_xxx_xxzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_x[j], pb_xx[j], pb_xxzz[j], pb_xzz[j], pb_zz[j], s_0_0[j]);
 
-                                0.25 * pa_xxx[j] * fx[j] * fx[j] + 1.5 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xxx_xyyy[j] = ovlvecfunc::fvec_xxx_xyyy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xy[j], pb_xyyy[j], pb_y[j], pb_yyy[j], s_0_0[j]);
 
-                                2.25 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 1.5 * fx[j] * fx[j] * pb_xzz[j] + 
+                t_xxx_xyyz[j] = ovlvecfunc::fvec_xxx_xyyz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xyyz[j], pb_xz[j], pb_yyz[j], pb_z[j], s_0_0[j]);
 
-                                0.5 * pa_xxx[j] * pb_xx[j] * fx[j] + 0.5 * pa_xxx[j] * fx[j] * pb_zz[j] + 3.0 * pa_xx[j] * fx[j] * pb_xzz[j] + 
+                t_xxx_xyzz[j] = ovlvecfunc::fvec_xxx_xyzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xy[j], pb_xyzz[j], pb_y[j], pb_yzz[j], s_0_0[j]);
 
-                                1.5 * pa_x[j] * fx[j] * pb_xxzz[j] + pa_xxx[j] * pb_xxzz[j]) * s_0_0[j];
-
-                t_xxx_xyyy[j] = (1.125 * fx[j] * fx[j] * fx[j] * pb_y[j] + 2.25 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                2.25 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_yyy[j] + 1.5 * pa_xxx[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_yyy[j] + 1.5 * pa_x[j] * fx[j] * pb_xyyy[j] + pa_xxx[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_xxx_xyyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_yyz[j] + 0.5 * pa_xxx[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_yyz[j] + 1.5 * pa_x[j] * fx[j] * pb_xyyz[j] + pa_xxx[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_xxx_xyzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_yzz[j] + 0.5 * pa_xxx[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_yzz[j] + 1.5 * pa_x[j] * fx[j] * pb_xyzz[j] + pa_xxx[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_xxx_xzzz[j] = (1.125 * fx[j] * fx[j] * fx[j] * pb_z[j] + 2.25 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                2.25 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_zzz[j] + 1.5 * pa_xxx[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_zzz[j] + 1.5 * pa_x[j] * fx[j] * pb_xzzz[j] + pa_xxx[j] * pb_xzzz[j]) * s_0_0[j];
+                t_xxx_xzzz[j] = ovlvecfunc::fvec_xxx_xzzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (2) = (10,15)
@@ -558,31 +510,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      pb_zzzz, s_0_0, t_xxx_yyyy, t_xxx_yyyz, t_xxx_yyzz, t_xxx_yzzz, t_xxx_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxx_yyyy[j] = (1.125 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xxx[j] * fx[j] * fx[j] + 
+                t_xxx_yyyy[j] = ovlvecfunc::fvec_xxx_yyyy_s_0(fx[j], pa_x[j], pa_xxx[j], pb_yy[j], pb_yyyy[j], s_0_0[j]);
 
-                                4.5 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_xxx[j] * pb_yy[j] * fx[j] + 1.5 * pa_x[j] * fx[j] * pb_yyyy[j] + 
+                t_xxx_yyyz[j] = ovlvecfunc::fvec_xxx_yyyz_s_0(fx[j], pa_x[j], pa_xxx[j], pb_yyyz[j], pb_yz[j], s_0_0[j]);
 
-                                pa_xxx[j] * pb_yyyy[j]) * s_0_0[j];
+                t_xxx_yyzz[j] = ovlvecfunc::fvec_xxx_yyzz_s_0(fx[j], pa_x[j], pa_xxx[j], pb_yy[j], pb_yyzz[j], pb_zz[j], s_0_0[j]);
 
-                t_xxx_yyyz[j] = (2.25 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xxx[j] * pb_yz[j] * fx[j] + 
+                t_xxx_yzzz[j] = ovlvecfunc::fvec_xxx_yzzz_s_0(fx[j], pa_x[j], pa_xxx[j], pb_yz[j], pb_yzzz[j], s_0_0[j]);
 
-                                1.5 * pa_x[j] * fx[j] * pb_yyyz[j] + pa_xxx[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_xxx_yyzz[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.25 * pa_xxx[j] * fx[j] * fx[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_xxx[j] * pb_yy[j] * fx[j] + 
-
-                                0.5 * pa_xxx[j] * fx[j] * pb_zz[j] + 1.5 * pa_x[j] * fx[j] * pb_yyzz[j] + pa_xxx[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_xxx_yzzz[j] = (2.25 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xxx[j] * pb_yz[j] * fx[j] + 
-
-                                1.5 * pa_x[j] * fx[j] * pb_yzzz[j] + pa_xxx[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_xxx_zzzz[j] = (1.125 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xxx[j] * fx[j] * fx[j] + 
-
-                                4.5 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_xxx[j] * pb_zz[j] * fx[j] + 1.5 * pa_x[j] * fx[j] * pb_zzzz[j] + 
-
-                                pa_xxx[j] * pb_zzzz[j]) * s_0_0[j];
+                t_xxx_zzzz[j] = ovlvecfunc::fvec_xxx_zzzz_s_0(fx[j], pa_x[j], pa_xxx[j], pb_zz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (3) = (15,20)
@@ -592,47 +528,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      pb_yz, pb_z, s_0_0, t_xxy_xxxx, t_xxy_xxxy, t_xxy_xxxz, t_xxy_xxyy, t_xxy_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxy_xxxx[j] = (1.875 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.75 * pa_xxy[j] * fx[j] * fx[j] + 
+                t_xxy_xxxx[j] = ovlvecfunc::fvec_xxy_xxxx_s_0(fx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]);
 
-                                6.0 * pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 4.5 * fx[j] * fx[j] * pa_y[j] * pb_xx[j] + 3.0 * pa_xxy[j] * pb_xx[j] * fx[j] + 
+                t_xxy_xxxy[j] = ovlvecfunc::fvec_xxy_xxxy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]);
 
-                                4.0 * pa_xy[j] * fx[j] * pb_xxx[j] + 0.5 * fx[j] * pa_y[j] * pb_xxxx[j] + pa_xxy[j] * pb_xxxx[j]) * s_0_0[j];
+                t_xxy_xxxz[j] = ovlvecfunc::fvec_xxy_xxxz_s_0(fx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]);
 
-                t_xxy_xxxy[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * fx[j] + 1.125 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xxy_xxyy[j] = ovlvecfunc::fvec_xxy_xxyy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_xy[j], pb_xyy[j], pb_y[j], pb_yy[j], s_0_0[j]);
 
-                                0.75 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                                2.25 * fx[j] * fx[j] * pa_y[j] * pb_xy[j] + 0.25 * fx[j] * fx[j] * pb_xxx[j] + 1.5 * pa_xxy[j] * pb_xy[j] * fx[j] + 
-
-                                0.5 * pa_xx[j] * fx[j] * pb_xxx[j] + 3.0 * pa_xy[j] * fx[j] * pb_xxy[j] + 0.5 * fx[j] * pa_y[j] * pb_xxxy[j] + 
-
-                                pa_xxy[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_xxy_xxxz[j] = (1.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                2.25 * fx[j] * fx[j] * pa_y[j] * pb_xz[j] + 1.5 * pa_xxy[j] * pb_xz[j] * fx[j] + 3.0 * pa_xy[j] * fx[j] * pb_xxz[j] + 
-
-                                0.5 * fx[j] * pa_y[j] * pb_xxxz[j] + pa_xxy[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_xxy_xxyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_xxy[j] * fx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                2.0 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pa_y[j] * pb_yy[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_y[j] * pb_xx[j] + 0.5 * fx[j] * fx[j] * pb_xxy[j] + 0.5 * pa_xxy[j] * pb_xx[j] * fx[j] + 
-
-                                0.5 * pa_xxy[j] * fx[j] * pb_yy[j] + pa_xx[j] * fx[j] * pb_xxy[j] + 2.0 * pa_xy[j] * fx[j] * pb_xyy[j] + 
-
-                                0.5 * fx[j] * pa_y[j] * pb_xxyy[j] + pa_xxy[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_xxy_xxyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pa_y[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_xxz[j] + 
-
-                                0.5 * pa_xxy[j] * fx[j] * pb_yz[j] + 0.5 * pa_xx[j] * fx[j] * pb_xxz[j] + 2.0 * pa_xy[j] * fx[j] * pb_xyz[j] + 
-
-                                0.5 * fx[j] * pa_y[j] * pb_xxyz[j] + pa_xxy[j] * pb_xxyz[j]) * s_0_0[j];
+                t_xxy_xxyz[j] = ovlvecfunc::fvec_xxy_xxyz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xxyz[j], pb_xxz[j], pb_xyz[j], pb_xz[j], pb_yz[j], pb_z[j], s_0_0[j]);
             }
 
             // Batch of Integrals (4) = (20,25)
@@ -643,47 +547,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xxy_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxy_xxzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.25 * pa_xxy[j] * fx[j] * fx[j] + 
+                t_xxy_xxzz[j] = ovlvecfunc::fvec_xxy_xxzz_s_0(fx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxzz[j], pb_xzz[j], pb_zz[j], s_0_0[j]);
 
-                                pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_y[j] * pb_zz[j] + 
+                t_xxy_xyyy[j] = ovlvecfunc::fvec_xxy_xyyy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], pb_y[j], pb_yy[j], pb_yyy[j], s_0_0[j]);
 
-                                0.25 * fx[j] * fx[j] * pa_y[j] * pb_xx[j] + 0.5 * pa_xxy[j] * pb_xx[j] * fx[j] + 0.5 * pa_xxy[j] * fx[j] * pb_zz[j] + 
+                t_xxy_xyyz[j] = ovlvecfunc::fvec_xxy_xyyz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                                2.0 * pa_xy[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_y[j] * pb_xxzz[j] + pa_xxy[j] * pb_xxzz[j]) * s_0_0[j];
+                t_xxy_xyzz[j] = ovlvecfunc::fvec_xxy_xyzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyzz[j], pb_xzz[j], pb_y[j], pb_yzz[j], pb_zz[j], s_0_0[j]);
 
-                t_xxy_xyyy[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_y[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_xyy[j] + 1.5 * pa_xxy[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_xyy[j] + pa_xy[j] * fx[j] * pb_yyy[j] + 0.5 * fx[j] * pa_y[j] * pb_xyyy[j] + 
-
-                                pa_xxy[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_xxy_xyyz[j] = (0.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_y[j] * pb_xz[j] + 0.5 * fx[j] * fx[j] * pb_xyz[j] + 0.5 * pa_xxy[j] * pb_xz[j] * fx[j] + 
-
-                                pa_xx[j] * fx[j] * pb_xyz[j] + pa_xy[j] * fx[j] * pb_yyz[j] + 0.5 * fx[j] * pa_y[j] * pb_xyyz[j] + 
-
-                                pa_xxy[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_xxy_xyzz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.125 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.25 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_y[j] * pb_xy[j] + 0.25 * fx[j] * fx[j] * pb_xzz[j] + 0.5 * pa_xxy[j] * pb_xy[j] * fx[j] + 
-
-                                0.5 * pa_xx[j] * fx[j] * pb_xzz[j] + pa_xy[j] * fx[j] * pb_yzz[j] + 0.5 * fx[j] * pa_y[j] * pb_xyzz[j] + 
-
-                                pa_xxy[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_xxy_xzzz[j] = (1.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_y[j] * pb_xz[j] + 1.5 * pa_xxy[j] * pb_xz[j] * fx[j] + pa_xy[j] * fx[j] * pb_zzz[j] + 
-
-                                0.5 * fx[j] * pa_y[j] * pb_xzzz[j] + pa_xxy[j] * pb_xzzz[j]) * s_0_0[j];
+                t_xxy_xzzz[j] = ovlvecfunc::fvec_xxy_xzzz_s_0(fx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (5) = (25,30)
@@ -693,41 +565,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xxy_yyzz, t_xxy_yzzz, t_xxy_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxy_yyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_y[j] + 1.5 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_xxy_yyyy[j] = ovlvecfunc::fvec_xxy_yyyy_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]);
 
-                                0.75 * pa_xxy[j] * fx[j] * fx[j] + 3.0 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * fx[j] * fx[j] * pa_y[j] * pb_yy[j] + 
+                t_xxy_yyyz[j] = ovlvecfunc::fvec_xxy_yyyz_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                                fx[j] * fx[j] * pb_yyy[j] + 3.0 * pa_xxy[j] * pb_yy[j] * fx[j] + 2.0 * pa_xx[j] * fx[j] * pb_yyy[j] + 
+                t_xxy_yyzz[j] = ovlvecfunc::fvec_xxy_yyzz_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_y[j], pb_yy[j], pb_yyzz[j], pb_yzz[j], pb_zz[j], s_0_0[j]);
 
-                                0.5 * fx[j] * pa_y[j] * pb_yyyy[j] + pa_xxy[j] * pb_yyyy[j]) * s_0_0[j];
+                t_xxy_yzzz[j] = ovlvecfunc::fvec_xxy_yzzz_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_yz[j], pb_yzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]);
 
-                t_xxy_yyyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_y[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_yyz[j] + 1.5 * pa_xxy[j] * pb_yz[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_yyz[j] + 0.5 * fx[j] * pa_y[j] * pb_yyyz[j] + pa_xxy[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_xxy_yyzz[j] = (0.125 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_xxy[j] * fx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_y[j] * pb_yy[j] + 0.25 * fx[j] * fx[j] * pa_y[j] * pb_zz[j] + 0.5 * fx[j] * fx[j] * pb_yzz[j] + 
-
-                                0.5 * pa_xxy[j] * pb_yy[j] * fx[j] + 0.5 * pa_xxy[j] * fx[j] * pb_zz[j] + pa_xx[j] * fx[j] * pb_yzz[j] + 
-
-                                0.5 * fx[j] * pa_y[j] * pb_yyzz[j] + pa_xxy[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_xxy_yzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_y[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_zzz[j] + 1.5 * pa_xxy[j] * pb_yz[j] * fx[j] + 
-
-                                0.5 * pa_xx[j] * fx[j] * pb_zzz[j] + 0.5 * fx[j] * pa_y[j] * pb_yzzz[j] + pa_xxy[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_xxy_zzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.75 * pa_xxy[j] * fx[j] * fx[j] + 
-
-                                1.5 * fx[j] * fx[j] * pa_y[j] * pb_zz[j] + 3.0 * pa_xxy[j] * pb_zz[j] * fx[j] + 0.5 * fx[j] * pa_y[j] * pb_zzzz[j] + 
-
-                                pa_xxy[j] * pb_zzzz[j]) * s_0_0[j];
+                t_xxy_zzzz[j] = ovlvecfunc::fvec_xxy_zzzz_s_0(fx[j], pa_xxy[j], pa_y[j], pb_zz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (6) = (30,35)
@@ -737,43 +583,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      pb_yz, pb_z, s_0_0, t_xxz_xxxx, t_xxz_xxxy, t_xxz_xxxz, t_xxz_xxyy, t_xxz_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxz_xxxx[j] = (1.875 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * pa_xxz[j] * fx[j] * fx[j] + 
+                t_xxz_xxxx[j] = ovlvecfunc::fvec_xxz_xxxx_s_0(fx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]);
 
-                                6.0 * pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 4.5 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 3.0 * pa_xxz[j] * pb_xx[j] * fx[j] + 
+                t_xxz_xxxy[j] = ovlvecfunc::fvec_xxz_xxxy_s_0(fx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]);
 
-                                4.0 * pa_xz[j] * fx[j] * pb_xxx[j] + 0.5 * fx[j] * pa_z[j] * pb_xxxx[j] + pa_xxz[j] * pb_xxxx[j]) * s_0_0[j];
+                t_xxz_xxxz[j] = ovlvecfunc::fvec_xxz_xxxz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]);
 
-                t_xxz_xxxy[j] = (1.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_xxz_xxyy[j] = ovlvecfunc::fvec_xxz_xxyy_s_0(fx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxyy[j], pb_xyy[j], pb_yy[j], s_0_0[j]);
 
-                                2.25 * fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 1.5 * pa_xxz[j] * pb_xy[j] * fx[j] + 3.0 * pa_xz[j] * fx[j] * pb_xxy[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_xxxy[j] + pa_xxz[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_xxz_xxxz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * fx[j] + 1.125 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                                2.25 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 0.25 * fx[j] * fx[j] * pb_xxx[j] + 1.5 * pa_xxz[j] * pb_xz[j] * fx[j] + 
-
-                                0.5 * pa_xx[j] * fx[j] * pb_xxx[j] + 3.0 * pa_xz[j] * fx[j] * pb_xxz[j] + 0.5 * fx[j] * pa_z[j] * pb_xxxz[j] + 
-
-                                pa_xxz[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_xxz_xxyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.25 * pa_xxz[j] * fx[j] * fx[j] + 
-
-                                pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 0.5 * pa_xxz[j] * pb_xx[j] * fx[j] + 0.5 * pa_xxz[j] * fx[j] * pb_yy[j] + 
-
-                                2.0 * pa_xz[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pa_z[j] * pb_xxyy[j] + pa_xxz[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_xxz_xxyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_xxy[j] + 
-
-                                0.5 * pa_xxz[j] * fx[j] * pb_yz[j] + 0.5 * pa_xx[j] * fx[j] * pb_xxy[j] + 2.0 * pa_xz[j] * fx[j] * pb_xyz[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_xxyz[j] + pa_xxz[j] * pb_xxyz[j]) * s_0_0[j];
+                t_xxz_xxyz[j] = ovlvecfunc::fvec_xxz_xxyz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xxy[j], pb_xxyz[j], pb_xy[j], pb_xyz[j], pb_y[j], pb_yz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (7) = (35,40)
@@ -784,51 +602,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xxz_xyzz, t_xxz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxz_xxzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_xxz_xxzz[j] = ovlvecfunc::fvec_xxz_xxzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_xz[j], pb_xzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.25 * pa_xxz[j] * fx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xxz_xyyy[j] = ovlvecfunc::fvec_xxz_xyyy_s_0(fx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyyy[j], pb_y[j], pb_yyy[j], s_0_0[j]);
 
-                                2.0 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 
+                t_xxz_xyyz[j] = ovlvecfunc::fvec_xxz_xyyz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xyy[j], pb_xyyz[j], pb_xz[j], pb_yy[j], pb_yyz[j], pb_z[j], s_0_0[j]);
 
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 0.5 * fx[j] * fx[j] * pb_xxz[j] + 0.5 * pa_xxz[j] * pb_xx[j] * fx[j] + 
+                t_xxz_xyzz[j] = ovlvecfunc::fvec_xxz_xyzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_y[j], pb_yz[j], pb_yzz[j], s_0_0[j]);
 
-                                0.5 * pa_xxz[j] * fx[j] * pb_zz[j] + pa_xx[j] * fx[j] * pb_xxz[j] + 2.0 * pa_xz[j] * fx[j] * pb_xzz[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_xxzz[j] + pa_xxz[j] * pb_xxzz[j]) * s_0_0[j];
-
-                t_xxz_xyyy[j] = (1.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 1.5 * pa_xxz[j] * pb_xy[j] * fx[j] + pa_xz[j] * fx[j] * pb_yyy[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_xyyy[j] + pa_xxz[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_xxz_xyyz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.125 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.25 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 0.25 * fx[j] * fx[j] * pb_xyy[j] + 0.5 * pa_xxz[j] * pb_xz[j] * fx[j] + 
-
-                                0.5 * pa_xx[j] * fx[j] * pb_xyy[j] + pa_xz[j] * fx[j] * pb_yyz[j] + 0.5 * fx[j] * pa_z[j] * pb_xyyz[j] + 
-
-                                pa_xxz[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_xxz_xyzz[j] = (0.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 0.5 * fx[j] * fx[j] * pb_xyz[j] + 0.5 * pa_xxz[j] * pb_xy[j] * fx[j] + 
-
-                                pa_xx[j] * fx[j] * pb_xyz[j] + pa_xz[j] * fx[j] * pb_yzz[j] + 0.5 * fx[j] * pa_z[j] * pb_xyzz[j] + 
-
-                                pa_xxz[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_xxz_xzzz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * pa_xx[j] * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_xzz[j] + 1.5 * pa_xxz[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_xzz[j] + pa_xz[j] * fx[j] * pb_zzz[j] + 0.5 * fx[j] * pa_z[j] * pb_xzzz[j] + 
-
-                                pa_xxz[j] * pb_xzzz[j]) * s_0_0[j];
+                t_xxz_xzzz[j] = ovlvecfunc::fvec_xxz_xzzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (8) = (40,45)
@@ -838,41 +620,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xxz_yyzz, t_xxz_yzzz, t_xxz_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxz_yyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * pa_xxz[j] * fx[j] * fx[j] + 
+                t_xxz_yyyy[j] = ovlvecfunc::fvec_xxz_yyyy_s_0(fx[j], pa_xxz[j], pa_z[j], pb_yy[j], pb_yyyy[j], s_0_0[j]);
 
-                                1.5 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 3.0 * pa_xxz[j] * pb_yy[j] * fx[j] + 0.5 * fx[j] * pa_z[j] * pb_yyyy[j] + 
+                t_xxz_yyyz[j] = ovlvecfunc::fvec_xxz_yyyz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_y[j], pb_yyy[j], pb_yyyz[j], pb_yz[j], s_0_0[j]);
 
-                                pa_xxz[j] * pb_yyyy[j]) * s_0_0[j];
+                t_xxz_yyzz[j] = ovlvecfunc::fvec_xxz_yyzz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                t_xxz_yyyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_xxz_yzzz[j] = ovlvecfunc::fvec_xxz_yzzz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], s_0_0[j]);
 
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_yyy[j] + 1.5 * pa_xxz[j] * pb_yz[j] * fx[j] + 
-
-                                0.5 * pa_xx[j] * fx[j] * pb_yyy[j] + 0.5 * fx[j] * pa_z[j] * pb_yyyz[j] + pa_xxz[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_xxz_yyzz[j] = (0.125 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.25 * pa_xxz[j] * fx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 0.25 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 0.5 * fx[j] * fx[j] * pb_yyz[j] + 
-
-                                0.5 * pa_xxz[j] * pb_yy[j] * fx[j] + 0.5 * pa_xxz[j] * fx[j] * pb_zz[j] + pa_xx[j] * fx[j] * pb_yyz[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_yyzz[j] + pa_xxz[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_xxz_yzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_yzz[j] + 1.5 * pa_xxz[j] * pb_yz[j] * fx[j] + 
-
-                                1.5 * pa_xx[j] * fx[j] * pb_yzz[j] + 0.5 * fx[j] * pa_z[j] * pb_yzzz[j] + pa_xxz[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_xxz_zzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 1.5 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * pa_xxz[j] * fx[j] * fx[j] + 3.0 * pa_xx[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 
-
-                                fx[j] * fx[j] * pb_zzz[j] + 3.0 * pa_xxz[j] * pb_zz[j] * fx[j] + 2.0 * pa_xx[j] * fx[j] * pb_zzz[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_zzzz[j] + pa_xxz[j] * pb_zzzz[j]) * s_0_0[j];
+                t_xxz_zzzz[j] = ovlvecfunc::fvec_xxz_zzzz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (9) = (45,50)
@@ -882,49 +638,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      pb_yz, pb_z, s_0_0, t_xyy_xxxx, t_xyy_xxxy, t_xyy_xxxz, t_xyy_xxyy, t_xyy_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyy_xxxx[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xyy_xxxx[j] = ovlvecfunc::fvec_xyy_xxxx_s_0(fx[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]);
 
-                                0.75 * pa_xyy[j] * fx[j] * fx[j] + 3.0 * fx[j] * fx[j] * pa_yy[j] * pb_x[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 
+                t_xyy_xxxy[j] = ovlvecfunc::fvec_xyy_xxxy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]);
 
-                                fx[j] * fx[j] * pb_xxx[j] + 3.0 * pa_xyy[j] * pb_xx[j] * fx[j] + 2.0 * fx[j] * pa_yy[j] * pb_xxx[j] + 
+                t_xyy_xxxz[j] = ovlvecfunc::fvec_xyy_xxxz_s_0(fx[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]);
 
-                                0.5 * pa_x[j] * fx[j] * pb_xxxx[j] + pa_xyy[j] * pb_xxxx[j]) * s_0_0[j];
+                t_xyy_xxyy[j] = ovlvecfunc::fvec_xyy_xxyy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_xy[j], pb_xyy[j], pb_y[j], pb_yy[j], s_0_0[j]);
 
-                t_xyy_xxxy[j] = (0.75 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                1.5 * pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_yy[j] * pb_y[j] + 
-
-                                1.5 * fx[j] * fx[j] * pa_y[j] * pb_xx[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_xxy[j] + 
-
-                                1.5 * pa_xyy[j] * pb_xy[j] * fx[j] + pa_xy[j] * fx[j] * pb_xxx[j] + 1.5 * fx[j] * pa_yy[j] * pb_xxy[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xxxy[j] + pa_xyy[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_xyy_xxxz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pa_yy[j] * pb_z[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_xxz[j] + 1.5 * pa_xyy[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * fx[j] * pa_yy[j] * pb_xxz[j] + 0.5 * pa_x[j] * fx[j] * pb_xxxz[j] + pa_xyy[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_xyy_xxyy[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.25 * pa_xyy[j] * fx[j] * fx[j] + pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                                0.5 * fx[j] * fx[j] * pa_yy[j] * pb_x[j] + 2.0 * fx[j] * fx[j] * pa_y[j] * pb_xy[j] + 
-
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * fx[j] * pb_xyy[j] + 0.5 * pa_xyy[j] * pb_xx[j] * fx[j] + 
-
-                                0.5 * pa_xyy[j] * fx[j] * pb_yy[j] + 2.0 * pa_xy[j] * fx[j] * pb_xxy[j] + fx[j] * pa_yy[j] * pb_xyy[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xxyy[j] + pa_xyy[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_xyy_xxyz[j] = (0.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + fx[j] * fx[j] * pa_y[j] * pb_xz[j] + 
-
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * fx[j] * pb_xyz[j] + 0.5 * pa_xyy[j] * fx[j] * pb_yz[j] + 
-
-                                pa_xy[j] * fx[j] * pb_xxz[j] + fx[j] * pa_yy[j] * pb_xyz[j] + 0.5 * pa_x[j] * fx[j] * pb_xxyz[j] + 
-
-                                pa_xyy[j] * pb_xxyz[j]) * s_0_0[j];
+                t_xyy_xxyz[j] = ovlvecfunc::fvec_xyy_xxyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_xxyz[j], pb_xxz[j], pb_xyz[j], pb_xz[j], pb_yz[j], pb_z[j], s_0_0[j]);
             }
 
             // Batch of Integrals (10) = (50,55)
@@ -935,49 +657,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xyy_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyy_xxzz[j] = (0.125 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xyy_xxzz[j] = ovlvecfunc::fvec_xyy_xxzz_s_0(fx[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_x[j], pb_xx[j], pb_xxzz[j], pb_xzz[j], pb_zz[j], s_0_0[j]);
 
-                                0.25 * pa_xyy[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_yy[j] * pb_x[j] + 
+                t_xyy_xyyy[j] = ovlvecfunc::fvec_xyy_xyyy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], pb_y[j], pb_yy[j], pb_yyy[j], s_0_0[j]);
 
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * fx[j] * pb_xzz[j] + 
+                t_xyy_xyyz[j] = ovlvecfunc::fvec_xyy_xyyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                                0.5 * pa_xyy[j] * pb_xx[j] * fx[j] + 0.5 * pa_xyy[j] * fx[j] * pb_zz[j] + fx[j] * pa_yy[j] * pb_xzz[j] + 
+                t_xyy_xyzz[j] = ovlvecfunc::fvec_xyy_xyzz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyzz[j], pb_xzz[j], pb_y[j], pb_yzz[j], pb_zz[j], s_0_0[j]);
 
-                                0.5 * pa_x[j] * fx[j] * pb_xxzz[j] + pa_xyy[j] * pb_xxzz[j]) * s_0_0[j];
-
-                t_xyy_xyyy[j] = (0.75 * fx[j] * fx[j] * fx[j] * pa_y[j] + 1.125 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                1.5 * pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_yy[j] * pb_y[j] + 1.5 * fx[j] * fx[j] * pa_y[j] * pb_yy[j] + 0.25 * fx[j] * fx[j] * pb_yyy[j] + 
-
-                                1.5 * pa_xyy[j] * pb_xy[j] * fx[j] + 3.0 * pa_xy[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pa_yy[j] * pb_yyy[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xyyy[j] + pa_xyy[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_xyy_xyyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_yy[j] * pb_z[j] + fx[j] * fx[j] * pa_y[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_yyz[j] + 
-
-                                0.5 * pa_xyy[j] * pb_xz[j] * fx[j] + 2.0 * pa_xy[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pa_yy[j] * pb_yyz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xyyz[j] + pa_xyy[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_xyy_xyzz[j] = (0.25 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.125 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.5 * pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pa_yy[j] * pb_y[j] + 
-
-                                0.5 * fx[j] * fx[j] * pa_y[j] * pb_zz[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.25 * fx[j] * fx[j] * pb_yzz[j] + 
-
-                                0.5 * pa_xyy[j] * pb_xy[j] * fx[j] + pa_xy[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_yy[j] * pb_yzz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xyzz[j] + pa_xyy[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_xyy_xzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pa_yy[j] * pb_z[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.25 * fx[j] * fx[j] * pb_zzz[j] + 1.5 * pa_xyy[j] * pb_xz[j] * fx[j] + 
-
-                                0.5 * fx[j] * pa_yy[j] * pb_zzz[j] + 0.5 * pa_x[j] * fx[j] * pb_xzzz[j] + pa_xyy[j] * pb_xzzz[j]) * s_0_0[j];
+                t_xyy_xzzz[j] = ovlvecfunc::fvec_xyy_xzzz_s_0(fx[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (11) = (55,60)
@@ -987,37 +675,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xyy_yyzz, t_xyy_yzzz, t_xyy_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyy_yyyy[j] = (1.875 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xyy[j] * fx[j] * fx[j] + 
+                t_xyy_yyyy[j] = ovlvecfunc::fvec_xyy_yyyy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]);
 
-                                6.0 * pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 4.5 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_xyy[j] * pb_yy[j] * fx[j] + 
+                t_xyy_yyyz[j] = ovlvecfunc::fvec_xyy_yyyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                                4.0 * pa_xy[j] * fx[j] * pb_yyy[j] + 0.5 * pa_x[j] * fx[j] * pb_yyyy[j] + pa_xyy[j] * pb_yyyy[j]) * s_0_0[j];
+                t_xyy_yyzz[j] = ovlvecfunc::fvec_xyy_yyzz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_y[j], pb_yy[j], pb_yyzz[j], pb_yzz[j], pb_zz[j], s_0_0[j]);
 
-                t_xyy_yyyz[j] = (1.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_xyy_yzzz[j] = ovlvecfunc::fvec_xyy_yzzz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_yz[j], pb_yzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]);
 
-                                2.25 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xyy[j] * pb_yz[j] * fx[j] + 3.0 * pa_xy[j] * fx[j] * pb_yyz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_yyyz[j] + pa_xyy[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_xyy_yyzz[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.25 * pa_xyy[j] * fx[j] * fx[j] + 
-
-                                pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 
-
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 0.5 * pa_xyy[j] * pb_yy[j] * fx[j] + 0.5 * pa_xyy[j] * fx[j] * pb_zz[j] + 
-
-                                2.0 * pa_xy[j] * fx[j] * pb_yzz[j] + 0.5 * pa_x[j] * fx[j] * pb_yyzz[j] + pa_xyy[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_xyy_yzzz[j] = (1.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xyy[j] * pb_yz[j] * fx[j] + pa_xy[j] * fx[j] * pb_zzz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_yzzz[j] + pa_xyy[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_xyy_zzzz[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xyy[j] * fx[j] * fx[j] + 
-
-                                1.5 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_xyy[j] * pb_zz[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * pb_zzzz[j] + 
-
-                                pa_xyy[j] * pb_zzzz[j]) * s_0_0[j];
+                t_xyy_zzzz[j] = ovlvecfunc::fvec_xyy_zzzz_s_0(fx[j], pa_x[j], pa_xyy[j], pb_zz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (12) = (60,65)
@@ -1028,37 +694,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xyz_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyz_xxxx[j] = (0.75 * pa_xyz[j] * fx[j] * fx[j] + 3.0 * fx[j] * fx[j] * pa_yz[j] * pb_x[j] + 
+                t_xyz_xxxx[j] = ovlvecfunc::fvec_xyz_xxxx_s_0(fx[j], pa_xyz[j], pa_yz[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]);
 
-                                3.0 * pa_xyz[j] * pb_xx[j] * fx[j] + 2.0 * fx[j] * pa_yz[j] * pb_xxx[j] + pa_xyz[j] * pb_xxxx[j]) * s_0_0[j];
+                t_xyz_xxxy[j] = ovlvecfunc::fvec_xyz_xxxy_s_0(fx[j], pa_xyz[j], pa_xz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]);
 
-                t_xyz_xxxy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xyz_xxxz[j] = ovlvecfunc::fvec_xyz_xxxz_s_0(fx[j], pa_xy[j], pa_xyz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]);
 
-                                0.75 * fx[j] * fx[j] * pa_yz[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 1.5 * pa_xyz[j] * pb_xy[j] * fx[j] + 
+                t_xyz_xxyy[j] = ovlvecfunc::fvec_xyz_xxyy_s_0(fx[j], pa_xyz[j], pa_xz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_xy[j], pb_xyy[j], pb_y[j], pb_yy[j], s_0_0[j]);
 
-                                0.5 * pa_xz[j] * fx[j] * pb_xxx[j] + 1.5 * fx[j] * pa_yz[j] * pb_xxy[j] + pa_xyz[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_xyz_xxxz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.75 * pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_yz[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pa_y[j] * pb_xx[j] + 1.5 * pa_xyz[j] * pb_xz[j] * fx[j] + 
-
-                                0.5 * pa_xy[j] * fx[j] * pb_xxx[j] + 1.5 * fx[j] * pa_yz[j] * pb_xxz[j] + pa_xyz[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_xyz_xxyy[j] = (0.25 * pa_xyz[j] * fx[j] * fx[j] + 0.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.5 * fx[j] * fx[j] * pa_yz[j] * pb_x[j] + fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 0.5 * pa_xyz[j] * pb_xx[j] * fx[j] + 
-
-                                0.5 * pa_xyz[j] * fx[j] * pb_yy[j] + pa_xz[j] * fx[j] * pb_xxy[j] + fx[j] * pa_yz[j] * pb_xyy[j] + pa_xyz[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_xyz_xxyz[j] = (0.125 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.25 * pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 0.25 * pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 0.5 * fx[j] * fx[j] * pa_y[j] * pb_xy[j] + 0.5 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 
-
-                                0.5 * pa_xyz[j] * fx[j] * pb_yz[j] + 0.5 * pa_xy[j] * fx[j] * pb_xxy[j] + 0.5 * pa_xz[j] * fx[j] * pb_xxz[j] + 
-
-                                fx[j] * pa_yz[j] * pb_xyz[j] + pa_xyz[j] * pb_xxyz[j]) * s_0_0[j];
+                t_xyz_xxyz[j] = ovlvecfunc::fvec_xyz_xxyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xxyz[j], pb_xxz[j], pb_xy[j], pb_xyz[j], pb_xz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]);
             }
 
             // Batch of Integrals (13) = (65,70)
@@ -1069,43 +713,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xyz_xyyz, t_xyz_xyzz, t_xyz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyz_xxzz[j] = (0.25 * pa_xyz[j] * fx[j] * fx[j] + 0.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_xyz_xxzz[j] = ovlvecfunc::fvec_xyz_xxzz_s_0(fx[j], pa_xy[j], pa_xyz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_xz[j], pb_xzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.5 * fx[j] * fx[j] * pa_yz[j] * pb_x[j] + fx[j] * fx[j] * pa_y[j] * pb_xz[j] + 0.5 * pa_xyz[j] * pb_xx[j] * fx[j] + 
+                t_xyz_xyyy[j] = ovlvecfunc::fvec_xyz_xyyy_s_0(fx[j], pa_xyz[j], pa_xz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], pb_y[j], pb_yy[j], pb_yyy[j], s_0_0[j]);
 
-                                0.5 * pa_xyz[j] * fx[j] * pb_zz[j] + pa_xy[j] * fx[j] * pb_xxz[j] + fx[j] * pa_yz[j] * pb_xzz[j] + pa_xyz[j] * pb_xxzz[j]) * s_0_0[j];
+                t_xyz_xyyz[j] = ovlvecfunc::fvec_xyz_xyyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                t_xyz_xyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xyz_xyzz[j] = ovlvecfunc::fvec_xyz_xyzz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_xz[j], pb_xzz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.75 * fx[j] * fx[j] * pa_yz[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 1.5 * pa_xyz[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * pa_xz[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pa_yz[j] * pb_yyy[j] + pa_xyz[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_xyz_xyyz[j] = (0.125 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_yz[j] * pb_z[j] + 0.25 * fx[j] * fx[j] * pa_y[j] * pb_yy[j] + 
-
-                                0.5 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.5 * pa_xyz[j] * pb_xz[j] * fx[j] + 0.5 * pa_xy[j] * fx[j] * pb_xyy[j] + 
-
-                                pa_xz[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pa_yz[j] * pb_yyz[j] + pa_xyz[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_xyz_xyzz[j] = (0.125 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.25 * pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_yz[j] * pb_y[j] + 0.5 * fx[j] * fx[j] * pa_y[j] * pb_yz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 0.5 * pa_xyz[j] * pb_xy[j] * fx[j] + pa_xy[j] * fx[j] * pb_xyz[j] + 
-
-                                0.5 * pa_xz[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_yz[j] * pb_yzz[j] + pa_xyz[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_xyz_xzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_y[j] + 0.75 * pa_xy[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_yz[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pa_y[j] * pb_zz[j] + 1.5 * pa_xyz[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_xy[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_yz[j] * pb_zzz[j] + pa_xyz[j] * pb_xzzz[j]) * s_0_0[j];
+                t_xyz_xzzz[j] = ovlvecfunc::fvec_xyz_xzzz_s_0(fx[j], pa_xy[j], pa_xyz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (14) = (70,75)
@@ -1115,31 +731,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xyz_yyyz, t_xyz_yyzz, t_xyz_yzzz, t_xyz_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyz_yyyy[j] = (0.75 * pa_xyz[j] * fx[j] * fx[j] + 3.0 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_xyz_yyyy[j] = ovlvecfunc::fvec_xyz_yyyy_s_0(fx[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]);
 
-                                3.0 * pa_xyz[j] * pb_yy[j] * fx[j] + 2.0 * pa_xz[j] * fx[j] * pb_yyy[j] + pa_xyz[j] * pb_yyyy[j]) * s_0_0[j];
+                t_xyz_yyyz[j] = ovlvecfunc::fvec_xyz_yyyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                t_xyz_yyyz[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_xyz_yyzz[j] = ovlvecfunc::fvec_xyz_yyzz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.75 * pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 1.5 * pa_xyz[j] * pb_yz[j] * fx[j] + 
+                t_xyz_yzzz[j] = ovlvecfunc::fvec_xyz_yzzz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]);
 
-                                0.5 * pa_xy[j] * fx[j] * pb_yyy[j] + 1.5 * pa_xz[j] * fx[j] * pb_yyz[j] + pa_xyz[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_xyz_yyzz[j] = (0.25 * pa_xyz[j] * fx[j] * fx[j] + 0.5 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 0.5 * pa_xyz[j] * pb_yy[j] * fx[j] + 
-
-                                0.5 * pa_xyz[j] * fx[j] * pb_zz[j] + pa_xy[j] * fx[j] * pb_yyz[j] + pa_xz[j] * fx[j] * pb_yzz[j] + pa_xyz[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_xyz_yzzz[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xy[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.75 * pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 1.5 * pa_xyz[j] * pb_yz[j] * fx[j] + 
-
-                                1.5 * pa_xy[j] * fx[j] * pb_yzz[j] + 0.5 * pa_xz[j] * fx[j] * pb_zzz[j] + pa_xyz[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_xyz_zzzz[j] = (0.75 * pa_xyz[j] * fx[j] * fx[j] + 3.0 * pa_xy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                3.0 * pa_xyz[j] * pb_zz[j] * fx[j] + 2.0 * pa_xy[j] * fx[j] * pb_zzz[j] + pa_xyz[j] * pb_zzzz[j]) * s_0_0[j];
+                t_xyz_zzzz[j] = ovlvecfunc::fvec_xyz_zzzz_s_0(fx[j], pa_xy[j], pa_xyz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (15) = (75,80)
@@ -1149,47 +749,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      pb_yz, pb_z, s_0_0, t_xzz_xxxx, t_xzz_xxxy, t_xzz_xxxz, t_xzz_xxyy, t_xzz_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xzz_xxxx[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xzz_xxxx[j] = ovlvecfunc::fvec_xzz_xxxx_s_0(fx[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]);
 
-                                0.75 * pa_xzz[j] * fx[j] * fx[j] + 3.0 * fx[j] * fx[j] * pa_zz[j] * pb_x[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 
+                t_xzz_xxxy[j] = ovlvecfunc::fvec_xzz_xxxy_s_0(fx[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]);
 
-                                fx[j] * fx[j] * pb_xxx[j] + 3.0 * pa_xzz[j] * pb_xx[j] * fx[j] + 2.0 * fx[j] * pa_zz[j] * pb_xxx[j] + 
+                t_xzz_xxxz[j] = ovlvecfunc::fvec_xzz_xxxz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]);
 
-                                0.5 * pa_x[j] * fx[j] * pb_xxxx[j] + pa_xzz[j] * pb_xxxx[j]) * s_0_0[j];
+                t_xzz_xxyy[j] = ovlvecfunc::fvec_xzz_xxyy_s_0(fx[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_x[j], pb_xx[j], pb_xxyy[j], pb_xyy[j], pb_yy[j], s_0_0[j]);
 
-                t_xzz_xxxy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] * pb_y[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_xxy[j] + 1.5 * pa_xzz[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * fx[j] * pa_zz[j] * pb_xxy[j] + 0.5 * pa_x[j] * fx[j] * pb_xxxy[j] + pa_xzz[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_xzz_xxxz[j] = (0.75 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                1.5 * pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] * pb_z[j] + 
-
-                                1.5 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_xxz[j] + 
-
-                                1.5 * pa_xzz[j] * pb_xz[j] * fx[j] + pa_xz[j] * fx[j] * pb_xxx[j] + 1.5 * fx[j] * pa_zz[j] * pb_xxz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xxxz[j] + pa_xzz[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_xzz_xxyy[j] = (0.125 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.25 * pa_xzz[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_zz[j] * pb_x[j] + 
-
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * fx[j] * pb_xyy[j] + 
-
-                                0.5 * pa_xzz[j] * pb_xx[j] * fx[j] + 0.5 * pa_xzz[j] * fx[j] * pb_yy[j] + fx[j] * pa_zz[j] * pb_xyy[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xxyy[j] + pa_xzz[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_xzz_xxyz[j] = (0.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 
-
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * fx[j] * pb_xyz[j] + 0.5 * pa_xzz[j] * fx[j] * pb_yz[j] + 
-
-                                pa_xz[j] * fx[j] * pb_xxy[j] + fx[j] * pa_zz[j] * pb_xyz[j] + 0.5 * pa_x[j] * fx[j] * pb_xxyz[j] + 
-
-                                pa_xzz[j] * pb_xxyz[j]) * s_0_0[j];
+                t_xzz_xxyz[j] = ovlvecfunc::fvec_xzz_xxyz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_xxy[j], pb_xxyz[j], pb_xy[j], pb_xyz[j], pb_y[j], pb_yz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (16) = (80,85)
@@ -1200,51 +768,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xzz_xyzz, t_xzz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xzz_xxzz[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xzz_xxzz[j] = ovlvecfunc::fvec_xzz_xxzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_xz[j], pb_xzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.25 * pa_xzz[j] * fx[j] * fx[j] + pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xx[j] + 
+                t_xzz_xyyy[j] = ovlvecfunc::fvec_xzz_xyyy_s_0(fx[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_xy[j], pb_xyyy[j], pb_y[j], pb_yyy[j], s_0_0[j]);
 
-                                0.5 * fx[j] * fx[j] * pa_zz[j] * pb_x[j] + 2.0 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 
+                t_xzz_xyyz[j] = ovlvecfunc::fvec_xzz_xyyz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xyy[j], pb_xyyz[j], pb_xz[j], pb_yy[j], pb_yyz[j], pb_z[j], s_0_0[j]);
 
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * fx[j] * pb_xzz[j] + 0.5 * pa_xzz[j] * pb_xx[j] * fx[j] + 
+                t_xzz_xyzz[j] = ovlvecfunc::fvec_xzz_xyzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_y[j], pb_yz[j], pb_yzz[j], s_0_0[j]);
 
-                                0.5 * pa_xzz[j] * fx[j] * pb_zz[j] + 2.0 * pa_xz[j] * fx[j] * pb_xxz[j] + fx[j] * pa_zz[j] * pb_xzz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xxzz[j] + pa_xzz[j] * pb_xxzz[j]) * s_0_0[j];
-
-                t_xzz_xyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] * pb_y[j] + 
-
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 0.25 * fx[j] * fx[j] * pb_yyy[j] + 1.5 * pa_xzz[j] * pb_xy[j] * fx[j] + 
-
-                                0.5 * fx[j] * pa_zz[j] * pb_yyy[j] + 0.5 * pa_x[j] * fx[j] * pb_xyyy[j] + pa_xzz[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_xzz_xyyz[j] = (0.25 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.125 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.5 * pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pa_zz[j] * pb_z[j] + 
-
-                                0.5 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 0.25 * fx[j] * fx[j] * pb_yyz[j] + 
-
-                                0.5 * pa_xzz[j] * pb_xz[j] * fx[j] + pa_xz[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pa_zz[j] * pb_yyz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xyyz[j] + pa_xzz[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_xzz_xyzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_xy[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_zz[j] * pb_y[j] + fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_yzz[j] + 
-
-                                0.5 * pa_xzz[j] * pb_xy[j] * fx[j] + 2.0 * pa_xz[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pa_zz[j] * pb_yzz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xyzz[j] + pa_xzz[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_xzz_xzzz[j] = (0.75 * fx[j] * fx[j] * fx[j] * pa_z[j] + 1.125 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                1.5 * pa_xz[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * pa_x[j] * fx[j] * fx[j] * pb_xz[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_zz[j] * pb_z[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 0.25 * fx[j] * fx[j] * pb_zzz[j] + 
-
-                                1.5 * pa_xzz[j] * pb_xz[j] * fx[j] + 3.0 * pa_xz[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_zz[j] * pb_zzz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_xzzz[j] + pa_xzz[j] * pb_xzzz[j]) * s_0_0[j];
+                t_xzz_xzzz[j] = ovlvecfunc::fvec_xzz_xzzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (17) = (85,90)
@@ -1254,37 +786,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_xzz_yyzz, t_xzz_yzzz, t_xzz_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xzz_yyyy[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xzz[j] * fx[j] * fx[j] + 
+                t_xzz_yyyy[j] = ovlvecfunc::fvec_xzz_yyyy_s_0(fx[j], pa_x[j], pa_xzz[j], pb_yy[j], pb_yyyy[j], s_0_0[j]);
 
-                                1.5 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_xzz[j] * pb_yy[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * pb_yyyy[j] + 
+                t_xzz_yyyz[j] = ovlvecfunc::fvec_xzz_yyyz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_y[j], pb_yyy[j], pb_yyyz[j], pb_yz[j], s_0_0[j]);
 
-                                pa_xzz[j] * pb_yyyy[j]) * s_0_0[j];
+                t_xzz_yyzz[j] = ovlvecfunc::fvec_xzz_yyzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                t_xzz_yyyz[j] = (1.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_xzz_yzzz[j] = ovlvecfunc::fvec_xzz_yzzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], s_0_0[j]);
 
-                                0.75 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xzz[j] * pb_yz[j] * fx[j] + pa_xz[j] * fx[j] * pb_yyy[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_yyyz[j] + pa_xzz[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_xzz_yyzz[j] = (0.375 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.25 * pa_xzz[j] * fx[j] * fx[j] + 
-
-                                pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                                0.25 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_xzz[j] * pb_yy[j] * fx[j] + 0.5 * pa_xzz[j] * fx[j] * pb_zz[j] + 
-
-                                2.0 * pa_xz[j] * fx[j] * pb_yyz[j] + 0.5 * pa_x[j] * fx[j] * pb_yyzz[j] + pa_xzz[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_xzz_yzzz[j] = (1.5 * pa_xz[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                2.25 * pa_x[j] * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xzz[j] * pb_yz[j] * fx[j] + 3.0 * pa_xz[j] * fx[j] * pb_yzz[j] + 
-
-                                0.5 * pa_x[j] * fx[j] * pb_yzzz[j] + pa_xzz[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_xzz_zzzz[j] = (1.875 * pa_x[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_xzz[j] * fx[j] * fx[j] + 
-
-                                6.0 * pa_xz[j] * fx[j] * fx[j] * pb_z[j] + 4.5 * pa_x[j] * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_xzz[j] * pb_zz[j] * fx[j] + 
-
-                                4.0 * pa_xz[j] * fx[j] * pb_zzz[j] + 0.5 * pa_x[j] * fx[j] * pb_zzzz[j] + pa_xzz[j] * pb_zzzz[j]) * s_0_0[j];
+                t_xzz_zzzz[j] = ovlvecfunc::fvec_xzz_zzzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (18) = (90,95)
@@ -1294,37 +804,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yyy_xxxy, t_yyy_xxxz, t_yyy_xxyy, t_yyy_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyy_xxxx[j] = (1.125 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_yyy[j] * fx[j] * fx[j] + 
+                t_yyy_xxxx[j] = ovlvecfunc::fvec_yyy_xxxx_s_0(fx[j], pa_y[j], pa_yyy[j], pb_xx[j], pb_xxxx[j], s_0_0[j]);
 
-                                4.5 * pa_y[j] * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_yyy[j] * pb_xx[j] * fx[j] + 1.5 * pa_y[j] * fx[j] * pb_xxxx[j] + 
+                t_yyy_xxxy[j] = ovlvecfunc::fvec_yyy_xxxy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_x[j], pb_xxx[j], pb_xxxy[j], pb_xy[j], s_0_0[j]);
 
-                                pa_yyy[j] * pb_xxxx[j]) * s_0_0[j];
+                t_yyy_xxxz[j] = ovlvecfunc::fvec_yyy_xxxz_s_0(fx[j], pa_y[j], pa_yyy[j], pb_xxxz[j], pb_xz[j], s_0_0[j]);
 
-                t_yyy_xxxy[j] = (1.125 * fx[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * pa_yy[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_yyy_xxyy[j] = ovlvecfunc::fvec_yyy_xxyy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_y[j], pb_yy[j], s_0_0[j]);
 
-                                2.25 * pa_y[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_xxx[j] + 1.5 * pa_yyy[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * pa_yy[j] * fx[j] * pb_xxx[j] + 1.5 * pa_y[j] * fx[j] * pb_xxxy[j] + pa_yyy[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_yyy_xxxz[j] = (2.25 * pa_y[j] * fx[j] * fx[j] * pb_xz[j] + 1.5 * pa_yyy[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_y[j] * fx[j] * pb_xxxz[j] + pa_yyy[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_yyy_xxyy[j] = (1.125 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_yyy[j] * fx[j] * fx[j] + 1.5 * pa_yy[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                2.25 * pa_y[j] * fx[j] * fx[j] * pb_xx[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_yy[j] + 1.5 * fx[j] * fx[j] * pb_xxy[j] + 
-
-                                0.5 * pa_yyy[j] * pb_xx[j] * fx[j] + 0.5 * pa_yyy[j] * fx[j] * pb_yy[j] + 3.0 * pa_yy[j] * fx[j] * pb_xxy[j] + 
-
-                                1.5 * pa_y[j] * fx[j] * pb_xxyy[j] + pa_yyy[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_yyy_xxyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * pa_y[j] * fx[j] * fx[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_xxz[j] + 0.5 * pa_yyy[j] * fx[j] * pb_yz[j] + 
-
-                                1.5 * pa_yy[j] * fx[j] * pb_xxz[j] + 1.5 * pa_y[j] * fx[j] * pb_xxyz[j] + pa_yyy[j] * pb_xxyz[j]) * s_0_0[j];
+                t_yyy_xxyz[j] = ovlvecfunc::fvec_yyy_xxyz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_xxyz[j], pb_xxz[j], pb_yz[j], pb_z[j], s_0_0[j]);
             }
 
             // Batch of Integrals (19) = (95,100)
@@ -1334,33 +822,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yyy_xyyz, t_yyy_xyzz, t_yyy_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyy_xxzz[j] = (0.375 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.25 * pa_yyy[j] * fx[j] * fx[j] + 
+                t_yyy_xxzz[j] = ovlvecfunc::fvec_yyy_xxzz_s_0(fx[j], pa_y[j], pa_yyy[j], pb_xx[j], pb_xxzz[j], pb_zz[j], s_0_0[j]);
 
-                                0.75 * pa_y[j] * fx[j] * fx[j] * pb_xx[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_yyy[j] * pb_xx[j] * fx[j] + 
+                t_yyy_xyyy[j] = ovlvecfunc::fvec_yyy_xyyy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], s_0_0[j]);
 
-                                0.5 * pa_yyy[j] * fx[j] * pb_zz[j] + 1.5 * pa_y[j] * fx[j] * pb_xxzz[j] + pa_yyy[j] * pb_xxzz[j]) * s_0_0[j];
+                t_yyy_xyyz[j] = ovlvecfunc::fvec_yyy_xyyz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], s_0_0[j]);
 
-                t_yyy_xyyy[j] = (1.875 * fx[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * pa_yy[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_yyy_xyzz[j] = ovlvecfunc::fvec_yyy_xyzz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_x[j], pb_xy[j], pb_xyzz[j], pb_xzz[j], s_0_0[j]);
 
-                                6.75 * pa_y[j] * fx[j] * fx[j] * pb_xy[j] + 2.25 * fx[j] * fx[j] * pb_xyy[j] + 1.5 * pa_yyy[j] * pb_xy[j] * fx[j] + 
-
-                                4.5 * pa_yy[j] * fx[j] * pb_xyy[j] + 1.5 * pa_y[j] * fx[j] * pb_xyyy[j] + pa_yyy[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_yyy_xyyz[j] = (2.25 * pa_y[j] * fx[j] * fx[j] * pb_xz[j] + 1.5 * fx[j] * fx[j] * pb_xyz[j] + 
-
-                                0.5 * pa_yyy[j] * pb_xz[j] * fx[j] + 3.0 * pa_yy[j] * fx[j] * pb_xyz[j] + 1.5 * pa_y[j] * fx[j] * pb_xyyz[j] + 
-
-                                pa_yyy[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_yyy_xyzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * pa_y[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_xzz[j] + 0.5 * pa_yyy[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * pa_yy[j] * fx[j] * pb_xzz[j] + 1.5 * pa_y[j] * fx[j] * pb_xyzz[j] + pa_yyy[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_yyy_xzzz[j] = (2.25 * pa_y[j] * fx[j] * fx[j] * pb_xz[j] + 1.5 * pa_yyy[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_y[j] * fx[j] * pb_xzzz[j] + pa_yyy[j] * pb_xzzz[j]) * s_0_0[j];
+                t_yyy_xzzz[j] = ovlvecfunc::fvec_yyy_xzzz_s_0(fx[j], pa_y[j], pa_yyy[j], pb_xz[j], pb_xzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (20) = (100,105)
@@ -1370,41 +840,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yyy_yyzz, t_yyy_yzzz, t_yyy_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyy_yyyy[j] = (5.625 * pa_y[j] * fx[j] * fx[j] * fx[j] + 7.5 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_yyy_yyyy[j] = ovlvecfunc::fvec_yyy_yyyy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]);
 
-                                0.75 * pa_yyy[j] * fx[j] * fx[j] + 9.0 * pa_yy[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_yyy_yyyz[j] = ovlvecfunc::fvec_yyy_yyyz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                                13.5 * pa_y[j] * fx[j] * fx[j] * pb_yy[j] + 3.0 * fx[j] * fx[j] * pb_yyy[j] + 3.0 * pa_yyy[j] * pb_yy[j] * fx[j] + 
+                t_yyy_yyzz[j] = ovlvecfunc::fvec_yyy_yyzz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_y[j], pb_yy[j], pb_yyzz[j], pb_yzz[j], pb_zz[j], s_0_0[j]);
 
-                                6.0 * pa_yy[j] * fx[j] * pb_yyy[j] + 1.5 * pa_y[j] * fx[j] * pb_yyyy[j] + pa_yyy[j] * pb_yyyy[j]) * s_0_0[j];
+                t_yyy_yzzz[j] = ovlvecfunc::fvec_yyy_yzzz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_yz[j], pb_yzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]);
 
-                t_yyy_yyyz[j] = (1.875 * fx[j] * fx[j] * fx[j] * pb_z[j] + 2.25 * pa_yy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                6.75 * pa_y[j] * fx[j] * fx[j] * pb_yz[j] + 2.25 * fx[j] * fx[j] * pb_yyz[j] + 1.5 * pa_yyy[j] * pb_yz[j] * fx[j] + 
-
-                                4.5 * pa_yy[j] * fx[j] * pb_yyz[j] + 1.5 * pa_y[j] * fx[j] * pb_yyyz[j] + pa_yyy[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_yyy_yyzz[j] = (1.125 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_yyy[j] * fx[j] * fx[j] + 1.5 * pa_yy[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                2.25 * pa_y[j] * fx[j] * fx[j] * pb_zz[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_yy[j] + 1.5 * fx[j] * fx[j] * pb_yzz[j] + 
-
-                                0.5 * pa_yyy[j] * pb_yy[j] * fx[j] + 0.5 * pa_yyy[j] * fx[j] * pb_zz[j] + 3.0 * pa_yy[j] * fx[j] * pb_yzz[j] + 
-
-                                1.5 * pa_y[j] * fx[j] * pb_yyzz[j] + pa_yyy[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_yyy_yzzz[j] = (1.125 * fx[j] * fx[j] * fx[j] * pb_z[j] + 2.25 * pa_yy[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                2.25 * pa_y[j] * fx[j] * fx[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_zzz[j] + 1.5 * pa_yyy[j] * pb_yz[j] * fx[j] + 
-
-                                1.5 * pa_yy[j] * fx[j] * pb_zzz[j] + 1.5 * pa_y[j] * fx[j] * pb_yzzz[j] + pa_yyy[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_yyy_zzzz[j] = (1.125 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_yyy[j] * fx[j] * fx[j] + 
-
-                                4.5 * pa_y[j] * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_yyy[j] * pb_zz[j] * fx[j] + 1.5 * pa_y[j] * fx[j] * pb_zzzz[j] + 
-
-                                pa_yyy[j] * pb_zzzz[j]) * s_0_0[j];
+                t_yyy_zzzz[j] = ovlvecfunc::fvec_yyy_zzzz_s_0(fx[j], pa_y[j], pa_yyy[j], pb_zz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (21) = (105,110)
@@ -1414,41 +858,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yyz_xxxx, t_yyz_xxxy, t_yyz_xxxz, t_yyz_xxyy, t_yyz_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyz_xxxx[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * pa_yyz[j] * fx[j] * fx[j] + 
+                t_yyz_xxxx[j] = ovlvecfunc::fvec_yyz_xxxx_s_0(fx[j], pa_yyz[j], pa_z[j], pb_xx[j], pb_xxxx[j], s_0_0[j]);
 
-                                1.5 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 3.0 * pa_yyz[j] * pb_xx[j] * fx[j] + 0.5 * fx[j] * pa_z[j] * pb_xxxx[j] + 
+                t_yyz_xxxy[j] = ovlvecfunc::fvec_yyz_xxxy_s_0(fx[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xxx[j], pb_xxxy[j], pb_xy[j], s_0_0[j]);
 
-                                pa_yyz[j] * pb_xxxx[j]) * s_0_0[j];
+                t_yyz_xxxz[j] = ovlvecfunc::fvec_yyz_xxxz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xxx[j], pb_xxxz[j], pb_xz[j], s_0_0[j]);
 
-                t_yyz_xxxy[j] = (1.5 * pa_yz[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_yyz_xxyy[j] = ovlvecfunc::fvec_yyz_xxyy_s_0(fx[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_y[j], pb_yy[j], s_0_0[j]);
 
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 1.5 * pa_yyz[j] * pb_xy[j] * fx[j] + pa_yz[j] * fx[j] * pb_xxx[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_xxxy[j] + pa_yyz[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_yyz_xxxz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 0.25 * fx[j] * fx[j] * pb_xxx[j] + 1.5 * pa_yyz[j] * pb_xz[j] * fx[j] + 
-
-                                0.5 * pa_yy[j] * fx[j] * pb_xxx[j] + 0.5 * fx[j] * pa_z[j] * pb_xxxz[j] + pa_yyz[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_yyz_xxyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.25 * pa_yyz[j] * fx[j] * fx[j] + 
-
-                                pa_yz[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 0.5 * pa_yyz[j] * pb_xx[j] * fx[j] + 0.5 * pa_yyz[j] * fx[j] * pb_yy[j] + 
-
-                                2.0 * pa_yz[j] * fx[j] * pb_xxy[j] + 0.5 * fx[j] * pa_z[j] * pb_xxyy[j] + pa_yyz[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_yyz_xxyz[j] = (0.25 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.125 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_yy[j] * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_yz[j] * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_y[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_xxy[j] + 0.5 * pa_yyz[j] * fx[j] * pb_yz[j] + 
-
-                                0.5 * pa_yy[j] * fx[j] * pb_xxy[j] + pa_yz[j] * fx[j] * pb_xxz[j] + 0.5 * fx[j] * pa_z[j] * pb_xxyz[j] + 
-
-                                pa_yyz[j] * pb_xxyz[j]) * s_0_0[j];
+                t_yyz_xxyz[j] = ovlvecfunc::fvec_yyz_xxyz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_xxyz[j], pb_xxz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]);
             }
 
             // Batch of Integrals (22) = (110,115)
@@ -1458,43 +876,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yyz_xxzz, t_yyz_xyyy, t_yyz_xyyz, t_yyz_xyzz, t_yyz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyz_xxzz[j] = (0.125 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_yyz_xxzz[j] = ovlvecfunc::fvec_yyz_xxzz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.25 * pa_yyz[j] * fx[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_yyz_xyyy[j] = ovlvecfunc::fvec_yyz_xyyy_s_0(fx[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], s_0_0[j]);
 
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 0.25 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 0.5 * fx[j] * fx[j] * pb_xxz[j] + 
+                t_yyz_xyyz[j] = ovlvecfunc::fvec_yyz_xyyz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], s_0_0[j]);
 
-                                0.5 * pa_yyz[j] * pb_xx[j] * fx[j] + 0.5 * pa_yyz[j] * fx[j] * pb_zz[j] + pa_yy[j] * fx[j] * pb_xxz[j] + 
+                t_yyz_xyzz[j] = ovlvecfunc::fvec_yyz_xyzz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_xz[j], pb_xzz[j], s_0_0[j]);
 
-                                0.5 * fx[j] * pa_z[j] * pb_xxzz[j] + pa_yyz[j] * pb_xxzz[j]) * s_0_0[j];
-
-                t_yyz_xyyy[j] = (1.5 * pa_yz[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                2.25 * fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 1.5 * pa_yyz[j] * pb_xy[j] * fx[j] + 3.0 * pa_yz[j] * fx[j] * pb_xyy[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_xyyy[j] + pa_yyz[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_yyz_xyyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.25 * pa_yy[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                pa_y[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 0.25 * fx[j] * fx[j] * pb_xyy[j] + 
-
-                                0.5 * pa_yyz[j] * pb_xz[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] * pb_xyy[j] + 2.0 * pa_yz[j] * fx[j] * pb_xyz[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_xyyz[j] + pa_yyz[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_yyz_xyzz[j] = (0.5 * pa_yz[j] * fx[j] * fx[j] * pb_x[j] + pa_y[j] * fx[j] * fx[j] * pb_xz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 0.5 * fx[j] * fx[j] * pb_xyz[j] + 0.5 * pa_yyz[j] * pb_xy[j] * fx[j] + 
-
-                                pa_yy[j] * fx[j] * pb_xyz[j] + pa_yz[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_z[j] * pb_xyzz[j] + 
-
-                                pa_yyz[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_yyz_xzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_xzz[j] + 1.5 * pa_yyz[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_yy[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_z[j] * pb_xzzz[j] + pa_yyz[j] * pb_xzzz[j]) * s_0_0[j];
+                t_yyz_xzzz[j] = ovlvecfunc::fvec_yyz_xzzz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (23) = (115,120)
@@ -1504,51 +894,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yyz_yyyy, t_yyz_yyyz, t_yyz_yyzz, t_yyz_yzzz, t_yyz_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyz_yyyy[j] = (1.875 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * pa_yyz[j] * fx[j] * fx[j] + 
+                t_yyz_yyyy[j] = ovlvecfunc::fvec_yyz_yyyy_s_0(fx[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]);
 
-                                6.0 * pa_yz[j] * fx[j] * fx[j] * pb_y[j] + 4.5 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 3.0 * pa_yyz[j] * pb_yy[j] * fx[j] + 
+                t_yyz_yyyz[j] = ovlvecfunc::fvec_yyz_yyyz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                                4.0 * pa_yz[j] * fx[j] * pb_yyy[j] + 0.5 * fx[j] * pa_z[j] * pb_yyyy[j] + pa_yyz[j] * pb_yyyy[j]) * s_0_0[j];
+                t_yyz_yyzz[j] = ovlvecfunc::fvec_yyz_yyzz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                t_yyz_yyyz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] * fx[j] + 1.125 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_yyz_yzzz[j] = ovlvecfunc::fvec_yyz_yzzz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]);
 
-                                0.75 * pa_yy[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_yz[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_y[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                                2.25 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_yyy[j] + 1.5 * pa_yyz[j] * pb_yz[j] * fx[j] + 
-
-                                0.5 * pa_yy[j] * fx[j] * pb_yyy[j] + 3.0 * pa_yz[j] * fx[j] * pb_yyz[j] + 0.5 * fx[j] * pa_z[j] * pb_yyyz[j] + 
-
-                                pa_yyz[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_yyz_yyzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.25 * pa_yyz[j] * fx[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] * fx[j] * pb_z[j] + pa_yz[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                2.0 * pa_y[j] * fx[j] * fx[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 0.5 * fx[j] * fx[j] * pb_yyz[j] + 0.5 * pa_yyz[j] * pb_yy[j] * fx[j] + 
-
-                                0.5 * pa_yyz[j] * fx[j] * pb_zz[j] + pa_yy[j] * fx[j] * pb_yyz[j] + 2.0 * pa_yz[j] * fx[j] * pb_yzz[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_yyzz[j] + pa_yyz[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_yyz_yzzz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.75 * pa_yy[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_yz[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_y[j] * fx[j] * fx[j] * pb_zz[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_yzz[j] + 1.5 * pa_yyz[j] * pb_yz[j] * fx[j] + 
-
-                                1.5 * pa_yy[j] * fx[j] * pb_yzz[j] + pa_yz[j] * fx[j] * pb_zzz[j] + 0.5 * fx[j] * pa_z[j] * pb_yzzz[j] + 
-
-                                pa_yyz[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_yyz_zzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pa_z[j] + 1.5 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * pa_yyz[j] * fx[j] * fx[j] + 3.0 * pa_yy[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 
-
-                                fx[j] * fx[j] * pb_zzz[j] + 3.0 * pa_yyz[j] * pb_zz[j] * fx[j] + 2.0 * pa_yy[j] * fx[j] * pb_zzz[j] + 
-
-                                0.5 * fx[j] * pa_z[j] * pb_zzzz[j] + pa_yyz[j] * pb_zzzz[j]) * s_0_0[j];
+                t_yyz_zzzz[j] = ovlvecfunc::fvec_yyz_zzzz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (24) = (120,125)
@@ -1558,43 +912,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yzz_xxxx, t_yzz_xxxy, t_yzz_xxxz, t_yzz_xxyy, t_yzz_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yzz_xxxx[j] = (0.375 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_yzz[j] * fx[j] * fx[j] + 
+                t_yzz_xxxx[j] = ovlvecfunc::fvec_yzz_xxxx_s_0(fx[j], pa_y[j], pa_yzz[j], pb_xx[j], pb_xxxx[j], s_0_0[j]);
 
-                                1.5 * pa_y[j] * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_yzz[j] * pb_xx[j] * fx[j] + 0.5 * pa_y[j] * fx[j] * pb_xxxx[j] + 
+                t_yzz_xxxy[j] = ovlvecfunc::fvec_yzz_xxxy_s_0(fx[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xxx[j], pb_xxxy[j], pb_xy[j], s_0_0[j]);
 
-                                pa_yzz[j] * pb_xxxx[j]) * s_0_0[j];
+                t_yzz_xxxz[j] = ovlvecfunc::fvec_yzz_xxxz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_x[j], pb_xxx[j], pb_xxxz[j], pb_xz[j], s_0_0[j]);
 
-                t_yzz_xxxy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] * pb_x[j] + 
+                t_yzz_xxyy[j] = ovlvecfunc::fvec_yzz_xxyy_s_0(fx[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_y[j], pb_yy[j], s_0_0[j]);
 
-                                0.75 * pa_y[j] * fx[j] * fx[j] * pb_xy[j] + 0.25 * fx[j] * fx[j] * pb_xxx[j] + 1.5 * pa_yzz[j] * pb_xy[j] * fx[j] + 
-
-                                0.5 * fx[j] * pa_zz[j] * pb_xxx[j] + 0.5 * pa_y[j] * fx[j] * pb_xxxy[j] + pa_yzz[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_yzz_xxxz[j] = (1.5 * pa_yz[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * pa_y[j] * fx[j] * fx[j] * pb_xz[j] + 1.5 * pa_yzz[j] * pb_xz[j] * fx[j] + pa_yz[j] * fx[j] * pb_xxx[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_xxxz[j] + pa_yzz[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_yzz_xxyy[j] = (0.125 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_yzz[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_zz[j] * pb_y[j] + 
-
-                                0.25 * pa_y[j] * fx[j] * fx[j] * pb_xx[j] + 0.25 * pa_y[j] * fx[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * fx[j] * pb_xxy[j] + 
-
-                                0.5 * pa_yzz[j] * pb_xx[j] * fx[j] + 0.5 * pa_yzz[j] * fx[j] * pb_yy[j] + fx[j] * pa_zz[j] * pb_xxy[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_xxyy[j] + pa_yzz[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_yzz_xxyz[j] = (0.25 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.125 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.5 * pa_yz[j] * fx[j] * fx[j] * pb_y[j] + 0.25 * fx[j] * fx[j] * pa_zz[j] * pb_z[j] + 
-
-                                0.5 * fx[j] * fx[j] * pa_z[j] * pb_xx[j] + 0.25 * pa_y[j] * fx[j] * fx[j] * pb_yz[j] + 0.25 * fx[j] * fx[j] * pb_xxz[j] + 
-
-                                0.5 * pa_yzz[j] * fx[j] * pb_yz[j] + pa_yz[j] * fx[j] * pb_xxy[j] + 0.5 * fx[j] * pa_zz[j] * pb_xxz[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_xxyz[j] + pa_yzz[j] * pb_xxyz[j]) * s_0_0[j];
+                t_yzz_xxyz[j] = ovlvecfunc::fvec_yzz_xxyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_xx[j], pb_xxy[j], pb_xxyz[j], pb_xxz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]);
             }
 
             // Batch of Integrals (25) = (125,130)
@@ -1604,41 +930,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yzz_xxzz, t_yzz_xyyy, t_yzz_xyyz, t_yzz_xyzz, t_yzz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yzz_xxzz[j] = (0.375 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.25 * pa_yzz[j] * fx[j] * fx[j] + 
+                t_yzz_xxzz[j] = ovlvecfunc::fvec_yzz_xxzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                pa_yz[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_xx[j] + 
+                t_yzz_xyyy[j] = ovlvecfunc::fvec_yzz_xyyy_s_0(fx[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], s_0_0[j]);
 
-                                0.25 * pa_y[j] * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_yzz[j] * pb_xx[j] * fx[j] + 0.5 * pa_yzz[j] * fx[j] * pb_zz[j] + 
+                t_yzz_xyyz[j] = ovlvecfunc::fvec_yzz_xyyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], s_0_0[j]);
 
-                                2.0 * pa_yz[j] * fx[j] * pb_xxz[j] + 0.5 * pa_y[j] * fx[j] * pb_xxzz[j] + pa_yzz[j] * pb_xxzz[j]) * s_0_0[j];
+                t_yzz_xyzz[j] = ovlvecfunc::fvec_yzz_xyzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_xz[j], pb_xzz[j], s_0_0[j]);
 
-                t_yzz_xyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] * pb_x[j] + 
-
-                                0.75 * pa_y[j] * fx[j] * fx[j] * pb_xy[j] + 0.75 * fx[j] * fx[j] * pb_xyy[j] + 1.5 * pa_yzz[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * fx[j] * pa_zz[j] * pb_xyy[j] + 0.5 * pa_y[j] * fx[j] * pb_xyyy[j] + pa_yzz[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_yzz_xyyz[j] = (0.5 * pa_yz[j] * fx[j] * fx[j] * pb_x[j] + fx[j] * fx[j] * pa_z[j] * pb_xy[j] + 
-
-                                0.25 * pa_y[j] * fx[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * fx[j] * pb_xyz[j] + 0.5 * pa_yzz[j] * pb_xz[j] * fx[j] + 
-
-                                pa_yz[j] * fx[j] * pb_xyy[j] + fx[j] * pa_zz[j] * pb_xyz[j] + 0.5 * pa_y[j] * fx[j] * pb_xyyz[j] + 
-
-                                pa_yzz[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_yzz_xyzz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_xy[j] + 
-
-                                0.25 * fx[j] * fx[j] * pa_zz[j] * pb_x[j] + fx[j] * fx[j] * pa_z[j] * pb_xz[j] + 0.25 * fx[j] * fx[j] * pb_xzz[j] + 
-
-                                0.5 * pa_yzz[j] * pb_xy[j] * fx[j] + 2.0 * pa_yz[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pa_zz[j] * pb_xzz[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_xyzz[j] + pa_yzz[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_yzz_xzzz[j] = (1.5 * pa_yz[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                2.25 * pa_y[j] * fx[j] * fx[j] * pb_xz[j] + 1.5 * pa_yzz[j] * pb_xz[j] * fx[j] + 3.0 * pa_yz[j] * fx[j] * pb_xzz[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_xzzz[j] + pa_yzz[j] * pb_xzzz[j]) * s_0_0[j];
+                t_yzz_xzzz[j] = ovlvecfunc::fvec_yzz_xzzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (26) = (130,135)
@@ -1648,51 +948,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_yzz_yyyy, t_yzz_yyyz, t_yzz_yyzz, t_yzz_yzzz, t_yzz_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yzz_yyyy[j] = (0.375 * pa_y[j] * fx[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_yzz_yyyy[j] = ovlvecfunc::fvec_yzz_yyyy_s_0(fx[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]);
 
-                                0.75 * pa_yzz[j] * fx[j] * fx[j] + 3.0 * fx[j] * fx[j] * pa_zz[j] * pb_y[j] + 1.5 * pa_y[j] * fx[j] * fx[j] * pb_yy[j] + 
+                t_yzz_yyyz[j] = ovlvecfunc::fvec_yzz_yyyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]);
 
-                                fx[j] * fx[j] * pb_yyy[j] + 3.0 * pa_yzz[j] * pb_yy[j] * fx[j] + 2.0 * fx[j] * pa_zz[j] * pb_yyy[j] + 
+                t_yzz_yyzz[j] = ovlvecfunc::fvec_yzz_yyzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.5 * pa_y[j] * fx[j] * pb_yyyy[j] + pa_yzz[j] * pb_yyyy[j]) * s_0_0[j];
+                t_yzz_yzzz[j] = ovlvecfunc::fvec_yzz_yzzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]);
 
-                t_yzz_yyyz[j] = (0.75 * fx[j] * fx[j] * fx[j] * pa_z[j] + 0.375 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                1.5 * pa_yz[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] * pb_z[j] + 
-
-                                1.5 * fx[j] * fx[j] * pa_z[j] * pb_yy[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_yyz[j] + 
-
-                                1.5 * pa_yzz[j] * pb_yz[j] * fx[j] + pa_yz[j] * fx[j] * pb_yyy[j] + 1.5 * fx[j] * pa_zz[j] * pb_yyz[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_yyyz[j] + pa_yzz[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_yzz_yyzz[j] = (0.375 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.25 * pa_yzz[j] * fx[j] * fx[j] + pa_yz[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                                0.5 * fx[j] * fx[j] * pa_zz[j] * pb_y[j] + 2.0 * fx[j] * fx[j] * pa_z[j] * pb_yz[j] + 
-
-                                0.25 * pa_y[j] * fx[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * fx[j] * pb_yzz[j] + 0.5 * pa_yzz[j] * pb_yy[j] * fx[j] + 
-
-                                0.5 * pa_yzz[j] * fx[j] * pb_zz[j] + 2.0 * pa_yz[j] * fx[j] * pb_yyz[j] + fx[j] * pa_zz[j] * pb_yzz[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_yyzz[j] + pa_yzz[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_yzz_yzzz[j] = (0.75 * fx[j] * fx[j] * fx[j] * pa_z[j] + 1.125 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                1.5 * pa_yz[j] * fx[j] * fx[j] * pb_y[j] + 2.25 * pa_y[j] * fx[j] * fx[j] * pb_yz[j] + 
-
-                                0.75 * fx[j] * fx[j] * pa_zz[j] * pb_z[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_zz[j] + 0.25 * fx[j] * fx[j] * pb_zzz[j] + 
-
-                                1.5 * pa_yzz[j] * pb_yz[j] * fx[j] + 3.0 * pa_yz[j] * fx[j] * pb_yzz[j] + 0.5 * fx[j] * pa_zz[j] * pb_zzz[j] + 
-
-                                0.5 * pa_y[j] * fx[j] * pb_yzzz[j] + pa_yzz[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_yzz_zzzz[j] = (1.875 * pa_y[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_yzz[j] * fx[j] * fx[j] + 
-
-                                6.0 * pa_yz[j] * fx[j] * fx[j] * pb_z[j] + 4.5 * pa_y[j] * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_yzz[j] * pb_zz[j] * fx[j] + 
-
-                                4.0 * pa_yz[j] * fx[j] * pb_zzz[j] + 0.5 * pa_y[j] * fx[j] * pb_zzzz[j] + pa_yzz[j] * pb_zzzz[j]) * s_0_0[j];
+                t_yzz_zzzz[j] = ovlvecfunc::fvec_yzz_zzzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (27) = (135,140)
@@ -1702,33 +966,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_zzz_xxxz, t_zzz_xxyy, t_zzz_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_zzz_xxxx[j] = (1.125 * pa_z[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_zzz[j] * fx[j] * fx[j] + 
+                t_zzz_xxxx[j] = ovlvecfunc::fvec_zzz_xxxx_s_0(fx[j], pa_z[j], pa_zzz[j], pb_xx[j], pb_xxxx[j], s_0_0[j]);
 
-                                4.5 * pa_z[j] * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_zzz[j] * pb_xx[j] * fx[j] + 1.5 * pa_z[j] * fx[j] * pb_xxxx[j] + 
+                t_zzz_xxxy[j] = ovlvecfunc::fvec_zzz_xxxy_s_0(fx[j], pa_z[j], pa_zzz[j], pb_xxxy[j], pb_xy[j], s_0_0[j]);
 
-                                pa_zzz[j] * pb_xxxx[j]) * s_0_0[j];
+                t_zzz_xxxz[j] = ovlvecfunc::fvec_zzz_xxxz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_x[j], pb_xxx[j], pb_xxxz[j], pb_xz[j], s_0_0[j]);
 
-                t_zzz_xxxy[j] = (2.25 * pa_z[j] * fx[j] * fx[j] * pb_xy[j] + 1.5 * pa_zzz[j] * pb_xy[j] * fx[j] + 
+                t_zzz_xxyy[j] = ovlvecfunc::fvec_zzz_xxyy_s_0(fx[j], pa_z[j], pa_zzz[j], pb_xx[j], pb_xxyy[j], pb_yy[j], s_0_0[j]);
 
-                                1.5 * pa_z[j] * fx[j] * pb_xxxy[j] + pa_zzz[j] * pb_xxxy[j]) * s_0_0[j];
-
-                t_zzz_xxxz[j] = (1.125 * fx[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * pa_zz[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                2.25 * pa_z[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_xxx[j] + 1.5 * pa_zzz[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_zz[j] * fx[j] * pb_xxx[j] + 1.5 * pa_z[j] * fx[j] * pb_xxxz[j] + pa_zzz[j] * pb_xxxz[j]) * s_0_0[j];
-
-                t_zzz_xxyy[j] = (0.375 * pa_z[j] * fx[j] * fx[j] * fx[j] + 0.25 * pa_zzz[j] * fx[j] * fx[j] + 
-
-                                0.75 * pa_z[j] * fx[j] * fx[j] * pb_xx[j] + 0.75 * pa_z[j] * fx[j] * fx[j] * pb_yy[j] + 0.5 * pa_zzz[j] * pb_xx[j] * fx[j] + 
-
-                                0.5 * pa_zzz[j] * fx[j] * pb_yy[j] + 1.5 * pa_z[j] * fx[j] * pb_xxyy[j] + pa_zzz[j] * pb_xxyy[j]) * s_0_0[j];
-
-                t_zzz_xxyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * pa_zz[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                0.75 * pa_z[j] * fx[j] * fx[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_xxy[j] + 0.5 * pa_zzz[j] * fx[j] * pb_yz[j] + 
-
-                                1.5 * pa_zz[j] * fx[j] * pb_xxy[j] + 1.5 * pa_z[j] * fx[j] * pb_xxyz[j] + pa_zzz[j] * pb_xxyz[j]) * s_0_0[j];
+                t_zzz_xxyz[j] = ovlvecfunc::fvec_zzz_xxyz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_xxy[j], pb_xxyz[j], pb_y[j], pb_yz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (28) = (140,145)
@@ -1738,37 +984,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_zzz_xyyy, t_zzz_xyyz, t_zzz_xyzz, t_zzz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_zzz_xxzz[j] = (1.125 * pa_z[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_zzz_xxzz[j] = ovlvecfunc::fvec_zzz_xxzz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                                0.25 * pa_zzz[j] * fx[j] * fx[j] + 1.5 * pa_zz[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_zzz_xyyy[j] = ovlvecfunc::fvec_zzz_xyyy_s_0(fx[j], pa_z[j], pa_zzz[j], pb_xy[j], pb_xyyy[j], s_0_0[j]);
 
-                                2.25 * pa_z[j] * fx[j] * fx[j] * pb_xx[j] + 0.75 * pa_z[j] * fx[j] * fx[j] * pb_zz[j] + 1.5 * fx[j] * fx[j] * pb_xxz[j] + 
+                t_zzz_xyyz[j] = ovlvecfunc::fvec_zzz_xyyz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_x[j], pb_xyy[j], pb_xyyz[j], pb_xz[j], s_0_0[j]);
 
-                                0.5 * pa_zzz[j] * pb_xx[j] * fx[j] + 0.5 * pa_zzz[j] * fx[j] * pb_zz[j] + 3.0 * pa_zz[j] * fx[j] * pb_xxz[j] + 
+                t_zzz_xyzz[j] = ovlvecfunc::fvec_zzz_xyzz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], s_0_0[j]);
 
-                                1.5 * pa_z[j] * fx[j] * pb_xxzz[j] + pa_zzz[j] * pb_xxzz[j]) * s_0_0[j];
-
-                t_zzz_xyyy[j] = (2.25 * pa_z[j] * fx[j] * fx[j] * pb_xy[j] + 1.5 * pa_zzz[j] * pb_xy[j] * fx[j] + 
-
-                                1.5 * pa_z[j] * fx[j] * pb_xyyy[j] + pa_zzz[j] * pb_xyyy[j]) * s_0_0[j];
-
-                t_zzz_xyyz[j] = (0.375 * fx[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * pa_zz[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                0.75 * pa_z[j] * fx[j] * fx[j] * pb_xz[j] + 0.75 * fx[j] * fx[j] * pb_xyy[j] + 0.5 * pa_zzz[j] * pb_xz[j] * fx[j] + 
-
-                                1.5 * pa_zz[j] * fx[j] * pb_xyy[j] + 1.5 * pa_z[j] * fx[j] * pb_xyyz[j] + pa_zzz[j] * pb_xyyz[j]) * s_0_0[j];
-
-                t_zzz_xyzz[j] = (2.25 * pa_z[j] * fx[j] * fx[j] * pb_xy[j] + 1.5 * fx[j] * fx[j] * pb_xyz[j] + 
-
-                                0.5 * pa_zzz[j] * pb_xy[j] * fx[j] + 3.0 * pa_zz[j] * fx[j] * pb_xyz[j] + 1.5 * pa_z[j] * fx[j] * pb_xyzz[j] + 
-
-                                pa_zzz[j] * pb_xyzz[j]) * s_0_0[j];
-
-                t_zzz_xzzz[j] = (1.875 * fx[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * pa_zz[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                                6.75 * pa_z[j] * fx[j] * fx[j] * pb_xz[j] + 2.25 * fx[j] * fx[j] * pb_xzz[j] + 1.5 * pa_zzz[j] * pb_xz[j] * fx[j] + 
-
-                                4.5 * pa_zz[j] * fx[j] * pb_xzz[j] + 1.5 * pa_z[j] * fx[j] * pb_xzzz[j] + pa_zzz[j] * pb_xzzz[j]) * s_0_0[j];
+                t_zzz_xzzz[j] = ovlvecfunc::fvec_zzz_xzzz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], s_0_0[j]);
             }
 
             // Batch of Integrals (29) = (145,150)
@@ -1778,41 +1002,15 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                                      t_zzz_yyzz, t_zzz_yzzz, t_zzz_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_zzz_yyyy[j] = (1.125 * pa_z[j] * fx[j] * fx[j] * fx[j] + 0.75 * pa_zzz[j] * fx[j] * fx[j] + 
+                t_zzz_yyyy[j] = ovlvecfunc::fvec_zzz_yyyy_s_0(fx[j], pa_z[j], pa_zzz[j], pb_yy[j], pb_yyyy[j], s_0_0[j]);
 
-                                4.5 * pa_z[j] * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_zzz[j] * pb_yy[j] * fx[j] + 1.5 * pa_z[j] * fx[j] * pb_yyyy[j] + 
+                t_zzz_yyyz[j] = ovlvecfunc::fvec_zzz_yyyz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_y[j], pb_yyy[j], pb_yyyz[j], pb_yz[j], s_0_0[j]);
 
-                                pa_zzz[j] * pb_yyyy[j]) * s_0_0[j];
+                t_zzz_yyzz[j] = ovlvecfunc::fvec_zzz_yyzz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_z[j], pb_zz[j], s_0_0[j]);
 
-                t_zzz_yyyz[j] = (1.125 * fx[j] * fx[j] * fx[j] * pb_y[j] + 2.25 * pa_zz[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_zzz_yzzz[j] = ovlvecfunc::fvec_zzz_yzzz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], s_0_0[j]);
 
-                                2.25 * pa_z[j] * fx[j] * fx[j] * pb_yz[j] + 0.75 * fx[j] * fx[j] * pb_yyy[j] + 1.5 * pa_zzz[j] * pb_yz[j] * fx[j] + 
-
-                                1.5 * pa_zz[j] * fx[j] * pb_yyy[j] + 1.5 * pa_z[j] * fx[j] * pb_yyyz[j] + pa_zzz[j] * pb_yyyz[j]) * s_0_0[j];
-
-                t_zzz_yyzz[j] = (1.125 * pa_z[j] * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.25 * pa_zzz[j] * fx[j] * fx[j] + 1.5 * pa_zz[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                2.25 * pa_z[j] * fx[j] * fx[j] * pb_yy[j] + 0.75 * pa_z[j] * fx[j] * fx[j] * pb_zz[j] + 1.5 * fx[j] * fx[j] * pb_yyz[j] + 
-
-                                0.5 * pa_zzz[j] * pb_yy[j] * fx[j] + 0.5 * pa_zzz[j] * fx[j] * pb_zz[j] + 3.0 * pa_zz[j] * fx[j] * pb_yyz[j] + 
-
-                                1.5 * pa_z[j] * fx[j] * pb_yyzz[j] + pa_zzz[j] * pb_yyzz[j]) * s_0_0[j];
-
-                t_zzz_yzzz[j] = (1.875 * fx[j] * fx[j] * fx[j] * pb_y[j] + 2.25 * pa_zz[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                                6.75 * pa_z[j] * fx[j] * fx[j] * pb_yz[j] + 2.25 * fx[j] * fx[j] * pb_yzz[j] + 1.5 * pa_zzz[j] * pb_yz[j] * fx[j] + 
-
-                                4.5 * pa_zz[j] * fx[j] * pb_yzz[j] + 1.5 * pa_z[j] * fx[j] * pb_yzzz[j] + pa_zzz[j] * pb_yzzz[j]) * s_0_0[j];
-
-                t_zzz_zzzz[j] = (5.625 * pa_z[j] * fx[j] * fx[j] * fx[j] + 7.5 * fx[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                0.75 * pa_zzz[j] * fx[j] * fx[j] + 9.0 * pa_zz[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                                13.5 * pa_z[j] * fx[j] * fx[j] * pb_zz[j] + 3.0 * fx[j] * fx[j] * pb_zzz[j] + 3.0 * pa_zzz[j] * pb_zz[j] * fx[j] + 
-
-                                6.0 * pa_zz[j] * fx[j] * pb_zzz[j] + 1.5 * pa_z[j] * fx[j] * pb_zzzz[j] + pa_zzz[j] * pb_zzzz[j]) * s_0_0[j];
+                t_zzz_zzzz[j] = ovlvecfunc::fvec_zzz_zzzz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]);
             }
 
             idx++;
