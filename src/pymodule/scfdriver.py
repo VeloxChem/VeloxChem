@@ -154,47 +154,6 @@ class ScfDriver:
         # restart information
         self.restart = True
 
-    def read_checkpoint(self, checkpoint_file, ostream):
-        """Reads checkpoint file.
-
-        Reads molecular orbitals from checkpoint file.
-
-        Parameters
-        ----------
-        checkpoint_file
-            The name of the checkpoint file.
-        ostream
-            The output stream.
-        """
-
-        if self.rank == mpi_master():
-            if not (checkpoint_file and isinstance(checkpoint_file, str) and
-                    isfile(checkpoint_file)):
-                return
-
-            restart_info = "Restarting from checkpoint file: " + checkpoint_file
-            ostream.print_info(restart_info)
-            ostream.print_blank()
-
-            self.mol_orbs = MolecularOrbitals.read_hdf5(checkpoint_file)
-
-    def write_checkpoint(self, checkpoint_file):
-        """Writes checkpoint file.
-
-        Writes molecular orbitals to checkpoint file.
-
-        Parameters
-        ----------
-        checkpoint_file
-            The name of the checkpoint file.
-        """
-
-        if self.rank == mpi_master():
-            if not (checkpoint_file and isinstance(checkpoint_file, str)):
-                return
-
-            self.mol_orbs.write_hdf5(checkpoint_file)
-    
     def compute_task(self, task):
         """Performs SCF calculation.
             
@@ -235,17 +194,45 @@ class ScfDriver:
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
 
+        # read checkpoint file and update self.restart flag
+
+        self.checkpoint_file = checkpoint_file
+        rst_info = None
+
+        if self.rank == mpi_master():
+            rst_info = {"restart": False}
+
+            valid_checkpoint = (self.restart and
+                                self.checkpoint_file and
+                                isinstance(self.checkpoint_file, str) and
+                                isfile(self.checkpoint_file))
+            if valid_checkpoint:
+                ovl_drv = OverlapIntegralsDriver(self.rank, self.nodes, comm)
+                ovl_mat = ovl_drv.compute(molecule, ao_basis, comm)
+                oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
+                nao = oao_mat.number_of_rows()
+                nmo = oao_mat.number_of_columns()
+
+                mol_orbs = MolecularOrbitals.read_hdf5(self.checkpoint_file)
+                valid_mo = (mol_orbs.number_aos() == nao and
+                            mol_orbs.number_mos() == nmo)
+                if valid_mo:
+                    self.mol_orbs = mol_orbs
+                    rst_info["restart"] = True
+
+        rst_info = comm.bcast(rst_info, root=mpi_master())
+        self.restart = rst_info["restart"]
+
         self.nuc_energy = molecule.nuclear_repulsion_energy()
         
         if self.rank == mpi_master():
             self.print_header(ostream)
 
-        # checkpoint file
-        self.checkpoint_file = checkpoint_file
-        self.restart = (self.restart and self.checkpoint_file and
-                        isfile(self.checkpoint_file))
-        if self.restart:
-            self.read_checkpoint(self.checkpoint_file, ostream)
+            if self.restart:
+                restart_text = "Restarting from checkpoint file: "
+                restart_text += self.checkpoint_file
+                ostream.print_info(restart_text)
+                ostream.print_blank()
 
         # C2-DIIS method
         if self.acc_type == "DIIS":
@@ -287,7 +274,15 @@ class ScfDriver:
             self.print_scf_energy(ostream)
             self.print_ground_state(molecule, ostream)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False, ostream)
-            self.print_checkpoint_info(self.checkpoint_file, ostream)
+
+            have_checkpoint = (self.checkpoint_file and
+                               isinstance(self.checkpoint_file, str) and
+                               isfile(self.checkpoint_file))
+            if have_checkpoint:
+                checkpoint_text = "Checkpoint written to file: "
+                checkpoint_text += self.checkpoint_file
+                ostream.print_info(checkpoint_text)
+                ostream.print_blank()
 
     def comp_diis(self, molecule, ao_basis, min_basis, comm, ostream):
         """Performs SCF calculation with C2-DIIS acceleration.
@@ -425,8 +420,15 @@ class ScfDriver:
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                         ostream)
             
-            if not self.first_step:
-                self.write_checkpoint(self.checkpoint_file)
+            # write molecular orbitals to checkpoint file
+
+            write_checkpoint = (self.rank == mpi_master() and
+                                not self.first_step and
+                                self.checkpoint_file and
+                                isinstance(self.checkpoint_file, str))
+
+            if write_checkpoint:
+                self.mol_orbs.write_hdf5(self.checkpoint_file)
 
             self.density = AODensityMatrix(den_mat)
 
@@ -851,7 +853,7 @@ class ScfDriver:
         
         self.is_converged = False
         
-        if len(self.iter_data) > 0:
+        if len(self.iter_data) > 1:
             
             e_elec, de_elec, e_grad, diff_den = self.iter_data[-1]
             
@@ -870,27 +872,6 @@ class ScfDriver:
         
         return range(self.max_iter + 1)
 
-    def print_checkpoint_info(self, checkpoint_file, ostream):
-        """Prints checkpoint file name.
-
-        Prints the name of the checkpoint file to output stream.
-
-        Parameters
-        ----------
-        checkpoint_file
-            The name of the checkpoint file.
-        ostream
-            The output stream.
-        """
-
-        if not (checkpoint_file and isinstance(checkpoint_file, str) and
-                isfile(checkpoint_file)):
-            return
-
-        checkpoint_info = "Checkpoint written to file: " + checkpoint_file
-        ostream.print_info(checkpoint_info)
-        ostream.print_blank()
-    
     def print_scf_energy(self, ostream):
         """Prints SCF energy information to output stream.
             
@@ -1022,7 +1003,7 @@ class ScfDriver:
                 return
         
             # DIIS or second step in two level DIIS
-            if i > 0 or self.restart:
+            if i > 0:
 
                 if len(self.iter_data) > 0:
                     te, diff_te, e_grad, diff_den = self.iter_data[-1]
@@ -1031,10 +1012,7 @@ class ScfDriver:
                     diff_te = 0.0
                     diff_den = 0.0
             
-                if self.restart:
-                    exec_str  = " " + (str(i + 1)).rjust(3) + 4 * " "
-                else:
-                    exec_str  = " " + (str(i)).rjust(3) + 4 * " "
+                exec_str  = " " + (str(i)).rjust(3) + 4 * " "
                 exec_str += ("{:7.12f}".format(te)).center(27) + 3 * " "
                 exec_str += ("{:5.10f}".format(diff_te)).center(17) + 3 * " "
                 exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
