@@ -1093,6 +1093,23 @@ namespace kinrecfunc { // kinrecfunc namespace
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
+        kinrecfunc::compKineticEnergyForDG_0_4(primBuffer, auxBuffer, osFactors, paDistances, pbDistances,
+                                               braGtoBlock, ketGtoBlock, iContrGto);
+        
+        kinrecfunc::compKineticEnergyForDG_5_8(primBuffer, auxBuffer, osFactors, paDistances, pbDistances,
+                                               braGtoBlock, ketGtoBlock, iContrGto);
+    }
+
+    void
+    compKineticEnergyForDG_0_4(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& auxBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CMemBlock2D<double>& pbDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto)
+    {
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -1136,10 +1153,6 @@ namespace kinrecfunc { // kinrecfunc namespace
             auto pa_xz = paDistances.data(9 * idx + 5);
 
             auto pa_yy = paDistances.data(9 * idx + 6);
-
-            auto pa_yz = paDistances.data(9 * idx + 7);
-
-            auto pa_zz = paDistances.data(9 * idx + 8);
 
             // set up pointers to 1-th order tensor of distance R(PB)
 
@@ -1325,86 +1338,6 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto t_yy_xxyz = primBuffer.data(90 * idx + 49);
 
-            auto t_yy_xxzz = primBuffer.data(90 * idx + 50);
-
-            auto t_yy_xyyy = primBuffer.data(90 * idx + 51);
-
-            auto t_yy_xyyz = primBuffer.data(90 * idx + 52);
-
-            auto t_yy_xyzz = primBuffer.data(90 * idx + 53);
-
-            auto t_yy_xzzz = primBuffer.data(90 * idx + 54);
-
-            auto t_yy_yyyy = primBuffer.data(90 * idx + 55);
-
-            auto t_yy_yyyz = primBuffer.data(90 * idx + 56);
-
-            auto t_yy_yyzz = primBuffer.data(90 * idx + 57);
-
-            auto t_yy_yzzz = primBuffer.data(90 * idx + 58);
-
-            auto t_yy_zzzz = primBuffer.data(90 * idx + 59);
-
-            auto t_yz_xxxx = primBuffer.data(90 * idx + 60);
-
-            auto t_yz_xxxy = primBuffer.data(90 * idx + 61);
-
-            auto t_yz_xxxz = primBuffer.data(90 * idx + 62);
-
-            auto t_yz_xxyy = primBuffer.data(90 * idx + 63);
-
-            auto t_yz_xxyz = primBuffer.data(90 * idx + 64);
-
-            auto t_yz_xxzz = primBuffer.data(90 * idx + 65);
-
-            auto t_yz_xyyy = primBuffer.data(90 * idx + 66);
-
-            auto t_yz_xyyz = primBuffer.data(90 * idx + 67);
-
-            auto t_yz_xyzz = primBuffer.data(90 * idx + 68);
-
-            auto t_yz_xzzz = primBuffer.data(90 * idx + 69);
-
-            auto t_yz_yyyy = primBuffer.data(90 * idx + 70);
-
-            auto t_yz_yyyz = primBuffer.data(90 * idx + 71);
-
-            auto t_yz_yyzz = primBuffer.data(90 * idx + 72);
-
-            auto t_yz_yzzz = primBuffer.data(90 * idx + 73);
-
-            auto t_yz_zzzz = primBuffer.data(90 * idx + 74);
-
-            auto t_zz_xxxx = primBuffer.data(90 * idx + 75);
-
-            auto t_zz_xxxy = primBuffer.data(90 * idx + 76);
-
-            auto t_zz_xxxz = primBuffer.data(90 * idx + 77);
-
-            auto t_zz_xxyy = primBuffer.data(90 * idx + 78);
-
-            auto t_zz_xxyz = primBuffer.data(90 * idx + 79);
-
-            auto t_zz_xxzz = primBuffer.data(90 * idx + 80);
-
-            auto t_zz_xyyy = primBuffer.data(90 * idx + 81);
-
-            auto t_zz_xyyz = primBuffer.data(90 * idx + 82);
-
-            auto t_zz_xyzz = primBuffer.data(90 * idx + 83);
-
-            auto t_zz_xzzz = primBuffer.data(90 * idx + 84);
-
-            auto t_zz_yyyy = primBuffer.data(90 * idx + 85);
-
-            auto t_zz_yyyz = primBuffer.data(90 * idx + 86);
-
-            auto t_zz_yyzz = primBuffer.data(90 * idx + 87);
-
-            auto t_zz_yzzz = primBuffer.data(90 * idx + 88);
-
-            auto t_zz_zzzz = primBuffer.data(90 * idx + 89);
-
             // Batch of Integrals (0) = (0,10)
 
             #pragma omp simd aligned(fga, fgb, fx, fz, pa_x, pa_xx, pb_x, pb_xx, pb_xxx, pb_xxxx, pb_xxxy, pb_xxxz, \
@@ -1555,6 +1488,224 @@ namespace kinrecfunc { // kinrecfunc namespace
                 t_yy_xxyz[j] = kinvecfunc::fvec_yy_xxyz_s_0(fx[j], pa_y[j], pa_yy[j], pb_xxyz[j], pb_xxz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_xxyz[j], pb_xxz[j], pb_yz[j], pb_z[j], r_0_0[j]);
             }
 
+            idx++;
+        }
+    }
+    
+    void
+    compKineticEnergyForDG_5_8(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& auxBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CMemBlock2D<double>& pbDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(4 * idx);
+
+            auto fz = osFactors.data(4 * idx + 1);
+
+            auto fga = osFactors.data(4 * idx + 2);
+
+            auto fgb = osFactors.data(4 * idx + 3);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_y = paDistances.data(9 * idx + 1);
+
+            auto pa_z = paDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_yy = paDistances.data(9 * idx + 6);
+
+            auto pa_yz = paDistances.data(9 * idx + 7);
+
+            auto pa_zz = paDistances.data(9 * idx + 8);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(34 * idx);
+
+            auto pb_y = pbDistances.data(34 * idx + 1);
+
+            auto pb_z = pbDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xx = pbDistances.data(34 * idx + 3);
+
+            auto pb_xy = pbDistances.data(34 * idx + 4);
+
+            auto pb_xz = pbDistances.data(34 * idx + 5);
+
+            auto pb_yy = pbDistances.data(34 * idx + 6);
+
+            auto pb_yz = pbDistances.data(34 * idx + 7);
+
+            auto pb_zz = pbDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PB)
+
+            auto pb_xxx = pbDistances.data(34 * idx + 9);
+
+            auto pb_xxy = pbDistances.data(34 * idx + 10);
+
+            auto pb_xxz = pbDistances.data(34 * idx + 11);
+
+            auto pb_xyy = pbDistances.data(34 * idx + 12);
+
+            auto pb_xyz = pbDistances.data(34 * idx + 13);
+
+            auto pb_xzz = pbDistances.data(34 * idx + 14);
+
+            auto pb_yyy = pbDistances.data(34 * idx + 15);
+
+            auto pb_yyz = pbDistances.data(34 * idx + 16);
+
+            auto pb_yzz = pbDistances.data(34 * idx + 17);
+
+            auto pb_zzz = pbDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PB)
+
+            auto pb_xxxx = pbDistances.data(34 * idx + 19);
+
+            auto pb_xxxy = pbDistances.data(34 * idx + 20);
+
+            auto pb_xxxz = pbDistances.data(34 * idx + 21);
+
+            auto pb_xxyy = pbDistances.data(34 * idx + 22);
+
+            auto pb_xxyz = pbDistances.data(34 * idx + 23);
+
+            auto pb_xxzz = pbDistances.data(34 * idx + 24);
+
+            auto pb_xyyy = pbDistances.data(34 * idx + 25);
+
+            auto pb_xyyz = pbDistances.data(34 * idx + 26);
+
+            auto pb_xyzz = pbDistances.data(34 * idx + 27);
+
+            auto pb_xzzz = pbDistances.data(34 * idx + 28);
+
+            auto pb_yyyy = pbDistances.data(34 * idx + 29);
+
+            auto pb_yyyz = pbDistances.data(34 * idx + 30);
+
+            auto pb_yyzz = pbDistances.data(34 * idx + 31);
+
+            auto pb_yzzz = pbDistances.data(34 * idx + 32);
+
+            auto pb_zzzz = pbDistances.data(34 * idx + 33);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0 = auxBuffer.data(2 * idx);
+
+            auto r_0_0 = auxBuffer.data(2 * idx + 1);
+
+            // set up pointers to integrals
+
+            auto t_yy_xxzz = primBuffer.data(90 * idx + 50);
+
+            auto t_yy_xyyy = primBuffer.data(90 * idx + 51);
+
+            auto t_yy_xyyz = primBuffer.data(90 * idx + 52);
+
+            auto t_yy_xyzz = primBuffer.data(90 * idx + 53);
+
+            auto t_yy_xzzz = primBuffer.data(90 * idx + 54);
+
+            auto t_yy_yyyy = primBuffer.data(90 * idx + 55);
+
+            auto t_yy_yyyz = primBuffer.data(90 * idx + 56);
+
+            auto t_yy_yyzz = primBuffer.data(90 * idx + 57);
+
+            auto t_yy_yzzz = primBuffer.data(90 * idx + 58);
+
+            auto t_yy_zzzz = primBuffer.data(90 * idx + 59);
+
+            auto t_yz_xxxx = primBuffer.data(90 * idx + 60);
+
+            auto t_yz_xxxy = primBuffer.data(90 * idx + 61);
+
+            auto t_yz_xxxz = primBuffer.data(90 * idx + 62);
+
+            auto t_yz_xxyy = primBuffer.data(90 * idx + 63);
+
+            auto t_yz_xxyz = primBuffer.data(90 * idx + 64);
+
+            auto t_yz_xxzz = primBuffer.data(90 * idx + 65);
+
+            auto t_yz_xyyy = primBuffer.data(90 * idx + 66);
+
+            auto t_yz_xyyz = primBuffer.data(90 * idx + 67);
+
+            auto t_yz_xyzz = primBuffer.data(90 * idx + 68);
+
+            auto t_yz_xzzz = primBuffer.data(90 * idx + 69);
+
+            auto t_yz_yyyy = primBuffer.data(90 * idx + 70);
+
+            auto t_yz_yyyz = primBuffer.data(90 * idx + 71);
+
+            auto t_yz_yyzz = primBuffer.data(90 * idx + 72);
+
+            auto t_yz_yzzz = primBuffer.data(90 * idx + 73);
+
+            auto t_yz_zzzz = primBuffer.data(90 * idx + 74);
+
+            auto t_zz_xxxx = primBuffer.data(90 * idx + 75);
+
+            auto t_zz_xxxy = primBuffer.data(90 * idx + 76);
+
+            auto t_zz_xxxz = primBuffer.data(90 * idx + 77);
+
+            auto t_zz_xxyy = primBuffer.data(90 * idx + 78);
+
+            auto t_zz_xxyz = primBuffer.data(90 * idx + 79);
+
+            auto t_zz_xxzz = primBuffer.data(90 * idx + 80);
+
+            auto t_zz_xyyy = primBuffer.data(90 * idx + 81);
+
+            auto t_zz_xyyz = primBuffer.data(90 * idx + 82);
+
+            auto t_zz_xyzz = primBuffer.data(90 * idx + 83);
+
+            auto t_zz_xzzz = primBuffer.data(90 * idx + 84);
+
+            auto t_zz_yyyy = primBuffer.data(90 * idx + 85);
+
+            auto t_zz_yyyz = primBuffer.data(90 * idx + 86);
+
+            auto t_zz_yyzz = primBuffer.data(90 * idx + 87);
+
+            auto t_zz_yzzz = primBuffer.data(90 * idx + 88);
+
+            auto t_zz_zzzz = primBuffer.data(90 * idx + 89);
+
             // Batch of Integrals (5) = (50,60)
 
             #pragma omp simd aligned(fga, fgb, fx, fz, pa_y, pa_yy, pb_x, pb_xx, pb_xxzz, pb_xy, pb_xyy, pb_xyyy, pb_xyyz, \
@@ -1678,7 +1829,7 @@ namespace kinrecfunc { // kinrecfunc namespace
             idx++;
         }
     }
-
+    
     void
     compKineticEnergyForGD(      CMemBlock2D<double>& primBuffer,
                            const CMemBlock2D<double>& auxBuffer,
