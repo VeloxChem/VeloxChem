@@ -22,6 +22,33 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                      const CGtoBlock&           ketGtoBlock,
                      const int32_t              iContrGto)
     {
+        ovlrecfunc::compOverlapForGG_0_10(primBuffer, auxBuffer, osFactors,
+                                          paDistances, pbDistances, braGtoBlock,
+                                          ketGtoBlock, iContrGto);
+        
+        ovlrecfunc::compOverlapForGG_11_20(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        ovlrecfunc::compOverlapForGG_21_30(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+        
+        ovlrecfunc::compOverlapForGG_31_43(primBuffer, auxBuffer, osFactors,
+                                           paDistances, pbDistances, braGtoBlock,
+                                           ketGtoBlock, iContrGto);
+    }
+    
+    void
+    compOverlapForGG_0_10(      CMemBlock2D<double>& primBuffer,
+                          const CMemBlock2D<double>& auxBuffer,
+                          const CMemBlock2D<double>& osFactors,
+                          const CMemBlock2D<double>& paDistances,
+                          const CMemBlock2D<double>& pbDistances,
+                          const CGtoBlock&           braGtoBlock,
+                          const CGtoBlock&           ketGtoBlock,
+                          const int32_t              iContrGto)
+    {
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -60,10 +87,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto pa_yy = paDistances.data(34 * idx + 6);
 
-            auto pa_yz = paDistances.data(34 * idx + 7);
-
-            auto pa_zz = paDistances.data(34 * idx + 8);
-
             // set up pointers to 3-th order tensor of distance R(PA)
 
             auto pa_xxx = paDistances.data(34 * idx + 9);
@@ -74,18 +97,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto pa_xyy = paDistances.data(34 * idx + 12);
 
-            auto pa_xyz = paDistances.data(34 * idx + 13);
-
-            auto pa_xzz = paDistances.data(34 * idx + 14);
-
-            auto pa_yyy = paDistances.data(34 * idx + 15);
-
-            auto pa_yyz = paDistances.data(34 * idx + 16);
-
-            auto pa_yzz = paDistances.data(34 * idx + 17);
-
-            auto pa_zzz = paDistances.data(34 * idx + 18);
-
             // set up pointers to 4-th order tensor of distance R(PA)
 
             auto pa_xxxx = paDistances.data(34 * idx + 19);
@@ -95,28 +106,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto pa_xxxz = paDistances.data(34 * idx + 21);
 
             auto pa_xxyy = paDistances.data(34 * idx + 22);
-
-            auto pa_xxyz = paDistances.data(34 * idx + 23);
-
-            auto pa_xxzz = paDistances.data(34 * idx + 24);
-
-            auto pa_xyyy = paDistances.data(34 * idx + 25);
-
-            auto pa_xyyz = paDistances.data(34 * idx + 26);
-
-            auto pa_xyzz = paDistances.data(34 * idx + 27);
-
-            auto pa_xzzz = paDistances.data(34 * idx + 28);
-
-            auto pa_yyyy = paDistances.data(34 * idx + 29);
-
-            auto pa_yyyz = paDistances.data(34 * idx + 30);
-
-            auto pa_yyzz = paDistances.data(34 * idx + 31);
-
-            auto pa_yzzz = paDistances.data(34 * idx + 32);
-
-            auto pa_zzzz = paDistances.data(34 * idx + 33);
 
             // set up pointers to 1-th order tensor of distance R(PB)
 
@@ -309,346 +298,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto t_xxyy_xyzz = primBuffer.data(225 * idx + 53);
 
             auto t_xxyy_xzzz = primBuffer.data(225 * idx + 54);
-
-            auto t_xxyy_yyyy = primBuffer.data(225 * idx + 55);
-
-            auto t_xxyy_yyyz = primBuffer.data(225 * idx + 56);
-
-            auto t_xxyy_yyzz = primBuffer.data(225 * idx + 57);
-
-            auto t_xxyy_yzzz = primBuffer.data(225 * idx + 58);
-
-            auto t_xxyy_zzzz = primBuffer.data(225 * idx + 59);
-
-            auto t_xxyz_xxxx = primBuffer.data(225 * idx + 60);
-
-            auto t_xxyz_xxxy = primBuffer.data(225 * idx + 61);
-
-            auto t_xxyz_xxxz = primBuffer.data(225 * idx + 62);
-
-            auto t_xxyz_xxyy = primBuffer.data(225 * idx + 63);
-
-            auto t_xxyz_xxyz = primBuffer.data(225 * idx + 64);
-
-            auto t_xxyz_xxzz = primBuffer.data(225 * idx + 65);
-
-            auto t_xxyz_xyyy = primBuffer.data(225 * idx + 66);
-
-            auto t_xxyz_xyyz = primBuffer.data(225 * idx + 67);
-
-            auto t_xxyz_xyzz = primBuffer.data(225 * idx + 68);
-
-            auto t_xxyz_xzzz = primBuffer.data(225 * idx + 69);
-
-            auto t_xxyz_yyyy = primBuffer.data(225 * idx + 70);
-
-            auto t_xxyz_yyyz = primBuffer.data(225 * idx + 71);
-
-            auto t_xxyz_yyzz = primBuffer.data(225 * idx + 72);
-
-            auto t_xxyz_yzzz = primBuffer.data(225 * idx + 73);
-
-            auto t_xxyz_zzzz = primBuffer.data(225 * idx + 74);
-
-            auto t_xxzz_xxxx = primBuffer.data(225 * idx + 75);
-
-            auto t_xxzz_xxxy = primBuffer.data(225 * idx + 76);
-
-            auto t_xxzz_xxxz = primBuffer.data(225 * idx + 77);
-
-            auto t_xxzz_xxyy = primBuffer.data(225 * idx + 78);
-
-            auto t_xxzz_xxyz = primBuffer.data(225 * idx + 79);
-
-            auto t_xxzz_xxzz = primBuffer.data(225 * idx + 80);
-
-            auto t_xxzz_xyyy = primBuffer.data(225 * idx + 81);
-
-            auto t_xxzz_xyyz = primBuffer.data(225 * idx + 82);
-
-            auto t_xxzz_xyzz = primBuffer.data(225 * idx + 83);
-
-            auto t_xxzz_xzzz = primBuffer.data(225 * idx + 84);
-
-            auto t_xxzz_yyyy = primBuffer.data(225 * idx + 85);
-
-            auto t_xxzz_yyyz = primBuffer.data(225 * idx + 86);
-
-            auto t_xxzz_yyzz = primBuffer.data(225 * idx + 87);
-
-            auto t_xxzz_yzzz = primBuffer.data(225 * idx + 88);
-
-            auto t_xxzz_zzzz = primBuffer.data(225 * idx + 89);
-
-            auto t_xyyy_xxxx = primBuffer.data(225 * idx + 90);
-
-            auto t_xyyy_xxxy = primBuffer.data(225 * idx + 91);
-
-            auto t_xyyy_xxxz = primBuffer.data(225 * idx + 92);
-
-            auto t_xyyy_xxyy = primBuffer.data(225 * idx + 93);
-
-            auto t_xyyy_xxyz = primBuffer.data(225 * idx + 94);
-
-            auto t_xyyy_xxzz = primBuffer.data(225 * idx + 95);
-
-            auto t_xyyy_xyyy = primBuffer.data(225 * idx + 96);
-
-            auto t_xyyy_xyyz = primBuffer.data(225 * idx + 97);
-
-            auto t_xyyy_xyzz = primBuffer.data(225 * idx + 98);
-
-            auto t_xyyy_xzzz = primBuffer.data(225 * idx + 99);
-
-            auto t_xyyy_yyyy = primBuffer.data(225 * idx + 100);
-
-            auto t_xyyy_yyyz = primBuffer.data(225 * idx + 101);
-
-            auto t_xyyy_yyzz = primBuffer.data(225 * idx + 102);
-
-            auto t_xyyy_yzzz = primBuffer.data(225 * idx + 103);
-
-            auto t_xyyy_zzzz = primBuffer.data(225 * idx + 104);
-
-            auto t_xyyz_xxxx = primBuffer.data(225 * idx + 105);
-
-            auto t_xyyz_xxxy = primBuffer.data(225 * idx + 106);
-
-            auto t_xyyz_xxxz = primBuffer.data(225 * idx + 107);
-
-            auto t_xyyz_xxyy = primBuffer.data(225 * idx + 108);
-
-            auto t_xyyz_xxyz = primBuffer.data(225 * idx + 109);
-
-            auto t_xyyz_xxzz = primBuffer.data(225 * idx + 110);
-
-            auto t_xyyz_xyyy = primBuffer.data(225 * idx + 111);
-
-            auto t_xyyz_xyyz = primBuffer.data(225 * idx + 112);
-
-            auto t_xyyz_xyzz = primBuffer.data(225 * idx + 113);
-
-            auto t_xyyz_xzzz = primBuffer.data(225 * idx + 114);
-
-            auto t_xyyz_yyyy = primBuffer.data(225 * idx + 115);
-
-            auto t_xyyz_yyyz = primBuffer.data(225 * idx + 116);
-
-            auto t_xyyz_yyzz = primBuffer.data(225 * idx + 117);
-
-            auto t_xyyz_yzzz = primBuffer.data(225 * idx + 118);
-
-            auto t_xyyz_zzzz = primBuffer.data(225 * idx + 119);
-
-            auto t_xyzz_xxxx = primBuffer.data(225 * idx + 120);
-
-            auto t_xyzz_xxxy = primBuffer.data(225 * idx + 121);
-
-            auto t_xyzz_xxxz = primBuffer.data(225 * idx + 122);
-
-            auto t_xyzz_xxyy = primBuffer.data(225 * idx + 123);
-
-            auto t_xyzz_xxyz = primBuffer.data(225 * idx + 124);
-
-            auto t_xyzz_xxzz = primBuffer.data(225 * idx + 125);
-
-            auto t_xyzz_xyyy = primBuffer.data(225 * idx + 126);
-
-            auto t_xyzz_xyyz = primBuffer.data(225 * idx + 127);
-
-            auto t_xyzz_xyzz = primBuffer.data(225 * idx + 128);
-
-            auto t_xyzz_xzzz = primBuffer.data(225 * idx + 129);
-
-            auto t_xyzz_yyyy = primBuffer.data(225 * idx + 130);
-
-            auto t_xyzz_yyyz = primBuffer.data(225 * idx + 131);
-
-            auto t_xyzz_yyzz = primBuffer.data(225 * idx + 132);
-
-            auto t_xyzz_yzzz = primBuffer.data(225 * idx + 133);
-
-            auto t_xyzz_zzzz = primBuffer.data(225 * idx + 134);
-
-            auto t_xzzz_xxxx = primBuffer.data(225 * idx + 135);
-
-            auto t_xzzz_xxxy = primBuffer.data(225 * idx + 136);
-
-            auto t_xzzz_xxxz = primBuffer.data(225 * idx + 137);
-
-            auto t_xzzz_xxyy = primBuffer.data(225 * idx + 138);
-
-            auto t_xzzz_xxyz = primBuffer.data(225 * idx + 139);
-
-            auto t_xzzz_xxzz = primBuffer.data(225 * idx + 140);
-
-            auto t_xzzz_xyyy = primBuffer.data(225 * idx + 141);
-
-            auto t_xzzz_xyyz = primBuffer.data(225 * idx + 142);
-
-            auto t_xzzz_xyzz = primBuffer.data(225 * idx + 143);
-
-            auto t_xzzz_xzzz = primBuffer.data(225 * idx + 144);
-
-            auto t_xzzz_yyyy = primBuffer.data(225 * idx + 145);
-
-            auto t_xzzz_yyyz = primBuffer.data(225 * idx + 146);
-
-            auto t_xzzz_yyzz = primBuffer.data(225 * idx + 147);
-
-            auto t_xzzz_yzzz = primBuffer.data(225 * idx + 148);
-
-            auto t_xzzz_zzzz = primBuffer.data(225 * idx + 149);
-
-            auto t_yyyy_xxxx = primBuffer.data(225 * idx + 150);
-
-            auto t_yyyy_xxxy = primBuffer.data(225 * idx + 151);
-
-            auto t_yyyy_xxxz = primBuffer.data(225 * idx + 152);
-
-            auto t_yyyy_xxyy = primBuffer.data(225 * idx + 153);
-
-            auto t_yyyy_xxyz = primBuffer.data(225 * idx + 154);
-
-            auto t_yyyy_xxzz = primBuffer.data(225 * idx + 155);
-
-            auto t_yyyy_xyyy = primBuffer.data(225 * idx + 156);
-
-            auto t_yyyy_xyyz = primBuffer.data(225 * idx + 157);
-
-            auto t_yyyy_xyzz = primBuffer.data(225 * idx + 158);
-
-            auto t_yyyy_xzzz = primBuffer.data(225 * idx + 159);
-
-            auto t_yyyy_yyyy = primBuffer.data(225 * idx + 160);
-
-            auto t_yyyy_yyyz = primBuffer.data(225 * idx + 161);
-
-            auto t_yyyy_yyzz = primBuffer.data(225 * idx + 162);
-
-            auto t_yyyy_yzzz = primBuffer.data(225 * idx + 163);
-
-            auto t_yyyy_zzzz = primBuffer.data(225 * idx + 164);
-
-            auto t_yyyz_xxxx = primBuffer.data(225 * idx + 165);
-
-            auto t_yyyz_xxxy = primBuffer.data(225 * idx + 166);
-
-            auto t_yyyz_xxxz = primBuffer.data(225 * idx + 167);
-
-            auto t_yyyz_xxyy = primBuffer.data(225 * idx + 168);
-
-            auto t_yyyz_xxyz = primBuffer.data(225 * idx + 169);
-
-            auto t_yyyz_xxzz = primBuffer.data(225 * idx + 170);
-
-            auto t_yyyz_xyyy = primBuffer.data(225 * idx + 171);
-
-            auto t_yyyz_xyyz = primBuffer.data(225 * idx + 172);
-
-            auto t_yyyz_xyzz = primBuffer.data(225 * idx + 173);
-
-            auto t_yyyz_xzzz = primBuffer.data(225 * idx + 174);
-
-            auto t_yyyz_yyyy = primBuffer.data(225 * idx + 175);
-
-            auto t_yyyz_yyyz = primBuffer.data(225 * idx + 176);
-
-            auto t_yyyz_yyzz = primBuffer.data(225 * idx + 177);
-
-            auto t_yyyz_yzzz = primBuffer.data(225 * idx + 178);
-
-            auto t_yyyz_zzzz = primBuffer.data(225 * idx + 179);
-
-            auto t_yyzz_xxxx = primBuffer.data(225 * idx + 180);
-
-            auto t_yyzz_xxxy = primBuffer.data(225 * idx + 181);
-
-            auto t_yyzz_xxxz = primBuffer.data(225 * idx + 182);
-
-            auto t_yyzz_xxyy = primBuffer.data(225 * idx + 183);
-
-            auto t_yyzz_xxyz = primBuffer.data(225 * idx + 184);
-
-            auto t_yyzz_xxzz = primBuffer.data(225 * idx + 185);
-
-            auto t_yyzz_xyyy = primBuffer.data(225 * idx + 186);
-
-            auto t_yyzz_xyyz = primBuffer.data(225 * idx + 187);
-
-            auto t_yyzz_xyzz = primBuffer.data(225 * idx + 188);
-
-            auto t_yyzz_xzzz = primBuffer.data(225 * idx + 189);
-
-            auto t_yyzz_yyyy = primBuffer.data(225 * idx + 190);
-
-            auto t_yyzz_yyyz = primBuffer.data(225 * idx + 191);
-
-            auto t_yyzz_yyzz = primBuffer.data(225 * idx + 192);
-
-            auto t_yyzz_yzzz = primBuffer.data(225 * idx + 193);
-
-            auto t_yyzz_zzzz = primBuffer.data(225 * idx + 194);
-
-            auto t_yzzz_xxxx = primBuffer.data(225 * idx + 195);
-
-            auto t_yzzz_xxxy = primBuffer.data(225 * idx + 196);
-
-            auto t_yzzz_xxxz = primBuffer.data(225 * idx + 197);
-
-            auto t_yzzz_xxyy = primBuffer.data(225 * idx + 198);
-
-            auto t_yzzz_xxyz = primBuffer.data(225 * idx + 199);
-
-            auto t_yzzz_xxzz = primBuffer.data(225 * idx + 200);
-
-            auto t_yzzz_xyyy = primBuffer.data(225 * idx + 201);
-
-            auto t_yzzz_xyyz = primBuffer.data(225 * idx + 202);
-
-            auto t_yzzz_xyzz = primBuffer.data(225 * idx + 203);
-
-            auto t_yzzz_xzzz = primBuffer.data(225 * idx + 204);
-
-            auto t_yzzz_yyyy = primBuffer.data(225 * idx + 205);
-
-            auto t_yzzz_yyyz = primBuffer.data(225 * idx + 206);
-
-            auto t_yzzz_yyzz = primBuffer.data(225 * idx + 207);
-
-            auto t_yzzz_yzzz = primBuffer.data(225 * idx + 208);
-
-            auto t_yzzz_zzzz = primBuffer.data(225 * idx + 209);
-
-            auto t_zzzz_xxxx = primBuffer.data(225 * idx + 210);
-
-            auto t_zzzz_xxxy = primBuffer.data(225 * idx + 211);
-
-            auto t_zzzz_xxxz = primBuffer.data(225 * idx + 212);
-
-            auto t_zzzz_xxyy = primBuffer.data(225 * idx + 213);
-
-            auto t_zzzz_xxyz = primBuffer.data(225 * idx + 214);
-
-            auto t_zzzz_xxzz = primBuffer.data(225 * idx + 215);
-
-            auto t_zzzz_xyyy = primBuffer.data(225 * idx + 216);
-
-            auto t_zzzz_xyyz = primBuffer.data(225 * idx + 217);
-
-            auto t_zzzz_xyzz = primBuffer.data(225 * idx + 218);
-
-            auto t_zzzz_xzzz = primBuffer.data(225 * idx + 219);
-
-            auto t_zzzz_yyyy = primBuffer.data(225 * idx + 220);
-
-            auto t_zzzz_yyyz = primBuffer.data(225 * idx + 221);
-
-            auto t_zzzz_yyzz = primBuffer.data(225 * idx + 222);
-
-            auto t_zzzz_yzzz = primBuffer.data(225 * idx + 223);
-
-            auto t_zzzz_zzzz = primBuffer.data(225 * idx + 224);
 
             // Batch of Integrals (0) = (0,5)
 
@@ -853,6 +502,268 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                 t_xxyy_xzzz[j] = ovlvecfunc::fvec_xxyy_xzzz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxyy[j], pa_xyy[j], pa_yy[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]);
             }
 
+            idx++;
+        }
+    }
+    
+    void
+    compOverlapForGG_11_20(      CMemBlock2D<double>& primBuffer,
+                           const CMemBlock2D<double>& auxBuffer,
+                           const CMemBlock2D<double>& osFactors,
+                           const CMemBlock2D<double>& paDistances,
+                           const CMemBlock2D<double>& pbDistances,
+                           const CGtoBlock&           braGtoBlock,
+                           const CGtoBlock&           ketGtoBlock,
+                           const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_x = paDistances.data(34 * idx);
+
+            auto pa_y = paDistances.data(34 * idx + 1);
+
+            auto pa_z = paDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_xx = paDistances.data(34 * idx + 3);
+
+            auto pa_xy = paDistances.data(34 * idx + 4);
+
+            auto pa_xz = paDistances.data(34 * idx + 5);
+
+            auto pa_yy = paDistances.data(34 * idx + 6);
+
+            auto pa_yz = paDistances.data(34 * idx + 7);
+
+            auto pa_zz = paDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PA)
+
+            auto pa_xxy = paDistances.data(34 * idx + 10);
+
+            auto pa_xxz = paDistances.data(34 * idx + 11);
+
+            auto pa_xyy = paDistances.data(34 * idx + 12);
+
+            auto pa_xyz = paDistances.data(34 * idx + 13);
+
+            auto pa_xzz = paDistances.data(34 * idx + 14);
+
+            auto pa_yyy = paDistances.data(34 * idx + 15);
+
+            // set up pointers to 4-th order tensor of distance R(PA)
+
+            auto pa_xxyy = paDistances.data(34 * idx + 22);
+
+            auto pa_xxyz = paDistances.data(34 * idx + 23);
+
+            auto pa_xxzz = paDistances.data(34 * idx + 24);
+
+            auto pa_xyyy = paDistances.data(34 * idx + 25);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(34 * idx);
+
+            auto pb_y = pbDistances.data(34 * idx + 1);
+
+            auto pb_z = pbDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xx = pbDistances.data(34 * idx + 3);
+
+            auto pb_xy = pbDistances.data(34 * idx + 4);
+
+            auto pb_xz = pbDistances.data(34 * idx + 5);
+
+            auto pb_yy = pbDistances.data(34 * idx + 6);
+
+            auto pb_yz = pbDistances.data(34 * idx + 7);
+
+            auto pb_zz = pbDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PB)
+
+            auto pb_xxx = pbDistances.data(34 * idx + 9);
+
+            auto pb_xxy = pbDistances.data(34 * idx + 10);
+
+            auto pb_xxz = pbDistances.data(34 * idx + 11);
+
+            auto pb_xyy = pbDistances.data(34 * idx + 12);
+
+            auto pb_xyz = pbDistances.data(34 * idx + 13);
+
+            auto pb_xzz = pbDistances.data(34 * idx + 14);
+
+            auto pb_yyy = pbDistances.data(34 * idx + 15);
+
+            auto pb_yyz = pbDistances.data(34 * idx + 16);
+
+            auto pb_yzz = pbDistances.data(34 * idx + 17);
+
+            auto pb_zzz = pbDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PB)
+
+            auto pb_xxxx = pbDistances.data(34 * idx + 19);
+
+            auto pb_xxxy = pbDistances.data(34 * idx + 20);
+
+            auto pb_xxxz = pbDistances.data(34 * idx + 21);
+
+            auto pb_xxyy = pbDistances.data(34 * idx + 22);
+
+            auto pb_xxyz = pbDistances.data(34 * idx + 23);
+
+            auto pb_xxzz = pbDistances.data(34 * idx + 24);
+
+            auto pb_xyyy = pbDistances.data(34 * idx + 25);
+
+            auto pb_xyyz = pbDistances.data(34 * idx + 26);
+
+            auto pb_xyzz = pbDistances.data(34 * idx + 27);
+
+            auto pb_xzzz = pbDistances.data(34 * idx + 28);
+
+            auto pb_yyyy = pbDistances.data(34 * idx + 29);
+
+            auto pb_yyyz = pbDistances.data(34 * idx + 30);
+
+            auto pb_yyzz = pbDistances.data(34 * idx + 31);
+
+            auto pb_yzzz = pbDistances.data(34 * idx + 32);
+
+            auto pb_zzzz = pbDistances.data(34 * idx + 33);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0 = auxBuffer.data(idx);
+
+            // set up pointers to integrals
+
+            auto t_xxyy_yyyy = primBuffer.data(225 * idx + 55);
+
+            auto t_xxyy_yyyz = primBuffer.data(225 * idx + 56);
+
+            auto t_xxyy_yyzz = primBuffer.data(225 * idx + 57);
+
+            auto t_xxyy_yzzz = primBuffer.data(225 * idx + 58);
+
+            auto t_xxyy_zzzz = primBuffer.data(225 * idx + 59);
+
+            auto t_xxyz_xxxx = primBuffer.data(225 * idx + 60);
+
+            auto t_xxyz_xxxy = primBuffer.data(225 * idx + 61);
+
+            auto t_xxyz_xxxz = primBuffer.data(225 * idx + 62);
+
+            auto t_xxyz_xxyy = primBuffer.data(225 * idx + 63);
+
+            auto t_xxyz_xxyz = primBuffer.data(225 * idx + 64);
+
+            auto t_xxyz_xxzz = primBuffer.data(225 * idx + 65);
+
+            auto t_xxyz_xyyy = primBuffer.data(225 * idx + 66);
+
+            auto t_xxyz_xyyz = primBuffer.data(225 * idx + 67);
+
+            auto t_xxyz_xyzz = primBuffer.data(225 * idx + 68);
+
+            auto t_xxyz_xzzz = primBuffer.data(225 * idx + 69);
+
+            auto t_xxyz_yyyy = primBuffer.data(225 * idx + 70);
+
+            auto t_xxyz_yyyz = primBuffer.data(225 * idx + 71);
+
+            auto t_xxyz_yyzz = primBuffer.data(225 * idx + 72);
+
+            auto t_xxyz_yzzz = primBuffer.data(225 * idx + 73);
+
+            auto t_xxyz_zzzz = primBuffer.data(225 * idx + 74);
+
+            auto t_xxzz_xxxx = primBuffer.data(225 * idx + 75);
+
+            auto t_xxzz_xxxy = primBuffer.data(225 * idx + 76);
+
+            auto t_xxzz_xxxz = primBuffer.data(225 * idx + 77);
+
+            auto t_xxzz_xxyy = primBuffer.data(225 * idx + 78);
+
+            auto t_xxzz_xxyz = primBuffer.data(225 * idx + 79);
+
+            auto t_xxzz_xxzz = primBuffer.data(225 * idx + 80);
+
+            auto t_xxzz_xyyy = primBuffer.data(225 * idx + 81);
+
+            auto t_xxzz_xyyz = primBuffer.data(225 * idx + 82);
+
+            auto t_xxzz_xyzz = primBuffer.data(225 * idx + 83);
+
+            auto t_xxzz_xzzz = primBuffer.data(225 * idx + 84);
+
+            auto t_xxzz_yyyy = primBuffer.data(225 * idx + 85);
+
+            auto t_xxzz_yyyz = primBuffer.data(225 * idx + 86);
+
+            auto t_xxzz_yyzz = primBuffer.data(225 * idx + 87);
+
+            auto t_xxzz_yzzz = primBuffer.data(225 * idx + 88);
+
+            auto t_xxzz_zzzz = primBuffer.data(225 * idx + 89);
+
+            auto t_xyyy_xxxx = primBuffer.data(225 * idx + 90);
+
+            auto t_xyyy_xxxy = primBuffer.data(225 * idx + 91);
+
+            auto t_xyyy_xxxz = primBuffer.data(225 * idx + 92);
+
+            auto t_xyyy_xxyy = primBuffer.data(225 * idx + 93);
+
+            auto t_xyyy_xxyz = primBuffer.data(225 * idx + 94);
+
+            auto t_xyyy_xxzz = primBuffer.data(225 * idx + 95);
+
+            auto t_xyyy_xyyy = primBuffer.data(225 * idx + 96);
+
+            auto t_xyyy_xyyz = primBuffer.data(225 * idx + 97);
+
+            auto t_xyyy_xyzz = primBuffer.data(225 * idx + 98);
+
+            auto t_xyyy_xzzz = primBuffer.data(225 * idx + 99);
+
+            auto t_xyyy_yyyy = primBuffer.data(225 * idx + 100);
+
+            auto t_xyyy_yyyz = primBuffer.data(225 * idx + 101);
+
+            auto t_xyyy_yyzz = primBuffer.data(225 * idx + 102);
+
+            auto t_xyyy_yzzz = primBuffer.data(225 * idx + 103);
+
+            auto t_xyyy_zzzz = primBuffer.data(225 * idx + 104);
+
             // Batch of Integrals (11) = (55,60)
 
             #pragma omp simd aligned(fx, pa_xx, pa_xxy, pa_xxyy, pa_y, pa_yy, pb_y, pb_yy, pb_yyy, pb_yyyy, pb_yyyz, \
@@ -1039,6 +950,269 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                 t_xyyy_zzzz[j] = ovlvecfunc::fvec_xyyy_zzzz_s_0(fx[j], pa_xy[j], pa_xyyy[j], pb_zz[j], pb_zzzz[j], s_0_0[j]);
             }
 
+            idx++;
+        }
+    }
+    
+    void
+    compOverlapForGG_21_30(      CMemBlock2D<double>& primBuffer,
+                           const CMemBlock2D<double>& auxBuffer,
+                           const CMemBlock2D<double>& osFactors,
+                           const CMemBlock2D<double>& paDistances,
+                           const CMemBlock2D<double>& pbDistances,
+                           const CGtoBlock&           braGtoBlock,
+                           const CGtoBlock&           ketGtoBlock,
+                           const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_x = paDistances.data(34 * idx);
+
+            auto pa_y = paDistances.data(34 * idx + 1);
+
+            auto pa_z = paDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_xy = paDistances.data(34 * idx + 4);
+
+            auto pa_xz = paDistances.data(34 * idx + 5);
+
+            auto pa_yy = paDistances.data(34 * idx + 6);
+
+            auto pa_yz = paDistances.data(34 * idx + 7);
+
+            auto pa_zz = paDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PA)
+
+            auto pa_xyy = paDistances.data(34 * idx + 12);
+
+            auto pa_xyz = paDistances.data(34 * idx + 13);
+
+            auto pa_xzz = paDistances.data(34 * idx + 14);
+
+            auto pa_yyy = paDistances.data(34 * idx + 15);
+
+            auto pa_yyz = paDistances.data(34 * idx + 16);
+
+            auto pa_yzz = paDistances.data(34 * idx + 17);
+
+            auto pa_zzz = paDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PA)
+
+
+            auto pa_xyyz = paDistances.data(34 * idx + 26);
+
+            auto pa_xyzz = paDistances.data(34 * idx + 27);
+
+            auto pa_xzzz = paDistances.data(34 * idx + 28);
+
+            auto pa_yyyy = paDistances.data(34 * idx + 29);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(34 * idx);
+
+            auto pb_y = pbDistances.data(34 * idx + 1);
+
+            auto pb_z = pbDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xx = pbDistances.data(34 * idx + 3);
+
+            auto pb_xy = pbDistances.data(34 * idx + 4);
+
+            auto pb_xz = pbDistances.data(34 * idx + 5);
+
+            auto pb_yy = pbDistances.data(34 * idx + 6);
+
+            auto pb_yz = pbDistances.data(34 * idx + 7);
+
+            auto pb_zz = pbDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PB)
+
+            auto pb_xxx = pbDistances.data(34 * idx + 9);
+
+            auto pb_xxy = pbDistances.data(34 * idx + 10);
+
+            auto pb_xxz = pbDistances.data(34 * idx + 11);
+
+            auto pb_xyy = pbDistances.data(34 * idx + 12);
+
+            auto pb_xyz = pbDistances.data(34 * idx + 13);
+
+            auto pb_xzz = pbDistances.data(34 * idx + 14);
+
+            auto pb_yyy = pbDistances.data(34 * idx + 15);
+
+            auto pb_yyz = pbDistances.data(34 * idx + 16);
+
+            auto pb_yzz = pbDistances.data(34 * idx + 17);
+
+            auto pb_zzz = pbDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PB)
+
+            auto pb_xxxx = pbDistances.data(34 * idx + 19);
+
+            auto pb_xxxy = pbDistances.data(34 * idx + 20);
+
+            auto pb_xxxz = pbDistances.data(34 * idx + 21);
+
+            auto pb_xxyy = pbDistances.data(34 * idx + 22);
+
+            auto pb_xxyz = pbDistances.data(34 * idx + 23);
+
+            auto pb_xxzz = pbDistances.data(34 * idx + 24);
+
+            auto pb_xyyy = pbDistances.data(34 * idx + 25);
+
+            auto pb_xyyz = pbDistances.data(34 * idx + 26);
+
+            auto pb_xyzz = pbDistances.data(34 * idx + 27);
+
+            auto pb_xzzz = pbDistances.data(34 * idx + 28);
+
+            auto pb_yyyy = pbDistances.data(34 * idx + 29);
+
+            auto pb_yyyz = pbDistances.data(34 * idx + 30);
+
+            auto pb_yyzz = pbDistances.data(34 * idx + 31);
+
+            auto pb_yzzz = pbDistances.data(34 * idx + 32);
+
+            auto pb_zzzz = pbDistances.data(34 * idx + 33);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0 = auxBuffer.data(idx);
+
+            // set up pointers to integrals
+
+            auto t_xyyz_xxxx = primBuffer.data(225 * idx + 105);
+
+            auto t_xyyz_xxxy = primBuffer.data(225 * idx + 106);
+
+            auto t_xyyz_xxxz = primBuffer.data(225 * idx + 107);
+
+            auto t_xyyz_xxyy = primBuffer.data(225 * idx + 108);
+
+            auto t_xyyz_xxyz = primBuffer.data(225 * idx + 109);
+
+            auto t_xyyz_xxzz = primBuffer.data(225 * idx + 110);
+
+            auto t_xyyz_xyyy = primBuffer.data(225 * idx + 111);
+
+            auto t_xyyz_xyyz = primBuffer.data(225 * idx + 112);
+
+            auto t_xyyz_xyzz = primBuffer.data(225 * idx + 113);
+
+            auto t_xyyz_xzzz = primBuffer.data(225 * idx + 114);
+
+            auto t_xyyz_yyyy = primBuffer.data(225 * idx + 115);
+
+            auto t_xyyz_yyyz = primBuffer.data(225 * idx + 116);
+
+            auto t_xyyz_yyzz = primBuffer.data(225 * idx + 117);
+
+            auto t_xyyz_yzzz = primBuffer.data(225 * idx + 118);
+
+            auto t_xyyz_zzzz = primBuffer.data(225 * idx + 119);
+
+            auto t_xyzz_xxxx = primBuffer.data(225 * idx + 120);
+
+            auto t_xyzz_xxxy = primBuffer.data(225 * idx + 121);
+
+            auto t_xyzz_xxxz = primBuffer.data(225 * idx + 122);
+
+            auto t_xyzz_xxyy = primBuffer.data(225 * idx + 123);
+
+            auto t_xyzz_xxyz = primBuffer.data(225 * idx + 124);
+
+            auto t_xyzz_xxzz = primBuffer.data(225 * idx + 125);
+
+            auto t_xyzz_xyyy = primBuffer.data(225 * idx + 126);
+
+            auto t_xyzz_xyyz = primBuffer.data(225 * idx + 127);
+
+            auto t_xyzz_xyzz = primBuffer.data(225 * idx + 128);
+
+            auto t_xyzz_xzzz = primBuffer.data(225 * idx + 129);
+
+            auto t_xyzz_yyyy = primBuffer.data(225 * idx + 130);
+
+            auto t_xyzz_yyyz = primBuffer.data(225 * idx + 131);
+
+            auto t_xyzz_yyzz = primBuffer.data(225 * idx + 132);
+
+            auto t_xyzz_yzzz = primBuffer.data(225 * idx + 133);
+
+            auto t_xyzz_zzzz = primBuffer.data(225 * idx + 134);
+
+            auto t_xzzz_xxxx = primBuffer.data(225 * idx + 135);
+
+            auto t_xzzz_xxxy = primBuffer.data(225 * idx + 136);
+
+            auto t_xzzz_xxxz = primBuffer.data(225 * idx + 137);
+
+            auto t_xzzz_xxyy = primBuffer.data(225 * idx + 138);
+
+            auto t_xzzz_xxyz = primBuffer.data(225 * idx + 139);
+
+            auto t_xzzz_xxzz = primBuffer.data(225 * idx + 140);
+
+            auto t_xzzz_xyyy = primBuffer.data(225 * idx + 141);
+
+            auto t_xzzz_xyyz = primBuffer.data(225 * idx + 142);
+
+            auto t_xzzz_xyzz = primBuffer.data(225 * idx + 143);
+
+            auto t_xzzz_xzzz = primBuffer.data(225 * idx + 144);
+
+            auto t_xzzz_yyyy = primBuffer.data(225 * idx + 145);
+
+            auto t_xzzz_yyyz = primBuffer.data(225 * idx + 146);
+
+            auto t_xzzz_yyzz = primBuffer.data(225 * idx + 147);
+
+            auto t_xzzz_yzzz = primBuffer.data(225 * idx + 148);
+
+            auto t_xzzz_zzzz = primBuffer.data(225 * idx + 149);
+
+            auto t_yyyy_xxxx = primBuffer.data(225 * idx + 150);
+
+            auto t_yyyy_xxxy = primBuffer.data(225 * idx + 151);
+
+            auto t_yyyy_xxxz = primBuffer.data(225 * idx + 152);
+
+            auto t_yyyy_xxyy = primBuffer.data(225 * idx + 153);
+
+            auto t_yyyy_xxyz = primBuffer.data(225 * idx + 154);
+
             // Batch of Integrals (21) = (105,110)
 
             #pragma omp simd aligned(fx, pa_x, pa_xy, pa_xyy, pa_xyyz, pa_xyz, pa_xz, pa_y, pa_yy, pa_yyz, pa_yz, pa_z, \
@@ -1224,6 +1398,298 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_yyyy_xxyz[j] = ovlvecfunc::fvec_yyyy_xxyz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyy[j], pb_xxyz[j], pb_xxz[j], pb_yz[j], pb_z[j], s_0_0[j]);
             }
+
+            idx++;
+        }
+    }
+    
+    void
+    compOverlapForGG_31_43(      CMemBlock2D<double>& primBuffer,
+                           const CMemBlock2D<double>& auxBuffer,
+                           const CMemBlock2D<double>& osFactors,
+                           const CMemBlock2D<double>& paDistances,
+                           const CMemBlock2D<double>& pbDistances,
+                           const CGtoBlock&           braGtoBlock,
+                           const CGtoBlock&           ketGtoBlock,
+                           const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(2 * idx);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_y = paDistances.data(34 * idx + 1);
+
+            auto pa_z = paDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_yy = paDistances.data(34 * idx + 6);
+
+            auto pa_yz = paDistances.data(34 * idx + 7);
+
+            auto pa_zz = paDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PA)
+
+            auto pa_yyy = paDistances.data(34 * idx + 15);
+
+            auto pa_yyz = paDistances.data(34 * idx + 16);
+
+            auto pa_yzz = paDistances.data(34 * idx + 17);
+
+            auto pa_zzz = paDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PA)
+
+            auto pa_yyyy = paDistances.data(34 * idx + 29);
+
+            auto pa_yyyz = paDistances.data(34 * idx + 30);
+
+            auto pa_yyzz = paDistances.data(34 * idx + 31);
+
+            auto pa_yzzz = paDistances.data(34 * idx + 32);
+
+            auto pa_zzzz = paDistances.data(34 * idx + 33);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(34 * idx);
+
+            auto pb_y = pbDistances.data(34 * idx + 1);
+
+            auto pb_z = pbDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xx = pbDistances.data(34 * idx + 3);
+
+            auto pb_xy = pbDistances.data(34 * idx + 4);
+
+            auto pb_xz = pbDistances.data(34 * idx + 5);
+
+            auto pb_yy = pbDistances.data(34 * idx + 6);
+
+            auto pb_yz = pbDistances.data(34 * idx + 7);
+
+            auto pb_zz = pbDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PB)
+
+            auto pb_xxx = pbDistances.data(34 * idx + 9);
+
+            auto pb_xxy = pbDistances.data(34 * idx + 10);
+
+            auto pb_xxz = pbDistances.data(34 * idx + 11);
+
+            auto pb_xyy = pbDistances.data(34 * idx + 12);
+
+            auto pb_xyz = pbDistances.data(34 * idx + 13);
+
+            auto pb_xzz = pbDistances.data(34 * idx + 14);
+
+            auto pb_yyy = pbDistances.data(34 * idx + 15);
+
+            auto pb_yyz = pbDistances.data(34 * idx + 16);
+
+            auto pb_yzz = pbDistances.data(34 * idx + 17);
+
+            auto pb_zzz = pbDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PB)
+
+            auto pb_xxxx = pbDistances.data(34 * idx + 19);
+
+            auto pb_xxxy = pbDistances.data(34 * idx + 20);
+
+            auto pb_xxxz = pbDistances.data(34 * idx + 21);
+
+            auto pb_xxyy = pbDistances.data(34 * idx + 22);
+
+            auto pb_xxyz = pbDistances.data(34 * idx + 23);
+
+            auto pb_xxzz = pbDistances.data(34 * idx + 24);
+
+            auto pb_xyyy = pbDistances.data(34 * idx + 25);
+
+            auto pb_xyyz = pbDistances.data(34 * idx + 26);
+
+            auto pb_xyzz = pbDistances.data(34 * idx + 27);
+
+            auto pb_xzzz = pbDistances.data(34 * idx + 28);
+
+            auto pb_yyyy = pbDistances.data(34 * idx + 29);
+
+            auto pb_yyyz = pbDistances.data(34 * idx + 30);
+
+            auto pb_yyzz = pbDistances.data(34 * idx + 31);
+
+            auto pb_yzzz = pbDistances.data(34 * idx + 32);
+
+            auto pb_zzzz = pbDistances.data(34 * idx + 33);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0 = auxBuffer.data(idx);
+
+            // set up pointers to integrals
+
+            auto t_yyyy_xxzz = primBuffer.data(225 * idx + 155);
+
+            auto t_yyyy_xyyy = primBuffer.data(225 * idx + 156);
+
+            auto t_yyyy_xyyz = primBuffer.data(225 * idx + 157);
+
+            auto t_yyyy_xyzz = primBuffer.data(225 * idx + 158);
+
+            auto t_yyyy_xzzz = primBuffer.data(225 * idx + 159);
+
+            auto t_yyyy_yyyy = primBuffer.data(225 * idx + 160);
+
+            auto t_yyyy_yyyz = primBuffer.data(225 * idx + 161);
+
+            auto t_yyyy_yyzz = primBuffer.data(225 * idx + 162);
+
+            auto t_yyyy_yzzz = primBuffer.data(225 * idx + 163);
+
+            auto t_yyyy_zzzz = primBuffer.data(225 * idx + 164);
+
+            auto t_yyyz_xxxx = primBuffer.data(225 * idx + 165);
+
+            auto t_yyyz_xxxy = primBuffer.data(225 * idx + 166);
+
+            auto t_yyyz_xxxz = primBuffer.data(225 * idx + 167);
+
+            auto t_yyyz_xxyy = primBuffer.data(225 * idx + 168);
+
+            auto t_yyyz_xxyz = primBuffer.data(225 * idx + 169);
+
+            auto t_yyyz_xxzz = primBuffer.data(225 * idx + 170);
+
+            auto t_yyyz_xyyy = primBuffer.data(225 * idx + 171);
+
+            auto t_yyyz_xyyz = primBuffer.data(225 * idx + 172);
+
+            auto t_yyyz_xyzz = primBuffer.data(225 * idx + 173);
+
+            auto t_yyyz_xzzz = primBuffer.data(225 * idx + 174);
+
+            auto t_yyyz_yyyy = primBuffer.data(225 * idx + 175);
+
+            auto t_yyyz_yyyz = primBuffer.data(225 * idx + 176);
+
+            auto t_yyyz_yyzz = primBuffer.data(225 * idx + 177);
+
+            auto t_yyyz_yzzz = primBuffer.data(225 * idx + 178);
+
+            auto t_yyyz_zzzz = primBuffer.data(225 * idx + 179);
+
+            auto t_yyzz_xxxx = primBuffer.data(225 * idx + 180);
+
+            auto t_yyzz_xxxy = primBuffer.data(225 * idx + 181);
+
+            auto t_yyzz_xxxz = primBuffer.data(225 * idx + 182);
+
+            auto t_yyzz_xxyy = primBuffer.data(225 * idx + 183);
+
+            auto t_yyzz_xxyz = primBuffer.data(225 * idx + 184);
+
+            auto t_yyzz_xxzz = primBuffer.data(225 * idx + 185);
+
+            auto t_yyzz_xyyy = primBuffer.data(225 * idx + 186);
+
+            auto t_yyzz_xyyz = primBuffer.data(225 * idx + 187);
+
+            auto t_yyzz_xyzz = primBuffer.data(225 * idx + 188);
+
+            auto t_yyzz_xzzz = primBuffer.data(225 * idx + 189);
+
+            auto t_yyzz_yyyy = primBuffer.data(225 * idx + 190);
+
+            auto t_yyzz_yyyz = primBuffer.data(225 * idx + 191);
+
+            auto t_yyzz_yyzz = primBuffer.data(225 * idx + 192);
+
+            auto t_yyzz_yzzz = primBuffer.data(225 * idx + 193);
+
+            auto t_yyzz_zzzz = primBuffer.data(225 * idx + 194);
+
+            auto t_yzzz_xxxx = primBuffer.data(225 * idx + 195);
+
+            auto t_yzzz_xxxy = primBuffer.data(225 * idx + 196);
+
+            auto t_yzzz_xxxz = primBuffer.data(225 * idx + 197);
+
+            auto t_yzzz_xxyy = primBuffer.data(225 * idx + 198);
+
+            auto t_yzzz_xxyz = primBuffer.data(225 * idx + 199);
+
+            auto t_yzzz_xxzz = primBuffer.data(225 * idx + 200);
+
+            auto t_yzzz_xyyy = primBuffer.data(225 * idx + 201);
+
+            auto t_yzzz_xyyz = primBuffer.data(225 * idx + 202);
+
+            auto t_yzzz_xyzz = primBuffer.data(225 * idx + 203);
+
+            auto t_yzzz_xzzz = primBuffer.data(225 * idx + 204);
+
+            auto t_yzzz_yyyy = primBuffer.data(225 * idx + 205);
+
+            auto t_yzzz_yyyz = primBuffer.data(225 * idx + 206);
+
+            auto t_yzzz_yyzz = primBuffer.data(225 * idx + 207);
+
+            auto t_yzzz_yzzz = primBuffer.data(225 * idx + 208);
+
+            auto t_yzzz_zzzz = primBuffer.data(225 * idx + 209);
+
+            auto t_zzzz_xxxx = primBuffer.data(225 * idx + 210);
+
+            auto t_zzzz_xxxy = primBuffer.data(225 * idx + 211);
+
+            auto t_zzzz_xxxz = primBuffer.data(225 * idx + 212);
+
+            auto t_zzzz_xxyy = primBuffer.data(225 * idx + 213);
+
+            auto t_zzzz_xxyz = primBuffer.data(225 * idx + 214);
+
+            auto t_zzzz_xxzz = primBuffer.data(225 * idx + 215);
+
+            auto t_zzzz_xyyy = primBuffer.data(225 * idx + 216);
+
+            auto t_zzzz_xyyz = primBuffer.data(225 * idx + 217);
+
+            auto t_zzzz_xyzz = primBuffer.data(225 * idx + 218);
+
+            auto t_zzzz_xzzz = primBuffer.data(225 * idx + 219);
+
+            auto t_zzzz_yyyy = primBuffer.data(225 * idx + 220);
+
+            auto t_zzzz_yyyz = primBuffer.data(225 * idx + 221);
+
+            auto t_zzzz_yyzz = primBuffer.data(225 * idx + 222);
+
+            auto t_zzzz_yzzz = primBuffer.data(225 * idx + 223);
+
+            auto t_zzzz_zzzz = primBuffer.data(225 * idx + 224);
 
             // Batch of Integrals (31) = (155,160)
 
@@ -1483,7 +1949,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             idx++;
         }
     }
-
 
 } // ovlrecfunc namespace
 
