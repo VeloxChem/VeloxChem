@@ -8,6 +8,8 @@
 
 #include "KineticEnergyRecFuncForDX.hpp"
 
+#include "KineticEnergyVecFuncForDX.hpp"
+
 namespace kinrecfunc { // kinrecfunc namespace
 
     void
@@ -177,65 +179,29 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xx_zz, t_xy_xx, t_xy_xy, t_xy_xz, t_xy_yy, t_xy_yz, t_xy_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xx_xx[j] = (0.75 * fx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] + 2.0 * pa_x[j] * fx[j] * pb_x[j] + 
+                t_xx_xx[j] = kinvecfunc::fvec_xx_xx_s_0(fx[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xx_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                             0.5 * fx[j] * pb_xx[j] + pa_xx[j] * pb_xx[j]) * s_0_0[j] + (3.0 * fx[j] * fx[j] * fz[j] - 0.5 * fx[j] * fz[j] * fgb[j] - 
+                t_xx_xy[j] = kinvecfunc::fvec_xx_xy_s_0(fx[j], pa_x[j], pa_xx[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xx_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                             0.5 * fz[j] * fga[j] * fx[j] - pa_xx[j] * fz[j] * fgb[j] + 3.0 * pa_xx[j] * fz[j] * fx[j] + 
+                t_xx_xz[j] = kinvecfunc::fvec_xx_xz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xx_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                             12.0 * pa_x[j] * fz[j] * fx[j] * pb_x[j] - fz[j] * fga[j] * pb_xx[j] + 3.0 * fz[j] * fx[j] * pb_xx[j] + 
+                t_xx_yy[j] = kinvecfunc::fvec_xx_yy_s_0(fx[j], pa_xx[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xx_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_yy[j], r_0_0[j]);
 
-                             8.0 * pa_xx[j] * fz[j] * pb_xx[j]) * r_0_0[j];
+                t_xx_yz[j] = kinvecfunc::fvec_xx_yz_s_0(fx[j], pa_xx[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xx_yz_r_0(fga[j], fx[j], fz[j], pa_xx[j], pb_yz[j], r_0_0[j]);
 
-                t_xx_xy[j] = (pa_x[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pb_xy[j] + pa_xx[j] * pb_xy[j]) * s_0_0[j] + (6.0 * pa_x[j] * fz[j] * fx[j] * pb_y[j] - fz[j] * fga[j] * pb_xy[j] + 
+                t_xx_zz[j] = kinvecfunc::fvec_xx_zz_s_0(fx[j], pa_xx[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xx_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_zz[j], r_0_0[j]);
 
-                             3.0 * fz[j] * fx[j] * pb_xy[j] + 8.0 * pa_xx[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_xy_xx[j] = kinvecfunc::fvec_xy_xx_s_0(fx[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xy_xx_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                t_xx_xz[j] = (pa_x[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pb_xz[j] + pa_xx[j] * pb_xz[j]) * s_0_0[j] + (6.0 * pa_x[j] * fz[j] * fx[j] * pb_z[j] - fz[j] * fga[j] * pb_xz[j] + 
+                t_xy_xy[j] = kinvecfunc::fvec_xy_xy_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xy_xy_r_0(fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                             3.0 * fz[j] * fx[j] * pb_xz[j] + 8.0 * pa_xx[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_xy_xz[j] = kinvecfunc::fvec_xy_xz_s_0(fx[j], pa_xy[j], pa_y[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_xz_r_0(fx[j], fz[j], pa_xy[j], pa_y[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                t_xx_yy[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] + 0.5 * fx[j] * pb_yy[j] + 
+                t_xy_yy[j] = kinvecfunc::fvec_xy_yy_s_0(fx[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xy_yy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                             pa_xx[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * fx[j] - 
+                t_xy_yz[j] = kinvecfunc::fvec_xy_yz_s_0(fx[j], pa_x[j], pa_xy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_yz_r_0(fx[j], fz[j], pa_x[j], pa_xy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                             pa_xx[j] * fz[j] * fgb[j] + fz[j] * fx[j] * fx[j] + 3.0 * pa_xx[j] * fz[j] * fx[j] - fz[j] * fga[j] * pb_yy[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_yy[j] + 8.0 * pa_xx[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xx_yz[j] = (0.5 * fx[j] * pb_yz[j] + pa_xx[j] * pb_yz[j]) * s_0_0[j] + (-fz[j] * fga[j] * pb_yz[j] + 3.0 * fz[j] * fx[j] * pb_yz[j] + 
-
-                             8.0 * pa_xx[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xx_zz[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] + 0.5 * fx[j] * pb_zz[j] + 
-
-                             pa_xx[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * fx[j] - 
-
-                             pa_xx[j] * fz[j] * fgb[j] + fz[j] * fx[j] * fx[j] + 3.0 * pa_xx[j] * fz[j] * fx[j] - fz[j] * fga[j] * pb_zz[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_zz[j] + 8.0 * pa_xx[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xy_xx[j] = (0.5 * pa_xy[j] * fx[j] + fx[j] * pa_y[j] * pb_x[j] + pa_xy[j] * pb_xx[j]) * s_0_0[j] + (-pa_xy[j] * fz[j] * fgb[j] + 3.0 * pa_xy[j] * fz[j] * fx[j] + 
-
-                             6.0 * fx[j] * fz[j] * pa_y[j] * pb_x[j] + 8.0 * pa_xy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xy_xy[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * pb_x[j] + 
-
-                             0.5 * fx[j] * pa_y[j] * pb_y[j] + pa_xy[j] * pb_xy[j]) * s_0_0[j] + (fx[j] * fx[j] * fz[j] + 3.0 * pa_x[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                             3.0 * fx[j] * fz[j] * pa_y[j] * pb_y[j] + 8.0 * pa_xy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xy_xz[j] = (0.5 * fx[j] * pa_y[j] * pb_z[j] + pa_xy[j] * pb_xz[j]) * s_0_0[j] + (3.0 * fx[j] * fz[j] * pa_y[j] * pb_z[j] + 8.0 * pa_xy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xy_yy[j] = (0.5 * pa_xy[j] * fx[j] + pa_x[j] * fx[j] * pb_y[j] + pa_xy[j] * pb_yy[j]) * s_0_0[j] + (-pa_xy[j] * fz[j] * fgb[j] + 3.0 * pa_xy[j] * fz[j] * fx[j] + 
-
-                             6.0 * pa_x[j] * fz[j] * fx[j] * pb_y[j] + 8.0 * pa_xy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xy_yz[j] = (0.5 * pa_x[j] * fx[j] * pb_z[j] + pa_xy[j] * pb_yz[j]) * s_0_0[j] + (3.0 * pa_x[j] * fz[j] * fx[j] * pb_z[j] + 8.0 * pa_xy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xy_zz[j] = (0.5 * pa_xy[j] * fx[j] + pa_xy[j] * pb_zz[j]) * s_0_0[j] + (-pa_xy[j] * fz[j] * fgb[j] + 3.0 * pa_xy[j] * fz[j] * fx[j] + 
-
-                             8.0 * pa_xy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_xy_zz[j] = kinvecfunc::fvec_xy_zz_s_0(fx[j], pa_xy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xy_zz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pb_zz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (1) = (12,24)
@@ -245,65 +211,29 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xz_zz, t_yy_xx, t_yy_xy, t_yy_xz, t_yy_yy, t_yy_yz, t_yy_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xz_xx[j] = (0.5 * pa_xz[j] * fx[j] + fx[j] * pa_z[j] * pb_x[j] + pa_xz[j] * pb_xx[j]) * s_0_0[j] + (-pa_xz[j] * fz[j] * fgb[j] + 3.0 * pa_xz[j] * fz[j] * fx[j] + 
+                t_xz_xx[j] = kinvecfunc::fvec_xz_xx_s_0(fx[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xz_xx_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                             6.0 * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 8.0 * pa_xz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
+                t_xz_xy[j] = kinvecfunc::fvec_xz_xy_s_0(fx[j], pa_xz[j], pa_z[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xz_xy_r_0(fx[j], fz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xz_xy[j] = (0.5 * fx[j] * pa_z[j] * pb_y[j] + pa_xz[j] * pb_xy[j]) * s_0_0[j] + (3.0 * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 8.0 * pa_xz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_xz_xz[j] = kinvecfunc::fvec_xz_xz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xz_xz_r_0(fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                t_xz_xz[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * pb_x[j] + 
+                t_xz_yy[j] = kinvecfunc::fvec_xz_yy_s_0(fx[j], pa_xz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xz_yy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pb_yy[j], r_0_0[j]);
 
-                             0.5 * fx[j] * pa_z[j] * pb_z[j] + pa_xz[j] * pb_xz[j]) * s_0_0[j] + (fx[j] * fx[j] * fz[j] + 3.0 * pa_x[j] * fz[j] * fx[j] * pb_x[j] + 
+                t_xz_yz[j] = kinvecfunc::fvec_xz_yz_s_0(fx[j], pa_x[j], pa_xz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xz_yz_r_0(fx[j], fz[j], pa_x[j], pa_xz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                             3.0 * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 8.0 * pa_xz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_xz_zz[j] = kinvecfunc::fvec_xz_zz_s_0(fx[j], pa_x[j], pa_xz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xz_zz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_xz_yy[j] = (0.5 * pa_xz[j] * fx[j] + pa_xz[j] * pb_yy[j]) * s_0_0[j] + (-pa_xz[j] * fz[j] * fgb[j] + 3.0 * pa_xz[j] * fz[j] * fx[j] + 
+                t_yy_xx[j] = kinvecfunc::fvec_yy_xx_s_0(fx[j], pa_yy[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_xx[j], r_0_0[j]);
 
-                             8.0 * pa_xz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_yy_xy[j] = kinvecfunc::fvec_yy_xy_s_0(fx[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yy_xy_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], r_0_0[j]);
 
-                t_xz_yz[j] = (0.5 * pa_x[j] * fx[j] * pb_y[j] + pa_xz[j] * pb_yz[j]) * s_0_0[j] + (3.0 * pa_x[j] * fz[j] * fx[j] * pb_y[j] + 8.0 * pa_xz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
+                t_yy_xz[j] = kinvecfunc::fvec_yy_xz_s_0(fx[j], pa_yy[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xz_r_0(fga[j], fx[j], fz[j], pa_yy[j], pb_xz[j], r_0_0[j]);
 
-                t_xz_zz[j] = (0.5 * pa_xz[j] * fx[j] + pa_x[j] * fx[j] * pb_z[j] + pa_xz[j] * pb_zz[j]) * s_0_0[j] + (-pa_xz[j] * fz[j] * fgb[j] + 3.0 * pa_xz[j] * fz[j] * fx[j] + 
+                t_yy_yy[j] = kinvecfunc::fvec_yy_yy_s_0(fx[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                             6.0 * pa_x[j] * fz[j] * fx[j] * pb_z[j] + 8.0 * pa_xz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_yy_yz[j] = kinvecfunc::fvec_yy_yz_s_0(fx[j], pa_y[j], pa_yy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yy_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                t_yy_xx[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] + 0.5 * fx[j] * pb_xx[j] + 
-
-                             pa_yy[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * fx[j] - 
-
-                             pa_yy[j] * fz[j] * fgb[j] + fz[j] * fx[j] * fx[j] + 3.0 * pa_yy[j] * fz[j] * fx[j] - fz[j] * fga[j] * pb_xx[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_xx[j] + 8.0 * pa_yy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_yy_xy[j] = (pa_y[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pb_xy[j] + pa_yy[j] * pb_xy[j]) * s_0_0[j] + (6.0 * pa_y[j] * fz[j] * fx[j] * pb_x[j] - fz[j] * fga[j] * pb_xy[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_xy[j] + 8.0 * pa_yy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_yy_xz[j] = (0.5 * fx[j] * pb_xz[j] + pa_yy[j] * pb_xz[j]) * s_0_0[j] + (-fz[j] * fga[j] * pb_xz[j] + 3.0 * fz[j] * fx[j] * pb_xz[j] + 
-
-                             8.0 * pa_yy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_yy_yy[j] = (0.75 * fx[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] + 2.0 * pa_y[j] * fx[j] * pb_y[j] + 
-
-                             0.5 * fx[j] * pb_yy[j] + pa_yy[j] * pb_yy[j]) * s_0_0[j] + (3.0 * fx[j] * fx[j] * fz[j] - 0.5 * fx[j] * fz[j] * fgb[j] - 
-
-                             0.5 * fz[j] * fga[j] * fx[j] - pa_yy[j] * fz[j] * fgb[j] + 3.0 * pa_yy[j] * fz[j] * fx[j] + 
-
-                             12.0 * pa_y[j] * fz[j] * fx[j] * pb_y[j] - fz[j] * fga[j] * pb_yy[j] + 3.0 * fz[j] * fx[j] * pb_yy[j] + 
-
-                             8.0 * pa_yy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_yy_yz[j] = (pa_y[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pb_yz[j] + pa_yy[j] * pb_yz[j]) * s_0_0[j] + (6.0 * pa_y[j] * fz[j] * fx[j] * pb_z[j] - fz[j] * fga[j] * pb_yz[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_yz[j] + 8.0 * pa_yy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_yy_zz[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] + 0.5 * fx[j] * pb_zz[j] + 
-
-                             pa_yy[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * fx[j] - 
-
-                             pa_yy[j] * fz[j] * fgb[j] + fz[j] * fx[j] * fx[j] + 3.0 * pa_yy[j] * fz[j] * fx[j] - fz[j] * fga[j] * pb_zz[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_zz[j] + 8.0 * pa_yy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_yy_zz[j] = kinvecfunc::fvec_yy_zz_s_0(fx[j], pa_yy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_zz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (2) = (24,36)
@@ -313,65 +243,29 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yz_zz, t_zz_xx, t_zz_xy, t_zz_xz, t_zz_yy, t_zz_yz, t_zz_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yz_xx[j] = (0.5 * pa_yz[j] * fx[j] + pa_yz[j] * pb_xx[j]) * s_0_0[j] + (-pa_yz[j] * fz[j] * fgb[j] + 3.0 * pa_yz[j] * fz[j] * fx[j] + 
+                t_yz_xx[j] = kinvecfunc::fvec_yz_xx_s_0(fx[j], pa_yz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yz_xx_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pb_xx[j], r_0_0[j]);
 
-                             8.0 * pa_yz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
+                t_yz_xy[j] = kinvecfunc::fvec_yz_xy_s_0(fx[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yz_xy_r_0(fx[j], fz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], r_0_0[j]);
 
-                t_yz_xy[j] = (0.5 * fx[j] * pa_z[j] * pb_x[j] + pa_yz[j] * pb_xy[j]) * s_0_0[j] + (3.0 * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 8.0 * pa_yz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_yz_xz[j] = kinvecfunc::fvec_yz_xz_s_0(fx[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xz_r_0(fx[j], fz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                t_yz_xz[j] = (0.5 * pa_y[j] * fx[j] * pb_x[j] + pa_yz[j] * pb_xz[j]) * s_0_0[j] + (3.0 * pa_y[j] * fz[j] * fx[j] * pb_x[j] + 8.0 * pa_yz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_yz_yy[j] = kinvecfunc::fvec_yz_yy_s_0(fx[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yz_yy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                t_yz_yy[j] = (0.5 * pa_yz[j] * fx[j] + fx[j] * pa_z[j] * pb_y[j] + pa_yz[j] * pb_yy[j]) * s_0_0[j] + (-pa_yz[j] * fz[j] * fgb[j] + 3.0 * pa_yz[j] * fz[j] * fx[j] + 
+                t_yz_yz[j] = kinvecfunc::fvec_yz_yz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yz_yz_r_0(fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                             6.0 * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 8.0 * pa_yz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_yz_zz[j] = kinvecfunc::fvec_yz_zz_s_0(fx[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yz_zz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_yz_yz[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_y[j] * fx[j] * pb_y[j] + 
+                t_zz_xx[j] = kinvecfunc::fvec_zz_xx_s_0(fx[j], pa_zz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_zz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_xx[j], r_0_0[j]);
 
-                             0.5 * fx[j] * pa_z[j] * pb_z[j] + pa_yz[j] * pb_yz[j]) * s_0_0[j] + (fx[j] * fx[j] * fz[j] + 3.0 * pa_y[j] * fz[j] * fx[j] * pb_y[j] + 
+                t_zz_xy[j] = kinvecfunc::fvec_zz_xy_s_0(fx[j], pa_zz[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_zz_xy_r_0(fga[j], fx[j], fz[j], pa_zz[j], pb_xy[j], r_0_0[j]);
 
-                             3.0 * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 8.0 * pa_yz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
+                t_zz_xz[j] = kinvecfunc::fvec_zz_xz_s_0(fx[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xz_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                t_yz_zz[j] = (0.5 * pa_yz[j] * fx[j] + pa_y[j] * fx[j] * pb_z[j] + pa_yz[j] * pb_zz[j]) * s_0_0[j] + (-pa_yz[j] * fz[j] * fgb[j] + 3.0 * pa_yz[j] * fz[j] * fx[j] + 
+                t_zz_yy[j] = kinvecfunc::fvec_zz_yy_s_0(fx[j], pa_zz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_zz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_yy[j], r_0_0[j]);
 
-                             6.0 * pa_y[j] * fz[j] * fx[j] * pb_z[j] + 8.0 * pa_yz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_zz_yz[j] = kinvecfunc::fvec_zz_yz_s_0(fx[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_zz_yz_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                t_zz_xx[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_zz[j] * fx[j] + 0.5 * fx[j] * pb_xx[j] + 
-
-                             pa_zz[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * fx[j] - 
-
-                             pa_zz[j] * fz[j] * fgb[j] + fz[j] * fx[j] * fx[j] + 3.0 * pa_zz[j] * fz[j] * fx[j] - fz[j] * fga[j] * pb_xx[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_xx[j] + 8.0 * pa_zz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_zz_xy[j] = (0.5 * fx[j] * pb_xy[j] + pa_zz[j] * pb_xy[j]) * s_0_0[j] + (-fz[j] * fga[j] * pb_xy[j] + 3.0 * fz[j] * fx[j] * pb_xy[j] + 
-
-                             8.0 * pa_zz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_zz_xz[j] = (pa_z[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pb_xz[j] + pa_zz[j] * pb_xz[j]) * s_0_0[j] + (6.0 * pa_z[j] * fz[j] * fx[j] * pb_x[j] - fz[j] * fga[j] * pb_xz[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_xz[j] + 8.0 * pa_zz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_zz_yy[j] = (0.25 * fx[j] * fx[j] + 0.5 * pa_zz[j] * fx[j] + 0.5 * fx[j] * pb_yy[j] + 
-
-                             pa_zz[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * fx[j] - 
-
-                             pa_zz[j] * fz[j] * fgb[j] + fz[j] * fx[j] * fx[j] + 3.0 * pa_zz[j] * fz[j] * fx[j] - fz[j] * fga[j] * pb_yy[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_yy[j] + 8.0 * pa_zz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_zz_yz[j] = (pa_z[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pb_yz[j] + pa_zz[j] * pb_yz[j]) * s_0_0[j] + (6.0 * pa_z[j] * fz[j] * fx[j] * pb_y[j] - fz[j] * fga[j] * pb_yz[j] + 
-
-                             3.0 * fz[j] * fx[j] * pb_yz[j] + 8.0 * pa_zz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_zz_zz[j] = (0.75 * fx[j] * fx[j] + 0.5 * pa_zz[j] * fx[j] + 2.0 * pa_z[j] * fx[j] * pb_z[j] + 
-
-                             0.5 * fx[j] * pb_zz[j] + pa_zz[j] * pb_zz[j]) * s_0_0[j] + (3.0 * fx[j] * fx[j] * fz[j] - 0.5 * fx[j] * fz[j] * fgb[j] - 
-
-                             0.5 * fz[j] * fga[j] * fx[j] - pa_zz[j] * fz[j] * fgb[j] + 3.0 * pa_zz[j] * fz[j] * fx[j] + 
-
-                             12.0 * pa_z[j] * fz[j] * fx[j] * pb_z[j] - fz[j] * fga[j] * pb_zz[j] + 3.0 * fz[j] * fx[j] * pb_zz[j] + 
-
-                             8.0 * pa_zz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_zz_zz[j] = kinvecfunc::fvec_zz_zz_s_0(fx[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_zz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], r_0_0[j]);
             }
 
             idx++;
@@ -616,93 +510,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xx_yyy, t_xx_yyz, t_xx_yzz, t_xx_zzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xx_xxx[j] = (1.5 * pa_x[j] * fx[j] * fx[j] + 2.25 * fx[j] * fx[j] * pb_x[j] + 
+                t_xx_xxx[j] = kinvecfunc::fvec_xx_xxx_s_0(fx[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxx[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxx[j], r_0_0[j]);
 
-                              1.5 * pa_xx[j] * pb_x[j] * fx[j] + 3.0 * pa_x[j] * fx[j] * pb_xx[j] + 0.5 * fx[j] * pb_xxx[j] + pa_xx[j] * pb_xxx[j]) * s_0_0[j] + (-3.0 * pa_x[j] * fx[j] * fz[j] * fgb[j] + 9.0 * pa_x[j] * fz[j] * fx[j] * fx[j] + 
+                t_xx_xxy[j] = kinvecfunc::fvec_xx_xxy_s_0(fx[j], pa_x[j], pa_xx[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xxy[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                              13.5 * fx[j] * fx[j] * fz[j] * pb_x[j] - 1.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - 
+                t_xx_xxz[j] = kinvecfunc::fvec_xx_xxz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xxz[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              3.0 * pa_xx[j] * pb_x[j] * fz[j] * fgb[j] + 12.0 * pa_xx[j] * fz[j] * pb_x[j] * fx[j] + 
+                t_xx_xyy[j] = kinvecfunc::fvec_xx_xyy_s_0(fx[j], pa_x[j], pa_xx[j], pb_x[j], pb_xyy[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xx_xyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_x[j], pb_xyy[j], pb_yy[j], r_0_0[j]);
 
-                              24.0 * pa_x[j] * fz[j] * fx[j] * pb_xx[j] - fz[j] * fga[j] * pb_xxx[j] + 4.0 * fz[j] * fx[j] * pb_xxx[j] + 
+                t_xx_xyz[j] = kinvecfunc::fvec_xx_xyz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xyz[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xx_xyz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xyz[j], pb_yz[j], r_0_0[j]);
 
-                              10.0 * pa_xx[j] * fz[j] * pb_xxx[j]) * r_0_0[j];
+                t_xx_xzz[j] = kinvecfunc::fvec_xx_xzz_s_0(fx[j], pa_x[j], pa_xx[j], pb_x[j], pb_xzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xx_xzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_x[j], pb_xzz[j], pb_zz[j], r_0_0[j]);
 
-                t_xx_xxy[j] = (0.75 * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_xx[j] * fx[j] * pb_y[j] + 
+                t_xx_yyy[j] = kinvecfunc::fvec_xx_yyy_s_0(fx[j], pa_xx[j], pb_y[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_xx_yyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_y[j], pb_yyy[j], r_0_0[j]);
 
-                              2.0 * pa_x[j] * fx[j] * pb_xy[j] + 0.5 * fx[j] * pb_xxy[j] + pa_xx[j] * pb_xxy[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pb_y[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_y[j] - 
+                t_xx_yyz[j] = kinvecfunc::fvec_xx_yyz_s_0(fx[j], pa_xx[j], pb_yyz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xx_yyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_yyz[j], pb_z[j], r_0_0[j]);
 
-                              0.5 * fz[j] * fga[j] * fx[j] * pb_y[j] - pa_xx[j] * fz[j] * fgb[j] * pb_y[j] + 4.0 * pa_xx[j] * fz[j] * fx[j] * pb_y[j] + 
+                t_xx_yzz[j] = kinvecfunc::fvec_xx_yzz_s_0(fx[j], pa_xx[j], pb_y[j], pb_yzz[j], s_0_0[j]) + kinvecfunc::fvec_xx_yzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_y[j], pb_yzz[j], r_0_0[j]);
 
-                              16.0 * pa_x[j] * fz[j] * fx[j] * pb_xy[j] - fz[j] * fga[j] * pb_xxy[j] + 4.0 * fz[j] * fx[j] * pb_xxy[j] + 
-
-                              10.0 * pa_xx[j] * fz[j] * pb_xxy[j]) * r_0_0[j];
-
-                t_xx_xxz[j] = (0.75 * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_xx[j] * fx[j] * pb_z[j] + 
-
-                              2.0 * pa_x[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * pb_xxz[j] + pa_xx[j] * pb_xxz[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pb_z[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_z[j] - 
-
-                              0.5 * fz[j] * fga[j] * fx[j] * pb_z[j] - pa_xx[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_xx[j] * fz[j] * fx[j] * pb_z[j] + 
-
-                              16.0 * pa_x[j] * fz[j] * fx[j] * pb_xz[j] - fz[j] * fga[j] * pb_xxz[j] + 4.0 * fz[j] * fx[j] * pb_xxz[j] + 
-
-                              10.0 * pa_xx[j] * fz[j] * pb_xxz[j]) * r_0_0[j];
-
-                t_xx_xyy[j] = (0.5 * pa_x[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * pa_xx[j] * pb_x[j] * fx[j] + pa_x[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * pb_xyy[j] + pa_xx[j] * pb_xyy[j]) * s_0_0[j] + (-pa_x[j] * fx[j] * fz[j] * fgb[j] + 3.0 * pa_x[j] * fz[j] * fx[j] * fx[j] - 
-
-                              0.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - pa_xx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                              1.5 * fz[j] * fx[j] * fx[j] * pb_x[j] + 4.0 * pa_xx[j] * fz[j] * pb_x[j] * fx[j] + 8.0 * pa_x[j] * fz[j] * fx[j] * pb_yy[j] - 
-
-                              fz[j] * fga[j] * pb_xyy[j] + 4.0 * fz[j] * fx[j] * pb_xyy[j] + 10.0 * pa_xx[j] * fz[j] * pb_xyy[j]) * r_0_0[j];
-
-                t_xx_xyz[j] = (pa_x[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * pb_xyz[j] + pa_xx[j] * pb_xyz[j]) * s_0_0[j] + (8.0 * pa_x[j] * fz[j] * fx[j] * pb_yz[j] - fz[j] * fga[j] * pb_xyz[j] + 
-
-                              4.0 * fz[j] * fx[j] * pb_xyz[j] + 10.0 * pa_xx[j] * fz[j] * pb_xyz[j]) * r_0_0[j];
-
-                t_xx_xzz[j] = (0.5 * pa_x[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * pa_xx[j] * pb_x[j] * fx[j] + pa_x[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * pb_xzz[j] + pa_xx[j] * pb_xzz[j]) * s_0_0[j] + (-pa_x[j] * fx[j] * fz[j] * fgb[j] + 3.0 * pa_x[j] * fz[j] * fx[j] * fx[j] - 
-
-                              0.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - pa_xx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                              1.5 * fz[j] * fx[j] * fx[j] * pb_x[j] + 4.0 * pa_xx[j] * fz[j] * pb_x[j] * fx[j] + 8.0 * pa_x[j] * fz[j] * fx[j] * pb_zz[j] - 
-
-                              fz[j] * fga[j] * pb_xzz[j] + 4.0 * fz[j] * fx[j] * pb_xzz[j] + 10.0 * pa_xx[j] * fz[j] * pb_xzz[j]) * r_0_0[j];
-
-                t_xx_yyy[j] = (0.75 * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_xx[j] * pb_y[j] * fx[j] + 
-
-                              0.5 * fx[j] * pb_yyy[j] + pa_xx[j] * pb_yyy[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_y[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_y[j] * fx[j] - 
-
-                              3.0 * pa_xx[j] * pb_y[j] * fz[j] * fgb[j] + 4.5 * fz[j] * fx[j] * fx[j] * pb_y[j] + 12.0 * pa_xx[j] * fz[j] * pb_y[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pb_yyy[j] + 4.0 * fz[j] * fx[j] * pb_yyy[j] + 10.0 * pa_xx[j] * fz[j] * pb_yyy[j]) * r_0_0[j];
-
-                t_xx_yyz[j] = (0.25 * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_xx[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * fx[j] * pb_yyz[j] + pa_xx[j] * pb_yyz[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] * pb_z[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_z[j] - 
-
-                              pa_xx[j] * fz[j] * fgb[j] * pb_z[j] + 1.5 * fz[j] * fx[j] * fx[j] * pb_z[j] + 4.0 * pa_xx[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                              fz[j] * fga[j] * pb_yyz[j] + 4.0 * fz[j] * fx[j] * pb_yyz[j] + 10.0 * pa_xx[j] * fz[j] * pb_yyz[j]) * r_0_0[j];
-
-                t_xx_yzz[j] = (0.25 * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_xx[j] * pb_y[j] * fx[j] + 
-
-                              0.5 * fx[j] * pb_yzz[j] + pa_xx[j] * pb_yzz[j]) * s_0_0[j] + (-0.5 * fx[j] * pb_y[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_y[j] * fx[j] - 
-
-                              pa_xx[j] * pb_y[j] * fz[j] * fgb[j] + 1.5 * fz[j] * fx[j] * fx[j] * pb_y[j] + 4.0 * pa_xx[j] * fz[j] * pb_y[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pb_yzz[j] + 4.0 * fz[j] * fx[j] * pb_yzz[j] + 10.0 * pa_xx[j] * fz[j] * pb_yzz[j]) * r_0_0[j];
-
-                t_xx_zzz[j] = (0.75 * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_xx[j] * pb_z[j] * fx[j] + 
-
-                              0.5 * fx[j] * pb_zzz[j] + pa_xx[j] * pb_zzz[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_z[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_z[j] * fx[j] - 
-
-                              3.0 * pa_xx[j] * pb_z[j] * fz[j] * fgb[j] + 4.5 * fz[j] * fx[j] * fx[j] * pb_z[j] + 12.0 * pa_xx[j] * fz[j] * pb_z[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pb_zzz[j] + 4.0 * fz[j] * fx[j] * pb_zzz[j] + 10.0 * pa_xx[j] * fz[j] * pb_zzz[j]) * r_0_0[j];
+                t_xx_zzz[j] = kinvecfunc::fvec_xx_zzz_s_0(fx[j], pa_xx[j], pb_z[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_xx_zzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_z[j], pb_zzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (1) = (10,20)
@@ -713,71 +539,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xy_yyy, t_xy_yyz, t_xy_yzz, t_xy_zzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xy_xxx[j] = (0.75 * fx[j] * fx[j] * pa_y[j] + 1.5 * pa_xy[j] * pb_x[j] * fx[j] + 
+                t_xy_xxx[j] = kinvecfunc::fvec_xy_xxx_s_0(fx[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxx_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], r_0_0[j]);
 
-                              1.5 * fx[j] * pa_y[j] * pb_xx[j] + pa_xy[j] * pb_xxx[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] + 4.5 * fx[j] * fx[j] * fz[j] * pa_y[j] - 
+                t_xy_xxy[j] = kinvecfunc::fvec_xy_xxy_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                              3.0 * pa_xy[j] * pb_x[j] * fz[j] * fgb[j] + 12.0 * pa_xy[j] * fz[j] * pb_x[j] * fx[j] + 
+                t_xy_xxz[j] = kinvecfunc::fvec_xy_xxz_s_0(fx[j], pa_xy[j], pa_y[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_xxz[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              12.0 * fx[j] * fz[j] * pa_y[j] * pb_xx[j] + 10.0 * pa_xy[j] * fz[j] * pb_xxx[j]) * r_0_0[j];
+                t_xy_xyy[j] = kinvecfunc::fvec_xy_xyy_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xy_xyy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                t_xy_xxy[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pb_x[j] + 
+                t_xy_xyz[j] = kinvecfunc::fvec_xy_xyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_xyz[j], pb_xz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_xyz_r_0(fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_xyz[j], pb_xz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              0.5 * pa_xy[j] * fx[j] * pb_y[j] + 0.5 * pa_x[j] * fx[j] * pb_xx[j] + fx[j] * pa_y[j] * pb_xy[j] + pa_xy[j] * pb_xxy[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 
+                t_xy_xzz[j] = kinvecfunc::fvec_xy_xzz_s_0(fx[j], pa_xy[j], pa_y[j], pb_x[j], pb_xzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xy_xzz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_x[j], pb_xzz[j], pb_zz[j], r_0_0[j]);
 
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_x[j] - pa_xy[j] * fz[j] * fgb[j] * pb_y[j] + 4.0 * pa_xy[j] * fz[j] * fx[j] * pb_y[j] + 
+                t_xy_yyy[j] = kinvecfunc::fvec_xy_yyy_s_0(fx[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_xy_yyy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], pb_yyy[j], r_0_0[j]);
 
-                              4.0 * pa_x[j] * fz[j] * fx[j] * pb_xx[j] + 8.0 * fx[j] * fz[j] * pa_y[j] * pb_xy[j] + 10.0 * pa_xy[j] * fz[j] * pb_xxy[j]) * r_0_0[j];
+                t_xy_yyz[j] = kinvecfunc::fvec_xy_yyz_s_0(fx[j], pa_x[j], pa_xy[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_yyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_yyz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                t_xy_xxz[j] = (0.5 * pa_xy[j] * fx[j] * pb_z[j] + fx[j] * pa_y[j] * pb_xz[j] + pa_xy[j] * pb_xxz[j]) * s_0_0[j] + (-pa_xy[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_xy[j] * fz[j] * fx[j] * pb_z[j] + 
+                t_xy_yzz[j] = kinvecfunc::fvec_xy_yzz_s_0(fx[j], pa_x[j], pa_xy[j], pb_y[j], pb_yzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xy_yzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_y[j], pb_yzz[j], pb_zz[j], r_0_0[j]);
 
-                              8.0 * fx[j] * fz[j] * pa_y[j] * pb_xz[j] + 10.0 * pa_xy[j] * fz[j] * pb_xxz[j]) * r_0_0[j];
-
-                t_xy_xyy[j] = (0.25 * fx[j] * fx[j] * pa_y[j] + 0.5 * fx[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * pa_xy[j] * pb_x[j] * fx[j] + pa_x[j] * fx[j] * pb_xy[j] + 0.5 * fx[j] * pa_y[j] * pb_yy[j] + pa_xy[j] * pb_xyy[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_y[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_y[j] - pa_xy[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_xy[j] * fz[j] * pb_x[j] * fx[j] + 
-
-                              8.0 * pa_x[j] * fz[j] * fx[j] * pb_xy[j] + 4.0 * fx[j] * fz[j] * pa_y[j] * pb_yy[j] + 10.0 * pa_xy[j] * fz[j] * pb_xyy[j]) * r_0_0[j];
-
-                t_xy_xyz[j] = (0.25 * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_x[j] * fx[j] * pb_xz[j] + 
-
-                              0.5 * fx[j] * pa_y[j] * pb_yz[j] + pa_xy[j] * pb_xyz[j]) * s_0_0[j] + (1.5 * fx[j] * fx[j] * fz[j] * pb_z[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xz[j] + 
-
-                              4.0 * fx[j] * fz[j] * pa_y[j] * pb_yz[j] + 10.0 * pa_xy[j] * fz[j] * pb_xyz[j]) * r_0_0[j];
-
-                t_xy_xzz[j] = (0.25 * fx[j] * fx[j] * pa_y[j] + 0.5 * pa_xy[j] * pb_x[j] * fx[j] + 
-
-                              0.5 * fx[j] * pa_y[j] * pb_zz[j] + pa_xy[j] * pb_xzz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_y[j] - 
-
-                              pa_xy[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_xy[j] * fz[j] * pb_x[j] * fx[j] + 4.0 * fx[j] * fz[j] * pa_y[j] * pb_zz[j] + 
-
-                              10.0 * pa_xy[j] * fz[j] * pb_xzz[j]) * r_0_0[j];
-
-                t_xy_yyy[j] = (0.75 * pa_x[j] * fx[j] * fx[j] + 1.5 * pa_xy[j] * pb_y[j] * fx[j] + 
-
-                              1.5 * pa_x[j] * fx[j] * pb_yy[j] + pa_xy[j] * pb_yyy[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] + 4.5 * pa_x[j] * fz[j] * fx[j] * fx[j] - 
-
-                              3.0 * pa_xy[j] * pb_y[j] * fz[j] * fgb[j] + 12.0 * pa_xy[j] * fz[j] * pb_y[j] * fx[j] + 
-
-                              12.0 * pa_x[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * pa_xy[j] * fz[j] * pb_yyy[j]) * r_0_0[j];
-
-                t_xy_yyz[j] = (0.5 * pa_xy[j] * fx[j] * pb_z[j] + pa_x[j] * fx[j] * pb_yz[j] + pa_xy[j] * pb_yyz[j]) * s_0_0[j] + (-pa_xy[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_xy[j] * fz[j] * fx[j] * pb_z[j] + 
-
-                              8.0 * pa_x[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_xy[j] * fz[j] * pb_yyz[j]) * r_0_0[j];
-
-                t_xy_yzz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xy[j] * pb_y[j] * fx[j] + 
-
-                              0.5 * pa_x[j] * fx[j] * pb_zz[j] + pa_xy[j] * pb_yzz[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] - 
-
-                              pa_xy[j] * pb_y[j] * fz[j] * fgb[j] + 4.0 * pa_xy[j] * fz[j] * pb_y[j] * fx[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                              10.0 * pa_xy[j] * fz[j] * pb_yzz[j]) * r_0_0[j];
-
-                t_xy_zzz[j] = (1.5 * pa_xy[j] * pb_z[j] * fx[j] + pa_xy[j] * pb_zzz[j]) * s_0_0[j] + (-3.0 * pa_xy[j] * pb_z[j] * fz[j] * fgb[j] + 
-
-                              12.0 * pa_xy[j] * fz[j] * pb_z[j] * fx[j] + 10.0 * pa_xy[j] * fz[j] * pb_zzz[j]) * r_0_0[j];
+                t_xy_zzz[j] = kinvecfunc::fvec_xy_zzz_s_0(fx[j], pa_xy[j], pb_z[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_xy_zzz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pb_z[j], pb_zzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (2) = (20,30)
@@ -788,71 +568,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xz_yyy, t_xz_yyz, t_xz_yzz, t_xz_zzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xz_xxx[j] = (0.75 * fx[j] * fx[j] * pa_z[j] + 1.5 * pa_xz[j] * pb_x[j] * fx[j] + 
+                t_xz_xxx[j] = kinvecfunc::fvec_xz_xxx_s_0(fx[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxx_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], r_0_0[j]);
 
-                              1.5 * fx[j] * pa_z[j] * pb_xx[j] + pa_xz[j] * pb_xxx[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] + 4.5 * fx[j] * fx[j] * fz[j] * pa_z[j] - 
+                t_xz_xxy[j] = kinvecfunc::fvec_xz_xxy_s_0(fx[j], pa_xz[j], pa_z[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_xxy[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                              3.0 * pa_xz[j] * pb_x[j] * fz[j] * fgb[j] + 12.0 * pa_xz[j] * fz[j] * pb_x[j] * fx[j] + 
+                t_xz_xxz[j] = kinvecfunc::fvec_xz_xxz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxz[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              12.0 * fx[j] * fz[j] * pa_z[j] * pb_xx[j] + 10.0 * pa_xz[j] * fz[j] * pb_xxx[j]) * r_0_0[j];
+                t_xz_xyy[j] = kinvecfunc::fvec_xz_xyy_s_0(fx[j], pa_xz[j], pa_z[j], pb_x[j], pb_xyy[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xz_xyy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xyy[j], pb_yy[j], r_0_0[j]);
 
-                t_xz_xxy[j] = (0.5 * pa_xz[j] * fx[j] * pb_y[j] + fx[j] * pa_z[j] * pb_xy[j] + pa_xz[j] * pb_xxy[j]) * s_0_0[j] + (-pa_xz[j] * fz[j] * fgb[j] * pb_y[j] + 4.0 * pa_xz[j] * fz[j] * fx[j] * pb_y[j] + 
+                t_xz_xyz[j] = kinvecfunc::fvec_xz_xyz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xz_xyz_r_0(fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                              8.0 * fx[j] * fz[j] * pa_z[j] * pb_xy[j] + 10.0 * pa_xz[j] * fz[j] * pb_xxy[j]) * r_0_0[j];
+                t_xz_xzz[j] = kinvecfunc::fvec_xz_xzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xz_xzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_xz_xxz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pb_x[j] + 
+                t_xz_yyy[j] = kinvecfunc::fvec_xz_yyy_s_0(fx[j], pa_xz[j], pb_y[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_xz_yyy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pb_y[j], pb_yyy[j], r_0_0[j]);
 
-                              0.5 * pa_xz[j] * fx[j] * pb_z[j] + 0.5 * pa_x[j] * fx[j] * pb_xx[j] + fx[j] * pa_z[j] * pb_xz[j] + pa_xz[j] * pb_xxz[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 
+                t_xz_yyz[j] = kinvecfunc::fvec_xz_yyz_s_0(fx[j], pa_x[j], pa_xz[j], pb_yy[j], pb_yyz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xz_yyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_yy[j], pb_yyz[j], pb_z[j], r_0_0[j]);
 
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_x[j] - pa_xz[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_xz[j] * fz[j] * fx[j] * pb_z[j] + 
+                t_xz_yzz[j] = kinvecfunc::fvec_xz_yzz_s_0(fx[j], pa_x[j], pa_xz[j], pb_y[j], pb_yz[j], pb_yzz[j], s_0_0[j]) + kinvecfunc::fvec_xz_yzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_y[j], pb_yz[j], pb_yzz[j], r_0_0[j]);
 
-                              4.0 * pa_x[j] * fz[j] * fx[j] * pb_xx[j] + 8.0 * fx[j] * fz[j] * pa_z[j] * pb_xz[j] + 10.0 * pa_xz[j] * fz[j] * pb_xxz[j]) * r_0_0[j];
-
-                t_xz_xyy[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * pa_xz[j] * pb_x[j] * fx[j] + 
-
-                              0.5 * fx[j] * pa_z[j] * pb_yy[j] + pa_xz[j] * pb_xyy[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] - 
-
-                              pa_xz[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_xz[j] * fz[j] * pb_x[j] * fx[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_yy[j] + 
-
-                              10.0 * pa_xz[j] * fz[j] * pb_xyy[j]) * r_0_0[j];
-
-                t_xz_xyz[j] = (0.25 * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_x[j] * fx[j] * pb_xy[j] + 
-
-                              0.5 * fx[j] * pa_z[j] * pb_yz[j] + pa_xz[j] * pb_xyz[j]) * s_0_0[j] + (1.5 * fx[j] * fx[j] * fz[j] * pb_y[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xy[j] + 
-
-                              4.0 * fx[j] * fz[j] * pa_z[j] * pb_yz[j] + 10.0 * pa_xz[j] * fz[j] * pb_xyz[j]) * r_0_0[j];
-
-                t_xz_xzz[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * fx[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * pa_xz[j] * pb_x[j] * fx[j] + pa_x[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * pa_z[j] * pb_zz[j] + pa_xz[j] * pb_xzz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_z[j] - pa_xz[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_xz[j] * fz[j] * pb_x[j] * fx[j] + 
-
-                              8.0 * pa_x[j] * fz[j] * fx[j] * pb_xz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_zz[j] + 10.0 * pa_xz[j] * fz[j] * pb_xzz[j]) * r_0_0[j];
-
-                t_xz_yyy[j] = (1.5 * pa_xz[j] * pb_y[j] * fx[j] + pa_xz[j] * pb_yyy[j]) * s_0_0[j] + (-3.0 * pa_xz[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                              12.0 * pa_xz[j] * fz[j] * pb_y[j] * fx[j] + 10.0 * pa_xz[j] * fz[j] * pb_yyy[j]) * r_0_0[j];
-
-                t_xz_yyz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xz[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * pa_x[j] * fx[j] * pb_yy[j] + pa_xz[j] * pb_yyz[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] - 
-
-                              pa_xz[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_xz[j] * fz[j] * fx[j] * pb_z[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_yy[j] + 
-
-                              10.0 * pa_xz[j] * fz[j] * pb_yyz[j]) * r_0_0[j];
-
-                t_xz_yzz[j] = (0.5 * pa_xz[j] * pb_y[j] * fx[j] + pa_x[j] * fx[j] * pb_yz[j] + pa_xz[j] * pb_yzz[j]) * s_0_0[j] + (-pa_xz[j] * pb_y[j] * fz[j] * fgb[j] + 4.0 * pa_xz[j] * fz[j] * pb_y[j] * fx[j] + 
-
-                              8.0 * pa_x[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_xz[j] * fz[j] * pb_yzz[j]) * r_0_0[j];
-
-                t_xz_zzz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] + 1.5 * pa_xz[j] * pb_z[j] * fx[j] + 
-
-                              1.5 * pa_x[j] * fx[j] * pb_zz[j] + pa_xz[j] * pb_zzz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] + 4.5 * pa_x[j] * fz[j] * fx[j] * fx[j] - 
-
-                              3.0 * pa_xz[j] * pb_z[j] * fz[j] * fgb[j] + 12.0 * pa_xz[j] * fz[j] * pb_z[j] * fx[j] + 
-
-                              12.0 * pa_x[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_xz[j] * fz[j] * pb_zzz[j]) * r_0_0[j];
+                t_xz_zzz[j] = kinvecfunc::fvec_xz_zzz_s_0(fx[j], pa_x[j], pa_xz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_xz_zzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_z[j], pb_zz[j], pb_zzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (3) = (30,40)
@@ -863,93 +597,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yy_yyy, t_yy_yyz, t_yy_yzz, t_yy_zzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yy_xxx[j] = (0.75 * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_yy[j] * pb_x[j] * fx[j] + 
+                t_yy_xxx[j] = kinvecfunc::fvec_yy_xxx_s_0(fx[j], pa_yy[j], pb_x[j], pb_xxx[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_x[j], pb_xxx[j], r_0_0[j]);
 
-                              0.5 * fx[j] * pb_xxx[j] + pa_yy[j] * pb_xxx[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - 
+                t_yy_xxy[j] = kinvecfunc::fvec_yy_xxy_s_0(fx[j], pa_y[j], pa_yy[j], pb_xx[j], pb_xxy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_xx[j], pb_xxy[j], pb_y[j], r_0_0[j]);
 
-                              3.0 * pa_yy[j] * pb_x[j] * fz[j] * fgb[j] + 4.5 * fz[j] * fx[j] * fx[j] * pb_x[j] + 12.0 * pa_yy[j] * fz[j] * pb_x[j] * fx[j] - 
+                t_yy_xxz[j] = kinvecfunc::fvec_yy_xxz_s_0(fx[j], pa_yy[j], pb_xxz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_xxz[j], pb_z[j], r_0_0[j]);
 
-                              fz[j] * fga[j] * pb_xxx[j] + 4.0 * fz[j] * fx[j] * pb_xxx[j] + 10.0 * pa_yy[j] * fz[j] * pb_xxx[j]) * r_0_0[j];
+                t_yy_xyy[j] = kinvecfunc::fvec_yy_xyy_s_0(fx[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyy[j], s_0_0[j]) + kinvecfunc::fvec_yy_xyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyy[j], r_0_0[j]);
 
-                t_yy_xxy[j] = (0.5 * pa_y[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_y[j] + 
+                t_yy_xyz[j] = kinvecfunc::fvec_yy_xyz_s_0(fx[j], pa_y[j], pa_yy[j], pb_xyz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xyz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_xyz[j], pb_xz[j], r_0_0[j]);
 
-                              0.5 * pa_yy[j] * fx[j] * pb_y[j] + pa_y[j] * fx[j] * pb_xx[j] + 0.5 * fx[j] * pb_xxy[j] + pa_yy[j] * pb_xxy[j]) * s_0_0[j] + (-pa_y[j] * fx[j] * fz[j] * fgb[j] + 3.0 * pa_y[j] * fz[j] * fx[j] * fx[j] - 
+                t_yy_xzz[j] = kinvecfunc::fvec_yy_xzz_s_0(fx[j], pa_yy[j], pb_x[j], pb_xzz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_x[j], pb_xzz[j], r_0_0[j]);
 
-                              0.5 * fx[j] * fz[j] * fgb[j] * pb_y[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_y[j] - pa_yy[j] * fz[j] * fgb[j] * pb_y[j] + 
+                t_yy_yyy[j] = kinvecfunc::fvec_yy_yyy_s_0(fx[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_yy_yyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], pb_yyy[j], r_0_0[j]);
 
-                              1.5 * fz[j] * fx[j] * fx[j] * pb_y[j] + 4.0 * pa_yy[j] * fz[j] * fx[j] * pb_y[j] + 8.0 * pa_y[j] * fz[j] * fx[j] * pb_xx[j] - 
+                t_yy_yyz[j] = kinvecfunc::fvec_yy_yyz_s_0(fx[j], pa_y[j], pa_yy[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yy_yyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_yyz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              fz[j] * fga[j] * pb_xxy[j] + 4.0 * fz[j] * fx[j] * pb_xxy[j] + 10.0 * pa_yy[j] * fz[j] * pb_xxy[j]) * r_0_0[j];
+                t_yy_yzz[j] = kinvecfunc::fvec_yy_yzz_s_0(fx[j], pa_y[j], pa_yy[j], pb_y[j], pb_yzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yy_yzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_y[j], pb_yzz[j], pb_zz[j], r_0_0[j]);
 
-                t_yy_xxz[j] = (0.25 * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_yy[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * fx[j] * pb_xxz[j] + pa_yy[j] * pb_xxz[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] * pb_z[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_z[j] - 
-
-                              pa_yy[j] * fz[j] * fgb[j] * pb_z[j] + 1.5 * fz[j] * fx[j] * fx[j] * pb_z[j] + 4.0 * pa_yy[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                              fz[j] * fga[j] * pb_xxz[j] + 4.0 * fz[j] * fx[j] * pb_xxz[j] + 10.0 * pa_yy[j] * fz[j] * pb_xxz[j]) * r_0_0[j];
-
-                t_yy_xyy[j] = (0.75 * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_yy[j] * pb_x[j] * fx[j] + 
-
-                              2.0 * pa_y[j] * fx[j] * pb_xy[j] + 0.5 * fx[j] * pb_xyy[j] + pa_yy[j] * pb_xyy[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pb_x[j] - 0.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 
-
-                              0.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - pa_yy[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_yy[j] * fz[j] * pb_x[j] * fx[j] + 
-
-                              16.0 * pa_y[j] * fz[j] * fx[j] * pb_xy[j] - fz[j] * fga[j] * pb_xyy[j] + 4.0 * fz[j] * fx[j] * pb_xyy[j] + 
-
-                              10.0 * pa_yy[j] * fz[j] * pb_xyy[j]) * r_0_0[j];
-
-                t_yy_xyz[j] = (pa_y[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * pb_xyz[j] + pa_yy[j] * pb_xyz[j]) * s_0_0[j] + (8.0 * pa_y[j] * fz[j] * fx[j] * pb_xz[j] - fz[j] * fga[j] * pb_xyz[j] + 
-
-                              4.0 * fz[j] * fx[j] * pb_xyz[j] + 10.0 * pa_yy[j] * fz[j] * pb_xyz[j]) * r_0_0[j];
-
-                t_yy_xzz[j] = (0.25 * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_yy[j] * pb_x[j] * fx[j] + 
-
-                              0.5 * fx[j] * pb_xzz[j] + pa_yy[j] * pb_xzz[j]) * s_0_0[j] + (-0.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - 
-
-                              pa_yy[j] * pb_x[j] * fz[j] * fgb[j] + 1.5 * fz[j] * fx[j] * fx[j] * pb_x[j] + 4.0 * pa_yy[j] * fz[j] * pb_x[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pb_xzz[j] + 4.0 * fz[j] * fx[j] * pb_xzz[j] + 10.0 * pa_yy[j] * fz[j] * pb_xzz[j]) * r_0_0[j];
-
-                t_yy_yyy[j] = (1.5 * pa_y[j] * fx[j] * fx[j] + 2.25 * fx[j] * fx[j] * pb_y[j] + 
-
-                              1.5 * pa_yy[j] * pb_y[j] * fx[j] + 3.0 * pa_y[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * pb_yyy[j] + pa_yy[j] * pb_yyy[j]) * s_0_0[j] + (-3.0 * pa_y[j] * fx[j] * fz[j] * fgb[j] + 9.0 * pa_y[j] * fz[j] * fx[j] * fx[j] + 
-
-                              13.5 * fx[j] * fx[j] * fz[j] * pb_y[j] - 1.5 * fx[j] * pb_y[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_y[j] * fx[j] - 
-
-                              3.0 * pa_yy[j] * pb_y[j] * fz[j] * fgb[j] + 12.0 * pa_yy[j] * fz[j] * pb_y[j] * fx[j] + 
-
-                              24.0 * pa_y[j] * fz[j] * fx[j] * pb_yy[j] - fz[j] * fga[j] * pb_yyy[j] + 4.0 * fz[j] * fx[j] * pb_yyy[j] + 
-
-                              10.0 * pa_yy[j] * fz[j] * pb_yyy[j]) * r_0_0[j];
-
-                t_yy_yyz[j] = (0.75 * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_yy[j] * fx[j] * pb_z[j] + 
-
-                              2.0 * pa_y[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * pb_yyz[j] + pa_yy[j] * pb_yyz[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pb_z[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_z[j] - 
-
-                              0.5 * fz[j] * fga[j] * fx[j] * pb_z[j] - pa_yy[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_yy[j] * fz[j] * fx[j] * pb_z[j] + 
-
-                              16.0 * pa_y[j] * fz[j] * fx[j] * pb_yz[j] - fz[j] * fga[j] * pb_yyz[j] + 4.0 * fz[j] * fx[j] * pb_yyz[j] + 
-
-                              10.0 * pa_yy[j] * fz[j] * pb_yyz[j]) * r_0_0[j];
-
-                t_yy_yzz[j] = (0.5 * pa_y[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * pa_yy[j] * pb_y[j] * fx[j] + pa_y[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * pb_yzz[j] + pa_yy[j] * pb_yzz[j]) * s_0_0[j] + (-pa_y[j] * fx[j] * fz[j] * fgb[j] + 3.0 * pa_y[j] * fz[j] * fx[j] * fx[j] - 
-
-                              0.5 * fx[j] * pb_y[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_y[j] * fx[j] - pa_yy[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                              1.5 * fz[j] * fx[j] * fx[j] * pb_y[j] + 4.0 * pa_yy[j] * fz[j] * pb_y[j] * fx[j] + 8.0 * pa_y[j] * fz[j] * fx[j] * pb_zz[j] - 
-
-                              fz[j] * fga[j] * pb_yzz[j] + 4.0 * fz[j] * fx[j] * pb_yzz[j] + 10.0 * pa_yy[j] * fz[j] * pb_yzz[j]) * r_0_0[j];
-
-                t_yy_zzz[j] = (0.75 * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_yy[j] * pb_z[j] * fx[j] + 
-
-                              0.5 * fx[j] * pb_zzz[j] + pa_yy[j] * pb_zzz[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_z[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_z[j] * fx[j] - 
-
-                              3.0 * pa_yy[j] * pb_z[j] * fz[j] * fgb[j] + 4.5 * fz[j] * fx[j] * fx[j] * pb_z[j] + 12.0 * pa_yy[j] * fz[j] * pb_z[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pb_zzz[j] + 4.0 * fz[j] * fx[j] * pb_zzz[j] + 10.0 * pa_yy[j] * fz[j] * pb_zzz[j]) * r_0_0[j];
+                t_yy_zzz[j] = kinvecfunc::fvec_yy_zzz_s_0(fx[j], pa_yy[j], pb_z[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_yy_zzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_z[j], pb_zzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (4) = (40,50)
@@ -960,71 +626,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yz_yyy, t_yz_yyz, t_yz_yzz, t_yz_zzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yz_xxx[j] = (1.5 * pa_yz[j] * pb_x[j] * fx[j] + pa_yz[j] * pb_xxx[j]) * s_0_0[j] + (-3.0 * pa_yz[j] * pb_x[j] * fz[j] * fgb[j] + 
+                t_yz_xxx[j] = kinvecfunc::fvec_yz_xxx_s_0(fx[j], pa_yz[j], pb_x[j], pb_xxx[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxx_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pb_x[j], pb_xxx[j], r_0_0[j]);
 
-                              12.0 * pa_yz[j] * fz[j] * pb_x[j] * fx[j] + 10.0 * pa_yz[j] * fz[j] * pb_xxx[j]) * r_0_0[j];
+                t_yz_xxy[j] = kinvecfunc::fvec_yz_xxy_s_0(fx[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_y[j], r_0_0[j]);
 
-                t_yz_xxy[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * pa_yz[j] * fx[j] * pb_y[j] + 
+                t_yz_xxz[j] = kinvecfunc::fvec_yz_xxz_s_0(fx[j], pa_y[j], pa_yz[j], pb_xx[j], pb_xxz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_xx[j], pb_xxz[j], pb_z[j], r_0_0[j]);
 
-                              0.5 * fx[j] * pa_z[j] * pb_xx[j] + pa_yz[j] * pb_xxy[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] - 
+                t_yz_xyy[j] = kinvecfunc::fvec_yz_xyy_s_0(fx[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], s_0_0[j]) + kinvecfunc::fvec_yz_xyy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], r_0_0[j]);
 
-                              pa_yz[j] * fz[j] * fgb[j] * pb_y[j] + 4.0 * pa_yz[j] * fz[j] * fx[j] * pb_y[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_xx[j] + 
+                t_yz_xyz[j] = kinvecfunc::fvec_yz_xyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xyz_r_0(fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyz[j], pb_xz[j], r_0_0[j]);
 
-                              10.0 * pa_yz[j] * fz[j] * pb_xxy[j]) * r_0_0[j];
+                t_yz_xzz[j] = kinvecfunc::fvec_yz_xzz_s_0(fx[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_xzz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_xzz[j], r_0_0[j]);
 
-                t_yz_xxz[j] = (0.25 * pa_y[j] * fx[j] * fx[j] + 0.5 * pa_yz[j] * fx[j] * pb_z[j] + 
+                t_yz_yyy[j] = kinvecfunc::fvec_yz_yyy_s_0(fx[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_yz_yyy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], r_0_0[j]);
 
-                              0.5 * pa_y[j] * fx[j] * pb_xx[j] + pa_yz[j] * pb_xxz[j]) * s_0_0[j] + (-0.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] + 1.5 * pa_y[j] * fz[j] * fx[j] * fx[j] - 
+                t_yz_yyz[j] = kinvecfunc::fvec_yz_yyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yz_yyz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              pa_yz[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_yz[j] * fz[j] * fx[j] * pb_z[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * pb_xx[j] + 
+                t_yz_yzz[j] = kinvecfunc::fvec_yz_yzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yz_yzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                              10.0 * pa_yz[j] * fz[j] * pb_xxz[j]) * r_0_0[j];
-
-                t_yz_xyy[j] = (0.5 * pa_yz[j] * pb_x[j] * fx[j] + fx[j] * pa_z[j] * pb_xy[j] + pa_yz[j] * pb_xyy[j]) * s_0_0[j] + (-pa_yz[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_yz[j] * fz[j] * pb_x[j] * fx[j] + 
-
-                              8.0 * fx[j] * fz[j] * pa_z[j] * pb_xy[j] + 10.0 * pa_yz[j] * fz[j] * pb_xyy[j]) * r_0_0[j];
-
-                t_yz_xyz[j] = (0.25 * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_y[j] * fx[j] * pb_xy[j] + 
-
-                              0.5 * fx[j] * pa_z[j] * pb_xz[j] + pa_yz[j] * pb_xyz[j]) * s_0_0[j] + (1.5 * fx[j] * fx[j] * fz[j] * pb_x[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * pb_xy[j] + 
-
-                              4.0 * fx[j] * fz[j] * pa_z[j] * pb_xz[j] + 10.0 * pa_yz[j] * fz[j] * pb_xyz[j]) * r_0_0[j];
-
-                t_yz_xzz[j] = (0.5 * pa_yz[j] * pb_x[j] * fx[j] + pa_y[j] * fx[j] * pb_xz[j] + pa_yz[j] * pb_xzz[j]) * s_0_0[j] + (-pa_yz[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_yz[j] * fz[j] * pb_x[j] * fx[j] + 
-
-                              8.0 * pa_y[j] * fz[j] * fx[j] * pb_xz[j] + 10.0 * pa_yz[j] * fz[j] * pb_xzz[j]) * r_0_0[j];
-
-                t_yz_yyy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] + 1.5 * pa_yz[j] * pb_y[j] * fx[j] + 
-
-                              1.5 * fx[j] * pa_z[j] * pb_yy[j] + pa_yz[j] * pb_yyy[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] + 4.5 * fx[j] * fx[j] * fz[j] * pa_z[j] - 
-
-                              3.0 * pa_yz[j] * pb_y[j] * fz[j] * fgb[j] + 12.0 * pa_yz[j] * fz[j] * pb_y[j] * fx[j] + 
-
-                              12.0 * fx[j] * fz[j] * pa_z[j] * pb_yy[j] + 10.0 * pa_yz[j] * fz[j] * pb_yyy[j]) * r_0_0[j];
-
-                t_yz_yyz[j] = (0.25 * pa_y[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * pa_yz[j] * fx[j] * pb_z[j] + 0.5 * pa_y[j] * fx[j] * pb_yy[j] + fx[j] * pa_z[j] * pb_yz[j] + pa_yz[j] * pb_yyz[j]) * s_0_0[j] + (-0.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] + 1.5 * pa_y[j] * fz[j] * fx[j] * fx[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_y[j] - pa_yz[j] * fz[j] * fgb[j] * pb_z[j] + 4.0 * pa_yz[j] * fz[j] * fx[j] * pb_z[j] + 
-
-                              4.0 * pa_y[j] * fz[j] * fx[j] * pb_yy[j] + 8.0 * fx[j] * fz[j] * pa_z[j] * pb_yz[j] + 10.0 * pa_yz[j] * fz[j] * pb_yyz[j]) * r_0_0[j];
-
-                t_yz_yzz[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * fx[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * pa_yz[j] * pb_y[j] * fx[j] + pa_y[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * pa_z[j] * pb_zz[j] + pa_yz[j] * pb_yzz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_z[j] - pa_yz[j] * pb_y[j] * fz[j] * fgb[j] + 4.0 * pa_yz[j] * fz[j] * pb_y[j] * fx[j] + 
-
-                              8.0 * pa_y[j] * fz[j] * fx[j] * pb_yz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_zz[j] + 10.0 * pa_yz[j] * fz[j] * pb_yzz[j]) * r_0_0[j];
-
-                t_yz_zzz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] + 1.5 * pa_yz[j] * pb_z[j] * fx[j] + 
-
-                              1.5 * pa_y[j] * fx[j] * pb_zz[j] + pa_yz[j] * pb_zzz[j]) * s_0_0[j] + (-1.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] + 4.5 * pa_y[j] * fz[j] * fx[j] * fx[j] - 
-
-                              3.0 * pa_yz[j] * pb_z[j] * fz[j] * fgb[j] + 12.0 * pa_yz[j] * fz[j] * pb_z[j] * fx[j] + 
-
-                              12.0 * pa_y[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_yz[j] * fz[j] * pb_zzz[j]) * r_0_0[j];
+                t_yz_zzz[j] = kinvecfunc::fvec_yz_zzz_s_0(fx[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_yz_zzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], pb_zzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (5) = (50,60)
@@ -1035,93 +655,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_zz_yyy, t_zz_yyz, t_zz_yzz, t_zz_zzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_zz_xxx[j] = (0.75 * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_zz[j] * pb_x[j] * fx[j] + 
+                t_zz_xxx[j] = kinvecfunc::fvec_zz_xxx_s_0(fx[j], pa_zz[j], pb_x[j], pb_xxx[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_x[j], pb_xxx[j], r_0_0[j]);
 
-                              0.5 * fx[j] * pb_xxx[j] + pa_zz[j] * pb_xxx[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - 
+                t_zz_xxy[j] = kinvecfunc::fvec_zz_xxy_s_0(fx[j], pa_zz[j], pb_xxy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_xxy[j], pb_y[j], r_0_0[j]);
 
-                              3.0 * pa_zz[j] * pb_x[j] * fz[j] * fgb[j] + 4.5 * fz[j] * fx[j] * fx[j] * pb_x[j] + 12.0 * pa_zz[j] * fz[j] * pb_x[j] * fx[j] - 
+                t_zz_xxz[j] = kinvecfunc::fvec_zz_xxz_s_0(fx[j], pa_z[j], pa_zz[j], pb_xx[j], pb_xxz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_xx[j], pb_xxz[j], pb_z[j], r_0_0[j]);
 
-                              fz[j] * fga[j] * pb_xxx[j] + 4.0 * fz[j] * fx[j] * pb_xxx[j] + 10.0 * pa_zz[j] * fz[j] * pb_xxx[j]) * r_0_0[j];
+                t_zz_xyy[j] = kinvecfunc::fvec_zz_xyy_s_0(fx[j], pa_zz[j], pb_x[j], pb_xyy[j], s_0_0[j]) + kinvecfunc::fvec_zz_xyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_x[j], pb_xyy[j], r_0_0[j]);
 
-                t_zz_xxy[j] = (0.25 * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_zz[j] * fx[j] * pb_y[j] + 
+                t_zz_xyz[j] = kinvecfunc::fvec_zz_xyz_s_0(fx[j], pa_z[j], pa_zz[j], pb_xy[j], pb_xyz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xyz_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_xy[j], pb_xyz[j], r_0_0[j]);
 
-                              0.5 * fx[j] * pb_xxy[j] + pa_zz[j] * pb_xxy[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fgb[j] * pb_y[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_y[j] - 
+                t_zz_xzz[j] = kinvecfunc::fvec_zz_xzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_xzz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_xzz[j], r_0_0[j]);
 
-                              pa_zz[j] * fz[j] * fgb[j] * pb_y[j] + 1.5 * fz[j] * fx[j] * fx[j] * pb_y[j] + 4.0 * pa_zz[j] * fz[j] * fx[j] * pb_y[j] - 
+                t_zz_yyy[j] = kinvecfunc::fvec_zz_yyy_s_0(fx[j], pa_zz[j], pb_y[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_zz_yyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_y[j], pb_yyy[j], r_0_0[j]);
 
-                              fz[j] * fga[j] * pb_xxy[j] + 4.0 * fz[j] * fx[j] * pb_xxy[j] + 10.0 * pa_zz[j] * fz[j] * pb_xxy[j]) * r_0_0[j];
+                t_zz_yyz[j] = kinvecfunc::fvec_zz_yyz_s_0(fx[j], pa_z[j], pa_zz[j], pb_yy[j], pb_yyz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_zz_yyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_yy[j], pb_yyz[j], pb_z[j], r_0_0[j]);
 
-                t_zz_xxz[j] = (0.5 * pa_z[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_z[j] + 
+                t_zz_yzz[j] = kinvecfunc::fvec_zz_yzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_yzz[j], s_0_0[j]) + kinvecfunc::fvec_zz_yzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_yzz[j], r_0_0[j]);
 
-                              0.5 * pa_zz[j] * fx[j] * pb_z[j] + pa_z[j] * fx[j] * pb_xx[j] + 0.5 * fx[j] * pb_xxz[j] + pa_zz[j] * pb_xxz[j]) * s_0_0[j] + (-pa_z[j] * fx[j] * fz[j] * fgb[j] + 3.0 * pa_z[j] * fz[j] * fx[j] * fx[j] - 
-
-                              0.5 * fx[j] * fz[j] * fgb[j] * pb_z[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_z[j] - pa_zz[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                              1.5 * fz[j] * fx[j] * fx[j] * pb_z[j] + 4.0 * pa_zz[j] * fz[j] * fx[j] * pb_z[j] + 8.0 * pa_z[j] * fz[j] * fx[j] * pb_xx[j] - 
-
-                              fz[j] * fga[j] * pb_xxz[j] + 4.0 * fz[j] * fx[j] * pb_xxz[j] + 10.0 * pa_zz[j] * fz[j] * pb_xxz[j]) * r_0_0[j];
-
-                t_zz_xyy[j] = (0.25 * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_zz[j] * pb_x[j] * fx[j] + 
-
-                              0.5 * fx[j] * pb_xyy[j] + pa_zz[j] * pb_xyy[j]) * s_0_0[j] + (-0.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - 
-
-                              pa_zz[j] * pb_x[j] * fz[j] * fgb[j] + 1.5 * fz[j] * fx[j] * fx[j] * pb_x[j] + 4.0 * pa_zz[j] * fz[j] * pb_x[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pb_xyy[j] + 4.0 * fz[j] * fx[j] * pb_xyy[j] + 10.0 * pa_zz[j] * fz[j] * pb_xyy[j]) * r_0_0[j];
-
-                t_zz_xyz[j] = (pa_z[j] * fx[j] * pb_xy[j] + 0.5 * fx[j] * pb_xyz[j] + pa_zz[j] * pb_xyz[j]) * s_0_0[j] + (8.0 * pa_z[j] * fz[j] * fx[j] * pb_xy[j] - fz[j] * fga[j] * pb_xyz[j] + 
-
-                              4.0 * fz[j] * fx[j] * pb_xyz[j] + 10.0 * pa_zz[j] * fz[j] * pb_xyz[j]) * r_0_0[j];
-
-                t_zz_xzz[j] = (0.75 * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_zz[j] * pb_x[j] * fx[j] + 
-
-                              2.0 * pa_z[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * pb_xzz[j] + pa_zz[j] * pb_xzz[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pb_x[j] - 0.5 * fx[j] * pb_x[j] * fz[j] * fgb[j] - 
-
-                              0.5 * fz[j] * fga[j] * pb_x[j] * fx[j] - pa_zz[j] * pb_x[j] * fz[j] * fgb[j] + 4.0 * pa_zz[j] * fz[j] * pb_x[j] * fx[j] + 
-
-                              16.0 * pa_z[j] * fz[j] * fx[j] * pb_xz[j] - fz[j] * fga[j] * pb_xzz[j] + 4.0 * fz[j] * fx[j] * pb_xzz[j] + 
-
-                              10.0 * pa_zz[j] * fz[j] * pb_xzz[j]) * r_0_0[j];
-
-                t_zz_yyy[j] = (0.75 * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_zz[j] * pb_y[j] * fx[j] + 
-
-                              0.5 * fx[j] * pb_yyy[j] + pa_zz[j] * pb_yyy[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_y[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_y[j] * fx[j] - 
-
-                              3.0 * pa_zz[j] * pb_y[j] * fz[j] * fgb[j] + 4.5 * fz[j] * fx[j] * fx[j] * pb_y[j] + 12.0 * pa_zz[j] * fz[j] * pb_y[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pb_yyy[j] + 4.0 * fz[j] * fx[j] * pb_yyy[j] + 10.0 * pa_zz[j] * fz[j] * pb_yyy[j]) * r_0_0[j];
-
-                t_zz_yyz[j] = (0.5 * pa_z[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * pa_zz[j] * fx[j] * pb_z[j] + pa_z[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * pb_yyz[j] + pa_zz[j] * pb_yyz[j]) * s_0_0[j] + (-pa_z[j] * fx[j] * fz[j] * fgb[j] + 3.0 * pa_z[j] * fz[j] * fx[j] * fx[j] - 
-
-                              0.5 * fx[j] * fz[j] * fgb[j] * pb_z[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_z[j] - pa_zz[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                              1.5 * fz[j] * fx[j] * fx[j] * pb_z[j] + 4.0 * pa_zz[j] * fz[j] * fx[j] * pb_z[j] + 8.0 * pa_z[j] * fz[j] * fx[j] * pb_yy[j] - 
-
-                              fz[j] * fga[j] * pb_yyz[j] + 4.0 * fz[j] * fx[j] * pb_yyz[j] + 10.0 * pa_zz[j] * fz[j] * pb_yyz[j]) * r_0_0[j];
-
-                t_zz_yzz[j] = (0.75 * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_zz[j] * pb_y[j] * fx[j] + 
-
-                              2.0 * pa_z[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * pb_yzz[j] + pa_zz[j] * pb_yzz[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pb_y[j] - 0.5 * fx[j] * pb_y[j] * fz[j] * fgb[j] - 
-
-                              0.5 * fz[j] * fga[j] * pb_y[j] * fx[j] - pa_zz[j] * pb_y[j] * fz[j] * fgb[j] + 4.0 * pa_zz[j] * fz[j] * pb_y[j] * fx[j] + 
-
-                              16.0 * pa_z[j] * fz[j] * fx[j] * pb_yz[j] - fz[j] * fga[j] * pb_yzz[j] + 4.0 * fz[j] * fx[j] * pb_yzz[j] + 
-
-                              10.0 * pa_zz[j] * fz[j] * pb_yzz[j]) * r_0_0[j];
-
-                t_zz_zzz[j] = (1.5 * pa_z[j] * fx[j] * fx[j] + 2.25 * fx[j] * fx[j] * pb_z[j] + 
-
-                              1.5 * pa_zz[j] * pb_z[j] * fx[j] + 3.0 * pa_z[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * pb_zzz[j] + pa_zz[j] * pb_zzz[j]) * s_0_0[j] + (-3.0 * pa_z[j] * fx[j] * fz[j] * fgb[j] + 9.0 * pa_z[j] * fz[j] * fx[j] * fx[j] + 
-
-                              13.5 * fx[j] * fx[j] * fz[j] * pb_z[j] - 1.5 * fx[j] * pb_z[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_z[j] * fx[j] - 
-
-                              3.0 * pa_zz[j] * pb_z[j] * fz[j] * fgb[j] + 12.0 * pa_zz[j] * fz[j] * pb_z[j] * fx[j] + 
-
-                              24.0 * pa_z[j] * fz[j] * fx[j] * pb_zz[j] - fz[j] * fga[j] * pb_zzz[j] + 4.0 * fz[j] * fx[j] * pb_zzz[j] + 
-
-                              10.0 * pa_zz[j] * fz[j] * pb_zzz[j]) * r_0_0[j];
+                t_zz_zzz[j] = kinvecfunc::fvec_zz_zzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_zz_zzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], pb_zzz[j], r_0_0[j]);
             }
 
             idx++;
@@ -1365,85 +917,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xxx_yy, t_xxx_yz, t_xxx_zz, t_xxy_xx, t_xxy_xy, t_xxy_xz, t_xxy_yy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxx_xx[j] = (2.25 * pa_x[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pb_x[j] + 
+                t_xxx_xx[j] = kinvecfunc::fvec_xxx_xx_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxx_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                              0.5 * pa_xxx[j] * fx[j] + 3.0 * pa_xx[j] * fx[j] * pb_x[j] + 1.5 * pa_x[j] * fx[j] * pb_xx[j] + 
+                t_xxx_xy[j] = kinvecfunc::fvec_xxx_xy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxx_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                              pa_xxx[j] * pb_xx[j]) * s_0_0[j] + (13.5 * pa_x[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 
+                t_xxx_xz[j] = kinvecfunc::fvec_xxx_xz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxx_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              1.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - 3.0 * fx[j] * fz[j] * fga[j] * pb_x[j] - pa_xxx[j] * fz[j] * fgb[j] + 
+                t_xxx_yy[j] = kinvecfunc::fvec_xxx_yy_s_0(fx[j], pa_x[j], pa_xxx[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxx_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xxx[j], pb_yy[j], r_0_0[j]);
 
-                              9.0 * fx[j] * fx[j] * fz[j] * pb_x[j] + 4.0 * pa_xxx[j] * fz[j] * fx[j] + 24.0 * pa_xx[j] * fz[j] * fx[j] * pb_x[j] - 
+                t_xxx_yz[j] = kinvecfunc::fvec_xxx_yz_s_0(fx[j], pa_x[j], pa_xxx[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xxx_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xxx[j], pb_yz[j], r_0_0[j]);
 
-                              3.0 * pa_x[j] * fz[j] * fga[j] * pb_xx[j] + 12.0 * pa_x[j] * fz[j] * fx[j] * pb_xx[j] + 10.0 * pa_xxx[j] * fz[j] * pb_xx[j]) * r_0_0[j];
+                t_xxx_zz[j] = kinvecfunc::fvec_xxx_zz_s_0(fx[j], pa_x[j], pa_xxx[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxx_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xxx[j], pb_zz[j], r_0_0[j]);
 
-                t_xxx_xy[j] = (0.75 * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_xx[j] * fx[j] * pb_y[j] + 
+                t_xxy_xx[j] = kinvecfunc::fvec_xxy_xx_s_0(fx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                              1.5 * pa_x[j] * fx[j] * pb_xy[j] + pa_xxx[j] * pb_xy[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pb_y[j] + 4.5 * fx[j] * fx[j] * fz[j] * pb_y[j] + 
+                t_xxy_xy[j] = kinvecfunc::fvec_xxy_xy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxy_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                              12.0 * pa_xx[j] * fz[j] * fx[j] * pb_y[j] - 3.0 * pa_x[j] * fz[j] * fga[j] * pb_xy[j] + 
+                t_xxy_xz[j] = kinvecfunc::fvec_xxy_xz_s_0(fx[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxy_xz_r_0(fga[j], fx[j], fz[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              12.0 * pa_x[j] * fz[j] * fx[j] * pb_xy[j] + 10.0 * pa_xxx[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxx_xz[j] = (0.75 * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_xx[j] * fx[j] * pb_z[j] + 
-
-                              1.5 * pa_x[j] * fx[j] * pb_xz[j] + pa_xxx[j] * pb_xz[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pb_z[j] + 4.5 * fx[j] * fx[j] * fz[j] * pb_z[j] + 
-
-                              12.0 * pa_xx[j] * fz[j] * fx[j] * pb_z[j] - 3.0 * pa_x[j] * fz[j] * fga[j] * pb_xz[j] + 
-
-                              12.0 * pa_x[j] * fz[j] * fx[j] * pb_xz[j] + 10.0 * pa_xxx[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxx_yy[j] = (0.75 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xxx[j] * fx[j] + 
-
-                              1.5 * pa_x[j] * fx[j] * pb_yy[j] + pa_xxx[j] * pb_yy[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_xxx[j] * fz[j] * fgb[j] + 4.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_xxx[j] * fz[j] * fx[j] - 
-
-                              3.0 * pa_x[j] * fz[j] * fga[j] * pb_yy[j] + 12.0 * pa_x[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * pa_xxx[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xxx_yz[j] = (1.5 * pa_x[j] * fx[j] * pb_yz[j] + pa_xxx[j] * pb_yz[j]) * s_0_0[j] + (-3.0 * pa_x[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                              12.0 * pa_x[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_xxx[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xxx_zz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xxx[j] * fx[j] + 
-
-                              1.5 * pa_x[j] * fx[j] * pb_zz[j] + pa_xxx[j] * pb_zz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_xxx[j] * fz[j] * fgb[j] + 4.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_xxx[j] * fz[j] * fx[j] - 
-
-                              3.0 * pa_x[j] * fz[j] * fga[j] * pb_zz[j] + 12.0 * pa_x[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_xxx[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xxy_xx[j] = (0.75 * fx[j] * fx[j] * pa_y[j] + 0.5 * pa_xxy[j] * fx[j] + 
-
-                              2.0 * pa_xy[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_y[j] * pb_xx[j] + pa_xxy[j] * pb_xx[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pa_y[j] - 0.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] - 
-
-                              0.5 * fz[j] * fga[j] * pa_y[j] * fx[j] - pa_xxy[j] * fz[j] * fgb[j] + 4.0 * pa_xxy[j] * fz[j] * fx[j] + 
-
-                              16.0 * pa_xy[j] * fx[j] * fz[j] * pb_x[j] - fz[j] * fga[j] * pa_y[j] * pb_xx[j] + 4.0 * fx[j] * fz[j] * pa_y[j] * pb_xx[j] + 
-
-                              10.0 * pa_xxy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xxy_xy[j] = (0.5 * pa_x[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * pa_xx[j] * fx[j] * pb_x[j] + pa_xy[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_y[j] * pb_xy[j] + pa_xxy[j] * pb_xy[j]) * s_0_0[j] + (3.0 * pa_x[j] * fx[j] * fx[j] * fz[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_x[j] + 
-
-                              1.5 * fx[j] * fx[j] * fz[j] * pb_x[j] + 4.0 * pa_xx[j] * fz[j] * fx[j] * pb_x[j] + 8.0 * pa_xy[j] * fx[j] * fz[j] * pb_y[j] - 
-
-                              fz[j] * fga[j] * pa_y[j] * pb_xy[j] + 4.0 * fx[j] * fz[j] * pa_y[j] * pb_xy[j] + 10.0 * pa_xxy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxy_xz[j] = (pa_xy[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_y[j] * pb_xz[j] + pa_xxy[j] * pb_xz[j]) * s_0_0[j] + (8.0 * pa_xy[j] * fx[j] * fz[j] * pb_z[j] - fz[j] * fga[j] * pa_y[j] * pb_xz[j] + 
-
-                              4.0 * fx[j] * fz[j] * pa_y[j] * pb_xz[j] + 10.0 * pa_xxy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxy_yy[j] = (0.25 * fx[j] * fx[j] * pa_y[j] + 0.5 * fx[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * pa_xxy[j] * fx[j] + pa_xx[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_y[j] * pb_yy[j] + pa_xxy[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_y[j] * fx[j] - 
-
-                              fz[j] * fga[j] * fx[j] * pb_y[j] - pa_xxy[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_y[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_y[j] + 4.0 * pa_xxy[j] * fz[j] * fx[j] + 8.0 * pa_xx[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                              fz[j] * fga[j] * pa_y[j] * pb_yy[j] + 4.0 * fx[j] * fz[j] * pa_y[j] * pb_yy[j] + 10.0 * pa_xxy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_xxy_yy[j] = kinvecfunc::fvec_xxy_yy_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_y[j], pb_yy[j], r_0_0[j]);
             }
 
             // Batch of Integrals (1) = (10,20)
@@ -1454,89 +946,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xyy_xy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxy_yz[j] = (0.25 * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_xx[j] * fx[j] * pb_z[j] + 
+                t_xxy_yz[j] = kinvecfunc::fvec_xxy_yz_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxy_yz_r_0(fga[j], fx[j], fz[j], pa_xx[j], pa_xxy[j], pa_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              0.5 * fx[j] * pa_y[j] * pb_yz[j] + pa_xxy[j] * pb_yz[j]) * s_0_0[j] + (-0.5 * fz[j] * fga[j] * fx[j] * pb_z[j] + 1.5 * fx[j] * fx[j] * fz[j] * pb_z[j] + 
+                t_xxy_zz[j] = kinvecfunc::fvec_xxy_zz_s_0(fx[j], pa_xxy[j], pa_y[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxy[j], pa_y[j], pb_zz[j], r_0_0[j]);
 
-                              4.0 * pa_xx[j] * fz[j] * fx[j] * pb_z[j] - fz[j] * fga[j] * pa_y[j] * pb_yz[j] + 4.0 * fx[j] * fz[j] * pa_y[j] * pb_yz[j] + 
+                t_xxz_xx[j] = kinvecfunc::fvec_xxz_xx_s_0(fx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                              10.0 * pa_xxy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
+                t_xxz_xy[j] = kinvecfunc::fvec_xxz_xy_s_0(fx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxz_xy_r_0(fga[j], fx[j], fz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xxy_zz[j] = (0.25 * fx[j] * fx[j] * pa_y[j] + 0.5 * pa_xxy[j] * fx[j] + 
+                t_xxz_xz[j] = kinvecfunc::fvec_xxz_xz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxz_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              0.5 * fx[j] * pa_y[j] * pb_zz[j] + pa_xxy[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_y[j] * fx[j] - 
+                t_xxz_yy[j] = kinvecfunc::fvec_xxz_yy_s_0(fx[j], pa_xxz[j], pa_z[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxz[j], pa_z[j], pb_yy[j], r_0_0[j]);
 
-                              pa_xxy[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_y[j] + 4.0 * pa_xxy[j] * fz[j] * fx[j] - 
+                t_xxz_yz[j] = kinvecfunc::fvec_xxz_yz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xxz_yz_r_0(fga[j], fx[j], fz[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                              fz[j] * fga[j] * pa_y[j] * pb_zz[j] + 4.0 * fx[j] * fz[j] * pa_y[j] * pb_zz[j] + 10.0 * pa_xxy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_xxz_zz[j] = kinvecfunc::fvec_xxz_zz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxz[j], pa_z[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_xxz_xx[j] = (0.75 * fx[j] * fx[j] * pa_z[j] + 0.5 * pa_xxz[j] * fx[j] + 
+                t_xyy_xx[j] = kinvecfunc::fvec_xyy_xx_s_0(fx[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xyy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                              2.0 * pa_xz[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_z[j] * pb_xx[j] + pa_xxz[j] * pb_xx[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pa_z[j] - 0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] - 
-
-                              0.5 * fz[j] * fga[j] * pa_z[j] * fx[j] - pa_xxz[j] * fz[j] * fgb[j] + 4.0 * pa_xxz[j] * fz[j] * fx[j] + 
-
-                              16.0 * pa_xz[j] * fx[j] * fz[j] * pb_x[j] - fz[j] * fga[j] * pa_z[j] * pb_xx[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_xx[j] + 
-
-                              10.0 * pa_xxz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xxz_xy[j] = (pa_xz[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_z[j] * pb_xy[j] + pa_xxz[j] * pb_xy[j]) * s_0_0[j] + (8.0 * pa_xz[j] * fx[j] * fz[j] * pb_y[j] - fz[j] * fga[j] * pa_z[j] * pb_xy[j] + 
-
-                              4.0 * fx[j] * fz[j] * pa_z[j] * pb_xy[j] + 10.0 * pa_xxz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxz_xz[j] = (0.5 * pa_x[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * pa_xx[j] * fx[j] * pb_x[j] + pa_xz[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_z[j] * pb_xz[j] + pa_xxz[j] * pb_xz[j]) * s_0_0[j] + (3.0 * pa_x[j] * fx[j] * fx[j] * fz[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_x[j] + 
-
-                              1.5 * fx[j] * fx[j] * fz[j] * pb_x[j] + 4.0 * pa_xx[j] * fz[j] * fx[j] * pb_x[j] + 8.0 * pa_xz[j] * fx[j] * fz[j] * pb_z[j] - 
-
-                              fz[j] * fga[j] * pa_z[j] * pb_xz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_xz[j] + 10.0 * pa_xxz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxz_yy[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * pa_xxz[j] * fx[j] + 
-
-                              0.5 * fx[j] * pa_z[j] * pb_yy[j] + pa_xxz[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_z[j] * fx[j] - 
-
-                              pa_xxz[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] + 4.0 * pa_xxz[j] * fz[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pa_z[j] * pb_yy[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_yy[j] + 10.0 * pa_xxz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xxz_yz[j] = (0.25 * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_xx[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * fx[j] * pa_z[j] * pb_yz[j] + pa_xxz[j] * pb_yz[j]) * s_0_0[j] + (-0.5 * fz[j] * fga[j] * fx[j] * pb_y[j] + 1.5 * fx[j] * fx[j] * fz[j] * pb_y[j] + 
-
-                              4.0 * pa_xx[j] * fz[j] * fx[j] * pb_y[j] - fz[j] * fga[j] * pa_z[j] * pb_yz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_yz[j] + 
-
-                              10.0 * pa_xxz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xxz_zz[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * fx[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * pa_xxz[j] * fx[j] + pa_xx[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_z[j] * pb_zz[j] + pa_xxz[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_z[j] * fx[j] - 
-
-                              fz[j] * fga[j] * fx[j] * pb_z[j] - pa_xxz[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_z[j] + 4.0 * pa_xxz[j] * fz[j] * fx[j] + 8.0 * pa_xx[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                              fz[j] * fga[j] * pa_z[j] * pb_zz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_zz[j] + 10.0 * pa_xxz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xyy_xx[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * pa_xyy[j] * fx[j] + fx[j] * pa_yy[j] * pb_x[j] + 0.5 * pa_x[j] * fx[j] * pb_xx[j] + pa_xyy[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - 
-
-                              fx[j] * fz[j] * fga[j] * pb_x[j] - pa_xyy[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_x[j] + 4.0 * pa_xyy[j] * fz[j] * fx[j] + 8.0 * fx[j] * pa_yy[j] * fz[j] * pb_x[j] - 
-
-                              pa_x[j] * fz[j] * fga[j] * pb_xx[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xx[j] + 10.0 * pa_xyy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xyy_xy[j] = (0.5 * fx[j] * fx[j] * pa_y[j] + 0.25 * fx[j] * fx[j] * pb_y[j] + 
-
-                              pa_xy[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_yy[j] * pb_y[j] + 0.5 * pa_x[j] * fx[j] * pb_xy[j] + 
-
-                              pa_xyy[j] * pb_xy[j]) * s_0_0[j] + (3.0 * fx[j] * fx[j] * pa_y[j] * fz[j] - 0.5 * fx[j] * fz[j] * fga[j] * pb_y[j] + 
-
-                              1.5 * fx[j] * fx[j] * fz[j] * pb_y[j] + 8.0 * pa_xy[j] * fz[j] * fx[j] * pb_x[j] + 4.0 * fx[j] * pa_yy[j] * fz[j] * pb_y[j] - 
-
-                              pa_x[j] * fz[j] * fga[j] * pb_xy[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xy[j] + 10.0 * pa_xyy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_xyy_xy[j] = kinvecfunc::fvec_xyy_xy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xyy_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
             }
 
             // Batch of Integrals (2) = (20,30)
@@ -1546,65 +974,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xyy_yz, t_xyy_zz, t_xyz_xx, t_xyz_xy, t_xyz_xz, t_xyz_yy, t_xyz_yz, t_xyz_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyy_xz[j] = (0.25 * fx[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_yy[j] * pb_z[j] + 
+                t_xyy_xz[j] = kinvecfunc::fvec_xyy_xz_s_0(fx[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyy_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xyy[j], pa_yy[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              0.5 * pa_x[j] * fx[j] * pb_xz[j] + pa_xyy[j] * pb_xz[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fga[j] * pb_z[j] + 1.5 * fx[j] * fx[j] * fz[j] * pb_z[j] + 
+                t_xyy_yy[j] = kinvecfunc::fvec_xyy_yy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xyy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                              4.0 * fx[j] * pa_yy[j] * fz[j] * pb_z[j] - pa_x[j] * fz[j] * fga[j] * pb_xz[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xz[j] + 
+                t_xyy_yz[j] = kinvecfunc::fvec_xyy_yz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyy_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              10.0 * pa_xyy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_xyy_zz[j] = kinvecfunc::fvec_xyy_zz_s_0(fx[j], pa_x[j], pa_xyy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xyy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xyy[j], pb_zz[j], r_0_0[j]);
 
-                t_xyy_yy[j] = (0.75 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xyy[j] * fx[j] + 
+                t_xyz_xx[j] = kinvecfunc::fvec_xyz_xx_s_0(fx[j], pa_xyz[j], pa_yz[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xyz_xx_r_0(fgb[j], fx[j], fz[j], pa_xyz[j], pa_yz[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                              2.0 * pa_xy[j] * fx[j] * pb_y[j] + 0.5 * pa_x[j] * fx[j] * pb_yy[j] + pa_xyy[j] * pb_yy[j]) * s_0_0[j] + (4.5 * pa_x[j] * fx[j] * fx[j] * fz[j] - 0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 
+                t_xyz_xy[j] = kinvecfunc::fvec_xyz_xy_s_0(fx[j], pa_xyz[j], pa_xz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xyz_xy_r_0(fx[j], fz[j], pa_xyz[j], pa_xz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                              0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - pa_xyy[j] * fz[j] * fgb[j] + 4.0 * pa_xyy[j] * fz[j] * fx[j] + 
+                t_xyz_xz[j] = kinvecfunc::fvec_xyz_xz_s_0(fx[j], pa_xy[j], pa_xyz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyz_xz_r_0(fx[j], fz[j], pa_xy[j], pa_xyz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              16.0 * pa_xy[j] * fz[j] * fx[j] * pb_y[j] - pa_x[j] * fz[j] * fga[j] * pb_yy[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_yy[j] + 
+                t_xyz_yy[j] = kinvecfunc::fvec_xyz_yy_s_0(fx[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xyz_yy_r_0(fgb[j], fx[j], fz[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                              10.0 * pa_xyy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_xyz_yz[j] = kinvecfunc::fvec_xyz_yz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyz_yz_r_0(fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                t_xyy_yz[j] = (pa_xy[j] * fx[j] * pb_z[j] + 0.5 * pa_x[j] * fx[j] * pb_yz[j] + pa_xyy[j] * pb_yz[j]) * s_0_0[j] + (8.0 * pa_xy[j] * fz[j] * fx[j] * pb_z[j] - pa_x[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                              4.0 * pa_x[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_xyy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xyy_zz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xyy[j] * fx[j] + 
-
-                              0.5 * pa_x[j] * fx[j] * pb_zz[j] + pa_xyy[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_xyy[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_xyy[j] * fz[j] * fx[j] - 
-
-                              pa_x[j] * fz[j] * fga[j] * pb_zz[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_xyy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xyz_xx[j] = (0.5 * pa_xyz[j] * fx[j] + fx[j] * pa_yz[j] * pb_x[j] + pa_xyz[j] * pb_xx[j]) * s_0_0[j] + (-pa_xyz[j] * fz[j] * fgb[j] + 4.0 * pa_xyz[j] * fz[j] * fx[j] + 
-
-                              8.0 * fx[j] * pa_yz[j] * fz[j] * pb_x[j] + 10.0 * pa_xyz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xyz_xy[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * pa_xz[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * fx[j] * pa_yz[j] * pb_y[j] + pa_xyz[j] * pb_xy[j]) * s_0_0[j] + (1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] + 4.0 * pa_xz[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                              4.0 * fx[j] * pa_yz[j] * fz[j] * pb_y[j] + 10.0 * pa_xyz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xyz_xz[j] = (0.25 * fx[j] * fx[j] * pa_y[j] + 0.5 * pa_xy[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * fx[j] * pa_yz[j] * pb_z[j] + pa_xyz[j] * pb_xz[j]) * s_0_0[j] + (1.5 * fx[j] * fx[j] * pa_y[j] * fz[j] + 4.0 * pa_xy[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                              4.0 * fx[j] * pa_yz[j] * fz[j] * pb_z[j] + 10.0 * pa_xyz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xyz_yy[j] = (0.5 * pa_xyz[j] * fx[j] + pa_xz[j] * fx[j] * pb_y[j] + pa_xyz[j] * pb_yy[j]) * s_0_0[j] + (-pa_xyz[j] * fz[j] * fgb[j] + 4.0 * pa_xyz[j] * fz[j] * fx[j] + 
-
-                              8.0 * pa_xz[j] * fx[j] * fz[j] * pb_y[j] + 10.0 * pa_xyz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xyz_yz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xy[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * pa_xz[j] * fx[j] * pb_z[j] + pa_xyz[j] * pb_yz[j]) * s_0_0[j] + (1.5 * pa_x[j] * fx[j] * fx[j] * fz[j] + 4.0 * pa_xy[j] * fz[j] * fx[j] * pb_y[j] + 
-
-                              4.0 * pa_xz[j] * fx[j] * fz[j] * pb_z[j] + 10.0 * pa_xyz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xyz_zz[j] = (0.5 * pa_xyz[j] * fx[j] + pa_xy[j] * fx[j] * pb_z[j] + pa_xyz[j] * pb_zz[j]) * s_0_0[j] + (-pa_xyz[j] * fz[j] * fgb[j] + 4.0 * pa_xyz[j] * fz[j] * fx[j] + 
-
-                              8.0 * pa_xy[j] * fz[j] * fx[j] * pb_z[j] + 10.0 * pa_xyz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_xyz_zz[j] = kinvecfunc::fvec_xyz_zz_s_0(fx[j], pa_xy[j], pa_xyz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xyz_zz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_xyz[j], pb_z[j], pb_zz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (3) = (30,40)
@@ -1614,87 +1002,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xzz_xz, t_xzz_yy, t_xzz_yz, t_xzz_zz, t_yyy_xx, t_yyy_xy, t_yyy_xz, t_yyy_yy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xzz_xx[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pb_x[j] + 
+                t_xzz_xx[j] = kinvecfunc::fvec_xzz_xx_s_0(fx[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                              0.5 * pa_xzz[j] * fx[j] + fx[j] * pa_zz[j] * pb_x[j] + 0.5 * pa_x[j] * fx[j] * pb_xx[j] + pa_xzz[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - 
+                t_xzz_xy[j] = kinvecfunc::fvec_xzz_xy_s_0(fx[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xzz_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xzz[j], pa_zz[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                              fx[j] * fz[j] * fga[j] * pb_x[j] - pa_xzz[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 
+                t_xzz_xz[j] = kinvecfunc::fvec_xzz_xz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xzz_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_x[j] + 4.0 * pa_xzz[j] * fz[j] * fx[j] + 8.0 * fx[j] * pa_zz[j] * fz[j] * pb_x[j] - 
+                t_xzz_yy[j] = kinvecfunc::fvec_xzz_yy_s_0(fx[j], pa_x[j], pa_xzz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xzz[j], pb_yy[j], r_0_0[j]);
 
-                              pa_x[j] * fz[j] * fga[j] * pb_xx[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xx[j] + 10.0 * pa_xzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
+                t_xzz_yz[j] = kinvecfunc::fvec_xzz_yz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xzz_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                t_xzz_xy[j] = (0.25 * fx[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_zz[j] * pb_y[j] + 
+                t_xzz_zz[j] = kinvecfunc::fvec_xzz_zz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_xzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                              0.5 * pa_x[j] * fx[j] * pb_xy[j] + pa_xzz[j] * pb_xy[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fga[j] * pb_y[j] + 1.5 * fx[j] * fx[j] * fz[j] * pb_y[j] + 
+                t_yyy_xx[j] = kinvecfunc::fvec_yyy_xx_s_0(fx[j], pa_y[j], pa_yyy[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yyy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yyy[j], pb_xx[j], r_0_0[j]);
 
-                              4.0 * fx[j] * pa_zz[j] * fz[j] * pb_y[j] - pa_x[j] * fz[j] * fga[j] * pb_xy[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xy[j] + 
+                t_yyy_xy[j] = kinvecfunc::fvec_yyy_xy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yyy_xy_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_x[j], pb_xy[j], r_0_0[j]);
 
-                              10.0 * pa_xzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_yyy_xz[j] = kinvecfunc::fvec_yyy_xz_s_0(fx[j], pa_y[j], pa_yyy[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yyy_xz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yyy[j], pb_xz[j], r_0_0[j]);
 
-                t_xzz_xz[j] = (0.5 * fx[j] * fx[j] * pa_z[j] + 0.25 * fx[j] * fx[j] * pb_z[j] + 
-
-                              pa_xz[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_zz[j] * pb_z[j] + 0.5 * pa_x[j] * fx[j] * pb_xz[j] + 
-
-                              pa_xzz[j] * pb_xz[j]) * s_0_0[j] + (3.0 * fx[j] * fx[j] * pa_z[j] * fz[j] - 0.5 * fx[j] * fz[j] * fga[j] * pb_z[j] + 
-
-                              1.5 * fx[j] * fx[j] * fz[j] * pb_z[j] + 8.0 * pa_xz[j] * fz[j] * fx[j] * pb_x[j] + 4.0 * fx[j] * pa_zz[j] * fz[j] * pb_z[j] - 
-
-                              pa_x[j] * fz[j] * fga[j] * pb_xz[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_xz[j] + 10.0 * pa_xzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xzz_yy[j] = (0.25 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xzz[j] * fx[j] + 
-
-                              0.5 * pa_x[j] * fx[j] * pb_yy[j] + pa_xzz[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_xzz[j] * fz[j] * fgb[j] + 1.5 * pa_x[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_xzz[j] * fz[j] * fx[j] - 
-
-                              pa_x[j] * fz[j] * fga[j] * pb_yy[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * pa_xzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xzz_yz[j] = (pa_xz[j] * fx[j] * pb_y[j] + 0.5 * pa_x[j] * fx[j] * pb_yz[j] + pa_xzz[j] * pb_yz[j]) * s_0_0[j] + (8.0 * pa_xz[j] * fz[j] * fx[j] * pb_y[j] - pa_x[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                              4.0 * pa_x[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_xzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xzz_zz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] + 0.5 * pa_xzz[j] * fx[j] + 
-
-                              2.0 * pa_xz[j] * fx[j] * pb_z[j] + 0.5 * pa_x[j] * fx[j] * pb_zz[j] + pa_xzz[j] * pb_zz[j]) * s_0_0[j] + (4.5 * pa_x[j] * fx[j] * fx[j] * fz[j] - 0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] - 
-
-                              0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] - pa_xzz[j] * fz[j] * fgb[j] + 4.0 * pa_xzz[j] * fz[j] * fx[j] + 
-
-                              16.0 * pa_xz[j] * fz[j] * fx[j] * pb_z[j] - pa_x[j] * fz[j] * fga[j] * pb_zz[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                              10.0 * pa_xzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_yyy_xx[j] = (0.75 * pa_y[j] * fx[j] * fx[j] + 0.5 * pa_yyy[j] * fx[j] + 
-
-                              1.5 * pa_y[j] * fx[j] * pb_xx[j] + pa_yyy[j] * pb_xx[j]) * s_0_0[j] + (-1.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_y[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_yyy[j] * fz[j] * fgb[j] + 4.5 * pa_y[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_yyy[j] * fz[j] * fx[j] - 
-
-                              3.0 * pa_y[j] * fz[j] * fga[j] * pb_xx[j] + 12.0 * pa_y[j] * fz[j] * fx[j] * pb_xx[j] + 10.0 * pa_yyy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_yyy_xy[j] = (0.75 * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_yy[j] * fx[j] * pb_x[j] + 
-
-                              1.5 * pa_y[j] * fx[j] * pb_xy[j] + pa_yyy[j] * pb_xy[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pb_x[j] + 4.5 * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                              12.0 * pa_yy[j] * fz[j] * fx[j] * pb_x[j] - 3.0 * pa_y[j] * fz[j] * fga[j] * pb_xy[j] + 
-
-                              12.0 * pa_y[j] * fz[j] * fx[j] * pb_xy[j] + 10.0 * pa_yyy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_yyy_xz[j] = (1.5 * pa_y[j] * fx[j] * pb_xz[j] + pa_yyy[j] * pb_xz[j]) * s_0_0[j] + (-3.0 * pa_y[j] * fz[j] * fga[j] * pb_xz[j] + 
-
-                              12.0 * pa_y[j] * fz[j] * fx[j] * pb_xz[j] + 10.0 * pa_yyy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_yyy_yy[j] = (2.25 * pa_y[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * pa_yyy[j] * fx[j] + 3.0 * pa_yy[j] * fx[j] * pb_y[j] + 1.5 * pa_y[j] * fx[j] * pb_yy[j] + 
-
-                              pa_yyy[j] * pb_yy[j]) * s_0_0[j] + (13.5 * pa_y[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] - 
-
-                              1.5 * pa_y[j] * fz[j] * fga[j] * fx[j] - 3.0 * fx[j] * fz[j] * fga[j] * pb_y[j] - pa_yyy[j] * fz[j] * fgb[j] + 
-
-                              9.0 * fx[j] * fx[j] * fz[j] * pb_y[j] + 4.0 * pa_yyy[j] * fz[j] * fx[j] + 24.0 * pa_yy[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                              3.0 * pa_y[j] * fz[j] * fga[j] * pb_yy[j] + 12.0 * pa_y[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * pa_yyy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_yyy_yy[j] = kinvecfunc::fvec_yyy_yy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yyy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
             }
 
             // Batch of Integrals (4) = (40,50)
@@ -1704,85 +1030,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yyz_xx, t_yyz_xy, t_yyz_xz, t_yyz_yy, t_yyz_yz, t_yyz_zz, t_yzz_xx, t_yzz_xy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyy_yz[j] = (0.75 * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_yy[j] * fx[j] * pb_z[j] + 
+                t_yyy_yz[j] = kinvecfunc::fvec_yyy_yz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yyy_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              1.5 * pa_y[j] * fx[j] * pb_yz[j] + pa_yyy[j] * pb_yz[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pb_z[j] + 4.5 * fx[j] * fx[j] * fz[j] * pb_z[j] + 
+                t_yyy_zz[j] = kinvecfunc::fvec_yyy_zz_s_0(fx[j], pa_y[j], pa_yyy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yyy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yyy[j], pb_zz[j], r_0_0[j]);
 
-                              12.0 * pa_yy[j] * fz[j] * fx[j] * pb_z[j] - 3.0 * pa_y[j] * fz[j] * fga[j] * pb_yz[j] + 
+                t_yyz_xx[j] = kinvecfunc::fvec_yyz_xx_s_0(fx[j], pa_yyz[j], pa_z[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yyz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yyz[j], pa_z[j], pb_xx[j], r_0_0[j]);
 
-                              12.0 * pa_y[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_yyy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
+                t_yyz_xy[j] = kinvecfunc::fvec_yyz_xy_s_0(fx[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yyz_xy_r_0(fga[j], fx[j], fz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], r_0_0[j]);
 
-                t_yyy_zz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] + 0.5 * pa_yyy[j] * fx[j] + 
+                t_yyz_xz[j] = kinvecfunc::fvec_yyz_xz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yyz_xz_r_0(fga[j], fx[j], fz[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                              1.5 * pa_y[j] * fx[j] * pb_zz[j] + pa_yyy[j] * pb_zz[j]) * s_0_0[j] + (-1.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_y[j] * fz[j] * fga[j] * fx[j] - 
+                t_yyz_yy[j] = kinvecfunc::fvec_yyz_yy_s_0(fx[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yyz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                              pa_yyy[j] * fz[j] * fgb[j] + 4.5 * pa_y[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_yyy[j] * fz[j] * fx[j] - 
+                t_yyz_yz[j] = kinvecfunc::fvec_yyz_yz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yyz_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              3.0 * pa_y[j] * fz[j] * fga[j] * pb_zz[j] + 12.0 * pa_y[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_yyy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_yyz_zz[j] = kinvecfunc::fvec_yyz_zz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yyz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_yyz_xx[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * pa_yyz[j] * fx[j] + 
+                t_yzz_xx[j] = kinvecfunc::fvec_yzz_xx_s_0(fx[j], pa_y[j], pa_yzz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yzz[j], pb_xx[j], r_0_0[j]);
 
-                              0.5 * fx[j] * pa_z[j] * pb_xx[j] + pa_yyz[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_z[j] * fx[j] - 
-
-                              pa_yyz[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] + 4.0 * pa_yyz[j] * fz[j] * fx[j] - 
-
-                              fz[j] * fga[j] * pa_z[j] * pb_xx[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_xx[j] + 10.0 * pa_yyz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_yyz_xy[j] = (pa_yz[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_z[j] * pb_xy[j] + pa_yyz[j] * pb_xy[j]) * s_0_0[j] + (8.0 * pa_yz[j] * fx[j] * fz[j] * pb_x[j] - fz[j] * fga[j] * pa_z[j] * pb_xy[j] + 
-
-                              4.0 * fx[j] * fz[j] * pa_z[j] * pb_xy[j] + 10.0 * pa_yyz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_yyz_xz[j] = (0.25 * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_yy[j] * fx[j] * pb_x[j] + 
-
-                              0.5 * fx[j] * pa_z[j] * pb_xz[j] + pa_yyz[j] * pb_xz[j]) * s_0_0[j] + (-0.5 * fz[j] * fga[j] * fx[j] * pb_x[j] + 1.5 * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                              4.0 * pa_yy[j] * fz[j] * fx[j] * pb_x[j] - fz[j] * fga[j] * pa_z[j] * pb_xz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_xz[j] + 
-
-                              10.0 * pa_yyz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_yyz_yy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] + 0.5 * pa_yyz[j] * fx[j] + 
-
-                              2.0 * pa_yz[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_z[j] * pb_yy[j] + pa_yyz[j] * pb_yy[j]) * s_0_0[j] + (4.5 * fx[j] * fx[j] * fz[j] * pa_z[j] - 0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] - 
-
-                              0.5 * fz[j] * fga[j] * pa_z[j] * fx[j] - pa_yyz[j] * fz[j] * fgb[j] + 4.0 * pa_yyz[j] * fz[j] * fx[j] + 
-
-                              16.0 * pa_yz[j] * fx[j] * fz[j] * pb_y[j] - fz[j] * fga[j] * pa_z[j] * pb_yy[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_yy[j] + 
-
-                              10.0 * pa_yyz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_yyz_yz[j] = (0.5 * pa_y[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_y[j] + 
-
-                              0.5 * pa_yy[j] * fx[j] * pb_y[j] + pa_yz[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_z[j] * pb_yz[j] + pa_yyz[j] * pb_yz[j]) * s_0_0[j] + (3.0 * pa_y[j] * fx[j] * fx[j] * fz[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_y[j] + 
-
-                              1.5 * fx[j] * fx[j] * fz[j] * pb_y[j] + 4.0 * pa_yy[j] * fz[j] * fx[j] * pb_y[j] + 8.0 * pa_yz[j] * fx[j] * fz[j] * pb_z[j] - 
-
-                              fz[j] * fga[j] * pa_z[j] * pb_yz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_yz[j] + 10.0 * pa_yyz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_yyz_zz[j] = (0.25 * fx[j] * fx[j] * pa_z[j] + 0.5 * fx[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * pa_yyz[j] * fx[j] + pa_yy[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_z[j] * pb_zz[j] + pa_yyz[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_z[j] * fx[j] - 
-
-                              fz[j] * fga[j] * fx[j] * pb_z[j] - pa_yyz[j] * fz[j] * fgb[j] + 1.5 * fx[j] * fx[j] * fz[j] * pa_z[j] + 
-
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_z[j] + 4.0 * pa_yyz[j] * fz[j] * fx[j] + 8.0 * pa_yy[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                              fz[j] * fga[j] * pa_z[j] * pb_zz[j] + 4.0 * fx[j] * fz[j] * pa_z[j] * pb_zz[j] + 10.0 * pa_yyz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_yzz_xx[j] = (0.25 * pa_y[j] * fx[j] * fx[j] + 0.5 * pa_yzz[j] * fx[j] + 
-
-                              0.5 * pa_y[j] * fx[j] * pb_xx[j] + pa_yzz[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_y[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_yzz[j] * fz[j] * fgb[j] + 1.5 * pa_y[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_yzz[j] * fz[j] * fx[j] - 
-
-                              pa_y[j] * fz[j] * fga[j] * pb_xx[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * pb_xx[j] + 10.0 * pa_yzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_yzz_xy[j] = (0.25 * fx[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_zz[j] * pb_x[j] + 
-
-                              0.5 * pa_y[j] * fx[j] * pb_xy[j] + pa_yzz[j] * pb_xy[j]) * s_0_0[j] + (-0.5 * fx[j] * fz[j] * fga[j] * pb_x[j] + 1.5 * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                              4.0 * fx[j] * pa_zz[j] * fz[j] * pb_x[j] - pa_y[j] * fz[j] * fga[j] * pb_xy[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * pb_xy[j] + 
-
-                              10.0 * pa_yzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_yzz_xy[j] = kinvecfunc::fvec_yzz_xy_s_0(fx[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yzz_xy_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], r_0_0[j]);
             }
 
             // Batch of Integrals (5) = (50,60)
@@ -1792,87 +1058,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yzz_zz, t_zzz_xx, t_zzz_xy, t_zzz_xz, t_zzz_yy, t_zzz_yz, t_zzz_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yzz_xz[j] = (pa_yz[j] * fx[j] * pb_x[j] + 0.5 * pa_y[j] * fx[j] * pb_xz[j] + pa_yzz[j] * pb_xz[j]) * s_0_0[j] + (8.0 * pa_yz[j] * fz[j] * fx[j] * pb_x[j] - pa_y[j] * fz[j] * fga[j] * pb_xz[j] + 
+                t_yzz_xz[j] = kinvecfunc::fvec_yzz_xz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yzz_xz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                              4.0 * pa_y[j] * fz[j] * fx[j] * pb_xz[j] + 10.0 * pa_yzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_yzz_yy[j] = kinvecfunc::fvec_yzz_yy_s_0(fx[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                t_yzz_yy[j] = (0.25 * pa_y[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pb_y[j] + 
+                t_yzz_yz[j] = kinvecfunc::fvec_yzz_yz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yzz_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                              0.5 * pa_yzz[j] * fx[j] + fx[j] * pa_zz[j] * pb_y[j] + 0.5 * pa_y[j] * fx[j] * pb_yy[j] + pa_yzz[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_y[j] * fz[j] * fga[j] * fx[j] - 
+                t_yzz_zz[j] = kinvecfunc::fvec_yzz_zz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                              fx[j] * fz[j] * fga[j] * pb_y[j] - pa_yzz[j] * fz[j] * fgb[j] + 1.5 * pa_y[j] * fz[j] * fx[j] * fx[j] + 
+                t_zzz_xx[j] = kinvecfunc::fvec_zzz_xx_s_0(fx[j], pa_z[j], pa_zzz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_zzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zzz[j], pb_xx[j], r_0_0[j]);
 
-                              3.0 * fx[j] * fx[j] * fz[j] * pb_y[j] + 4.0 * pa_yzz[j] * fz[j] * fx[j] + 8.0 * fx[j] * pa_zz[j] * fz[j] * pb_y[j] - 
+                t_zzz_xy[j] = kinvecfunc::fvec_zzz_xy_s_0(fx[j], pa_z[j], pa_zzz[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_zzz_xy_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zzz[j], pb_xy[j], r_0_0[j]);
 
-                              pa_y[j] * fz[j] * fga[j] * pb_yy[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * pa_yzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_zzz_xz[j] = kinvecfunc::fvec_zzz_xz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_zzz_xz_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                t_yzz_yz[j] = (0.5 * fx[j] * fx[j] * pa_z[j] + 0.25 * fx[j] * fx[j] * pb_z[j] + 
+                t_zzz_yy[j] = kinvecfunc::fvec_zzz_yy_s_0(fx[j], pa_z[j], pa_zzz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_zzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zzz[j], pb_yy[j], r_0_0[j]);
 
-                              pa_yz[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_zz[j] * pb_z[j] + 0.5 * pa_y[j] * fx[j] * pb_yz[j] + 
+                t_zzz_yz[j] = kinvecfunc::fvec_zzz_yz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_zzz_yz_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                              pa_yzz[j] * pb_yz[j]) * s_0_0[j] + (3.0 * fx[j] * fx[j] * pa_z[j] * fz[j] - 0.5 * fx[j] * fz[j] * fga[j] * pb_z[j] + 
-
-                              1.5 * fx[j] * fx[j] * fz[j] * pb_z[j] + 8.0 * pa_yz[j] * fz[j] * fx[j] * pb_y[j] + 4.0 * fx[j] * pa_zz[j] * fz[j] * pb_z[j] - 
-
-                              pa_y[j] * fz[j] * fga[j] * pb_yz[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_yzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_yzz_zz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] + 0.5 * pa_yzz[j] * fx[j] + 
-
-                              2.0 * pa_yz[j] * fx[j] * pb_z[j] + 0.5 * pa_y[j] * fx[j] * pb_zz[j] + pa_yzz[j] * pb_zz[j]) * s_0_0[j] + (4.5 * pa_y[j] * fx[j] * fx[j] * fz[j] - 0.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] - 
-
-                              0.5 * pa_y[j] * fz[j] * fga[j] * fx[j] - pa_yzz[j] * fz[j] * fgb[j] + 4.0 * pa_yzz[j] * fz[j] * fx[j] + 
-
-                              16.0 * pa_yz[j] * fz[j] * fx[j] * pb_z[j] - pa_y[j] * fz[j] * fga[j] * pb_zz[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                              10.0 * pa_yzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_zzz_xx[j] = (0.75 * pa_z[j] * fx[j] * fx[j] + 0.5 * pa_zzz[j] * fx[j] + 
-
-                              1.5 * pa_z[j] * fx[j] * pb_xx[j] + pa_zzz[j] * pb_xx[j]) * s_0_0[j] + (-1.5 * pa_z[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_z[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_zzz[j] * fz[j] * fgb[j] + 4.5 * pa_z[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_zzz[j] * fz[j] * fx[j] - 
-
-                              3.0 * pa_z[j] * fz[j] * fga[j] * pb_xx[j] + 12.0 * pa_z[j] * fz[j] * fx[j] * pb_xx[j] + 10.0 * pa_zzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_zzz_xy[j] = (1.5 * pa_z[j] * fx[j] * pb_xy[j] + pa_zzz[j] * pb_xy[j]) * s_0_0[j] + (-3.0 * pa_z[j] * fz[j] * fga[j] * pb_xy[j] + 
-
-                              12.0 * pa_z[j] * fz[j] * fx[j] * pb_xy[j] + 10.0 * pa_zzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_zzz_xz[j] = (0.75 * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_zz[j] * fx[j] * pb_x[j] + 
-
-                              1.5 * pa_z[j] * fx[j] * pb_xz[j] + pa_zzz[j] * pb_xz[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pb_x[j] + 4.5 * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                              12.0 * pa_zz[j] * fz[j] * fx[j] * pb_x[j] - 3.0 * pa_z[j] * fz[j] * fga[j] * pb_xz[j] + 
-
-                              12.0 * pa_z[j] * fz[j] * fx[j] * pb_xz[j] + 10.0 * pa_zzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_zzz_yy[j] = (0.75 * pa_z[j] * fx[j] * fx[j] + 0.5 * pa_zzz[j] * fx[j] + 
-
-                              1.5 * pa_z[j] * fx[j] * pb_yy[j] + pa_zzz[j] * pb_yy[j]) * s_0_0[j] + (-1.5 * pa_z[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_z[j] * fz[j] * fga[j] * fx[j] - 
-
-                              pa_zzz[j] * fz[j] * fgb[j] + 4.5 * pa_z[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_zzz[j] * fz[j] * fx[j] - 
-
-                              3.0 * pa_z[j] * fz[j] * fga[j] * pb_yy[j] + 12.0 * pa_z[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * pa_zzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_zzz_yz[j] = (0.75 * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_zz[j] * fx[j] * pb_y[j] + 
-
-                              1.5 * pa_z[j] * fx[j] * pb_yz[j] + pa_zzz[j] * pb_yz[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pb_y[j] + 4.5 * fx[j] * fx[j] * fz[j] * pb_y[j] + 
-
-                              12.0 * pa_zz[j] * fz[j] * fx[j] * pb_y[j] - 3.0 * pa_z[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                              12.0 * pa_z[j] * fz[j] * fx[j] * pb_yz[j] + 10.0 * pa_zzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_zzz_zz[j] = (2.25 * pa_z[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pb_z[j] + 
-
-                              0.5 * pa_zzz[j] * fx[j] + 3.0 * pa_zz[j] * fx[j] * pb_z[j] + 1.5 * pa_z[j] * fx[j] * pb_zz[j] + 
-
-                              pa_zzz[j] * pb_zz[j]) * s_0_0[j] + (13.5 * pa_z[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_z[j] * fx[j] * fz[j] * fgb[j] - 
-
-                              1.5 * pa_z[j] * fz[j] * fga[j] * fx[j] - 3.0 * fx[j] * fz[j] * fga[j] * pb_z[j] - pa_zzz[j] * fz[j] * fgb[j] + 
-
-                              9.0 * fx[j] * fx[j] * fz[j] * pb_z[j] + 4.0 * pa_zzz[j] * fz[j] * fx[j] + 24.0 * pa_zz[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                              3.0 * pa_z[j] * fz[j] * fga[j] * pb_zz[j] + 12.0 * pa_z[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_zzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_zzz_zz[j] = kinvecfunc::fvec_zzz_zz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_zzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
             }
 
             idx++;
@@ -2210,153 +1414,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xx_xxzz, t_xx_xyyy, t_xx_xyyz, t_xx_xyzz, t_xx_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xx_xxxx[j] = (1.875 * fx[j] * fx[j] * fx[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] + 
+                t_xx_xxxx[j] = kinvecfunc::fvec_xx_xxxx_s_0(fx[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxxx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], r_0_0[j]);
 
-                               6.0 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 4.5 * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_xx[j] * pb_xx[j] * fx[j] + 
+                t_xx_xxxy[j] = kinvecfunc::fvec_xx_xxxy_s_0(fx[j], pa_x[j], pa_xx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxxy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                               4.0 * pa_x[j] * fx[j] * pb_xxx[j] + 0.5 * fx[j] * pb_xxxx[j] + pa_xx[j] * pb_xxxx[j]) * s_0_0[j] + (-4.5 * fx[j] * fx[j] * fz[j] * fgb[j] + 11.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
+                t_xx_xxxz[j] = kinvecfunc::fvec_xx_xxxz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxxz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 3.0 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
+                t_xx_xxyy[j] = kinvecfunc::fvec_xx_xxyy_s_0(fx[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxyy[j], pb_xyy[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxyy[j], pb_xyy[j], pb_yy[j], r_0_0[j]);
 
-                               12.0 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 6.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 
+                t_xx_xxyz[j] = kinvecfunc::fvec_xx_xxyz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xxyz[j], pb_xyz[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xxyz[j], pb_xyz[j], pb_yz[j], r_0_0[j]);
 
-                               48.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 36.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - 3.0 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 
+                t_xx_xxzz[j] = kinvecfunc::fvec_xx_xxzz_s_0(fx[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxzz[j], pb_xzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xx_xxzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_x[j], pb_xx[j], pb_xxzz[j], pb_xzz[j], pb_zz[j], r_0_0[j]);
 
-                               3.0 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 6.0 * pa_xx[j] * pb_xx[j] * fz[j] * fgb[j] + 
+                t_xx_xyyy[j] = kinvecfunc::fvec_xx_xyyy_s_0(fx[j], pa_x[j], pa_xx[j], pb_xy[j], pb_xyyy[j], pb_y[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_xx_xyyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xy[j], pb_xyyy[j], pb_y[j], pb_yyy[j], r_0_0[j]);
 
-                               30.0 * pa_xx[j] * fz[j] * pb_xx[j] * fx[j] + 40.0 * pa_x[j] * fz[j] * fx[j] * pb_xxx[j] - fz[j] * fga[j] * pb_xxxx[j] + 
+                t_xx_xyyz[j] = kinvecfunc::fvec_xx_xyyz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xyyz[j], pb_xz[j], pb_yyz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xx_xyyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xyyz[j], pb_xz[j], pb_yyz[j], pb_z[j], r_0_0[j]);
 
-                               5.0 * fz[j] * fx[j] * pb_xxxx[j] + 12.0 * pa_xx[j] * fz[j] * pb_xxxx[j]) * r_0_0[j];
+                t_xx_xyzz[j] = kinvecfunc::fvec_xx_xyzz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xy[j], pb_xyzz[j], pb_y[j], pb_yzz[j], s_0_0[j]) + kinvecfunc::fvec_xx_xyzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xy[j], pb_xyzz[j], pb_y[j], pb_yzz[j], r_0_0[j]);
 
-                t_xx_xxxy[j] = (1.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 2.25 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               1.5 * pa_xx[j] * pb_xy[j] * fx[j] + 3.0 * pa_x[j] * fx[j] * pb_xxy[j] + 0.5 * fx[j] * pb_xxxy[j] + pa_xx[j] * pb_xxxy[j]) * s_0_0[j] + (-3.0 * pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_y[j] + 
-
-                               12.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 18.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - 1.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 
-
-                               1.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 3.0 * pa_xx[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xx[j] * fz[j] * pb_xy[j] * fx[j] + 30.0 * pa_x[j] * fz[j] * fx[j] * pb_xxy[j] - fz[j] * fga[j] * pb_xxxy[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_xxxy[j] + 12.0 * pa_xx[j] * fz[j] * pb_xxxy[j]) * r_0_0[j];
-
-                t_xx_xxxz[j] = (1.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 2.25 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               1.5 * pa_xx[j] * pb_xz[j] * fx[j] + 3.0 * pa_x[j] * fx[j] * pb_xxz[j] + 0.5 * fx[j] * pb_xxxz[j] + pa_xx[j] * pb_xxxz[j]) * s_0_0[j] + (-3.0 * pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               12.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 18.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - 1.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 
-
-                               1.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 3.0 * pa_xx[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xx[j] * fz[j] * pb_xz[j] * fx[j] + 30.0 * pa_x[j] * fz[j] * fx[j] * pb_xxz[j] - fz[j] * fga[j] * pb_xxxz[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_xxxz[j] + 12.0 * pa_xx[j] * fz[j] * pb_xxxz[j]) * r_0_0[j];
-
-                t_xx_xxyy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pb_yy[j] + 0.25 * fx[j] * fx[j] * pb_xx[j] + 
-
-                               0.5 * pa_xx[j] * pb_xx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] * pb_yy[j] + 2.0 * pa_x[j] * fx[j] * pb_xyy[j] + 
-
-                               0.5 * fx[j] * pb_xxyy[j] + pa_xx[j] * pb_xxyy[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.25 * fz[j] * fga[j] * fx[j] * fx[j] - pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               2.0 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 2.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 
-
-                               8.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - 0.5 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fx[j] * fz[j] * fgb[j] * pb_yy[j] - 0.5 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_yy[j] - 
-
-                               pa_xx[j] * pb_xx[j] * fz[j] * fgb[j] - pa_xx[j] * fz[j] * fgb[j] * pb_yy[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                               5.0 * pa_xx[j] * fz[j] * pb_xx[j] * fx[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_yy[j] + 
-
-                               20.0 * pa_x[j] * fz[j] * fx[j] * pb_xyy[j] - fz[j] * fga[j] * pb_xxyy[j] + 5.0 * fz[j] * fx[j] * pb_xxyy[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_xxyy[j]) * r_0_0[j];
-
-                t_xx_xxyz[j] = (0.75 * fx[j] * fx[j] * pb_yz[j] + 0.5 * pa_xx[j] * fx[j] * pb_yz[j] + 
-
-                               2.0 * pa_x[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pb_xxyz[j] + pa_xx[j] * pb_xxyz[j]) * s_0_0[j] + (6.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_yz[j] - 
-
-                               0.5 * fz[j] * fga[j] * fx[j] * pb_yz[j] - pa_xx[j] * fz[j] * fgb[j] * pb_yz[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_yz[j] + 
-
-                               20.0 * pa_x[j] * fz[j] * fx[j] * pb_xyz[j] - fz[j] * fga[j] * pb_xxyz[j] + 5.0 * fz[j] * fx[j] * pb_xxyz[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_xxyz[j]) * r_0_0[j];
-
-                t_xx_xxzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pb_zz[j] + 0.25 * fx[j] * fx[j] * pb_xx[j] + 
-
-                               0.5 * pa_xx[j] * pb_xx[j] * fx[j] + 0.5 * pa_xx[j] * fx[j] * pb_zz[j] + 2.0 * pa_x[j] * fx[j] * pb_xzz[j] + 
-
-                               0.5 * fx[j] * pb_xxzz[j] + pa_xx[j] * pb_xxzz[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.25 * fz[j] * fga[j] * fx[j] * fx[j] - pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               2.0 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 2.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 
-
-                               8.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 0.5 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fx[j] * fz[j] * fgb[j] * pb_zz[j] - 0.5 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_zz[j] - 
-
-                               pa_xx[j] * pb_xx[j] * fz[j] * fgb[j] - pa_xx[j] * fz[j] * fgb[j] * pb_zz[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                               5.0 * pa_xx[j] * fz[j] * pb_xx[j] * fx[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               20.0 * pa_x[j] * fz[j] * fx[j] * pb_xzz[j] - fz[j] * fga[j] * pb_xxzz[j] + 5.0 * fz[j] * fx[j] * pb_xxzz[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_xxzz[j]) * r_0_0[j];
-
-                t_xx_xyyy[j] = (1.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               1.5 * pa_xx[j] * pb_xy[j] * fx[j] + pa_x[j] * fx[j] * pb_yyy[j] + 0.5 * fx[j] * pb_xyyy[j] + pa_xx[j] * pb_xyyy[j]) * s_0_0[j] + (-3.0 * pa_x[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 1.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 
-
-                               3.0 * pa_xx[j] * pb_xy[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xy[j] + 15.0 * pa_xx[j] * fz[j] * pb_xy[j] * fx[j] + 
-
-                               10.0 * pa_x[j] * fz[j] * fx[j] * pb_yyy[j] - fz[j] * fga[j] * pb_xyyy[j] + 5.0 * fz[j] * fx[j] * pb_xyyy[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_xyyy[j]) * r_0_0[j];
-
-                t_xx_xyyz[j] = (0.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 0.25 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               0.5 * pa_xx[j] * pb_xz[j] * fx[j] + pa_x[j] * fx[j] * pb_yyz[j] + 0.5 * fx[j] * pb_xyyz[j] + pa_xx[j] * pb_xyyz[j]) * s_0_0[j] + (-pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               4.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 0.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 
-
-                               pa_xx[j] * pb_xz[j] * fz[j] * fgb[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_xz[j] + 5.0 * pa_xx[j] * fz[j] * pb_xz[j] * fx[j] + 
-
-                               10.0 * pa_x[j] * fz[j] * fx[j] * pb_yyz[j] - fz[j] * fga[j] * pb_xyyz[j] + 5.0 * fz[j] * fx[j] * pb_xyyz[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_xyyz[j]) * r_0_0[j];
-
-                t_xx_xyzz[j] = (0.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 0.25 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               0.5 * pa_xx[j] * pb_xy[j] * fx[j] + pa_x[j] * fx[j] * pb_yzz[j] + 0.5 * fx[j] * pb_xyzz[j] + pa_xx[j] * pb_xyzz[j]) * s_0_0[j] + (-pa_x[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               4.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 0.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 
-
-                               pa_xx[j] * pb_xy[j] * fz[j] * fgb[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_xy[j] + 5.0 * pa_xx[j] * fz[j] * pb_xy[j] * fx[j] + 
-
-                               10.0 * pa_x[j] * fz[j] * fx[j] * pb_yzz[j] - fz[j] * fga[j] * pb_xyzz[j] + 5.0 * fz[j] * fx[j] * pb_xyzz[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_xyzz[j]) * r_0_0[j];
-
-                t_xx_xzzz[j] = (1.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               1.5 * pa_xx[j] * pb_xz[j] * fx[j] + pa_x[j] * fx[j] * pb_zzz[j] + 0.5 * fx[j] * pb_xzzz[j] + pa_xx[j] * pb_xzzz[j]) * s_0_0[j] + (-3.0 * pa_x[j] * fx[j] * pb_z[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 1.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 
-
-                               3.0 * pa_xx[j] * pb_xz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xz[j] + 15.0 * pa_xx[j] * fz[j] * pb_xz[j] * fx[j] + 
-
-                               10.0 * pa_x[j] * fz[j] * fx[j] * pb_zzz[j] - fz[j] * fga[j] * pb_xzzz[j] + 5.0 * fz[j] * fx[j] * pb_xzzz[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_xzzz[j]) * r_0_0[j];
+                t_xx_xzzz[j] = kinvecfunc::fvec_xx_xzzz_s_0(fx[j], pa_x[j], pa_xx[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_xx_xzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (1) = (10,20)
@@ -2368,129 +1444,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xy_xxxz, t_xy_xxyy, t_xy_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xx_yyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] + 
+                t_xx_yyyy[j] = kinvecfunc::fvec_xx_yyyy_s_0(fx[j], pa_xx[j], pb_yy[j], pb_yyyy[j], s_0_0[j]) + kinvecfunc::fvec_xx_yyyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_yy[j], pb_yyyy[j], r_0_0[j]);
 
-                               1.5 * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_xx[j] * pb_yy[j] * fx[j] + 0.5 * fx[j] * pb_yyyy[j] + pa_xx[j] * pb_yyyy[j]) * s_0_0[j] + (-1.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 
+                t_xx_yyyz[j] = kinvecfunc::fvec_xx_yyyz_s_0(fx[j], pa_xx[j], pb_yyyz[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xx_yyyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_yyyz[j], pb_yz[j], r_0_0[j]);
 
-                               3.0 * pa_xx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fz[j] * fx[j] * fx[j] * fx[j] + 6.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] - 
+                t_xx_yyzz[j] = kinvecfunc::fvec_xx_yyzz_s_0(fx[j], pa_xx[j], pb_yy[j], pb_yyzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xx_yyzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_yy[j], pb_yyzz[j], pb_zz[j], r_0_0[j]);
 
-                               3.0 * fx[j] * pb_yy[j] * fz[j] * fgb[j] - 3.0 * fz[j] * fga[j] * pb_yy[j] * fx[j] - 
+                t_xx_yzzz[j] = kinvecfunc::fvec_xx_yzzz_s_0(fx[j], pa_xx[j], pb_yz[j], pb_yzzz[j], s_0_0[j]) + kinvecfunc::fvec_xx_yzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_yz[j], pb_yzzz[j], r_0_0[j]);
 
-                               6.0 * pa_xx[j] * pb_yy[j] * fz[j] * fgb[j] + 12.0 * fz[j] * fx[j] * fx[j] * pb_yy[j] + 
+                t_xx_zzzz[j] = kinvecfunc::fvec_xx_zzzz_s_0(fx[j], pa_xx[j], pb_zz[j], pb_zzzz[j], s_0_0[j]) + kinvecfunc::fvec_xx_zzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pb_zz[j], pb_zzzz[j], r_0_0[j]);
 
-                               30.0 * pa_xx[j] * fz[j] * pb_yy[j] * fx[j] - fz[j] * fga[j] * pb_yyyy[j] + 5.0 * fz[j] * fx[j] * pb_yyyy[j] + 
+                t_xy_xxxx[j] = kinvecfunc::fvec_xy_xxxx_s_0(fx[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxxx_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], r_0_0[j]);
 
-                               12.0 * pa_xx[j] * fz[j] * pb_yyyy[j]) * r_0_0[j];
+                t_xy_xxxy[j] = kinvecfunc::fvec_xy_xxxy_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxxy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xx_yyyz[j] = (0.75 * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xx[j] * pb_yz[j] * fx[j] + 
+                t_xy_xxxz[j] = kinvecfunc::fvec_xy_xxxz_s_0(fx[j], pa_xy[j], pa_y[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxxz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pb_yyyz[j] + pa_xx[j] * pb_yyyz[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_yz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_yz[j] * fx[j] - 
+                t_xy_xxyy[j] = kinvecfunc::fvec_xy_xxyy_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_xy[j], pb_xyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxyy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_xy[j], pb_xyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               3.0 * pa_xx[j] * pb_yz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_yz[j] + 15.0 * pa_xx[j] * fz[j] * pb_yz[j] * fx[j] - 
-
-                               fz[j] * fga[j] * pb_yyyz[j] + 5.0 * fz[j] * fx[j] * pb_yyyz[j] + 12.0 * pa_xx[j] * fz[j] * pb_yyyz[j]) * r_0_0[j];
-
-                t_xx_yyzz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_yy[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_xx[j] * pb_yy[j] * fx[j] + 
-
-                               0.5 * pa_xx[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * pb_yyzz[j] + pa_xx[j] * pb_yyzz[j]) * s_0_0[j] + (-0.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.25 * fz[j] * fga[j] * fx[j] * fx[j] - 
-
-                               pa_xx[j] * fx[j] * fz[j] * fgb[j] + 0.75 * fz[j] * fx[j] * fx[j] * fx[j] + 2.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] - 
-
-                               0.5 * fx[j] * pb_yy[j] * fz[j] * fgb[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_zz[j] - 0.5 * fz[j] * fga[j] * pb_yy[j] * fx[j] - 
-
-                               0.5 * fz[j] * fga[j] * fx[j] * pb_zz[j] - pa_xx[j] * pb_yy[j] * fz[j] * fgb[j] - pa_xx[j] * fz[j] * fgb[j] * pb_zz[j] + 
-
-                               2.0 * fz[j] * fx[j] * fx[j] * pb_yy[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_zz[j] + 5.0 * pa_xx[j] * fz[j] * pb_yy[j] * fx[j] + 
-
-                               5.0 * pa_xx[j] * fz[j] * fx[j] * pb_zz[j] - fz[j] * fga[j] * pb_yyzz[j] + 5.0 * fz[j] * fx[j] * pb_yyzz[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_yyzz[j]) * r_0_0[j];
-
-                t_xx_yzzz[j] = (0.75 * fx[j] * fx[j] * pb_yz[j] + 1.5 * pa_xx[j] * pb_yz[j] * fx[j] + 
-
-                               0.5 * fx[j] * pb_yzzz[j] + pa_xx[j] * pb_yzzz[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_yz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_yz[j] * fx[j] - 
-
-                               3.0 * pa_xx[j] * pb_yz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_yz[j] + 15.0 * pa_xx[j] * fz[j] * pb_yz[j] * fx[j] - 
-
-                               fz[j] * fga[j] * pb_yzzz[j] + 5.0 * fz[j] * fx[j] * pb_yzzz[j] + 12.0 * pa_xx[j] * fz[j] * pb_yzzz[j]) * r_0_0[j];
-
-                t_xx_zzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               1.5 * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_xx[j] * pb_zz[j] * fx[j] + 0.5 * fx[j] * pb_zzzz[j] + pa_xx[j] * pb_zzzz[j]) * s_0_0[j] + (-1.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 
-
-                               3.0 * pa_xx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fz[j] * fx[j] * fx[j] * fx[j] + 6.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] - 
-
-                               3.0 * fx[j] * pb_zz[j] * fz[j] * fgb[j] - 3.0 * fz[j] * fga[j] * pb_zz[j] * fx[j] - 
-
-                               6.0 * pa_xx[j] * pb_zz[j] * fz[j] * fgb[j] + 12.0 * fz[j] * fx[j] * fx[j] * pb_zz[j] + 
-
-                               30.0 * pa_xx[j] * fz[j] * pb_zz[j] * fx[j] - fz[j] * fga[j] * pb_zzzz[j] + 5.0 * fz[j] * fx[j] * pb_zzzz[j] + 
-
-                               12.0 * pa_xx[j] * fz[j] * pb_zzzz[j]) * r_0_0[j];
-
-                t_xy_xxxx[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 3.0 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + 
-
-                               3.0 * pa_xy[j] * pb_xx[j] * fx[j] + 2.0 * fx[j] * pa_y[j] * pb_xxx[j] + pa_xy[j] * pb_xxxx[j]) * s_0_0[j] + (-3.0 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               6.0 * fx[j] * pa_y[j] * pb_x[j] * fz[j] * fgb[j] + 6.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               24.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_x[j] - 6.0 * pa_xy[j] * pb_xx[j] * fz[j] * fgb[j] + 
-
-                               30.0 * pa_xy[j] * fz[j] * pb_xx[j] * fx[j] + 20.0 * fx[j] * fz[j] * pa_y[j] * pb_xxx[j] + 12.0 * pa_xy[j] * fz[j] * pb_xxxx[j]) * r_0_0[j];
-
-                t_xy_xxxy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                               0.75 * fx[j] * fx[j] * pa_y[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pb_xx[j] + 1.5 * pa_xy[j] * pb_xy[j] * fx[j] + 
-
-                               0.5 * pa_x[j] * fx[j] * pb_xxx[j] + 1.5 * fx[j] * pa_y[j] * pb_xxy[j] + pa_xy[j] * pb_xxxy[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               1.5 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] - 1.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] * pb_y[j] + 
-
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 6.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_y[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - 3.0 * pa_xy[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xy[j] * fz[j] * pb_xy[j] * fx[j] + 5.0 * pa_x[j] * fz[j] * fx[j] * pb_xxx[j] + 
-
-                               15.0 * fx[j] * fz[j] * pa_y[j] * pb_xxy[j] + 12.0 * pa_xy[j] * fz[j] * pb_xxxy[j]) * r_0_0[j];
-
-                t_xy_xxxz[j] = (0.75 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + 1.5 * pa_xy[j] * pb_xz[j] * fx[j] + 
-
-                               1.5 * fx[j] * pa_y[j] * pb_xxz[j] + pa_xy[j] * pb_xxxz[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_z[j] - 3.0 * pa_xy[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xy[j] * fz[j] * pb_xz[j] * fx[j] + 15.0 * fx[j] * fz[j] * pa_y[j] * pb_xxz[j] + 12.0 * pa_xy[j] * fz[j] * pb_xxxz[j]) * r_0_0[j];
-
-                t_xy_xxyy[j] = (0.25 * pa_xy[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + fx[j] * fx[j] * pb_xy[j] + 0.5 * pa_xy[j] * pb_xx[j] * fx[j] + 
-
-                               0.5 * pa_xy[j] * fx[j] * pb_yy[j] + pa_x[j] * fx[j] * pb_xxy[j] + fx[j] * pa_y[j] * pb_xyy[j] + pa_xy[j] * pb_xxyy[j]) * s_0_0[j] + (-pa_xy[j] * fx[j] * fz[j] * fgb[j] - pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_y[j] - 
-
-                               fx[j] * pa_y[j] * pb_x[j] * fz[j] * fgb[j] + 2.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               4.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 4.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_x[j] + 
-
-                               8.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - pa_xy[j] * pb_xx[j] * fz[j] * fgb[j] - pa_xy[j] * fz[j] * fgb[j] * pb_yy[j] + 
-
-                               5.0 * pa_xy[j] * fz[j] * pb_xx[j] * fx[j] + 5.0 * pa_xy[j] * fz[j] * fx[j] * pb_yy[j] + 
-
-                               10.0 * pa_x[j] * fz[j] * fx[j] * pb_xxy[j] + 10.0 * fx[j] * fz[j] * pa_y[j] * pb_xyy[j] + 12.0 * pa_xy[j] * fz[j] * pb_xxyy[j]) * r_0_0[j];
-
-                t_xy_xxyz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               0.5 * pa_xy[j] * fx[j] * pb_yz[j] + 0.5 * pa_x[j] * fx[j] * pb_xxz[j] + fx[j] * pa_y[j] * pb_xyz[j] + 
-
-                               pa_xy[j] * pb_xxyz[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               2.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 4.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - pa_xy[j] * fz[j] * fgb[j] * pb_yz[j] + 
-
-                               5.0 * pa_xy[j] * fz[j] * fx[j] * pb_yz[j] + 5.0 * pa_x[j] * fz[j] * fx[j] * pb_xxz[j] + 
-
-                               10.0 * fx[j] * fz[j] * pa_y[j] * pb_xyz[j] + 12.0 * pa_xy[j] * fz[j] * pb_xxyz[j]) * r_0_0[j];
+                t_xy_xxyz[j] = kinvecfunc::fvec_xy_xxyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_xxyz[j], pb_xxz[j], pb_xyz[j], pb_xz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_xxyz[j], pb_xxz[j], pb_xyz[j], pb_xz[j], pb_yz[j], pb_z[j], r_0_0[j]);
             }
 
             // Batch of Integrals (2) = (20,30)
@@ -2502,111 +1474,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xy_yyzz, t_xy_yzzz, t_xy_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xy_xxzz[j] = (0.25 * pa_xy[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + 
+                t_xy_xxzz[j] = kinvecfunc::fvec_xy_xxzz_s_0(fx[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxzz[j], pb_xzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xy_xxzz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], pb_xxzz[j], pb_xzz[j], pb_zz[j], r_0_0[j]);
 
-                               0.5 * pa_xy[j] * pb_xx[j] * fx[j] + 0.5 * pa_xy[j] * fx[j] * pb_zz[j] + fx[j] * pa_y[j] * pb_xzz[j] + 
+                t_xy_xyyy[j] = kinvecfunc::fvec_xy_xyyy_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], pb_y[j], pb_yy[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_xy_xyyy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], pb_y[j], pb_yy[j], pb_yyy[j], r_0_0[j]);
 
-                               pa_xy[j] * pb_xxzz[j]) * s_0_0[j] + (-pa_xy[j] * fx[j] * fz[j] * fgb[j] - fx[j] * pa_y[j] * pb_x[j] * fz[j] * fgb[j] + 
+                t_xy_xyyz[j] = kinvecfunc::fvec_xy_xyyz_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_xyyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], pb_yyz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               2.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 4.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_x[j] - 
+                t_xy_xyzz[j] = kinvecfunc::fvec_xy_xyzz_s_0(fx[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyzz[j], pb_xzz[j], pb_y[j], pb_yzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xy_xyzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_xyzz[j], pb_xzz[j], pb_y[j], pb_yzz[j], pb_zz[j], r_0_0[j]);
 
-                               pa_xy[j] * pb_xx[j] * fz[j] * fgb[j] - pa_xy[j] * fz[j] * fgb[j] * pb_zz[j] + 5.0 * pa_xy[j] * fz[j] * pb_xx[j] * fx[j] + 
+                t_xy_xzzz[j] = kinvecfunc::fvec_xy_xzzz_s_0(fx[j], pa_xy[j], pa_y[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_xy_xzzz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pa_y[j], pb_xz[j], pb_xzzz[j], pb_z[j], pb_zzz[j], r_0_0[j]);
 
-                               5.0 * pa_xy[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * fx[j] * fz[j] * pa_y[j] * pb_xzz[j] + 12.0 * pa_xy[j] * fz[j] * pb_xxzz[j]) * r_0_0[j];
+                t_xy_yyyy[j] = kinvecfunc::fvec_xy_yyyy_s_0(fx[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]) + kinvecfunc::fvec_xy_yyyy_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], r_0_0[j]);
 
-                t_xy_xyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 
+                t_xy_yyyz[j] = kinvecfunc::fvec_xy_yyyz_s_0(fx[j], pa_x[j], pa_xy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xy_yyyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               0.75 * fx[j] * fx[j] * pa_y[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pb_yy[j] + 1.5 * pa_xy[j] * pb_xy[j] * fx[j] + 
+                t_xy_yyzz[j] = kinvecfunc::fvec_xy_yyzz_s_0(fx[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], pb_yyzz[j], pb_yzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xy_yyzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_y[j], pb_yy[j], pb_yyzz[j], pb_yzz[j], pb_zz[j], r_0_0[j]);
 
-                               1.5 * pa_x[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pa_y[j] * pb_yyy[j] + pa_xy[j] * pb_xyyy[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
+                t_xy_yzzz[j] = kinvecfunc::fvec_xy_yzzz_s_0(fx[j], pa_x[j], pa_xy[j], pb_yz[j], pb_yzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_xy_yzzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pb_yz[j], pb_yzzz[j], pb_z[j], pb_zzz[j], r_0_0[j]);
 
-                               1.5 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] - 1.5 * fx[j] * pa_y[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 6.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_y[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - 3.0 * pa_xy[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xy[j] * fz[j] * pb_xy[j] * fx[j] + 15.0 * pa_x[j] * fz[j] * fx[j] * pb_xyy[j] + 
-
-                               5.0 * fx[j] * fz[j] * pa_y[j] * pb_yyy[j] + 12.0 * pa_xy[j] * fz[j] * pb_xyyy[j]) * r_0_0[j];
-
-                t_xy_xyyz[j] = (0.25 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + 0.5 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               0.5 * pa_xy[j] * pb_xz[j] * fx[j] + pa_x[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pa_y[j] * pb_yyz[j] + 
-
-                               pa_xy[j] * pb_xyyz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_y[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_z[j] + 4.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - pa_xy[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               5.0 * pa_xy[j] * fz[j] * pb_xz[j] * fx[j] + 10.0 * pa_x[j] * fz[j] * fx[j] * pb_xyz[j] + 
-
-                               5.0 * fx[j] * fz[j] * pa_y[j] * pb_yyz[j] + 12.0 * pa_xy[j] * fz[j] * pb_xyyz[j]) * r_0_0[j];
-
-                t_xy_xyzz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_y[j] * pb_y[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_xy[j] * pb_xy[j] * fx[j] + 
-
-                               0.5 * pa_x[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_y[j] * pb_yzz[j] + pa_xy[j] * pb_xyzz[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fgb[j] + 0.75 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.5 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] - 0.5 * fx[j] * pa_y[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 2.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_y[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - pa_xy[j] * pb_xy[j] * fz[j] * fgb[j] + 5.0 * pa_xy[j] * fz[j] * pb_xy[j] * fx[j] + 
-
-                               5.0 * pa_x[j] * fz[j] * fx[j] * pb_xzz[j] + 5.0 * fx[j] * fz[j] * pa_y[j] * pb_yzz[j] + 12.0 * pa_xy[j] * fz[j] * pb_xyzz[j]) * r_0_0[j];
-
-                t_xy_xzzz[j] = (0.75 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + 1.5 * pa_xy[j] * pb_xz[j] * fx[j] + 
-
-                               0.5 * fx[j] * pa_y[j] * pb_zzz[j] + pa_xy[j] * pb_xzzz[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_y[j] * pb_z[j] * fz[j] * fgb[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_z[j] - 3.0 * pa_xy[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xy[j] * fz[j] * pb_xz[j] * fx[j] + 5.0 * fx[j] * fz[j] * pa_y[j] * pb_zzz[j] + 12.0 * pa_xy[j] * fz[j] * pb_xzzz[j]) * r_0_0[j];
-
-                t_xy_yyyy[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 3.0 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               3.0 * pa_xy[j] * pb_yy[j] * fx[j] + 2.0 * pa_x[j] * fx[j] * pb_yyy[j] + pa_xy[j] * pb_yyyy[j]) * s_0_0[j] + (-3.0 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               6.0 * pa_x[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 6.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               24.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 6.0 * pa_xy[j] * pb_yy[j] * fz[j] * fgb[j] + 
-
-                               30.0 * pa_xy[j] * fz[j] * pb_yy[j] * fx[j] + 20.0 * pa_x[j] * fz[j] * fx[j] * pb_yyy[j] + 12.0 * pa_xy[j] * fz[j] * pb_yyyy[j]) * r_0_0[j];
-
-                t_xy_yyyz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_xy[j] * pb_yz[j] * fx[j] + 
-
-                               1.5 * pa_x[j] * fx[j] * pb_yyz[j] + pa_xy[j] * pb_yyyz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 3.0 * pa_xy[j] * pb_yz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xy[j] * fz[j] * pb_yz[j] * fx[j] + 15.0 * pa_x[j] * fz[j] * fx[j] * pb_yyz[j] + 12.0 * pa_xy[j] * fz[j] * pb_yyyz[j]) * r_0_0[j];
-
-                t_xy_yyzz[j] = (0.25 * pa_xy[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * pa_xy[j] * pb_yy[j] * fx[j] + 0.5 * pa_xy[j] * fx[j] * pb_zz[j] + pa_x[j] * fx[j] * pb_yzz[j] + 
-
-                               pa_xy[j] * pb_yyzz[j]) * s_0_0[j] + (-pa_xy[j] * fx[j] * fz[j] * fgb[j] - pa_x[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 
-
-                               pa_xy[j] * pb_yy[j] * fz[j] * fgb[j] - pa_xy[j] * fz[j] * fgb[j] * pb_zz[j] + 5.0 * pa_xy[j] * fz[j] * pb_yy[j] * fx[j] + 
-
-                               5.0 * pa_xy[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_x[j] * fz[j] * fx[j] * pb_yzz[j] + 12.0 * pa_xy[j] * fz[j] * pb_yyzz[j]) * r_0_0[j];
-
-                t_xy_yzzz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_xy[j] * pb_yz[j] * fx[j] + 
-
-                               0.5 * pa_x[j] * fx[j] * pb_zzz[j] + pa_xy[j] * pb_yzzz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * pb_z[j] * fz[j] * fgb[j] + 
-
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 3.0 * pa_xy[j] * pb_yz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xy[j] * fz[j] * pb_yz[j] * fx[j] + 5.0 * pa_x[j] * fz[j] * fx[j] * pb_zzz[j] + 12.0 * pa_xy[j] * fz[j] * pb_yzzz[j]) * r_0_0[j];
-
-                t_xy_zzzz[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 3.0 * pa_xy[j] * pb_zz[j] * fx[j] + 
-
-                               pa_xy[j] * pb_zzzz[j]) * s_0_0[j] + (-3.0 * pa_xy[j] * fx[j] * fz[j] * fgb[j] + 6.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] - 
-
-                               6.0 * pa_xy[j] * pb_zz[j] * fz[j] * fgb[j] + 30.0 * pa_xy[j] * fz[j] * pb_zz[j] * fx[j] + 12.0 * pa_xy[j] * fz[j] * pb_zzzz[j]) * r_0_0[j];
+                t_xy_zzzz[j] = kinvecfunc::fvec_xy_zzzz_s_0(fx[j], pa_xy[j], pb_zz[j], pb_zzzz[j], s_0_0[j]) + kinvecfunc::fvec_xy_zzzz_r_0(fgb[j], fx[j], fz[j], pa_xy[j], pb_zz[j], pb_zzzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (3) = (30,40)
@@ -2618,129 +1504,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xz_xxzz, t_xz_xyyy, t_xz_xyyz, t_xz_xyzz, t_xz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xz_xxxx[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 3.0 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 
+                t_xz_xxxx[j] = kinvecfunc::fvec_xz_xxxx_s_0(fx[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxxx_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxx[j], r_0_0[j]);
 
-                               3.0 * pa_xz[j] * pb_xx[j] * fx[j] + 2.0 * fx[j] * pa_z[j] * pb_xxx[j] + pa_xz[j] * pb_xxxx[j]) * s_0_0[j] + (-3.0 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 
+                t_xz_xxxy[j] = kinvecfunc::fvec_xz_xxxy_s_0(fx[j], pa_xz[j], pa_z[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxxy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_xxxy[j], pb_xxy[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                               6.0 * fx[j] * pa_z[j] * pb_x[j] * fz[j] * fgb[j] + 6.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] + 
+                t_xz_xxxz[j] = kinvecfunc::fvec_xz_xxxz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxxz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxx[j], pb_xxxz[j], pb_xxz[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               24.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] - 6.0 * pa_xz[j] * pb_xx[j] * fz[j] * fgb[j] + 
+                t_xz_xxyy[j] = kinvecfunc::fvec_xz_xxyy_s_0(fx[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxyy[j], pb_xyy[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxyy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxyy[j], pb_xyy[j], pb_yy[j], r_0_0[j]);
 
-                               30.0 * pa_xz[j] * fz[j] * pb_xx[j] * fx[j] + 20.0 * fx[j] * fz[j] * pa_z[j] * pb_xxx[j] + 12.0 * pa_xz[j] * fz[j] * pb_xxxx[j]) * r_0_0[j];
+                t_xz_xxyz[j] = kinvecfunc::fvec_xz_xxyz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_xxy[j], pb_xxyz[j], pb_xy[j], pb_xyz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_xxy[j], pb_xxyz[j], pb_xy[j], pb_xyz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                t_xz_xxxy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 1.5 * pa_xz[j] * pb_xy[j] * fx[j] + 
+                t_xz_xxzz[j] = kinvecfunc::fvec_xz_xxzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_xz[j], pb_xzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xz_xxzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_xz[j], pb_xzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               1.5 * fx[j] * pa_z[j] * pb_xxy[j] + pa_xz[j] * pb_xxxy[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] * pb_y[j] + 
+                t_xz_xyyy[j] = kinvecfunc::fvec_xz_xyyy_s_0(fx[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyyy[j], pb_y[j], pb_yyy[j], s_0_0[j]) + kinvecfunc::fvec_xz_xyyy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyyy[j], pb_y[j], pb_yyy[j], r_0_0[j]);
 
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] - 3.0 * pa_xz[j] * pb_xy[j] * fz[j] * fgb[j] + 
+                t_xz_xyyz[j] = kinvecfunc::fvec_xz_xyyz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xyy[j], pb_xyyz[j], pb_xz[j], pb_yy[j], pb_yyz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xz_xyyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xyy[j], pb_xyyz[j], pb_xz[j], pb_yy[j], pb_yyz[j], pb_z[j], r_0_0[j]);
 
-                               15.0 * pa_xz[j] * fz[j] * pb_xy[j] * fx[j] + 15.0 * fx[j] * fz[j] * pa_z[j] * pb_xxy[j] + 12.0 * pa_xz[j] * fz[j] * pb_xxxy[j]) * r_0_0[j];
+                t_xz_xyzz[j] = kinvecfunc::fvec_xz_xyzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_y[j], pb_yz[j], pb_yzz[j], s_0_0[j]) + kinvecfunc::fvec_xz_xyzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_y[j], pb_yz[j], pb_yzz[j], r_0_0[j]);
 
-                t_xz_xxxz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                               0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_xx[j] + 1.5 * pa_xz[j] * pb_xz[j] * fx[j] + 
-
-                               0.5 * pa_x[j] * fx[j] * pb_xxx[j] + 1.5 * fx[j] * pa_z[j] * pb_xxz[j] + pa_xz[j] * pb_xxxz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               1.5 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] - 1.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - 3.0 * pa_xz[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xz[j] * fz[j] * pb_xz[j] * fx[j] + 5.0 * pa_x[j] * fz[j] * fx[j] * pb_xxx[j] + 
-
-                               15.0 * fx[j] * fz[j] * pa_z[j] * pb_xxz[j] + 12.0 * pa_xz[j] * fz[j] * pb_xxxz[j]) * r_0_0[j];
-
-                t_xz_xxyy[j] = (0.25 * pa_xz[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 
-
-                               0.5 * pa_xz[j] * pb_xx[j] * fx[j] + 0.5 * pa_xz[j] * fx[j] * pb_yy[j] + fx[j] * pa_z[j] * pb_xyy[j] + 
-
-                               pa_xz[j] * pb_xxyy[j]) * s_0_0[j] + (-pa_xz[j] * fx[j] * fz[j] * fgb[j] - fx[j] * pa_z[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] + 4.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] - 
-
-                               pa_xz[j] * pb_xx[j] * fz[j] * fgb[j] - pa_xz[j] * fz[j] * fgb[j] * pb_yy[j] + 5.0 * pa_xz[j] * fz[j] * pb_xx[j] * fx[j] + 
-
-                               5.0 * pa_xz[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * fx[j] * fz[j] * pa_z[j] * pb_xyy[j] + 12.0 * pa_xz[j] * fz[j] * pb_xxyy[j]) * r_0_0[j];
-
-                t_xz_xxyz[j] = (0.25 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               0.5 * pa_xz[j] * fx[j] * pb_yz[j] + 0.5 * pa_x[j] * fx[j] * pb_xxy[j] + fx[j] * pa_z[j] * pb_xyz[j] + 
-
-                               pa_xz[j] * pb_xxyz[j]) * s_0_0[j] + (-0.5 * pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_y[j] + 
-
-                               2.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 4.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - pa_xz[j] * fz[j] * fgb[j] * pb_yz[j] + 
-
-                               5.0 * pa_xz[j] * fz[j] * fx[j] * pb_yz[j] + 5.0 * pa_x[j] * fz[j] * fx[j] * pb_xxy[j] + 
-
-                               10.0 * fx[j] * fz[j] * pa_z[j] * pb_xyz[j] + 12.0 * pa_xz[j] * fz[j] * pb_xxyz[j]) * r_0_0[j];
-
-                t_xz_xxzz[j] = (0.25 * pa_xz[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + fx[j] * fx[j] * pb_xz[j] + 0.5 * pa_xz[j] * pb_xx[j] * fx[j] + 
-
-                               0.5 * pa_xz[j] * fx[j] * pb_zz[j] + pa_x[j] * fx[j] * pb_xxz[j] + fx[j] * pa_z[j] * pb_xzz[j] + pa_xz[j] * pb_xxzz[j]) * s_0_0[j] + (-pa_xz[j] * fx[j] * fz[j] * fgb[j] - pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] - 
-
-                               fx[j] * pa_z[j] * pb_x[j] * fz[j] * fgb[j] + 2.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] + 
-
-                               4.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 4.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 
-
-                               8.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - pa_xz[j] * pb_xx[j] * fz[j] * fgb[j] - pa_xz[j] * fz[j] * fgb[j] * pb_zz[j] + 
-
-                               5.0 * pa_xz[j] * fz[j] * pb_xx[j] * fx[j] + 5.0 * pa_xz[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               10.0 * pa_x[j] * fz[j] * fx[j] * pb_xxz[j] + 10.0 * fx[j] * fz[j] * pa_z[j] * pb_xzz[j] + 12.0 * pa_xz[j] * fz[j] * pb_xxzz[j]) * r_0_0[j];
-
-                t_xz_xyyy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 1.5 * pa_xz[j] * pb_xy[j] * fx[j] + 
-
-                               0.5 * fx[j] * pa_z[j] * pb_yyy[j] + pa_xz[j] * pb_xyyy[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] - 3.0 * pa_xz[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xz[j] * fz[j] * pb_xy[j] * fx[j] + 5.0 * fx[j] * fz[j] * pa_z[j] * pb_yyy[j] + 12.0 * pa_xz[j] * fz[j] * pb_xyyy[j]) * r_0_0[j];
-
-                t_xz_xyyz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.25 * fx[j] * fx[j] * pb_yy[j] + 0.5 * pa_xz[j] * pb_xz[j] * fx[j] + 
-
-                               0.5 * pa_x[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pa_z[j] * pb_yyz[j] + pa_xz[j] * pb_xyyz[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fgb[j] + 0.75 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.5 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] - 0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               2.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - pa_xz[j] * pb_xz[j] * fz[j] * fgb[j] + 5.0 * pa_xz[j] * fz[j] * pb_xz[j] * fx[j] + 
-
-                               5.0 * pa_x[j] * fz[j] * fx[j] * pb_xyy[j] + 5.0 * fx[j] * fz[j] * pa_z[j] * pb_yyz[j] + 12.0 * pa_xz[j] * fz[j] * pb_xyyz[j]) * r_0_0[j];
-
-                t_xz_xyzz[j] = (0.25 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 0.5 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               0.5 * pa_xz[j] * pb_xy[j] * fx[j] + pa_x[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pa_z[j] * pb_yzz[j] + 
-
-                               pa_xz[j] * pb_xyzz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 4.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - pa_xz[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               5.0 * pa_xz[j] * fz[j] * pb_xy[j] * fx[j] + 10.0 * pa_x[j] * fz[j] * fx[j] * pb_xyz[j] + 
-
-                               5.0 * fx[j] * fz[j] * pa_z[j] * pb_yzz[j] + 12.0 * pa_xz[j] * fz[j] * pb_xyzz[j]) * r_0_0[j];
-
-                t_xz_xzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 
-
-                               0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_zz[j] + 1.5 * pa_xz[j] * pb_xz[j] * fx[j] + 
-
-                               1.5 * pa_x[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pa_z[j] * pb_zzz[j] + pa_xz[j] * pb_xzzz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               1.5 * pa_x[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] - 1.5 * fx[j] * pa_z[j] * pb_z[j] * fz[j] * fgb[j] + 
-
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 3.0 * pa_xz[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xz[j] * fz[j] * pb_xz[j] * fx[j] + 15.0 * pa_x[j] * fz[j] * fx[j] * pb_xzz[j] + 
-
-                               5.0 * fx[j] * fz[j] * pa_z[j] * pb_zzz[j] + 12.0 * pa_xz[j] * fz[j] * pb_xzzz[j]) * r_0_0[j];
+                t_xz_xzzz[j] = kinvecfunc::fvec_xz_xzzz_s_0(fx[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_xz_xzzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (4) = (40,50)
@@ -2752,119 +1534,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yy_xxxy, t_yy_xxxz, t_yy_xxyy, t_yy_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xz_yyyy[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 3.0 * pa_xz[j] * pb_yy[j] * fx[j] + 
+                t_xz_yyyy[j] = kinvecfunc::fvec_xz_yyyy_s_0(fx[j], pa_xz[j], pb_yy[j], pb_yyyy[j], s_0_0[j]) + kinvecfunc::fvec_xz_yyyy_r_0(fgb[j], fx[j], fz[j], pa_xz[j], pb_yy[j], pb_yyyy[j], r_0_0[j]);
 
-                               pa_xz[j] * pb_yyyy[j]) * s_0_0[j] + (-3.0 * pa_xz[j] * fx[j] * fz[j] * fgb[j] + 6.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] - 
+                t_xz_yyyz[j] = kinvecfunc::fvec_xz_yyyz_s_0(fx[j], pa_x[j], pa_xz[j], pb_y[j], pb_yyy[j], pb_yyyz[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xz_yyyz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_y[j], pb_yyy[j], pb_yyyz[j], pb_yz[j], r_0_0[j]);
 
-                               6.0 * pa_xz[j] * pb_yy[j] * fz[j] * fgb[j] + 30.0 * pa_xz[j] * fz[j] * pb_yy[j] * fx[j] + 12.0 * pa_xz[j] * fz[j] * pb_yyyy[j]) * r_0_0[j];
+                t_xz_yyzz[j] = kinvecfunc::fvec_xz_yyzz_s_0(fx[j], pa_x[j], pa_xz[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xz_yyzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_xz_yyyz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_xz[j] * pb_yz[j] * fx[j] + 
+                t_xz_yzzz[j] = kinvecfunc::fvec_xz_yzzz_s_0(fx[j], pa_x[j], pa_xz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], s_0_0[j]) + kinvecfunc::fvec_xz_yzzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], r_0_0[j]);
 
-                               0.5 * pa_x[j] * fx[j] * pb_yyy[j] + pa_xz[j] * pb_yyyz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 
+                t_xz_zzzz[j] = kinvecfunc::fvec_xz_zzzz_s_0(fx[j], pa_x[j], pa_xz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]) + kinvecfunc::fvec_xz_zzzz_r_0(fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], r_0_0[j]);
 
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 3.0 * pa_xz[j] * pb_yz[j] * fz[j] * fgb[j] + 
+                t_yy_xxxx[j] = kinvecfunc::fvec_yy_xxxx_s_0(fx[j], pa_yy[j], pb_xx[j], pb_xxxx[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxxx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_xx[j], pb_xxxx[j], r_0_0[j]);
 
-                               15.0 * pa_xz[j] * fz[j] * pb_yz[j] * fx[j] + 5.0 * pa_x[j] * fz[j] * fx[j] * pb_yyy[j] + 12.0 * pa_xz[j] * fz[j] * pb_yyyz[j]) * r_0_0[j];
+                t_yy_xxxy[j] = kinvecfunc::fvec_yy_xxxy_s_0(fx[j], pa_y[j], pa_yy[j], pb_x[j], pb_xxx[j], pb_xxxy[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxxy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_x[j], pb_xxx[j], pb_xxxy[j], pb_xy[j], r_0_0[j]);
 
-                t_xz_yyzz[j] = (0.25 * pa_xz[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_yy_xxxz[j] = kinvecfunc::fvec_yy_xxxz_s_0(fx[j], pa_yy[j], pb_xxxz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxxz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_xxxz[j], pb_xz[j], r_0_0[j]);
 
-                               0.5 * pa_xz[j] * pb_yy[j] * fx[j] + 0.5 * pa_xz[j] * fx[j] * pb_zz[j] + pa_x[j] * fx[j] * pb_yyz[j] + 
+                t_yy_xxyy[j] = kinvecfunc::fvec_yy_xxyy_s_0(fx[j], pa_y[j], pa_yy[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               pa_xz[j] * pb_yyzz[j]) * s_0_0[j] + (-pa_xz[j] * fx[j] * fz[j] * fgb[j] - pa_x[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               2.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 
-
-                               pa_xz[j] * pb_yy[j] * fz[j] * fgb[j] - pa_xz[j] * fz[j] * fgb[j] * pb_zz[j] + 5.0 * pa_xz[j] * fz[j] * pb_yy[j] * fx[j] + 
-
-                               5.0 * pa_xz[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_x[j] * fz[j] * fx[j] * pb_yyz[j] + 12.0 * pa_xz[j] * fz[j] * pb_yyzz[j]) * r_0_0[j];
-
-                t_xz_yzzz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_xz[j] * pb_yz[j] * fx[j] + 
-
-                               1.5 * pa_x[j] * fx[j] * pb_yzz[j] + pa_xz[j] * pb_yzzz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               6.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 3.0 * pa_xz[j] * pb_yz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_xz[j] * fz[j] * pb_yz[j] * fx[j] + 15.0 * pa_x[j] * fz[j] * fx[j] * pb_yzz[j] + 12.0 * pa_xz[j] * fz[j] * pb_yzzz[j]) * r_0_0[j];
-
-                t_xz_zzzz[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 3.0 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               3.0 * pa_xz[j] * pb_zz[j] * fx[j] + 2.0 * pa_x[j] * fx[j] * pb_zzz[j] + pa_xz[j] * pb_zzzz[j]) * s_0_0[j] + (-3.0 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               6.0 * pa_x[j] * fx[j] * pb_z[j] * fz[j] * fgb[j] + 6.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] + 
-
-                               24.0 * pa_x[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 6.0 * pa_xz[j] * pb_zz[j] * fz[j] * fgb[j] + 
-
-                               30.0 * pa_xz[j] * fz[j] * pb_zz[j] * fx[j] + 20.0 * pa_x[j] * fz[j] * fx[j] * pb_zzz[j] + 12.0 * pa_xz[j] * fz[j] * pb_zzzz[j]) * r_0_0[j];
-
-                t_yy_xxxx[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               1.5 * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_yy[j] * pb_xx[j] * fx[j] + 0.5 * fx[j] * pb_xxxx[j] + pa_yy[j] * pb_xxxx[j]) * s_0_0[j] + (-1.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 
-
-                               3.0 * pa_yy[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fz[j] * fx[j] * fx[j] * fx[j] + 6.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] - 
-
-                               3.0 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 3.0 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 
-
-                               6.0 * pa_yy[j] * pb_xx[j] * fz[j] * fgb[j] + 12.0 * fz[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                               30.0 * pa_yy[j] * fz[j] * pb_xx[j] * fx[j] - fz[j] * fga[j] * pb_xxxx[j] + 5.0 * fz[j] * fx[j] * pb_xxxx[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_xxxx[j]) * r_0_0[j];
-
-                t_yy_xxxy[j] = (1.5 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               1.5 * pa_yy[j] * pb_xy[j] * fx[j] + pa_y[j] * fx[j] * pb_xxx[j] + 0.5 * fx[j] * pb_xxxy[j] + pa_yy[j] * pb_xxxy[j]) * s_0_0[j] + (-3.0 * pa_y[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_x[j] - 1.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 
-
-                               3.0 * pa_yy[j] * pb_xy[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xy[j] + 15.0 * pa_yy[j] * fz[j] * pb_xy[j] * fx[j] + 
-
-                               10.0 * pa_y[j] * fz[j] * fx[j] * pb_xxx[j] - fz[j] * fga[j] * pb_xxxy[j] + 5.0 * fz[j] * fx[j] * pb_xxxy[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_xxxy[j]) * r_0_0[j];
-
-                t_yy_xxxz[j] = (0.75 * fx[j] * fx[j] * pb_xz[j] + 1.5 * pa_yy[j] * pb_xz[j] * fx[j] + 
-
-                               0.5 * fx[j] * pb_xxxz[j] + pa_yy[j] * pb_xxxz[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 
-
-                               3.0 * pa_yy[j] * pb_xz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xz[j] + 15.0 * pa_yy[j] * fz[j] * pb_xz[j] * fx[j] - 
-
-                               fz[j] * fga[j] * pb_xxxz[j] + 5.0 * fz[j] * fx[j] * pb_xxxz[j] + 12.0 * pa_yy[j] * fz[j] * pb_xxxz[j]) * r_0_0[j];
-
-                t_yy_xxyy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.25 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               pa_y[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pb_xx[j] + 0.25 * fx[j] * fx[j] * pb_yy[j] + 
-
-                               0.5 * pa_yy[j] * pb_xx[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] * pb_yy[j] + 2.0 * pa_y[j] * fx[j] * pb_xxy[j] + 
-
-                               0.5 * fx[j] * pb_xxyy[j] + pa_yy[j] * pb_xxyy[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.25 * fz[j] * fga[j] * fx[j] * fx[j] - pa_yy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               2.0 * pa_y[j] * fx[j] * fz[j] * fgb[j] * pb_y[j] + 2.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               8.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - 0.5 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fx[j] * fz[j] * fgb[j] * pb_yy[j] - 0.5 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_yy[j] - 
-
-                               pa_yy[j] * pb_xx[j] * fz[j] * fgb[j] - pa_yy[j] * fz[j] * fgb[j] * pb_yy[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                               5.0 * pa_yy[j] * fz[j] * pb_xx[j] * fx[j] + 5.0 * pa_yy[j] * fz[j] * fx[j] * pb_yy[j] + 
-
-                               20.0 * pa_y[j] * fz[j] * fx[j] * pb_xxy[j] - fz[j] * fga[j] * pb_xxyy[j] + 5.0 * fz[j] * fx[j] * pb_xxyy[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_xxyy[j]) * r_0_0[j];
-
-                t_yy_xxyz[j] = (0.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 0.25 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               0.5 * pa_yy[j] * fx[j] * pb_yz[j] + pa_y[j] * fx[j] * pb_xxz[j] + 0.5 * fx[j] * pb_xxyz[j] + pa_yy[j] * pb_xxyz[j]) * s_0_0[j] + (-pa_y[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               4.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_yz[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_yz[j] - 
-
-                               pa_yy[j] * fz[j] * fgb[j] * pb_yz[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_yz[j] + 5.0 * pa_yy[j] * fz[j] * fx[j] * pb_yz[j] + 
-
-                               10.0 * pa_y[j] * fz[j] * fx[j] * pb_xxz[j] - fz[j] * fga[j] * pb_xxyz[j] + 5.0 * fz[j] * fx[j] * pb_xxyz[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_xxyz[j]) * r_0_0[j];
+                t_yy_xxyz[j] = kinvecfunc::fvec_yy_xxyz_s_0(fx[j], pa_y[j], pa_yy[j], pb_xxyz[j], pb_xxz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_xxyz[j], pb_xxz[j], pb_yz[j], pb_z[j], r_0_0[j]);
             }
 
             // Batch of Integrals (5) = (50,60)
@@ -2876,145 +1564,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yy_yzzz, t_yy_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yy_xxzz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_yy[j] * fx[j] * fx[j] + 
+                t_yy_xxzz[j] = kinvecfunc::fvec_yy_xxzz_s_0(fx[j], pa_yy[j], pb_xx[j], pb_xxzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xxzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_xx[j], pb_xxzz[j], pb_zz[j], r_0_0[j]);
 
-                               0.25 * fx[j] * fx[j] * pb_xx[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_yy[j] * pb_xx[j] * fx[j] + 
+                t_yy_xyyy[j] = kinvecfunc::fvec_yy_xyyy_s_0(fx[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], s_0_0[j]) + kinvecfunc::fvec_yy_xyyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], r_0_0[j]);
 
-                               0.5 * pa_yy[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * pb_xxzz[j] + pa_yy[j] * pb_xxzz[j]) * s_0_0[j] + (-0.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.25 * fz[j] * fga[j] * fx[j] * fx[j] - 
+                t_yy_xyyz[j] = kinvecfunc::fvec_yy_xyyz_s_0(fx[j], pa_y[j], pa_yy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xyyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], r_0_0[j]);
 
-                               pa_yy[j] * fx[j] * fz[j] * fgb[j] + 0.75 * fz[j] * fx[j] * fx[j] * fx[j] + 2.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] - 
+                t_yy_xyzz[j] = kinvecfunc::fvec_yy_xyzz_s_0(fx[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyzz[j], pb_xzz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xyzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_xyzz[j], pb_xzz[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_zz[j] - 0.5 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 
+                t_yy_xzzz[j] = kinvecfunc::fvec_yy_xzzz_s_0(fx[j], pa_yy[j], pb_xz[j], pb_xzzz[j], s_0_0[j]) + kinvecfunc::fvec_yy_xzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_xz[j], pb_xzzz[j], r_0_0[j]);
 
-                               0.5 * fz[j] * fga[j] * fx[j] * pb_zz[j] - pa_yy[j] * pb_xx[j] * fz[j] * fgb[j] - pa_yy[j] * fz[j] * fgb[j] * pb_zz[j] + 
+                t_yy_yyyy[j] = kinvecfunc::fvec_yy_yyyy_s_0(fx[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]) + kinvecfunc::fvec_yy_yyyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], r_0_0[j]);
 
-                               2.0 * fz[j] * fx[j] * fx[j] * pb_xx[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_zz[j] + 5.0 * pa_yy[j] * fz[j] * pb_xx[j] * fx[j] + 
+                t_yy_yyyz[j] = kinvecfunc::fvec_yy_yyyz_s_0(fx[j], pa_y[j], pa_yy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yy_yyyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               5.0 * pa_yy[j] * fz[j] * fx[j] * pb_zz[j] - fz[j] * fga[j] * pb_xxzz[j] + 5.0 * fz[j] * fx[j] * pb_xxzz[j] + 
+                t_yy_yyzz[j] = kinvecfunc::fvec_yy_yyzz_s_0(fx[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], pb_yyzz[j], pb_yzz[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yy_yyzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], pb_yyzz[j], pb_yzz[j], pb_zz[j], r_0_0[j]);
 
-                               12.0 * pa_yy[j] * fz[j] * pb_xxzz[j]) * r_0_0[j];
+                t_yy_yzzz[j] = kinvecfunc::fvec_yy_yzzz_s_0(fx[j], pa_y[j], pa_yy[j], pb_yz[j], pb_yzzz[j], pb_z[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_yy_yzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pb_yz[j], pb_yzzz[j], pb_z[j], pb_zzz[j], r_0_0[j]);
 
-                t_yy_xyyy[j] = (1.5 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               1.5 * pa_yy[j] * pb_xy[j] * fx[j] + 3.0 * pa_y[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pb_xyyy[j] + pa_yy[j] * pb_xyyy[j]) * s_0_0[j] + (-3.0 * pa_y[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 18.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - 1.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 
-
-                               1.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 3.0 * pa_yy[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_yy[j] * fz[j] * pb_xy[j] * fx[j] + 30.0 * pa_y[j] * fz[j] * fx[j] * pb_xyy[j] - fz[j] * fga[j] * pb_xyyy[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_xyyy[j] + 12.0 * pa_yy[j] * fz[j] * pb_xyyy[j]) * r_0_0[j];
-
-                t_yy_xyyz[j] = (0.75 * fx[j] * fx[j] * pb_xz[j] + 0.5 * pa_yy[j] * pb_xz[j] * fx[j] + 
-
-                               2.0 * pa_y[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pb_xyyz[j] + pa_yy[j] * pb_xyyz[j]) * s_0_0[j] + (6.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - 0.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - pa_yy[j] * pb_xz[j] * fz[j] * fgb[j] + 5.0 * pa_yy[j] * fz[j] * pb_xz[j] * fx[j] + 
-
-                               20.0 * pa_y[j] * fz[j] * fx[j] * pb_xyz[j] - fz[j] * fga[j] * pb_xyyz[j] + 5.0 * fz[j] * fx[j] * pb_xyyz[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_xyyz[j]) * r_0_0[j];
-
-                t_yy_xyzz[j] = (0.5 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               0.5 * pa_yy[j] * pb_xy[j] * fx[j] + pa_y[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pb_xyzz[j] + pa_yy[j] * pb_xyzz[j]) * s_0_0[j] + (-pa_y[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               4.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_x[j] - 0.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 
-
-                               pa_yy[j] * pb_xy[j] * fz[j] * fgb[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_xy[j] + 5.0 * pa_yy[j] * fz[j] * pb_xy[j] * fx[j] + 
-
-                               10.0 * pa_y[j] * fz[j] * fx[j] * pb_xzz[j] - fz[j] * fga[j] * pb_xyzz[j] + 5.0 * fz[j] * fx[j] * pb_xyzz[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_xyzz[j]) * r_0_0[j];
-
-                t_yy_xzzz[j] = (0.75 * fx[j] * fx[j] * pb_xz[j] + 1.5 * pa_yy[j] * pb_xz[j] * fx[j] + 
-
-                               0.5 * fx[j] * pb_xzzz[j] + pa_yy[j] * pb_xzzz[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 
-
-                               3.0 * pa_yy[j] * pb_xz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xz[j] + 15.0 * pa_yy[j] * fz[j] * pb_xz[j] * fx[j] - 
-
-                               fz[j] * fga[j] * pb_xzzz[j] + 5.0 * fz[j] * fx[j] * pb_xzzz[j] + 12.0 * pa_yy[j] * fz[j] * pb_xzzz[j]) * r_0_0[j];
-
-                t_yy_yyyy[j] = (1.875 * fx[j] * fx[j] * fx[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               6.0 * pa_y[j] * fx[j] * fx[j] * pb_y[j] + 4.5 * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_yy[j] * pb_yy[j] * fx[j] + 
-
-                               4.0 * pa_y[j] * fx[j] * pb_yyy[j] + 0.5 * fx[j] * pb_yyyy[j] + pa_yy[j] * pb_yyyy[j]) * s_0_0[j] + (-4.5 * fx[j] * fx[j] * fz[j] * fgb[j] + 11.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 3.0 * pa_yy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               12.0 * pa_y[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 6.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               48.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 36.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - 3.0 * fx[j] * pb_yy[j] * fz[j] * fgb[j] - 
-
-                               3.0 * fz[j] * fga[j] * pb_yy[j] * fx[j] - 6.0 * pa_yy[j] * pb_yy[j] * fz[j] * fgb[j] + 
-
-                               30.0 * pa_yy[j] * fz[j] * pb_yy[j] * fx[j] + 40.0 * pa_y[j] * fz[j] * fx[j] * pb_yyy[j] - fz[j] * fga[j] * pb_yyyy[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_yyyy[j] + 12.0 * pa_yy[j] * fz[j] * pb_yyyy[j]) * r_0_0[j];
-
-                t_yy_yyyz[j] = (1.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 2.25 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               1.5 * pa_yy[j] * pb_yz[j] * fx[j] + 3.0 * pa_y[j] * fx[j] * pb_yyz[j] + 0.5 * fx[j] * pb_yyyz[j] + pa_yy[j] * pb_yyyz[j]) * s_0_0[j] + (-3.0 * pa_y[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               12.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 18.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - 1.5 * fx[j] * pb_yz[j] * fz[j] * fgb[j] - 
-
-                               1.5 * fz[j] * fga[j] * pb_yz[j] * fx[j] - 3.0 * pa_yy[j] * pb_yz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_yy[j] * fz[j] * pb_yz[j] * fx[j] + 30.0 * pa_y[j] * fz[j] * fx[j] * pb_yyz[j] - fz[j] * fga[j] * pb_yyyz[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_yyyz[j] + 12.0 * pa_yy[j] * fz[j] * pb_yyyz[j]) * r_0_0[j];
-
-                t_yy_yyzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.25 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               pa_y[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pb_zz[j] + 0.25 * fx[j] * fx[j] * pb_yy[j] + 
-
-                               0.5 * pa_yy[j] * pb_yy[j] * fx[j] + 0.5 * pa_yy[j] * fx[j] * pb_zz[j] + 2.0 * pa_y[j] * fx[j] * pb_yzz[j] + 
-
-                               0.5 * fx[j] * pb_yyzz[j] + pa_yy[j] * pb_yyzz[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.25 * fz[j] * fga[j] * fx[j] * fx[j] - pa_yy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               2.0 * pa_y[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 2.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               8.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 0.5 * fx[j] * pb_yy[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fx[j] * fz[j] * fgb[j] * pb_zz[j] - 0.5 * fz[j] * fga[j] * pb_yy[j] * fx[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_zz[j] - 
-
-                               pa_yy[j] * pb_yy[j] * fz[j] * fgb[j] - pa_yy[j] * fz[j] * fgb[j] * pb_zz[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                               5.0 * pa_yy[j] * fz[j] * pb_yy[j] * fx[j] + 5.0 * pa_yy[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               20.0 * pa_y[j] * fz[j] * fx[j] * pb_yzz[j] - fz[j] * fga[j] * pb_yyzz[j] + 5.0 * fz[j] * fx[j] * pb_yyzz[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_yyzz[j]) * r_0_0[j];
-
-                t_yy_yzzz[j] = (1.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               1.5 * pa_yy[j] * pb_yz[j] * fx[j] + pa_y[j] * fx[j] * pb_zzz[j] + 0.5 * fx[j] * pb_yzzz[j] + pa_yy[j] * pb_yzzz[j]) * s_0_0[j] + (-3.0 * pa_y[j] * fx[j] * pb_z[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 1.5 * fx[j] * pb_yz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_yz[j] * fx[j] - 
-
-                               3.0 * pa_yy[j] * pb_yz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_yz[j] + 15.0 * pa_yy[j] * fz[j] * pb_yz[j] * fx[j] + 
-
-                               10.0 * pa_y[j] * fz[j] * fx[j] * pb_zzz[j] - fz[j] * fga[j] * pb_yzzz[j] + 5.0 * fz[j] * fx[j] * pb_yzzz[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_yzzz[j]) * r_0_0[j];
-
-                t_yy_zzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               1.5 * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_yy[j] * pb_zz[j] * fx[j] + 0.5 * fx[j] * pb_zzzz[j] + pa_yy[j] * pb_zzzz[j]) * s_0_0[j] + (-1.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 
-
-                               3.0 * pa_yy[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fz[j] * fx[j] * fx[j] * fx[j] + 6.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] - 
-
-                               3.0 * fx[j] * pb_zz[j] * fz[j] * fgb[j] - 3.0 * fz[j] * fga[j] * pb_zz[j] * fx[j] - 
-
-                               6.0 * pa_yy[j] * pb_zz[j] * fz[j] * fgb[j] + 12.0 * fz[j] * fx[j] * fx[j] * pb_zz[j] + 
-
-                               30.0 * pa_yy[j] * fz[j] * pb_zz[j] * fx[j] - fz[j] * fga[j] * pb_zzzz[j] + 5.0 * fz[j] * fx[j] * pb_zzzz[j] + 
-
-                               12.0 * pa_yy[j] * fz[j] * pb_zzzz[j]) * r_0_0[j];
+                t_yy_zzzz[j] = kinvecfunc::fvec_yy_zzzz_s_0(fx[j], pa_yy[j], pb_zz[j], pb_zzzz[j], s_0_0[j]) + kinvecfunc::fvec_yy_zzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pb_zz[j], pb_zzzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (6) = (60,70)
@@ -3026,105 +1594,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yz_xyzz, t_yz_xzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yz_xxxx[j] = (0.75 * pa_yz[j] * fx[j] * fx[j] + 3.0 * pa_yz[j] * pb_xx[j] * fx[j] + 
+                t_yz_xxxx[j] = kinvecfunc::fvec_yz_xxxx_s_0(fx[j], pa_yz[j], pb_xx[j], pb_xxxx[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxxx_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pb_xx[j], pb_xxxx[j], r_0_0[j]);
 
-                               pa_yz[j] * pb_xxxx[j]) * s_0_0[j] + (-3.0 * pa_yz[j] * fx[j] * fz[j] * fgb[j] + 6.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] - 
+                t_yz_xxxy[j] = kinvecfunc::fvec_yz_xxxy_s_0(fx[j], pa_yz[j], pa_z[j], pb_x[j], pb_xxx[j], pb_xxxy[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxxy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xxx[j], pb_xxxy[j], pb_xy[j], r_0_0[j]);
 
-                               6.0 * pa_yz[j] * pb_xx[j] * fz[j] * fgb[j] + 30.0 * pa_yz[j] * fz[j] * pb_xx[j] * fx[j] + 12.0 * pa_yz[j] * fz[j] * pb_xxxx[j]) * r_0_0[j];
+                t_yz_xxxz[j] = kinvecfunc::fvec_yz_xxxz_s_0(fx[j], pa_y[j], pa_yz[j], pb_x[j], pb_xxx[j], pb_xxxz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxxz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xxx[j], pb_xxxz[j], pb_xz[j], r_0_0[j]);
 
-                t_yz_xxxy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 1.5 * pa_yz[j] * pb_xy[j] * fx[j] + 
+                t_yz_xxyy[j] = kinvecfunc::fvec_yz_xxyy_s_0(fx[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxyy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_xxyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pa_z[j] * pb_xxx[j] + pa_yz[j] * pb_xxxy[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * pb_x[j] * fz[j] * fgb[j] + 
+                t_yz_xxyz[j] = kinvecfunc::fvec_yz_xxyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_xxyz[j], pb_xxz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxyz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_xx[j], pb_xxy[j], pb_xxyz[j], pb_xxz[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] - 3.0 * pa_yz[j] * pb_xy[j] * fz[j] * fgb[j] + 
+                t_yz_xxzz[j] = kinvecfunc::fvec_yz_xxzz_s_0(fx[j], pa_y[j], pa_yz[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xxzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               15.0 * pa_yz[j] * fz[j] * pb_xy[j] * fx[j] + 5.0 * fx[j] * fz[j] * pa_z[j] * pb_xxx[j] + 12.0 * pa_yz[j] * fz[j] * pb_xxxy[j]) * r_0_0[j];
+                t_yz_xyyy[j] = kinvecfunc::fvec_yz_xyyy_s_0(fx[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], s_0_0[j]) + kinvecfunc::fvec_yz_xyyy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyy[j], r_0_0[j]);
 
-                t_yz_xxxz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_yz[j] * pb_xz[j] * fx[j] + 
+                t_yz_xyyz[j] = kinvecfunc::fvec_yz_xyyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xyyz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyy[j], pb_xyyz[j], pb_xyz[j], pb_xz[j], r_0_0[j]);
 
-                               0.5 * pa_y[j] * fx[j] * pb_xxx[j] + pa_yz[j] * pb_xxxz[j]) * s_0_0[j] + (-1.5 * pa_y[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
+                t_yz_xyzz[j] = kinvecfunc::fvec_yz_xyzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_xz[j], pb_xzz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xyzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], pb_xz[j], pb_xzz[j], r_0_0[j]);
 
-                               6.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_x[j] - 3.0 * pa_yz[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_yz[j] * fz[j] * pb_xz[j] * fx[j] + 5.0 * pa_y[j] * fz[j] * fx[j] * pb_xxx[j] + 12.0 * pa_yz[j] * fz[j] * pb_xxxz[j]) * r_0_0[j];
-
-                t_yz_xxyy[j] = (0.25 * pa_yz[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 
-
-                               0.5 * pa_yz[j] * pb_xx[j] * fx[j] + 0.5 * pa_yz[j] * fx[j] * pb_yy[j] + fx[j] * pa_z[j] * pb_xxy[j] + 
-
-                               pa_yz[j] * pb_xxyy[j]) * s_0_0[j] + (-pa_yz[j] * fx[j] * fz[j] * fgb[j] - fx[j] * pa_z[j] * fz[j] * fgb[j] * pb_y[j] + 
-
-                               2.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] + 4.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] - 
-
-                               pa_yz[j] * pb_xx[j] * fz[j] * fgb[j] - pa_yz[j] * fz[j] * fgb[j] * pb_yy[j] + 5.0 * pa_yz[j] * fz[j] * pb_xx[j] * fx[j] + 
-
-                               5.0 * pa_yz[j] * fz[j] * fx[j] * pb_yy[j] + 10.0 * fx[j] * fz[j] * pa_z[j] * pb_xxy[j] + 12.0 * pa_yz[j] * fz[j] * pb_xxyy[j]) * r_0_0[j];
-
-                t_yz_xxyz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_y[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.25 * fx[j] * fx[j] * pb_xx[j] + 0.5 * pa_yz[j] * fx[j] * pb_yz[j] + 
-
-                               0.5 * pa_y[j] * fx[j] * pb_xxy[j] + 0.5 * fx[j] * pa_z[j] * pb_xxz[j] + pa_yz[j] * pb_xxyz[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fgb[j] + 0.75 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.5 * pa_y[j] * fx[j] * fz[j] * fgb[j] * pb_y[j] - 0.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               2.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - pa_yz[j] * fz[j] * fgb[j] * pb_yz[j] + 5.0 * pa_yz[j] * fz[j] * fx[j] * pb_yz[j] + 
-
-                               5.0 * pa_y[j] * fz[j] * fx[j] * pb_xxy[j] + 5.0 * fx[j] * fz[j] * pa_z[j] * pb_xxz[j] + 12.0 * pa_yz[j] * fz[j] * pb_xxyz[j]) * r_0_0[j];
-
-                t_yz_xxzz[j] = (0.25 * pa_yz[j] * fx[j] * fx[j] + 0.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * pa_yz[j] * pb_xx[j] * fx[j] + 0.5 * pa_yz[j] * fx[j] * pb_zz[j] + pa_y[j] * fx[j] * pb_xxz[j] + 
-
-                               pa_yz[j] * pb_xxzz[j]) * s_0_0[j] + (-pa_yz[j] * fx[j] * fz[j] * fgb[j] - pa_y[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 
-
-                               2.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] + 4.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 
-
-                               pa_yz[j] * pb_xx[j] * fz[j] * fgb[j] - pa_yz[j] * fz[j] * fgb[j] * pb_zz[j] + 5.0 * pa_yz[j] * fz[j] * pb_xx[j] * fx[j] + 
-
-                               5.0 * pa_yz[j] * fz[j] * fx[j] * pb_zz[j] + 10.0 * pa_y[j] * fz[j] * fx[j] * pb_xxz[j] + 12.0 * pa_yz[j] * fz[j] * pb_xxzz[j]) * r_0_0[j];
-
-                t_yz_xyyy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 1.5 * pa_yz[j] * pb_xy[j] * fx[j] + 
-
-                               1.5 * fx[j] * pa_z[j] * pb_xyy[j] + pa_yz[j] * pb_xyyy[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] - 3.0 * pa_yz[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_yz[j] * fz[j] * pb_xy[j] * fx[j] + 15.0 * fx[j] * fz[j] * pa_z[j] * pb_xyy[j] + 12.0 * pa_yz[j] * fz[j] * pb_xyyy[j]) * r_0_0[j];
-
-                t_yz_xyyz[j] = (0.25 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * fx[j] * pb_xy[j] + 
-
-                               0.5 * pa_yz[j] * pb_xz[j] * fx[j] + 0.5 * pa_y[j] * fx[j] * pb_xyy[j] + fx[j] * pa_z[j] * pb_xyz[j] + 
-
-                               pa_yz[j] * pb_xyyz[j]) * s_0_0[j] + (-0.5 * pa_y[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 4.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - pa_yz[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               5.0 * pa_yz[j] * fz[j] * pb_xz[j] * fx[j] + 5.0 * pa_y[j] * fz[j] * fx[j] * pb_xyy[j] + 
-
-                               10.0 * fx[j] * fz[j] * pa_z[j] * pb_xyz[j] + 12.0 * pa_yz[j] * fz[j] * pb_xyyz[j]) * r_0_0[j];
-
-                t_yz_xyzz[j] = (0.25 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 0.5 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               0.5 * pa_yz[j] * pb_xy[j] * fx[j] + pa_y[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pa_z[j] * pb_xzz[j] + 
-
-                               pa_yz[j] * pb_xyzz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_z[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 4.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - pa_yz[j] * pb_xy[j] * fz[j] * fgb[j] + 
-
-                               5.0 * pa_yz[j] * fz[j] * pb_xy[j] * fx[j] + 10.0 * pa_y[j] * fz[j] * fx[j] * pb_xyz[j] + 
-
-                               5.0 * fx[j] * fz[j] * pa_z[j] * pb_xzz[j] + 12.0 * pa_yz[j] * fz[j] * pb_xyzz[j]) * r_0_0[j];
-
-                t_yz_xzzz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_yz[j] * pb_xz[j] * fx[j] + 
-
-                               1.5 * pa_y[j] * fx[j] * pb_xzz[j] + pa_yz[j] * pb_xzzz[j]) * s_0_0[j] + (-1.5 * pa_y[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               6.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_x[j] - 3.0 * pa_yz[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_yz[j] * fz[j] * pb_xz[j] * fx[j] + 15.0 * pa_y[j] * fz[j] * fx[j] * pb_xzz[j] + 12.0 * pa_yz[j] * fz[j] * pb_xzzz[j]) * r_0_0[j];
+                t_yz_xzzz[j] = kinvecfunc::fvec_yz_xzzz_s_0(fx[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], s_0_0[j]) + kinvecfunc::fvec_yz_xzzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (7) = (70,80)
@@ -3136,137 +1624,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_zz_xxxz, t_zz_xxyy, t_zz_xxyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yz_yyyy[j] = (0.75 * pa_yz[j] * fx[j] * fx[j] + 3.0 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 
+                t_yz_yyyy[j] = kinvecfunc::fvec_yz_yyyy_s_0(fx[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], s_0_0[j]) + kinvecfunc::fvec_yz_yyyy_r_0(fgb[j], fx[j], fz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyy[j], r_0_0[j]);
 
-                               3.0 * pa_yz[j] * pb_yy[j] * fx[j] + 2.0 * fx[j] * pa_z[j] * pb_yyy[j] + pa_yz[j] * pb_yyyy[j]) * s_0_0[j] + (-3.0 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 
+                t_yz_yyyz[j] = kinvecfunc::fvec_yz_yyyz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yz_yyyz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyy[j], pb_yyyz[j], pb_yyz[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               6.0 * fx[j] * pa_z[j] * pb_y[j] * fz[j] * fgb[j] + 6.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] + 
+                t_yz_yyzz[j] = kinvecfunc::fvec_yz_yyzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yz_yyzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_yz[j], pb_yzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               24.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] - 6.0 * pa_yz[j] * pb_yy[j] * fz[j] * fgb[j] + 
+                t_yz_yzzz[j] = kinvecfunc::fvec_yz_yzzz_s_0(fx[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], s_0_0[j]) + kinvecfunc::fvec_yz_yzzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], pb_z[j], pb_zz[j], pb_zzz[j], r_0_0[j]);
 
-                               30.0 * pa_yz[j] * fz[j] * pb_yy[j] * fx[j] + 20.0 * fx[j] * fz[j] * pa_z[j] * pb_yyy[j] + 12.0 * pa_yz[j] * fz[j] * pb_yyyy[j]) * r_0_0[j];
+                t_yz_zzzz[j] = kinvecfunc::fvec_yz_zzzz_s_0(fx[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]) + kinvecfunc::fvec_yz_zzzz_r_0(fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], r_0_0[j]);
 
-                t_yz_yyyz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_zz_xxxx[j] = kinvecfunc::fvec_zz_xxxx_s_0(fx[j], pa_zz[j], pb_xx[j], pb_xxxx[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxxx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_xx[j], pb_xxxx[j], r_0_0[j]);
 
-                               0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_yy[j] + 1.5 * pa_yz[j] * pb_yz[j] * fx[j] + 
+                t_zz_xxxy[j] = kinvecfunc::fvec_zz_xxxy_s_0(fx[j], pa_zz[j], pb_xxxy[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxxy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_xxxy[j], pb_xy[j], r_0_0[j]);
 
-                               0.5 * pa_y[j] * fx[j] * pb_yyy[j] + 1.5 * fx[j] * pa_z[j] * pb_yyz[j] + pa_yz[j] * pb_yyyz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
+                t_zz_xxxz[j] = kinvecfunc::fvec_zz_xxxz_s_0(fx[j], pa_z[j], pa_zz[j], pb_x[j], pb_xxx[j], pb_xxxz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxxz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xxx[j], pb_xxxz[j], pb_xz[j], r_0_0[j]);
 
-                               1.5 * pa_y[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] - 1.5 * fx[j] * pa_z[j] * fz[j] * fgb[j] * pb_z[j] + 
+                t_zz_xxyy[j] = kinvecfunc::fvec_zz_xxyy_s_0(fx[j], pa_zz[j], pb_xx[j], pb_xxyy[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_xx[j], pb_xxyy[j], pb_yy[j], r_0_0[j]);
 
-                               6.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - 3.0 * pa_yz[j] * pb_yz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_yz[j] * fz[j] * pb_yz[j] * fx[j] + 5.0 * pa_y[j] * fz[j] * fx[j] * pb_yyy[j] + 
-
-                               15.0 * fx[j] * fz[j] * pa_z[j] * pb_yyz[j] + 12.0 * pa_yz[j] * fz[j] * pb_yyyz[j]) * r_0_0[j];
-
-                t_yz_yyzz[j] = (0.25 * pa_yz[j] * fx[j] * fx[j] + 0.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + fx[j] * fx[j] * pb_yz[j] + 0.5 * pa_yz[j] * pb_yy[j] * fx[j] + 
-
-                               0.5 * pa_yz[j] * fx[j] * pb_zz[j] + pa_y[j] * fx[j] * pb_yyz[j] + fx[j] * pa_z[j] * pb_yzz[j] + pa_yz[j] * pb_yyzz[j]) * s_0_0[j] + (-pa_yz[j] * fx[j] * fz[j] * fgb[j] - pa_y[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] - 
-
-                               fx[j] * pa_z[j] * pb_y[j] * fz[j] * fgb[j] + 2.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] + 
-
-                               4.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 4.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 
-
-                               8.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - pa_yz[j] * pb_yy[j] * fz[j] * fgb[j] - pa_yz[j] * fz[j] * fgb[j] * pb_zz[j] + 
-
-                               5.0 * pa_yz[j] * fz[j] * pb_yy[j] * fx[j] + 5.0 * pa_yz[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               10.0 * pa_y[j] * fz[j] * fx[j] * pb_yyz[j] + 10.0 * fx[j] * fz[j] * pa_z[j] * pb_yzz[j] + 12.0 * pa_yz[j] * fz[j] * pb_yyzz[j]) * r_0_0[j];
-
-                t_yz_yzzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_y[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_zz[j] + 1.5 * pa_yz[j] * pb_yz[j] * fx[j] + 
-
-                               1.5 * pa_y[j] * fx[j] * pb_yzz[j] + 0.5 * fx[j] * pa_z[j] * pb_zzz[j] + pa_yz[j] * pb_yzzz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               1.5 * pa_y[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] - 1.5 * fx[j] * pa_z[j] * pb_z[j] * fz[j] * fgb[j] + 
-
-                               6.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 3.0 * pa_yz[j] * pb_yz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_yz[j] * fz[j] * pb_yz[j] * fx[j] + 15.0 * pa_y[j] * fz[j] * fx[j] * pb_yzz[j] + 
-
-                               5.0 * fx[j] * fz[j] * pa_z[j] * pb_zzz[j] + 12.0 * pa_yz[j] * fz[j] * pb_yzzz[j]) * r_0_0[j];
-
-                t_yz_zzzz[j] = (0.75 * pa_yz[j] * fx[j] * fx[j] + 3.0 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               3.0 * pa_yz[j] * pb_zz[j] * fx[j] + 2.0 * pa_y[j] * fx[j] * pb_zzz[j] + pa_yz[j] * pb_zzzz[j]) * s_0_0[j] + (-3.0 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               6.0 * pa_y[j] * fx[j] * pb_z[j] * fz[j] * fgb[j] + 6.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] + 
-
-                               24.0 * pa_y[j] * fz[j] * fx[j] * fx[j] * pb_z[j] - 6.0 * pa_yz[j] * pb_zz[j] * fz[j] * fgb[j] + 
-
-                               30.0 * pa_yz[j] * fz[j] * pb_zz[j] * fx[j] + 20.0 * pa_y[j] * fz[j] * fx[j] * pb_zzz[j] + 12.0 * pa_yz[j] * fz[j] * pb_zzzz[j]) * r_0_0[j];
-
-                t_zz_xxxx[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               1.5 * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_zz[j] * pb_xx[j] * fx[j] + 0.5 * fx[j] * pb_xxxx[j] + pa_zz[j] * pb_xxxx[j]) * s_0_0[j] + (-1.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 
-
-                               3.0 * pa_zz[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fz[j] * fx[j] * fx[j] * fx[j] + 6.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] - 
-
-                               3.0 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 3.0 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 
-
-                               6.0 * pa_zz[j] * pb_xx[j] * fz[j] * fgb[j] + 12.0 * fz[j] * fx[j] * fx[j] * pb_xx[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * pb_xx[j] * fx[j] - fz[j] * fga[j] * pb_xxxx[j] + 5.0 * fz[j] * fx[j] * pb_xxxx[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_xxxx[j]) * r_0_0[j];
-
-                t_zz_xxxy[j] = (0.75 * fx[j] * fx[j] * pb_xy[j] + 1.5 * pa_zz[j] * pb_xy[j] * fx[j] + 
-
-                               0.5 * fx[j] * pb_xxxy[j] + pa_zz[j] * pb_xxxy[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 
-
-                               3.0 * pa_zz[j] * pb_xy[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xy[j] + 15.0 * pa_zz[j] * fz[j] * pb_xy[j] * fx[j] - 
-
-                               fz[j] * fga[j] * pb_xxxy[j] + 5.0 * fz[j] * fx[j] * pb_xxxy[j] + 12.0 * pa_zz[j] * fz[j] * pb_xxxy[j]) * r_0_0[j];
-
-                t_zz_xxxz[j] = (1.5 * pa_z[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               1.5 * pa_zz[j] * pb_xz[j] * fx[j] + pa_z[j] * fx[j] * pb_xxx[j] + 0.5 * fx[j] * pb_xxxz[j] + pa_zz[j] * pb_xxxz[j]) * s_0_0[j] + (-3.0 * pa_z[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_x[j] - 1.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 
-
-                               3.0 * pa_zz[j] * pb_xz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xz[j] + 15.0 * pa_zz[j] * fz[j] * pb_xz[j] * fx[j] + 
-
-                               10.0 * pa_z[j] * fz[j] * fx[j] * pb_xxx[j] - fz[j] * fga[j] * pb_xxxz[j] + 5.0 * fz[j] * fx[j] * pb_xxxz[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_xxxz[j]) * r_0_0[j];
-
-                t_zz_xxyy[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_xx[j] + 0.25 * fx[j] * fx[j] * pb_yy[j] + 0.5 * pa_zz[j] * pb_xx[j] * fx[j] + 
-
-                               0.5 * pa_zz[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * pb_xxyy[j] + pa_zz[j] * pb_xxyy[j]) * s_0_0[j] + (-0.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.25 * fz[j] * fga[j] * fx[j] * fx[j] - 
-
-                               pa_zz[j] * fx[j] * fz[j] * fgb[j] + 0.75 * fz[j] * fx[j] * fx[j] * fx[j] + 2.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] - 
-
-                               0.5 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_yy[j] - 0.5 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 
-
-                               0.5 * fz[j] * fga[j] * fx[j] * pb_yy[j] - pa_zz[j] * pb_xx[j] * fz[j] * fgb[j] - pa_zz[j] * fz[j] * fgb[j] * pb_yy[j] + 
-
-                               2.0 * fz[j] * fx[j] * fx[j] * pb_xx[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_yy[j] + 5.0 * pa_zz[j] * fz[j] * pb_xx[j] * fx[j] + 
-
-                               5.0 * pa_zz[j] * fz[j] * fx[j] * pb_yy[j] - fz[j] * fga[j] * pb_xxyy[j] + 5.0 * fz[j] * fx[j] * pb_xxyy[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_xxyy[j]) * r_0_0[j];
-
-                t_zz_xxyz[j] = (0.5 * pa_z[j] * fx[j] * fx[j] * pb_y[j] + 0.25 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               0.5 * pa_zz[j] * fx[j] * pb_yz[j] + pa_z[j] * fx[j] * pb_xxy[j] + 0.5 * fx[j] * pb_xxyz[j] + pa_zz[j] * pb_xxyz[j]) * s_0_0[j] + (-pa_z[j] * fx[j] * fz[j] * fgb[j] * pb_y[j] + 
-
-                               4.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 0.5 * fx[j] * fz[j] * fgb[j] * pb_yz[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_yz[j] - 
-
-                               pa_zz[j] * fz[j] * fgb[j] * pb_yz[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_yz[j] + 5.0 * pa_zz[j] * fz[j] * fx[j] * pb_yz[j] + 
-
-                               10.0 * pa_z[j] * fz[j] * fx[j] * pb_xxy[j] - fz[j] * fga[j] * pb_xxyz[j] + 5.0 * fz[j] * fx[j] * pb_xxyz[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_xxyz[j]) * r_0_0[j];
+                t_zz_xxyz[j] = kinvecfunc::fvec_zz_xxyz_s_0(fx[j], pa_z[j], pa_zz[j], pb_xxy[j], pb_xxyz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_xxy[j], pb_xxyz[j], pb_y[j], pb_yz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (8) = (80,90)
@@ -3278,151 +1654,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_zz_yyzz, t_zz_yzzz, t_zz_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_zz_xxzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.25 * pa_zz[j] * fx[j] * fx[j] + 
+                t_zz_xxzz[j] = kinvecfunc::fvec_zz_xxzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xxzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_xx[j], pb_xxz[j], pb_xxzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               pa_z[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_xx[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 
+                t_zz_xyyy[j] = kinvecfunc::fvec_zz_xyyy_s_0(fx[j], pa_zz[j], pb_xy[j], pb_xyyy[j], s_0_0[j]) + kinvecfunc::fvec_zz_xyyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_xy[j], pb_xyyy[j], r_0_0[j]);
 
-                               0.5 * pa_zz[j] * pb_xx[j] * fx[j] + 0.5 * pa_zz[j] * fx[j] * pb_zz[j] + 2.0 * pa_z[j] * fx[j] * pb_xxz[j] + 
+                t_zz_xyyz[j] = kinvecfunc::fvec_zz_xyyz_s_0(fx[j], pa_z[j], pa_zz[j], pb_x[j], pb_xyy[j], pb_xyyz[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xyyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xyy[j], pb_xyyz[j], pb_xz[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pb_xxzz[j] + pa_zz[j] * pb_xxzz[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
+                t_zz_xyzz[j] = kinvecfunc::fvec_zz_xyzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xyzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_xy[j], pb_xyz[j], pb_xyzz[j], r_0_0[j]);
 
-                               0.25 * fz[j] * fga[j] * fx[j] * fx[j] - pa_zz[j] * fx[j] * fz[j] * fgb[j] - 
+                t_zz_xzzz[j] = kinvecfunc::fvec_zz_xzzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], s_0_0[j]) + kinvecfunc::fvec_zz_xzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_xzz[j], pb_xzzz[j], r_0_0[j]);
 
-                               2.0 * pa_z[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 2.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] + 
+                t_zz_yyyy[j] = kinvecfunc::fvec_zz_yyyy_s_0(fx[j], pa_zz[j], pb_yy[j], pb_yyyy[j], s_0_0[j]) + kinvecfunc::fvec_zz_yyyy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pb_yy[j], pb_yyyy[j], r_0_0[j]);
 
-                               8.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - 0.5 * fx[j] * pb_xx[j] * fz[j] * fgb[j] - 
+                t_zz_yyyz[j] = kinvecfunc::fvec_zz_yyyz_s_0(fx[j], pa_z[j], pa_zz[j], pb_y[j], pb_yyy[j], pb_yyyz[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_zz_yyyz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yyy[j], pb_yyyz[j], pb_yz[j], r_0_0[j]);
 
-                               0.5 * fx[j] * fz[j] * fgb[j] * pb_zz[j] - 0.5 * fz[j] * fga[j] * pb_xx[j] * fx[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_zz[j] - 
+                t_zz_yyzz[j] = kinvecfunc::fvec_zz_yyzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_zz_yyzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_yy[j], pb_yyz[j], pb_yyzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               pa_zz[j] * pb_xx[j] * fz[j] * fgb[j] - pa_zz[j] * fz[j] * fgb[j] * pb_zz[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_zz[j] + 
+                t_zz_yzzz[j] = kinvecfunc::fvec_zz_yzzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], s_0_0[j]) + kinvecfunc::fvec_zz_yzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_yzz[j], pb_yzzz[j], r_0_0[j]);
 
-                               5.0 * pa_zz[j] * fz[j] * pb_xx[j] * fx[j] + 5.0 * pa_zz[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               20.0 * pa_z[j] * fz[j] * fx[j] * pb_xxz[j] - fz[j] * fga[j] * pb_xxzz[j] + 5.0 * fz[j] * fx[j] * pb_xxzz[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_xxzz[j]) * r_0_0[j];
-
-                t_zz_xyyy[j] = (0.75 * fx[j] * fx[j] * pb_xy[j] + 1.5 * pa_zz[j] * pb_xy[j] * fx[j] + 
-
-                               0.5 * fx[j] * pb_xyyy[j] + pa_zz[j] * pb_xyyy[j]) * s_0_0[j] + (-1.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - 
-
-                               3.0 * pa_zz[j] * pb_xy[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_xy[j] + 15.0 * pa_zz[j] * fz[j] * pb_xy[j] * fx[j] - 
-
-                               fz[j] * fga[j] * pb_xyyy[j] + 5.0 * fz[j] * fx[j] * pb_xyyy[j] + 12.0 * pa_zz[j] * fz[j] * pb_xyyy[j]) * r_0_0[j];
-
-                t_zz_xyyz[j] = (0.5 * pa_z[j] * fx[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               0.5 * pa_zz[j] * pb_xz[j] * fx[j] + pa_z[j] * fx[j] * pb_xyy[j] + 0.5 * fx[j] * pb_xyyz[j] + pa_zz[j] * pb_xyyz[j]) * s_0_0[j] + (-pa_z[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               4.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_x[j] - 0.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 
-
-                               pa_zz[j] * pb_xz[j] * fz[j] * fgb[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_xz[j] + 5.0 * pa_zz[j] * fz[j] * pb_xz[j] * fx[j] + 
-
-                               10.0 * pa_z[j] * fz[j] * fx[j] * pb_xyy[j] - fz[j] * fga[j] * pb_xyyz[j] + 5.0 * fz[j] * fx[j] * pb_xyyz[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_xyyz[j]) * r_0_0[j];
-
-                t_zz_xyzz[j] = (0.75 * fx[j] * fx[j] * pb_xy[j] + 0.5 * pa_zz[j] * pb_xy[j] * fx[j] + 
-
-                               2.0 * pa_z[j] * fx[j] * pb_xyz[j] + 0.5 * fx[j] * pb_xyzz[j] + pa_zz[j] * pb_xyzz[j]) * s_0_0[j] + (6.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - 0.5 * fx[j] * pb_xy[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fz[j] * fga[j] * pb_xy[j] * fx[j] - pa_zz[j] * pb_xy[j] * fz[j] * fgb[j] + 5.0 * pa_zz[j] * fz[j] * pb_xy[j] * fx[j] + 
-
-                               20.0 * pa_z[j] * fz[j] * fx[j] * pb_xyz[j] - fz[j] * fga[j] * pb_xyzz[j] + 5.0 * fz[j] * fx[j] * pb_xyzz[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_xyzz[j]) * r_0_0[j];
-
-                t_zz_xzzz[j] = (1.5 * pa_z[j] * fx[j] * fx[j] * pb_x[j] + 2.25 * fx[j] * fx[j] * pb_xz[j] + 
-
-                               1.5 * pa_zz[j] * pb_xz[j] * fx[j] + 3.0 * pa_z[j] * fx[j] * pb_xzz[j] + 0.5 * fx[j] * pb_xzzz[j] + pa_zz[j] * pb_xzzz[j]) * s_0_0[j] + (-3.0 * pa_z[j] * fx[j] * pb_x[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_x[j] + 18.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - 1.5 * fx[j] * pb_xz[j] * fz[j] * fgb[j] - 
-
-                               1.5 * fz[j] * fga[j] * pb_xz[j] * fx[j] - 3.0 * pa_zz[j] * pb_xz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_zz[j] * fz[j] * pb_xz[j] * fx[j] + 30.0 * pa_z[j] * fz[j] * fx[j] * pb_xzz[j] - fz[j] * fga[j] * pb_xzzz[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_xzzz[j] + 12.0 * pa_zz[j] * fz[j] * pb_xzzz[j]) * r_0_0[j];
-
-                t_zz_yyyy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               1.5 * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_zz[j] * pb_yy[j] * fx[j] + 0.5 * fx[j] * pb_yyyy[j] + pa_zz[j] * pb_yyyy[j]) * s_0_0[j] + (-1.5 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 
-
-                               3.0 * pa_zz[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fz[j] * fx[j] * fx[j] * fx[j] + 6.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] - 
-
-                               3.0 * fx[j] * pb_yy[j] * fz[j] * fgb[j] - 3.0 * fz[j] * fga[j] * pb_yy[j] * fx[j] - 
-
-                               6.0 * pa_zz[j] * pb_yy[j] * fz[j] * fgb[j] + 12.0 * fz[j] * fx[j] * fx[j] * pb_yy[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * pb_yy[j] * fx[j] - fz[j] * fga[j] * pb_yyyy[j] + 5.0 * fz[j] * fx[j] * pb_yyyy[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_yyyy[j]) * r_0_0[j];
-
-                t_zz_yyyz[j] = (1.5 * pa_z[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               1.5 * pa_zz[j] * pb_yz[j] * fx[j] + pa_z[j] * fx[j] * pb_yyy[j] + 0.5 * fx[j] * pb_yyyz[j] + pa_zz[j] * pb_yyyz[j]) * s_0_0[j] + (-3.0 * pa_z[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_y[j] - 1.5 * fx[j] * pb_yz[j] * fz[j] * fgb[j] - 1.5 * fz[j] * fga[j] * pb_yz[j] * fx[j] - 
-
-                               3.0 * pa_zz[j] * pb_yz[j] * fz[j] * fgb[j] + 6.0 * fz[j] * fx[j] * fx[j] * pb_yz[j] + 15.0 * pa_zz[j] * fz[j] * pb_yz[j] * fx[j] + 
-
-                               10.0 * pa_z[j] * fz[j] * fx[j] * pb_yyy[j] - fz[j] * fga[j] * pb_yyyz[j] + 5.0 * fz[j] * fx[j] * pb_yyyz[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_yyyz[j]) * r_0_0[j];
-
-                t_zz_yyzz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.25 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               pa_z[j] * fx[j] * fx[j] * pb_z[j] + 0.75 * fx[j] * fx[j] * pb_yy[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 
-
-                               0.5 * pa_zz[j] * pb_yy[j] * fx[j] + 0.5 * pa_zz[j] * fx[j] * pb_zz[j] + 2.0 * pa_z[j] * fx[j] * pb_yyz[j] + 
-
-                               0.5 * fx[j] * pb_yyzz[j] + pa_zz[j] * pb_yyzz[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fgb[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.25 * fz[j] * fga[j] * fx[j] * fx[j] - pa_zz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               2.0 * pa_z[j] * fx[j] * fz[j] * fgb[j] * pb_z[j] + 2.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] + 
-
-                               8.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - 0.5 * fx[j] * pb_yy[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fx[j] * fz[j] * fgb[j] * pb_zz[j] - 0.5 * fz[j] * fga[j] * pb_yy[j] * fx[j] - 0.5 * fz[j] * fga[j] * fx[j] * pb_zz[j] - 
-
-                               pa_zz[j] * pb_yy[j] * fz[j] * fgb[j] - pa_zz[j] * fz[j] * fgb[j] * pb_zz[j] + 2.0 * fz[j] * fx[j] * fx[j] * pb_zz[j] + 
-
-                               5.0 * pa_zz[j] * fz[j] * pb_yy[j] * fx[j] + 5.0 * pa_zz[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               20.0 * pa_z[j] * fz[j] * fx[j] * pb_yyz[j] - fz[j] * fga[j] * pb_yyzz[j] + 5.0 * fz[j] * fx[j] * pb_yyzz[j] + 
-
-                               12.0 * pa_zz[j] * fz[j] * pb_yyzz[j]) * r_0_0[j];
-
-                t_zz_yzzz[j] = (1.5 * pa_z[j] * fx[j] * fx[j] * pb_y[j] + 2.25 * fx[j] * fx[j] * pb_yz[j] + 
-
-                               1.5 * pa_zz[j] * pb_yz[j] * fx[j] + 3.0 * pa_z[j] * fx[j] * pb_yzz[j] + 0.5 * fx[j] * pb_yzzz[j] + pa_zz[j] * pb_yzzz[j]) * s_0_0[j] + (-3.0 * pa_z[j] * fx[j] * pb_y[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_y[j] + 18.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - 1.5 * fx[j] * pb_yz[j] * fz[j] * fgb[j] - 
-
-                               1.5 * fz[j] * fga[j] * pb_yz[j] * fx[j] - 3.0 * pa_zz[j] * pb_yz[j] * fz[j] * fgb[j] + 
-
-                               15.0 * pa_zz[j] * fz[j] * pb_yz[j] * fx[j] + 30.0 * pa_z[j] * fz[j] * fx[j] * pb_yzz[j] - fz[j] * fga[j] * pb_yzzz[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_yzzz[j] + 12.0 * pa_zz[j] * fz[j] * pb_yzzz[j]) * r_0_0[j];
-
-                t_zz_zzzz[j] = (1.875 * fx[j] * fx[j] * fx[j] + 0.75 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               6.0 * pa_z[j] * fx[j] * fx[j] * pb_z[j] + 4.5 * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_zz[j] * pb_zz[j] * fx[j] + 
-
-                               4.0 * pa_z[j] * fx[j] * pb_zzz[j] + 0.5 * fx[j] * pb_zzzz[j] + pa_zz[j] * pb_zzzz[j]) * s_0_0[j] + (-4.5 * fx[j] * fx[j] * fz[j] * fgb[j] + 11.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.75 * fz[j] * fga[j] * fx[j] * fx[j] - 3.0 * pa_zz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               12.0 * pa_z[j] * fx[j] * pb_z[j] * fz[j] * fgb[j] + 6.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] + 
-
-                               48.0 * pa_z[j] * fz[j] * fx[j] * fx[j] * pb_z[j] + 36.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 3.0 * fx[j] * pb_zz[j] * fz[j] * fgb[j] - 
-
-                               3.0 * fz[j] * fga[j] * pb_zz[j] * fx[j] - 6.0 * pa_zz[j] * pb_zz[j] * fz[j] * fgb[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * pb_zz[j] * fx[j] + 40.0 * pa_z[j] * fz[j] * fx[j] * pb_zzz[j] - fz[j] * fga[j] * pb_zzzz[j] + 
-
-                               5.0 * fz[j] * fx[j] * pb_zzzz[j] + 12.0 * pa_zz[j] * fz[j] * pb_zzzz[j]) * r_0_0[j];
+                t_zz_zzzz[j] = kinvecfunc::fvec_zz_zzzz_s_0(fx[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], s_0_0[j]) + kinvecfunc::fvec_zz_zzzz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], pb_zzz[j], pb_zzzz[j], r_0_0[j]);
             }
 
             idx++;
@@ -3759,125 +2009,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xxxy_xz, t_xxxy_yy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxxx_xx[j] = (1.875 * fx[j] * fx[j] * fx[j] + 4.5 * pa_xx[j] * fx[j] * fx[j] + 
+                t_xxxx_xx[j] = kinvecfunc::fvec_xxxx_xx_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxx[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxxx_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxx[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               6.0 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_xxxx[j] * fx[j] + 4.0 * pa_xxx[j] * fx[j] * pb_x[j] + 
+                t_xxxx_xy[j] = kinvecfunc::fvec_xxxx_xy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxx[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxxx_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxx[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                               0.75 * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_xx[j] * fx[j] * pb_xx[j] + pa_xxxx[j] * pb_xx[j]) * s_0_0[j] + (-4.5 * fx[j] * fx[j] * fz[j] * fga[j] + 11.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
+                t_xxxx_xz[j] = kinvecfunc::fvec_xxxx_xz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxx[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxxx_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxx[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               36.0 * pa_xx[j] * fx[j] * fx[j] * fz[j] - 0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
+                t_xxxx_yy[j] = kinvecfunc::fvec_xxxx_yy_s_0(fx[j], pa_xx[j], pa_xxxx[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxxx_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxxx[j], pb_yy[j], r_0_0[j]);
 
-                               3.0 * pa_xx[j] * fz[j] * fga[j] * fx[j] - 12.0 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_x[j] - pa_xxxx[j] * fz[j] * fgb[j] + 
+                t_xxxx_yz[j] = kinvecfunc::fvec_xxxx_yz_s_0(fx[j], pa_xx[j], pa_xxxx[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xxxx_yz_r_0(fga[j], fx[j], fz[j], pa_xx[j], pa_xxxx[j], pb_yz[j], r_0_0[j]);
 
-                               48.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 5.0 * pa_xxxx[j] * fz[j] * fx[j] + 40.0 * pa_xxx[j] * fz[j] * fx[j] * pb_x[j] - 
+                t_xxxx_zz[j] = kinvecfunc::fvec_xxxx_zz_s_0(fx[j], pa_xx[j], pa_xxxx[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxxx_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxxx[j], pb_zz[j], r_0_0[j]);
 
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_xx[j] - 6.0 * pa_xx[j] * fz[j] * fga[j] * pb_xx[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] + 
+                t_xxxy_xx[j] = kinvecfunc::fvec_xxxy_xx_s_0(fx[j], pa_xxxy[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxxy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxxy[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               30.0 * pa_xx[j] * fz[j] * fx[j] * pb_xx[j] + 12.0 * pa_xxxx[j] * fz[j] * pb_xx[j]) * r_0_0[j];
+                t_xxxy_xy[j] = kinvecfunc::fvec_xxxy_xy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxy[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxxy_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxy[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xxxx_xy[j] = (3.0 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 2.0 * pa_xxx[j] * fx[j] * pb_y[j] + 
+                t_xxxy_xz[j] = kinvecfunc::fvec_xxxy_xz_s_0(fx[j], pa_xxxy[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxxy_xz_r_0(fga[j], fx[j], fz[j], pa_xxxy[j], pa_xxy[j], pa_xy[j], pa_y[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               0.75 * fx[j] * fx[j] * pb_xy[j] + 3.0 * pa_xx[j] * fx[j] * pb_xy[j] + pa_xxxx[j] * pb_xy[j]) * s_0_0[j] + (-6.0 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_y[j] + 
-
-                               24.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 20.0 * pa_xxx[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_xy[j] - 6.0 * pa_xx[j] * fz[j] * fga[j] * pb_xy[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] + 
-
-                               30.0 * pa_xx[j] * fz[j] * fx[j] * pb_xy[j] + 12.0 * pa_xxxx[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxxx_xz[j] = (3.0 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 2.0 * pa_xxx[j] * fx[j] * pb_z[j] + 
-
-                               0.75 * fx[j] * fx[j] * pb_xz[j] + 3.0 * pa_xx[j] * fx[j] * pb_xz[j] + pa_xxxx[j] * pb_xz[j]) * s_0_0[j] + (-6.0 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_z[j] + 
-
-                               24.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 20.0 * pa_xxx[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_xz[j] - 6.0 * pa_xx[j] * fz[j] * fga[j] * pb_xz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] + 
-
-                               30.0 * pa_xx[j] * fz[j] * fx[j] * pb_xz[j] + 12.0 * pa_xxxx[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxxx_yy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 1.5 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.5 * pa_xxxx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_xx[j] * fx[j] * pb_yy[j] + 
-
-                               pa_xxxx[j] * pb_yy[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 1.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               3.0 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_xx[j] * fz[j] * fga[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               pa_xxxx[j] * fz[j] * fgb[j] + 12.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_xxxx[j] * fz[j] * fx[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_yy[j] - 6.0 * pa_xx[j] * fz[j] * fga[j] * pb_yy[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] + 
-
-                               30.0 * pa_xx[j] * fz[j] * fx[j] * pb_yy[j] + 12.0 * pa_xxxx[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xxxx_yz[j] = (0.75 * fx[j] * fx[j] * pb_yz[j] + 3.0 * pa_xx[j] * fx[j] * pb_yz[j] + 
-
-                               pa_xxxx[j] * pb_yz[j]) * s_0_0[j] + (-3.0 * fx[j] * fz[j] * fga[j] * pb_yz[j] - 
-
-                               6.0 * pa_xx[j] * fz[j] * fga[j] * pb_yz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] + 30.0 * pa_xx[j] * fz[j] * fx[j] * pb_yz[j] + 
-
-                               12.0 * pa_xxxx[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xxxx_zz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 1.5 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.5 * pa_xxxx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_xx[j] * fx[j] * pb_zz[j] + 
-
-                               pa_xxxx[j] * pb_zz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 1.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               3.0 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_xx[j] * fz[j] * fga[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               pa_xxxx[j] * fz[j] * fgb[j] + 12.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_xxxx[j] * fz[j] * fx[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_zz[j] - 6.0 * pa_xx[j] * fz[j] * fga[j] * pb_zz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] + 
-
-                               30.0 * pa_xx[j] * fz[j] * fx[j] * pb_zz[j] + 12.0 * pa_xxxx[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xxxy_xx[j] = (2.25 * pa_xy[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + 
-
-                               0.5 * pa_xxxy[j] * fx[j] + 3.0 * pa_xxy[j] * fx[j] * pb_x[j] + 1.5 * pa_xy[j] * fx[j] * pb_xx[j] + 
-
-                               pa_xxxy[j] * pb_xx[j]) * s_0_0[j] + (18.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               1.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 3.0 * fx[j] * fz[j] * fga[j] * pa_y[j] * pb_x[j] - pa_xxxy[j] * fz[j] * fgb[j] + 
-
-                               12.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_x[j] + 5.0 * pa_xxxy[j] * fz[j] * fx[j] + 30.0 * pa_xxy[j] * fx[j] * fz[j] * pb_x[j] - 
-
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_xx[j] + 15.0 * pa_xy[j] * fx[j] * fz[j] * pb_xx[j] + 12.0 * pa_xxxy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xxxy_xy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_y[j] * pb_y[j] + 0.5 * pa_xxx[j] * fx[j] * pb_x[j] + 
-
-                               1.5 * pa_xxy[j] * fx[j] * pb_y[j] + 1.5 * pa_xy[j] * fx[j] * pb_xy[j] + pa_xxxy[j] * pb_xy[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * pa_xx[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_x[j] - 
-
-                               1.5 * fx[j] * fz[j] * fga[j] * pa_y[j] * pb_y[j] + 6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_y[j] + 5.0 * pa_xxx[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                               15.0 * pa_xxy[j] * fx[j] * fz[j] * pb_y[j] - 3.0 * pa_xy[j] * fz[j] * fga[j] * pb_xy[j] + 
-
-                               15.0 * pa_xy[j] * fx[j] * fz[j] * pb_xy[j] + 12.0 * pa_xxxy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxxy_xz[j] = (0.75 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + 1.5 * pa_xxy[j] * fx[j] * pb_z[j] + 
-
-                               1.5 * pa_xy[j] * fx[j] * pb_xz[j] + pa_xxxy[j] * pb_xz[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pa_y[j] * pb_z[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_y[j] * pb_z[j] + 15.0 * pa_xxy[j] * fx[j] * fz[j] * pb_z[j] - 
-
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_xz[j] + 15.0 * pa_xy[j] * fx[j] * fz[j] * pb_xz[j] + 12.0 * pa_xxxy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxxy_yy[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * pa_xxxy[j] * fx[j] + pa_xxx[j] * fx[j] * pb_y[j] + 1.5 * pa_xy[j] * fx[j] * pb_yy[j] + 
-
-                               pa_xxxy[j] * pb_yy[j]) * s_0_0[j] + (-1.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 
-
-                               3.0 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_y[j] - pa_xxxy[j] * fz[j] * fgb[j] + 6.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] + 
-
-                               12.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 5.0 * pa_xxxy[j] * fz[j] * fx[j] + 10.0 * pa_xxx[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_yy[j] + 15.0 * pa_xy[j] * fx[j] * fz[j] * pb_yy[j] + 12.0 * pa_xxxy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_xxxy_yy[j] = kinvecfunc::fvec_xxxy_yy_s_0(fx[j], pa_x[j], pa_xxx[j], pa_xxxy[j], pa_xy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxxy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xxx[j], pa_xxxy[j], pa_xy[j], pb_y[j], pb_yy[j], r_0_0[j]);
             }
 
             // Batch of Integrals (1) = (10,20)
@@ -3888,125 +2038,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xxxz_yy, t_xxxz_yz, t_xxxz_zz, t_xxyy_xx, t_xxyy_xy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxxy_yz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_xxx[j] * fx[j] * pb_z[j] + 
+                t_xxxy_yz[j] = kinvecfunc::fvec_xxxy_yz_s_0(fx[j], pa_x[j], pa_xxx[j], pa_xxxy[j], pa_xy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxxy_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xxx[j], pa_xxxy[j], pa_xy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               1.5 * pa_xy[j] * fx[j] * pb_yz[j] + pa_xxxy[j] * pb_yz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_z[j] + 
+                t_xxxy_zz[j] = kinvecfunc::fvec_xxxy_zz_s_0(fx[j], pa_xxxy[j], pa_xy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxxy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxxy[j], pa_xy[j], pb_zz[j], r_0_0[j]);
 
-                               6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 5.0 * pa_xxx[j] * fz[j] * fx[j] * pb_z[j] - 
+                t_xxxz_xx[j] = kinvecfunc::fvec_xxxz_xx_s_0(fx[j], pa_xxxz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxxz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxxz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_yz[j] + 15.0 * pa_xy[j] * fx[j] * fz[j] * pb_yz[j] + 12.0 * pa_xxxy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
+                t_xxxz_xy[j] = kinvecfunc::fvec_xxxz_xy_s_0(fx[j], pa_xxxz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxxz_xy_r_0(fga[j], fx[j], fz[j], pa_xxxz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xxxy_zz[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 0.5 * pa_xxxy[j] * fx[j] + 
+                t_xxxz_xz[j] = kinvecfunc::fvec_xxxz_xz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxxz_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxx[j], pa_xxxz[j], pa_xxz[j], pa_xz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               1.5 * pa_xy[j] * fx[j] * pb_zz[j] + pa_xxxy[j] * pb_zz[j]) * s_0_0[j] + (-1.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 
+                t_xxxz_yy[j] = kinvecfunc::fvec_xxxz_yy_s_0(fx[j], pa_xxxz[j], pa_xz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxxz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxxz[j], pa_xz[j], pb_yy[j], r_0_0[j]);
 
-                               pa_xxxy[j] * fz[j] * fgb[j] + 6.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] + 5.0 * pa_xxxy[j] * fz[j] * fx[j] - 
+                t_xxxz_yz[j] = kinvecfunc::fvec_xxxz_yz_s_0(fx[j], pa_x[j], pa_xxx[j], pa_xxxz[j], pa_xz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xxxz_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xxx[j], pa_xxxz[j], pa_xz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_zz[j] + 15.0 * pa_xy[j] * fx[j] * fz[j] * pb_zz[j] + 12.0 * pa_xxxy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_xxxz_zz[j] = kinvecfunc::fvec_xxxz_zz_s_0(fx[j], pa_x[j], pa_xxx[j], pa_xxxz[j], pa_xz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxxz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xxx[j], pa_xxxz[j], pa_xz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_xxxz_xx[j] = (2.25 * pa_xz[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 
+                t_xxyy_xx[j] = kinvecfunc::fvec_xxyy_xx_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxyy[j], pa_xyy[j], pa_yy[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxyy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxyy[j], pa_xyy[j], pa_yy[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               0.5 * pa_xxxz[j] * fx[j] + 3.0 * pa_xxz[j] * fx[j] * pb_x[j] + 1.5 * pa_xz[j] * fx[j] * pb_xx[j] + 
-
-                               pa_xxxz[j] * pb_xx[j]) * s_0_0[j] + (18.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               1.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 3.0 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_x[j] - pa_xxxz[j] * fz[j] * fgb[j] + 
-
-                               12.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 5.0 * pa_xxxz[j] * fz[j] * fx[j] + 30.0 * pa_xxz[j] * fx[j] * fz[j] * pb_x[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_xx[j] + 15.0 * pa_xz[j] * fx[j] * fz[j] * pb_xx[j] + 12.0 * pa_xxxz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xxxz_xy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 1.5 * pa_xxz[j] * fx[j] * pb_y[j] + 
-
-                               1.5 * pa_xz[j] * fx[j] * pb_xy[j] + pa_xxxz[j] * pb_xy[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_y[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 15.0 * pa_xxz[j] * fx[j] * fz[j] * pb_y[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_xy[j] + 15.0 * pa_xz[j] * fx[j] * fz[j] * pb_xy[j] + 12.0 * pa_xxxz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxxz_xz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.5 * pa_xxx[j] * fx[j] * pb_x[j] + 
-
-                               1.5 * pa_xxz[j] * fx[j] * pb_z[j] + 1.5 * pa_xz[j] * fx[j] * pb_xz[j] + pa_xxxz[j] * pb_xz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * pa_xx[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_x[j] - 
-
-                               1.5 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_z[j] + 6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 5.0 * pa_xxx[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                               15.0 * pa_xxz[j] * fx[j] * fz[j] * pb_z[j] - 3.0 * pa_xz[j] * fz[j] * fga[j] * pb_xz[j] + 
-
-                               15.0 * pa_xz[j] * fx[j] * fz[j] * pb_xz[j] + 12.0 * pa_xxxz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxxz_yy[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 0.5 * pa_xxxz[j] * fx[j] + 
-
-                               1.5 * pa_xz[j] * fx[j] * pb_yy[j] + pa_xxxz[j] * pb_yy[j]) * s_0_0[j] + (-1.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               pa_xxxz[j] * fz[j] * fgb[j] + 6.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] + 5.0 * pa_xxxz[j] * fz[j] * fx[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_yy[j] + 15.0 * pa_xz[j] * fx[j] * fz[j] * pb_yy[j] + 12.0 * pa_xxxz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xxxz_yz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_xxx[j] * fx[j] * pb_y[j] + 
-
-                               1.5 * pa_xz[j] * fx[j] * pb_yz[j] + pa_xxxz[j] * pb_yz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_y[j] + 
-
-                               6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 5.0 * pa_xxx[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_yz[j] + 15.0 * pa_xz[j] * fx[j] * fz[j] * pb_yz[j] + 12.0 * pa_xxxz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xxxz_zz[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * pa_xxxz[j] * fx[j] + pa_xxx[j] * fx[j] * pb_z[j] + 1.5 * pa_xz[j] * fx[j] * pb_zz[j] + 
-
-                               pa_xxxz[j] * pb_zz[j]) * s_0_0[j] + (-1.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               3.0 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_z[j] - pa_xxxz[j] * fz[j] * fgb[j] + 6.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] + 
-
-                               12.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 5.0 * pa_xxxz[j] * fz[j] * fx[j] + 10.0 * pa_xxx[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_zz[j] + 15.0 * pa_xz[j] * fx[j] * fz[j] * pb_zz[j] + 12.0 * pa_xxxz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xxyy_xx[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pa_yy[j] + 
-
-                               0.25 * pa_xx[j] * fx[j] * fx[j] + pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_xxyy[j] * fx[j] + 
-
-                               2.0 * pa_xyy[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pb_xx[j] + 0.5 * pa_xx[j] * fx[j] * pb_xx[j] + 
-
-                               0.5 * fx[j] * pa_yy[j] * pb_xx[j] + pa_xxyy[j] * pb_xx[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_yy[j] * fz[j] - 0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * pa_xx[j] * fz[j] * fga[j] * fx[j] - 2.0 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_x[j] - 
-
-                               0.5 * fx[j] * pa_yy[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_yy[j] * fx[j] - pa_xxyy[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 8.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 5.0 * pa_xxyy[j] * fz[j] * fx[j] + 
-
-                               20.0 * pa_xyy[j] * fx[j] * fz[j] * pb_x[j] - fx[j] * fz[j] * fga[j] * pb_xx[j] - pa_xx[j] * fz[j] * fga[j] * pb_xx[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - fz[j] * fga[j] * pa_yy[j] * pb_xx[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_xx[j] + 
-
-                               5.0 * fx[j] * pa_yy[j] * fz[j] * pb_xx[j] + 12.0 * pa_xxyy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xxyy_xy[j] = (pa_xy[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + pa_xxy[j] * fx[j] * pb_x[j] + pa_xyy[j] * fx[j] * pb_y[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_xy[j] + 0.5 * pa_xx[j] * fx[j] * pb_xy[j] + 0.5 * fx[j] * pa_yy[j] * pb_xy[j] + 
-
-                               pa_xxyy[j] * pb_xy[j]) * s_0_0[j] + (8.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] - pa_x[j] * fx[j] * fz[j] * fga[j] * pb_y[j] - 
-
-                               fz[j] * fga[j] * pa_y[j] * fx[j] * pb_x[j] + 4.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_x[j] + 10.0 * pa_xxy[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                               10.0 * pa_xyy[j] * fx[j] * fz[j] * pb_y[j] - fx[j] * fz[j] * fga[j] * pb_xy[j] - pa_xx[j] * fz[j] * fga[j] * pb_xy[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - fz[j] * fga[j] * pa_yy[j] * pb_xy[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_xy[j] + 
-
-                               5.0 * fx[j] * pa_yy[j] * fz[j] * pb_xy[j] + 12.0 * pa_xxyy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_xxyy_xy[j] = kinvecfunc::fvec_xxyy_xy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xxyy[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxyy_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxy[j], pa_xxyy[j], pa_xy[j], pa_xyy[j], pa_y[j], pa_yy[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
             }
 
             // Batch of Integrals (2) = (20,30)
@@ -4017,143 +2067,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xxyz_xy, t_xxyz_xz, t_xxyz_yy, t_xxyz_yz, t_xxyz_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxyy_xz[j] = (0.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + pa_xyy[j] * fx[j] * pb_z[j] + 
+                t_xxyy_xz[j] = kinvecfunc::fvec_xxyy_xz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxyy[j], pa_xyy[j], pa_yy[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxyy_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxyy[j], pa_xyy[j], pa_yy[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               0.25 * fx[j] * fx[j] * pb_xz[j] + 0.5 * pa_xx[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * pa_yy[j] * pb_xz[j] + 
+                t_xxyy_yy[j] = kinvecfunc::fvec_xxyy_yy_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_xxyy[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxyy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxy[j], pa_xxyy[j], pa_y[j], pa_yy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               pa_xxyy[j] * pb_xz[j]) * s_0_0[j] + (-pa_x[j] * fx[j] * fz[j] * fga[j] * pb_z[j] + 
+                t_xxyy_yz[j] = kinvecfunc::fvec_xxyy_yz_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_xxyy[j], pa_y[j], pa_yy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxyy_yz_r_0(fga[j], fx[j], fz[j], pa_xx[j], pa_xxy[j], pa_xxyy[j], pa_y[j], pa_yy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               4.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 10.0 * pa_xyy[j] * fx[j] * fz[j] * pb_z[j] - fx[j] * fz[j] * fga[j] * pb_xz[j] - 
+                t_xxyy_zz[j] = kinvecfunc::fvec_xxyy_zz_s_0(fx[j], pa_xx[j], pa_xxyy[j], pa_yy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxyy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxyy[j], pa_yy[j], pb_zz[j], r_0_0[j]);
 
-                               pa_xx[j] * fz[j] * fga[j] * pb_xz[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - fz[j] * fga[j] * pa_yy[j] * pb_xz[j] + 
+                t_xxyz_xx[j] = kinvecfunc::fvec_xxyz_xx_s_0(fx[j], pa_xxyz[j], pa_xyz[j], pa_yz[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxyz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxyz[j], pa_xyz[j], pa_yz[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               5.0 * pa_xx[j] * fz[j] * fx[j] * pb_xz[j] + 5.0 * fx[j] * pa_yy[j] * fz[j] * pb_xz[j] + 12.0 * pa_xxyy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_xxyz_xy[j] = kinvecfunc::fvec_xxyz_xy_s_0(fx[j], pa_xxyz[j], pa_xxz[j], pa_xyz[j], pa_xz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxyz_xy_r_0(fga[j], fx[j], fz[j], pa_xxyz[j], pa_xxz[j], pa_xyz[j], pa_xz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xxyy_yy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] + 
+                t_xxyz_xz[j] = kinvecfunc::fvec_xxyz_xz_s_0(fx[j], pa_xxy[j], pa_xxyz[j], pa_xy[j], pa_xyz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxyz_xz_r_0(fga[j], fx[j], fz[j], pa_xxy[j], pa_xxyz[j], pa_xy[j], pa_xyz[j], pa_y[j], pa_yz[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               0.25 * fx[j] * fx[j] * pa_yy[j] + fx[j] * fx[j] * pa_y[j] * pb_y[j] + 0.5 * pa_xxyy[j] * fx[j] + 
+                t_xxyz_yy[j] = kinvecfunc::fvec_xxyz_yy_s_0(fx[j], pa_xxyz[j], pa_xxz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxyz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxyz[j], pa_xxz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               2.0 * pa_xxy[j] * fx[j] * pb_y[j] + 0.25 * fx[j] * fx[j] * pb_yy[j] + 0.5 * pa_xx[j] * fx[j] * pb_yy[j] + 
+                t_xxyz_yz[j] = kinvecfunc::fvec_xxyz_yz_s_0(fx[j], pa_xx[j], pa_xxy[j], pa_xxyz[j], pa_xxz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxyz_yz_r_0(fga[j], fx[j], fz[j], pa_xx[j], pa_xxy[j], pa_xxyz[j], pa_xxz[j], pa_y[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pa_yy[j] * pb_yy[j] + pa_xxyy[j] * pb_yy[j]) * s_0_0[j] + (-fz[j] * fga[j] * fx[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * pa_xx[j] * fx[j] * fx[j] * fz[j] - 0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * pa_xx[j] * fz[j] * fga[j] * fx[j] - 0.5 * fx[j] * pa_yy[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_yy[j] * fx[j] - 
-
-                               2.0 * fz[j] * fga[j] * pa_y[j] * fx[j] * pb_y[j] - pa_xxyy[j] * fz[j] * fgb[j] + 2.0 * fx[j] * fx[j] * pa_yy[j] * fz[j] + 
-
-                               8.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_y[j] + 5.0 * pa_xxyy[j] * fz[j] * fx[j] + 20.0 * pa_xxy[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               fx[j] * fz[j] * fga[j] * pb_yy[j] - pa_xx[j] * fz[j] * fga[j] * pb_yy[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - 
-
-                               fz[j] * fga[j] * pa_yy[j] * pb_yy[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_yy[j] + 
-
-                               5.0 * fx[j] * pa_yy[j] * fz[j] * pb_yy[j] + 12.0 * pa_xxyy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xxyy_yz[j] = (0.5 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + pa_xxy[j] * fx[j] * pb_z[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_yz[j] + 0.5 * pa_xx[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * pa_yy[j] * pb_yz[j] + 
-
-                               pa_xxyy[j] * pb_yz[j]) * s_0_0[j] + (-fz[j] * fga[j] * pa_y[j] * fx[j] * pb_z[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_z[j] + 10.0 * pa_xxy[j] * fz[j] * fx[j] * pb_z[j] - fx[j] * fz[j] * fga[j] * pb_yz[j] - 
-
-                               pa_xx[j] * fz[j] * fga[j] * pb_yz[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - fz[j] * fga[j] * pa_yy[j] * pb_yz[j] + 
-
-                               5.0 * pa_xx[j] * fz[j] * fx[j] * pb_yz[j] + 5.0 * fx[j] * pa_yy[j] * fz[j] * pb_yz[j] + 12.0 * pa_xxyy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xxyy_zz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_yy[j] + 0.5 * pa_xxyy[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 
-
-                               0.5 * pa_xx[j] * fx[j] * pb_zz[j] + 0.5 * fx[j] * pa_yy[j] * pb_zz[j] + pa_xxyy[j] * pb_zz[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               0.5 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xx[j] * fz[j] * fga[j] * fx[j] - 0.5 * fx[j] * pa_yy[j] * fz[j] * fgb[j] + 
-
-                               0.75 * fx[j] * fx[j] * fx[j] * fz[j] - 0.5 * fz[j] * fga[j] * pa_yy[j] * fx[j] - pa_xxyy[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 2.0 * fx[j] * fx[j] * pa_yy[j] * fz[j] + 5.0 * pa_xxyy[j] * fz[j] * fx[j] - 
-
-                               fx[j] * fz[j] * fga[j] * pb_zz[j] - pa_xx[j] * fz[j] * fga[j] * pb_zz[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 
-
-                               fz[j] * fga[j] * pa_yy[j] * pb_zz[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               5.0 * fx[j] * pa_yy[j] * fz[j] * pb_zz[j] + 12.0 * pa_xxyy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xxyz_xx[j] = (0.75 * fx[j] * fx[j] * pa_yz[j] + 0.5 * pa_xxyz[j] * fx[j] + 
-
-                               2.0 * pa_xyz[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_yz[j] * pb_xx[j] + pa_xxyz[j] * pb_xx[j]) * s_0_0[j] + (6.0 * fx[j] * fx[j] * pa_yz[j] * fz[j] - 0.5 * fx[j] * pa_yz[j] * fz[j] * fgb[j] - 
-
-                               0.5 * fz[j] * fga[j] * pa_yz[j] * fx[j] - pa_xxyz[j] * fz[j] * fgb[j] + 5.0 * pa_xxyz[j] * fz[j] * fx[j] + 
-
-                               20.0 * pa_xyz[j] * fx[j] * fz[j] * pb_x[j] - fz[j] * fga[j] * pa_yz[j] * pb_xx[j] + 5.0 * fx[j] * pa_yz[j] * fz[j] * pb_xx[j] + 
-
-                               12.0 * pa_xxyz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xxyz_xy[j] = (0.5 * pa_xz[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 
-
-                               0.5 * pa_xxz[j] * fx[j] * pb_x[j] + pa_xyz[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_yz[j] * pb_xy[j] + 
-
-                               pa_xxyz[j] * pb_xy[j]) * s_0_0[j] + (4.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.5 * fz[j] * fga[j] * fx[j] * pa_z[j] * pb_x[j] + 2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 
-
-                               5.0 * pa_xxz[j] * fx[j] * fz[j] * pb_x[j] + 10.0 * pa_xyz[j] * fx[j] * fz[j] * pb_y[j] - fz[j] * fga[j] * pa_yz[j] * pb_xy[j] + 
-
-                               5.0 * fx[j] * pa_yz[j] * fz[j] * pb_xy[j] + 12.0 * pa_xxyz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxyz_xz[j] = (0.5 * pa_xy[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + 
-
-                               0.5 * pa_xxy[j] * fx[j] * pb_x[j] + pa_xyz[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_yz[j] * pb_xz[j] + 
-
-                               pa_xxyz[j] * pb_xz[j]) * s_0_0[j] + (4.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.5 * fz[j] * fga[j] * pa_y[j] * fx[j] * pb_x[j] + 2.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_x[j] + 
-
-                               5.0 * pa_xxy[j] * fz[j] * fx[j] * pb_x[j] + 10.0 * pa_xyz[j] * fx[j] * fz[j] * pb_z[j] - fz[j] * fga[j] * pa_yz[j] * pb_xz[j] + 
-
-                               5.0 * fx[j] * pa_yz[j] * fz[j] * pb_xz[j] + 12.0 * pa_xxyz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxyz_yy[j] = (0.25 * fx[j] * fx[j] * pa_yz[j] + 0.5 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 
-
-                               0.5 * pa_xxyz[j] * fx[j] + pa_xxz[j] * fx[j] * pb_y[j] + 0.5 * fx[j] * pa_yz[j] * pb_yy[j] + 
-
-                               pa_xxyz[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_yz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_yz[j] * fx[j] - 
-
-                               fz[j] * fga[j] * fx[j] * pa_z[j] * pb_y[j] - pa_xxyz[j] * fz[j] * fgb[j] + 2.0 * fx[j] * fx[j] * pa_yz[j] * fz[j] + 
-
-                               4.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 5.0 * pa_xxyz[j] * fz[j] * fx[j] + 10.0 * pa_xxz[j] * fx[j] * fz[j] * pb_y[j] - 
-
-                               fz[j] * fga[j] * pa_yz[j] * pb_yy[j] + 5.0 * fx[j] * pa_yz[j] * fz[j] * pb_yy[j] + 12.0 * pa_xxyz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xxyz_yz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_y[j] * pb_y[j] + 0.25 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.5 * pa_xxy[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * pa_xxz[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_yz[j] * pb_yz[j] + pa_xxyz[j] * pb_yz[j]) * s_0_0[j] + (-0.25 * fz[j] * fga[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               2.0 * pa_xx[j] * fx[j] * fx[j] * fz[j] - 0.5 * fz[j] * fga[j] * pa_y[j] * fx[j] * pb_y[j] - 
-
-                               0.5 * fz[j] * fga[j] * fx[j] * pa_z[j] * pb_z[j] + 2.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_y[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 5.0 * pa_xxy[j] * fz[j] * fx[j] * pb_y[j] + 
-
-                               5.0 * pa_xxz[j] * fx[j] * fz[j] * pb_z[j] - fz[j] * fga[j] * pa_yz[j] * pb_yz[j] + 5.0 * fx[j] * pa_yz[j] * fz[j] * pb_yz[j] + 
-
-                               12.0 * pa_xxyz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xxyz_zz[j] = (0.25 * fx[j] * fx[j] * pa_yz[j] + 0.5 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + 
-
-                               0.5 * pa_xxyz[j] * fx[j] + pa_xxy[j] * fx[j] * pb_z[j] + 0.5 * fx[j] * pa_yz[j] * pb_zz[j] + 
-
-                               pa_xxyz[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * fx[j] * pa_yz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_yz[j] * fx[j] - 
-
-                               fz[j] * fga[j] * pa_y[j] * fx[j] * pb_z[j] - pa_xxyz[j] * fz[j] * fgb[j] + 2.0 * fx[j] * fx[j] * pa_yz[j] * fz[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_z[j] + 5.0 * pa_xxyz[j] * fz[j] * fx[j] + 10.0 * pa_xxy[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               fz[j] * fga[j] * pa_yz[j] * pb_zz[j] + 5.0 * fx[j] * pa_yz[j] * fz[j] * pb_zz[j] + 12.0 * pa_xxyz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_xxyz_zz[j] = kinvecfunc::fvec_xxyz_zz_s_0(fx[j], pa_xxy[j], pa_xxyz[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxyz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xxy[j], pa_xxyz[j], pa_y[j], pa_yz[j], pb_z[j], pb_zz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (3) = (30,40)
@@ -4164,157 +2096,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xxzz_zz, t_xyyy_xx, t_xyyy_xy, t_xyyy_xz, t_xyyy_yy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xxzz_xx[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] + 
+                t_xxzz_xx[j] = kinvecfunc::fvec_xxzz_xx_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxzz[j], pa_xzz[j], pa_zz[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xxzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxzz[j], pa_xzz[j], pa_zz[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               0.25 * pa_xx[j] * fx[j] * fx[j] + pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_xxzz[j] * fx[j] + 
+                t_xxzz_xy[j] = kinvecfunc::fvec_xxzz_xy_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxzz[j], pa_xzz[j], pa_zz[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xxzz_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxzz[j], pa_xzz[j], pa_zz[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                               2.0 * pa_xzz[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pb_xx[j] + 0.5 * pa_xx[j] * fx[j] * pb_xx[j] + 
+                t_xxzz_xz[j] = kinvecfunc::fvec_xxzz_xz_s_0(fx[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xxzz[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xxzz_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xx[j], pa_xxz[j], pa_xxzz[j], pa_xz[j], pa_xzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pa_zz[j] * pb_xx[j] + pa_xxzz[j] * pb_xx[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
+                t_xxzz_yy[j] = kinvecfunc::fvec_xxzz_yy_s_0(fx[j], pa_xx[j], pa_xxzz[j], pa_zz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xxzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxzz[j], pa_zz[j], pb_yy[j], r_0_0[j]);
 
-                               6.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] - 0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
+                t_xxzz_yz[j] = kinvecfunc::fvec_xxzz_yz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_xxzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xxzz_yz_r_0(fga[j], fx[j], fz[j], pa_xx[j], pa_xxz[j], pa_xxzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                               0.5 * pa_xx[j] * fz[j] * fga[j] * fx[j] - 2.0 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_x[j] - 
+                t_xxzz_zz[j] = kinvecfunc::fvec_xxzz_zz_s_0(fx[j], pa_xx[j], pa_xxz[j], pa_xxzz[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xxzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xx[j], pa_xxz[j], pa_xxzz[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pa_zz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_zz[j] * fx[j] - pa_xxzz[j] * fz[j] * fgb[j] + 
+                t_xyyy_xx[j] = kinvecfunc::fvec_xyyy_xx_s_0(fx[j], pa_xy[j], pa_xyyy[j], pa_y[j], pa_yyy[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xyyy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xy[j], pa_xyyy[j], pa_y[j], pa_yyy[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               2.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 8.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 5.0 * pa_xxzz[j] * fz[j] * fx[j] + 
+                t_xyyy_xy[j] = kinvecfunc::fvec_xyyy_xy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyy[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xyyy_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyy[j], pa_y[j], pa_yy[j], pa_yyy[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                               20.0 * pa_xzz[j] * fx[j] * fz[j] * pb_x[j] - fx[j] * fz[j] * fga[j] * pb_xx[j] - pa_xx[j] * fz[j] * fga[j] * pb_xx[j] + 
+                t_xyyy_xz[j] = kinvecfunc::fvec_xyyy_xz_s_0(fx[j], pa_xy[j], pa_xyyy[j], pa_y[j], pa_yyy[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyyy_xz_r_0(fga[j], fx[j], fz[j], pa_xy[j], pa_xyyy[j], pa_y[j], pa_yyy[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - fz[j] * fga[j] * pa_zz[j] * pb_xx[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_xx[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_xx[j] + 12.0 * pa_xxzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xxzz_xy[j] = (0.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + pa_xzz[j] * fx[j] * pb_y[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_xy[j] + 0.5 * pa_xx[j] * fx[j] * pb_xy[j] + 0.5 * fx[j] * pa_zz[j] * pb_xy[j] + 
-
-                               pa_xxzz[j] * pb_xy[j]) * s_0_0[j] + (-pa_x[j] * fx[j] * fz[j] * fga[j] * pb_y[j] + 
-
-                               4.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 10.0 * pa_xzz[j] * fx[j] * fz[j] * pb_y[j] - fx[j] * fz[j] * fga[j] * pb_xy[j] - 
-
-                               pa_xx[j] * fz[j] * fga[j] * pb_xy[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - fz[j] * fga[j] * pa_zz[j] * pb_xy[j] + 
-
-                               5.0 * pa_xx[j] * fz[j] * fx[j] * pb_xy[j] + 5.0 * fx[j] * pa_zz[j] * fz[j] * pb_xy[j] + 12.0 * pa_xxzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xxzz_xz[j] = (pa_xz[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + pa_xxz[j] * fx[j] * pb_x[j] + pa_xzz[j] * fx[j] * pb_z[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_xz[j] + 0.5 * pa_xx[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * pa_zz[j] * pb_xz[j] + 
-
-                               pa_xxzz[j] * pb_xz[j]) * s_0_0[j] + (8.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] - pa_x[j] * fx[j] * fz[j] * fga[j] * pb_z[j] - 
-
-                               fz[j] * fga[j] * pa_z[j] * fx[j] * pb_x[j] + 4.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_x[j] + 10.0 * pa_xxz[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                               10.0 * pa_xzz[j] * fx[j] * fz[j] * pb_z[j] - fx[j] * fz[j] * fga[j] * pb_xz[j] - pa_xx[j] * fz[j] * fga[j] * pb_xz[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - fz[j] * fga[j] * pa_zz[j] * pb_xz[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_xz[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_xz[j] + 12.0 * pa_xxzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xxzz_yy[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_zz[j] + 0.5 * pa_xxzz[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_yy[j] + 
-
-                               0.5 * pa_xx[j] * fx[j] * pb_yy[j] + 0.5 * fx[j] * pa_zz[j] * pb_yy[j] + pa_xxzz[j] * pb_yy[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               0.5 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xx[j] * fz[j] * fga[j] * fx[j] - 0.5 * fx[j] * pa_zz[j] * fz[j] * fgb[j] + 
-
-                               0.75 * fx[j] * fx[j] * fx[j] * fz[j] - 0.5 * fz[j] * fga[j] * pa_zz[j] * fx[j] - pa_xxzz[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_xx[j] * fz[j] * fx[j] * fx[j] + 2.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] + 5.0 * pa_xxzz[j] * fz[j] * fx[j] - 
-
-                               fx[j] * fz[j] * fga[j] * pb_yy[j] - pa_xx[j] * fz[j] * fga[j] * pb_yy[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - 
-
-                               fz[j] * fga[j] * pa_zz[j] * pb_yy[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_yy[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_yy[j] + 12.0 * pa_xxzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xxzz_yz[j] = (0.5 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + pa_xxz[j] * fx[j] * pb_y[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_yz[j] + 0.5 * pa_xx[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * pa_zz[j] * pb_yz[j] + 
-
-                               pa_xxzz[j] * pb_yz[j]) * s_0_0[j] + (-fz[j] * fga[j] * pa_z[j] * fx[j] * pb_y[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_y[j] + 10.0 * pa_xxz[j] * fz[j] * fx[j] * pb_y[j] - fx[j] * fz[j] * fga[j] * pb_yz[j] - 
-
-                               pa_xx[j] * fz[j] * fga[j] * pb_yz[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - fz[j] * fga[j] * pa_zz[j] * pb_yz[j] + 
-
-                               5.0 * pa_xx[j] * fz[j] * fx[j] * pb_yz[j] + 5.0 * fx[j] * pa_zz[j] * fz[j] * pb_yz[j] + 12.0 * pa_xxzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xxzz_zz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_xx[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_zz[j] + fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.5 * pa_xxzz[j] * fx[j] + 
-
-                               2.0 * pa_xxz[j] * fx[j] * pb_z[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_xx[j] * fx[j] * pb_zz[j] + 
-
-                               0.5 * fx[j] * pa_zz[j] * pb_zz[j] + pa_xxzz[j] * pb_zz[j]) * s_0_0[j] + (-fz[j] * fga[j] * fx[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * pa_xx[j] * fx[j] * fx[j] * fz[j] - 0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xx[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * pa_xx[j] * fz[j] * fga[j] * fx[j] - 0.5 * fx[j] * pa_zz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_zz[j] * fx[j] - 
-
-                               2.0 * fz[j] * fga[j] * pa_z[j] * fx[j] * pb_z[j] - pa_xxzz[j] * fz[j] * fgb[j] + 2.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] + 
-
-                               8.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_z[j] + 5.0 * pa_xxzz[j] * fz[j] * fx[j] + 20.0 * pa_xxz[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               fx[j] * fz[j] * fga[j] * pb_zz[j] - pa_xx[j] * fz[j] * fga[j] * pb_zz[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 
-
-                               fz[j] * fga[j] * pa_zz[j] * pb_zz[j] + 5.0 * pa_xx[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_zz[j] + 12.0 * pa_xxzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xyyy_xx[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + 
-
-                               0.5 * pa_xyyy[j] * fx[j] + fx[j] * pa_yyy[j] * pb_x[j] + 1.5 * pa_xy[j] * fx[j] * pb_xx[j] + 
-
-                               pa_xyyy[j] * pb_xx[j]) * s_0_0[j] + (-1.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 
-
-                               3.0 * fx[j] * pa_y[j] * fz[j] * fga[j] * pb_x[j] - pa_xyyy[j] * fz[j] * fgb[j] + 6.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               12.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_x[j] + 5.0 * pa_xyyy[j] * fz[j] * fx[j] + 10.0 * fx[j] * pa_yyy[j] * fz[j] * pb_x[j] - 
-
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_xx[j] + 15.0 * pa_xy[j] * fz[j] * fx[j] * pb_xx[j] + 12.0 * pa_xyyy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xyyy_xy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pa_yy[j] + 
-
-                               0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_y[j] * pb_y[j] + 1.5 * pa_xyy[j] * fx[j] * pb_x[j] + 
-
-                               0.5 * fx[j] * pa_yyy[j] * pb_y[j] + 1.5 * pa_xy[j] * fx[j] * pb_xy[j] + pa_xyyy[j] * pb_xy[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_yy[j] * fz[j] - 1.5 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_x[j] - 
-
-                               1.5 * fx[j] * pa_y[j] * fz[j] * fga[j] * pb_y[j] + 6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_y[j] + 15.0 * pa_xyy[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                               5.0 * fx[j] * pa_yyy[j] * fz[j] * pb_y[j] - 3.0 * pa_xy[j] * fz[j] * fga[j] * pb_xy[j] + 
-
-                               15.0 * pa_xy[j] * fz[j] * fx[j] * pb_xy[j] + 12.0 * pa_xyyy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xyyy_xz[j] = (0.75 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + 0.5 * fx[j] * pa_yyy[j] * pb_z[j] + 
-
-                               1.5 * pa_xy[j] * fx[j] * pb_xz[j] + pa_xyyy[j] * pb_xz[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_y[j] * fz[j] * fga[j] * pb_z[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_z[j] + 5.0 * fx[j] * pa_yyy[j] * fz[j] * pb_z[j] - 
-
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_xz[j] + 15.0 * pa_xy[j] * fz[j] * fx[j] * pb_xz[j] + 12.0 * pa_xyyy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xyyy_yy[j] = (2.25 * pa_xy[j] * fx[j] * fx[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * pa_xyyy[j] * fx[j] + 3.0 * pa_xyy[j] * fx[j] * pb_y[j] + 1.5 * pa_xy[j] * fx[j] * pb_yy[j] + 
-
-                               pa_xyyy[j] * pb_yy[j]) * s_0_0[j] + (18.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               1.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 3.0 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_y[j] - pa_xyyy[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 5.0 * pa_xyyy[j] * fz[j] * fx[j] + 30.0 * pa_xyy[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_yy[j] + 15.0 * pa_xy[j] * fz[j] * fx[j] * pb_yy[j] + 12.0 * pa_xyyy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_xyyy_yy[j] = kinvecfunc::fvec_xyyy_yy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xyyy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
             }
 
             // Batch of Integrals (4) = (40,50)
@@ -4325,123 +2125,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xyyz_xz, t_xyyz_yy, t_xyyz_yz, t_xyyz_zz, t_xyzz_xx, t_xyzz_xy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyyy_yz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 1.5 * pa_xyy[j] * fx[j] * pb_z[j] + 
+                t_xyyy_yz[j] = kinvecfunc::fvec_xyyy_yz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyyy_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               1.5 * pa_xy[j] * fx[j] * pb_yz[j] + pa_xyyy[j] * pb_yz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_z[j] + 
+                t_xyyy_zz[j] = kinvecfunc::fvec_xyyy_zz_s_0(fx[j], pa_xy[j], pa_xyyy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xyyy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xy[j], pa_xyyy[j], pb_zz[j], r_0_0[j]);
 
-                               6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 15.0 * pa_xyy[j] * fz[j] * fx[j] * pb_z[j] - 
+                t_xyyz_xx[j] = kinvecfunc::fvec_xyyz_xx_s_0(fx[j], pa_xyyz[j], pa_xz[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xyyz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xyyz[j], pa_xz[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_yz[j] + 15.0 * pa_xy[j] * fz[j] * fx[j] * pb_yz[j] + 12.0 * pa_xyyy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
+                t_xyyz_xy[j] = kinvecfunc::fvec_xyyz_xy_s_0(fx[j], pa_xyyz[j], pa_xyz[j], pa_xz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xyyz_xy_r_0(fga[j], fx[j], fz[j], pa_xyyz[j], pa_xyz[j], pa_xz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xyyy_zz[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 0.5 * pa_xyyy[j] * fx[j] + 
+                t_xyyz_xz[j] = kinvecfunc::fvec_xyyz_xz_s_0(fx[j], pa_x[j], pa_xyy[j], pa_xyyz[j], pa_xz[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyyz_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xyy[j], pa_xyyz[j], pa_xz[j], pa_yy[j], pa_yyz[j], pa_z[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               1.5 * pa_xy[j] * fx[j] * pb_zz[j] + pa_xyyy[j] * pb_zz[j]) * s_0_0[j] + (-1.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 
+                t_xyyz_yy[j] = kinvecfunc::fvec_xyyz_yy_s_0(fx[j], pa_xyyz[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xyyz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xyyz[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               pa_xyyy[j] * fz[j] * fgb[j] + 6.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_xyyy[j] * fz[j] * fx[j] - 
+                t_xyyz_yz[j] = kinvecfunc::fvec_xyyz_yz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyz[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyyz_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyy[j], pa_xyyz[j], pa_xyz[j], pa_xz[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               3.0 * pa_xy[j] * fz[j] * fga[j] * pb_zz[j] + 15.0 * pa_xy[j] * fz[j] * fx[j] * pb_zz[j] + 12.0 * pa_xyyy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_xyyz_zz[j] = kinvecfunc::fvec_xyyz_zz_s_0(fx[j], pa_x[j], pa_xyy[j], pa_xyyz[j], pa_xz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xyyz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xyy[j], pa_xyyz[j], pa_xz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_xyyz_xx[j] = (0.25 * pa_xz[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 
+                t_xyzz_xx[j] = kinvecfunc::fvec_xyzz_xx_s_0(fx[j], pa_xy[j], pa_xyzz[j], pa_y[j], pa_yzz[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xyzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xy[j], pa_xyzz[j], pa_y[j], pa_yzz[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               0.5 * pa_xyyz[j] * fx[j] + fx[j] * pa_yyz[j] * pb_x[j] + 0.5 * pa_xz[j] * fx[j] * pb_xx[j] + 
-
-                               pa_xyyz[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               fx[j] * fz[j] * fga[j] * pa_z[j] * pb_x[j] - pa_xyyz[j] * fz[j] * fgb[j] + 2.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] + 
-
-                               4.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 5.0 * pa_xyyz[j] * fz[j] * fx[j] + 10.0 * fx[j] * pa_yyz[j] * fz[j] * pb_x[j] - 
-
-                               pa_xz[j] * fz[j] * fga[j] * pb_xx[j] + 5.0 * pa_xz[j] * fx[j] * fz[j] * pb_xx[j] + 12.0 * pa_xyyz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xyyz_xy[j] = (0.5 * fx[j] * fx[j] * pa_yz[j] + 0.25 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 
-
-                               pa_xyz[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_yyz[j] * pb_y[j] + 0.5 * pa_xz[j] * fx[j] * pb_xy[j] + 
-
-                               pa_xyyz[j] * pb_xy[j]) * s_0_0[j] + (4.0 * fx[j] * fx[j] * pa_yz[j] * fz[j] - 
-
-                               0.5 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_y[j] + 2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 
-
-                               10.0 * pa_xyz[j] * fx[j] * fz[j] * pb_x[j] + 5.0 * fx[j] * pa_yyz[j] * fz[j] * pb_y[j] - pa_xz[j] * fz[j] * fga[j] * pb_xy[j] + 
-
-                               5.0 * pa_xz[j] * fx[j] * fz[j] * pb_xy[j] + 12.0 * pa_xyyz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xyyz_xz[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pa_yy[j] + 
-
-                               0.25 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.5 * pa_xyy[j] * fx[j] * pb_x[j] + 
-
-                               0.5 * fx[j] * pa_yyz[j] * pb_z[j] + 0.5 * pa_xz[j] * fx[j] * pb_xz[j] + pa_xyyz[j] * pb_xz[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fga[j] + 0.75 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               2.0 * fx[j] * fx[j] * pa_yy[j] * fz[j] - 0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_x[j] - 
-
-                               0.5 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_z[j] + 2.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 5.0 * pa_xyy[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                               5.0 * fx[j] * pa_yyz[j] * fz[j] * pb_z[j] - pa_xz[j] * fz[j] * fga[j] * pb_xz[j] + 5.0 * pa_xz[j] * fx[j] * fz[j] * pb_xz[j] + 
-
-                               12.0 * pa_xyyz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xyyz_yy[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 0.5 * pa_xyyz[j] * fx[j] + 
-
-                               2.0 * pa_xyz[j] * fx[j] * pb_y[j] + 0.5 * pa_xz[j] * fx[j] * pb_yy[j] + pa_xyyz[j] * pb_yy[j]) * s_0_0[j] + (6.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] - 0.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - pa_xyyz[j] * fz[j] * fgb[j] + 5.0 * pa_xyyz[j] * fz[j] * fx[j] + 
-
-                               20.0 * pa_xyz[j] * fx[j] * fz[j] * pb_y[j] - pa_xz[j] * fz[j] * fga[j] * pb_yy[j] + 5.0 * pa_xz[j] * fx[j] * fz[j] * pb_yy[j] + 
-
-                               12.0 * pa_xyyz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xyyz_yz[j] = (0.5 * pa_xy[j] * fx[j] * fx[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * pa_xyy[j] * fx[j] * pb_y[j] + pa_xyz[j] * fx[j] * pb_z[j] + 0.5 * pa_xz[j] * fx[j] * pb_yz[j] + 
-
-                               pa_xyyz[j] * pb_yz[j]) * s_0_0[j] + (4.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.5 * pa_x[j] * fz[j] * fga[j] * fx[j] * pb_y[j] + 2.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 
-
-                               5.0 * pa_xyy[j] * fz[j] * fx[j] * pb_y[j] + 10.0 * pa_xyz[j] * fx[j] * fz[j] * pb_z[j] - pa_xz[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                               5.0 * pa_xz[j] * fx[j] * fz[j] * pb_yz[j] + 12.0 * pa_xyyz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xyyz_zz[j] = (0.25 * pa_xz[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * pa_xyyz[j] * fx[j] + pa_xyy[j] * fx[j] * pb_z[j] + 0.5 * pa_xz[j] * fx[j] * pb_zz[j] + 
-
-                               pa_xyyz[j] * pb_zz[j]) * s_0_0[j] + (-0.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               pa_x[j] * fz[j] * fga[j] * fx[j] * pb_z[j] - pa_xyyz[j] * fz[j] * fgb[j] + 2.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] + 
-
-                               4.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 5.0 * pa_xyyz[j] * fz[j] * fx[j] + 10.0 * pa_xyy[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               pa_xz[j] * fz[j] * fga[j] * pb_zz[j] + 5.0 * pa_xz[j] * fx[j] * fz[j] * pb_zz[j] + 12.0 * pa_xyyz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xyzz_xx[j] = (0.25 * pa_xy[j] * fx[j] * fx[j] + 0.5 * fx[j] * fx[j] * pa_y[j] * pb_x[j] + 
-
-                               0.5 * pa_xyzz[j] * fx[j] + fx[j] * pa_yzz[j] * pb_x[j] + 0.5 * pa_xy[j] * fx[j] * pb_xx[j] + 
-
-                               pa_xyzz[j] * pb_xx[j]) * s_0_0[j] + (-0.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 
-
-                               fx[j] * pa_y[j] * fz[j] * fga[j] * pb_x[j] - pa_xyzz[j] * fz[j] * fgb[j] + 2.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_x[j] + 5.0 * pa_xyzz[j] * fz[j] * fx[j] + 10.0 * fx[j] * pa_yzz[j] * fz[j] * pb_x[j] - 
-
-                               pa_xy[j] * fz[j] * fga[j] * pb_xx[j] + 5.0 * pa_xy[j] * fz[j] * fx[j] * pb_xx[j] + 12.0 * pa_xyzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xyzz_xy[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * fx[j] * fx[j] * pa_zz[j] + 
-
-                               0.25 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.25 * fx[j] * fx[j] * pa_y[j] * pb_y[j] + 0.5 * pa_xzz[j] * fx[j] * pb_x[j] + 
-
-                               0.5 * fx[j] * pa_yzz[j] * pb_y[j] + 0.5 * pa_xy[j] * fx[j] * pb_xy[j] + pa_xyzz[j] * pb_xy[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fga[j] + 0.75 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               2.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] - 0.5 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_x[j] - 
-
-                               0.5 * fx[j] * pa_y[j] * fz[j] * fga[j] * pb_y[j] + 2.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                               2.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_y[j] + 5.0 * pa_xzz[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                               5.0 * fx[j] * pa_yzz[j] * fz[j] * pb_y[j] - pa_xy[j] * fz[j] * fga[j] * pb_xy[j] + 5.0 * pa_xy[j] * fz[j] * fx[j] * pb_xy[j] + 
-
-                               12.0 * pa_xyzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_xyzz_xy[j] = kinvecfunc::fvec_xyzz_xy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyzz[j], pa_xzz[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xyzz_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyzz[j], pa_xzz[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
             }
 
             // Batch of Integrals (5) = (50,60)
@@ -4452,115 +2154,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_xzzz_xz, t_xzzz_yy, t_xzzz_yz, t_xzzz_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_xyzz_xz[j] = (0.5 * fx[j] * fx[j] * pa_yz[j] + 0.25 * fx[j] * fx[j] * pa_y[j] * pb_z[j] + 
+                t_xyzz_xz[j] = kinvecfunc::fvec_xyzz_xz_s_0(fx[j], pa_xy[j], pa_xyz[j], pa_xyzz[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyzz_xz_r_0(fga[j], fx[j], fz[j], pa_xy[j], pa_xyz[j], pa_xyzz[j], pa_y[j], pa_yz[j], pa_yzz[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               pa_xyz[j] * fx[j] * pb_x[j] + 0.5 * fx[j] * pa_yzz[j] * pb_z[j] + 0.5 * pa_xy[j] * fx[j] * pb_xz[j] + 
+                t_xyzz_yy[j] = kinvecfunc::fvec_xyzz_yy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyzz[j], pa_xzz[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xyzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyzz[j], pa_xzz[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               pa_xyzz[j] * pb_xz[j]) * s_0_0[j] + (4.0 * fx[j] * fx[j] * pa_yz[j] * fz[j] - 
+                t_xyzz_yz[j] = kinvecfunc::fvec_xyzz_yz_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xyzz[j], pa_xz[j], pa_xzz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xyzz_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyz[j], pa_xyzz[j], pa_xz[j], pa_xzz[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               0.5 * fx[j] * pa_y[j] * fz[j] * fga[j] * pb_z[j] + 2.0 * fx[j] * fx[j] * pa_y[j] * fz[j] * pb_z[j] + 
+                t_xyzz_zz[j] = kinvecfunc::fvec_xyzz_zz_s_0(fx[j], pa_xy[j], pa_xyz[j], pa_xyzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xyzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xy[j], pa_xyz[j], pa_xyzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               10.0 * pa_xyz[j] * fz[j] * fx[j] * pb_x[j] + 5.0 * fx[j] * pa_yzz[j] * fz[j] * pb_z[j] - pa_xy[j] * fz[j] * fga[j] * pb_xz[j] + 
+                t_xzzz_xx[j] = kinvecfunc::fvec_xzzz_xx_s_0(fx[j], pa_xz[j], pa_xzzz[j], pa_z[j], pa_zzz[j], pb_x[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_xzzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xz[j], pa_xzzz[j], pa_z[j], pa_zzz[j], pb_x[j], pb_xx[j], r_0_0[j]);
 
-                               5.0 * pa_xy[j] * fz[j] * fx[j] * pb_xz[j] + 12.0 * pa_xyzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_xzzz_xy[j] = kinvecfunc::fvec_xzzz_xy_s_0(fx[j], pa_xz[j], pa_xzzz[j], pa_z[j], pa_zzz[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xzzz_xy_r_0(fga[j], fx[j], fz[j], pa_xz[j], pa_xzzz[j], pa_z[j], pa_zzz[j], pb_xy[j], pb_y[j], r_0_0[j]);
 
-                t_xyzz_yy[j] = (0.25 * pa_xy[j] * fx[j] * fx[j] + 0.5 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 
+                t_xzzz_xz[j] = kinvecfunc::fvec_xzzz_xz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_xzzz[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_x[j], pb_xz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_xzzz_xz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_xzzz[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_x[j], pb_xz[j], pb_z[j], r_0_0[j]);
 
-                               0.5 * pa_xyzz[j] * fx[j] + pa_xzz[j] * fx[j] * pb_y[j] + 0.5 * pa_xy[j] * fx[j] * pb_yy[j] + 
+                t_xzzz_yy[j] = kinvecfunc::fvec_xzzz_yy_s_0(fx[j], pa_xz[j], pa_xzzz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_xzzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_xz[j], pa_xzzz[j], pb_yy[j], r_0_0[j]);
 
-                               pa_xyzz[j] * pb_yy[j]) * s_0_0[j] + (-0.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - 
+                t_xzzz_yz[j] = kinvecfunc::fvec_xzzz_yz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_xzzz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_xzzz_yz_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_xzzz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                               pa_x[j] * fx[j] * fz[j] * fga[j] * pb_y[j] - pa_xyzz[j] * fz[j] * fgb[j] + 2.0 * pa_xy[j] * fz[j] * fx[j] * fx[j] + 
-
-                               4.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 5.0 * pa_xyzz[j] * fz[j] * fx[j] + 10.0 * pa_xzz[j] * fx[j] * fz[j] * pb_y[j] - 
-
-                               pa_xy[j] * fz[j] * fga[j] * pb_yy[j] + 5.0 * pa_xy[j] * fz[j] * fx[j] * pb_yy[j] + 12.0 * pa_xyzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xyzz_yz[j] = (0.5 * pa_xz[j] * fx[j] * fx[j] + 0.25 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               pa_xyz[j] * fx[j] * pb_y[j] + 0.5 * pa_xzz[j] * fx[j] * pb_z[j] + 0.5 * pa_xy[j] * fx[j] * pb_yz[j] + 
-
-                               pa_xyzz[j] * pb_yz[j]) * s_0_0[j] + (4.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] - 
-
-                               0.5 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_z[j] + 2.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 
-
-                               10.0 * pa_xyz[j] * fz[j] * fx[j] * pb_y[j] + 5.0 * pa_xzz[j] * fx[j] * fz[j] * pb_z[j] - pa_xy[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                               5.0 * pa_xy[j] * fz[j] * fx[j] * pb_yz[j] + 12.0 * pa_xyzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xyzz_zz[j] = (0.75 * pa_xy[j] * fx[j] * fx[j] + 0.5 * pa_xyzz[j] * fx[j] + 
-
-                               2.0 * pa_xyz[j] * fx[j] * pb_z[j] + 0.5 * pa_xy[j] * fx[j] * pb_zz[j] + pa_xyzz[j] * pb_zz[j]) * s_0_0[j] + (6.0 * pa_xy[j] * fx[j] * fx[j] * fz[j] - 0.5 * pa_xy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * pa_xy[j] * fz[j] * fga[j] * fx[j] - pa_xyzz[j] * fz[j] * fgb[j] + 5.0 * pa_xyzz[j] * fz[j] * fx[j] + 
-
-                               20.0 * pa_xyz[j] * fz[j] * fx[j] * pb_z[j] - pa_xy[j] * fz[j] * fga[j] * pb_zz[j] + 5.0 * pa_xy[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               12.0 * pa_xyzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_xzzz_xx[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 
-
-                               0.5 * pa_xzzz[j] * fx[j] + fx[j] * pa_zzz[j] * pb_x[j] + 1.5 * pa_xz[j] * fx[j] * pb_xx[j] + 
-
-                               pa_xzzz[j] * pb_xx[j]) * s_0_0[j] + (-1.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               3.0 * fx[j] * pa_z[j] * fz[j] * fga[j] * pb_x[j] - pa_xzzz[j] * fz[j] * fgb[j] + 6.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] + 
-
-                               12.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_x[j] + 5.0 * pa_xzzz[j] * fz[j] * fx[j] + 10.0 * fx[j] * pa_zzz[j] * fz[j] * pb_x[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_xx[j] + 15.0 * pa_xz[j] * fz[j] * fx[j] * pb_xx[j] + 12.0 * pa_xzzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_xzzz_xy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 0.5 * fx[j] * pa_zzz[j] * pb_y[j] + 
-
-                               1.5 * pa_xz[j] * fx[j] * pb_xy[j] + pa_xzzz[j] * pb_xy[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * fz[j] * fga[j] * pb_y[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_y[j] + 5.0 * fx[j] * pa_zzz[j] * fz[j] * pb_y[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_xy[j] + 15.0 * pa_xz[j] * fz[j] * fx[j] * pb_xy[j] + 12.0 * pa_xzzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_xzzz_xz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] + 
-
-                               0.75 * pa_x[j] * fx[j] * fx[j] * pb_x[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 1.5 * pa_xzz[j] * fx[j] * pb_x[j] + 
-
-                               0.5 * fx[j] * pa_zzz[j] * pb_z[j] + 1.5 * pa_xz[j] * fx[j] * pb_xz[j] + pa_xzzz[j] * pb_xz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] - 1.5 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_x[j] - 
-
-                               1.5 * fx[j] * pa_z[j] * fz[j] * fga[j] * pb_z[j] + 6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_z[j] + 15.0 * pa_xzz[j] * fz[j] * fx[j] * pb_x[j] + 
-
-                               5.0 * fx[j] * pa_zzz[j] * fz[j] * pb_z[j] - 3.0 * pa_xz[j] * fz[j] * fga[j] * pb_xz[j] + 
-
-                               15.0 * pa_xz[j] * fz[j] * fx[j] * pb_xz[j] + 12.0 * pa_xzzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_xzzz_yy[j] = (0.75 * pa_xz[j] * fx[j] * fx[j] + 0.5 * pa_xzzz[j] * fx[j] + 
-
-                               1.5 * pa_xz[j] * fx[j] * pb_yy[j] + pa_xzzz[j] * pb_yy[j]) * s_0_0[j] + (-1.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               pa_xzzz[j] * fz[j] * fgb[j] + 6.0 * pa_xz[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_xzzz[j] * fz[j] * fx[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_yy[j] + 15.0 * pa_xz[j] * fz[j] * fx[j] * pb_yy[j] + 12.0 * pa_xzzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_xzzz_yz[j] = (0.75 * pa_x[j] * fx[j] * fx[j] * pb_y[j] + 1.5 * pa_xzz[j] * fx[j] * pb_y[j] + 
-
-                               1.5 * pa_xz[j] * fx[j] * pb_yz[j] + pa_xzzz[j] * pb_yz[j]) * s_0_0[j] + (-1.5 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_y[j] + 
-
-                               6.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 15.0 * pa_xzz[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_yz[j] + 15.0 * pa_xz[j] * fz[j] * fx[j] * pb_yz[j] + 12.0 * pa_xzzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_xzzz_zz[j] = (2.25 * pa_xz[j] * fx[j] * fx[j] + 1.5 * pa_x[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * pa_xzzz[j] * fx[j] + 3.0 * pa_xzz[j] * fx[j] * pb_z[j] + 1.5 * pa_xz[j] * fx[j] * pb_zz[j] + 
-
-                               pa_xzzz[j] * pb_zz[j]) * s_0_0[j] + (18.0 * pa_xz[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_xz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               1.5 * pa_xz[j] * fz[j] * fga[j] * fx[j] - 3.0 * pa_x[j] * fx[j] * fz[j] * fga[j] * pb_z[j] - pa_xzzz[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_x[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 5.0 * pa_xzzz[j] * fz[j] * fx[j] + 30.0 * pa_xzz[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               3.0 * pa_xz[j] * fz[j] * fga[j] * pb_zz[j] + 15.0 * pa_xz[j] * fz[j] * fx[j] * pb_zz[j] + 12.0 * pa_xzzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_xzzz_zz[j] = kinvecfunc::fvec_xzzz_zz_s_0(fx[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_xzzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_xzzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_x[j], pa_xz[j], pa_xzz[j], pa_xzzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
             }
 
             // Batch of Integrals (6) = (60,70)
@@ -4571,113 +2183,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yyyz_xz, t_yyyz_yy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyyy_xx[j] = (0.375 * fx[j] * fx[j] * fx[j] + 1.5 * pa_yy[j] * fx[j] * fx[j] + 
+                t_yyyy_xx[j] = kinvecfunc::fvec_yyyy_xx_s_0(fx[j], pa_yy[j], pa_yyyy[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yyyy_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pa_yyyy[j], pb_xx[j], r_0_0[j]);
 
-                               0.5 * pa_yyyy[j] * fx[j] + 0.75 * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_yy[j] * fx[j] * pb_xx[j] + 
+                t_yyyy_xy[j] = kinvecfunc::fvec_yyyy_xy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyy[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yyyy_xy_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyy[j], pb_x[j], pb_xy[j], r_0_0[j]);
 
-                               pa_yyyy[j] * pb_xx[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 1.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
+                t_yyyy_xz[j] = kinvecfunc::fvec_yyyy_xz_s_0(fx[j], pa_yy[j], pa_yyyy[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yyyy_xz_r_0(fga[j], fx[j], fz[j], pa_yy[j], pa_yyyy[j], pb_xz[j], r_0_0[j]);
 
-                               3.0 * pa_yy[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_yy[j] * fz[j] * fga[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
+                t_yyyy_yy[j] = kinvecfunc::fvec_yyyy_yy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyy[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yyyy_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyy[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               pa_yyyy[j] * fz[j] * fgb[j] + 12.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_yyyy[j] * fz[j] * fx[j] - 
+                t_yyyy_yz[j] = kinvecfunc::fvec_yyyy_yz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyy[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yyyy_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyy[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_xx[j] - 6.0 * pa_yy[j] * fz[j] * fga[j] * pb_xx[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] + 
+                t_yyyy_zz[j] = kinvecfunc::fvec_yyyy_zz_s_0(fx[j], pa_yy[j], pa_yyyy[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yyyy_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pa_yyyy[j], pb_zz[j], r_0_0[j]);
 
-                               30.0 * pa_yy[j] * fz[j] * fx[j] * pb_xx[j] + 12.0 * pa_yyyy[j] * fz[j] * pb_xx[j]) * r_0_0[j];
+                t_yyyz_xx[j] = kinvecfunc::fvec_yyyz_xx_s_0(fx[j], pa_yyyz[j], pa_yz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yyyz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yyyz[j], pa_yz[j], pb_xx[j], r_0_0[j]);
 
-                t_yyyy_xy[j] = (3.0 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 2.0 * pa_yyy[j] * fx[j] * pb_x[j] + 
+                t_yyyz_xy[j] = kinvecfunc::fvec_yyyz_xy_s_0(fx[j], pa_yyyz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yyyz_xy_r_0(fga[j], fx[j], fz[j], pa_yyyz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_x[j], pb_xy[j], r_0_0[j]);
 
-                               0.75 * fx[j] * fx[j] * pb_xy[j] + 3.0 * pa_yy[j] * fx[j] * pb_xy[j] + pa_yyyy[j] * pb_xy[j]) * s_0_0[j] + (-6.0 * pa_y[j] * fx[j] * fz[j] * fga[j] * pb_x[j] + 
+                t_yyyz_xz[j] = kinvecfunc::fvec_yyyz_xz_s_0(fx[j], pa_y[j], pa_yyy[j], pa_yyyz[j], pa_yz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yyyz_xz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yyy[j], pa_yyyz[j], pa_yz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                               24.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 20.0 * pa_yyy[j] * fz[j] * fx[j] * pb_x[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_xy[j] - 6.0 * pa_yy[j] * fz[j] * fga[j] * pb_xy[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] + 
-
-                               30.0 * pa_yy[j] * fz[j] * fx[j] * pb_xy[j] + 12.0 * pa_yyyy[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_yyyy_xz[j] = (0.75 * fx[j] * fx[j] * pb_xz[j] + 3.0 * pa_yy[j] * fx[j] * pb_xz[j] + 
-
-                               pa_yyyy[j] * pb_xz[j]) * s_0_0[j] + (-3.0 * fx[j] * fz[j] * fga[j] * pb_xz[j] - 
-
-                               6.0 * pa_yy[j] * fz[j] * fga[j] * pb_xz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] + 30.0 * pa_yy[j] * fz[j] * fx[j] * pb_xz[j] + 
-
-                               12.0 * pa_yyyy[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_yyyy_yy[j] = (1.875 * fx[j] * fx[j] * fx[j] + 4.5 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               6.0 * pa_y[j] * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_yyyy[j] * fx[j] + 4.0 * pa_yyy[j] * fx[j] * pb_y[j] + 
-
-                               0.75 * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_yy[j] * fx[j] * pb_yy[j] + pa_yyyy[j] * pb_yy[j]) * s_0_0[j] + (-4.5 * fx[j] * fx[j] * fz[j] * fga[j] + 11.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               36.0 * pa_yy[j] * fx[j] * fx[j] * fz[j] - 0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_yy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               3.0 * pa_yy[j] * fz[j] * fga[j] * fx[j] - 12.0 * pa_y[j] * fx[j] * fz[j] * fga[j] * pb_y[j] - pa_yyyy[j] * fz[j] * fgb[j] + 
-
-                               48.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 5.0 * pa_yyyy[j] * fz[j] * fx[j] + 40.0 * pa_yyy[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_yy[j] - 6.0 * pa_yy[j] * fz[j] * fga[j] * pb_yy[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] + 
-
-                               30.0 * pa_yy[j] * fz[j] * fx[j] * pb_yy[j] + 12.0 * pa_yyyy[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_yyyy_yz[j] = (3.0 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 2.0 * pa_yyy[j] * fx[j] * pb_z[j] + 
-
-                               0.75 * fx[j] * fx[j] * pb_yz[j] + 3.0 * pa_yy[j] * fx[j] * pb_yz[j] + pa_yyyy[j] * pb_yz[j]) * s_0_0[j] + (-6.0 * pa_y[j] * fx[j] * fz[j] * fga[j] * pb_z[j] + 
-
-                               24.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 20.0 * pa_yyy[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_yz[j] - 6.0 * pa_yy[j] * fz[j] * fga[j] * pb_yz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] + 
-
-                               30.0 * pa_yy[j] * fz[j] * fx[j] * pb_yz[j] + 12.0 * pa_yyyy[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_yyyy_zz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 1.5 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               0.5 * pa_yyyy[j] * fx[j] + 0.75 * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_yy[j] * fx[j] * pb_zz[j] + 
-
-                               pa_yyyy[j] * pb_zz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 1.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               3.0 * pa_yy[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_yy[j] * fz[j] * fga[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               pa_yyyy[j] * fz[j] * fgb[j] + 12.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_yyyy[j] * fz[j] * fx[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_zz[j] - 6.0 * pa_yy[j] * fz[j] * fga[j] * pb_zz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] + 
-
-                               30.0 * pa_yy[j] * fz[j] * fx[j] * pb_zz[j] + 12.0 * pa_yyyy[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_yyyz_xx[j] = (0.75 * pa_yz[j] * fx[j] * fx[j] + 0.5 * pa_yyyz[j] * fx[j] + 
-
-                               1.5 * pa_yz[j] * fx[j] * pb_xx[j] + pa_yyyz[j] * pb_xx[j]) * s_0_0[j] + (-1.5 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_yz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               pa_yyyz[j] * fz[j] * fgb[j] + 6.0 * pa_yz[j] * fx[j] * fx[j] * fz[j] + 5.0 * pa_yyyz[j] * fz[j] * fx[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_xx[j] + 15.0 * pa_yz[j] * fx[j] * fz[j] * pb_xx[j] + 12.0 * pa_yyyz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_yyyz_xy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 1.5 * pa_yyz[j] * fx[j] * pb_x[j] + 
-
-                               1.5 * pa_yz[j] * fx[j] * pb_xy[j] + pa_yyyz[j] * pb_xy[j]) * s_0_0[j] + (-1.5 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_x[j] + 
-
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_x[j] + 15.0 * pa_yyz[j] * fx[j] * fz[j] * pb_x[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_xy[j] + 15.0 * pa_yz[j] * fx[j] * fz[j] * pb_xy[j] + 12.0 * pa_yyyz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_yyyz_xz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 0.5 * pa_yyy[j] * fx[j] * pb_x[j] + 
-
-                               1.5 * pa_yz[j] * fx[j] * pb_xz[j] + pa_yyyz[j] * pb_xz[j]) * s_0_0[j] + (-1.5 * pa_y[j] * fz[j] * fga[j] * fx[j] * pb_x[j] + 
-
-                               6.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 5.0 * pa_yyy[j] * fz[j] * fx[j] * pb_x[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_xz[j] + 15.0 * pa_yz[j] * fx[j] * fz[j] * pb_xz[j] + 12.0 * pa_yyyz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_yyyz_yy[j] = (2.25 * pa_yz[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 
-
-                               0.5 * pa_yyyz[j] * fx[j] + 3.0 * pa_yyz[j] * fx[j] * pb_y[j] + 1.5 * pa_yz[j] * fx[j] * pb_yy[j] + 
-
-                               pa_yyyz[j] * pb_yy[j]) * s_0_0[j] + (18.0 * pa_yz[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               1.5 * pa_yz[j] * fz[j] * fga[j] * fx[j] - 3.0 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_y[j] - pa_yyyz[j] * fz[j] * fgb[j] + 
-
-                               12.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_y[j] + 5.0 * pa_yyyz[j] * fz[j] * fx[j] + 30.0 * pa_yyz[j] * fx[j] * fz[j] * pb_y[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_yy[j] + 15.0 * pa_yz[j] * fx[j] * fz[j] * pb_yy[j] + 12.0 * pa_yyyz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
+                t_yyyz_yy[j] = kinvecfunc::fvec_yyyz_yy_s_0(fx[j], pa_yyyz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yyyz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yyyz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yy[j], r_0_0[j]);
             }
 
             // Batch of Integrals (7) = (70,80)
@@ -4688,153 +2212,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_yyzz_yz, t_yyzz_zz, t_yzzz_xx, t_yzzz_xy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yyyz_yz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] + 
+                t_yyyz_yz[j] = kinvecfunc::fvec_yyyz_yz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yyyz_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyy[j], pa_yyyz[j], pa_yyz[j], pa_yz[j], pa_z[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               0.75 * pa_y[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.5 * pa_yyy[j] * fx[j] * pb_y[j] + 
+                t_yyyz_zz[j] = kinvecfunc::fvec_yyyz_zz_s_0(fx[j], pa_y[j], pa_yyy[j], pa_yyyz[j], pa_yz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yyyz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yyy[j], pa_yyyz[j], pa_yz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                               1.5 * pa_yyz[j] * fx[j] * pb_z[j] + 1.5 * pa_yz[j] * fx[j] * pb_yz[j] + pa_yyyz[j] * pb_yz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
+                t_yyzz_xx[j] = kinvecfunc::fvec_yyzz_xx_s_0(fx[j], pa_yy[j], pa_yyzz[j], pa_zz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yyzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pa_yyzz[j], pa_zz[j], pb_xx[j], r_0_0[j]);
 
-                               6.0 * pa_yy[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_y[j] * fz[j] * fga[j] * fx[j] * pb_y[j] - 
+                t_yyzz_xy[j] = kinvecfunc::fvec_yyzz_xy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyzz[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yyzz_xy_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyzz[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], r_0_0[j]);
 
-                               1.5 * fx[j] * fz[j] * fga[j] * pa_z[j] * pb_z[j] + 6.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 
+                t_yyzz_xz[j] = kinvecfunc::fvec_yyzz_xz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_yyzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yyzz_xz_r_0(fga[j], fx[j], fz[j], pa_yy[j], pa_yyz[j], pa_yyzz[j], pa_z[j], pa_zz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                               6.0 * fx[j] * fx[j] * fz[j] * pa_z[j] * pb_z[j] + 5.0 * pa_yyy[j] * fz[j] * fx[j] * pb_y[j] + 
+                t_yyzz_yy[j] = kinvecfunc::fvec_yyzz_yy_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyzz[j], pa_yzz[j], pa_zz[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yyzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyzz[j], pa_yzz[j], pa_zz[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               15.0 * pa_yyz[j] * fx[j] * fz[j] * pb_z[j] - 3.0 * pa_yz[j] * fz[j] * fga[j] * pb_yz[j] + 
+                t_yyzz_yz[j] = kinvecfunc::fvec_yyzz_yz_s_0(fx[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yyzz[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yyzz_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yy[j], pa_yyz[j], pa_yyzz[j], pa_yz[j], pa_yzz[j], pa_z[j], pa_zz[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               15.0 * pa_yz[j] * fx[j] * fz[j] * pb_yz[j] + 12.0 * pa_yyyz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
+                t_yyzz_zz[j] = kinvecfunc::fvec_yyzz_zz_s_0(fx[j], pa_yy[j], pa_yyz[j], pa_yyzz[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yyzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yy[j], pa_yyz[j], pa_yyzz[j], pa_z[j], pa_zz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_yyyz_zz[j] = (0.75 * pa_yz[j] * fx[j] * fx[j] + 1.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 
+                t_yzzz_xx[j] = kinvecfunc::fvec_yzzz_xx_s_0(fx[j], pa_yz[j], pa_yzzz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_yzzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yz[j], pa_yzzz[j], pb_xx[j], r_0_0[j]);
 
-                               0.5 * pa_yyyz[j] * fx[j] + pa_yyy[j] * fx[j] * pb_z[j] + 1.5 * pa_yz[j] * fx[j] * pb_zz[j] + 
-
-                               pa_yyyz[j] * pb_zz[j]) * s_0_0[j] + (-1.5 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_yz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               3.0 * pa_y[j] * fz[j] * fga[j] * fx[j] * pb_z[j] - pa_yyyz[j] * fz[j] * fgb[j] + 6.0 * pa_yz[j] * fx[j] * fx[j] * fz[j] + 
-
-                               12.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 5.0 * pa_yyyz[j] * fz[j] * fx[j] + 10.0 * pa_yyy[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_zz[j] + 15.0 * pa_yz[j] * fx[j] * fz[j] * pb_zz[j] + 12.0 * pa_yyyz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_yyzz_xx[j] = (0.125 * fx[j] * fx[j] * fx[j] + 0.25 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_zz[j] + 0.5 * pa_yyzz[j] * fx[j] + 0.25 * fx[j] * fx[j] * pb_xx[j] + 
-
-                               0.5 * pa_yy[j] * fx[j] * pb_xx[j] + 0.5 * fx[j] * pa_zz[j] * pb_xx[j] + pa_yyzz[j] * pb_xx[j]) * s_0_0[j] + (-0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               0.5 * pa_yy[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_yy[j] * fz[j] * fga[j] * fx[j] - 0.5 * fx[j] * pa_zz[j] * fz[j] * fgb[j] + 
-
-                               0.75 * fx[j] * fx[j] * fx[j] * fz[j] - 0.5 * fz[j] * fga[j] * pa_zz[j] * fx[j] - pa_yyzz[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] + 2.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] + 5.0 * pa_yyzz[j] * fz[j] * fx[j] - 
-
-                               fx[j] * fz[j] * fga[j] * pb_xx[j] - pa_yy[j] * fz[j] * fga[j] * pb_xx[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] - 
-
-                               fz[j] * fga[j] * pa_zz[j] * pb_xx[j] + 5.0 * pa_yy[j] * fz[j] * fx[j] * pb_xx[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_xx[j] + 12.0 * pa_yyzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_yyzz_xy[j] = (0.5 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + pa_yzz[j] * fx[j] * pb_x[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_xy[j] + 0.5 * pa_yy[j] * fx[j] * pb_xy[j] + 0.5 * fx[j] * pa_zz[j] * pb_xy[j] + 
-
-                               pa_yyzz[j] * pb_xy[j]) * s_0_0[j] + (-pa_y[j] * fx[j] * fz[j] * fga[j] * pb_x[j] + 
-
-                               4.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 10.0 * pa_yzz[j] * fx[j] * fz[j] * pb_x[j] - fx[j] * fz[j] * fga[j] * pb_xy[j] - 
-
-                               pa_yy[j] * fz[j] * fga[j] * pb_xy[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] - fz[j] * fga[j] * pa_zz[j] * pb_xy[j] + 
-
-                               5.0 * pa_yy[j] * fz[j] * fx[j] * pb_xy[j] + 5.0 * fx[j] * pa_zz[j] * fz[j] * pb_xy[j] + 12.0 * pa_yyzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_yyzz_xz[j] = (0.5 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + pa_yyz[j] * fx[j] * pb_x[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_xz[j] + 0.5 * pa_yy[j] * fx[j] * pb_xz[j] + 0.5 * fx[j] * pa_zz[j] * pb_xz[j] + 
-
-                               pa_yyzz[j] * pb_xz[j]) * s_0_0[j] + (-fz[j] * fga[j] * pa_z[j] * fx[j] * pb_x[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_x[j] + 10.0 * pa_yyz[j] * fz[j] * fx[j] * pb_x[j] - fx[j] * fz[j] * fga[j] * pb_xz[j] - 
-
-                               pa_yy[j] * fz[j] * fga[j] * pb_xz[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] - fz[j] * fga[j] * pa_zz[j] * pb_xz[j] + 
-
-                               5.0 * pa_yy[j] * fz[j] * fx[j] * pb_xz[j] + 5.0 * fx[j] * pa_zz[j] * fz[j] * pb_xz[j] + 12.0 * pa_yyzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_yyzz_yy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] + 
-
-                               0.25 * pa_yy[j] * fx[j] * fx[j] + pa_y[j] * fx[j] * fx[j] * pb_y[j] + 0.5 * pa_yyzz[j] * fx[j] + 
-
-                               2.0 * pa_yzz[j] * fx[j] * pb_y[j] + 0.25 * fx[j] * fx[j] * pb_yy[j] + 0.5 * pa_yy[j] * fx[j] * pb_yy[j] + 
-
-                               0.5 * fx[j] * pa_zz[j] * pb_yy[j] + pa_yyzz[j] * pb_yy[j]) * s_0_0[j] + (-fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] - 0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_yy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * pa_yy[j] * fz[j] * fga[j] * fx[j] - 2.0 * pa_y[j] * fx[j] * fz[j] * fga[j] * pb_y[j] - 
-
-                               0.5 * fx[j] * pa_zz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_zz[j] * fx[j] - pa_yyzz[j] * fz[j] * fgb[j] + 
-
-                               2.0 * pa_yy[j] * fz[j] * fx[j] * fx[j] + 8.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 5.0 * pa_yyzz[j] * fz[j] * fx[j] + 
-
-                               20.0 * pa_yzz[j] * fx[j] * fz[j] * pb_y[j] - fx[j] * fz[j] * fga[j] * pb_yy[j] - pa_yy[j] * fz[j] * fga[j] * pb_yy[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] - fz[j] * fga[j] * pa_zz[j] * pb_yy[j] + 5.0 * pa_yy[j] * fz[j] * fx[j] * pb_yy[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_yy[j] + 12.0 * pa_yyzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_yyzz_yz[j] = (pa_yz[j] * fx[j] * fx[j] + 0.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + pa_yyz[j] * fx[j] * pb_y[j] + pa_yzz[j] * fx[j] * pb_z[j] + 
-
-                               0.25 * fx[j] * fx[j] * pb_yz[j] + 0.5 * pa_yy[j] * fx[j] * pb_yz[j] + 0.5 * fx[j] * pa_zz[j] * pb_yz[j] + 
-
-                               pa_yyzz[j] * pb_yz[j]) * s_0_0[j] + (8.0 * pa_yz[j] * fx[j] * fx[j] * fz[j] - pa_y[j] * fx[j] * fz[j] * fga[j] * pb_z[j] - 
-
-                               fz[j] * fga[j] * pa_z[j] * fx[j] * pb_y[j] + 4.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 
-
-                               4.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_y[j] + 10.0 * pa_yyz[j] * fz[j] * fx[j] * pb_y[j] + 
-
-                               10.0 * pa_yzz[j] * fx[j] * fz[j] * pb_z[j] - fx[j] * fz[j] * fga[j] * pb_yz[j] - pa_yy[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                               2.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] - fz[j] * fga[j] * pa_zz[j] * pb_yz[j] + 5.0 * pa_yy[j] * fz[j] * fx[j] * pb_yz[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_yz[j] + 12.0 * pa_yyzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_yyzz_zz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * pa_yy[j] * fx[j] * fx[j] + 
-
-                               0.25 * fx[j] * fx[j] * pa_zz[j] + fx[j] * fx[j] * pa_z[j] * pb_z[j] + 0.5 * pa_yyzz[j] * fx[j] + 
-
-                               2.0 * pa_yyz[j] * fx[j] * pb_z[j] + 0.25 * fx[j] * fx[j] * pb_zz[j] + 0.5 * pa_yy[j] * fx[j] * pb_zz[j] + 
-
-                               0.5 * fx[j] * pa_zz[j] * pb_zz[j] + pa_yyzz[j] * pb_zz[j]) * s_0_0[j] + (-fz[j] * fga[j] * fx[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * pa_yy[j] * fx[j] * fx[j] * fz[j] - 0.25 * fx[j] * fx[j] * fz[j] * fgb[j] - 0.5 * pa_yy[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               0.5 * pa_yy[j] * fz[j] * fga[j] * fx[j] - 0.5 * fx[j] * pa_zz[j] * fz[j] * fgb[j] - 0.5 * fz[j] * fga[j] * pa_zz[j] * fx[j] - 
-
-                               2.0 * fz[j] * fga[j] * pa_z[j] * fx[j] * pb_z[j] - pa_yyzz[j] * fz[j] * fgb[j] + 2.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] + 
-
-                               8.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_z[j] + 5.0 * pa_yyzz[j] * fz[j] * fx[j] + 20.0 * pa_yyz[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               fx[j] * fz[j] * fga[j] * pb_zz[j] - pa_yy[j] * fz[j] * fga[j] * pb_zz[j] + 2.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] - 
-
-                               fz[j] * fga[j] * pa_zz[j] * pb_zz[j] + 5.0 * pa_yy[j] * fz[j] * fx[j] * pb_zz[j] + 
-
-                               5.0 * fx[j] * pa_zz[j] * fz[j] * pb_zz[j] + 12.0 * pa_yyzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_yzzz_xx[j] = (0.75 * pa_yz[j] * fx[j] * fx[j] + 0.5 * pa_yzzz[j] * fx[j] + 
-
-                               1.5 * pa_yz[j] * fx[j] * pb_xx[j] + pa_yzzz[j] * pb_xx[j]) * s_0_0[j] + (-1.5 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_yz[j] * fz[j] * fga[j] * fx[j] - 
-
-                               pa_yzzz[j] * fz[j] * fgb[j] + 6.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_yzzz[j] * fz[j] * fx[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_xx[j] + 15.0 * pa_yz[j] * fz[j] * fx[j] * pb_xx[j] + 12.0 * pa_yzzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_yzzz_xy[j] = (0.75 * fx[j] * fx[j] * pa_z[j] * pb_x[j] + 0.5 * fx[j] * pa_zzz[j] * pb_x[j] + 
-
-                               1.5 * pa_yz[j] * fx[j] * pb_xy[j] + pa_yzzz[j] * pb_xy[j]) * s_0_0[j] + (-1.5 * fx[j] * pa_z[j] * fz[j] * fga[j] * pb_x[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_x[j] + 5.0 * fx[j] * pa_zzz[j] * fz[j] * pb_x[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_xy[j] + 15.0 * pa_yz[j] * fz[j] * fx[j] * pb_xy[j] + 12.0 * pa_yzzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
+                t_yzzz_xy[j] = kinvecfunc::fvec_yzzz_xy_s_0(fx[j], pa_yz[j], pa_yzzz[j], pa_z[j], pa_zzz[j], pb_x[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_yzzz_xy_r_0(fga[j], fx[j], fz[j], pa_yz[j], pa_yzzz[j], pa_z[j], pa_zzz[j], pb_x[j], pb_xy[j], r_0_0[j]);
             }
 
             // Batch of Integrals (8) = (80,90)
@@ -4845,125 +2241,25 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      t_zzzz_yz, t_zzzz_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                t_yzzz_xz[j] = (0.75 * pa_y[j] * fx[j] * fx[j] * pb_x[j] + 1.5 * pa_yzz[j] * fx[j] * pb_x[j] + 
+                t_yzzz_xz[j] = kinvecfunc::fvec_yzzz_xz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_yzzz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_yzzz_xz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_yzzz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                               1.5 * pa_yz[j] * fx[j] * pb_xz[j] + pa_yzzz[j] * pb_xz[j]) * s_0_0[j] + (-1.5 * pa_y[j] * fx[j] * fz[j] * fga[j] * pb_x[j] + 
+                t_yzzz_yy[j] = kinvecfunc::fvec_yzzz_yy_s_0(fx[j], pa_yz[j], pa_yzzz[j], pa_z[j], pa_zzz[j], pb_y[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_yzzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_yz[j], pa_yzzz[j], pa_z[j], pa_zzz[j], pb_y[j], pb_yy[j], r_0_0[j]);
 
-                               6.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 15.0 * pa_yzz[j] * fz[j] * fx[j] * pb_x[j] - 
+                t_yzzz_yz[j] = kinvecfunc::fvec_yzzz_yz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_yzzz[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_y[j], pb_yz[j], pb_z[j], s_0_0[j]) + kinvecfunc::fvec_yzzz_yz_r_0(fga[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_yzzz[j], pa_z[j], pa_zz[j], pa_zzz[j], pb_y[j], pb_yz[j], pb_z[j], r_0_0[j]);
 
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_xz[j] + 15.0 * pa_yz[j] * fz[j] * fx[j] * pb_xz[j] + 12.0 * pa_yzzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
+                t_yzzz_zz[j] = kinvecfunc::fvec_yzzz_zz_s_0(fx[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_yzzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_yzzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_y[j], pa_yz[j], pa_yzz[j], pa_yzzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
 
-                t_yzzz_yy[j] = (0.75 * pa_yz[j] * fx[j] * fx[j] + 1.5 * fx[j] * fx[j] * pa_z[j] * pb_y[j] + 
+                t_zzzz_xx[j] = kinvecfunc::fvec_zzzz_xx_s_0(fx[j], pa_zz[j], pa_zzzz[j], pb_xx[j], s_0_0[j]) + kinvecfunc::fvec_zzzz_xx_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pa_zzzz[j], pb_xx[j], r_0_0[j]);
 
-                               0.5 * pa_yzzz[j] * fx[j] + fx[j] * pa_zzz[j] * pb_y[j] + 1.5 * pa_yz[j] * fx[j] * pb_yy[j] + 
+                t_zzzz_xy[j] = kinvecfunc::fvec_zzzz_xy_s_0(fx[j], pa_zz[j], pa_zzzz[j], pb_xy[j], s_0_0[j]) + kinvecfunc::fvec_zzzz_xy_r_0(fga[j], fx[j], fz[j], pa_zz[j], pa_zzzz[j], pb_xy[j], r_0_0[j]);
 
-                               pa_yzzz[j] * pb_yy[j]) * s_0_0[j] + (-1.5 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 1.5 * pa_yz[j] * fz[j] * fga[j] * fx[j] - 
+                t_zzzz_xz[j] = kinvecfunc::fvec_zzzz_xz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pa_zzzz[j], pb_x[j], pb_xz[j], s_0_0[j]) + kinvecfunc::fvec_zzzz_xz_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zz[j], pa_zzz[j], pa_zzzz[j], pb_x[j], pb_xz[j], r_0_0[j]);
 
-                               3.0 * fx[j] * pa_z[j] * fz[j] * fga[j] * pb_y[j] - pa_yzzz[j] * fz[j] * fgb[j] + 6.0 * pa_yz[j] * fz[j] * fx[j] * fx[j] + 
+                t_zzzz_yy[j] = kinvecfunc::fvec_zzzz_yy_s_0(fx[j], pa_zz[j], pa_zzzz[j], pb_yy[j], s_0_0[j]) + kinvecfunc::fvec_zzzz_yy_r_0(fga[j], fgb[j], fx[j], fz[j], pa_zz[j], pa_zzzz[j], pb_yy[j], r_0_0[j]);
 
-                               12.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_y[j] + 5.0 * pa_yzzz[j] * fz[j] * fx[j] + 10.0 * fx[j] * pa_zzz[j] * fz[j] * pb_y[j] - 
+                t_zzzz_yz[j] = kinvecfunc::fvec_zzzz_yz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pa_zzzz[j], pb_y[j], pb_yz[j], s_0_0[j]) + kinvecfunc::fvec_zzzz_yz_r_0(fga[j], fx[j], fz[j], pa_z[j], pa_zz[j], pa_zzz[j], pa_zzzz[j], pb_y[j], pb_yz[j], r_0_0[j]);
 
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_yy[j] + 15.0 * pa_yz[j] * fz[j] * fx[j] * pb_yy[j] + 12.0 * pa_yzzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_yzzz_yz[j] = (0.375 * fx[j] * fx[j] * fx[j] + 0.75 * fx[j] * fx[j] * pa_zz[j] + 
-
-                               0.75 * pa_y[j] * fx[j] * fx[j] * pb_y[j] + 0.75 * fx[j] * fx[j] * pa_z[j] * pb_z[j] + 1.5 * pa_yzz[j] * fx[j] * pb_y[j] + 
-
-                               0.5 * fx[j] * pa_zzz[j] * pb_z[j] + 1.5 * pa_yz[j] * fx[j] * pb_yz[j] + pa_yzzz[j] * pb_yz[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fga[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_zz[j] * fz[j] - 1.5 * pa_y[j] * fx[j] * fz[j] * fga[j] * pb_y[j] - 
-
-                               1.5 * fx[j] * pa_z[j] * fz[j] * fga[j] * pb_z[j] + 6.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 
-
-                               6.0 * fx[j] * fx[j] * pa_z[j] * fz[j] * pb_z[j] + 15.0 * pa_yzz[j] * fz[j] * fx[j] * pb_y[j] + 
-
-                               5.0 * fx[j] * pa_zzz[j] * fz[j] * pb_z[j] - 3.0 * pa_yz[j] * fz[j] * fga[j] * pb_yz[j] + 
-
-                               15.0 * pa_yz[j] * fz[j] * fx[j] * pb_yz[j] + 12.0 * pa_yzzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_yzzz_zz[j] = (2.25 * pa_yz[j] * fx[j] * fx[j] + 1.5 * pa_y[j] * fx[j] * fx[j] * pb_z[j] + 
-
-                               0.5 * pa_yzzz[j] * fx[j] + 3.0 * pa_yzz[j] * fx[j] * pb_z[j] + 1.5 * pa_yz[j] * fx[j] * pb_zz[j] + 
-
-                               pa_yzzz[j] * pb_zz[j]) * s_0_0[j] + (18.0 * pa_yz[j] * fx[j] * fx[j] * fz[j] - 1.5 * pa_yz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               1.5 * pa_yz[j] * fz[j] * fga[j] * fx[j] - 3.0 * pa_y[j] * fx[j] * fz[j] * fga[j] * pb_z[j] - pa_yzzz[j] * fz[j] * fgb[j] + 
-
-                               12.0 * pa_y[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 5.0 * pa_yzzz[j] * fz[j] * fx[j] + 30.0 * pa_yzz[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               3.0 * pa_yz[j] * fz[j] * fga[j] * pb_zz[j] + 15.0 * pa_yz[j] * fz[j] * fx[j] * pb_zz[j] + 12.0 * pa_yzzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
-
-                t_zzzz_xx[j] = (0.375 * fx[j] * fx[j] * fx[j] + 1.5 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               0.5 * pa_zzzz[j] * fx[j] + 0.75 * fx[j] * fx[j] * pb_xx[j] + 3.0 * pa_zz[j] * fx[j] * pb_xx[j] + 
-
-                               pa_zzzz[j] * pb_xx[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 1.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               3.0 * pa_zz[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_zz[j] * fz[j] * fga[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               pa_zzzz[j] * fz[j] * fgb[j] + 12.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_zzzz[j] * fz[j] * fx[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_xx[j] - 6.0 * pa_zz[j] * fz[j] * fga[j] * pb_xx[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xx[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * fx[j] * pb_xx[j] + 12.0 * pa_zzzz[j] * fz[j] * pb_xx[j]) * r_0_0[j];
-
-                t_zzzz_xy[j] = (0.75 * fx[j] * fx[j] * pb_xy[j] + 3.0 * pa_zz[j] * fx[j] * pb_xy[j] + 
-
-                               pa_zzzz[j] * pb_xy[j]) * s_0_0[j] + (-3.0 * fx[j] * fz[j] * fga[j] * pb_xy[j] - 
-
-                               6.0 * pa_zz[j] * fz[j] * fga[j] * pb_xy[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xy[j] + 30.0 * pa_zz[j] * fz[j] * fx[j] * pb_xy[j] + 
-
-                               12.0 * pa_zzzz[j] * fz[j] * pb_xy[j]) * r_0_0[j];
-
-                t_zzzz_xz[j] = (3.0 * pa_z[j] * fx[j] * fx[j] * pb_x[j] + 2.0 * pa_zzz[j] * fx[j] * pb_x[j] + 
-
-                               0.75 * fx[j] * fx[j] * pb_xz[j] + 3.0 * pa_zz[j] * fx[j] * pb_xz[j] + pa_zzzz[j] * pb_xz[j]) * s_0_0[j] + (-6.0 * pa_z[j] * fx[j] * fz[j] * fga[j] * pb_x[j] + 
-
-                               24.0 * pa_z[j] * fx[j] * fx[j] * fz[j] * pb_x[j] + 20.0 * pa_zzz[j] * fz[j] * fx[j] * pb_x[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_xz[j] - 6.0 * pa_zz[j] * fz[j] * fga[j] * pb_xz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_xz[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * fx[j] * pb_xz[j] + 12.0 * pa_zzzz[j] * fz[j] * pb_xz[j]) * r_0_0[j];
-
-                t_zzzz_yy[j] = (0.375 * fx[j] * fx[j] * fx[j] + 1.5 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               0.5 * pa_zzzz[j] * fx[j] + 0.75 * fx[j] * fx[j] * pb_yy[j] + 3.0 * pa_zz[j] * fx[j] * pb_yy[j] + 
-
-                               pa_zzzz[j] * pb_yy[j]) * s_0_0[j] + (-0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 1.5 * fx[j] * fx[j] * fz[j] * fga[j] - 
-
-                               3.0 * pa_zz[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_zz[j] * fz[j] * fga[j] * fx[j] + 2.25 * fx[j] * fx[j] * fx[j] * fz[j] - 
-
-                               pa_zzzz[j] * fz[j] * fgb[j] + 12.0 * pa_zz[j] * fz[j] * fx[j] * fx[j] + 5.0 * pa_zzzz[j] * fz[j] * fx[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_yy[j] - 6.0 * pa_zz[j] * fz[j] * fga[j] * pb_yy[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yy[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * fx[j] * pb_yy[j] + 12.0 * pa_zzzz[j] * fz[j] * pb_yy[j]) * r_0_0[j];
-
-                t_zzzz_yz[j] = (3.0 * pa_z[j] * fx[j] * fx[j] * pb_y[j] + 2.0 * pa_zzz[j] * fx[j] * pb_y[j] + 
-
-                               0.75 * fx[j] * fx[j] * pb_yz[j] + 3.0 * pa_zz[j] * fx[j] * pb_yz[j] + pa_zzzz[j] * pb_yz[j]) * s_0_0[j] + (-6.0 * pa_z[j] * fx[j] * fz[j] * fga[j] * pb_y[j] + 
-
-                               24.0 * pa_z[j] * fx[j] * fx[j] * fz[j] * pb_y[j] + 20.0 * pa_zzz[j] * fz[j] * fx[j] * pb_y[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_yz[j] - 6.0 * pa_zz[j] * fz[j] * fga[j] * pb_yz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_yz[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * fx[j] * pb_yz[j] + 12.0 * pa_zzzz[j] * fz[j] * pb_yz[j]) * r_0_0[j];
-
-                t_zzzz_zz[j] = (1.875 * fx[j] * fx[j] * fx[j] + 4.5 * pa_zz[j] * fx[j] * fx[j] + 
-
-                               6.0 * pa_z[j] * fx[j] * fx[j] * pb_z[j] + 0.5 * pa_zzzz[j] * fx[j] + 4.0 * pa_zzz[j] * fx[j] * pb_z[j] + 
-
-                               0.75 * fx[j] * fx[j] * pb_zz[j] + 3.0 * pa_zz[j] * fx[j] * pb_zz[j] + pa_zzzz[j] * pb_zz[j]) * s_0_0[j] + (-4.5 * fx[j] * fx[j] * fz[j] * fga[j] + 11.25 * fx[j] * fx[j] * fx[j] * fz[j] + 
-
-                               36.0 * pa_zz[j] * fx[j] * fx[j] * fz[j] - 0.75 * fx[j] * fx[j] * fz[j] * fgb[j] - 3.0 * pa_zz[j] * fx[j] * fz[j] * fgb[j] - 
-
-                               3.0 * pa_zz[j] * fz[j] * fga[j] * fx[j] - 12.0 * pa_z[j] * fx[j] * fz[j] * fga[j] * pb_z[j] - pa_zzzz[j] * fz[j] * fgb[j] + 
-
-                               48.0 * pa_z[j] * fx[j] * fx[j] * fz[j] * pb_z[j] + 5.0 * pa_zzzz[j] * fz[j] * fx[j] + 40.0 * pa_zzz[j] * fz[j] * fx[j] * pb_z[j] - 
-
-                               3.0 * fx[j] * fz[j] * fga[j] * pb_zz[j] - 6.0 * pa_zz[j] * fz[j] * fga[j] * pb_zz[j] + 6.0 * fx[j] * fx[j] * fz[j] * pb_zz[j] + 
-
-                               30.0 * pa_zz[j] * fz[j] * fx[j] * pb_zz[j] + 12.0 * pa_zzzz[j] * fz[j] * pb_zz[j]) * r_0_0[j];
+                t_zzzz_zz[j] = kinvecfunc::fvec_zzzz_zz_s_0(fx[j], pa_z[j], pa_zz[j], pa_zzz[j], pa_zzzz[j], pb_z[j], pb_zz[j], s_0_0[j]) + kinvecfunc::fvec_zzzz_zz_r_0(fga[j], fgb[j], fx[j], fz[j], pa_z[j], pa_zz[j], pa_zzz[j], pa_zzzz[j], pb_z[j], pb_zz[j], r_0_0[j]);
             }
 
             idx++;

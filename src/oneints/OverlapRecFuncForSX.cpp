@@ -11,7 +11,6 @@
 #include <cmath>
 
 #include "MathConst.hpp"
-
 #include "OverlapVecFuncForSX.hpp"
 
 namespace ovlrecfunc { // ovlrecfunc namespace
