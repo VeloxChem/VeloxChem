@@ -1840,6 +1840,23 @@ namespace kinrecfunc { // kinrecfunc namespace
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
+        kinrecfunc::compKineticEnergyForGD_0_4(primBuffer, auxBuffer, osFactors, paDistances, pbDistances,
+                                               braGtoBlock, ketGtoBlock, iContrGto);
+       
+        kinrecfunc::compKineticEnergyForGD_5_8(primBuffer, auxBuffer, osFactors, paDistances, pbDistances,
+                                               braGtoBlock, ketGtoBlock, iContrGto);
+    }
+    
+    void
+    compKineticEnergyForGD_0_4(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& auxBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CMemBlock2D<double>& pbDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto)
+    {
         // set up pointers to primitives data on bra side
 
         auto spos = braGtoBlock.getStartPositions();
@@ -1908,8 +1925,6 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_yzz = paDistances.data(34 * idx + 17);
 
-            auto pa_zzz = paDistances.data(34 * idx + 18);
-
             // set up pointers to 4-th order tensor of distance R(PA)
 
             auto pa_xxxx = paDistances.data(34 * idx + 19);
@@ -1929,18 +1944,6 @@ namespace kinrecfunc { // kinrecfunc namespace
             auto pa_xyyz = paDistances.data(34 * idx + 26);
 
             auto pa_xyzz = paDistances.data(34 * idx + 27);
-
-            auto pa_xzzz = paDistances.data(34 * idx + 28);
-
-            auto pa_yyyy = paDistances.data(34 * idx + 29);
-
-            auto pa_yyyz = paDistances.data(34 * idx + 30);
-
-            auto pa_yyzz = paDistances.data(34 * idx + 31);
-
-            auto pa_yzzz = paDistances.data(34 * idx + 32);
-
-            auto pa_zzzz = paDistances.data(34 * idx + 33);
 
             // set up pointers to 1-th order tensor of distance R(PB)
 
@@ -2071,86 +2074,6 @@ namespace kinrecfunc { // kinrecfunc namespace
             auto t_xyzz_xx = primBuffer.data(90 * idx + 48);
 
             auto t_xyzz_xy = primBuffer.data(90 * idx + 49);
-
-            auto t_xyzz_xz = primBuffer.data(90 * idx + 50);
-
-            auto t_xyzz_yy = primBuffer.data(90 * idx + 51);
-
-            auto t_xyzz_yz = primBuffer.data(90 * idx + 52);
-
-            auto t_xyzz_zz = primBuffer.data(90 * idx + 53);
-
-            auto t_xzzz_xx = primBuffer.data(90 * idx + 54);
-
-            auto t_xzzz_xy = primBuffer.data(90 * idx + 55);
-
-            auto t_xzzz_xz = primBuffer.data(90 * idx + 56);
-
-            auto t_xzzz_yy = primBuffer.data(90 * idx + 57);
-
-            auto t_xzzz_yz = primBuffer.data(90 * idx + 58);
-
-            auto t_xzzz_zz = primBuffer.data(90 * idx + 59);
-
-            auto t_yyyy_xx = primBuffer.data(90 * idx + 60);
-
-            auto t_yyyy_xy = primBuffer.data(90 * idx + 61);
-
-            auto t_yyyy_xz = primBuffer.data(90 * idx + 62);
-
-            auto t_yyyy_yy = primBuffer.data(90 * idx + 63);
-
-            auto t_yyyy_yz = primBuffer.data(90 * idx + 64);
-
-            auto t_yyyy_zz = primBuffer.data(90 * idx + 65);
-
-            auto t_yyyz_xx = primBuffer.data(90 * idx + 66);
-
-            auto t_yyyz_xy = primBuffer.data(90 * idx + 67);
-
-            auto t_yyyz_xz = primBuffer.data(90 * idx + 68);
-
-            auto t_yyyz_yy = primBuffer.data(90 * idx + 69);
-
-            auto t_yyyz_yz = primBuffer.data(90 * idx + 70);
-
-            auto t_yyyz_zz = primBuffer.data(90 * idx + 71);
-
-            auto t_yyzz_xx = primBuffer.data(90 * idx + 72);
-
-            auto t_yyzz_xy = primBuffer.data(90 * idx + 73);
-
-            auto t_yyzz_xz = primBuffer.data(90 * idx + 74);
-
-            auto t_yyzz_yy = primBuffer.data(90 * idx + 75);
-
-            auto t_yyzz_yz = primBuffer.data(90 * idx + 76);
-
-            auto t_yyzz_zz = primBuffer.data(90 * idx + 77);
-
-            auto t_yzzz_xx = primBuffer.data(90 * idx + 78);
-
-            auto t_yzzz_xy = primBuffer.data(90 * idx + 79);
-
-            auto t_yzzz_xz = primBuffer.data(90 * idx + 80);
-
-            auto t_yzzz_yy = primBuffer.data(90 * idx + 81);
-
-            auto t_yzzz_yz = primBuffer.data(90 * idx + 82);
-
-            auto t_yzzz_zz = primBuffer.data(90 * idx + 83);
-
-            auto t_zzzz_xx = primBuffer.data(90 * idx + 84);
-
-            auto t_zzzz_xy = primBuffer.data(90 * idx + 85);
-
-            auto t_zzzz_xz = primBuffer.data(90 * idx + 86);
-
-            auto t_zzzz_yy = primBuffer.data(90 * idx + 87);
-
-            auto t_zzzz_yz = primBuffer.data(90 * idx + 88);
-
-            auto t_zzzz_zz = primBuffer.data(90 * idx + 89);
 
             // Batch of Integrals (0) = (0,10)
 
@@ -2297,6 +2220,206 @@ namespace kinrecfunc { // kinrecfunc namespace
                 t_xyzz_xy[j] = kinvecfunc::fvec_xyzz_xy_s_0(fx[j], pa_x[j], pa_xy[j], pa_xyzz[j], pa_xzz[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], pb_y[j], s_0_0[j]) + kinvecfunc::fvec_xyzz_xy_r_0(fga[j], fx[j], fz[j], pa_x[j], pa_xy[j], pa_xyzz[j], pa_xzz[j], pa_y[j], pa_yzz[j], pa_zz[j], pb_x[j], pb_xy[j], pb_y[j], r_0_0[j]);
             }
 
+            idx++;
+        }
+    }
+
+    void
+    compKineticEnergyForGD_5_8(      CMemBlock2D<double>& primBuffer,
+                               const CMemBlock2D<double>& auxBuffer,
+                               const CMemBlock2D<double>& osFactors,
+                               const CMemBlock2D<double>& paDistances,
+                               const CMemBlock2D<double>& pbDistances,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(4 * idx);
+
+            auto fz = osFactors.data(4 * idx + 1);
+
+            auto fga = osFactors.data(4 * idx + 2);
+
+            auto fgb = osFactors.data(4 * idx + 3);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_x = paDistances.data(34 * idx);
+
+            auto pa_y = paDistances.data(34 * idx + 1);
+
+            auto pa_z = paDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_xy = paDistances.data(34 * idx + 4);
+
+            auto pa_xz = paDistances.data(34 * idx + 5);
+
+            auto pa_yy = paDistances.data(34 * idx + 6);
+
+            auto pa_yz = paDistances.data(34 * idx + 7);
+
+            auto pa_zz = paDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PA)
+
+            auto pa_xyz = paDistances.data(34 * idx + 13);
+
+            auto pa_xzz = paDistances.data(34 * idx + 14);
+
+            auto pa_yyy = paDistances.data(34 * idx + 15);
+
+            auto pa_yyz = paDistances.data(34 * idx + 16);
+
+            auto pa_yzz = paDistances.data(34 * idx + 17);
+
+            auto pa_zzz = paDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PA)
+
+            auto pa_xyzz = paDistances.data(34 * idx + 27);
+
+            auto pa_xzzz = paDistances.data(34 * idx + 28);
+
+            auto pa_yyyy = paDistances.data(34 * idx + 29);
+
+            auto pa_yyyz = paDistances.data(34 * idx + 30);
+
+            auto pa_yyzz = paDistances.data(34 * idx + 31);
+
+            auto pa_yzzz = paDistances.data(34 * idx + 32);
+
+            auto pa_zzzz = paDistances.data(34 * idx + 33);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(9 * idx);
+
+            auto pb_y = pbDistances.data(9 * idx + 1);
+
+            auto pb_z = pbDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xx = pbDistances.data(9 * idx + 3);
+
+            auto pb_xy = pbDistances.data(9 * idx + 4);
+
+            auto pb_xz = pbDistances.data(9 * idx + 5);
+
+            auto pb_yy = pbDistances.data(9 * idx + 6);
+
+            auto pb_yz = pbDistances.data(9 * idx + 7);
+
+            auto pb_zz = pbDistances.data(9 * idx + 8);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0 = auxBuffer.data(2 * idx);
+
+            auto r_0_0 = auxBuffer.data(2 * idx + 1);
+
+            // set up pointers to integrals
+
+            auto t_xyzz_xz = primBuffer.data(90 * idx + 50);
+
+            auto t_xyzz_yy = primBuffer.data(90 * idx + 51);
+
+            auto t_xyzz_yz = primBuffer.data(90 * idx + 52);
+
+            auto t_xyzz_zz = primBuffer.data(90 * idx + 53);
+
+            auto t_xzzz_xx = primBuffer.data(90 * idx + 54);
+
+            auto t_xzzz_xy = primBuffer.data(90 * idx + 55);
+
+            auto t_xzzz_xz = primBuffer.data(90 * idx + 56);
+
+            auto t_xzzz_yy = primBuffer.data(90 * idx + 57);
+
+            auto t_xzzz_yz = primBuffer.data(90 * idx + 58);
+
+            auto t_xzzz_zz = primBuffer.data(90 * idx + 59);
+
+            auto t_yyyy_xx = primBuffer.data(90 * idx + 60);
+
+            auto t_yyyy_xy = primBuffer.data(90 * idx + 61);
+
+            auto t_yyyy_xz = primBuffer.data(90 * idx + 62);
+
+            auto t_yyyy_yy = primBuffer.data(90 * idx + 63);
+
+            auto t_yyyy_yz = primBuffer.data(90 * idx + 64);
+
+            auto t_yyyy_zz = primBuffer.data(90 * idx + 65);
+
+            auto t_yyyz_xx = primBuffer.data(90 * idx + 66);
+
+            auto t_yyyz_xy = primBuffer.data(90 * idx + 67);
+
+            auto t_yyyz_xz = primBuffer.data(90 * idx + 68);
+
+            auto t_yyyz_yy = primBuffer.data(90 * idx + 69);
+
+            auto t_yyyz_yz = primBuffer.data(90 * idx + 70);
+
+            auto t_yyyz_zz = primBuffer.data(90 * idx + 71);
+
+            auto t_yyzz_xx = primBuffer.data(90 * idx + 72);
+
+            auto t_yyzz_xy = primBuffer.data(90 * idx + 73);
+
+            auto t_yyzz_xz = primBuffer.data(90 * idx + 74);
+
+            auto t_yyzz_yy = primBuffer.data(90 * idx + 75);
+
+            auto t_yyzz_yz = primBuffer.data(90 * idx + 76);
+
+            auto t_yyzz_zz = primBuffer.data(90 * idx + 77);
+
+            auto t_yzzz_xx = primBuffer.data(90 * idx + 78);
+
+            auto t_yzzz_xy = primBuffer.data(90 * idx + 79);
+
+            auto t_yzzz_xz = primBuffer.data(90 * idx + 80);
+
+            auto t_yzzz_yy = primBuffer.data(90 * idx + 81);
+
+            auto t_yzzz_yz = primBuffer.data(90 * idx + 82);
+
+            auto t_yzzz_zz = primBuffer.data(90 * idx + 83);
+
+            auto t_zzzz_xx = primBuffer.data(90 * idx + 84);
+
+            auto t_zzzz_xy = primBuffer.data(90 * idx + 85);
+
+            auto t_zzzz_xz = primBuffer.data(90 * idx + 86);
+
+            auto t_zzzz_yy = primBuffer.data(90 * idx + 87);
+
+            auto t_zzzz_yz = primBuffer.data(90 * idx + 88);
+
+            auto t_zzzz_zz = primBuffer.data(90 * idx + 89);
+
             // Batch of Integrals (5) = (50,60)
 
             #pragma omp simd aligned(fga, fgb, fx, fz, pa_x, pa_xy, pa_xyz, pa_xyzz, pa_xz, pa_xzz, pa_xzzz, pa_y, pa_yz, \
@@ -2416,7 +2539,6 @@ namespace kinrecfunc { // kinrecfunc namespace
             idx++;
         }
     }
-
 
 } // kinrecfunc namespace
 
