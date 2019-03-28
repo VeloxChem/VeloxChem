@@ -168,7 +168,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                     const int32_t              iContrGto);
     
     /**
-     Computes batch of primitive (G|T|D) kinetic energy integrals and stores
+     Computes block 0-4 from batch of primitive (G|T|D) kinetic energy integrals and stores
      results in primitives buffer.
      
      @param primBuffer the primitives buffer.
@@ -190,7 +190,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                     const int32_t              iContrGto);
     
     /**
-     Computes batch of primitive (G|T|D) kinetic energy integrals and stores
+     Computes block 5-8 from batch of primitive (G|T|D) kinetic energy integrals and stores
      results in primitives buffer.
      
      @param primBuffer the primitives buffer.
