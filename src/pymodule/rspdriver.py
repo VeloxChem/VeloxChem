@@ -3,12 +3,12 @@ from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import ScreeningContainer
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ericut
 from .veloxchemlib import molorb
 from .veloxchemlib import szblock
 
 from .outputstream import OutputStream
 from .tdaexcidriver import TDAExciDriver
+from .lrsolver import LinearResponseSolver
 
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
@@ -37,7 +37,8 @@ class ResponseDriver:
         """
         
         # calculation type
-        self.prop_type = "SINGEX_TDA"
+        #self.prop_type = "SINGEX_TDA"
+        self.prop_type = "POLARIZABILITY"
         
         # convergence information
         self.max_iter = 50
@@ -46,7 +47,8 @@ class ResponseDriver:
         self.qq_type = "QQ_DEN"
         
         # thresholds
-        self.conv_thresh = 1.0e-3
+        #self.conv_thresh = 1.0e-3
+        self.conv_thresh = 1.0e-5
         self.eri_thresh  = 1.0e-15
         
         # excited states information
@@ -110,7 +112,7 @@ class ResponseDriver:
 
         # TDA singlet/triplet excited states
         
-        if self.prop_type in ["SINGEX_TDA", "TRIPEX_TDA"]:
+        if self.prop_type.upper() in ["SINGEX_TDA", "TRIPEX_TDA"]:
             tda_exci = TDAExciDriver(self.rank, self.nodes)
             
             tda_exci.set_number_states(self.nstates)
@@ -119,7 +121,18 @@ class ResponseDriver:
             
             tda_exci.compute(qq_data, mol_orbs, molecule, ao_basis, comm,
                              ostream)
-    
+
+        # Linear response solver
+
+        if self.prop_type.upper() in ["POLARIZABILITY"]:
+            lr_solver = LinearResponseSolver()
+
+            lr_solver.set_eri_threshold(self.eri_thresh)
+            lr_solver.set_solver(self.conv_thresh, self.max_iter)
+
+            lr_prop = lr_solver.compute(molecule, ao_basis, mol_orbs, comm,
+                                        ostream)
+
     def print_header(self, ostream):
         """Prints response driver setup header to output stream.
             
@@ -176,8 +189,7 @@ class ResponseDriver:
         if self.prop_type == "SINGEX_TDA":
             return "Singlet Excited States"
 
+        if self.prop_type == "POLARIZABILITY":
+            return "Polarizability"
+
         return "Undefined"
-
-
-
-

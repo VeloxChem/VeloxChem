@@ -38,6 +38,7 @@ from .visualizationdriver import VisualizationDriver
 from .rspdriver import ResponseDriver
 from .tdaexcidriver import TDAExciDriver
 from .blockdavidson import BlockDavidsonSolver
+from .lrsolver import LinearResponseSolver
 from .mpitask import MpiTask
 
 # Python functions
