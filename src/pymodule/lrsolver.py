@@ -27,7 +27,7 @@ import sys
 class LinearResponseSolver:
     """Implements linear response solver"""
 
-    def __init__(self):
+    def __init__(self, frequencies=None):
         """Initializes linear response solver"""
 
         # TODO: initialize with rsp_input dictionary
@@ -35,7 +35,11 @@ class LinearResponseSolver:
         # operators
         self.a_ops = 'xyz'
         self.b_ops = 'xyz'
-        self.freqs = (0,)
+
+        if frequencies:
+            self.frequencies = tuple(frequencies)
+        else:
+            self.frequencies = (0,)
 
         # ERI settings
         self.qq_type = 'QQ_DEN'
@@ -99,7 +103,7 @@ class LinearResponseSolver:
 
         self.start_time = tm.time()
 
-        solutions = self.lr_solve(self.b_ops, self.freqs)
+        solutions = self.lr_solve(self.b_ops, self.frequencies)
 
         if self.rank == mpi_master():
             v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}
@@ -248,6 +252,7 @@ class LinearResponseSolver:
                     min(relative_residual_norm.values()))
                 self.ostream.print_header(output_header.ljust(72))
                 self.ostream.print_block(output_iter)
+                self.ostream.flush()
 
                 max_residual = max(relative_residual_norm.values())
                 if max_residual < self.conv_thresh:

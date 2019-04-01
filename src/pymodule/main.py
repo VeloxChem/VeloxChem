@@ -44,7 +44,10 @@ def main():
         else:
             mol_orbs = MolecularOrbitals()
 
-        rsp_drv = ResponseDriver()
+        if 'response' in task.input_dict:
+            rsp_drv = ResponseDriver(task.input_dict['response'])
+        else:
+            rsp_drv = ResponseDriver()
 
         rsp_drv.compute_task(mol_orbs, task)
 

@@ -971,6 +971,7 @@ class ScfDriver:
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
             ostream.print_info(valstr)
             ostream.print_blank()
+
         else:
             valstr = "*** SCF "
             if self.is_converged:
@@ -983,6 +984,8 @@ class ScfDriver:
             ostream.print_blank()
             ostream.print_header(valstr.ljust(92))
             ostream.print_blank()
+
+        ostream.flush()
 
     def print_iter_data(self, i, ostream):
         """Prints SCF iteration data to output stream.

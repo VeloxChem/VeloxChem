@@ -30,16 +30,15 @@ class ResponseDriver:
         The number of MPI processes.
     """
 
-    def __init__(self):
+    def __init__(self, rsp_dict=None):
         """Initializes Response driver.
             
         Initializes Response driver to default setup.
         """
         
         # calculation type
-        #self.prop_type = "SINGEX_TDA"
-        self.prop_type = "POLARIZABILITY"
-        
+        self.prop_type = "SINGEX_TDA"
+
         # convergence information
         self.max_iter = 50
         
@@ -47,12 +46,19 @@ class ResponseDriver:
         self.qq_type = "QQ_DEN"
         
         # thresholds
-        #self.conv_thresh = 1.0e-3
-        self.conv_thresh = 1.0e-5
+        self.conv_thresh = 1.0e-3
         self.eri_thresh  = 1.0e-15
         
         # excited states information
         self.nstates = 3
+        
+        # polarizability
+        if rsp_dict:
+            self.prop_type = rsp_dict['property'].upper()
+            if self.prop_type == 'POLARIZABILITY':
+                self.conv_thresh = 1.0e-5
+                self.frequencies = rsp_dict['frequencies'].split(',')
+                self.frequencies = list(map(float, self.frequencies))
         
         # mpi information
         self.rank = 0
@@ -125,7 +131,7 @@ class ResponseDriver:
         # Linear response solver
 
         if self.prop_type.upper() in ["POLARIZABILITY"]:
-            lr_solver = LinearResponseSolver()
+            lr_solver = LinearResponseSolver(self.frequencies)
 
             lr_solver.set_eri_threshold(self.eri_thresh)
             lr_solver.set_solver(self.conv_thresh, self.max_iter)
@@ -174,6 +180,8 @@ class ResponseDriver:
             "{:.1e}".format(self.eri_thresh)
         ostream.print_header(cur_str.ljust(str_width))
         ostream.print_blank()
+
+        ostream.flush()
 
     def prop_str(self):
         """Gets string with type of molecular property calculation.
