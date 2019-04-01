@@ -67,11 +67,12 @@ class LinearResponseSolver:
                 ostream=OutputStream(sys.stdout)):
         """Performs linear response calculation"""
 
-        self.ostream = ostream
-
         self.comm = comm
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
+
+        if self.rank == mpi_master():
+            self.ostream = ostream
 
         self.molecule = molecule
         self.basis = basis
@@ -83,10 +84,12 @@ class LinearResponseSolver:
             nalpha == nbeta,
             'LinearResponseSolver: not yet implemented for unrestricted case')
 
-        self.nocc = nalpha
-        self.norb = self.mol_orbs.number_mos()
+        if self.rank == mpi_master():
+            self.nocc= nalpha
+            self.norb= self.mol_orbs.number_mos()
 
-        self.density = self.mol_orbs.get_density(self.molecule)
+            self.density = self.mol_orbs.get_density(self.molecule)
+
         # TODO: make use of 1e integrals from scf
         self.comp_1e_ints()
 
@@ -96,24 +99,27 @@ class LinearResponseSolver:
 
         self.start_time = tm.time()
 
-        v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}
-
         solutions = self.lr_solve(self.b_ops, self.freqs)
 
-        lrs = {}
-        for aop in self.a_ops:
-            for bop, w in solutions:
-                lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[(bop, w)])
+        if self.rank == mpi_master():
+            v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}
 
-        self.ostream.print_header('Polarizability')
-        self.ostream.print_header('--------------')
-        for (a, b, w), alpha_abw in lrs.items():
-            ops_label = '<<{};{}>>_{}'.format(a, b, w)
-            output_alpha = '{:<15s} {:15.8f}'.format(ops_label, alpha_abw)
-            self.ostream.print_header(output_alpha)
-        self.ostream.print_blank()
+            lrs = {}
+            for aop in self.a_ops:
+                for bop, w in solutions:
+                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[(bop, w)])
 
-        return lrs
+            self.ostream.print_header('Polarizability')
+            self.ostream.print_header('--------------')
+            for (a, b, w), alpha_abw in lrs.items():
+                ops_label = '<<{};{}>>_{}'.format(a, b, w)
+                output_alpha = '{:<15s} {:15.8f}'.format(ops_label, alpha_abw)
+                self.ostream.print_header(output_alpha)
+            self.ostream.print_blank()
+
+            return lrs
+        else:
+            return None
 
     def comp_1e_ints(self):
         """Computes 1e integrals"""
@@ -131,9 +137,10 @@ class LinearResponseSolver:
         V = potential_drv.compute(self.molecule, self.basis, self.comm)
         Dpl = dipole_drv.compute(self.molecule, self.basis, self.comm)
 
-        self.overlap = S.to_numpy()
-        self.hcore = T.to_numpy() - V.to_numpy()
-        self.dipoles = (Dpl.x_to_numpy(), Dpl.y_to_numpy(), Dpl.z_to_numpy())
+        if self.rank == mpi_master():
+            self.overlap = S.to_numpy()
+            self.hcore = T.to_numpy() - V.to_numpy()
+            self.dipoles = (Dpl.x_to_numpy(), Dpl.y_to_numpy(), Dpl.z_to_numpy())
 
     def get_rhs(self, ops):
         """Create right-hand sides of linear response equations"""
@@ -162,107 +169,130 @@ class LinearResponseSolver:
 
     def lr_solve(self, ops, freqs):
 
-        V1 = {op: v for op, v in zip(ops, self.get_rhs(ops))}
+        if self.rank == mpi_master():
+            V1 = {op: v for op, v in zip(ops, self.get_rhs(ops))}
+            igs = self.initial_guess(ops, freqs)
+            b = self.setup_trials(igs)
 
-        igs = self.initial_guess(ops, freqs)
-        b = self.setup_trials(igs)
-        # if the set of trial vectors is null we return the initial guess
-        if not np.any(b):
-            return igs
+            assert_msg_critical(np.any(b),
+                'LinearResponseSolver.lr_solve: trial vector is empty')
+        else:
+            b = None
 
         e2b = self.e2n(b)
-        s2b = self.s2n(b)
 
-        od = self.get_orbital_diagonal()
-        sd = self.get_overlap_diagonal()
-        td = {w: od - w * sd for w in freqs}
+        if self.rank == mpi_master():
+            s2b = self.s2n(b)
 
-        solutions = {}
-        residuals = {}
-        e2nn = {}
-        relative_residual_norm = {}
+            od = self.get_orbital_diagonal()
+            sd = self.get_overlap_diagonal()
+            td = {w: od - w * sd for w in freqs}
+
+            solutions = {}
+            residuals = {}
+            e2nn = {}
+            relative_residual_norm = {}
 
         for i in range(self.max_iter):
-            self.cur_iter = i
 
-            # next solution
-            for op, freq in igs:
-                v = V1[op]
+            if self.rank == mpi_master():
+                self.cur_iter = i
 
-                # reduced_solution = (b.T*v)/(b.T*(e2b-freq*s2b))
-                reduced_solution = np.linalg.solve(
-                    np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
+                # next solution
+                for op, freq in igs:
+                    v = V1[op]
 
-                solutions[(op, freq)] = np.matmul(b, reduced_solution)
-                e2nn[(op, freq)] = np.matmul(e2b, reduced_solution)
+                    # reduced_solution = (b.T*v)/(b.T*(e2b-freq*s2b))
+                    reduced_solution = np.linalg.solve(
+                        np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
 
-            # TODO: reduce intermediate copies
-            # solutions -> solutions_np -> s2nn_np -> s2nn
-            nrows = len(list(solutions.values())[0])
-            op_freq_keys = list(solutions.keys())
+                    solutions[(op, freq)] = np.matmul(b, reduced_solution)
+                    e2nn[(op, freq)] = np.matmul(e2b, reduced_solution)
 
-            solutions_np = np.zeros((nrows, len(op_freq_keys)))
-            for col, op_freq in enumerate(op_freq_keys):
-                solutions_np[:, col] = solutions[op_freq]
+                # TODO: reduce intermediate copies
+                # solutions -> solutions_np -> s2nn_np -> s2nn
+                nrows = len(list(solutions.values())[0])
+                op_freq_keys = list(solutions.keys())
 
-            s2nn_np = self.s2n(solutions_np)
+                solutions_np = np.zeros((nrows, len(op_freq_keys)))
+                for col, op_freq in enumerate(op_freq_keys):
+                    solutions_np[:, col] = solutions[op_freq]
 
-            s2nn = {}
-            for col, op_freq in enumerate(op_freq_keys):
-                s2nn[op_freq] = s2nn_np[:, col]
+                s2nn_np = self.s2n(solutions_np)
 
-            # next residual
-            output_iter = ''
+                s2nn = {}
+                for col, op_freq in enumerate(op_freq_keys):
+                    s2nn[op_freq] = s2nn_np[:, col]
 
-            for op, freq in igs:
-                v = V1[op]
-                n = solutions[(op, freq)]
-                r = e2nn[(op, freq)] - freq * s2nn[(op, freq)] - v
-                residuals[(op, freq)] = r
-                nv = np.dot(n, v)
-                rn = np.linalg.norm(r)
-                nn = np.linalg.norm(n)
-                relative_residual_norm[(op, freq)] = rn / nn
+                # next residual
+                output_iter = ''
 
-                ops_label = '<<{};{}>>_{}'.format(op, op, freq)
-                output_iter += '{:<15s}: {:.8f} '.format(ops_label, -nv)
-                output_iter += 'Residual Norm: {:.8f}\n'.format(rn / nn)
+                for op, freq in igs:
+                    v = V1[op]
+                    n = solutions[(op, freq)]
+                    r = e2nn[(op, freq)] - freq * s2nn[(op, freq)] - v
+                    residuals[(op, freq)] = r
+                    nv = np.dot(n, v)
+                    rn = np.linalg.norm(r)
+                    nn = np.linalg.norm(n)
+                    relative_residual_norm[(op, freq)] = rn / nn
 
-            output_header = '*** Iteration:   {} '.format(i + 1)
-            output_header += '* Residuals (Max,Min): '
-            output_header += '{:.2e} and {:.2e}\n'.format(
-                max(relative_residual_norm.values()),
-                min(relative_residual_norm.values()))
-            self.ostream.print_header(output_header.ljust(72))
-            self.ostream.print_block(output_iter)
+                    ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+                    output_iter += '{:<15s}: {:.8f} '.format(ops_label, -nv)
+                    output_iter += 'Residual Norm: {:.8f}\n'.format(rn / nn)
 
-            max_residual = max(relative_residual_norm.values())
-            if max_residual < self.conv_thresh:
-                self.is_converged = True
+                output_header = '*** Iteration:   {} '.format(i + 1)
+                output_header += '* Residuals (Max,Min): '
+                output_header += '{:.2e} and {:.2e}\n'.format(
+                    max(relative_residual_norm.values()),
+                    min(relative_residual_norm.values()))
+                self.ostream.print_header(output_header.ljust(72))
+                self.ostream.print_block(output_iter)
+
+                max_residual = max(relative_residual_norm.values())
+                if max_residual < self.conv_thresh:
+                    self.is_converged = True
+
+                conv_info = {'is_converged': self.is_converged}
+            else:
+                conv_info = None
+
+            conv_info = self.comm.bcast(conv_info, root=mpi_master())
+            self.is_converged = conv_info['is_converged']
+            if self.is_converged:
                 break
 
-            new_trials = self.setup_trials(residuals, td=td, b=b)
-            b = np.append(b, new_trials, axis=1)
+            if self.rank == mpi_master():
+                new_trials = self.setup_trials(residuals, td=td, b=b)
+                b = np.append(b, new_trials, axis=1)
+            else:
+                new_trials = None
+
             new_e2b = self.e2n(new_trials)
-            new_s2b = self.s2n(new_trials)
-            e2b = np.append(e2b, new_e2b, axis=1)
-            s2b = np.append(s2b, new_s2b, axis=1)
 
-        output_conv = '*** '
-        if self.is_converged:
-            output_conv += 'Converged'
+            if self.rank == mpi_master():
+                new_s2b = self.s2n(new_trials)
+                e2b = np.append(e2b, new_e2b, axis=1)
+                s2b = np.append(s2b, new_s2b, axis=1)
+
+        if self.rank == mpi_master():
+            output_conv = '*** '
+            if self.is_converged:
+                output_conv += 'Converged'
+            else:
+                output_conv += 'NOT converged'
+            output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
+            output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
+            self.ostream.print_header(output_conv.ljust(72))
+            self.ostream.print_blank()
+            
+            assert_msg_critical(
+                self.is_converged,
+                'LinearResponseSolver.compute: failed to converge')
+
+            return solutions
         else:
-            output_conv += 'NOT converged'
-        output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
-        output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
-        self.ostream.print_header(output_conv.ljust(72))
-        self.ostream.print_blank()
-        
-        assert_msg_critical(
-            self.is_converged,
-            'LinearResponseSolver.compute: failed to converge')
-
-        return solutions
+            return None
 
     def initial_guess(self, ops, freqs):
 
@@ -372,70 +402,89 @@ class LinearResponseSolver:
 
     def e2n(self, vecs):
 
-        S = self.overlap
-        da = self.density.alpha_to_numpy(0)
-        db = self.density.beta_to_numpy(0)
-        mo = self.mol_orbs.alpha_to_numpy()
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                len(vecs.shape) == 2,
+                'LinearResponseSolver.e2n: invalid shape of vecs')
+
+            S = self.overlap
+            mo = self.mol_orbs.alpha_to_numpy()
+
+            da = self.density.alpha_to_numpy(0)
+            db = self.density.beta_to_numpy(0)
+
+            dabs = ((da, db),)
+        else:
+            dabs = None
 
         # TODO: make use of 2e fock from scf
-        (fa, fb), = self.get_two_el_fock((da, db),)
-        fa += self.hcore
-        fb += self.hcore
+        fabs = self.get_two_el_fock(dabs)
 
-        assert_msg_critical(
-            len(vecs.shape) == 2,
-            'LinearResponseSolver.e2n: invalid shape of vecs')
+        if self.rank == mpi_master():
+            fa, fb = fabs[0]
+            fa += self.hcore
+            fb += self.hcore
 
-        gv = np.zeros(vecs.shape)
+            dks = []
+            kns = []
 
-        dks = []
-        kns = []
+            for col in range(vecs.shape[1]):
+                vec = vecs[:, col]
 
-        for col in range(vecs.shape[1]):
-            vec = vecs[:, col]
+                kN = self.vec2mat(vec).T
+                kn = mo @ kN @ mo.T
 
-            kN = self.vec2mat(vec).T
-            kn = mo @ kN @ mo.T
+                dak = kn.T @ S @ da - da @ S @ kn.T
+                dbk = kn.T @ S @ db - db @ S @ kn.T
 
-            dak = kn.T @ S @ da - da @ S @ kn.T
-            dbk = kn.T @ S @ db - db @ S @ kn.T
+                dks.append((dak, dbk))
+                kns.append(kn)
 
-            dks.append((dak, dbk))
-            kns.append(kn)
+            dks = tuple(dks)
+        else:
+            dks = None
 
-        dks = tuple(dks)
-        fks = self.get_two_el_fock(*dks)
+        fks = self.get_two_el_fock(dks)
 
-        for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
+        if self.rank == mpi_master():
+            gv = np.zeros(vecs.shape)
 
-            kfa = S @ kn @ fa - fa @ kn @ S
-            kfb = S @ kn @ fb - fb @ kn @ S
+            for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
 
-            fat = fak + kfa
-            fbt = fbk + kfb
+                kfa = S @ kn @ fa - fa @ kn @ S
+                kfb = S @ kn @ fb - fb @ kn @ S
 
-            gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da + fbt.T @ db) @ S
-            gmo = mo.T @ gao @ mo
+                fat = fak + kfa
+                fbt = fbk + kfb
 
-            gv[:, col] = -self.mat2vec(gmo)
+                gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da + fbt.T @ db) @ S
+                gmo = mo.T @ gao @ mo
 
-        return gv
+                gv[:, col] = -self.mat2vec(gmo)
+            return gv
+        else:
+            return None
 
-    def get_two_el_fock(self, *dabs):
+    def get_two_el_fock(self, dabs):
 
         # TODO: make this routine more general (for both rest and unrest)
 
-        dts = []
-        for dab in dabs:
-            da, db = dab
-            dt = da + db
-            dts.append(dt)
+        if self.rank == mpi_master():
+            dts = []
+            for dab in dabs:
+                da, db = dab
+                dt = da + db
+                dts.append(dt)
 
-            # Note: skip spin density for restricted case
-            # ds = da - db
-            # dts.append(ds)
+                # Note: skip spin density for restricted case
+                # ds = da - db
+                # dts.append(ds)
 
-        dens = AODensityMatrix(dts, denmat.rest)
+            dens = AODensityMatrix(dts, denmat.rest)
+        else:
+            dens = AODensityMatrix()
+        dens.broadcast(self.rank, self.comm)
+
         fock = AOFockMatrix(dens)
 
         # for i in range(0, 2 * len(dabs), 2):
@@ -443,7 +492,9 @@ class LinearResponseSolver:
         #    fock.set_fock_type(fockmat.rgenk, i + 1)
 
         # Note: skip spin density for restricted case
-        for i in range(len(dabs)):
+        #for i in range(len(dabs)):
+        #    fock.set_fock_type(fockmat.rgenjk, i)
+        for i in range(fock.number_of_fock_matrices()):
             fock.set_fock_type(fockmat.rgenjk, i)
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes,
@@ -455,22 +506,25 @@ class LinearResponseSolver:
         fock.reduce_sum(self.rank, self.nodes, self.comm)
 
         fabs = []
+        if self.rank == mpi_master():
 
-        # for i in range(0, 2 * len(dabs), 2):
-        #    ft = fock.to_numpy(i).T
-        #    fs = -fock.to_numpy(i + 1).T
-        #    fa = (ft + fs) / 2
-        #    fb = (ft - fs) / 2
-        #    fabs.append((fa, fb))
+            # for i in range(0, 2 * len(dabs), 2):
+            #    ft = fock.to_numpy(i).T
+            #    fs = -fock.to_numpy(i + 1).T
+            #    fa = (ft + fs) / 2
+            #    fb = (ft - fs) / 2
+            #    fabs.append((fa, fb))
 
-        # Note: skip spin density for restricted case
-        for i in range(len(dabs)):
-            ft = fock.to_numpy(i).T
-            fa = ft * 0.5
-            fb = ft * 0.5
-            fabs.append((fa, fb))
+            # Note: skip spin density for restricted case
+            for i in range(len(dabs)):
+                ft = fock.to_numpy(i).T
+                fa = ft * 0.5
+                fb = ft * 0.5
+                fabs.append((fa, fb))
 
-        return tuple(fabs)
+            return tuple(fabs)
+        else:
+            return None
 
     def np2vlx(self, vec):
 
