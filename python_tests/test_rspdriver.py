@@ -29,7 +29,7 @@ class TestRspDriver(unittest.TestCase):
         tda_exci = TDAExciDriver(task.mpi_rank, task.mpi_size)
 
         tda_exci.set_number_states(3)
-        tda_exci.set_eri_threshold(1.0e-12)
+        tda_exci.set_eri(1.0e-12, 'QQ_DEN')
         tda_exci.set_solver(1.0e-4, 50)
 
         eri_drv = ElectronRepulsionIntegralsDriver(task.mpi_rank, task.mpi_size,
@@ -38,8 +38,8 @@ class TestRspDriver(unittest.TestCase):
         qq_data = eri_drv.compute(ericut.qq, 1.0e-12, task.molecule,
                                   task.ao_basis)
 
-        tda_exci.compute(qq_data, mol_orbs, task.molecule, task.ao_basis,
-                         task.mpi_comm, OutputStream())
+        tda_exci.compute(mol_orbs, task.molecule, task.ao_basis, task.mpi_comm,
+                         OutputStream())
 
         if task.mpi_rank == mpi_master():
 
@@ -52,10 +52,10 @@ class TestRspDriver(unittest.TestCase):
         # polarizability
         lr_solver = LinearResponseSolver()
 
-        lr_solver.set_eri_threshold(1.0e-12)
+        lr_solver.set_eri(1.0e-12, 'QQ_DEN')
         lr_solver.set_solver(1.0e-5, 50)
 
-        lr_prop = lr_solver.compute(task.molecule, task.ao_basis, mol_orbs,
+        lr_prop = lr_solver.compute(mol_orbs, task.molecule, task.ao_basis,
                                     task.mpi_comm, OutputStream())
 
         if task.mpi_rank == mpi_master():

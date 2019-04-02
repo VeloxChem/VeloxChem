@@ -1,0 +1,77 @@
+from .molecule import Molecule
+from .molecularbasis import MolecularBasis
+from .outputstream import OutputStream
+
+import sys
+
+
+class ResponseProperty:
+    """Implements response property/spectroscopy class.
+
+    Implements the base class for response property/spectroscopy.
+    """
+
+    def __init__(self, rsp_input, rsp_driver):
+        """Initializes response property/spectroscopy.
+
+        Parameters
+        ----------
+        rsp_input
+            The input dictionary that defines the property/spectroscopy.
+        rsp_driver
+            The response driver that does the actual computation.
+        """
+
+        self.rsp_input = rsp_input
+        self.rsp_driver = rsp_driver
+
+    def compute_task(self, mol_orbs, task):
+        """Performs response property/spectroscopy calculation.
+
+        Parameters
+        ----------
+        mol_orbs
+            The molecular orbitals.
+        task
+            The MPI task.
+        """
+
+        self.rsp_property = self.rsp_driver.compute(
+            mol_orbs, task.molecule, task.ao_basis, task.mpi_comm, task.ostream)
+
+    def compute(self, mol_orbs, molecule, basis, comm,
+                ostream=OutputStream(sys.stdout)):
+        """Performs response property/spectroscopy calculation.
+
+        Parameters
+        ----------
+        mol_orbs
+            The molecular orbitals.
+        molecule
+            The molecule.
+        basis
+            The AO basis set.
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
+
+        self.rsp_property = self.rsp_driver.compute(mol_orbs, molecule, basis,
+                                                    comm, ostream)
+
+    def get_property(self, req_list):
+        """Gets response property/spectroscopy.
+
+        Parameters
+        ----------
+        req_list
+            The requested component of the response property.
+        """
+
+        return None
+
+    def print_property(self, ostream):
+        """Prints response property/spectroscopy to output stream."""
+
+        return

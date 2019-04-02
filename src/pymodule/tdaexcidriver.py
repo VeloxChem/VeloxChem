@@ -1,14 +1,11 @@
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import MolecularOrbitals
-from .veloxchemlib import ScreeningContainer
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ericut
-from .veloxchemlib import molorb
 from .veloxchemlib import szblock
 
 from .outputstream import OutputStream
+from .qqscheme import get_qq_scheme
 from .blockdavidson import BlockDavidsonSolver
 
 import numpy as np
@@ -55,11 +52,12 @@ class TDAExciDriver:
         self.nstates = 0
         self.triplet = False
         
-        # thresholds
+        # ERI settings
         self.eri_thresh = 1.0e-15
-        self.conv_thesh = 1.0e-4
+        self.qq_type = 'QQ_DEN'
         
         # solver setup
+        self.conv_thesh = 1.0e-4
         self.max_iter = 50
         self.cur_iter = 0
         self.solver = None
@@ -81,19 +79,22 @@ class TDAExciDriver:
         """
         
         self.nstates = nstates
-
-    def set_eri_threshold(self, eri_thresh):
-        """Sets threshold in computation of electron repulsion integrals.
+    
+    def set_eri(self, eri_thresh, qq_type):
+        """Sets screening in computation of electron repulsion integrals.
             
-        Sets threshold in computation of electron repulsion integrals.
+        Sets screening in computation of electron repulsion integrals.
         
         Parameters
         ----------
         eri_thresh
             The threshold for computation of electron repulsion integrals.
+        qq_type
+            The screening type for computation of electron repulsion integrals.
         """
 
         self.eri_thresh = eri_thresh
+        self.qq_type = qq_type
     
     def set_solver(self, conv_thresh, max_iter):
         """Sets convergence threshold and maximum number of iterations.
@@ -112,7 +113,7 @@ class TDAExciDriver:
         self.conv_thresh = conv_thresh
         self.max_iter = max_iter
  
-    def compute(self, qq_data, mol_orbs, molecule, ao_basis, comm,
+    def compute(self, mol_orbs, molecule, ao_basis, comm,
                 ostream=OutputStream(sys.stdout)):
         """Performs TDA excited states calculation.
             
@@ -139,6 +140,11 @@ class TDAExciDriver:
        
         start_time = tm.time()
        
+        eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes, comm)
+    
+        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
+                                  molecule, ao_basis)
+
         # set up trial excitation vectors on master node
         
         diag_mat, trial_vecs = self.gen_trial_vectors(mol_orbs, molecule)
@@ -184,6 +190,11 @@ class TDAExciDriver:
 
         if self.rank == mpi_master():
             self.print_excited_states(trial_vecs, start_time, ostream)
+
+            reigs, rnorms = self.solver.get_eigenvalues()
+            return reigs
+        else:
+            return None
         
     def gen_trial_vectors(self, mol_orbs, molecule):
         """Generates set of TDA trial vectors.
@@ -409,9 +420,3 @@ class TDAExciDriver:
         ostream.print_header(valstr.ljust(92))
 
         ostream.print_blank()
-
-
-
-
-
-

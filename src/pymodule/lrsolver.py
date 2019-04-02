@@ -7,15 +7,13 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ericut
-from .veloxchemlib import molorb
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
 
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
+from .errorhandler import assert_msg_critical
 
 import numpy as np
 import time as tm
@@ -27,23 +25,28 @@ import sys
 class LinearResponseSolver:
     """Implements linear response solver"""
 
-    def __init__(self, frequencies=None):
+    def __init__(self, a_ops=None, b_ops=None, frequencies=None):
         """Initializes linear response solver"""
 
-        # TODO: initialize with rsp_input dictionary
+        # operators and frequencies
+        if a_ops:
+            self.a_ops = a_ops
+        else:
+            self.a_ops = 'xyz'
 
-        # operators
-        self.a_ops = 'xyz'
-        self.b_ops = 'xyz'
+        if b_ops:
+            self.b_ops = b_ops
+        else:
+            self.b_ops = 'xyz'
 
         if frequencies:
-            self.frequencies = tuple(frequencies)
+            self.frequencies = frequencies
         else:
             self.frequencies = (0,)
 
         # ERI settings
-        self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
 
         # solver setup
         self.conv_thresh = 1.0e-5
@@ -52,10 +55,11 @@ class LinearResponseSolver:
         self.small_thresh = 1.0e-10
         self.is_converged = False
 
-    def set_eri_threshold(self, eri_thresh):
-        """Sets threshold in computation of electron repulsion integrals"""
+    def set_eri(self, eri_thresh, qq_type):
+        """Sets screening in computation of electron repulsion integrals"""
 
         self.eri_thresh = eri_thresh
+        self.qq_type = qq_type
 
     def set_solver(self, conv_thresh, max_iter):
         """Sets convergence threshold and maximum number of iterations"""
@@ -64,9 +68,9 @@ class LinearResponseSolver:
         self.max_iter = max_iter
 
     def compute(self,
+                mol_orbs,
                 molecule,
                 basis,
-                mol_orbs,
                 comm,
                 ostream=OutputStream(sys.stdout)):
         """Performs linear response calculation"""
@@ -89,8 +93,8 @@ class LinearResponseSolver:
             'LinearResponseSolver: not yet implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            self.nocc= nalpha
-            self.norb= self.mol_orbs.number_mos()
+            self.nocc = nalpha
+            self.norb = self.mol_orbs.number_mos()
 
             self.density = self.mol_orbs.get_density(self.molecule)
 
@@ -103,24 +107,16 @@ class LinearResponseSolver:
 
         self.start_time = tm.time()
 
-        solutions = self.lr_solve(self.b_ops, self.frequencies)
+        op_freq_keys, solutions = self.lr_solve(self.b_ops, self.frequencies)
 
         if self.rank == mpi_master():
             v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}
 
             lrs = {}
             for aop in self.a_ops:
-                for bop, w in solutions:
-                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[(bop, w)])
-
-            self.ostream.print_header('Polarizability')
-            self.ostream.print_header('--------------')
-            for (a, b, w), alpha_abw in lrs.items():
-                ops_label = '<<{};{}>>_{}'.format(a, b, w)
-                output_alpha = '{:<15s} {:15.8f}'.format(ops_label, alpha_abw)
-                self.ostream.print_header(output_alpha)
-            self.ostream.print_blank()
-
+                for col, key in enumerate(op_freq_keys):
+                    bop, w = key
+                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[:, col])
             return lrs
         else:
             return None
@@ -144,7 +140,8 @@ class LinearResponseSolver:
         if self.rank == mpi_master():
             self.overlap = S.to_numpy()
             self.hcore = T.to_numpy() - V.to_numpy()
-            self.dipoles = (Dpl.x_to_numpy(), Dpl.y_to_numpy(), Dpl.z_to_numpy())
+            self.dipoles = (Dpl.x_to_numpy(), Dpl.y_to_numpy(),
+                            Dpl.z_to_numpy())
 
     def get_rhs(self, ops):
         """Create right-hand sides of linear response equations"""
@@ -178,7 +175,8 @@ class LinearResponseSolver:
             igs = self.initial_guess(ops, freqs)
             b = self.setup_trials(igs)
 
-            assert_msg_critical(np.any(b),
+            assert_msg_critical(
+                np.any(b),
                 'LinearResponseSolver.lr_solve: trial vector is empty')
         else:
             b = None
@@ -192,9 +190,10 @@ class LinearResponseSolver:
             sd = self.get_overlap_diagonal()
             td = {w: od - w * sd for w in freqs}
 
-            solutions = {}
+            op_freq_keys = list(igs.keys())
+            solutions = np.zeros((b.shape[0], len(igs)))
+            e2nn = np.zeros((e2b.shape[0], len(igs)))
             residuals = {}
-            e2nn = {}
             relative_residual_norm = {}
 
         for i in range(self.max_iter):
@@ -203,38 +202,27 @@ class LinearResponseSolver:
                 self.cur_iter = i
 
                 # next solution
-                for op, freq in igs:
+                for col, key in enumerate(op_freq_keys):
+                    op, freq = key
                     v = V1[op]
 
                     # reduced_solution = (b.T*v)/(b.T*(e2b-freq*s2b))
                     reduced_solution = np.linalg.solve(
                         np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
 
-                    solutions[(op, freq)] = np.matmul(b, reduced_solution)
-                    e2nn[(op, freq)] = np.matmul(e2b, reduced_solution)
+                    solutions[:, col] = np.matmul(b, reduced_solution)
+                    e2nn[:, col] = np.matmul(e2b, reduced_solution)
 
-                # TODO: reduce intermediate copies
-                # solutions -> solutions_np -> s2nn_np -> s2nn
-                nrows = len(list(solutions.values())[0])
-                op_freq_keys = list(solutions.keys())
-
-                solutions_np = np.zeros((nrows, len(op_freq_keys)))
-                for col, op_freq in enumerate(op_freq_keys):
-                    solutions_np[:, col] = solutions[op_freq]
-
-                s2nn_np = self.s2n(solutions_np)
-
-                s2nn = {}
-                for col, op_freq in enumerate(op_freq_keys):
-                    s2nn[op_freq] = s2nn_np[:, col]
+                s2nn = self.s2n(solutions)
 
                 # next residual
                 output_iter = ''
 
-                for op, freq in igs:
+                for col, key in enumerate(op_freq_keys):
+                    op, freq = key
                     v = V1[op]
-                    n = solutions[(op, freq)]
-                    r = e2nn[(op, freq)] - freq * s2nn[(op, freq)] - v
+                    n = solutions[:, col]
+                    r = e2nn[:, col] - freq * s2nn[:, col] - v
                     residuals[(op, freq)] = r
                     nv = np.dot(n, v)
                     rn = np.linalg.norm(r)
@@ -242,15 +230,16 @@ class LinearResponseSolver:
                     relative_residual_norm[(op, freq)] = rn / nn
 
                     ops_label = '<<{};{}>>_{}'.format(op, op, freq)
-                    output_iter += '{:<15s}: {:.8f} '.format(ops_label, -nv)
+                    output_iter += '{:<15s}: {:15.8f} '.format(ops_label, -nv)
                     output_iter += 'Residual Norm: {:.8f}\n'.format(rn / nn)
 
                 output_header = '*** Iteration:   {} '.format(i + 1)
                 output_header += '* Residuals (Max,Min): '
-                output_header += '{:.2e} and {:.2e}\n'.format(
+                output_header += '{:.2e} and {:.2e}'.format(
                     max(relative_residual_norm.values()),
                     min(relative_residual_norm.values()))
                 self.ostream.print_header(output_header.ljust(72))
+                self.ostream.print_blank()
                 self.ostream.print_block(output_iter)
                 self.ostream.flush()
 
@@ -287,17 +276,18 @@ class LinearResponseSolver:
             else:
                 output_conv += 'NOT converged'
             output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
-            output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
+            output_conv += 'Time: {:.2f} sec'.format(tm.time() -
+                                                     self.start_time)
             self.ostream.print_header(output_conv.ljust(72))
             self.ostream.print_blank()
-            
+
             assert_msg_critical(
                 self.is_converged,
                 'LinearResponseSolver.compute: failed to converge')
 
-            return solutions
+            return op_freq_keys, solutions
         else:
-            return None
+            return None, None
 
     def initial_guess(self, ops, freqs):
 
@@ -462,7 +452,8 @@ class LinearResponseSolver:
                 fat = fak + kfa
                 fbt = fbk + kfb
 
-                gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da + fbt.T @ db) @ S
+                gao = S @ (da @ fat.T + db @ fbt.T) - (
+                    fat.T @ da + fbt.T @ db) @ S
                 gmo = mo.T @ gao @ mo
 
                 gv[:, col] = -self.mat2vec(gmo)
@@ -497,7 +488,7 @@ class LinearResponseSolver:
         #    fock.set_fock_type(fockmat.rgenk, i + 1)
 
         # Note: skip spin density for restricted case
-        #for i in range(len(dabs)):
+        # for i in range(len(dabs)):
         #    fock.set_fock_type(fockmat.rgenjk, i)
         for i in range(fock.number_of_fock_matrices()):
             fock.set_fock_type(fockmat.rgenjk, i)
@@ -558,31 +549,24 @@ class LinearResponseSolver:
 
     def s2n(self, vecs):
 
-        b = np.array(vecs)
+        assert_msg_critical(
+            len(vecs.shape) == 2,
+            'LinearResponseSolver.s2n: invalid shape of vecs')
 
         S = self.overlap
         D = self.density.alpha_to_numpy(0) + self.density.beta_to_numpy(0)
 
         mo = self.mol_orbs.alpha_to_numpy()
 
-        if len(b.shape) == 1:
-            kappa = self.vec2mat(vecs).T
+        s2n_vecs = np.ndarray(vecs.shape)
+        rows, columns = vecs.shape
+
+        for c in range(columns):
+            kappa = self.vec2mat(vecs[:, c]).T
             kappa_ao = mo @ kappa @ mo.T
 
             s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
             s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-            s2n_vecs = -self.mat2vec(s2n_mo)
-
-        elif len(b.shape) == 2:
-            s2n_vecs = np.ndarray(b.shape)
-            rows, columns = b.shape
-
-            for c in range(columns):
-                kappa = self.vec2mat(b[:, c]).T
-                kappa_ao = mo @ kappa @ mo.T
-
-                s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
-                s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-                s2n_vecs[:, c] = -self.mat2vec(s2n_mo)
+            s2n_vecs[:, c] = -self.mat2vec(s2n_mo)
 
         return s2n_vecs

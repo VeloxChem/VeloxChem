@@ -39,6 +39,9 @@ from .rspdriver import ResponseDriver
 from .tdaexcidriver import TDAExciDriver
 from .blockdavidson import BlockDavidsonSolver
 from .lrsolver import LinearResponseSolver
+from .rspproperty import ResponseProperty
+from .rsppolarizability import Polarizability
+from .rspabsorption import Absorption
 from .mpitask import MpiTask
 
 # Python functions

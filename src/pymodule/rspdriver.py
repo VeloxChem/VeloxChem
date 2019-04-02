@@ -30,7 +30,7 @@ class ResponseDriver:
         The number of MPI processes.
     """
 
-    def __init__(self, rsp_dict=None):
+    def __init__(self, rsp_input=None):
         """Initializes Response driver.
             
         Initializes Response driver to default setup.
@@ -42,23 +42,27 @@ class ResponseDriver:
         # convergence information
         self.max_iter = 50
         
-        # screening scheme
+        # ERI settings
+        self.eri_thresh  = 1.0e-15
         self.qq_type = "QQ_DEN"
         
         # thresholds
-        self.conv_thresh = 1.0e-3
-        self.eri_thresh  = 1.0e-15
+        self.conv_thresh = 1.0e-4
         
         # excited states information
         self.nstates = 3
         
-        # polarizability
-        if rsp_dict:
-            self.prop_type = rsp_dict['property'].upper()
-            if self.prop_type == 'POLARIZABILITY':
+        if rsp_input:
+
+            if rsp_input['property'].lower() == 'polarizability':
+                self.prop_type = 'POLARIZABILITY'
                 self.conv_thresh = 1.0e-5
-                self.frequencies = rsp_dict['frequencies'].split(',')
-                self.frequencies = list(map(float, self.frequencies))
+                self.frequencies = rsp_input['frequencies']
+                self.a_ops, self.b_ops = rsp_input['operators']
+
+            elif rsp_input['property'].lower() == 'absorption':
+                self.prop_type = 'SINGEX_TDA'
+                self.nstates = rsp_input['nstates']
         
         # mpi information
         self.rank = 0
@@ -109,35 +113,29 @@ class ResponseDriver:
         if self.rank == mpi_master():
             self.print_header(ostream)
 
-        # compute eri's screening factors
-        
-        eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes, comm)
-    
-        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
-                                  molecule, ao_basis)
-
         # TDA singlet/triplet excited states
         
         if self.prop_type.upper() in ["SINGEX_TDA", "TRIPEX_TDA"]:
             tda_exci = TDAExciDriver(self.rank, self.nodes)
             
             tda_exci.set_number_states(self.nstates)
-            tda_exci.set_eri_threshold(self.eri_thresh)
+            tda_exci.set_eri(self.eri_thresh, self.qq_type)
             tda_exci.set_solver(self.conv_thresh, self.max_iter)
             
-            tda_exci.compute(qq_data, mol_orbs, molecule, ao_basis, comm,
-                             ostream)
+            return tda_exci.compute(mol_orbs, molecule, ao_basis, comm,
+                                    ostream)
 
         # Linear response solver
 
         if self.prop_type.upper() in ["POLARIZABILITY"]:
-            lr_solver = LinearResponseSolver(self.frequencies)
+            lr_solver = LinearResponseSolver(self.a_ops, self.b_ops,
+                                             self.frequencies)
 
-            lr_solver.set_eri_threshold(self.eri_thresh)
+            lr_solver.set_eri(self.eri_thresh, self.qq_type)
             lr_solver.set_solver(self.conv_thresh, self.max_iter)
 
-            lr_prop = lr_solver.compute(molecule, ao_basis, mol_orbs, comm,
-                                        ostream)
+            return lr_solver.compute(mol_orbs, molecule, ao_basis, comm,
+                                     ostream)
 
     def print_header(self, ostream):
         """Prints response driver setup header to output stream.

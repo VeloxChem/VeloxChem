@@ -7,6 +7,8 @@ from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .rspdriver import ResponseDriver
+from .rsppolarizability import Polarizability
+from .rspabsorption import Absorption
 from .mointsdriver import MOIntegralsDriver
 from .visualizationdriver import VisualizationDriver
 from .molecularorbitals import MolecularOrbitals
@@ -45,11 +47,33 @@ def main():
             mol_orbs = MolecularOrbitals()
 
         if 'response' in task.input_dict:
-            rsp_drv = ResponseDriver(task.input_dict['response'])
+
+            rsp_dict = task.input_dict['response']
+
+            if rsp_dict['property'] == 'polarizability':
+                frequencies = rsp_dict['frequencies'].split(',')
+                frequencies = tuple(map(float, frequencies))
+
+                polar = Polarizability(frequencies)
+                polar.compute_task(mol_orbs, task)
+                if task.mpi_rank == mpi_master():
+                    polar.print_property(task.ostream)
+
+            elif rsp_dict['property'] == 'absorption':
+                nstates = int(rsp_dict['nstates'])
+
+                abs_spec = Absorption(nstates)
+                abs_spec.compute_task(mol_orbs, task)
+                if task.mpi_rank == mpi_master():
+                    abs_spec.print_property(task.ostream)
+
+            else:
+                if task.mpi_rank == mpi_master():
+                    assert_msg_critical(False, 'response: invalid property')
+
         else:
             rsp_drv = ResponseDriver()
-
-        rsp_drv.compute_task(mol_orbs, task)
+            rsp_drv.compute_task(mol_orbs, task)
 
     # MP2 perturbation theory
 
