@@ -81,9 +81,16 @@ py::array_t<double>
 pointer_to_numpy(const double*               ptr,
                  const std::vector<int32_t>& dimension)
 {
-    return py::array_t<double>(dimension_to_shape(dimension),
-                               dimension_to_strides(dimension, sizeof(double)),
-                               ptr);
+    if (ptr == nullptr || dimension.size() == 0)
+    {
+        return py::array_t<double>();
+    }
+    else
+    {
+        return py::array_t<double>(dimension_to_shape(dimension),
+                                   dimension_to_strides(dimension, sizeof(double)),
+                                   ptr);
+    }
 }
 
 py::array_t<double>
@@ -105,9 +112,16 @@ py::array_t<int32_t>
 pointer_to_numpy(const int32_t*              ptr,
                  const std::vector<int32_t>& dimension)
 {
-    return py::array_t<int32_t>(dimension_to_shape(dimension),
-                                dimension_to_strides(dimension, sizeof(int32_t)),
-                                ptr);
+    if (ptr == nullptr || dimension.size() == 0)
+    {
+        return py::array_t<int32_t>();
+    }
+    else
+    {
+        return py::array_t<int32_t>(dimension_to_shape(dimension),
+                                    dimension_to_strides(dimension, sizeof(int32_t)),
+                                    ptr);
+    }
 }
 
 py::array_t<int32_t>

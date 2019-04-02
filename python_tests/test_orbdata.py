@@ -44,6 +44,16 @@ class TestOrbData(unittest.TestCase):
         self.assertEqual(1, d_rest.number_of_density_matrices())
         self.assertEqual(1, d_unrest.number_of_density_matrices())
 
+        den_empty_1 = d_rest.alpha_to_numpy(1)
+        den_empty_2 = d_rest.beta_to_numpy(3)
+        den_empty_3 = d_unrest.alpha_to_numpy(2)
+        den_empty_4 = d_unrest.beta_to_numpy(4)
+
+        self.assertTrue(den_empty_1.size == 0)
+        self.assertTrue(den_empty_2.size == 0)
+        self.assertTrue(den_empty_3.size == 0)
+        self.assertTrue(den_empty_4.size == 0)
+
     def test_density_sub(self):
 
         arr_1 = np.array([[1., .2], [.2, 1.]])
