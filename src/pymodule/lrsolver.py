@@ -214,10 +214,9 @@ class LinearResponseSolver:
                     e2nn[:, col] = np.matmul(e2b, reduced_solution)
 
                 s2nn = self.s2n(solutions)
+                nvs = []
 
                 # next residual
-                output_iter = ''
-
                 for col, key in enumerate(op_freq_keys):
                     op, freq = key
                     v = V1[op]
@@ -225,22 +224,27 @@ class LinearResponseSolver:
                     r = e2nn[:, col] - freq * s2nn[:, col] - v
                     residuals[(op, freq)] = r
                     nv = np.dot(n, v)
+                    nvs.append(nv)
                     rn = np.linalg.norm(r)
                     nn = np.linalg.norm(n)
                     relative_residual_norm[(op, freq)] = rn / nn
 
-                    ops_label = '<<{};{}>>_{}'.format(op, op, freq)
-                    output_iter += '{:<15s}: {:15.8f} '.format(ops_label, -nv)
-                    output_iter += 'Residual Norm: {:.8f}\n'.format(rn / nn)
-
+                # write to output
                 output_header = '*** Iteration:   {} '.format(i + 1)
                 output_header += '* Residuals (Max,Min): '
                 output_header += '{:.2e} and {:.2e}'.format(
                     max(relative_residual_norm.values()),
                     min(relative_residual_norm.values()))
-                self.ostream.print_header(output_header.ljust(72))
+                self.ostream.print_header(output_header.ljust(68))
                 self.ostream.print_blank()
-                self.ostream.print_block(output_iter)
+                for key, nv in zip(op_freq_keys, nvs):
+                    op, freq = key
+                    rel_res = relative_residual_norm[key]
+                    ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+                    output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
+                    output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
+                    self.ostream.print_header(output_iter.ljust(68))
+                self.ostream.print_blank()
                 self.ostream.flush()
 
                 max_residual = max(relative_residual_norm.values())
@@ -278,7 +282,7 @@ class LinearResponseSolver:
             output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
             output_conv += 'Time: {:.2f} sec'.format(tm.time() -
                                                      self.start_time)
-            self.ostream.print_header(output_conv.ljust(72))
+            self.ostream.print_header(output_conv.ljust(68))
             self.ostream.print_blank()
 
             assert_msg_critical(
