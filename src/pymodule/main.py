@@ -64,8 +64,8 @@ def main():
 
                 abs_spec = Absorption(nstates)
                 abs_spec.compute_task(mol_orbs, task)
-                if task.mpi_rank == mpi_master():
-                    abs_spec.print_property(task.ostream)
+                #if task.mpi_rank == mpi_master():
+                #    abs_spec.print_property(task.ostream)
 
             else:
                 if task.mpi_rank == mpi_master():

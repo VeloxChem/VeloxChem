@@ -30,10 +30,14 @@ class Polarizability(ResponseProperty):
     def print_property(self, ostream):
         """Prints polarizability to output stream"""
 
-        ostream.print_header('Polarizability')
-        ostream.print_header('--------------')
-        for (a, b, w), alpha_abw in self.rsp_property.items():
-            ops_label = '<<{};{}>>_{}'.format(a, b, w)
-            output_alpha = '{:<15s} {:15.8f}'.format(ops_label, alpha_abw)
-            ostream.print_header(output_alpha)
-        ostream.print_blank()
+        for w in self.rsp_input['frequencies']:
+            w_str = 'Polarizability (w={})'.format(w)
+            ostream.print_header(w_str.ljust(68))
+            ostream.print_header(('-' * len(w_str)).ljust(68))
+            for a in self.rsp_input['operators'][0]:
+                for b in self.rsp_input['operators'][1]:
+                    ops_label = '<<{};{}>>_{}'.format(a, b, w)
+                    output_alpha = '{:<15s} {:15.8f}'.format(
+                        ops_label, self.rsp_property[(a, b, w)])
+                    ostream.print_header(output_alpha.ljust(68))
+            ostream.print_blank()

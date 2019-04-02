@@ -114,8 +114,7 @@ class LinearResponseSolver:
 
             lrs = {}
             for aop in self.a_ops:
-                for col, key in enumerate(op_freq_keys):
-                    bop, w = key
+                for col, (bop, w) in enumerate(op_freq_keys):
                     lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[:, col])
             return lrs
         else:
@@ -202,8 +201,7 @@ class LinearResponseSolver:
                 self.cur_iter = i
 
                 # next solution
-                for col, key in enumerate(op_freq_keys):
-                    op, freq = key
+                for col, (op, freq) in enumerate(op_freq_keys):
                     v = V1[op]
 
                     # reduced_solution = (b.T*v)/(b.T*(e2b-freq*s2b))
@@ -217,14 +215,12 @@ class LinearResponseSolver:
                 nvs = []
 
                 # next residual
-                for col, key in enumerate(op_freq_keys):
-                    op, freq = key
+                for col, (op, freq) in enumerate(op_freq_keys):
                     v = V1[op]
                     n = solutions[:, col]
                     r = e2nn[:, col] - freq * s2nn[:, col] - v
                     residuals[(op, freq)] = r
-                    nv = np.dot(n, v)
-                    nvs.append(nv)
+                    nvs.append(np.dot(n, v))
                     rn = np.linalg.norm(r)
                     nn = np.linalg.norm(n)
                     relative_residual_norm[(op, freq)] = rn / nn
@@ -237,10 +233,9 @@ class LinearResponseSolver:
                     min(relative_residual_norm.values()))
                 self.ostream.print_header(output_header.ljust(68))
                 self.ostream.print_blank()
-                for key, nv in zip(op_freq_keys, nvs):
-                    op, freq = key
-                    rel_res = relative_residual_norm[key]
+                for (op, freq), nv in zip(op_freq_keys, nvs):
                     ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+                    rel_res = relative_residual_norm[(op, freq)]
                     output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
                     output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
                     self.ostream.print_header(output_iter.ljust(68))
