@@ -332,6 +332,13 @@ CExcitationVector::getKetUniqueIndexes() const
 CDenseMatrix
 CExcitationVector::getMatrixZ() const
 {
+    // check empty vector
+
+    if (_zCoefficents.size() == 0)
+    {
+        return CDenseMatrix();
+    }
+
     // get unique indexes vectors
     
     auto bidx = getBraUniqueIndexes();
@@ -367,6 +374,13 @@ CExcitationVector::getMatrixZ() const
 CDenseMatrix
 CExcitationVector::getMatrixY() const
 {
+    // check empty vector
+
+    if (_yCoefficents.size() == 0)
+    {
+        return CDenseMatrix();
+    }
+
     // get unique indexes vectors
     
     auto bidx = getBraUniqueIndexes();
