@@ -84,7 +84,6 @@ class LinearResponseSolver:
 
         self.molecule = molecule
         self.basis = basis
-        self.mol_orbs = mol_orbs
 
         nalpha = self.molecule.number_of_alpha_electrons()
         nbeta = self.molecule.number_of_beta_electrons()
@@ -94,14 +93,23 @@ class LinearResponseSolver:
 
         if self.rank == mpi_master():
             self.nocc = nalpha
-            self.norb = self.mol_orbs.number_mos()
-
-            self.density = self.mol_orbs.get_density(self.molecule)
+            self.norb = mol_orbs.number_mos()
+            self.mo = mol_orbs.alpha_to_numpy()
+            self.ea = mol_orbs.ea_to_numpy()
+            dens = mol_orbs.get_density(self.molecule)
+            self.dens = (dens.alpha_to_numpy(0), dens.beta_to_numpy(0))
 
         # TODO: make use of 1e integrals from scf
         self.comp_1e_ints()
 
-        self.qq_scheme = get_qq_scheme(self.qq_type)
+        self.eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes,
+                                                        self.comm)
+        self.screening = self.eri_drv.compute(
+            get_qq_scheme(self.qq_type), self.eri_thresh, self.molecule,
+            self.basis)
+
+        # TODO: make use of Fock matrices from scf
+        self.comp_fock()
 
         # start linear response calculation
 
@@ -142,15 +150,31 @@ class LinearResponseSolver:
             self.dipoles = (Dpl.x_to_numpy(), Dpl.y_to_numpy(),
                             Dpl.z_to_numpy())
 
+    def comp_fock(self):
+        """Computes Fock matrices"""
+
+        if self.rank == mpi_master():
+            dabs = (self.dens,)
+        else:
+            dabs = None
+
+        fabs = self.get_two_el_fock(dabs)
+
+        if self.rank == mpi_master():
+            fa, fb = fabs[0]
+            fa += self.hcore
+            fb += self.hcore
+            self.focks = (fa, fb)
+
     def get_rhs(self, ops):
         """Create right-hand sides of linear response equations"""
 
         if 'x' in ops or 'y' in ops or 'z' in ops:
             props = {k: v for k, v in zip('xyz', self.dipoles)}
 
-        D = self.density.alpha_to_numpy(0) + self.density.beta_to_numpy(0)
+        D = self.dens[0] + self.dens[1]
         S = self.overlap
-        mo = self.mol_orbs.alpha_to_numpy()
+        mo = self.mo
 
         matrices = tuple(
             mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
@@ -307,7 +331,7 @@ class LinearResponseSolver:
 
     def get_orbital_diagonal(self):
 
-        orben = self.mol_orbs.ea_to_numpy()
+        orben = self.ea
         z = [2 * (orben[j] - orben[i]) for i, j in self.get_excitations()]
         e2c = np.array(z + z)
         return e2c
@@ -401,23 +425,9 @@ class LinearResponseSolver:
                 len(vecs.shape) == 2,
                 'LinearResponseSolver.e2n: invalid shape of vecs')
 
+            da, db = self.dens
             S = self.overlap
-            mo = self.mol_orbs.alpha_to_numpy()
-
-            da = self.density.alpha_to_numpy(0)
-            db = self.density.beta_to_numpy(0)
-
-            dabs = ((da, db),)
-        else:
-            dabs = None
-
-        # TODO: make use of 2e fock from scf
-        fabs = self.get_two_el_fock(dabs)
-
-        if self.rank == mpi_master():
-            fa, fb = fabs[0]
-            fa += self.hcore
-            fb += self.hcore
+            mo = self.mo
 
             dks = []
             kns = []
@@ -442,6 +452,8 @@ class LinearResponseSolver:
 
         if self.rank == mpi_master():
             gv = np.zeros(vecs.shape)
+
+            fa, fb = self.focks
 
             for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
 
@@ -492,12 +504,8 @@ class LinearResponseSolver:
         for i in range(fock.number_of_fock_matrices()):
             fock.set_fock_type(fockmat.rgenjk, i)
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes,
-                                                   self.comm)
-        screening = eri_drv.compute(self.qq_scheme, self.eri_thresh,
-                                    self.molecule, self.basis)
-        eri_drv.compute(fock, dens, self.molecule, self.basis, screening,
-                        self.comm)
+        self.eri_drv.compute(fock, dens, self.molecule, self.basis,
+                             self.screening, self.comm)
         fock.reduce_sum(self.rank, self.nodes, self.comm)
 
         fabs = []
@@ -552,10 +560,9 @@ class LinearResponseSolver:
             len(vecs.shape) == 2,
             'LinearResponseSolver.s2n: invalid shape of vecs')
 
+        D = self.dens[0] + self.dens[1]
         S = self.overlap
-        D = self.density.alpha_to_numpy(0) + self.density.beta_to_numpy(0)
-
-        mo = self.mol_orbs.alpha_to_numpy()
+        mo = self.mo
 
         s2n_vecs = np.ndarray(vecs.shape)
         rows, columns = vecs.shape
