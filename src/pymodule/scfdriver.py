@@ -270,6 +270,9 @@ class ScfDriver:
             else:
                 self.comp_diis(molecule, ao_basis, min_basis, comm, ostream)
 
+        self.fock_matrices.clear()
+        self.den_matrices.clear()
+    
         if self.rank == mpi_master():
             self.print_scf_energy(ostream)
             self.print_ground_state(molecule, ostream)
@@ -307,7 +310,6 @@ class ScfDriver:
         start_time = tm.time()
 
         self.fock_matrices.clear()
-        
         self.den_matrices.clear()
     
         ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis,
