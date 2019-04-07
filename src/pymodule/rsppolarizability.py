@@ -1,30 +1,36 @@
 from .rspproperty import ResponseProperty
-from .rspdriver import ResponseDriver
 
 
 class Polarizability(ResponseProperty):
     """Polarizability class"""
 
-    def __init__(self, frequencies):
+    def __init__(self, rsp_dict):
         """Initializes polarizability"""
 
-        rsp_input = {
-            'property': 'polarizability',
-            'response': 'linear',
-            'residue': 'none',
-            'operators': ('xyz', 'xyz'),
-            'frequencies': frequencies,
-        }
+        rsp_input = dict(rsp_dict)
 
-        rsp_driver = ResponseDriver(rsp_input)
+        rsp_input['property'] = 'polarizability'
+        rsp_input['response'] = 'linear'
+        rsp_input['residue'] = 'none'
 
-        super().__init__(rsp_input, rsp_driver)
+        rsp_input['operators'] = ('xyz', 'xyz')
+        rsp_input['frequencies'] = (0,)
+
+        if 'operators' in rsp_dict:
+            operators = rsp_dict['operators'].replace(' ', '')
+            operators = operators.lower().split(',')
+            rsp_input['operators'] = tuple(operators)
+        if 'frequencies' in rsp_dict:
+            frequencies = rsp_dict['frequencies'].replace(' ', '')
+            frequencies = frequencies.split(',')
+            rsp_input['frequencies'] = tuple(map(float, frequencies))
+
+        super().__init__(rsp_input)
 
     def get_property(self, key):
         """Gets polarizability component"""
 
         # key example: ('x', 'y', 0.1)
-
         return self.rsp_property[key]
 
     def print_property(self, ostream):

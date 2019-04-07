@@ -1,25 +1,29 @@
 from .rspproperty import ResponseProperty
-from .rspdriver import ResponseDriver
+from .veloxchemlib import hartree_in_ev
 
 
 class Absorption(ResponseProperty):
     """Absorption class"""
 
-    def __init__(self, nstates):
+    def __init__(self, rsp_dict):
         """Initializes absorption"""
 
-        rsp_input = {
-            'property': 'absorption',
-            'response': 'linear',
-            'residue': 'single',
-            'operators': ('xyz',),
-            'nstates': nstates,
-            'spin': 'singlet',
-        }
+        rsp_input = dict(rsp_dict)
 
-        rsp_driver = ResponseDriver(rsp_input)
+        rsp_input['property'] = 'absorption'
+        rsp_input['response'] = 'linear'
+        rsp_input['residue'] = 'single'
+        # rsp_input['operators'] = ('xyz',)
 
-        super().__init__(rsp_input, rsp_driver)
+        rsp_input['nstates'] = 3
+        # rsp_input['spin'] = 'singlet'
+
+        if 'nstates' in rsp_dict:
+            rsp_input['nstates'] = int(rsp_dict['nstates'])
+        # if 'spin' in rsp_dict:
+        #    rsp_input['spin'] = rsp_dict['spin']
+
+        super().__init__(rsp_input)
 
     def get_property(self, state):
         """Gets absorption component"""
@@ -29,9 +33,12 @@ class Absorption(ResponseProperty):
     def print_property(self, ostream):
         """Prints absorption to output stream"""
 
-        ostream.print_header('Absorption')
-        ostream.print_header('----------')
+        ostream.print_blank()
+        ostream.print_header('One-Photon Absorption'.ljust(92))
+        ostream.print_header('---------------------'.ljust(92))
         for s, e in enumerate(self.rsp_property):
-            output_abs = 'State {:3d}: {:15.8f}'.format(s + 1, e)
-            ostream.print_header(output_abs)
+            output_abs = 'Excited State {:5d}: '.format(s + 1)
+            output_abs += '{:15.8f} a.u. '.format(e)
+            output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
+            ostream.print_header(output_abs.ljust(92))
         ostream.print_blank()

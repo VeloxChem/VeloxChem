@@ -1,22 +1,12 @@
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import MolecularOrbitals
-from .veloxchemlib import ScreeningContainer
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
-from .veloxchemlib import molorb
-from .veloxchemlib import szblock
 
 from .outputstream import OutputStream
 from .tdaexcidriver import TDAExciDriver
 from .lrsolver import LinearResponseSolver
-
 from .qqscheme import get_qq_type
-from .qqscheme import get_qq_scheme
 
-import numpy as np
-import time as tm
-import math
 import sys
+
 
 class ResponseDriver:
     """Implements response driver.
@@ -36,29 +26,33 @@ class ResponseDriver:
         Initializes Response driver to default setup.
         """
         
-        # calculation type
+        # default calculation type
         self.prop_type = "SINGEX_TDA"
+        self.nstates = 3
 
-        # convergence information
+        # default solver settings
+        self.conv_thresh = 1.0e-4
         self.max_iter = 50
         
-        # ERI settings
+        # default ERI settings
         self.eri_thresh  = 1.0e-15
         self.qq_type = "QQ_DEN"
         
-        # thresholds
-        self.conv_thresh = 1.0e-4
-        
-        # excited states information
-        self.nstates = 3
-        
         if rsp_input:
+
+            if 'conv_thresh' in rsp_input:
+                self.conv_thresh = rsp_input['conv_thresh']
+            if 'max_iter' in rsp_input:
+                self.max_iter = rsp_input['max_iter']
+            if 'eri_thresh' in rsp_input:
+                self.eri_thresh = rsp_input['eri_thresh']
+            if 'qq_type' in rsp_input:
+                self.qq_type = rsp_input['qq_type']
 
             if rsp_input['property'].lower() == 'polarizability':
                 self.prop_type = 'POLARIZABILITY'
-                self.conv_thresh = 1.0e-5
-                self.frequencies = rsp_input['frequencies']
                 self.a_ops, self.b_ops = rsp_input['operators']
+                self.frequencies = rsp_input['frequencies']
 
             elif rsp_input['property'].lower() == 'absorption':
                 self.prop_type = 'SINGEX_TDA'
