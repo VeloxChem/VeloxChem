@@ -15,13 +15,10 @@ class Absorption(ResponseProperty):
         rsp_input['residue'] = 'single'
         # rsp_input['operators'] = ('xyz',)
 
-        rsp_input['nstates'] = 3
-        # rsp_input['spin'] = 'singlet'
-
-        if 'nstates' in rsp_dict:
-            rsp_input['nstates'] = int(rsp_dict['nstates'])
         # if 'spin' in rsp_dict:
         #    rsp_input['spin'] = rsp_dict['spin']
+        # else:
+        #    rsp_input['spin'] = 'singlet'
 
         super().__init__(rsp_input)
 

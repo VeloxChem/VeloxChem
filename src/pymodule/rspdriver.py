@@ -20,34 +20,30 @@ class ResponseDriver:
         The number of MPI processes.
     """
 
-    def __init__(self, rsp_input=None):
+    def __init__(self, rsp_input):
         """Initializes Response driver.
             
         Initializes Response driver to default setup.
         """
         
-        # default calculation type
-        self.prop_type = "SINGEX_TDA"
-        self.nstates = 3
+        # calculation type
+        self.prop_type = 'SINGEX_TDA'
+        self.nstates = int(rsp_input['nstates']) \
+            if 'nstates' in rsp_input else 3
 
-        # default solver settings
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
-        
-        # default ERI settings
-        self.eri_thresh  = 1.0e-15
-        self.qq_type = "QQ_DEN"
-        
+        # solver settings
+        self.conv_thresh = float(rsp_input['conv_thresh']) \
+            if 'conv_thresh' in rsp_input else 1.0e-4
+        self.max_iter = int(rsp_input['max_iter']) \
+            if 'max_iter' in rsp_input else 50
+
+        # ERI settings
+        self.eri_thresh = float(rsp_input['eri_thresh']) \
+            if 'eri_thresh' in rsp_input else 1.0e-15
+        self.qq_type = rsp_input['qq_type'].upper() \
+            if 'qq_type' in rsp_input else 'QQ_DEN'
+
         if rsp_input:
-
-            if 'conv_thresh' in rsp_input:
-                self.conv_thresh = rsp_input['conv_thresh']
-            if 'max_iter' in rsp_input:
-                self.max_iter = rsp_input['max_iter']
-            if 'eri_thresh' in rsp_input:
-                self.eri_thresh = rsp_input['eri_thresh']
-            if 'qq_type' in rsp_input:
-                self.qq_type = rsp_input['qq_type']
 
             if rsp_input['property'].lower() == 'polarizability':
                 self.prop_type = 'POLARIZABILITY'
@@ -56,7 +52,6 @@ class ResponseDriver:
 
             elif rsp_input['property'].lower() == 'absorption':
                 self.prop_type = 'SINGEX_TDA'
-                self.nstates = rsp_input['nstates']
         
         # mpi information
         self.rank = 0

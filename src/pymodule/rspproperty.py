@@ -19,15 +19,6 @@ class ResponseProperty:
             The input dictionary that defines the property/spectroscopy.
         """
 
-        if 'conv_thresh' in rsp_input:
-            rsp_input['conv_thresh'] = float(rsp_input['conv_thresh'])
-        if 'max_iter' in rsp_input:
-            rsp_input['max_iter'] = int(rsp_input['max_iter'])
-        if 'eri_thresh' in rsp_input:
-            rsp_input['eri_thresh'] = float(rsp_input['eri_thresh'])
-        if 'qq_type' in rsp_input:
-            rsp_input['qq_type'] = rsp_input['qq_type'].upper()
-
         self.rsp_input = rsp_input
         self.rsp_driver = ResponseDriver(rsp_input)
 

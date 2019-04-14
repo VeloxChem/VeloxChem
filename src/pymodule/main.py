@@ -71,7 +71,7 @@ def main():
                     assert_msg_critical(False, 'response: invalid property')
 
         else:
-            rsp_drv = ResponseDriver()
+            rsp_drv = ResponseDriver({'property': 'absorption'})
             rsp_drv.compute_task(mol_orbs, task)
 
     # MP2 perturbation theory

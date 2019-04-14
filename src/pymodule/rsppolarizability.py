@@ -13,17 +13,19 @@ class Polarizability(ResponseProperty):
         rsp_input['response'] = 'linear'
         rsp_input['residue'] = 'none'
 
-        rsp_input['operators'] = ('xyz', 'xyz')
-        rsp_input['frequencies'] = (0,)
-
         if 'operators' in rsp_dict:
             operators = rsp_dict['operators'].replace(' ', '')
             operators = operators.lower().split(',')
             rsp_input['operators'] = tuple(operators)
+        else:
+            rsp_input['operators'] = ('xyz', 'xyz')
+
         if 'frequencies' in rsp_dict:
             frequencies = rsp_dict['frequencies'].replace(' ', '')
             frequencies = frequencies.split(',')
             rsp_input['frequencies'] = tuple(map(float, frequencies))
+        else:
+            rsp_input['frequencies'] = (0,)
 
         super().__init__(rsp_input)
 
