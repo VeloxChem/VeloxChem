@@ -167,6 +167,12 @@ CAODensityMatrix::getNumberOfDensityMatrices() const
     return 0;
 }
 
+int32_t
+CAODensityMatrix::getNumberOfMatrices() const
+{
+    return static_cast<int32_t>(_denMatrices.size()); 
+}
+
 denmat
 CAODensityMatrix::getDensityType() const
 {
@@ -314,6 +320,12 @@ CAODensityMatrix::getDensity(const int32_t iDensityMatrix) const
     }
     
     return nullptr;
+}
+
+const CDenseMatrix&
+CAODensityMatrix::getReferenceToDensity(const int32_t iDensityMatrix) const
+{
+    return _denMatrices[iDensityMatrix]; 
 }
 
 std::string

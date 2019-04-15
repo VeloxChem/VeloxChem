@@ -12,8 +12,8 @@
 #include <cstdint>
 #include <string>
 
-
 #include "DenseMatrix.hpp"
+#include "AODensityMatrix.hpp"
 
 /**
  Class CKineticEnergyMatrix stores general kinetic energy matrix and provides
@@ -131,6 +131,16 @@ public:
      @return the constant pointer to first element of kinetic energy matrix.
      */
     const double* values() const;
+    
+    /**
+     Computes kinetic energy for specific AO density matrix.
+
+     @param aoDensityMatrix the AO density matrix object.
+     @param iDensityMatrix the index of AO density matrix in AO density matrix object.
+     @return the kinetic energy.
+     */
+    double getKineticEnergy(const CAODensityMatrix& aoDensityMatrix,
+                            const int32_t           iDensityMatrix) const;
     
     /**
      Converts kinetic energy matrix object to text output and insert it into

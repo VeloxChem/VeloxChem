@@ -320,6 +320,32 @@ namespace denblas { // denblas namespace
         
         return cblas_ddot(vectorA.size(), vectorA.data(), 1, matrixB.values(), 1);
     }
-
+    
+    double
+    trace(const CDenseMatrix& matrix)
+    {
+        errors::assertMsgCritical(
+                matrix.getNumberOfColumns() == matrix.getNumberOfRows(),
+                "denblas::trace - Non-square matrix"
+                                  );
+        
+        auto pvals = matrix.values();
+        
+        auto mdim = matrix.getNumberOfRows();
+        
+        double fsum = 0.0;
+        
+        for (int32_t i = 0; i < mdim; i++)
+            fsum += pvals[i * mdim + i];
+        
+        return fsum;
+    }
+    
+    double
+    trace(const CDenseMatrix& matrixA,
+          const CDenseMatrix& matrixB)
+    {
+        return denblas::trace(denblas::multAB(matrixA, matrixB));
+    }
     
 } // denblas namespace

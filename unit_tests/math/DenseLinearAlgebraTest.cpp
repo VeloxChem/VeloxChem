@@ -224,3 +224,29 @@ TEST_F(CDenseLinearAlgebraTest, DotVectorMatrix)
     
     ASSERT_NEAR(2.0, denblas::dot(veca, matb), 1.0e-13);
 }
+
+TEST_F(CDenseLinearAlgebraTest, Trace)
+{
+    CDenseMatrix mat({ 2.0, 3.0, 4.0,
+                      -3.0, 3.0, 1.0,
+                       6.0, 2.3, 7.0},
+                      3, 3);
+    
+    ASSERT_NEAR(12.0, denblas::trace(mat), 1.0e-13);
+}
+
+TEST_F(CDenseLinearAlgebraTest, TraceAB)
+{
+   CDenseMatrix mata({ 2.0, 3.0, 4.0,
+                      -3.0, 3.0, 1.0,
+                       6.0, 2.3, 7.0,
+                       1.0, 2.0, 4.0},
+                      4, 3);
+        
+        CDenseMatrix matb({ 1.0, 2.0, 5.0,  2.0,
+                           -3.0, 3.0, 1.0, -1.0,
+                            3.0, 0.5, 7.8,  1.0},
+                          3, 4);
+    
+    ASSERT_NEAR(0.0, denblas::trace(mata, matb), 1.0e-13);
+}

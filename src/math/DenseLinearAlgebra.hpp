@@ -119,6 +119,24 @@ namespace denblas { // denblas namespace
     double dot(const CMemBlock<double>& vectorA,
                const CDenseMatrix&      matrixB);
     
+    /**
+     Computes trace of matrix.
+
+     @param matrix the matrix.
+     @return the trace of matrix.
+     */
+    double trace(const CDenseMatrix& matrix);
+    
+    /**
+     Computes trace of matrix multiplication A * B.
+
+     @param matrixA the matrix A.
+     @param matrixB the matrix B.
+     @return the trace of A * B.
+     */
+    double trace(const CDenseMatrix& matrixA,
+                 const CDenseMatrix& matrixB);
+    
 } // denblas namespace
 
 #endif /* DenseLinearAlgebra_hpp */

@@ -230,7 +230,7 @@ class BlockDavidsonSolver:
             
             for i in range(1,tvecs.shape[1]):
                 for j in range(i):
-                    f = np.dot(tvecs[:,i],tvecs[:,j])/np.dot(tvecs[:,j],tvecs[:,j])
+                    f = np.dot(tvecs[:,i],tvecs[:,j]) / np.dot(tvecs[:,j],tvecs[:,j])
                     tvecs[:,i] -= f * tvecs[:,j]
                 f = 1.0 / np.linalg.norm(tvecs[:,i])
                 tvecs[:,i] *= f
@@ -249,7 +249,7 @@ class BlockDavidsonSolver:
         fnorms = np.linalg.norm(tvecs, axis=0)
         
         for i in range(tvecs.shape[1]):
-            tvecs[:,i] *= 1.0/fnorms[i]
+            tvecs[:,i] *= 1.0 / fnorms[i]
 
 
 

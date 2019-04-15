@@ -138,6 +138,19 @@ TEST_F(CAODensityMatrixTest, GetNumberOfDensityMatrices)
     ASSERT_EQ(2, dmatb.getNumberOfDensityMatrices());
 }
 
+TEST_F(CAODensityMatrixTest, GetNumberOfMatrices)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CAODensityMatrix dmata({ma, ma}, denmat::unrest);
+    
+    CAODensityMatrix dmatb({ma, ma, ma}, denmat::rest);
+    
+    ASSERT_EQ(2, dmata.getNumberOfMatrices());
+    
+    ASSERT_EQ(3, dmatb.getNumberOfMatrices());
+}
+
 TEST_F(CAODensityMatrixTest, GetDensityType)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
@@ -259,4 +272,42 @@ TEST_F(CAODensityMatrixTest, UnrestrictedBetaDensity)
                      dmat.betaDensity(1));
 
     ASSERT_TRUE(dmat.betaDensity(2) == nullptr);
+}
+
+TEST_F(CAODensityMatrixTest, GetDensity)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 1.0, 4.0, 3.0, 7.0}, 2, 4);
+    
+    CAODensityMatrix dmat({ma, ma, mb, mb}, denmat::unrest);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     dmat.getDensity(0));
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     dmat.getDensity(1));
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 1.0, 4.0, 3.0, 7.0},
+                     dmat.getDensity(2));
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 1.0, 4.0, 3.0, 7.0},
+                     dmat.getDensity(3));
+}
+
+TEST_F(CAODensityMatrixTest, GetReferenceToDensity)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 1.0, 4.0, 3.0, 7.0}, 2, 4);
+    
+    CAODensityMatrix dmat({ma, ma, mb, mb}, denmat::unrest);
+    
+    ASSERT_EQ(ma, dmat.getReferenceToDensity(0));
+    
+    ASSERT_EQ(ma, dmat.getReferenceToDensity(1));
+    
+    ASSERT_EQ(mb, dmat.getReferenceToDensity(2));
+    
+    ASSERT_EQ(mb, dmat.getReferenceToDensity(3));
 }

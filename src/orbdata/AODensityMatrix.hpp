@@ -135,6 +135,13 @@ public:
     int32_t getNumberOfDensityMatrices() const;
     
     /**
+     Gets total number of matrices stored in AO density matrix.
+     
+     @return the number of density matrices.
+     */
+    int32_t getNumberOfMatrices() const;
+    
+    /**
      Gets type of density matrix.
 
      @return the type of density matrix.
@@ -191,6 +198,14 @@ public:
      matrix.
      */
     const double* getDensity(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets constant reference to density matrix as dense matrix object.
+
+     @param iDensityMatrix the index of density matrix.
+     @return the constant reference to density matrix.
+     */
+    const CDenseMatrix& getReferenceToDensity(const int32_t iDensityMatrix) const;
     
     /**
      Gets string representation of density matrix object.

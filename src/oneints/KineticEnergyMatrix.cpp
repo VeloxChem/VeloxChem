@@ -103,6 +103,18 @@ CKineticEnergyMatrix::values() const
     return _matrix.values();
 }
 
+double
+CKineticEnergyMatrix::getKineticEnergy(const CAODensityMatrix& aoDensityMatrix,
+                                       const int32_t           iDensityMatrix) const
+{
+    if (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices())
+    {
+        return 1.0; 
+    }
+    
+    return 0.0;
+}
+
 std::ostream&
 operator<<(      std::ostream&         output,
            const CKineticEnergyMatrix& source)
