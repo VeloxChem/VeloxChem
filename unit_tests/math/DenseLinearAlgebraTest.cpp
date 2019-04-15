@@ -248,5 +248,5 @@ TEST_F(CDenseLinearAlgebraTest, TraceAB)
                             3.0, 0.5, 7.8,  1.0},
                           3, 4);
     
-    ASSERT_NEAR(0.0, denblas::trace(mata, matb), 1.0e-13);
+    ASSERT_NEAR(99.40, denblas::trace(mata, matb), 1.0e-13);
 }
