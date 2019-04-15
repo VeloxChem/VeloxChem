@@ -43,8 +43,10 @@ class InputParser:
             self.success_monitor = False
 
         except SyntaxError:
-            errmsg = 'input parser: bad syntax in file {}'.format(self.filename)
-            errmsg += '\n     You may check for incorrect, incomplete or empty groups.'
+            errmsg = 'input parser: bad syntax in file '
+            errmsg += self.filename + '\n     '
+            errmsg += 'You may check for incorrect, '
+            errmsg += 'incomplete or empty groups.'
             self.success_monitor = False
 
         assert_msg_critical(self.success_monitor, errmsg)
@@ -174,5 +176,5 @@ class InputParser:
                 checkpoint = '.'.join(self.filename.split('.')[:-1]) + ".scf.h5"
             else:
                 checkpoint = self.filename + ".scf.h5"
-            self.input_dict["input_file"]= self.filename
+            self.input_dict["input_file"] = self.filename
             self.input_dict["checkpoint_file"] = checkpoint

@@ -1,22 +1,12 @@
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import MolecularOrbitals
-from .veloxchemlib import ScreeningContainer
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
-from .veloxchemlib import molorb
-from .veloxchemlib import szblock
 
 from .outputstream import OutputStream
 from .tdaexcidriver import TDAExciDriver
 from .lrsolver import LinearResponseSolver
-
 from .qqscheme import get_qq_type
-from .qqscheme import get_qq_scheme
 
-import numpy as np
-import time as tm
-import math
 import sys
+
 
 class ResponseDriver:
     """Implements response driver.
@@ -30,39 +20,38 @@ class ResponseDriver:
         The number of MPI processes.
     """
 
-    def __init__(self, rsp_input=None):
+    def __init__(self, rsp_input):
         """Initializes Response driver.
             
         Initializes Response driver to default setup.
         """
         
         # calculation type
-        self.prop_type = "SINGEX_TDA"
+        self.prop_type = 'SINGEX_TDA'
+        self.nstates = int(rsp_input['nstates']) \
+            if 'nstates' in rsp_input else 3
 
-        # convergence information
-        self.max_iter = 50
-        
+        # solver settings
+        self.conv_thresh = float(rsp_input['conv_thresh']) \
+            if 'conv_thresh' in rsp_input else 1.0e-4
+        self.max_iter = int(rsp_input['max_iter']) \
+            if 'max_iter' in rsp_input else 50
+
         # ERI settings
-        self.eri_thresh  = 1.0e-15
-        self.qq_type = "QQ_DEN"
-        
-        # thresholds
-        self.conv_thresh = 1.0e-4
-        
-        # excited states information
-        self.nstates = 3
-        
+        self.eri_thresh = float(rsp_input['eri_thresh']) \
+            if 'eri_thresh' in rsp_input else 1.0e-15
+        self.qq_type = rsp_input['qq_type'].upper() \
+            if 'qq_type' in rsp_input else 'QQ_DEN'
+
         if rsp_input:
 
             if rsp_input['property'].lower() == 'polarizability':
                 self.prop_type = 'POLARIZABILITY'
-                self.conv_thresh = 1.0e-5
-                self.frequencies = rsp_input['frequencies']
                 self.a_ops, self.b_ops = rsp_input['operators']
+                self.frequencies = rsp_input['frequencies']
 
             elif rsp_input['property'].lower() == 'absorption':
                 self.prop_type = 'SINGEX_TDA'
-                self.nstates = rsp_input['nstates']
         
         # mpi information
         self.rank = 0

@@ -8,6 +8,7 @@ from .c2diis import CTwoDiis
 
 import numpy as np
 
+
 class ScfRestrictedDriver(ScfDriver):
     """Implements spin restricted closed shell SCF method (derrived class).
         
@@ -15,7 +16,7 @@ class ScfRestrictedDriver(ScfDriver):
         two-level C2-DIIS convergence accelerators.
     """
 
-    def __init__(self):
+    def __init__(self, scf_dict=None):
         """Initializes spin restricted closed shell SCF driver.
             
         Initializes spin restricted closed shell SCF driver to default setup
@@ -23,7 +24,7 @@ class ScfRestrictedDriver(ScfDriver):
         constructor.
         """
         
-        super().__init__()
+        super().__init__(scf_dict)
     
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat, comm):
         """Computes spin restricted closed shell SCF energy components.
@@ -130,7 +131,7 @@ class ScfRestrictedDriver(ScfDriver):
             fa = np.matmul(fmat, np.matmul(dmat, smat))
             fb = np.matmul(smat, np.matmul(dmat, fmat))
             
-            fx = np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat))
+            # fx = np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat))
             
             e_grad = 2.0 * np.linalg.norm(np.matmul(tmat.transpose(),
                                                     np.matmul(fa - fb, tmat)))

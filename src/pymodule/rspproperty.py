@@ -1,5 +1,4 @@
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
+from .rspdriver import ResponseDriver
 from .outputstream import OutputStream
 
 import sys
@@ -11,19 +10,17 @@ class ResponseProperty:
     Implements the base class for response property/spectroscopy.
     """
 
-    def __init__(self, rsp_input, rsp_driver):
+    def __init__(self, rsp_input):
         """Initializes response property/spectroscopy.
 
         Parameters
         ----------
         rsp_input
             The input dictionary that defines the property/spectroscopy.
-        rsp_driver
-            The response driver that does the actual computation.
         """
 
         self.rsp_input = rsp_input
-        self.rsp_driver = rsp_driver
+        self.rsp_driver = ResponseDriver(rsp_input)
 
     def compute_task(self, mol_orbs, task):
         """Performs response property/spectroscopy calculation.

@@ -295,9 +295,9 @@ class LinearResponseSolver:
         if self.rank == mpi_master():
             output_conv = '*** '
             if self.is_converged:
-                output_conv += 'Converged'
+                output_conv += 'Linear response converged'
             else:
-                output_conv += 'NOT converged'
+                output_conv += 'Linear response NOT converged'
             output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
             output_conv += 'Time: {:.2f} sec'.format(tm.time() -
                                                      self.start_time)

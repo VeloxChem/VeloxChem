@@ -1,16 +1,9 @@
-from .veloxchemlib import OverlapMatrix
-from .veloxchemlib import KineticEnergyMatrix
-from .veloxchemlib import NuclearPotentialMatrix
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import MolecularOrbitals
-from .veloxchemlib import ScreeningContainer
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ericut
-from .veloxchemlib import molorb
 
 from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
@@ -27,6 +20,7 @@ import math
 import sys
 
 from collections import deque
+
 
 class ScfDriver:
     """Implements SCF method (base class).
@@ -95,7 +89,7 @@ class ScfDriver:
         The flag for restarting from checkpoint file
     """
 
-    def __init__(self):
+    def __init__(self, scf_dict):
         """Initializes SCF driver.
             
         Initializes SCF driver to default setup (convergence threshold, initial
@@ -118,10 +112,10 @@ class ScfDriver:
         
         # thresholds
         self.conv_thresh = 1.0e-6
-        self.ovl_thresh  = 1.0e-6
+        self.ovl_thresh = 1.0e-6
         self.diis_thresh = 1000.0
         self.dden_thresh = 1.0e-3
-        self.eri_thresh  = 1.0e-12
+        self.eri_thresh = 1.0e-12
         self.eri_thresh_tight = 1.0e-15
         
         # level shifting
@@ -153,6 +147,21 @@ class ScfDriver:
 
         # restart information
         self.restart = True
+
+        if scf_dict:
+            if 'acc_type' in scf_dict:
+                self.acc_type = scf_dict['acc_type'].upper()
+            if 'max_iter' in scf_dict:
+                self.max_iter = int(scf_dict['max_iter'])
+            if 'conv_thresh' in scf_dict:
+                self.conv_thresh = float(scf_dict['conv_thresh'])
+            if 'qq_type' in scf_dict:
+                self.qq_type = scf_dict['qq_type'].upper()
+            if 'eri_thresh' in scf_dict:
+                self.eri_thresh = float(scf_dict['eri_thresh'])
+            if 'restart' in scf_dict:
+                key = scf_dict['restart'].lower()
+                self.restart = True if key == 'yes' else False
 
     def compute_task(self, task):
         """Performs SCF calculation.
@@ -365,7 +374,7 @@ class ScfDriver:
 
         if not self.restart:
             den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, comm, ostream) 
+                                              ovl_mat, comm, ostream)
 
         else:
             if self.rank == mpi_master():
@@ -635,7 +644,6 @@ class ScfDriver:
         else:
             eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
                             comm)
-    
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
         """Computes full Fock/Kohn-Sham matrix.
@@ -1017,7 +1025,7 @@ class ScfDriver:
                     diff_te = 0.0
                     diff_den = 0.0
             
-                exec_str  = " " + (str(i)).rjust(3) + 4 * " "
+                exec_str = " " + (str(i)).rjust(3) + 4 * " "
                 exec_str += ("{:7.12f}".format(te)).center(27) + 3 * " "
                 exec_str += ("{:5.10f}".format(diff_te)).center(17) + 3 * " "
                 exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
@@ -1162,7 +1170,7 @@ class ScfDriver:
         
         fmax = 1.0 / math.sqrt(self.ovl_thresh)
         
-        mvec = np.amax(np.abs(mol_orbs), axis = 0)
+        mvec = np.amax(np.abs(mol_orbs), axis=0)
         
         molist = []
         for i in range(mvec.shape[0]):

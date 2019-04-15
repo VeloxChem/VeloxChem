@@ -31,8 +31,12 @@ def main():
 
         # initialize scf driver and run scf
 
-        scf_drv = ScfRestrictedDriver()
+        if 'scf' in task.input_dict:
+            scf_dict = task.input_dict['scf']
+        else:
+            scf_dict = None
 
+        scf_drv = ScfRestrictedDriver(scf_dict)
         scf_drv.compute_task(task)
 
     # Response
@@ -50,29 +54,24 @@ def main():
 
             rsp_dict = task.input_dict['response']
 
-            if rsp_dict['property'] == 'polarizability':
-                frequencies = rsp_dict['frequencies'].split(',')
-                frequencies = tuple(map(float, frequencies))
-
-                polar = Polarizability(frequencies)
+            if rsp_dict['property'].lower() == 'polarizability':
+                polar = Polarizability(rsp_dict)
                 polar.compute_task(mol_orbs, task)
                 if task.mpi_rank == mpi_master():
                     polar.print_property(task.ostream)
 
-            elif rsp_dict['property'] == 'absorption':
-                nstates = int(rsp_dict['nstates'])
-
-                abs_spec = Absorption(nstates)
+            elif rsp_dict['property'].lower() == 'absorption':
+                abs_spec = Absorption(rsp_dict)
                 abs_spec.compute_task(mol_orbs, task)
-                #if task.mpi_rank == mpi_master():
-                #    abs_spec.print_property(task.ostream)
+                if task.mpi_rank == mpi_master():
+                    abs_spec.print_property(task.ostream)
 
             else:
                 if task.mpi_rank == mpi_master():
                     assert_msg_critical(False, 'response: invalid property')
 
         else:
-            rsp_drv = ResponseDriver()
+            rsp_drv = ResponseDriver({'property': 'absorption'})
             rsp_drv.compute_task(mol_orbs, task)
 
     # MP2 perturbation theory
