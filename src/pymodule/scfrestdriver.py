@@ -52,12 +52,9 @@ class ScfRestrictedDriver(ScfDriver):
         """
         
         if self.rank == mpi_master():
-            dmat = den_mat.alpha_to_numpy(0)
         
             # electronic energy
-            gmat = fock_mat.to_numpy(0)
-            gd = np.matmul(gmat, dmat)
-            e_ee = gd.trace()
+            e_ee = fock_mat.get_energy(0, den_mat, 0)
         
             # kinetic energy
             e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)

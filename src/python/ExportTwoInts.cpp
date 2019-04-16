@@ -305,6 +305,7 @@ void export_twoints(py::module& m)
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
         .def("add", &CAOFockMatrix::add)
         .def("reduce_sum", &CAOFockMatrix_reduce_sum)
+        .def("get_energy", &CAOFockMatrix::getElectronicEnergy)
         .def(py::self == py::self)
     ;
 
