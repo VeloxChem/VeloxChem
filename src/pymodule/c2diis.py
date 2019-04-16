@@ -150,7 +150,7 @@ class CTwoDiis:
             evec = np.zeros(self.error_vectors[0].shape, dtype=float)
             
             for f, v in zip(w, self.error_vectors):
-                eecv = evec + f * v
+                evec = evec + f * v
 
             fact = np.vdot(evec, evec)
 
