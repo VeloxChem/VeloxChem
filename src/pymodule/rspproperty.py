@@ -1,7 +1,7 @@
+import sys
+
 from .rspdriver import ResponseDriver
 from .outputstream import OutputStream
-
-import sys
 
 
 class ResponseProperty:
@@ -36,7 +36,11 @@ class ResponseProperty:
         self.rsp_property = self.rsp_driver.compute(
             mol_orbs, task.molecule, task.ao_basis, task.mpi_comm, task.ostream)
 
-    def compute(self, mol_orbs, molecule, basis, comm,
+    def compute(self,
+                mol_orbs,
+                molecule,
+                basis,
+                comm,
                 ostream=OutputStream(sys.stdout)):
         """Performs response property/spectroscopy calculation.
 

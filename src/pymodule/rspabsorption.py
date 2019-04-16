@@ -1,5 +1,5 @@
-from .rspproperty import ResponseProperty
 from .veloxchemlib import hartree_in_ev
+from .rspproperty import ResponseProperty
 
 
 class Absorption(ResponseProperty):

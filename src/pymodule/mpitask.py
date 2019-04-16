@@ -1,17 +1,12 @@
-from .veloxchemlib import AtomBasis
-from .veloxchemlib import BasisFunction
-from .veloxchemlib import ChemicalElement
-from .veloxchemlib import mpi_master
-from .veloxchemlib import to_angular_momentum
+from os.path import isfile
+import sys
 
+from .veloxchemlib import mpi_master
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
-
-from os.path import isfile
-import sys
 
 
 class MpiTask:
@@ -68,8 +63,8 @@ class MpiTask:
 
             self.input_dict = InputParser(input_fname).get_dict()
 
-            self.ostream.print_info(
-                "Found {} control groups.".format(len(self.input_dict)))
+            self.ostream.print_info("Found {} control groups.".format(
+                len(self.input_dict)))
             self.ostream.print_info("...done.")
             self.ostream.print_blank()
 
