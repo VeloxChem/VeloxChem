@@ -418,6 +418,19 @@ CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
     return false;
 }
 
+double
+CAOFockMatrix::getElectronicEnergy(const int32_t           iFockMatrix,
+                                   const CAODensityMatrix& aoDensityMatrix,
+                                   const int32_t           iDensityMatrix) const
+{
+    if ((iFockMatrix < getNumberOfFockMatrices()) && (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices()))
+    {
+        return denblas::trace(_fockMatrices[iFockMatrix], aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
+    }
+    
+    return 0.0; 
+}
+
 std::string
 CAOFockMatrix::getString() const
 {

@@ -450,3 +450,48 @@ TEST_F(CAOFockMatrixTest, IsSymmetric)
     ASSERT_FALSE(fmata.isSymmetric(3));
 }
 
+TEST_F(CAOFockMatrixTest, GetElectronicEnergy)
+{
+    CDenseMatrix ma({ 1.0, -1.0, -3.0,
+                     -2.0,  5.0,  4.0,
+                      6.0,  4.0, -4.0},
+                    3, 3);
+    
+    CDenseMatrix mb({ 1.0, -1.0, -3.0,
+                     -2.0,  5.0,  4.0,
+                      2.0,  1.0,  3.0},
+                    3, 3);
+    
+    CAOFockMatrix fmat({ma, mb}, {fockmat::restj, fockmat::restk}, {1.0, 2.0}, {0, 2});
+    
+    CDenseMatrix da({ 1.0, -1.0, -3.0,
+                     -2.0,  2.0,  3.0,
+                      6.0,  3.0, -4.0},
+                     3, 3);
+    
+    CDenseMatrix db({ 1.0, -1.0, -3.0,
+                     -2.0,  1.0,  4.0,
+                      3.0,  7.0,  3.0},
+                    3, 3);
+    
+    CAODensityMatrix dmat({da, db}, denmat::unrest);
+    
+    ASSERT_NEAR(19.0, fmat.getElectronicEnergy(0 , dmat, 0), 1.0e-13);
+    
+    ASSERT_NEAR(15.0, fmat.getElectronicEnergy(0, dmat, 1), 1.0e-13);
+    
+    ASSERT_NEAR(0.0, fmat.getElectronicEnergy(0, dmat, 2), 1.0e-13);
+    
+    ASSERT_NEAR(-6.0, fmat.getElectronicEnergy(1 , dmat, 0), 1.0e-13);
+    
+    ASSERT_NEAR(36.0, fmat.getElectronicEnergy(1, dmat, 1), 1.0e-13);
+    
+    ASSERT_NEAR(0.0, fmat.getElectronicEnergy(1, dmat, 2), 1.0e-13);
+    
+    ASSERT_NEAR(0.0, fmat.getElectronicEnergy(2 , dmat, 0), 1.0e-13);
+    
+    ASSERT_NEAR(0.0, fmat.getElectronicEnergy(2, dmat, 1), 1.0e-13);
+    
+    ASSERT_NEAR(0.0, fmat.getElectronicEnergy(2, dmat, 2), 1.0e-13);
+}
+

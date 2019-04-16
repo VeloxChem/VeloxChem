@@ -271,6 +271,18 @@ public:
     bool isSymmetric(const int32_t iFockMatrix) const;
     
     /**
+     Computes electronic energy for specific AO density matrix.
+
+     @param iFockMatrix the index of Fock matrix
+     @param aoDensityMatrix the AO density matrix object.
+     @param iDensityMatrix the index of AO density matrix in AO density matrix object.
+     @return the electronic energy.
+     */
+    double getElectronicEnergy(const int32_t           iFockMatrix,
+                               const CAODensityMatrix& aoDensityMatrix,
+                               const int32_t           iDensityMatrix) const;
+    
+    /**
      Gets string representation of density matrix object.
 
      @return the string representation of density matrix.
