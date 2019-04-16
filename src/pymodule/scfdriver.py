@@ -21,7 +21,6 @@ import sys
 
 from collections import deque
 
-
 class ScfDriver:
     """Implements SCF method (base class).
         

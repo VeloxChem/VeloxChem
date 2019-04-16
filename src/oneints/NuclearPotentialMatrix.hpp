@@ -13,6 +13,7 @@
 #include <string>
 
 #include "DenseMatrix.hpp"
+#include "AODensityMatrix.hpp"
 
 /**
  Class CNuclearPotentialMatrix stores general nuclear potential matrix and
@@ -131,6 +132,16 @@ public:
      @return the constant pointer to first element of nuclear potential matrix.
      */
     const double* values() const;
+    
+    /**
+     Computes nuclear potential energy for specific AO density matrix.
+     
+     @param aoDensityMatrix the AO density matrix object.
+     @param iDensityMatrix the index of AO density matrix in AO density matrix object.
+     @return the nuclear potential energy.
+     */
+    double getNuclearPotentialEnergy(const CAODensityMatrix& aoDensityMatrix,
+                                     const int32_t           iDensityMatrix) const;
     
     /**
      Converts nuclear potential matrix object to text output and insert it into

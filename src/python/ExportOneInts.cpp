@@ -493,6 +493,7 @@ void export_oneints(py::module& m)
         .def(py::init(&CKineticEnergyMatrix_from_numpy))
         .def("__str__", &CKineticEnergyMatrix_str)
         .def("to_numpy", &CKineticEnergyMatrix_to_numpy)
+        .def("get_energy", &CKineticEnergyMatrix::getKineticEnergy)
         .def(py::self == py::self)
     ;
 
@@ -522,6 +523,7 @@ void export_oneints(py::module& m)
         .def(py::init(&CNuclearPotentialMatrix_from_numpy))
         .def("__str__", &CNuclearPotentialMatrix_str)
         .def("to_numpy", &CNuclearPotentialMatrix_to_numpy)
+        .def("get_energy", &CNuclearPotentialMatrix::getNuclearPotentialEnergy)
         .def(py::self == py::self)
     ;
 

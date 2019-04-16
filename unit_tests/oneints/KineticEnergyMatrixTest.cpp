@@ -108,3 +108,31 @@ TEST_F(CKineticEnergyMatrixTest, Values)
     
     vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, smata.values());
 }
+
+TEST_F(CKineticEnergyMatrixTest, GetKineticEnergy)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0,
+                    -2.0,  5.0,  4.0,
+                     6.0,  4.0, -4.0},
+                    3, 3);
+    
+    CKineticEnergyMatrix smat(ma);
+    
+    CDenseMatrix da({ 1.0, -1.0, -3.0,
+                     -2.0,  2.0,  3.0,
+                      6.0,  3.0, -4.0},
+                     3, 3);
+    
+    CDenseMatrix db({ 1.0, -1.0, -3.0,
+                     -2.0,  1.0,  4.0,
+                      3.0,  7.0,  3.0},
+                    3, 3);
+    
+    CAODensityMatrix dmat({da, db}, denmat::unrest);
+    
+    ASSERT_NEAR(19.0, smat.getKineticEnergy(dmat, 0), 1.0e-13);
+    
+    ASSERT_NEAR(15.0, smat.getKineticEnergy(dmat, 1), 1.0e-13);
+    
+    ASSERT_NEAR(0.0, smat.getKineticEnergy(dmat, 2), 1.0e-13);
+}

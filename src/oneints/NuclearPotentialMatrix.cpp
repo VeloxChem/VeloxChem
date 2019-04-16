@@ -8,6 +8,8 @@
 
 #include "NuclearPotentialMatrix.hpp"
 
+#include "DenseLinearAlgebra.hpp"
+
 CNuclearPotentialMatrix::CNuclearPotentialMatrix()
 {
     
@@ -101,6 +103,18 @@ const double*
 CNuclearPotentialMatrix::values() const
 {
     return _matrix.values();
+}
+
+double
+CNuclearPotentialMatrix::getNuclearPotentialEnergy(const CAODensityMatrix& aoDensityMatrix,
+                                                   const int32_t           iDensityMatrix) const
+{
+    if (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices())
+    {
+        return denblas::trace(_matrix, aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
+    }
+    
+    return 0;
 }
 
 std::ostream&
