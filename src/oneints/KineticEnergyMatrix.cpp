@@ -8,6 +8,8 @@
 
 #include "KineticEnergyMatrix.hpp"
 
+#include "DenseLinearAlgebra.hpp"
+
 CKineticEnergyMatrix::CKineticEnergyMatrix()
 {
     
@@ -109,7 +111,7 @@ CKineticEnergyMatrix::getKineticEnergy(const CAODensityMatrix& aoDensityMatrix,
 {
     if (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices())
     {
-        return 1.0; 
+        return denblas::trace(_matrix, aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
     }
     
     return 0.0;
