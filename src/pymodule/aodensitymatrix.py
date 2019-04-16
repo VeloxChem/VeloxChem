@@ -1,10 +1,9 @@
+import numpy as np
+import h5py
+
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
-
 from .errorhandler import assert_msg_critical
-
-import h5py
-import numpy as np
 
 
 def _write_hdf5(self, fname):
@@ -66,9 +65,8 @@ def _read_hdf5(fname):
         len(set(types)) == 1,
         "AODensityMatrix.read_hdf5: inconsistent density type!")
 
-    assert_msg_critical(
-        types[0] in list(dentype.values()),
-        "AODensityMatrix.read_hdf5: invalid density type!")
+    assert_msg_critical(types[0] in list(dentype.values()),
+                        "AODensityMatrix.read_hdf5: invalid density type!")
 
     return AODensityMatrix(dens, types[0])
 

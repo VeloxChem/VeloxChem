@@ -1,3 +1,9 @@
+import numpy as np
+import time as tm
+import itertools
+import math
+import sys
+
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
@@ -10,16 +16,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
-
 from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
-
-import numpy as np
-import time as tm
-import itertools
-import math
-import sys
 
 
 class LinearResponseSolver:

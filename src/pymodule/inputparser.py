@@ -1,6 +1,6 @@
-from .errorhandler import assert_msg_critical
-
 import re
+
+from .errorhandler import assert_msg_critical
 
 
 class InputParser:
@@ -173,8 +173,9 @@ class InputParser:
         else:
             # for input file, save input file name and checkpoint file name
             if '.' in self.filename:
-                checkpoint = '.'.join(self.filename.split('.')[:-1]) + ".scf.h5"
+                fname = '.'.join(self.filename.split('.')[:-1])
+                fchkp = fname + ".scf.h5"
             else:
-                checkpoint = self.filename + ".scf.h5"
+                fchkp = self.filename + ".scf.h5"
             self.input_dict["input_file"] = self.filename
-            self.input_dict["checkpoint_file"] = checkpoint
+            self.input_dict["checkpoint_file"] = fchkp
