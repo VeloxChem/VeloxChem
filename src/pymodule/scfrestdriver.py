@@ -60,10 +60,10 @@ class ScfRestrictedDriver(ScfDriver):
             e_ee = gd.trace()
         
             # kinetic energy
-            e_kin = 2.0 * kmat.get_energy(den_mat, 0)
+            e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
         
             # nuclear potential energy
-            e_en = -2.0 * npmat.get_energy(den_mat, 0)
+            e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
         else:
             e_ee = 0.0
             e_kin = 0.0
