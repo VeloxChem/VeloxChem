@@ -96,9 +96,6 @@ class ScfDriver:
         guess, etc).
         """
     
-        # density guess
-        self.den_guess = DensityGuess("SAD")
-        
         # scf accelerator
         self.acc_type = "L2_DIIS"
         self.max_err_vecs = 10
@@ -200,48 +197,26 @@ class ScfDriver:
             The output stream.
         """
         
+        # MPI rank and size
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
 
-        # read checkpoint file and update self.restart flag
-
+        # checkpoint file
         self.checkpoint_file = checkpoint_file
-        rst_info = None
 
-        if self.rank == mpi_master():
-            rst_info = {"restart": False}
+        # initial guess
+        if self.restart:
+            self.den_guess = DensityGuess("RESTART", checkpoint_file)
+            self.restart = self.den_guess.validate_checkpoint(
+                molecule, ao_basis, comm, self.ovl_thresh)
+        if not self.restart:
+            self.den_guess = DensityGuess("SAD")
 
-            valid_checkpoint = (self.restart and
-                                self.checkpoint_file and
-                                isinstance(self.checkpoint_file, str) and
-                                isfile(self.checkpoint_file))
-            if valid_checkpoint:
-                ovl_drv = OverlapIntegralsDriver(self.rank, self.nodes, comm)
-                ovl_mat = ovl_drv.compute(molecule, ao_basis, comm)
-                oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
-                nao = oao_mat.number_of_rows()
-                nmo = oao_mat.number_of_columns()
-
-                mol_orbs = MolecularOrbitals.read_hdf5(self.checkpoint_file)
-                valid_mo = (mol_orbs.number_aos() == nao and
-                            mol_orbs.number_mos() == nmo)
-                if valid_mo:
-                    self.mol_orbs = mol_orbs
-                    rst_info["restart"] = True
-
-        rst_info = comm.bcast(rst_info, root=mpi_master())
-        self.restart = rst_info["restart"]
-
+        # nuclear repulsion energy
         self.nuc_energy = molecule.nuclear_repulsion_energy()
         
         if self.rank == mpi_master():
             self.print_header(ostream)
-
-            if self.restart:
-                restart_text = "Restarting from checkpoint file: "
-                restart_text += self.checkpoint_file
-                ostream.print_info(restart_text)
-                ostream.print_blank()
 
         # C2-DIIS method
         if self.acc_type == "DIIS":
@@ -287,14 +262,18 @@ class ScfDriver:
             self.print_ground_state(molecule, ostream)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False, ostream)
 
-            have_checkpoint = (self.checkpoint_file and
-                               isinstance(self.checkpoint_file, str) and
-                               isfile(self.checkpoint_file))
-            if have_checkpoint:
+            if isfile(checkpoint_file):
                 checkpoint_text = "Checkpoint written to file: "
-                checkpoint_text += self.checkpoint_file
+                checkpoint_text += checkpoint_file
                 ostream.print_info(checkpoint_text)
                 ostream.print_blank()
+
+    def write_checkpoint(self, checkpoint_file):
+        """Writes molecular orbitals to checkpoint file"""
+
+        if self.rank == mpi_master() and not self.first_step:
+            if checkpoint_file and isinstance(checkpoint_file, str):
+                self.mol_orbs.write_hdf5(checkpoint_file)
 
     def comp_diis(self, molecule, ao_basis, min_basis, comm, ostream):
         """Performs SCF calculation with C2-DIIS acceleration.
@@ -324,7 +303,7 @@ class ScfDriver:
         ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis,
                                                         comm, ostream)
 
-        ovl_info = None
+        linear_dependency = False
                                                         
         if self.rank == mpi_master():
             t0 = tm.time()
@@ -337,27 +316,22 @@ class ScfDriver:
 
             nrow = oao_mat.number_of_rows()
             ncol = oao_mat.number_of_columns()
-            if nrow != ncol:
+            linear_dependency = (nrow != ncol)
+
+            if linear_dependency:
                 ndim = nrow - ncol
                 ostream.print_info(
                     "Removed " + str(ndim) + " linearly dependent" +
                     " vector{:s}.".format('' if ndim == 1 else 's'))
                 ostream.print_blank()
-
-                ovl_info = {"linear_dependency": True}
-
-            else:
-                ovl_info = {"linear_dependency": False}
-
             ostream.flush()
 
         else:
             oao_mat = None
 
-        ovl_info = comm.bcast(ovl_info, root=mpi_master())
+        linear_dependency = comm.bcast(linear_dependency, root=mpi_master())
 
-        if (ovl_info["linear_dependency"] and
-            self.eri_thresh > self.eri_thresh_tight):
+        if (linear_dependency and self.eri_thresh > self.eri_thresh_tight):
             self.eri_thresh = self.eri_thresh_tight
 
             if self.rank == mpi_master():
@@ -365,22 +339,13 @@ class ScfDriver:
                                    " {:.1e}.".format(self.eri_thresh))
                 ostream.print_blank()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.rank,
-                                                   self.nodes,
-                                                   comm)
+        eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes, comm)
                                                           
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
 
-        if not self.restart:
-            den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, comm, ostream)
-
-        else:
-            if self.rank == mpi_master():
-                den_mat = self.mol_orbs.get_density(molecule)
-            else:
-                den_mat = AODensityMatrix()
+        den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
+                                          ovl_mat, comm, ostream)
 
         den_mat.broadcast(self.rank, comm)
 
@@ -431,15 +396,7 @@ class ScfDriver:
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
                                                         ostream)
             
-            # write molecular orbitals to checkpoint file
-
-            write_checkpoint = (self.rank == mpi_master() and
-                                not self.first_step and
-                                self.checkpoint_file and
-                                isinstance(self.checkpoint_file, str))
-
-            if write_checkpoint:
-                self.mol_orbs.write_hdf5(self.checkpoint_file)
+            self.write_checkpoint(self.checkpoint_file)
 
             self.density = AODensityMatrix(den_mat)
 
@@ -535,6 +492,11 @@ class ScfDriver:
         ostream
             The output stream.
         """
+
+        # guess: read from checkpoint file
+        if self.den_guess.guess_type == "RESTART":
+
+            return self.den_guess.restart_density(molecule, comm, ostream)
 
         # guess: superposition of atomic densities
         if self.den_guess.guess_type == "SAD":
