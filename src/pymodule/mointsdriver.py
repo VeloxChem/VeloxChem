@@ -1,104 +1,83 @@
+import time as tm
+import sys
+
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import MolecularOrbitals
-from .veloxchemlib import ScreeningContainer
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ericut
 from .veloxchemlib import fockmat
-from .veloxchemlib import molorb
 from .veloxchemlib import moints
 from .veloxchemlib import MOIntsBatch
-from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
-
 from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
-
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .mpiutils import split_comm
 
-import numpy as np
-import time as tm
-import math
-import sys
 
 class MOIntegralsDriver:
 
     def __init__(self):
-        
+
         # screening scheme
         self.qq_type = "QQ_DEN"
         self.eri_thresh = 1.0e-12
-    
-        # mpi information
-        self.global_comm = None
-        self.local_comm = None
-        self.cross_comm = None
-        self.dist_exec = False
-    
+
         # Fock matrices
         self.num_matrices = 0
         self.batch_size = 3000
-    
+
     def compute_task(self, task, mol_orbs, mints_type):
 
         return self.compute(task.molecule, task.ao_basis, mol_orbs, mints_type,
                             task.mpi_comm, task.ostream)
-    
-    def compute(self, molecule, ao_basis, mol_orbs, mints_type, global_comm,
+
+    def compute(self,
+                molecule,
+                ao_basis,
+                mol_orbs,
+                mints_type,
+                grps,
+                global_comm,
                 ostream=OutputStream(sys.stdout)):
-        
+
         # start timer
         start_time = tm.time()
-        
-        # mpi communicators
-        self.global_comm = global_comm
-        if (self.global_comm.Get_size() > 1):
-            self.dist_exec = True
+
+        # split communicators
+        local_comm, cross_comm = split_comm(global_comm, grps)
 
         global_rank = global_comm.Get_rank()
-        global_nodes = global_comm.Get_size()
-
         global_master = (global_rank == mpi_master())
 
-        # Note: At the moment we set the size of subcommunicators as 1.
-
-        local_group = global_rank // 1
-        local_comm = global_comm.Split(local_group, global_rank)
         local_rank = local_comm.Get_rank()
         local_nodes = local_comm.Get_size()
-
         local_master = (local_rank == mpi_master())
 
-        cross_group = int(local_rank == mpi_master())
-        cross_comm = global_comm.Split(cross_group, global_rank)
         cross_rank = cross_comm.Get_rank()
         cross_nodes = cross_comm.Get_size()
-
-        self.local_comm = local_comm
-        self.cross_comm = cross_comm
 
         # set up screening data
         eri_drv = ElectronRepulsionIntegralsDriver(local_rank, local_nodes,
                                                    local_comm)
-            
-        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
-                                  molecule, ao_basis)
-                               
+
+        qq_data = eri_drv.compute(
+            get_qq_scheme(self.qq_type), self.eri_thresh, molecule, ao_basis)
+
         # initialize MO integrals batch
         moints_batch = MOIntsBatch()
-        
+
         # set up properties of MO integrals batch
         moints_batch.set_ext_indexes(self.get_external_indexes(mints_type))
         moints_batch.set_batch_type(self.get_moints_type(mints_type))
-        
+
         # broadcast molecular orbitals to local master nodes
         if local_master:
             mol_orbs.broadcast(cross_rank, cross_comm)
 
             # transformation matrices
-            xmat, ymat = self.get_transformation_vectors(mints_type, mol_orbs,
-                                                         molecule)
+            xmat, ymat = self.get_transformation_vectors(
+                mints_type, mol_orbs, molecule)
 
             # set up bra and ket orbitals list
             bra_ids, ket_ids = self.set_orbital_pairs(mints_type, mol_orbs,
@@ -107,10 +86,14 @@ class MOIntegralsDriver:
             # create MO integrals batch
             batch_pos, batch_dim = self.get_batch_dimensions(bra_ids)
 
-            loc_bra_ids = [bra_ids[pos + cross_rank: pos + dim: cross_nodes]
-                           for pos, dim in zip(batch_pos, batch_dim)]
-            loc_ket_ids = [ket_ids[pos + cross_rank: pos + dim: cross_nodes]
-                           for pos, dim in zip(batch_pos, batch_dim)]
+            loc_bra_ids = [
+                bra_ids[pos + cross_rank:pos + dim:cross_nodes]
+                for pos, dim in zip(batch_pos, batch_dim)
+            ]
+            loc_ket_ids = [
+                ket_ids[pos + cross_rank:pos + dim:cross_nodes]
+                for pos, dim in zip(batch_pos, batch_dim)
+            ]
 
         else:
             loc_bra_ids = []
@@ -122,7 +105,7 @@ class MOIntegralsDriver:
         # print title
         if global_master:
             self.print_header(ostream)
-        
+
         # loop over batches
         for cur_bra_ids, cur_ket_ids in zip(loc_bra_ids, loc_ket_ids):
 
@@ -139,8 +122,8 @@ class MOIntegralsDriver:
             fock_mat = AOFockMatrix(pair_den)
 
             self.set_fock_matrices_type(mints_type, fock_mat)
-            eri_drv.compute(fock_mat, pair_den, molecule, ao_basis,
-                            qq_data, local_comm)
+            eri_drv.compute(fock_mat, pair_den, molecule, ao_basis, qq_data,
+                            local_comm)
 
             fock_mat.reduce_sum(local_rank, local_nodes, local_comm)
 
@@ -148,12 +131,16 @@ class MOIntegralsDriver:
                 # transform Fock matrices and add MO integrals to batch
                 moints_batch.append(fock_mat, xmat, ymat, cur_bra_ids,
                                     cur_ket_ids)
-        
+
         if global_master:
             self.print_finish(start_time, ostream)
 
+        local_comm.Disconnect()
+        cross_comm.Disconnect()
+
         return moints_batch
 
+    """
     def collect_moints_batches(self, moints_batch):
 
         global_master = (self.global_comm.Get_rank() == mpi_master())
@@ -170,52 +157,15 @@ class MOIntegralsDriver:
             moints_batch = MOIntsBatch()
 
         return moints_batch
-
-    def compute_mp2_energy(self, mol_orbs, nocc, moints_batch):
-
-        mints_type = moints_batch.get_batch_type()
-
-        if mints_type != moints.oovv:
-            return None
-
-        global_master = (self.global_comm.Get_rank() == mpi_master())
-        local_master = (self.local_comm.Get_rank() == mpi_master())
-
-        cross_comm = self.cross_comm
-        cross_rank = cross_comm.Get_rank()
-        cross_nodes = cross_comm.Get_size()
-
-        if local_master:
-            orb_ene = mol_orbs.ea_to_numpy()
-            eocc = orb_ene[:nocc]
-            evir = orb_ene[nocc:]
-            eab = evir.reshape(-1, 1) + evir
-
-            local_e_mp2 = 0.0
-
-            for pair in moints_batch.get_gen_pairs():
-                eij = orb_ene[pair.first()] + orb_ene[pair.second()]
-                denom = eij - eab
-
-                ij = moints_batch.to_numpy(pair)
-                ij_asym = ij - ij.T
-
-                local_e_mp2 += np.sum(ij * (ij + ij_asym) / denom)
-
-            local_e_mp2 = self.cross_comm.gather(local_e_mp2, root=mpi_master())
-
-        if global_master:
-            return sum(local_e_mp2)
-        else:
-            return None
+    """
 
     def print_header(self, ostream):
-        
+
         ostream.print_blank()
         ostream.print_header("Integrals Transformation (AO->MO) Driver Setup")
         ostream.print_header(46 * "=")
         ostream.print_blank()
-        
+
         str_width = 80
         cur_str = "Number of Fock matrices      : " + str(self.num_matrices)
         ostream.print_header(cur_str.ljust(str_width))
@@ -230,26 +180,26 @@ class MOIntegralsDriver:
         ostream.flush()
 
     def print_finish(self, start_time, ostream):
-        
+
         valstr = "*** Integrals transformation (AO->MO) done in "
         valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
         ostream.print_blank()
         ostream.print_header(valstr.ljust(92))
         ostream.print_blank()
-    
+
     def get_batch_dimensions(self, vec_ids):
-        
+
         vdim = len(vec_ids)
-        
+
         # determine number of batches
         nbatch = vdim // self.batch_size
         if (vdim % self.batch_size) != 0:
             nbatch = nbatch + 1
-        
+
         # compute dimensions of batches
         bdim = vdim // nbatch
-        brem = vdim %  nbatch
-        
+        brem = vdim % nbatch
+
         # populate dimensions list
         vec_dim = []
         for i in range(nbatch):
@@ -257,7 +207,7 @@ class MOIntegralsDriver:
                 vec_dim.append(bdim + 1)
             else:
                 vec_dim.append(bdim)
-        
+
         # populate positions list
         vec_pos = []
         cur_pos = 0
@@ -298,7 +248,7 @@ class MOIntegralsDriver:
             for j in range(ket_dim[0], ket_dim[1]):
                 bra_ids.append(i)
                 ket_ids.append(j)
-        
+
         # set number of Fock matrices
         self.num_matrices = len(bra_ids)
 
@@ -341,24 +291,20 @@ class MOIntegralsDriver:
 
         if mints_type == "OOOO":
             return moints.oooo
-        
+
         if mints_type == "OOOV":
             return moints.ooov
-        
+
         if mints_type == "OOVV":
             return moints.oovv
-        
+
         if mints_type == "OVOV":
             return moints.ovov
-        
+
         if mints_type == "OVVV":
             return moints.ovvv
-        
+
         if mints_type == "VVVV":
             return moints.vvvv
 
         return None
-
-
-
-

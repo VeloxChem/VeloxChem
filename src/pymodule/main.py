@@ -3,13 +3,12 @@ import sys
 
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
-
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
-from .mointsdriver import MOIntegralsDriver
+from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver
 from .molecularorbitals import MolecularOrbitals
 from .errorhandler import assert_msg_critical
@@ -39,16 +38,16 @@ def main():
         scf_drv = ScfRestrictedDriver(scf_dict)
         scf_drv.compute_task(task)
 
-    # Response
-
-    if task_type == 'response':
-
         # molecular orbitals
 
         if task.mpi_rank == mpi_master():
             mol_orbs = scf_drv.mol_orbs
         else:
             mol_orbs = MolecularOrbitals()
+
+    # Response
+
+    if task_type == 'response':
 
         if 'response' in task.input_dict:
 
@@ -78,27 +77,8 @@ def main():
 
     if task_type == 'mp2':
 
-        # molecular orbitals
-
-        if task.mpi_rank == mpi_master():
-            mol_orbs = scf_drv.mol_orbs
-        else:
-            mol_orbs = MolecularOrbitals()
-
-        # MO integrals
-
-        moints_drv = MOIntegralsDriver()
-        oovv = moints_drv.compute_task(task, mol_orbs, "OOVV")
-
-        # MP2 energy
-
-        nocc = task.molecule.number_of_alpha_electrons()
-        e_mp2 = moints_drv.compute_mp2_energy(mol_orbs, nocc, oovv)
-
-        if task.mpi_rank == mpi_master():
-            mp2_str = "*** MP2 correlation energy: %20.12f a.u." % e_mp2
-            task.ostream.print_header(mp2_str.ljust(92))
-            task.ostream.print_blank()
+        mp2_drv = Mp2Driver()
+        mp2_drv.compute_task(task, mol_orbs)
 
     # Cube
 
