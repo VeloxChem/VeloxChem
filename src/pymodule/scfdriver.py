@@ -211,7 +211,10 @@ class ScfDriver:
             self.den_guess = DensityGuess("RESTART", checkpoint_file)
             self.restart = self.den_guess.validate_checkpoint(
                 molecule, ao_basis, comm, self.ovl_thresh)
-        if not self.restart:
+
+        if self.restart:
+            self.acc_type = "DIIS"
+        else:
             self.den_guess = DensityGuess("SAD")
 
         # nuclear repulsion energy
@@ -236,10 +239,9 @@ class ScfDriver:
             old_max_iter = self.max_iter
             self.max_iter = 5
 
-            if not self.restart:
-                val_basis = ao_basis.get_valence_basis()
+            val_basis = ao_basis.get_valence_basis()
 
-                self.comp_diis(molecule, val_basis, min_basis, comm, ostream)
+            self.comp_diis(molecule, val_basis, min_basis, comm, ostream)
 
             # second step
             self.first_step = False
@@ -248,13 +250,9 @@ class ScfDriver:
 
             self.max_iter = old_max_iter
 
-            if not self.restart:
-                self.den_guess.guess_type = "PRCMO"
+            self.den_guess.guess_type = "PRCMO"
 
-                self.comp_diis(molecule, ao_basis, val_basis, comm, ostream)
-
-            else:
-                self.comp_diis(molecule, ao_basis, min_basis, comm, ostream)
+            self.comp_diis(molecule, ao_basis, val_basis, comm, ostream)
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
