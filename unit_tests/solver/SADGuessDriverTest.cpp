@@ -40,9 +40,7 @@ TEST_F(CSADGuessDriverTest, AtomIdxForAO)
 
 TEST_F(CSADGuessDriverTest, InitialGuess)
 {
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
-                                   mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     CSADGuessDriver saddrv(MPI_COMM_WORLD);
 

@@ -67,7 +67,7 @@ class DensityGuess:
 
         rank = comm.Get_rank()
         size = comm.Get_size()
-        ovl_drv = OverlapIntegralsDriver(rank, size, comm)
+        ovl_drv = OverlapIntegralsDriver(comm)
         ovl_mat = ovl_drv.compute(molecule, ao_basis, comm)
 
         if rank == mpi_master():
@@ -144,7 +144,7 @@ class DensityGuess:
 
         if self._guess_type == 'SAD':
 
-            ovl_drv = OverlapIntegralsDriver(loc_rank, loc_nodes, comm)
+            ovl_drv = OverlapIntegralsDriver(comm)
 
             ovl_mat_sb = ovl_drv.compute(molecule, min_basis, ao_basis, comm)
 

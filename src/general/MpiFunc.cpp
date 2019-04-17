@@ -94,6 +94,35 @@ nodes(MPI_Comm comm)
 
     return mnodes;
 }
+
+void
+duplicate(MPI_Comm  comm1,
+          MPI_Comm* comm2)
+{
+    if (ENABLE_MPI)
+    {
+        auto merror = MPI_Comm_dup(comm1, comm2);
+    
+        if (merror != MPI_SUCCESS)
+        {
+            mpi::abort(merror, "mpi::duplicate");
+        }
+    }
+}
+    
+void
+destroy(MPI_Comm* comm)
+{
+    if (ENABLE_MPI)
+    {
+        auto merror = MPI_Comm_free(comm);
+    
+        if (merror != MPI_SUCCESS)
+        {
+            mpi::abort(merror, "mpi::destroy");
+        }
+    }
+}
     
 bool
 compare(MPI_Comm comm1,

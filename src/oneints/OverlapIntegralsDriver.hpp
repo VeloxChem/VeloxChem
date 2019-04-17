@@ -28,16 +28,6 @@
 class COverlapIntegralsDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -46,11 +36,6 @@ class COverlapIntegralsDriver
      The total number of local MPI processes.
      */
     int32_t _locNodes;
-    
-    /**
-     The flag for local execution mode.
-     */
-    bool _isLocalMode;
     
     /**
      Comutes overlap integrals for pair of GTOs containers.
@@ -107,13 +92,9 @@ public:
     /**
      Creates a overlap integrals driver object using MPI info.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    COverlapIntegralsDriver(const int32_t  globRank,
-                            const int32_t  globNodes,
-                                  MPI_Comm comm);
+    COverlapIntegralsDriver(MPI_Comm comm);
     
     /**
      Destroys a overlap integrals driver object.

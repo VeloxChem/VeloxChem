@@ -22,21 +22,11 @@
 #include "OverlapRecFuncForGF.hpp"
 #include "OverlapRecFuncForGG.hpp"
 
-COverlapIntegralsDriver::COverlapIntegralsDriver(const int32_t  globRank,
-                                                 const int32_t  globNodes,
-                                                       MPI_Comm comm)
-
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
+COverlapIntegralsDriver::COverlapIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
 }
 
 COverlapIntegralsDriver::~COverlapIntegralsDriver()

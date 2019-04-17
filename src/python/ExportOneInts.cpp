@@ -36,14 +36,12 @@ namespace vlx_oneints { // vlx_oneints namespace
 // Helper function for COverlapIntegralsDriver constructor
 
 static std::shared_ptr<COverlapIntegralsDriver>
-COverlapIntegralsDriver_create(int32_t    globRank,
-                               int32_t    globNodes,
-                               py::object py_comm)
+COverlapIntegralsDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<COverlapIntegralsDriver>(
-        new COverlapIntegralsDriver(globRank, globNodes, *comm_ptr)
+        new COverlapIntegralsDriver(*comm_ptr)
         );
 }
 

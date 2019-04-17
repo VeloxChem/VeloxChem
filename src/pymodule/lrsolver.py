@@ -132,7 +132,7 @@ class LinearResponseSolver:
     def comp_1e_ints(self):
         """Computes 1e integrals"""
 
-        overlap_drv = OverlapIntegralsDriver(self.rank, self.nodes, self.comm)
+        overlap_drv = OverlapIntegralsDriver(self.comm)
         kinetic_drv = KineticEnergyIntegralsDriver(self.rank, self.nodes,
                                                    self.comm)
         potential_drv = NuclearPotentialIntegralsDriver(self.rank, self.nodes,

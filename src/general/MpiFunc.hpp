@@ -65,6 +65,22 @@ int32_t rank(MPI_Comm comm);
 int32_t nodes(MPI_Comm comm);
 
 /**
+ Duplicates an existing MPI communicator.
+
+ @param comm1 the MPI communicator.
+ @param comm2 the copy of MPI communicator.
+ */
+void duplicate(MPI_Comm  comm1, 
+               MPI_Comm* comm2);
+    
+/**
+ Destroys data in MPI communicator.
+
+ @param comm the pointer to MPI communicator.
+ */
+void destroy(MPI_Comm* comm);
+
+/**
  Compares two MPI communicators.
 
  @param comm1 the first MPI communicator.
