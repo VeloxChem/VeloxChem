@@ -52,14 +52,9 @@ class ScfRestrictedDriver(ScfDriver):
         """
         
         if self.rank == mpi_master():
-        
-            # electronic energy
+            # electronic, kinetic, nuclear energy
             e_ee = fock_mat.get_energy(0, den_mat, 0)
-        
-            # kinetic energy
             e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
-        
-            # nuclear potential energy
             e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
         else:
             e_ee = 0.0
@@ -103,7 +98,7 @@ class ScfRestrictedDriver(ScfDriver):
         fock_mat
             The Fock/Kohn-Sham matrix.
         ovl_mat
-            The overlap matrix..
+#            The overlap matrix.
         den_mat
             The density matrix.
         oao_mat
