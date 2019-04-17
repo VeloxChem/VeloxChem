@@ -29,16 +29,6 @@
 class CElectricFieldIntegralsDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -49,9 +39,9 @@ class CElectricFieldIntegralsDriver
     int32_t _locNodes;
     
     /**
-     The flag for local execution mode.
+     The local MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
     
     /**
      Comutes electric field integrals for pair of GTOs containers.
@@ -184,13 +174,9 @@ public:
     /**
      Creates a electric field integrals driver object using MPI info.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    CElectricFieldIntegralsDriver(const int32_t  globRank,
-                                  const int32_t  globNodes,
-                                        MPI_Comm comm);
+    CElectricFieldIntegralsDriver(MPI_Comm comm);
     
     /**
      Destroys a electric field integrals driver object.
@@ -206,15 +192,13 @@ public:
      @param coordinateX the Cartesian X coordinate of electric field position.
      @param coordinateY the Cartesian Y coordinate of electric field position.
      @param coordinateZ the Cartesian Z coordinate of electric field position.
-     @param comm the MPI communicator.
      @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
                                  const double           coordinateX,
                                  const double           coordinateY,
-                                 const double           coordinateZ,
-                                       MPI_Comm         comm) const;
+                                 const double           coordinateZ) const;
     
     /**
      Computes electric field integrals for molecules in specific basis set for
@@ -225,14 +209,12 @@ public:
      @param basis the molecular basis.
      @param dipoles the vector of point dipoles.
      @param coordinates the vector of point dipoles coordinates.
-     @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&           molecule,
                                  const CMolecularBasis&     basis,
                                  const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates,
-                                       MPI_Comm             comm) const;
+                                 const CMemBlock2D<double>* coordinates) const;
     
     /**
      Computes electric field integrals for molecule in two basis sets at
@@ -244,7 +226,6 @@ public:
      @param coordinateX the Cartesian X coordinate of electric field position.
      @param coordinateY the Cartesian Y coordinate of electric field position.
      @param coordinateZ the Cartesian Z coordinate of electric field position.
-     @param comm the MPI communicator.
      @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&       molecule,
@@ -252,8 +233,7 @@ public:
                                  const CMolecularBasis& ketBasis,
                                  const double           coordinateX,
                                  const double           coordinateY,
-                                 const double           coordinateZ,
-                                       MPI_Comm         comm) const;
+                                 const double           coordinateZ) const;
     
     /**
      Computes electric field integrals for molecule in two basis sets for given
@@ -264,15 +244,13 @@ public:
      @param ketBasis the molecular basis for ket side of electric field matrix.
      @param dipoles the vector of point dipoles.
      @param coordinates the vector of point dipoles coordinates.
-     @param comm the MPI communicator.
      @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&           molecule,
                                  const CMolecularBasis&     braBasis,
                                  const CMolecularBasis&     ketBasis,
                                  const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates,
-                                       MPI_Comm             comm) const;
+                                 const CMemBlock2D<double>* coordinates) const;
     
     /**
      Computes electric field integrals for two molecules in specific basis
@@ -285,7 +263,6 @@ public:
      @param coordinateX the Cartesian X coordinate of electric field position.
      @param coordinateY the Cartesian Y coordinate of electric field position.
      @param coordinateZ the Cartesian Z coordinate of electric field position.
-     @param comm the MPI communicator.
      @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&       braMolecule,
@@ -293,8 +270,7 @@ public:
                                  const CMolecularBasis& basis,
                                  const double           coordinateX,
                                  const double           coordinateY,
-                                 const double           coordinateZ,
-                                       MPI_Comm         comm) const;
+                                 const double           coordinateZ) const;
     
     /**
      Computes electric field integrals for two molecules in specific basis
@@ -306,15 +282,13 @@ public:
      @param basis the molecular basis.
      @param dipoles the vector of point dipoles.
      @param coordinates the vector of point dipoles coordinates.
-     @param comm the MPI communicator.
      @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&           braMolecule,
                                  const CMolecule&           ketMolecule,
                                  const CMolecularBasis&     basis,
                                  const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates,
-                                       MPI_Comm             comm) const;
+                                 const CMemBlock2D<double>* coordinates) const;
     
     /**
      Computes electric field integrals for two molecules in two basis sets
@@ -327,7 +301,6 @@ public:
      @param coordinateX the Cartesian X coordinate of electric field position.
      @param coordinateY the Cartesian Y coordinate of electric field position.
      @param coordinateZ the Cartesian Z coordinate of electric field position.
-     @param comm the MPI communicator.
      @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&       braMolecule,
@@ -336,8 +309,7 @@ public:
                                  const CMolecularBasis& ketBasis,
                                  const double           coordinateX,
                                  const double           coordinateY,
-                                 const double           coordinateZ,
-                                       MPI_Comm         comm) const;
+                                 const double           coordinateZ) const;
     
     /**
      Computes electric field integrals for two molecules in two basis sets
@@ -350,7 +322,6 @@ public:
      @param ketBasis the molecular basis for ket side of electric field matrix.
      @param dipoles the vector of point dipoles.
      @param coordinates the vector of point dipoles coordinates.
-     @param comm the MPI communicator.
      @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&           braMolecule,
@@ -358,8 +329,7 @@ public:
                                  const CMolecularBasis&     braBasis,
                                  const CMolecularBasis&     ketBasis,
                                  const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates,
-                                       MPI_Comm             comm) const;
+                                 const CMemBlock2D<double>* coordinates) const;
     
     /**
      Computes electric field integrals blocks for pair of GTOs blocks and

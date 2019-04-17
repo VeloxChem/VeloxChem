@@ -13,25 +13,28 @@
 #include "OneIntsFunc.hpp"
 #include "ElectricFieldRecFunc.hpp"
 
-CElectricFieldIntegralsDriver::CElectricFieldIntegralsDriver(const int32_t  globRank,
-                                                             const int32_t  globNodes,
-                                                                   MPI_Comm comm)
-
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
+CElectricFieldIntegralsDriver::CElectricFieldIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+
+    auto merror = MPI_Comm_dup(comm, &_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CElectricFieldIntegralsDriver, MPI_Comm_dup");
+    }
 }
 
 CElectricFieldIntegralsDriver::~CElectricFieldIntegralsDriver()
 {
+    auto merror = MPI_Comm_free(&_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CElectricFieldIntegralsDriver, MPI_Comm_free");
+    }
 }
 
 CElectricFieldMatrix
@@ -39,8 +42,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& basis,
                                        const double           coordinateX,
                                        const double           coordinateY,
-                                       const double           coordinateZ,
-                                             MPI_Comm         comm) const
+                                       const double           coordinateZ) const
 {
     CElectricFieldMatrix efieldmat;
     
@@ -70,8 +72,7 @@ CElectricFieldMatrix
 CElectricFieldIntegralsDriver::compute(const CMolecule&           molecule,
                                        const CMolecularBasis&     basis,
                                        const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates,
-                                             MPI_Comm             comm) const
+                                       const CMemBlock2D<double>* coordinates) const
 {
     CElectricFieldMatrix efieldmat;
     
@@ -96,8 +97,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       molecule,
                                        const CMolecularBasis& ketBasis,
                                        const double           coordinateX,
                                        const double           coordinateY,
-                                       const double           coordinateZ,
-                                             MPI_Comm         comm) const
+                                       const double           coordinateZ) const
 {
     CElectricFieldMatrix efieldmat;
     
@@ -130,8 +130,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           molecule,
                                        const CMolecularBasis&     braBasis,
                                        const CMolecularBasis&     ketBasis,
                                        const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates,
-                                             MPI_Comm             comm) const
+                                       const CMemBlock2D<double>* coordinates) const
 {
     CElectricFieldMatrix efieldmat;
     
@@ -158,8 +157,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecularBasis& basis,
                                        const double           coordinateX,
                                        const double           coordinateY,
-                                       const double           coordinateZ,
-                                             MPI_Comm         comm) const
+                                       const double           coordinateZ) const
 {
   
     CElectricFieldMatrix efieldmat;
@@ -193,8 +191,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
                                        const CMolecule&           ketMolecule,
                                        const CMolecularBasis&     basis,
                                        const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates,
-                                             MPI_Comm             comm) const
+                                       const CMemBlock2D<double>* coordinates) const
 {
     
     CElectricFieldMatrix efieldmat;
@@ -223,8 +220,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       braMolecule,
                                        const CMolecularBasis& ketBasis,
                                        const double           coordinateX,
                                        const double           coordinateY,
-                                       const double           coordinateZ,
-                                             MPI_Comm         comm) const
+                                       const double           coordinateZ) const
 {
     CElectricFieldMatrix efieldmat;
     
@@ -258,8 +254,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
                                        const CMolecularBasis&     braBasis,
                                        const CMolecularBasis&     ketBasis,
                                        const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates,
-                                             MPI_Comm             comm) const
+                                       const CMemBlock2D<double>* coordinates) const
 {
     CElectricFieldMatrix efieldmat;
     

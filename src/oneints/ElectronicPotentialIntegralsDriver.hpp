@@ -32,16 +32,6 @@
 class CElectronicPotentialIntegralsDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -52,9 +42,9 @@ class CElectronicPotentialIntegralsDriver
     int32_t _locNodes;
     
     /**
-     The flag for local execution mode.
+     The MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
     
     /**
      Comutes electronic potential integrals for pair of GTOs containers.
@@ -147,13 +137,9 @@ public:
     /**
      Creates a electronic potential integrals driver object using MPI info.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    CElectronicPotentialIntegralsDriver(const int32_t  globRank,
-                                        const int32_t  globNodes,
-                                              MPI_Comm comm);
+    CElectronicPotentialIntegralsDriver(MPI_Comm comm);
     
     /**
      Destroys a electronic potential integrals driver object.
@@ -166,12 +152,10 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param comm the MPI communicator.
      @return the electronic potential matrix object.
      */
     CElectronicPotentialMatrix compute(const CMolecule&       molecule,
-                                       const CMolecularBasis& basis,
-                                             MPI_Comm         comm) const;
+                                       const CMolecularBasis& basis) const;
     
     /**
      Computes electronic potential integrals blocks for pair of GTOs blocks and

@@ -14,32 +14,33 @@
 #include "ElectronicPotentialRecFunc.hpp"
 #include "StringFormat.hpp"
 
-CElectronicPotentialIntegralsDriver::CElectronicPotentialIntegralsDriver(const int32_t  globRank,
-                                                                         const int32_t  globNodes,
-                                                                               MPI_Comm comm)
-
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
+CElectronicPotentialIntegralsDriver::CElectronicPotentialIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+
+    auto merror = MPI_Comm_dup(comm, &_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "COverlapIntegralsDriver, MPI_Comm_dup");
+    }
 }
 
 CElectronicPotentialIntegralsDriver::~CElectronicPotentialIntegralsDriver()
 {
-    
+    auto merror = MPI_Comm_free(&_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "COverlapIntegralsDriver, MPI_Comm_free");
+    }
 }
 
 CElectronicPotentialMatrix
 CElectronicPotentialIntegralsDriver::compute(const CMolecule&       molecule,
-                                             const CMolecularBasis& basis,
-                                                   MPI_Comm         comm) const
+                                             const CMolecularBasis& basis) const
 {
     CElectronicPotentialMatrix epotmat;
     
