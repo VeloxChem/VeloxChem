@@ -28,22 +28,12 @@ COverlapIntegralsDriver::COverlapIntegralsDriver(MPI_Comm comm)
     
     _locNodes = mpi::nodes(comm);
 
-    auto merror = MPI_Comm_dup(comm, &_locComm);
-
-    if (merror != MPI_SUCCESS)
-    {
-        mpi::abort(merror, "COverlapIntegralsDriver, MPI_Comm_dup");
-    }
+    mpi::duplicate(comm, &_locComm);
 }
 
 COverlapIntegralsDriver::~COverlapIntegralsDriver()
 {
-    auto merror = MPI_Comm_free(&_locComm);
-
-    if (merror != MPI_SUCCESS)
-    {
-        mpi::abort(merror, "COverlapIntegralsDriver, MPI_Comm_free");
-    }
+    mpi::destroy(&_locComm);
 }
 
 COverlapMatrix

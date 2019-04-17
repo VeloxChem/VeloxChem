@@ -27,22 +27,12 @@ CKineticEnergyIntegralsDriver::CKineticEnergyIntegralsDriver(MPI_Comm comm)
     
     _locNodes = mpi::nodes(comm);
 
-    auto merror = MPI_Comm_dup(comm, &_locComm);
-
-    if (merror != MPI_SUCCESS)
-    {
-        mpi::abort(merror, "CKineticEnergyIntegralsDriver, MPI_Comm_dup");
-    }
+    mpi::duplicate(comm, &_locComm);
 }
 
 CKineticEnergyIntegralsDriver::~CKineticEnergyIntegralsDriver()
 {
-    auto merror = MPI_Comm_free(&_locComm);
-
-    if (merror != MPI_SUCCESS)
-    {
-        mpi::abort(merror, "CKineticEnergyIntegralsDriver, MPI_Comm_free");
-    }
+    mpi::destroy(&_locComm);
 }
 
 CKineticEnergyMatrix

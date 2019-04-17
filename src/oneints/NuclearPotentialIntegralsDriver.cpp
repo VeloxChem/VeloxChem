@@ -21,22 +21,12 @@ CNuclearPotentialIntegralsDriver::CNuclearPotentialIntegralsDriver(MPI_Comm comm
     
     _locNodes = mpi::nodes(comm);
 
-    auto merror = MPI_Comm_dup(comm, &_locComm);
-
-    if (merror != MPI_SUCCESS)
-    {
-        mpi::abort(merror, "CNuclearPotentialIntegralsDriver, MPI_Comm_dup");
-    }
+    mpi::duplicate(comm, &_locComm);
 }
 
 CNuclearPotentialIntegralsDriver::~CNuclearPotentialIntegralsDriver()
 {
-    auto merror = MPI_Comm_free(&_locComm);
-
-    if (merror != MPI_SUCCESS)
-    {
-        mpi::abort(merror, "CNuclearPotentialIntegralsDriver, MPI_Comm_free");
-    }
+    mpi::destroy(&_locComm);
 }
 
 CNuclearPotentialMatrix
