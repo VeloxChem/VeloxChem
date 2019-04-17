@@ -1,8 +1,8 @@
 from mpi4py import MPI
+import unittest
+
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
-
-import unittest
 
 
 class TestScfDriver(unittest.TestCase):

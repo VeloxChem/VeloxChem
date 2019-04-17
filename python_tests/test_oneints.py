@@ -1,8 +1,8 @@
 from mpi4py import MPI
-from veloxchem.mpitask import MpiTask
-from veloxchem.inputparser import InputParser
-from veloxchem.molecule import Molecule
-from veloxchem.molecularbasis import MolecularBasis
+import numpy as np
+import unittest
+import h5py
+
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
@@ -10,11 +10,9 @@ from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
 from veloxchem.veloxchemlib import mpi_master
-
-import h5py
-import math
-import numpy as np
-import unittest
+from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 
 
 class TestOneInts(unittest.TestCase):

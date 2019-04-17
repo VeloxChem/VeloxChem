@@ -1,13 +1,11 @@
 from mpi4py import MPI
-from veloxchem.mpitask import MpiTask
-from veloxchem.veloxchemlib import Molecule
-from veloxchem.veloxchemlib import MolecularBasis
+import numpy as np
+import unittest
+
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
 from veloxchem.veloxchemlib import mpi_master
-
-import numpy as np
-import unittest
+from veloxchem.mpitask import MpiTask
 
 
 class TestSolvers(unittest.TestCase):

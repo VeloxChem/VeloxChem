@@ -1,17 +1,13 @@
 from mpi4py import MPI
-from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
-from veloxchem.veloxchemlib import ericut
-from veloxchem.veloxchemlib import mpi_master
-from veloxchem.outputstream import OutputStream
-from veloxchem.molecularorbitals import MolecularOrbitals
-from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tdaexcidriver import TDAExciDriver
-from veloxchem.rspdriver import ResponseDriver
-from veloxchem.lrsolver import LinearResponseSolver
-from veloxchem.mpitask import MpiTask
-
 import numpy as np
 import unittest
+
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.outputstream import OutputStream
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.lrsolver import LinearResponseSolver
+from veloxchem.mpitask import MpiTask
 
 
 class TestRspDriver(unittest.TestCase):
@@ -31,12 +27,6 @@ class TestRspDriver(unittest.TestCase):
         tda_exci.set_number_states(3)
         tda_exci.set_eri(1.0e-12, 'QQ_DEN')
         tda_exci.set_solver(1.0e-4, 50)
-
-        eri_drv = ElectronRepulsionIntegralsDriver(task.mpi_rank, task.mpi_size,
-                                                   task.mpi_comm)
-
-        qq_data = eri_drv.compute(ericut.qq, 1.0e-12, task.molecule,
-                                  task.ao_basis)
 
         tda_exci.compute(mol_orbs, task.molecule, task.ao_basis, task.mpi_comm,
                          OutputStream())

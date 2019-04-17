@@ -1,11 +1,11 @@
 from mpi4py import MPI
-from veloxchem.mpitask import MpiTask
-from veloxchem.molecule import Molecule
-from veloxchem.veloxchemlib import ChemicalElement
-from veloxchem.veloxchemlib import bohr_in_angstroms
-
 import numpy as np
 import unittest
+
+from veloxchem.veloxchemlib import ChemicalElement
+from veloxchem.veloxchemlib import bohr_in_angstroms
+from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
 
 
 class TestMolData(unittest.TestCase):
@@ -130,19 +130,18 @@ class TestMolData(unittest.TestCase):
 
         # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
 
-        mol = Molecule.read_str(
-            """H    0.0   0.0   0.0
-               Li   0.0   0.0   1.0
-               C    0.0   0.0   2.0
-               N    0.0   0.0   3.0
-               O    0.0   0.0   4.0
-               S    0.0   0.0   5.0
-               Cu   0.0   0.0   6.0
-               Zn   0.0   0.0   7.0
-               Br   0.0   0.0   8.0
-               Ag   0.0   0.0   9.0
-               Au   0.0   0.0  10.0
-               Hg   0.0   0.0  11.0""")
+        mol = Molecule.read_str("""H    0.0   0.0   0.0
+                                   Li   0.0   0.0   1.0
+                                   C    0.0   0.0   2.0
+                                   N    0.0   0.0   3.0
+                                   O    0.0   0.0   4.0
+                                   S    0.0   0.0   5.0
+                                   Cu   0.0   0.0   6.0
+                                   Zn   0.0   0.0   7.0
+                                   Br   0.0   0.0   8.0
+                                   Ag   0.0   0.0   9.0
+                                   Au   0.0   0.0  10.0
+                                   Hg   0.0   0.0  11.0""")
 
         atom_radii = mol.vdw_radii_to_numpy()
 

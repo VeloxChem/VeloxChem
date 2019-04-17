@@ -1,14 +1,12 @@
 from mpi4py import MPI
-from veloxchem.veloxchemlib import CubicGrid
-from veloxchem.veloxchemlib import mpi_master
-from veloxchem.veloxchemlib import denmat
-from veloxchem.visualizationdriver import VisualizationDriver
-from veloxchem.aodensitymatrix import AODensityMatrix
-from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.mpitask import MpiTask
-
 import numpy as np
 import unittest
+
+from veloxchem.veloxchemlib import CubicGrid
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.visualizationdriver import VisualizationDriver
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.mpitask import MpiTask
 
 
 class TestVisualization(unittest.TestCase):
