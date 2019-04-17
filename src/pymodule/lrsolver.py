@@ -74,7 +74,7 @@ class LinearResponseSolver:
                 ostream=OutputStream(sys.stdout)):
         """Performs linear response calculation"""
 
-        self.comm = comm
+        self.comm = comm.Clone()
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
 
@@ -115,6 +115,8 @@ class LinearResponseSolver:
         self.start_time = tm.time()
 
         op_freq_keys, solutions = self.lr_solve(self.b_ops, self.frequencies)
+
+        self.comm.Free()
 
         if self.rank == mpi_master():
             v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}

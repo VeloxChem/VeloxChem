@@ -10,9 +10,9 @@ from .veloxchemlib import TwoIndexes
 from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
+from .mpiutils import SubCommunicators
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
-from .mpiutils import split_comm
 
 
 class MOIntegralsDriver:
@@ -27,10 +27,10 @@ class MOIntegralsDriver:
         self.num_matrices = 0
         self.batch_size = 3000
 
-    def compute_task(self, task, mol_orbs, mints_type):
+    def compute_task(self, task, mol_orbs, mints_type, grps):
 
         return self.compute(task.molecule, task.ao_basis, mol_orbs, mints_type,
-                            task.mpi_comm, task.ostream)
+                            grps, task.mpi_comm, task.ostream)
 
     def compute(self,
                 molecule,
@@ -45,7 +45,9 @@ class MOIntegralsDriver:
         start_time = tm.time()
 
         # split communicators
-        local_comm, cross_comm = split_comm(global_comm, grps)
+        subcomm = SubCommunicators(global_comm, grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
 
         global_rank = global_comm.Get_rank()
         global_master = (global_rank == mpi_master())
@@ -135,18 +137,17 @@ class MOIntegralsDriver:
         if global_master:
             self.print_finish(start_time, ostream)
 
-        local_comm.Disconnect()
-        cross_comm.Disconnect()
-
         return moints_batch
 
-    """
-    def collect_moints_batches(self, moints_batch):
+    def collect_moints_batches(self, moints_batch, grps, global_comm):
 
-        global_master = (self.global_comm.Get_rank() == mpi_master())
-        local_master = (self.local_comm.Get_rank() == mpi_master())
+        subcomm = SubCommunicators(global_comm, grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
 
-        cross_comm = self.cross_comm
+        global_master = (global_comm.Get_rank() == mpi_master())
+        local_master = (local_comm.Get_rank() == mpi_master())
+
         cross_rank = cross_comm.Get_rank()
         cross_nodes = cross_comm.Get_size()
 
@@ -157,7 +158,6 @@ class MOIntegralsDriver:
             moints_batch = MOIntsBatch()
 
         return moints_batch
-    """
 
     def print_header(self, ostream):
 

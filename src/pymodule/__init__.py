@@ -46,12 +46,12 @@ from .rspproperty import ResponseProperty
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mpitask import MpiTask
+from .mpiutils import SubCommunicators
 
 # Python functions
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
-from .mpiutils import split_comm
 from .main import main
 
 # Environment variable: basis set path

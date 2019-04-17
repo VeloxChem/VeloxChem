@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import numpy as np
 import unittest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -39,6 +40,29 @@ class TestMOIntegralsDriver(unittest.TestCase):
             e_mp2 = mp2_drv.e_mp2
             e_ref = -0.2852908836
             self.assertAlmostEqual(e_ref, e_mp2, 8)
+
+        # extra test: collect moints batches to master node
+        moints_drv = MOIntegralsDriver()
+        grps = [p for p in range(task.mpi_size)]
+        oovv = moints_drv.compute_task(task, mol_orbs, "OOVV", grps)
+        moints_drv.collect_moints_batches(oovv, grps, task.mpi_comm)
+
+        if task.mpi_rank == mpi_master():
+            orb_ene = mol_orbs.ea_to_numpy()
+            nocc = task.molecule.number_of_alpha_electrons()
+            eocc = orb_ene[:nocc]
+            evir = orb_ene[nocc:]
+            eab = evir.reshape(-1, 1) + evir
+
+            # loop over generator pairs for mp2 energy
+            master_e_mp2 = 0.0
+            for pair in oovv.get_gen_pairs():
+                ij = oovv.to_numpy(pair)
+                ij_antisym = ij - ij.T
+                denom = eocc[pair.first()] + eocc[pair.second()] - eab
+                master_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
+
+            self.assertAlmostEqual(e_mp2, master_e_mp2, 10)
 
         task.finish()
 

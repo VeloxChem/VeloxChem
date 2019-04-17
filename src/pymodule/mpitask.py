@@ -15,9 +15,9 @@ class MpiTask:
 
         # mpi settings
 
-        self.mpi_comm = mpi_comm
-        self.mpi_rank = mpi_comm.Get_rank()
-        self.mpi_size = mpi_comm.Get_size()
+        self.mpi_comm = mpi_comm.Clone()
+        self.mpi_rank = self.mpi_comm.Get_rank()
+        self.mpi_size = self.mpi_comm.Get_size()
 
         input_fname = None
         output_fname = None
@@ -116,3 +116,7 @@ class MpiTask:
 
         if (self.mpi_rank == mpi_master()):
             self.ostream.print_finish_header(self.start_time)
+
+    def __del__(self):
+
+        self.mpi_comm.Free()
