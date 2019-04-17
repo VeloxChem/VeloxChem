@@ -150,10 +150,10 @@ class DensityGuess:
 
             t0 = tm.time()
 
-            sad_drv = SADGuessDriver(loc_rank, loc_nodes, comm)
+            sad_drv = SADGuessDriver(comm)
 
             den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
-                                      overlap_matrix, comm)
+                                      overlap_matrix)
 
             if loc_rank == mpi_master():
 

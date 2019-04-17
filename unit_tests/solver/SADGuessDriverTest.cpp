@@ -19,9 +19,7 @@
 
 TEST_F(CSADGuessDriverTest, AtomIdxForAO)
 {
-    CSADGuessDriver saddrv(mpi::rank(MPI_COMM_WORLD),
-                           mpi::nodes(MPI_COMM_WORLD),
-                           MPI_COMM_WORLD);
+    CSADGuessDriver saddrv(MPI_COMM_WORLD);
 
     auto h2o = vlxmol::getMoleculeH2O();
     
@@ -46,9 +44,7 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
                                    mpi::nodes(MPI_COMM_WORLD),
                                    MPI_COMM_WORLD);
     
-    CSADGuessDriver saddrv(mpi::rank(MPI_COMM_WORLD),
-                           mpi::nodes(MPI_COMM_WORLD),
-                           MPI_COMM_WORLD);
+    CSADGuessDriver saddrv(MPI_COMM_WORLD);
 
     auto h2o = vlxmol::getMoleculeH2O();
     
@@ -60,7 +56,7 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     auto S22 = ovldrv.compute(h2o, ao_basis, MPI_COMM_WORLD);
 
-    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, MPI_COMM_WORLD);
+    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22);
 
     ASSERT_EQ(1, dsad.getNumberOfDensityMatrices());
 
