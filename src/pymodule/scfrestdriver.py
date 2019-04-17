@@ -97,7 +97,7 @@ class ScfRestrictedDriver(ScfDriver):
         fock_mat
             The Fock/Kohn-Sham matrix.
         ovl_mat
-#            The overlap matrix.
+            The overlap matrix.
         den_mat
             The density matrix.
         oao_mat
