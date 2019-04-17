@@ -66,7 +66,6 @@ class DensityGuess:
         """
 
         rank = comm.Get_rank()
-        size = comm.Get_size()
         ovl_drv = OverlapIntegralsDriver(comm)
         ovl_mat = ovl_drv.compute(molecule, ao_basis)
 
@@ -115,8 +114,8 @@ class DensityGuess:
 
         return den_mat
 
-    def sad_density(self, molecule, ao_basis, min_basis, overlap_matrix,
-                    comm, ostream):
+    def sad_density(self, molecule, ao_basis, min_basis, overlap_matrix, comm,
+                    ostream):
         """Generates initial AO density using SAD scheme.
 
         Computes initial AO density using superposition of atomic densities
