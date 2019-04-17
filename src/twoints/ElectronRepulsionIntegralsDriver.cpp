@@ -24,26 +24,18 @@
 #include "BraHrrFunc.hpp"
 #include "StringFormat.hpp"
 
-CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(const int32_t  globRank,
-                                                                     const int32_t  globNodes,
-                                                                           MPI_Comm comm)
-
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
+CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+
+    mpi::duplicate(comm, &_locComm);
 }
 
 CElectronRepulsionIntegralsDriver::~CElectronRepulsionIntegralsDriver()
 {
-    
+    mpi::destroy(&_locComm);
 }
 
 void
@@ -51,8 +43,7 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
                                            const CAODensityMatrix&    aoDensityMatrix,
                                            const CMolecule&           molecule,
                                            const CMolecularBasis&     aoBasis,
-                                           const CScreeningContainer& screeningContainer,
-                                                 MPI_Comm             comm) const
+                                           const CScreeningContainer& screeningContainer) const
 {
     // generate GTOs pairs blocks for AO basis on bra side
     

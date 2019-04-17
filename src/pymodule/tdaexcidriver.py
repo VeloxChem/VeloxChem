@@ -144,7 +144,7 @@ class TDAExciDriver:
 
         start_time = tm.time()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes, comm)
+        eri_drv = ElectronRepulsionIntegralsDriver(comm)
 
         qq_data = eri_drv.compute(
             get_qq_scheme(self.qq_type), self.eri_thresh, molecule, ao_basis)

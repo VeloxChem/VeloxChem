@@ -702,9 +702,7 @@ TEST_F(CMOIntsBatchTest, AppendForOOVV)
     const CAODensityMatrix dmat({CDenseMatrix(denvals00, nrows, ncols),
                                  CDenseMatrix(denvals01, nrows, ncols)}, denmat::rmoij);
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -714,7 +712,7 @@ TEST_F(CMOIntsBatchTest, AppendForOOVV)
     
     ASSERT_TRUE(fockmat::rgenk == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -1533,9 +1531,7 @@ TEST_F(CMOIntsBatchTest, AppendForOOOV)
     const CAODensityMatrix dmat({CDenseMatrix(denvals00, nrows, ncols),
                                  CDenseMatrix(denvals01, nrows, ncols)}, denmat::rmoij);
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -1545,7 +1541,7 @@ TEST_F(CMOIntsBatchTest, AppendForOOOV)
     
     ASSERT_TRUE(fockmat::rgenk == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -2229,9 +2225,7 @@ TEST_F(CMOIntsBatchTest, AppendForOVVV)
     const CAODensityMatrix dmat({CDenseMatrix(denvals00, nrows, ncols),
                                  CDenseMatrix(denvals01, nrows, ncols)}, denmat::rmoij);
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -2241,7 +2235,7 @@ TEST_F(CMOIntsBatchTest, AppendForOVVV)
     
     ASSERT_TRUE(fockmat::rgenk == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -3060,9 +3054,7 @@ TEST_F(CMOIntsBatchTest, AppendForOOOO)
     const CAODensityMatrix dmat({CDenseMatrix(denvals00, nrows, ncols),
                                  CDenseMatrix(denvals01, nrows, ncols)}, denmat::rmoij);
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -3072,7 +3064,7 @@ TEST_F(CMOIntsBatchTest, AppendForOOOO)
     
     ASSERT_TRUE(fockmat::rgenk == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -3555,9 +3547,7 @@ TEST_F(CMOIntsBatchTest, AppendForVVVV)
     const CAODensityMatrix dmat({CDenseMatrix(denvals00, nrows, ncols),
                                  CDenseMatrix(denvals01, nrows, ncols)}, denmat::rmoij);
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -3567,7 +3557,7 @@ TEST_F(CMOIntsBatchTest, AppendForVVVV)
     
     ASSERT_TRUE(fockmat::rgenk == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -3999,9 +3989,7 @@ TEST_F(CMOIntsBatchTest, AppendForOVOV)
 
     auto dmat = vlxden::getGenOODensityMatrixForH2O();
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -4015,7 +4003,7 @@ TEST_F(CMOIntsBatchTest, AppendForOVOV)
     
     ASSERT_TRUE(fockmat::rgenj == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     

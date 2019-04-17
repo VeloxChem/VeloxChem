@@ -340,7 +340,7 @@ class ScfDriver:
                                    " {:.1e}.".format(self.eri_thresh))
                 ostream.print_blank()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes, comm)
+        eri_drv = ElectronRepulsionIntegralsDriver(comm)
 
         qq_data = eri_drv.compute(
             get_qq_scheme(self.qq_type), self.eri_thresh, molecule, ao_basis)
@@ -601,12 +601,10 @@ class ScfDriver:
 
         if dden_fock:
             dden_mat = den_mat.sub(self.density)
-            eri_drv.compute(fock_mat, dden_mat, molecule, ao_basis, qq_data,
-                            comm)
+            eri_drv.compute(fock_mat, dden_mat, molecule, ao_basis, qq_data)
             fock_mat.add(ref_fock_mat)
         else:
-            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data,
-                            comm)
+            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data)
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
         """Computes full Fock/Kohn-Sham matrix.

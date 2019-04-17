@@ -19,8 +19,7 @@
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSSForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -59,8 +58,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSSForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -105,8 +103,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPSSForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -151,8 +148,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPSSForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPSPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -201,8 +197,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPSPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSPPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -253,8 +248,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSPPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPSSForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -305,8 +299,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPSSForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPSPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -383,8 +376,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPSPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPPPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -461,8 +453,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPPPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPPPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -605,8 +596,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPPPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -655,8 +645,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSSDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDSSForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -705,8 +694,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDSSForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSPDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -767,8 +755,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSPDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDSSForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -829,8 +816,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDSSForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPSDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -893,8 +879,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPSDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDSPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -957,8 +942,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDSPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDSDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1031,8 +1015,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDSDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSDDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1107,8 +1090,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSSDDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDSSForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1183,8 +1165,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDSSForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPPDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1287,8 +1268,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPPDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDSPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1391,8 +1371,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDSPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPSDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1493,8 +1472,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPSDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDPPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1595,8 +1573,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDPPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDPDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1739,8 +1716,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDPDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDSDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1883,8 +1859,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDSDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPDDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2025,8 +2000,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSPDDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDSPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2167,8 +2141,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDSPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPPDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2389,8 +2362,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPPDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDPPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2611,8 +2583,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDPPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDDDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2821,8 +2792,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeSDDDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDSDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3031,8 +3001,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDSDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPDDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3371,8 +3340,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePPDDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDPPForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3711,8 +3679,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDPPForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDDDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -4253,8 +4220,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputePDDDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDPDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -4795,8 +4761,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDPDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDDDForLiH)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -5667,8 +5632,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeDDDDForLiH)
 
 TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeMaxQValues)
 {
-    CElectronRepulsionIntegralsDriver eridrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -5721,15 +5685,13 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJKForHeAtom)
 
     const CAODensityMatrix dmat({CDenseMatrix(denvals, nrows, ncols)}, denmat::rest);
 
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
 
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas);
 
     CAOFockMatrix fock(dmat);
 
-    eridrv.compute(fock, dmat, mhe, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mhe, mbas, qqdata);
 
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
 
@@ -5772,15 +5734,13 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJKForHeAnionWithSPD)
     
     const CAODensityMatrix dmat({CDenseMatrix(denvals, nrows, ncols)}, denmat::rest);
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas);
     
     CAOFockMatrix fock(dmat);
     
-    eridrv.compute(fock, dmat, mhe, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mhe, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -5831,15 +5791,13 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJKForH2O)
 
     auto dmat = vlxden::getRestDensityMatrixForH2O();
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
     CAOFockMatrix fock(dmat);
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -6567,15 +6525,13 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJKForH2Se)
 
     const CAODensityMatrix dmat({CDenseMatrix(denvals, nrows, ncols)}, denmat::rest);
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-12, mh2o, mbas);
     
     CAOFockMatrix fock(dmat);
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -7217,9 +7173,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJForH2O)
 
     auto dmat = vlxden::getRestDensityMatrixForH2O();
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -7227,7 +7181,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJForH2O)
     
     fock.setFockType(fockmat::restj, 0);
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -7366,9 +7320,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestKForH2O)
 
     auto dmat = vlxden::getRestDensityMatrixForH2O();
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -7376,7 +7328,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestKForH2O)
     
     fock.setFockType(fockmat::restk, 0);
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -7515,9 +7467,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestGenJForH2O)
 
     auto dmat = vlxden::getGenOODensityMatrixForH2O();
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -7535,7 +7485,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestGenJForH2O)
     
     ASSERT_TRUE(fockmat::rgenj == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -7800,9 +7750,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestGenKForH2O)
 
     auto dmat = vlxden::getGenOODensityMatrixForH2O();
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -7816,7 +7764,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestGenKForH2O)
     
     ASSERT_TRUE(fockmat::rgenk == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     
@@ -8081,9 +8029,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestGenJKForH2O)
     
     auto dmat = vlxden::getGenOODensityMatrixForH2O();
     
-    CElectronRepulsionIntegralsDriver eridrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CElectronRepulsionIntegralsDriver eridrv(MPI_COMM_WORLD);
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mh2o, mbas);
     
@@ -8097,7 +8043,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestGenJKForH2O)
     
     ASSERT_TRUE(fockmat::rgenjk == fock.getFockType(1));
     
-    eridrv.compute(fock, dmat, mh2o, mbas, qqdata, MPI_COMM_WORLD);
+    eridrv.compute(fock, dmat, mh2o, mbas, qqdata);
     
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
     

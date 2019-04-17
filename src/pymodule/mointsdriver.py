@@ -60,8 +60,7 @@ class MOIntegralsDriver:
         cross_nodes = cross_comm.Get_size()
 
         # set up screening data
-        eri_drv = ElectronRepulsionIntegralsDriver(local_rank, local_nodes,
-                                                   local_comm)
+        eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
 
         qq_data = eri_drv.compute(
             get_qq_scheme(self.qq_type), self.eri_thresh, molecule, ao_basis)
@@ -124,8 +123,7 @@ class MOIntegralsDriver:
             fock_mat = AOFockMatrix(pair_den)
 
             self.set_fock_matrices_type(mints_type, fock_mat)
-            eri_drv.compute(fock_mat, pair_den, molecule, ao_basis, qq_data,
-                            local_comm)
+            eri_drv.compute(fock_mat, pair_den, molecule, ao_basis, qq_data)
 
             fock_mat.reduce_sum(local_rank, local_nodes, local_comm)
 

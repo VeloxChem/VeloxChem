@@ -142,9 +142,9 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(      std::vector<CDenseMa
     
     CAOFockMatrix faomat(dmat);
     
-    CElectronRepulsionIntegralsDriver eri_drv(_locRank, _locNodes, comm);
+    CElectronRepulsionIntegralsDriver eri_drv(comm);
     
-    eri_drv.compute(faomat, dmat, molecule, basis, screeningContainer, comm);
+    eri_drv.compute(faomat, dmat, molecule, basis, screeningContainer);
     
     faomat.reduce_sum(_locRank, _locNodes, comm);
     

@@ -73,44 +73,13 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 // Helper function for CElectronRepulsionIntegralsDriver constructor
 
 static std::shared_ptr<CElectronRepulsionIntegralsDriver>
-CElectronRepulsionIntegralsDriver_create(int32_t    globRank,
-                                         int32_t    globNodes,
-                                         py::object py_comm)
+CElectronRepulsionIntegralsDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CElectronRepulsionIntegralsDriver>(
-        new CElectronRepulsionIntegralsDriver(globRank, globNodes, *comm_ptr)
+        new CElectronRepulsionIntegralsDriver(*comm_ptr)
         );
-}
-
-// Helper functions for overloading CElectronRepulsionIntegralsDriver::compute
-
-static void
-CElectronRepulsionIntegralsDriver_compute_1(
-          CElectronRepulsionIntegralsDriver& self,
-          CAOFockMatrix&                     aoFockMatrix,
-    const CAODensityMatrix&                  aoDensityMatrix,
-    const CMolecule&                         molecule,
-    const CMolecularBasis&                   aoBasis,
-    const CScreeningContainer&               screeningContainer,
-          py::object                         py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis,
-                 screeningContainer, *comm_ptr);
-}
-
-static CScreeningContainer
-CElectronRepulsionIntegralsDriver_compute_2(
-          CElectronRepulsionIntegralsDriver& self,
-    const ericut                             screeningScheme,
-    const double                             threshold,
-    const CMolecule&                         molecule,
-    const CMolecularBasis&                   aoBasis)
-{
-    return self.compute(screeningScheme, threshold, molecule, aoBasis);
 }
 
 // Helper function for reduce_sum CAOFockMatrix object
@@ -345,8 +314,21 @@ void export_twoints(py::module& m)
             m, "ElectronRepulsionIntegralsDriver"
         )
         .def(py::init(&CElectronRepulsionIntegralsDriver_create))
-        .def("compute", &CElectronRepulsionIntegralsDriver_compute_1)
-        .def("compute", &CElectronRepulsionIntegralsDriver_compute_2)
+        .def("compute",
+             (void (CElectronRepulsionIntegralsDriver::*)
+              (      CAOFockMatrix&,
+               const CAODensityMatrix&,
+               const CMolecule&,
+               const CMolecularBasis&,
+               const CScreeningContainer&) const)
+             &CElectronRepulsionIntegralsDriver::compute)
+        .def("compute",
+             (CScreeningContainer (CElectronRepulsionIntegralsDriver::*)
+              (const ericut,
+               const double,
+               const CMolecule&,
+               const CMolecularBasis&) const)
+             &CElectronRepulsionIntegralsDriver::compute)
     ;
 
     // CMOIntsBatch class

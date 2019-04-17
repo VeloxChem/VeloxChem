@@ -40,16 +40,6 @@
 class CElectronRepulsionIntegralsDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -60,9 +50,9 @@ class CElectronRepulsionIntegralsDriver
     int32_t _locNodes;
     
     /**
-     The flag for local execution mode.
+     The MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
     
     /**
      Computes electronic repulsion integrals for combination of GTOs pairs
@@ -277,13 +267,9 @@ public:
     /**
      Creates an electron repulsion integrals driver object using MPI info.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    CElectronRepulsionIntegralsDriver(const int32_t  globRank,
-                                      const int32_t  globNodes,
-                                            MPI_Comm comm);
+    CElectronRepulsionIntegralsDriver(MPI_Comm comm);
     
     /**
      Destroys an electron repulsion integrals driver object.
@@ -299,14 +285,12 @@ public:
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
      @param screeningContainer the screening container object.
-     @param comm the MPI communicator.
      */
     void compute(      CAOFockMatrix&       aoFockMatrix,
                  const CAODensityMatrix&    aoDensityMatrix,
                  const CMolecule&           molecule,
                  const CMolecularBasis&     aoBasis,
-                 const CScreeningContainer& screeningContainer,
-                       MPI_Comm             comm) const;
+                 const CScreeningContainer& screeningContainer) const;
     
     /**
      Computes Q values for electron repulsion integrals for molecule with

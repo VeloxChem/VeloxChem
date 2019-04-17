@@ -149,7 +149,7 @@ class TestTwoInts(unittest.TestCase):
 
         # compute Fock
 
-        eridrv = ElectronRepulsionIntegralsDriver(rank, size, comm)
+        eridrv = ElectronRepulsionIntegralsDriver(comm)
 
         qqdata = eridrv.compute(ericut.qqden, 1.0e-12, molecule, ao_basis)
 
@@ -169,7 +169,7 @@ class TestTwoInts(unittest.TestCase):
 
         fock = AOFockMatrix(dmat)
 
-        eridrv.compute(fock, dmat, molecule, ao_basis, qqdata, comm)
+        eridrv.compute(fock, dmat, molecule, ao_basis, qqdata)
 
         fock.reduce_sum(rank, size, comm)
 

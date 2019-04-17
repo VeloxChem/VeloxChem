@@ -101,8 +101,7 @@ class LinearResponseSolver:
         # TODO: make use of 1e integrals from scf
         self.comp_1e_ints()
 
-        self.eri_drv = ElectronRepulsionIntegralsDriver(self.rank, self.nodes,
-                                                        self.comm)
+        self.eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         self.screening = self.eri_drv.compute(
             get_qq_scheme(self.qq_type), self.eri_thresh, self.molecule,
             self.basis)
@@ -503,7 +502,7 @@ class LinearResponseSolver:
             fock.set_fock_type(fockmat.rgenjk, i)
 
         self.eri_drv.compute(fock, dens, self.molecule, self.basis,
-                             self.screening, self.comm)
+                             self.screening)
         fock.reduce_sum(self.rank, self.nodes, self.comm)
 
         fabs = []
