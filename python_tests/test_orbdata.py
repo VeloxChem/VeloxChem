@@ -1,16 +1,14 @@
 from mpi4py import MPI
-from veloxchem.mpitask import MpiTask
-from veloxchem.molecule import Molecule
+import numpy as np
+import unittest
+
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
 from veloxchem.veloxchemlib import mpi_master
-
+from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.molecularorbitals import MolecularOrbitals
-from veloxchem.inputparser import InputParser
-
-import numpy as np
-import unittest
 
 
 class TestOrbData(unittest.TestCase):

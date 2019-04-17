@@ -1,3 +1,9 @@
+import numpy as np
+import time as tm
+import itertools
+import math
+import sys
+
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
@@ -10,16 +16,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
-
 from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
-
-import numpy as np
-import time as tm
-import itertools
-import math
-import sys
 
 
 class LinearResponseSolver:
@@ -75,7 +74,7 @@ class LinearResponseSolver:
                 ostream=OutputStream(sys.stdout)):
         """Performs linear response calculation"""
 
-        self.comm = comm
+        self.comm = comm.Clone()
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
 
@@ -116,6 +115,8 @@ class LinearResponseSolver:
         self.start_time = tm.time()
 
         op_freq_keys, solutions = self.lr_solve(self.b_ops, self.frequencies)
+
+        self.comm.Free()
 
         if self.rank == mpi_master():
             v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}

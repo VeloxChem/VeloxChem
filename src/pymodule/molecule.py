@@ -1,8 +1,4 @@
 from .veloxchemlib import Molecule
-from .veloxchemlib import bohr_in_angstroms
-from .errorhandler import assert_msg_critical
-
-import numpy as np
 
 
 @staticmethod

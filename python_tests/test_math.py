@@ -1,8 +1,7 @@
-from mpi4py import MPI
-from veloxchem.veloxchemlib import DenseMatrix
-
 import numpy as np
 import unittest
+
+from veloxchem.veloxchemlib import DenseMatrix
 
 
 class TestMath(unittest.TestCase):

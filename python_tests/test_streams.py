@@ -1,9 +1,7 @@
-from mpi4py import MPI
-from veloxchem.outputstream import OutputStream
-
-import numpy as np
 import unittest
 import sys
+
+from veloxchem.outputstream import OutputStream
 
 
 class TestStreams(unittest.TestCase):

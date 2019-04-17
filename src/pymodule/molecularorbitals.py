@@ -1,32 +1,34 @@
-from .veloxchemlib import MolecularOrbitals
-from .veloxchemlib import molorb
-from .veloxchemlib import to_angular_momentum
-
-from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
-
-import h5py
 import numpy as np
+import h5py
 import math
 import sys
 
+from .veloxchemlib import MolecularOrbitals
+from .veloxchemlib import molorb
+from .veloxchemlib import to_angular_momentum
+from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
-def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
+
+def _print_orbitals(self,
+                    molecule,
+                    ao_basis,
+                    all_orbs=False,
                     ostream=OutputStream(sys.stdout)):
 
     norb = self.number_mos()
-    
+
     ao_map = ao_basis.get_ao_basis_map(molecule)
-    
+
     if self.get_orbitals_type() == molorb.rest:
-    
+
         ostream.print_blank()
-        
+
         ostream.print_header("Spin Restricted Orbitals")
         ostream.print_header("------------------------")
 
         nocc = molecule.number_of_electrons() // 2
-        
+
         if all_orbs:
             nstart, nend = 0, norb
         else:
@@ -35,7 +37,7 @@ def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
         rvecs = self.alpha_to_numpy()
         reigs = self.ea_to_numpy()
         rnocc = [2.0 if x < nocc else 0.0 for x in range(norb)]
-        
+
         for i in range(nstart, nend):
             _print_coefficients(reigs[i], rnocc[i], i, rvecs[:, i], ao_map,
                                 0.15, ostream)
@@ -43,12 +45,12 @@ def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
         ostream.print_blank()
 
     elif self.get_orbitals_type() == molorb.unrest:
-        
+
         ostream.print_blank()
 
         ostream.print_header("Spin Unrestricted Alpha Orbitals")
         ostream.print_header("--------------------------------")
-        
+
         # FIX ME
 
         ostream.print_blank()
@@ -59,7 +61,7 @@ def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
         # FIX ME
 
     else:
-    
+
         errmsg = "MolecularOrbitals.get_density:"
         errmsg += " Invalid molecular orbitals type"
         assert_msg_critical(False, errmsg)
@@ -67,19 +69,19 @@ def _print_orbitals(self, molecule, ao_basis, all_orbs=False,
 
 def _print_coefficients(eigval, focc, iorb, coeffs, ao_map, thresh, ostream):
     ostream.print_blank()
-    
+
     valstr = "Molecular Orbital No.{:4d}:".format(iorb + 1)
     ostream.print_header(valstr.ljust(92))
     valstr = 26 * "-"
     ostream.print_header(valstr.ljust(92))
-    
+
     valstr = "Occupation: {:.1f} Energy: {:10.5f} au".format(focc, eigval)
     ostream.print_header(valstr.ljust(92))
-    
+
     tuplist = []
 
     for i in range(coeffs.shape[0]):
-        
+
         if math.fabs(coeffs[i]) > thresh:
             atomidx = int(ao_map[i].split()[0])
             anglmom = to_angular_momentum(ao_map[i][-3].upper())

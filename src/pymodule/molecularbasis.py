@@ -1,18 +1,19 @@
+import os
+
 from .veloxchemlib import MolecularBasis
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import ChemicalElement
 from .veloxchemlib import to_angular_momentum
-
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
-import os
-
 
 @staticmethod
-def _MolecularBasis_read(mol, basis_name, basis_path='.',
+def _MolecularBasis_read(mol,
+                         basis_name,
+                         basis_path='.',
                          ostream=OutputStream()):
 
     err_gc = "MolcularBasis.read_file: "

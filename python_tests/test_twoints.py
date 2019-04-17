@@ -1,24 +1,19 @@
 from mpi4py import MPI
-from veloxchem.mpitask import MpiTask
-from veloxchem.veloxchemlib import MolecularBasis
+import numpy as np
+import unittest
+import math
+
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
-from veloxchem.veloxchemlib import OverlapIntegralsDriver
-from veloxchem.veloxchemlib import SADGuessDriver
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
-from veloxchem.veloxchemlib import ScreeningContainer
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import fockmat
 from veloxchem.veloxchemlib import ericut
 from veloxchem.veloxchemlib import mpi_master
-
+from veloxchem.mpitask import MpiTask
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
 from veloxchem.qqscheme import get_qq_scheme
-
-import numpy as np
-import math
-import unittest
 
 
 class TestTwoInts(unittest.TestCase):
@@ -36,12 +31,10 @@ class TestTwoInts(unittest.TestCase):
         arr_kx = x * arr_k
         arr_jkx = arr_j + arr_kx
 
-        fock = AOFockMatrix(
-            [arr_jk, arr_jkx, arr_j, arr_k, arr_kx],
-            [fockmat.restjk, fockmat.restjkx, fockmat.restj, fockmat.restk,
-             fockmat.restkx],
-            [1.0, x, 1.0, 1.0, x],
-            [0, 0, 0, 0, 0])
+        fock = AOFockMatrix([arr_jk, arr_jkx, arr_j, arr_k, arr_kx], [
+            fockmat.restjk, fockmat.restjkx, fockmat.restj, fockmat.restk,
+            fockmat.restkx
+        ], [1.0, x, 1.0, 1.0, x], [0, 0, 0, 0, 0])
 
         np_jkx = fock.to_numpy(1)
         np_j = fock.to_numpy(2)
@@ -130,7 +123,6 @@ class TestTwoInts(unittest.TestCase):
 
         molecule = task.molecule
         ao_basis = task.ao_basis
-        min_basis = task.min_basis
 
         molecule.check_proximity(0.1)
 

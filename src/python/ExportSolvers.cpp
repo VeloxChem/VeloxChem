@@ -27,32 +27,13 @@ namespace vlx_solvers { // vlx_solvers namespace
 // Helper function for CSADGuessDriver constructor
 
 static std::shared_ptr<CSADGuessDriver>
-CSADGuessDriver_create(int32_t    globRank,
-                       int32_t    globNodes,
-                       py::object py_comm)
+CSADGuessDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CSADGuessDriver>(
-        new CSADGuessDriver(globRank, globNodes, *comm_ptr)
+        new CSADGuessDriver(*comm_ptr)
         );
-}
-
-// Helper functions for overloading CSADGuessDriver::compute
-
-static CAODensityMatrix
-CSADGuessDriver_compute(
-          CSADGuessDriver& self,
-    const CMolecule&       molecule,
-    const CMolecularBasis& basis_1,
-    const CMolecularBasis& basis_2,
-    const COverlapMatrix&  S12,
-    const COverlapMatrix&  S22,
-          py::object       py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, basis_1, basis_2, S12, S22, *comm_ptr);
 }
 
 // Exports classes/functions in src/solvers to python
@@ -66,7 +47,7 @@ void export_solvers(py::module& m)
             m, "SADGuessDriver"
         )
         .def(py::init(&CSADGuessDriver_create))
-        .def("compute", &CSADGuessDriver_compute)
+        .def("compute", &CSADGuessDriver::compute)
     ;
 }
 

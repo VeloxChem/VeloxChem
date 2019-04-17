@@ -1,19 +1,18 @@
-from .veloxchemlib import mpi_master
+import sys
 
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .tdaexcidriver import TDAExciDriver
 from .lrsolver import LinearResponseSolver
 from .qqscheme import get_qq_type
 
-import sys
-
 
 class ResponseDriver:
     """Implements response driver.
-        
+
     Implements response driver for molecular property calculations using
     conventional Hatree-Fock/Kohn-Sham response theory.
-    
+
     rank
         The rank of MPI process.
     nodes
@@ -22,10 +21,10 @@ class ResponseDriver:
 
     def __init__(self, rsp_input):
         """Initializes Response driver.
-            
+
         Initializes Response driver to default setup.
         """
-        
+
         # calculation type
         self.prop_type = 'SINGEX_TDA'
         self.nstates = int(rsp_input['nstates']) \
@@ -52,16 +51,16 @@ class ResponseDriver:
 
             elif rsp_input['property'].lower() == 'absorption':
                 self.prop_type = 'SINGEX_TDA'
-        
+
         # mpi information
         self.rank = 0
         self.nodes = 1
-    
+
     def compute_task(self, mol_orbs, task):
         """Performs molecular property calculation using response theory.
-            
+
         Performs molecular property calculation using data from MPI task.
-            
+
         Parameters
         ----------
         mol_orbs
@@ -72,14 +71,18 @@ class ResponseDriver:
 
         self.compute(mol_orbs, task.molecule, task.ao_basis, task.mpi_comm,
                      task.ostream)
-    
-    def compute(self, mol_orbs, molecule, ao_basis, comm,
+
+    def compute(self,
+                mol_orbs,
+                molecule,
+                ao_basis,
+                comm,
                 ostream=OutputStream(sys.stdout)):
         """Performs molecular property calculation.
-            
+
         Performs molecular property calculation using molecular data, MPI
         communicator and output stream.
-        
+
         Parameters
         ----------
         mol_orbs
@@ -95,24 +98,23 @@ class ResponseDriver:
         ostream
             The output stream.
         """
-        
+
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
-        
+
         if self.rank == mpi_master():
             self.print_header(ostream)
 
         # TDA singlet/triplet excited states
-        
+
         if self.prop_type.upper() in ["SINGEX_TDA", "TRIPEX_TDA"]:
             tda_exci = TDAExciDriver(self.rank, self.nodes)
-            
+
             tda_exci.set_number_states(self.nstates)
             tda_exci.set_eri(self.eri_thresh, self.qq_type)
             tda_exci.set_solver(self.conv_thresh, self.max_iter)
-            
-            return tda_exci.compute(mol_orbs, molecule, ao_basis, comm,
-                                    ostream)
+
+            return tda_exci.compute(mol_orbs, molecule, ao_basis, comm, ostream)
 
         # Linear response solver
 
@@ -128,33 +130,33 @@ class ResponseDriver:
 
     def print_header(self, ostream):
         """Prints response driver setup header to output stream.
-            
+
         Prints molecular property calculation setup details to output stream.
-        
+
         Parameters
         ----------
         ostream
             The output stream.
         """
-    
+
         ostream.print_blank()
         ostream.print_header("Response Driver Setup")
         ostream.print_header(23 * "=")
         ostream.print_blank()
-        
+
         str_width = 60
-       
+
         cur_str = "Molecular Property Type   : " + self.prop_str()
         ostream.print_header(cur_str.ljust(str_width))
-        
+
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
             cur_str = "Number Of Excited States  : " + str(self.nstates)
             ostream.print_header(cur_str.ljust(str_width))
-        
+
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
             cur_str = "Response Equations Type   : Tamm-Dancoff"
             ostream.print_header(cur_str.ljust(str_width))
-        
+
         cur_str = "Max. Number Of Iterations : " + str(self.max_iter)
         ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold     : " + \
@@ -172,15 +174,15 @@ class ResponseDriver:
 
     def prop_str(self):
         """Gets string with type of molecular property calculation.
-            
-        Gets string with type of molecular property calculation (Excited states,
-        linear and non-linear spectroscopies).
-            
+
+        Gets string with type of molecular property calculation (Excited
+        states, linear and non-linear spectroscopies).
+
         Returns
         -------
         The string with type of molecular property calculation.
         """
-        
+
         if self.prop_type == "SINGEX_TDA":
             return "Singlet Excited States"
 

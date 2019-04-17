@@ -1,5 +1,6 @@
 from mpi4py import MPI
-from veloxchem.mpitask import MpiTask
+import unittest
+
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
@@ -7,9 +8,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import assemble_overlap_matrices
 from veloxchem.veloxchemlib import assemble_kinetic_energy_matrices
 from veloxchem.veloxchemlib import assemble_nuclear_potential_matrices
-
-import numpy as np
-import unittest
+from veloxchem.mpitask import MpiTask
 
 
 class TestExciton(unittest.TestCase):
@@ -41,8 +40,8 @@ class TestExciton(unittest.TestCase):
 
         if (rank == mpi_master()):
 
-            S_exmod = assemble_overlap_matrices(
-                mol_1, mol_2, basis, basis, S11, S22, S12, S21)
+            S_exmod = assemble_overlap_matrices(mol_1, mol_2, basis, basis, S11,
+                                                S22, S12, S21)
 
             self.assertEqual(S, S_exmod)
 

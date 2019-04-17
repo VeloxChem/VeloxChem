@@ -1,3 +1,5 @@
+import os
+
 # C++ classes
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
@@ -34,6 +36,7 @@ from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .mointsdriver import MOIntegralsDriver
+from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver
 from .rspdriver import ResponseDriver
 from .tdaexcidriver import TDAExciDriver
@@ -43,6 +46,7 @@ from .rspproperty import ResponseProperty
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mpitask import MpiTask
+from .subcommunicators import SubCommunicators
 
 # Python functions
 from .errorhandler import assert_msg_critical
@@ -51,9 +55,6 @@ from .qqscheme import get_qq_scheme
 from .main import main
 
 # Environment variable: basis set path
-
-import os
-
 if 'VLXBASISPATH' not in os.environ:
     module_path = os.path.dirname(os.path.abspath(__file__))
     os.environ['VLXBASISPATH'] = module_path + '/../../../basis'

@@ -4,7 +4,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .mointsdriver import MOIntegralsDriver
 from .outputstream import OutputStream
-from .mpiutils import split_comm
+from .subcommunicators import SubCommunicators
 
 
 class Mp2Driver:
@@ -33,7 +33,10 @@ class Mp2Driver:
                                   comm, ostream)
 
         # MP2 energy
-        local_comm, cross_comm = split_comm(comm, grps)
+        subcomm = SubCommunicators(comm, grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+
         local_master = (local_comm.Get_rank() == mpi_master())
         global_master = (comm.Get_rank() == mpi_master())
 
@@ -61,6 +64,3 @@ class Mp2Driver:
             mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
             ostream.print_header(mp2_str.ljust(92))
             ostream.print_blank()
-
-        local_comm.Disconnect()
-        cross_comm.Disconnect()

@@ -15,26 +15,28 @@
 #include "DensityMatrixType.hpp"
 #include "ErrorHandler.hpp"
 
-CSADGuessDriver::CSADGuessDriver(const int32_t  globRank,
-                                 const int32_t  globNodes,
-                                       MPI_Comm comm)
-
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
+CSADGuessDriver::CSADGuessDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+
+    auto merror = MPI_Comm_dup(comm, &_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CSADGuessDriver, MPI_Comm_dup");
+    }
 }
 
 CSADGuessDriver::~CSADGuessDriver()
 {
-    
+    auto merror = MPI_Comm_free(&_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CSADGuessDriver, MPI_Comm_free");
+    }
 }
 
 std::vector<double>
@@ -240,8 +242,7 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
                          const CMolecularBasis& basis_1,
                          const CMolecularBasis& basis_2,
                          const COverlapMatrix&  S12,
-                         const COverlapMatrix&  S22,
-                               MPI_Comm         comm) const 
+                         const COverlapMatrix&  S22) const
 {
     CAODensityMatrix dsad;
     
