@@ -31,16 +31,6 @@
 class CTDASigmaVectorDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -51,9 +41,9 @@ class CTDASigmaVectorDriver
     int32_t _locNodes;
     
     /**
-     The flag for local execution mode.
+     The MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
     
     /**
      Allocates and initializes set of sigma vectors according to given set of Z
@@ -85,28 +75,22 @@ class CTDASigmaVectorDriver
      @param molecularOrbitals the molecular orbitals.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param comm the MPI communicator.
      */
     void _addFirstOrderFockContribution(      std::vector<CDenseMatrix>&      sigmaVectors,
                                         const std::vector<CExcitationVector>& zVectors,
                                         const CScreeningContainer&            screeningContainer,
                                         const CMolecularOrbitals&             molecularOrbitals,
                                         const CMolecule&                      molecule,
-                                        const CMolecularBasis&                basis,
-                                              MPI_Comm                        comm) const;
+                                        const CMolecularBasis&                basis) const;
     
 public:
     
     /**
      Creates a TDA sigma vector driver object.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    CTDASigmaVectorDriver(const int32_t  globRank,
-                          const int32_t  globNodes,
-                                MPI_Comm comm);
+    CTDASigmaVectorDriver(MPI_Comm comm);
     
     /**
      Destroys a TDA sigma vector driver object.
@@ -123,7 +107,6 @@ public:
      container.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param comm the MPI communication.
      @return the vector of sigma vectors.
      */
     std::vector<CDenseMatrix> compute(const std::vector<CExcitationVector>& zVectors,
@@ -131,8 +114,7 @@ public:
                                       const CScreeningContainer&            screeningContainer,
                                       const CMolecularOrbitals&             molecularOrbitals,
                                       const CMolecule&                      molecule,
-                                      const CMolecularBasis&                basis,
-                                            MPI_Comm                        comm) const;
+                                      const CMolecularBasis&                basis) const;
     
     /**
      Computes sigma = A * Z vectors.
@@ -142,15 +124,13 @@ public:
             container.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param comm the MPI communication.
      @return the vector of sigma vectors.
      */
     std::vector<CDenseMatrix> compute(const std::vector<CExcitationVector>& zVectors,
                                       const CScreeningContainer&            screeningContainer,
                                       const CMolecularOrbitals&             molecularOrbitals,
                                       const CMolecule&                      molecule,
-                                      const CMolecularBasis&                basis,
-                                            MPI_Comm                        comm) const;
+                                      const CMolecularBasis&                basis) const;
     
     
 };

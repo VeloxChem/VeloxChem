@@ -12,26 +12,18 @@
 #include "AOFockMatrix.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
 
-CTDASigmaVectorDriver::CTDASigmaVectorDriver(const int32_t  globRank,
-                                             const int32_t  globNodes,
-                                                   MPI_Comm comm)
-
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
+CTDASigmaVectorDriver::CTDASigmaVectorDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+
+    mpi::duplicate(comm, &_locComm);
 }
 
 CTDASigmaVectorDriver::~CTDASigmaVectorDriver()
 {
-    
+    mpi::destroy(&_locComm);
 }
 
 std::vector<CDenseMatrix>
@@ -39,15 +31,14 @@ CTDASigmaVectorDriver::compute(const std::vector<CExcitationVector>& zVectors,
                                const CScreeningContainer&            screeningContainer,
                                const CMolecularOrbitals&             molecularOrbitals,
                                const CMolecule&                      molecule,
-                               const CMolecularBasis&                basis,
-                                     MPI_Comm                        comm) const
+                               const CMolecularBasis&                basis) const
 {
     auto sig_vecs = _allocSigmaVectors(zVectors);
  
     _addCanonicalFockContribution(sig_vecs, zVectors, molecularOrbitals);
     
     _addFirstOrderFockContribution(sig_vecs, zVectors, screeningContainer,
-                                   molecularOrbitals, molecule, basis, comm);
+                                   molecularOrbitals, molecule, basis);
     
     return sig_vecs;
 }
@@ -120,8 +111,7 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(      std::vector<CDenseMa
                                                       const CScreeningContainer&            screeningContainer,
                                                       const CMolecularOrbitals&             molecularOrbitals,
                                                       const CMolecule&                      molecule,
-                                                      const CMolecularBasis&                basis,
-                                                            MPI_Comm                        comm) const
+                                                      const CMolecularBasis&                basis) const
 {
     auto nvecs = static_cast<int32_t>(sigmaVectors.size());
     
@@ -136,17 +126,17 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(      std::vector<CDenseMa
         dmat.append(zVectors[i].getDensityZ(molecularOrbitals));
     }
     
-    dmat.broadcast(_locRank, comm);
+    dmat.broadcast(_locRank, _locComm);
     
     // compute AO Fock matrices
     
     CAOFockMatrix faomat(dmat);
     
-    CElectronRepulsionIntegralsDriver eri_drv(comm);
+    CElectronRepulsionIntegralsDriver eri_drv(_locComm);
     
     eri_drv.compute(faomat, dmat, molecule, basis, screeningContainer);
     
-    faomat.reduce_sum(_locRank, _locNodes, comm);
+    faomat.reduce_sum(_locRank, _locNodes, _locComm);
     
     // add contributions to sigma vectors on master node
     

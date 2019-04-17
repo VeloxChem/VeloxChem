@@ -93,36 +93,16 @@ CExcitationVector_ket_indexes_to_numpy(const CExcitationVector& self)
 // Helper function for CTDASigmaVectorDriver constructor
     
 static std::shared_ptr<CTDASigmaVectorDriver>
-CTDASigmaVectorDriver_create(int32_t    globRank,
-                             int32_t    globNodes,
-                             py::object py_comm)
+CTDASigmaVectorDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
         
     return std::shared_ptr<CTDASigmaVectorDriver>(
-        new CTDASigmaVectorDriver(globRank, globNodes, *comm_ptr)
+        new CTDASigmaVectorDriver(*comm_ptr)
         );
     
 }
     
-// Helper functions for overloading CTDASigmaVectorDriver::compute
-
-static std::vector<CDenseMatrix>
-CTDASigmaVectorDriver_compute(
-          CTDASigmaVectorDriver&          self,
-    const std::vector<CExcitationVector>& zVectors,
-    const CScreeningContainer&            screeningContainer,
-    const CMolecularOrbitals&             molecularOrbitals,
-    const CMolecule&                      molecule,
-    const CMolecularBasis&                basis,
-          py::object                      py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(zVectors, screeningContainer, molecularOrbitals,
-                        molecule, basis, *comm_ptr);
-}
-
 // Exports classes/functions in src/response to python
 
 void export_response(py::module& m)
@@ -181,7 +161,14 @@ void export_response(py::module& m)
             m, "TDASigmaVectorDriver"
         )
         .def(py::init(&CTDASigmaVectorDriver_create))
-        .def("compute", &CTDASigmaVectorDriver_compute)
+        .def("compute",
+             (std::vector<CDenseMatrix> (CTDASigmaVectorDriver::*)
+              (const std::vector<CExcitationVector>&,
+               const CScreeningContainer&,
+               const CMolecularOrbitals&,
+               const CMolecule&,
+               const CMolecularBasis&) const)
+             &CTDASigmaVectorDriver::compute)
     ;
 }
     
