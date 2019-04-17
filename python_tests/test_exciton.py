@@ -31,12 +31,12 @@ class TestExciton(unittest.TestCase):
 
         # compute overlap
 
-        ovldrv = OverlapIntegralsDriver(rank, size, comm)
-        S = ovldrv.compute(molecule, basis, comm)
-        S11 = ovldrv.compute(mol_1, basis, comm)
-        S22 = ovldrv.compute(mol_2, basis, comm)
-        S12 = ovldrv.compute(mol_1, mol_2, basis, comm)
-        S21 = ovldrv.compute(mol_2, mol_1, basis, comm)
+        ovldrv = OverlapIntegralsDriver(comm)
+        S = ovldrv.compute(molecule, basis)
+        S11 = ovldrv.compute(mol_1, basis)
+        S22 = ovldrv.compute(mol_2, basis)
+        S12 = ovldrv.compute(mol_1, mol_2, basis)
+        S21 = ovldrv.compute(mol_2, mol_1, basis)
 
         if (rank == mpi_master()):
 

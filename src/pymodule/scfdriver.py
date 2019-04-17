@@ -438,8 +438,8 @@ class ScfDriver:
 
         t0 = tm.time()
 
-        ovl_drv = OverlapIntegralsDriver(self.rank, self.nodes, comm)
-        ovl_mat = ovl_drv.compute(molecule, basis, comm)
+        ovl_drv = OverlapIntegralsDriver(comm)
+        ovl_mat = ovl_drv.compute(molecule, basis)
 
         t1 = tm.time()
 

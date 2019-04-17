@@ -28,16 +28,6 @@
 class COverlapIntegralsDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -48,9 +38,9 @@ class COverlapIntegralsDriver
     int32_t _locNodes;
     
     /**
-     The flag for local execution mode.
+     The MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
     
     /**
      Comutes overlap integrals for pair of GTOs containers.
@@ -107,13 +97,9 @@ public:
     /**
      Creates a overlap integrals driver object using MPI info.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    COverlapIntegralsDriver(const int32_t  globRank,
-                            const int32_t  globNodes,
-                                  MPI_Comm comm);
+    COverlapIntegralsDriver(MPI_Comm comm);
     
     /**
      Destroys a overlap integrals driver object.
@@ -126,12 +112,10 @@ public:
 
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param comm the MPI communicator.
      @return the overlap matrix object.
      */
     COverlapMatrix compute(const CMolecule&       molecule,
-                           const CMolecularBasis& basis,
-                                 MPI_Comm         comm) const;
+                           const CMolecularBasis& basis) const;
     
     /**
      Computes overlap integrals for molecule in two basis sets and stores
@@ -140,13 +124,11 @@ public:
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of overlap matrix.
      @param ketBasis the molecular basis for ket side of overlap matrix.
-     @param comm the MPI communicator.
      @return the overlap matrix object.
      */
     COverlapMatrix compute(const CMolecule&       molecule,
                            const CMolecularBasis& braBasis,
-                           const CMolecularBasis& ketBasis,
-                                 MPI_Comm         comm) const;
+                           const CMolecularBasis& ketBasis) const;
     
     /**
      Computes overlap integrals for two molecules in basis set and stores
@@ -155,13 +137,11 @@ public:
      @param braMolecule the molecule for bra side of overlap matrix.
      @param ketMolecule the molecule for ket side of overlap matrix.
      @param basis the molecular basis.
-     @param comm the MPI communicator.
      @return the overlap matrix object.
      */
     COverlapMatrix compute(const CMolecule&       braMolecule,
                            const CMolecule&       ketMolecule,
-                           const CMolecularBasis& basis,
-                                 MPI_Comm         comm) const;
+                           const CMolecularBasis& basis) const;
     
     /**
      Computes overlap integrals for two molecules in different basis sets and
@@ -171,14 +151,12 @@ public:
      @param ketMolecule the molecule for ket side of overlap matrix.
      @param braBasis the molecular basis for bra side of overlap matrix.
      @param ketBasis the molecular basis for ket side of overlap matrix.
-     @param comm the MPI communicator.
      @return the overlap matrix object.
      */
     COverlapMatrix compute(const CMolecule&       braMolecule,
                            const CMolecule&       ketMolecule,
                            const CMolecularBasis& braBasis,
-                           const CMolecularBasis& ketBasis,
-                                 MPI_Comm         comm) const;
+                           const CMolecularBasis& ketBasis) const;
     
     /**
      Computes overlap integrals blocks for pair of GTOs blocks and stores them

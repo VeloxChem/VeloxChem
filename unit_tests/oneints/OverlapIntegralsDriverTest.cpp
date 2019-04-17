@@ -15,8 +15,7 @@
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSSForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -42,8 +41,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeSSForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSPForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -79,8 +77,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeSPForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputePSForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -116,8 +113,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputePSForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputePPForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -185,8 +181,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputePPForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSDForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -233,8 +228,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeSDForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeDSForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -282,8 +276,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeDSForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputePDForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -383,8 +376,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputePDForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeDPForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -484,8 +476,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeDPForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeDDForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -639,8 +630,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeDDForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSFForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -698,8 +688,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeSFForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeFSForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -757,8 +746,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeFSForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputePFForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -890,8 +878,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputePFForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeFPForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1023,8 +1010,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeFPForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeDFForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1231,8 +1217,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeDFForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeFDForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1439,8 +1424,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeFDForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeFFForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1722,8 +1706,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeFFForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSGForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1791,8 +1774,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeSGForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeGSForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1860,8 +1842,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeGSForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputePGForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2025,8 +2006,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputePGForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeGPForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2190,8 +2170,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeGPForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeDGForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2451,8 +2430,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeDGForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeGDForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2712,8 +2690,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeGDForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeFGForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3069,8 +3046,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeFGForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeGFForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3426,8 +3402,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeGFForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeGGForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3879,14 +3854,13 @@ TEST_F(COverlapIntegralsDriverTest, ComputeGGForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeForLiH)
 {
-    COverlapIntegralsDriver ovldrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
     auto mbas = vlxbas::getTestBasisForLiH();
     
-    auto ovlmat = ovldrv.compute(mlih, mbas, MPI_COMM_WORLD);
+    auto ovlmat = ovldrv.compute(mlih, mbas);
     
     std::vector<double> intvals{ 1.000000000000000,  0.950707129188576,  0.153183585372556,
                                  0.323354079718979,  0.000000000000000,  0.000000000000000,
@@ -7230,15 +7204,13 @@ TEST_F(COverlapIntegralsDriverTest, ComputeForLiH)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2O)
 {
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
-                                   mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mh2o = vlxmol::getMoleculeH2O();
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COverlapMatrix ovlmat = ovldrv.compute(mh2o, mbas, MPI_COMM_WORLD);
+    COverlapMatrix ovlmat = ovldrv.compute(mh2o, mbas);
 
     std::vector<double> intvals{   0.999999999999999,  -0.344016553802724,  -0.157870042005142, 
                                   -0.050165623197619,  -0.063330527957723,  -0.050165623197619, 
@@ -7442,9 +7414,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2O)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
 {
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
-                                   mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto mdimer = vlxmol::getMoleculeH2ODimer();
 
@@ -7454,15 +7424,15 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    COverlapMatrix S = ovldrv.compute(mdimer, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S = ovldrv.compute(mdimer, mbas);
 
-    COverlapMatrix S11 = ovldrv.compute(mh2o_1, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S11 = ovldrv.compute(mh2o_1, mbas);
 
-    COverlapMatrix S22 = ovldrv.compute(mh2o_2, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S22 = ovldrv.compute(mh2o_2, mbas);
 
-    COverlapMatrix S12 = ovldrv.compute(mh2o_1, mh2o_2, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S12 = ovldrv.compute(mh2o_1, mh2o_2, mbas);
 
-    COverlapMatrix S21 = ovldrv.compute(mh2o_2, mh2o_1, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S21 = ovldrv.compute(mh2o_2, mh2o_1, mbas);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7481,9 +7451,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForNH3CH4)
 {
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
-                                   mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
 
     auto mdimer = vlxmol::getMoleculeNH3CH4();
 
@@ -7493,15 +7461,15 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForNH3CH4)
     
     auto mbas = vlxbas::getMinimalBasisForNH3CH4();
 
-    COverlapMatrix S = ovldrv.compute(mdimer, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S = ovldrv.compute(mdimer, mbas);
 
-    COverlapMatrix S11 = ovldrv.compute(mnh3, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S11 = ovldrv.compute(mnh3, mbas);
 
-    COverlapMatrix S22 = ovldrv.compute(mch4, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S22 = ovldrv.compute(mch4, mbas);
 
-    COverlapMatrix S12 = ovldrv.compute(mnh3, mch4, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S12 = ovldrv.compute(mnh3, mch4, mbas);
 
-    COverlapMatrix S21 = ovldrv.compute(mch4, mnh3, mbas, MPI_COMM_WORLD);
+    COverlapMatrix S21 = ovldrv.compute(mch4, mnh3, mbas);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7520,9 +7488,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForNH3CH4)
 
 TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForTwoBasis)
 {
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
-                                   mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     auto h2o = vlxmol::getMoleculeH2O();
     
@@ -7530,7 +7496,7 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForTwoBasis)
 
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    COverlapMatrix ovlmat = ovldrv.compute(h2o, ao_basis, min_basis, MPI_COMM_WORLD);
+    COverlapMatrix ovlmat = ovldrv.compute(h2o, ao_basis, min_basis);
 
     std::vector<double> intvals{ -0.999725064261023,  0.018870459069969, -0.061222289562095,
                                  -0.061222289562095,  0.000000000000000,  0.000000000000000,

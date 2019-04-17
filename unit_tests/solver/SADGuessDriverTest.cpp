@@ -40,9 +40,7 @@ TEST_F(CSADGuessDriverTest, AtomIdxForAO)
 
 TEST_F(CSADGuessDriverTest, InitialGuess)
 {
-    COverlapIntegralsDriver ovldrv(mpi::rank(MPI_COMM_WORLD),
-                                   mpi::nodes(MPI_COMM_WORLD),
-                                   MPI_COMM_WORLD);
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
     
     CSADGuessDriver saddrv(MPI_COMM_WORLD);
 
@@ -52,9 +50,9 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     auto ao_basis  = vlxbas::getMolecularBasisForH2O();
 
-    auto S12 = ovldrv.compute(h2o, min_basis, ao_basis, MPI_COMM_WORLD);
+    auto S12 = ovldrv.compute(h2o, min_basis, ao_basis);
 
-    auto S22 = ovldrv.compute(h2o, ao_basis, MPI_COMM_WORLD);
+    auto S22 = ovldrv.compute(h2o, ao_basis);
 
     auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22);
 

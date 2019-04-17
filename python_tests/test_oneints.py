@@ -60,8 +60,8 @@ class TestOneInts(unittest.TestCase):
 
         # compute 1e integrals
 
-        ovldrv = OverlapIntegralsDriver(rank, size, comm)
-        S = ovldrv.compute(molecule, basis, comm)
+        ovldrv = OverlapIntegralsDriver(comm)
+        S = ovldrv.compute(molecule, basis)
         S1 = S.to_numpy()
 
         kindrv = KineticEnergyIntegralsDriver(rank, size, comm)
@@ -96,7 +96,7 @@ class TestOneInts(unittest.TestCase):
         rank = comm.Get_rank()
         size = comm.Get_size()
 
-        ovldrv = OverlapIntegralsDriver(rank, size, comm)
+        ovldrv = OverlapIntegralsDriver(comm)
         kindrv = KineticEnergyIntegralsDriver(rank, size, comm)
         npotdrv = NuclearPotentialIntegralsDriver(rank, size, comm)
 
@@ -107,7 +107,7 @@ class TestOneInts(unittest.TestCase):
         mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
 
-        S11 = ovldrv.compute(mol_1, bas_1, comm)
+        S11 = ovldrv.compute(mol_1, bas_1)
         T11 = kindrv.compute(mol_1, bas_1, comm)
         V11 = npotdrv.compute(mol_1, bas_1, comm)
 
@@ -136,7 +136,7 @@ class TestOneInts(unittest.TestCase):
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
         bas_2 = MolecularBasis.read(mol_1, 'cc-pvdz', bas_path)
 
-        S12 = ovldrv.compute(mol_1, bas_1, bas_2, comm)
+        S12 = ovldrv.compute(mol_1, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, bas_1, bas_2, comm)
         V12 = npotdrv.compute(mol_1, bas_1, bas_2, mol_1, comm)
 
@@ -163,7 +163,7 @@ class TestOneInts(unittest.TestCase):
         mol = Molecule(mol_1, mol_2)
         bas = MolecularBasis.read(mol, 'def2-svp', bas_path)
 
-        S12 = ovldrv.compute(mol_1, mol_2, bas, comm)
+        S12 = ovldrv.compute(mol_1, mol_2, bas)
         T12 = kindrv.compute(mol_1, mol_2, bas, comm)
         V12 = npotdrv.compute(mol_1, mol_2, bas, mol, comm)
 
@@ -191,7 +191,7 @@ class TestOneInts(unittest.TestCase):
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
         bas_2 = MolecularBasis.read(mol_2, 'cc-pvdz', bas_path)
 
-        S12 = ovldrv.compute(mol_1, mol_2, bas_1, bas_2, comm)
+        S12 = ovldrv.compute(mol_1, mol_2, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, mol_2, bas_1, bas_2, comm)
         V12 = npotdrv.compute(mol_1, mol_2, bas_1, bas_2, mol, comm)
 

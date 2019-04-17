@@ -24,9 +24,9 @@ class TestSolvers(unittest.TestCase):
 
         # compute overlap
 
-        ovldrv = OverlapIntegralsDriver(rank, size, comm)
-        S12 = ovldrv.compute(molecule, min_basis, ao_basis, comm)
-        S22 = ovldrv.compute(molecule, ao_basis, comm)
+        ovldrv = OverlapIntegralsDriver(comm)
+        S12 = ovldrv.compute(molecule, min_basis, ao_basis)
+        S22 = ovldrv.compute(molecule, ao_basis)
 
         # compute initial guess
 

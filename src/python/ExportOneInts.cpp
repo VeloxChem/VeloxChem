@@ -36,70 +36,13 @@ namespace vlx_oneints { // vlx_oneints namespace
 // Helper function for COverlapIntegralsDriver constructor
 
 static std::shared_ptr<COverlapIntegralsDriver>
-COverlapIntegralsDriver_create(int32_t    globRank,
-                               int32_t    globNodes,
-                               py::object py_comm)
+COverlapIntegralsDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<COverlapIntegralsDriver>(
-        new COverlapIntegralsDriver(globRank, globNodes, *comm_ptr)
+        new COverlapIntegralsDriver(*comm_ptr)
         );
-}
-
-// Helper functions for overloading COverlapIntegralsDriver::compute
-
-static COverlapMatrix
-COverlapIntegralsDriver_compute_1(
-          COverlapIntegralsDriver& self,
-    const CMolecule&               molecule,
-    const CMolecularBasis&         basis,
-          py::object               py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, basis, *comm_ptr);
-}
-
-static COverlapMatrix
-COverlapIntegralsDriver_compute_2(
-          COverlapIntegralsDriver& self,
-    const CMolecule&               molecule,
-    const CMolecularBasis&         braBasis,
-    const CMolecularBasis&         ketBasis,
-          py::object               py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, braBasis, ketBasis, *comm_ptr);
-}
-
-static COverlapMatrix
-COverlapIntegralsDriver_compute_3(
-          COverlapIntegralsDriver& self,
-    const CMolecule&               braMolecule,
-    const CMolecule&               ketMolecule,
-    const CMolecularBasis&         basis,
-          py::object               py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(braMolecule, ketMolecule, basis, *comm_ptr);
-}
-
-static COverlapMatrix
-COverlapIntegralsDriver_compute_4(
-          COverlapIntegralsDriver& self,
-    const CMolecule&               braMolecule,
-    const CMolecule&               ketMolecule,
-    const CMolecularBasis&         braBasis,
-    const CMolecularBasis&         ketBasis,
-          py::object               py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
-                        *comm_ptr);
 }
 
 // Helper function for printing COverlapMatrix
@@ -475,10 +418,30 @@ void export_oneints(py::module& m)
             m, "OverlapIntegralsDriver"
         )
         .def(py::init(&COverlapIntegralsDriver_create))
-        .def("compute", &COverlapIntegralsDriver_compute_1)
-        .def("compute", &COverlapIntegralsDriver_compute_2)
-        .def("compute", &COverlapIntegralsDriver_compute_3)
-        .def("compute", &COverlapIntegralsDriver_compute_4)
+        .def("compute",
+             (COverlapMatrix (COverlapIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&) const)
+             &COverlapIntegralsDriver::compute)
+        .def("compute",
+             (COverlapMatrix (COverlapIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &COverlapIntegralsDriver::compute)
+        .def("compute",
+             (COverlapMatrix (COverlapIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&) const)
+             &COverlapIntegralsDriver::compute)
+        .def("compute",
+             (COverlapMatrix (COverlapIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &COverlapIntegralsDriver::compute)
     ;
 
     // CKineticEnergyMatrix class
