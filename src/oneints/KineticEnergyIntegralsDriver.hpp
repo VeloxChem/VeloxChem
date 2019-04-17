@@ -31,16 +31,6 @@
 class CKineticEnergyIntegralsDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -51,9 +41,9 @@ class CKineticEnergyIntegralsDriver
     int32_t _locNodes;
     
     /**
-     The flag for local execution mode.
+     The MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
     
     /**
      Comutes kinetic energy integrals for pair of GTOs containers.
@@ -110,13 +100,9 @@ public:
     /**
      Creates a kinetic energy integrals driver object using MPI info.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    CKineticEnergyIntegralsDriver(const int32_t  globRank,
-                                  const int32_t  globNodes,
-                                        MPI_Comm comm);
+    CKineticEnergyIntegralsDriver(MPI_Comm comm);
     
     /**
      Destroys a kinetic energy integrals driver object.
@@ -129,12 +115,10 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       molecule,
-                                 const CMolecularBasis& basis,
-                                       MPI_Comm         comm) const;
+                                 const CMolecularBasis& basis) const;
     
     /**
      Computes kinetic energy integrals for molecule in two basis sets and stores
@@ -143,13 +127,11 @@ public:
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of kinetic energy matrix.
      @param ketBasis the molecular basis for ket side of kinetic energy matrix.
-     @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       molecule,
                                  const CMolecularBasis& braBasis,
-                                 const CMolecularBasis& ketBasis,
-                                       MPI_Comm         comm) const;
+                                 const CMolecularBasis& ketBasis) const;
     
     /**
      Computes kinetic energy integrals for two molecules in basis set and stores
@@ -158,13 +140,11 @@ public:
      @param braMolecule the molecule for bra side of kinetic energy matrix.
      @param ketMolecule the molecule for ket side of kinetic energy matrix.
      @param basis the molecular basis.
-     @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
-                                 const CMolecularBasis& basis,
-                                       MPI_Comm         comm) const;
+                                 const CMolecularBasis& basis) const;
     
     /**
      Computes kinetic energy integrals for two molecules in different basis sets
@@ -174,14 +154,12 @@ public:
      @param ketMolecule the molecule for ket side of kinetic energy matrix.
      @param braBasis the molecular basis for bra side of kinetic energy matrix.
      @param ketBasis the molecular basis for ket side of kinetic energy matrix.
-     @param comm the MPI communicator.
      @return the kinetic energy matrix object.
      */
     CKineticEnergyMatrix compute(const CMolecule&       braMolecule,
                                  const CMolecule&       ketMolecule,
                                  const CMolecularBasis& braBasis,
-                                 const CMolecularBasis& ketBasis,
-                                       MPI_Comm         comm) const;
+                                 const CMolecularBasis& ketBasis) const;
     
     /**
      Computes kinetic energy integrals blocks for pair of GTOs blocks and stores

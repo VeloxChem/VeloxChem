@@ -47,12 +47,12 @@ class TestExciton(unittest.TestCase):
 
         # compute kinetic energy
 
-        kindrv = KineticEnergyIntegralsDriver(rank, size, comm)
-        T = kindrv.compute(molecule, basis, comm)
-        T11 = kindrv.compute(mol_1, basis, comm)
-        T22 = kindrv.compute(mol_2, basis, comm)
-        T12 = kindrv.compute(mol_1, mol_2, basis, comm)
-        T21 = kindrv.compute(mol_2, mol_1, basis, comm)
+        kindrv = KineticEnergyIntegralsDriver(comm)
+        T = kindrv.compute(molecule, basis)
+        T11 = kindrv.compute(mol_1, basis)
+        T22 = kindrv.compute(mol_2, basis)
+        T12 = kindrv.compute(mol_1, mol_2, basis)
+        T21 = kindrv.compute(mol_2, mol_1, basis)
 
         if (rank == mpi_master()):
 

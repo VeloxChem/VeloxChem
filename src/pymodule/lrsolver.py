@@ -133,15 +133,14 @@ class LinearResponseSolver:
         """Computes 1e integrals"""
 
         overlap_drv = OverlapIntegralsDriver(self.comm)
-        kinetic_drv = KineticEnergyIntegralsDriver(self.rank, self.nodes,
-                                                   self.comm)
+        kinetic_drv = KineticEnergyIntegralsDriver(self.comm)
         potential_drv = NuclearPotentialIntegralsDriver(self.rank, self.nodes,
                                                         self.comm)
         dipole_drv = ElectricDipoleIntegralsDriver(self.rank, self.nodes,
                                                    self.comm)
 
         S = overlap_drv.compute(self.molecule, self.basis)
-        T = kinetic_drv.compute(self.molecule, self.basis, self.comm)
+        T = kinetic_drv.compute(self.molecule, self.basis)
         V = potential_drv.compute(self.molecule, self.basis, self.comm)
         Dpl = dipole_drv.compute(self.molecule, self.basis, self.comm)
 

@@ -15,8 +15,7 @@
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSSForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -42,8 +41,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSSForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSPForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -79,8 +77,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSPForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputePSForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -116,8 +113,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputePSForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputePPForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -185,8 +181,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputePPForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSDForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -233,8 +228,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSDForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDSForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -281,8 +275,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDSForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputePDForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -382,8 +375,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputePDForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDPForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -483,8 +475,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDPForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDDForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -638,8 +629,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDDForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSFForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -697,8 +687,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSFForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFSForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -756,8 +745,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFSForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputePFForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -889,8 +877,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputePFForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFPForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1022,8 +1009,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFPForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDFForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1230,8 +1216,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDFForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFDForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1438,8 +1423,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFDForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFFForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1721,8 +1705,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFFForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSGForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1790,8 +1773,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSGForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGSForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1859,8 +1841,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGSForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputePGForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2024,8 +2005,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputePGForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGPForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2189,8 +2169,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGPForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDGForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2450,8 +2429,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeDGForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGDForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2711,8 +2689,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGDForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFGForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3068,8 +3045,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeFGForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGFForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3425,8 +3401,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGFForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGGForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3878,14 +3853,13 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeGGForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeForLiH)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
     auto mbas = vlxbas::getTestBasisForLiH();
     
-    auto kinmat = kindrv.compute(mlih, mbas, MPI_COMM_WORLD);
+    auto kinmat = kindrv.compute(mlih, mbas);
     
     std::vector<double> intvals{ 3.082911586456580,  2.133606523257290, -0.118704796811193,
                                  0.188907818018553,  0.000000000000000,  0.000000000000000,
@@ -7229,15 +7203,13 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeForLiH)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
-                                         mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mh2o = vlxmol::getMoleculeH2O();
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    CKineticEnergyMatrix kinmat = kindrv.compute(mh2o, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix kinmat = kindrv.compute(mh2o, mbas);
 
     std::vector<double> intvals{  29.356654381441949,  -0.768111871596593,  -0.117549361967610, 
                                    0.002649698131267,  -0.017043989536863,   0.002649698131267, 
@@ -7441,9 +7413,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
-                                         mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto mdimer = vlxmol::getMoleculeH2ODimer();
 
@@ -7453,15 +7423,15 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas);
 
-    CKineticEnergyMatrix S11 = kindrv.compute(mh2o_1, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S11 = kindrv.compute(mh2o_1, mbas);
 
-    CKineticEnergyMatrix S22 = kindrv.compute(mh2o_2, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S22 = kindrv.compute(mh2o_2, mbas);
 
-    CKineticEnergyMatrix S12 = kindrv.compute(mh2o_1, mh2o_2, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S12 = kindrv.compute(mh2o_1, mh2o_2, mbas);
 
-    CKineticEnergyMatrix S21 = kindrv.compute(mh2o_2, mh2o_1, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S21 = kindrv.compute(mh2o_2, mh2o_1, mbas);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7480,9 +7450,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForNH3CH4)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
-                                         mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
 
     auto mdimer = vlxmol::getMoleculeNH3CH4();
 
@@ -7492,15 +7460,15 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForNH3CH4)
     
     auto mbas = vlxbas::getMinimalBasisForNH3CH4();
 
-    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas);
 
-    CKineticEnergyMatrix S11 = kindrv.compute(mnh3, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S11 = kindrv.compute(mnh3, mbas);
 
-    CKineticEnergyMatrix S22 = kindrv.compute(mch4, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S22 = kindrv.compute(mch4, mbas);
 
-    CKineticEnergyMatrix S12 = kindrv.compute(mnh3, mch4, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S12 = kindrv.compute(mnh3, mch4, mbas);
 
-    CKineticEnergyMatrix S21 = kindrv.compute(mch4, mnh3, mbas, MPI_COMM_WORLD);
+    CKineticEnergyMatrix S21 = kindrv.compute(mch4, mnh3, mbas);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7519,9 +7487,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForNH3CH4)
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForTwoBasis)
 {
-    CKineticEnergyIntegralsDriver kindrv(mpi::rank(MPI_COMM_WORLD),
-                                         mpi::nodes(MPI_COMM_WORLD),
-                                         MPI_COMM_WORLD);
+    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
     
     auto h2o = vlxmol::getMoleculeH2O();
     
@@ -7529,7 +7495,7 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForTwoBasis)
 
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    CKineticEnergyMatrix kinmat = kindrv.compute(h2o, ao_basis, min_basis, MPI_COMM_WORLD);
+    CKineticEnergyMatrix kinmat = kindrv.compute(h2o, ao_basis, min_basis);
 
     std::vector<double> intvals{-29.279305345784234,  8.076500670892111, -0.006981963263064,
                                  -0.006981963263064,  0.000000000000000,  0.000000000000000,

@@ -76,70 +76,13 @@ COverlapMatrix_from_numpy(const py::array_t<double>& arr)
 // Helper function for CKineticEnergyIntegralsDriver constructor
 
 static std::shared_ptr<CKineticEnergyIntegralsDriver>
-CKineticEnergyIntegralsDriver_create(int32_t    globRank,
-                                     int32_t    globNodes,
-                                     py::object py_comm)
+CKineticEnergyIntegralsDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CKineticEnergyIntegralsDriver>(
-        new CKineticEnergyIntegralsDriver(globRank, globNodes, *comm_ptr)
+        new CKineticEnergyIntegralsDriver(*comm_ptr)
         );
-}
-
-// Helper functions for overloading CKineticEnergyIntegralsDriver::compute
-
-static CKineticEnergyMatrix
-CKineticEnergyIntegralsDriver_compute_1(
-          CKineticEnergyIntegralsDriver& self,
-    const CMolecule&                     molecule,
-    const CMolecularBasis&               basis,
-          py::object                     py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, basis, *comm_ptr);
-}
-
-static CKineticEnergyMatrix
-CKineticEnergyIntegralsDriver_compute_2(
-          CKineticEnergyIntegralsDriver& self,
-    const CMolecule&                     molecule,
-    const CMolecularBasis&               braBasis,
-    const CMolecularBasis&               ketBasis,
-          py::object                     py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, braBasis, ketBasis, *comm_ptr);
-}
-
-static CKineticEnergyMatrix
-CKineticEnergyIntegralsDriver_compute_3(
-          CKineticEnergyIntegralsDriver& self,
-    const CMolecule&                     braMolecule,
-    const CMolecule&                     ketMolecule,
-    const CMolecularBasis&               basis,
-          py::object                     py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(braMolecule, ketMolecule, basis, *comm_ptr);
-}
-
-static CKineticEnergyMatrix
-CKineticEnergyIntegralsDriver_compute_4(
-          CKineticEnergyIntegralsDriver& self,
-    const CMolecule&                     braMolecule,
-    const CMolecule&                     ketMolecule,
-    const CMolecularBasis&               braBasis,
-    const CMolecularBasis&               ketBasis,
-          py::object                     py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(braMolecule, ketMolecule, braBasis, ketBasis,
-                        *comm_ptr);
 }
 
 // Helper function for printing CKineticEnergyMatrix
@@ -468,10 +411,30 @@ void export_oneints(py::module& m)
             m, "KineticEnergyIntegralsDriver"
         )
         .def(py::init(&CKineticEnergyIntegralsDriver_create))
-        .def("compute", &CKineticEnergyIntegralsDriver_compute_1)
-        .def("compute", &CKineticEnergyIntegralsDriver_compute_2)
-        .def("compute", &CKineticEnergyIntegralsDriver_compute_3)
-        .def("compute", &CKineticEnergyIntegralsDriver_compute_4)
+        .def("compute",
+             (CKineticEnergyMatrix (CKineticEnergyIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&) const)
+             &CKineticEnergyIntegralsDriver::compute)
+        .def("compute",
+             (CKineticEnergyMatrix (CKineticEnergyIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &CKineticEnergyIntegralsDriver::compute)
+        .def("compute",
+             (CKineticEnergyMatrix (CKineticEnergyIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&) const)
+             &CKineticEnergyIntegralsDriver::compute)
+        .def("compute",
+             (CKineticEnergyMatrix (CKineticEnergyIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &CKineticEnergyIntegralsDriver::compute)
     ;
 
     // CNuclearPotentialMatrix class

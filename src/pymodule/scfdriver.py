@@ -443,8 +443,8 @@ class ScfDriver:
 
         t1 = tm.time()
 
-        kin_drv = KineticEnergyIntegralsDriver(self.rank, self.nodes, comm)
-        kin_mat = kin_drv.compute(molecule, basis, comm)
+        kin_drv = KineticEnergyIntegralsDriver(comm)
+        kin_mat = kin_drv.compute(molecule, basis)
 
         t2 = tm.time()
 
