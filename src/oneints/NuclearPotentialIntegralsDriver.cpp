@@ -15,31 +15,33 @@
 #include "NuclearPotentialRecFunc.hpp"
 #include "StringFormat.hpp"
 
-CNuclearPotentialIntegralsDriver::CNuclearPotentialIntegralsDriver(const int32_t  globRank,
-                                                                   const int32_t  globNodes,
-                                                                         MPI_Comm comm)
-
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
+CNuclearPotentialIntegralsDriver::CNuclearPotentialIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+
+    auto merror = MPI_Comm_dup(comm, &_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CNuclearPotentialIntegralsDriver, MPI_Comm_dup");
+    }
 }
 
 CNuclearPotentialIntegralsDriver::~CNuclearPotentialIntegralsDriver()
 {
+    auto merror = MPI_Comm_free(&_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CNuclearPotentialIntegralsDriver, MPI_Comm_free");
+    }
 }
 
 CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
-                                          const CMolecularBasis& basis,
-                                                MPI_Comm         comm) const
+                                          const CMolecularBasis& basis) const
 {
     CNuclearPotentialMatrix npotmat;
     
@@ -67,8 +69,7 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
 CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecularBasis& basis,
-                                          const CMolecule&       pchgMolecule,
-                                                MPI_Comm         comm) const
+                                          const CMolecule&       pchgMolecule) const
 {
     CNuclearPotentialMatrix npotmat;
     
@@ -97,8 +98,7 @@ CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
                                           const CMolecularBasis& braBasis,
                                           const CMolecularBasis& ketBasis,
-                                          const CMolecule&       pchgMolecule,
-                                                MPI_Comm         comm) const
+                                          const CMolecule&       pchgMolecule) const
 {
     CNuclearPotentialMatrix npotmat;
     
@@ -129,8 +129,7 @@ CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecule&       ketMolecule,
                                           const CMolecularBasis& basis,
-                                          const CMolecule&       pchgMolecule,
-                                                MPI_Comm         comm) const
+                                          const CMolecule&       pchgMolecule) const
 {
     CNuclearPotentialMatrix npotmat;
     
@@ -162,8 +161,7 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecule&       ketMolecule,
                                           const CMolecularBasis& braBasis,
                                           const CMolecularBasis& ketBasis,
-                                          const CMolecule&       pchgMolecule,
-                                                MPI_Comm         comm) const
+                                          const CMolecule&       pchgMolecule) const
 {
     CNuclearPotentialMatrix npotmat;
     

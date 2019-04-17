@@ -30,16 +30,6 @@
 class CNuclearPotentialIntegralsDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-    
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-    
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -50,9 +40,9 @@ class CNuclearPotentialIntegralsDriver
     int32_t _locNodes;
     
     /**
-     The flag for local execution mode.
+     The MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
     
     /**
      Comutes nuclear potential integrals for pair of GTOs containers.
@@ -178,13 +168,9 @@ public:
     /**
      Creates a nuclear potential integrals driver object using MPI info.
      
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
      @param comm the MPI communicator.
      */
-    CNuclearPotentialIntegralsDriver(const int32_t  globRank,
-                                     const int32_t  globNodes,
-                                     MPI_Comm comm);
+    CNuclearPotentialIntegralsDriver(MPI_Comm comm);
     
     /**
      Destroys a nuclear potential integrals driver object.
@@ -197,12 +183,10 @@ public:
      
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       molecule,
-                                    const CMolecularBasis& basis,
-                                          MPI_Comm         comm) const;
+                                    const CMolecularBasis& basis) const;
     
     /**
      Computes nuclear potential integrals for molecules in specific basis set
@@ -211,13 +195,11 @@ public:
      @param molecule the molecule.
      @param basis the molecular basis.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       molecule,
                                     const CMolecularBasis& basis,
-                                    const CMolecule&       pchgMolecule,
-                                          MPI_Comm         comm) const;
+                                    const CMolecule&       pchgMolecule) const;
 
     /**
      Computes nuclear potential integrals for molecules in two basis sets and
@@ -227,14 +209,12 @@ public:
      @param braBasis the molecular basis for bra side of nuclear potential matrix.
      @param ketBasis the molecular basis for ket side of nuclear potential matrix.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       molecule,
                                     const CMolecularBasis& braBasis,
                                     const CMolecularBasis& ketBasis,
-                                    const CMolecule&       pchgMolecule,
-                                          MPI_Comm         comm) const;
+                                    const CMolecule&       pchgMolecule) const;
 
     /**
      Computes nuclear potential integrals for two molecules in specific basis
@@ -244,14 +224,12 @@ public:
      @param ketMolecule the molecule for ket side of nuclear potential matrix.
      @param basis the molecular basis.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       braMolecule,
                                     const CMolecule&       ketMolecule,
                                     const CMolecularBasis& basis,
-                                    const CMolecule&       pchgMolecule,
-                                          MPI_Comm         comm) const;
+                                    const CMolecule&       pchgMolecule) const;
 
     /**
      Computes nuclear potential integrals for two molecules in two basis sets
@@ -262,15 +240,13 @@ public:
      @param braBasis the molecular basis for bra side of nuclear potential matrix.
      @param ketBasis the molecular basis for ket side of nuclear potential matrix.
      @param pchgMolecule the molecule providing nuclear point charges.
-     @param comm the MPI communicator.
      @return the nuclear potential matrix object.
      */
     CNuclearPotentialMatrix compute(const CMolecule&       braMolecule,
                                     const CMolecule&       ketMolecule,
                                     const CMolecularBasis& braBasis,
                                     const CMolecularBasis& ketBasis,
-                                    const CMolecule&       pchgMolecule,
-                                          MPI_Comm         comm) const;
+                                    const CMolecule&       pchgMolecule) const;
 
     /**
      Computes nuclear potential integrals blocks for pair of GTOs blocks and

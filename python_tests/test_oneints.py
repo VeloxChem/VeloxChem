@@ -68,8 +68,8 @@ class TestOneInts(unittest.TestCase):
         T = kindrv.compute(molecule, basis)
         T1 = T.to_numpy()
 
-        npotdrv = NuclearPotentialIntegralsDriver(rank, size, comm)
-        V = npotdrv.compute(molecule, basis, comm)
+        npotdrv = NuclearPotentialIntegralsDriver(comm)
+        V = npotdrv.compute(molecule, basis)
         V1 = V.to_numpy()
 
         # compare with reference
@@ -98,7 +98,7 @@ class TestOneInts(unittest.TestCase):
 
         ovldrv = OverlapIntegralsDriver(comm)
         kindrv = KineticEnergyIntegralsDriver(comm)
-        npotdrv = NuclearPotentialIntegralsDriver(rank, size, comm)
+        npotdrv = NuclearPotentialIntegralsDriver(comm)
 
         bas_path = '../basis'
 
@@ -109,9 +109,9 @@ class TestOneInts(unittest.TestCase):
 
         S11 = ovldrv.compute(mol_1, bas_1)
         T11 = kindrv.compute(mol_1, bas_1)
-        V11 = npotdrv.compute(mol_1, bas_1, comm)
+        V11 = npotdrv.compute(mol_1, bas_1)
 
-        V11p = npotdrv.compute(mol_1, bas_1, mol_1, comm)
+        V11p = npotdrv.compute(mol_1, bas_1, mol_1)
         self.assertTrue((V11.to_numpy() == V11p.to_numpy()).all())
 
         if rank == mpi_master():
@@ -138,7 +138,7 @@ class TestOneInts(unittest.TestCase):
 
         S12 = ovldrv.compute(mol_1, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, bas_1, bas_2)
-        V12 = npotdrv.compute(mol_1, bas_1, bas_2, mol_1, comm)
+        V12 = npotdrv.compute(mol_1, bas_1, bas_2, mol_1)
 
         if rank == mpi_master():
 
@@ -165,7 +165,7 @@ class TestOneInts(unittest.TestCase):
 
         S12 = ovldrv.compute(mol_1, mol_2, bas)
         T12 = kindrv.compute(mol_1, mol_2, bas)
-        V12 = npotdrv.compute(mol_1, mol_2, bas, mol, comm)
+        V12 = npotdrv.compute(mol_1, mol_2, bas, mol)
 
         if rank == mpi_master():
 
@@ -193,7 +193,7 @@ class TestOneInts(unittest.TestCase):
 
         S12 = ovldrv.compute(mol_1, mol_2, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, mol_2, bas_1, bas_2)
-        V12 = npotdrv.compute(mol_1, mol_2, bas_1, bas_2, mol, comm)
+        V12 = npotdrv.compute(mol_1, mol_2, bas_1, bas_2, mol)
 
         if rank == mpi_master():
 

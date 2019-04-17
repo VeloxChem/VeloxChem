@@ -15,8 +15,7 @@
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSSForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -46,8 +45,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSSForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSPForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -87,8 +85,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSPForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePSForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -128,8 +125,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePSForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePPForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -201,8 +197,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePPForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSDForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -253,8 +248,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSDForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDSForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -305,8 +299,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDSForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePDForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -410,8 +403,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePDForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDPForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -515,8 +507,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDPForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDDForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -674,8 +665,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDDForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSFForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -737,8 +727,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSFForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFSForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -800,8 +789,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFSForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePFForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -937,8 +925,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePFForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFPForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1074,8 +1061,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFPForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDFForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1286,8 +1272,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDFForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFDForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1498,8 +1483,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFDForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFFForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1785,8 +1769,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFFForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSGForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1858,8 +1841,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSGForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGSForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1931,8 +1913,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGSForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePGForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2100,8 +2081,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputePGForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGPForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2269,8 +2249,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGPForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDGForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2534,8 +2513,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeDGForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGDForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2799,8 +2777,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGDForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFGForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3160,8 +3137,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeFGForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGFForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3521,8 +3497,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGFForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGGForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3978,14 +3953,13 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeGGForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeForLiH)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
     auto mbas = vlxbas::getTestBasisForLiH();
     
-    auto npotmat = npotdrv.compute(mlih, mbas, MPI_COMM_WORLD);
+    auto npotmat = npotdrv.compute(mlih, mbas);
     
     std::vector<double> intvals{ 7.736774122879349,  6.549415227007131,  0.855280000184068,
                                  1.949488520360516,  0.091633975206306,  0.084729594009098,
@@ -7329,15 +7303,13 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeForLiH)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mh2o = vlxmol::getMoleculeH2O();
     
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    CNuclearPotentialMatrix npotmat = npotdrv.compute(mh2o, mbas, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix npotmat = npotdrv.compute(mh2o, mbas);
 
     std::vector<double> intvals{  62.407271930631438, -11.891776058068634,  -5.253809097285499, 
                                   -1.637393640002757,  -2.082849579191473,  -1.637393640002757, 
@@ -7541,9 +7513,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto mdimer = vlxmol::getMoleculeH2ODimer();
 
@@ -7553,15 +7523,15 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
 
     auto mbas = vlxbas::getMolecularBasisForH2O();
 
-    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas);
 
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mbas, mdimer);
                                                                   
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mbas, mdimer);
 
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mdimer);
 
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mdimer);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7580,9 +7550,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
 
     auto mdimer = vlxmol::getMoleculeNH3CH4();
 
@@ -7592,15 +7560,15 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
     
     auto mbas = vlxbas::getMinimalBasisForNH3CH4();
 
-    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas);
 
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mbas, mdimer);
                                                                                 
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mbas, mdimer);
 
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mdimer);
                                                                                 
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mdimer, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mdimer);
 
     ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
 
@@ -7619,9 +7587,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForTwoBasis)
 {
-    CNuclearPotentialIntegralsDriver npotdrv(mpi::rank(MPI_COMM_WORLD),
-                                             mpi::nodes(MPI_COMM_WORLD),
-                                             MPI_COMM_WORLD);
+    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
     
     auto h2o = vlxmol::getMoleculeH2O();
     
@@ -7629,7 +7595,7 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForTwoBasis)
 
     auto min_basis = vlxbas::getMinimalBasisForH2O();
 
-    CNuclearPotentialMatrix npotmat = npotdrv.compute(h2o, ao_basis, min_basis, h2o, MPI_COMM_WORLD);
+    CNuclearPotentialMatrix npotmat = npotdrv.compute(h2o, ao_basis, min_basis, h2o);
 
     std::vector<double> intvals{-62.330818445846084,  8.873516667931849, -2.006175030692724,
                                  -2.006175030692724, -0.000000000000000, -0.020725456424117,

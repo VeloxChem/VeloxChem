@@ -448,8 +448,8 @@ class ScfDriver:
 
         t2 = tm.time()
 
-        npot_drv = NuclearPotentialIntegralsDriver(self.rank, self.nodes, comm)
-        npot_mat = npot_drv.compute(molecule, basis, comm)
+        npot_drv = NuclearPotentialIntegralsDriver(comm)
+        npot_mat = npot_drv.compute(molecule, basis)
 
         t3 = tm.time()
 

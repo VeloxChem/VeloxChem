@@ -134,14 +134,13 @@ class LinearResponseSolver:
 
         overlap_drv = OverlapIntegralsDriver(self.comm)
         kinetic_drv = KineticEnergyIntegralsDriver(self.comm)
-        potential_drv = NuclearPotentialIntegralsDriver(self.rank, self.nodes,
-                                                        self.comm)
+        potential_drv = NuclearPotentialIntegralsDriver(self.comm)
         dipole_drv = ElectricDipoleIntegralsDriver(self.rank, self.nodes,
                                                    self.comm)
 
         S = overlap_drv.compute(self.molecule, self.basis)
         T = kinetic_drv.compute(self.molecule, self.basis)
-        V = potential_drv.compute(self.molecule, self.basis, self.comm)
+        V = potential_drv.compute(self.molecule, self.basis)
         Dpl = dipole_drv.compute(self.molecule, self.basis, self.comm)
 
         if self.rank == mpi_master():

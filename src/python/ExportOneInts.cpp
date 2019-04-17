@@ -113,91 +113,16 @@ CKineticEnergyMatrix_from_numpy(const py::array_t<double>& arr)
     return std::shared_ptr<CKineticEnergyMatrix>(new CKineticEnergyMatrix(*mp));
 }
 
-// Helper function for CKineticEnergyIntegralsDriver constructor
+// Helper function for CNuclearPotentialIntegralsDriver constructor
 
 static std::shared_ptr<CNuclearPotentialIntegralsDriver>
-CNuclearPotentialIntegralsDriver_create(int32_t    globRank,
-                                        int32_t    globNodes,
-                                        py::object py_comm)
+CNuclearPotentialIntegralsDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CNuclearPotentialIntegralsDriver>(
-        new CNuclearPotentialIntegralsDriver(globRank, globNodes, *comm_ptr)
+        new CNuclearPotentialIntegralsDriver(*comm_ptr)
         );
-}
-
-// Helper functions for overloading CNuclearPotentialIntegralsDriver::compute
-
-static CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute_0(
-          CNuclearPotentialIntegralsDriver& self,
-    const CMolecule&                        molecule,
-    const CMolecularBasis&                  basis,
-          py::object                        py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, basis, *comm_ptr);
-}
-
-static CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute_1(
-          CNuclearPotentialIntegralsDriver& self,
-    const CMolecule&                        molecule,
-    const CMolecularBasis&                  basis,
-    const CMolecule&                        pchgMolecule,
-          py::object                        py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, basis, pchgMolecule, *comm_ptr);
-}
-
-static CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute_2(
-          CNuclearPotentialIntegralsDriver& self,
-    const CMolecule&                        molecule,
-    const CMolecularBasis&                  braBasis,
-    const CMolecularBasis&                  ketBasis,
-    const CMolecule&                        pchgMolecule,
-          py::object                        py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(molecule, braBasis, ketBasis, pchgMolecule,
-                        *comm_ptr);
-}
-
-static CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute_3(
-          CNuclearPotentialIntegralsDriver& self,
-    const CMolecule&                        braMolecule,
-    const CMolecule&                        ketMolecule,
-    const CMolecularBasis&                  basis,
-    const CMolecule&                        pchgMolecule,
-          py::object                        py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(braMolecule, ketMolecule, basis, pchgMolecule,
-                        *comm_ptr);
-}
-
-static CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute_4(
-          CNuclearPotentialIntegralsDriver& self,
-    const CMolecule&                        braMolecule,
-    const CMolecule&                        ketMolecule,
-    const CMolecularBasis&                  braBasis,
-    const CMolecularBasis&                  ketBasis,
-    const CMolecule&                        pchgMolecule,
-          py::object                        py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return self.compute(braMolecule, ketMolecule, braBasis, ketBasis, pchgMolecule,
-                        *comm_ptr);
 }
 
 // Helper function for printing CNuclearPotentialMatrix
@@ -461,11 +386,39 @@ void export_oneints(py::module& m)
             m, "NuclearPotentialIntegralsDriver"
         )
         .def(py::init(&CNuclearPotentialIntegralsDriver_create))
-        .def("compute", &CNuclearPotentialIntegralsDriver_compute_0)
-        .def("compute", &CNuclearPotentialIntegralsDriver_compute_1)
-        .def("compute", &CNuclearPotentialIntegralsDriver_compute_2)
-        .def("compute", &CNuclearPotentialIntegralsDriver_compute_3)
-        .def("compute", &CNuclearPotentialIntegralsDriver_compute_4)
+        .def("compute",
+             (CNuclearPotentialMatrix (CNuclearPotentialIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&) const)
+             &CNuclearPotentialIntegralsDriver::compute)
+        .def("compute",
+             (CNuclearPotentialMatrix (CNuclearPotentialIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecule&) const)
+             &CNuclearPotentialIntegralsDriver::compute)
+        .def("compute",
+             (CNuclearPotentialMatrix (CNuclearPotentialIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&,
+               const CMolecule&) const)
+             &CNuclearPotentialIntegralsDriver::compute)
+        .def("compute",
+             (CNuclearPotentialMatrix (CNuclearPotentialIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecule&) const)
+             &CNuclearPotentialIntegralsDriver::compute)
+        .def("compute",
+             (CNuclearPotentialMatrix (CNuclearPotentialIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&,
+               const CMolecule&) const)
+             &CNuclearPotentialIntegralsDriver::compute)
     ;
 
     // CElectricDipoleMatrix class

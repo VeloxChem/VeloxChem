@@ -63,12 +63,12 @@ class TestExciton(unittest.TestCase):
 
         # compute nuclear potential
 
-        npotdrv = NuclearPotentialIntegralsDriver(rank, size, comm)
-        V = npotdrv.compute(molecule, basis, comm)
-        V11 = npotdrv.compute(mol_1, basis, molecule, comm)
-        V22 = npotdrv.compute(mol_2, basis, molecule, comm)
-        V12 = npotdrv.compute(mol_1, mol_2, basis, molecule, comm)
-        V21 = npotdrv.compute(mol_2, mol_1, basis, molecule, comm)
+        npotdrv = NuclearPotentialIntegralsDriver(comm)
+        V = npotdrv.compute(molecule, basis)
+        V11 = npotdrv.compute(mol_1, basis, molecule)
+        V22 = npotdrv.compute(mol_2, basis, molecule)
+        V12 = npotdrv.compute(mol_1, mol_2, basis, molecule)
+        V21 = npotdrv.compute(mol_2, mol_1, basis, molecule)
 
         if (rank == mpi_master()):
 
