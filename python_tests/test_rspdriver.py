@@ -22,9 +22,8 @@ class TestRspDriver(unittest.TestCase):
         mol_orbs = scf_drv.mol_orbs
 
         # TDA
-        tda_exci = TDAExciDriver(task.mpi_rank, task.mpi_size)
+        tda_exci = TDAExciDriver(3, 'Singlet')
 
-        tda_exci.set_number_states(3)
         tda_exci.set_eri(1.0e-12, 'QQ_DEN')
         tda_exci.set_solver(1.0e-4, 50)
 

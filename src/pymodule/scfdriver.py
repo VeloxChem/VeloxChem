@@ -503,8 +503,7 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.rank, self.nodes,
-                                              comm, ostream)
+                                              ovl_mat, comm, ostream)
 
         # guess: projection of molecular orbitals from reduced basis
         if self.den_guess.guess_type == "PRCMO":

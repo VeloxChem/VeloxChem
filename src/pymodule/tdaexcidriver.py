@@ -42,15 +42,15 @@ class TDAExciDriver:
         The number of MPI processes.
     """
 
-    def __init__(self, rank, nodes):
+    def __init__(self, nstates=3, spin='S'):
         """Initializes TDA excited states computation driver.
 
         Initializes TDA excited states computation drived to default setup.
         """
 
         # excited states information
-        self.nstates = 0
-        self.triplet = False
+        self.nstates = nstates
+        self.triplet = True if spin[0].upper() == 'T' else False
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -64,21 +64,8 @@ class TDAExciDriver:
         self.is_converged = None
 
         # mpi information
-        self.rank = rank
-        self.nodes = nodes
-
-    def set_number_states(self, nstates):
-        """Sets number of excited states determined by solver.
-
-        Sets number of excited states determined by solver.
-
-        Parameters
-        ----------
-        nstates
-            The number of excited states.
-        """
-
-        self.nstates = nstates
+        self.rank = 0
+        self.nodes = 1
 
     def set_eri(self, eri_thresh, qq_type):
         """Sets screening in computation of electron repulsion integrals.
@@ -139,6 +126,11 @@ class TDAExciDriver:
         ostream
             The output stream.
         """
+
+        # MPI rank and size
+
+        self.rank = comm.Get_rank()
+        self.nodes = comm.Get_size()
 
         # set start time
 

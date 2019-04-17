@@ -108,9 +108,8 @@ class ResponseDriver:
         # TDA singlet/triplet excited states
 
         if self.prop_type.upper() in ["SINGEX_TDA", "TRIPEX_TDA"]:
-            tda_exci = TDAExciDriver(self.rank, self.nodes)
+            tda_exci = TDAExciDriver(self.nstates, self.prop_type.upper()[0])
 
-            tda_exci.set_number_states(self.nstates)
             tda_exci.set_eri(self.eri_thresh, self.qq_type)
             tda_exci.set_solver(self.conv_thresh, self.max_iter)
 
