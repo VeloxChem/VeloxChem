@@ -4,7 +4,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .mointsdriver import MOIntegralsDriver
 from .outputstream import OutputStream
-from .mpiutils import SubCommunicators
+from .subcommunicators import SubCommunicators
 
 
 class Mp2Driver:

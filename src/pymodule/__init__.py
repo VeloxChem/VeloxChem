@@ -46,7 +46,7 @@ from .rspproperty import ResponseProperty
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mpitask import MpiTask
-from .mpiutils import SubCommunicators
+from .subcommunicators import SubCommunicators
 
 # Python functions
 from .errorhandler import assert_msg_critical

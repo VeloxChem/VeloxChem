@@ -10,7 +10,7 @@ from .veloxchemlib import TwoIndexes
 from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
-from .mpiutils import SubCommunicators
+from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 
