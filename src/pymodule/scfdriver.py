@@ -264,7 +264,8 @@ class ScfDriver:
             self.print_ground_state(molecule, ostream)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False, ostream)
 
-            if isfile(checkpoint_file):
+            if (checkpoint_file and isinstance(checkpoint_file, str) and
+                    isfile(checkpoint_file)):
                 checkpoint_text = "Checkpoint written to file: "
                 checkpoint_text += checkpoint_file
                 ostream.print_info(checkpoint_text)
