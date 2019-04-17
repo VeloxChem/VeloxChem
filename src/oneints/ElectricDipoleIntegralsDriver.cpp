@@ -15,17 +15,9 @@
 #include "OneIntsDistributor.hpp"
 #include "ElectricDipoleRecFunc.hpp"
 
-CElectricDipoleIntegralsDriver::CElectricDipoleIntegralsDriver(const int32_t  globRank,
-                                                               const int32_t  globNodes,
-                                                                     MPI_Comm comm)
+CElectricDipoleIntegralsDriver::CElectricDipoleIntegralsDriver(MPI_Comm comm)
 
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
-
-    , _xOrigin(0.0)
+    : _xOrigin(0.0)
 
     , _yOrigin(0.0)
 
@@ -34,13 +26,23 @@ CElectricDipoleIntegralsDriver::CElectricDipoleIntegralsDriver(const int32_t  gl
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-    
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+
+    auto merror = MPI_Comm_dup(comm, &_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CElectricDipoleIntegralsDriver, MPI_Comm_dup");
+    }
 }
 
 CElectricDipoleIntegralsDriver::~CElectricDipoleIntegralsDriver()
 {
-    
+    auto merror = MPI_Comm_free(&_locComm);
+
+    if (merror != MPI_SUCCESS)
+    {
+        mpi::abort(merror, "CElectricDipoleIntegralsDriver, MPI_Comm_free");
+    }
 }
 
 void
@@ -57,8 +59,7 @@ CElectricDipoleIntegralsDriver::setElectricDipoleOrigin(const double xOrigin,
 
 CElectricDipoleMatrix
 CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
-                                        const CMolecularBasis& basis,
-                                              MPI_Comm         comm) const
+                                        const CMolecularBasis& basis) const
 {
     CElectricDipoleMatrix dipmat;
     
@@ -79,8 +80,7 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
 CElectricDipoleMatrix
 CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
                                         const CMolecularBasis& braBasis,
-                                        const CMolecularBasis& ketBasis,
-                                              MPI_Comm         comm) const
+                                        const CMolecularBasis& ketBasis) const
 {
     CElectricDipoleMatrix dipmat;
     
@@ -103,8 +103,7 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
 CElectricDipoleMatrix
 CElectricDipoleIntegralsDriver::compute(const CMolecule&       braMolecule,
                                         const CMolecule&       ketMolecule,
-                                        const CMolecularBasis& basis,
-                                              MPI_Comm         comm) const
+                                        const CMolecularBasis& basis) const
 {
     CElectricDipoleMatrix dipmat;
     
@@ -128,8 +127,7 @@ CElectricDipoleMatrix
 CElectricDipoleIntegralsDriver::compute(const CMolecule&       braMolecule,
                                         const CMolecule&       ketMolecule,
                                         const CMolecularBasis& braBasis,
-                                        const CMolecularBasis& ketBasis,
-                                              MPI_Comm         comm) const
+                                        const CMolecularBasis& ketBasis) const
 {
     CElectricDipoleMatrix dipmat;
     

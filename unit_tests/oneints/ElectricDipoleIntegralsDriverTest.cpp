@@ -15,8 +15,7 @@
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSSForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -65,8 +64,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSSForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSPForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -145,8 +143,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSPForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputePSForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -225,8 +222,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputePSForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputePPForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -401,8 +397,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputePPForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSDForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -514,8 +509,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSDForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDSForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -627,8 +621,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDSForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputePDForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -899,8 +892,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputePDForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDPForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1172,8 +1164,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDPForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSFForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1318,8 +1309,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSFForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFSForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1464,8 +1454,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFSForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDDForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -1899,8 +1888,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDDForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputePFForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2267,8 +2255,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputePFForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFPForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2636,8 +2623,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFPForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSGForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2812,8 +2798,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSGForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGSForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -2988,8 +2973,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGSForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDFForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -3581,8 +3565,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDFForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFDForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -4174,8 +4157,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFDForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFFForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -4992,8 +4974,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFFForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputePGForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -5456,8 +5437,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputePGForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGPForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -5920,8 +5900,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGPForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDGForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -6672,8 +6651,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeDGForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGDForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -7424,8 +7402,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGDForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFGForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -8464,8 +8441,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFGForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGFForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -9504,8 +9480,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGFForLiH)
 
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeGGForLiH)
 {
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     auto mlih = vlxmol::getTestLiH();
     
@@ -10838,12 +10813,12 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeElectricDipoleForH2O)
     
     const int nrows = 24, ncols = 24;
     
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
-    auto dipmat = dipdrv.compute(mh2o, mbas, MPI_COMM_WORLD);
+    auto dipmat = dipdrv.compute(mh2o, mbas);
     
-    std::vector<double> intxvals{     0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,
+    std::vector<double> intxvals{
+     0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,
      0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,
      0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,   0.0000000000000000,
     -0.0711721794901836,  -0.0095418670107523,  -0.0030973122602807,  -0.0030973122602807,   0.0000000000000000,
@@ -11213,14 +11188,14 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeElectricDipoleForH2OWithOrigin
     
     const int nrows = 24, ncols = 24;
     
-    CElectricDipoleIntegralsDriver dipdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD),
-                                          MPI_COMM_WORLD);
+    CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
     
     dipdrv.setElectricDipoleOrigin(1.0, 1.0, 1.0);
     
-    auto dipmat = dipdrv.compute(mh2o, mbas, MPI_COMM_WORLD);
+    auto dipmat = dipdrv.compute(mh2o, mbas);
     
-    std::vector<double> intxvals{-0.9999999999999997,   0.3440165538027237,   0.1578700420051422,   0.0501656231976193,   0.0633305279577229,
+    std::vector<double> intxvals{
+    -0.9999999999999997,   0.3440165538027237,   0.1578700420051422,   0.0501656231976193,   0.0633305279577229,
      0.0501656231976193,   0.0633305279577229,   0.0000000000000000,   0.0000000000000000,  -0.0763467930722837,
      0.0763467930722837,   0.0000000000000000,   0.0000000000000000,  -0.0599867659853658,  -0.0599867659853658,
     -0.0711721794901836,  -0.0095418670107523,  -0.0030973122602807,  -0.0030973122602807,   0.0000000000000000,
