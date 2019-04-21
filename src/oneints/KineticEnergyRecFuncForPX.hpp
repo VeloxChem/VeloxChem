@@ -58,6 +58,50 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const int32_t              iContrGto);
 
     /**
+    Computes sub-batch (0,9) of primitive (P|T|D) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPD_0_9(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (9,18) of primitive (P|T|D) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPD_9_18(      CMemBlock2D<double>& primBuffer,
+                                     const CMemBlock2D<double>& auxBuffer,
+                                     const CMemBlock2D<double>& osFactors,
+                                     const CMemBlock2D<double>& paDistances,
+                                     const CMemBlock2D<double>& pbDistances,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto);
+
+    /**
     Computes batch of primitive (D|T|P) kinetic energy integrals and stores
     results in primitives buffer.
 
@@ -78,6 +122,50 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,9) of primitive (D|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForDP_0_9(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (9,18) of primitive (D|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForDP_9_18(      CMemBlock2D<double>& primBuffer,
+                                     const CMemBlock2D<double>& auxBuffer,
+                                     const CMemBlock2D<double>& osFactors,
+                                     const CMemBlock2D<double>& paDistances,
+                                     const CMemBlock2D<double>& pbDistances,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto);
 
     /**
     Computes batch of primitive (P|T|F) kinetic energy integrals and stores
@@ -102,6 +190,50 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const int32_t              iContrGto);
 
     /**
+    Computes sub-batch (0,15) of primitive (P|T|F) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPF_0_15(      CMemBlock2D<double>& primBuffer,
+                                     const CMemBlock2D<double>& auxBuffer,
+                                     const CMemBlock2D<double>& osFactors,
+                                     const CMemBlock2D<double>& paDistances,
+                                     const CMemBlock2D<double>& pbDistances,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (15,30) of primitive (P|T|F) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPF_15_30(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
+
+    /**
     Computes batch of primitive (F|T|P) kinetic energy integrals and stores
     results in primitives buffer.
 
@@ -122,6 +254,50 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,15) of primitive (F|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForFP_0_15(      CMemBlock2D<double>& primBuffer,
+                                     const CMemBlock2D<double>& auxBuffer,
+                                     const CMemBlock2D<double>& osFactors,
+                                     const CMemBlock2D<double>& paDistances,
+                                     const CMemBlock2D<double>& pbDistances,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (15,30) of primitive (F|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForFP_15_30(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
 
     /**
     Computes batch of primitive (P|T|G) kinetic energy integrals and stores
@@ -146,6 +322,116 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const int32_t              iContrGto);
 
     /**
+    Computes sub-batch (0,9) of primitive (P|T|G) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPG_0_9(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (9,18) of primitive (P|T|G) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPG_9_18(      CMemBlock2D<double>& primBuffer,
+                                     const CMemBlock2D<double>& auxBuffer,
+                                     const CMemBlock2D<double>& osFactors,
+                                     const CMemBlock2D<double>& paDistances,
+                                     const CMemBlock2D<double>& pbDistances,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (18,27) of primitive (P|T|G) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPG_18_27(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (27,36) of primitive (P|T|G) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPG_27_36(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (36,45) of primitive (P|T|G) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForPG_36_45(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
+
+    /**
     Computes batch of primitive (G|T|P) kinetic energy integrals and stores
     results in primitives buffer.
 
@@ -166,6 +452,116 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,9) of primitive (G|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForGP_0_9(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (9,18) of primitive (G|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForGP_9_18(      CMemBlock2D<double>& primBuffer,
+                                     const CMemBlock2D<double>& auxBuffer,
+                                     const CMemBlock2D<double>& osFactors,
+                                     const CMemBlock2D<double>& paDistances,
+                                     const CMemBlock2D<double>& pbDistances,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (18,27) of primitive (G|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForGP_18_27(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (27,36) of primitive (G|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForGP_27_36(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (36,45) of primitive (G|T|P) kinetic energy integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compKineticEnergyForGP_36_45(      CMemBlock2D<double>& primBuffer,
+                                      const CMemBlock2D<double>& auxBuffer,
+                                      const CMemBlock2D<double>& osFactors,
+                                      const CMemBlock2D<double>& paDistances,
+                                      const CMemBlock2D<double>& pbDistances,
+                                      const CGtoBlock&           braGtoBlock,
+                                      const CGtoBlock&           ketGtoBlock,
+                                      const int32_t              iContrGto);
 
 
 } // kinrecfunc namespace
