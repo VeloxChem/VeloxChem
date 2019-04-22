@@ -727,6 +727,102 @@ namespace intsfunc { // intsfunc namespace
     }
     
     void
+    compTensorsPA(      CMemBlock2D<double>& paDistances,
+                  const CMemBlock2D<double>& pCoordinates,
+                  const CGtoBlock&           braGtoBlock,
+                  const CGtoBlock&           ketGtoBlock,
+                  const int32_t              iContrGto)
+    {
+        // skip computation for zero angular momentum on bra side
+        
+        auto bang = braGtoBlock.getAngularMomentum();
+        
+        if (bang == 0) return;
+        
+        // set up pointers to primitives data on bra side
+        
+        auto brx = braGtoBlock.getCoordinatesX();
+        
+        auto bry = braGtoBlock.getCoordinatesY();
+        
+        auto brz = braGtoBlock.getCoordinatesZ();
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // determine number of tensor components
+        
+        auto tcomps = intsfunc::getNumberOfComponentsInDistancesTensor(bang);
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of P
+            
+            auto px = pCoordinates.data(3 * idx);
+            
+            auto py = pCoordinates.data(3 * idx + 1);
+            
+            auto pz = pCoordinates.data(3 * idx + 2);
+            
+            // set up pmitive GTO data on bra side
+            
+            auto ax = brx[i];
+            
+            auto ay = bry[i];
+            
+            auto az = brz[i];
+            
+            // set up pointers to distances R(PA)
+            
+            auto poff = tcomps * idx;
+            
+            auto pax = paDistances.data(poff);
+            
+            auto pay = paDistances.data(poff + 1);
+            
+            auto paz = paDistances.data(poff + 2);
+            
+            #pragma omp simd aligned(px, py, pz, pax, pay, paz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                pax[j] = px[j] - ax;
+                
+                pay[j] = py[j] - ay;
+                
+                paz[j] = pz[j] - az;
+            }
+            
+            // compute higher order reduced R(PA) tensors
+            
+            if (bang > 1)
+            {
+                genfunc::compTensorTwoFromVector(paDistances, poff, poff + 3);
+                
+                for (int32_t j = 3; j <= bang; j++)
+                {
+                    auto t10ff = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 2);
+                    
+                    auto t2off = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 1);
+                    
+                    genfunc::compTensorFromVectorAndTensor(paDistances, poff,
+                                                           t10ff,  t2off, j);
+                }
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
     compDistancesPA(      CMemBlock2D<double>& paDistances,
                     const CMemBlock2D<double>& pCoordinates,
                     const CGtoBlock&           braGtoBlock,
@@ -797,6 +893,95 @@ namespace intsfunc { // intsfunc namespace
         }
     }
     
+    void compTensorsPB(      CMemBlock2D<double>& pbDistances,
+                       const CMemBlock2D<double>& pCoordinates,
+                       const CGtoBlock&           braGtoBlock,
+                       const CGtoBlock&           ketGtoBlock,
+                       const int32_t              iContrGto)
+    {
+        
+        // skip computation for zero angular momentum on ket side
+        
+        auto kang = ketGtoBlock.getAngularMomentum();
+        
+        if (kang == 0) return;
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto krx = ketGtoBlock.getCoordinatesX();
+        
+        auto kry = ketGtoBlock.getCoordinatesY();
+        
+        auto krz = ketGtoBlock.getCoordinatesZ();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // determine number of tensor components
+        
+        auto tcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of P
+            
+            auto px = pCoordinates.data(3 * idx);
+            
+            auto py = pCoordinates.data(3 * idx + 1);
+            
+            auto pz = pCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(PB)
+            
+            auto poff = tcomps * idx;
+            
+            auto pbx = pbDistances.data(poff);
+            
+            auto pby = pbDistances.data(poff + 1);
+            
+            auto pbz = pbDistances.data(poff + 2);
+            
+            #pragma omp simd aligned(krx, kry, krz, px, py, pz, pbx, pby,\
+                                     pbz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                pbx[j] = px[j] - krx[j];
+                
+                pby[j] = py[j] - kry[j];
+                
+                pbz[j] = pz[j] - krz[j];
+            }
+            
+            // compute higher order reduced R(PB) tensors
+            
+            if (kang > 1)
+            {
+                genfunc::compTensorTwoFromVector(pbDistances, poff, poff + 3);
+                
+                for (int32_t j = 3; j <= kang; j++)
+                {
+                    auto t10ff = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 2);
+                    
+                    auto t2off = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 1);
+                    
+                    genfunc::compTensorFromVectorAndTensor(pbDistances, poff,
+                                                           t10ff,  t2off, j);
+                }
+            }
+            
+            idx++;
+        }
+    }
+    
     void
     compDistancesPB(      CMemBlock2D<double>& pbDistances,
                     const CMemBlock2D<double>& pCoordinates,
@@ -859,6 +1044,31 @@ namespace intsfunc { // intsfunc namespace
             
             idx++;
         }
+    }
+    
+    void
+    compTensorsPC(      CMemBlock2D<double>& pcDistances,
+                  const CMemBlock2D<double>& pCoordinates,
+                  const CMemBlock2D<double>& cCoordinates,
+                  const int32_t              orderOfTensor,
+                  const CGtoBlock&           braGtoBlock,
+                  const CGtoBlock&           ketGtoBlock,
+                  const int32_t              iContrGto,
+                  const int32_t              iPointCharge)
+    {
+        // set up coordinates of point charges
+        
+        double crx = (cCoordinates.data(0))[iPointCharge];
+        
+        double cry = (cCoordinates.data(1))[iPointCharge];
+        
+        double crz = (cCoordinates.data(2))[iPointCharge];
+        
+        // compute PC distances : R(PC) = P - C
+        
+        intsfunc::compTensorsPC(pcDistances, pCoordinates, crx, cry, crz,
+                                orderOfTensor, braGtoBlock, ketGtoBlock,
+                                iContrGto); 
     }
     
     void
@@ -934,6 +1144,88 @@ namespace intsfunc { // intsfunc namespace
                 pcy[j] = py[j] - yCoordinateC;
                 
                 pcz[j] = pz[j] - zCoordinateC;
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compTensorsPC(      CMemBlock2D<double>& pcDistances,
+                  const CMemBlock2D<double>& pCoordinates,
+                  const double               xCoordinateC,
+                  const double               yCoordinateC,
+                  const double               zCoordinateC,
+                  const int32_t              orderOfTensor,
+                  const CGtoBlock&           braGtoBlock,
+                  const CGtoBlock&           ketGtoBlock,
+                  const int32_t              iContrGto)
+    {
+        if (orderOfTensor == 0) return;
+        
+        // set up pointers to primitives data on bra side
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // determine number of tensor components
+        
+        auto tcomps = intsfunc::getNumberOfComponentsInDistancesTensor(orderOfTensor);
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to coordinates of P
+            
+            auto px = pCoordinates.data(3 * idx);
+            
+            auto py = pCoordinates.data(3 * idx + 1);
+            
+            auto pz = pCoordinates.data(3 * idx + 2);
+            
+            // set up pointers to distances R(PC)
+            
+            auto poff = tcomps * idx;
+            
+            auto pcx = pcDistances.data(poff);
+            
+            auto pcy = pcDistances.data(poff + 1);
+            
+            auto pcz = pcDistances.data(poff + 2);
+            
+            #pragma omp simd aligned(px, py, pz, pcx, pcy, pcz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                pcx[j] = px[j] - xCoordinateC;
+                
+                pcy[j] = py[j] - yCoordinateC;
+                
+                pcz[j] = pz[j] - zCoordinateC;
+            }
+            
+            // compute higher order reduced R(PB) tensors
+            
+            if (orderOfTensor> 1)
+            {
+                genfunc::compTensorTwoFromVector(pcDistances, poff, poff + 3);
+                
+                for (int32_t j = 3; j <= orderOfTensor; j++)
+                {
+                    auto t10ff = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 2);
+                    
+                    auto t2off = poff + intsfunc::getNumberOfComponentsInDistancesTensor(j - 1);
+                    
+                    genfunc::compTensorFromVectorAndTensor(pcDistances, poff,
+                                                           t10ff,  t2off, j);
+                }
             }
             
             idx++;

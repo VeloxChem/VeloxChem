@@ -202,6 +202,23 @@ namespace intsfunc { // intsfunc namespace
                          const int32_t              iContrGto);
     
     /**
+     Computes set of tensors of distances between center P of combined primitive
+     GTOs and center A of primitive GTO on bra side.
+     
+     @param paDistances the set of tensors of Cartesian R(PA) = P - A distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+     functions.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compTensorsPA(      CMemBlock2D<double>& paDistances,
+                       const CMemBlock2D<double>& pCoordinates,
+                       const CGtoBlock&           braGtoBlock,
+                       const CGtoBlock&           ketGtoBlock,
+                       const int32_t              iContrGto);
+    
+    /**
      Computes vector of distances between center P of combined primitive GTOs
      and center B of primitive GTO on bra side.
      
@@ -217,6 +234,47 @@ namespace intsfunc { // intsfunc namespace
                          const CGtoBlock&           braGtoBlock,
                          const CGtoBlock&           ketGtoBlock,
                          const int32_t              iContrGto);
+    
+    /**
+     Computes set of tensors of distances between center P of combined primitive
+     GTOs and center B of primitive GTO on bra side.
+     
+     @param pbDistances the set of tensors of Cartesian R(PB) = P - B distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+     functions.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compTensorsPB(      CMemBlock2D<double>& pbDistances,
+                       const CMemBlock2D<double>& pCoordinates,
+                       const CGtoBlock&           braGtoBlock,
+                       const CGtoBlock&           ketGtoBlock,
+                       const int32_t              iContrGto);
+    
+    /**
+     Computes set of tensors of distances between center P of combined primitive
+     GTOs and center C of specific point charge.
+     
+     @param pcDistances the set of tensors of Cartesian R(PC) = P - C distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+     functions.
+     @param cCoordinates the vector of coordinates of point charges.
+     @param orderOfTensor the max. order of R(PC) tensors.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     @param iPointCharge the index of point charge in vector point charges
+     coordinates.
+     */
+    void compTensorsPC(      CMemBlock2D<double>& pcDistances,
+                       const CMemBlock2D<double>& pCoordinates,
+                       const CMemBlock2D<double>& cCoordinates,
+                       const int32_t              orderOfTensor,
+                       const CGtoBlock&           braGtoBlock,
+                       const CGtoBlock&           ketGtoBlock,
+                       const int32_t              iContrGto,
+                       const int32_t              iPointCharge);
     
     /**
      Computes vector of distances between center P of combined primitive GTOs
@@ -240,6 +298,32 @@ namespace intsfunc { // intsfunc namespace
                          const int32_t              iContrGto,
                          const int32_t              iPointCharge);
     
+    
+    /**
+     Computes set of tensors of distances between center P of combined primitive
+     GTOs and center C.
+
+     @param pcDistances the set of tensors of Cartesian R(PC) = P - C distances.
+     @param pCoordinates the vector of coordinates for combined Gaussian
+     functions.
+     @param xCoordinateC the Cartesian X coordinate of center C.
+     @param yCoordinateC the Cartesian Y coordinate of center C.
+     @param zCoordinateC the Cartesian Z coordinate of center C.
+     @param orderOfTensor the max. order of R(PC) tensors.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compTensorsPC(      CMemBlock2D<double>& pcDistances,
+                       const CMemBlock2D<double>& pCoordinates,
+                       const double               xCoordinateC,
+                       const double               yCoordinateC,
+                       const double               zCoordinateC,
+                       const int32_t              orderOfTensor,
+                       const CGtoBlock&           braGtoBlock,
+                       const CGtoBlock&           ketGtoBlock,
+                       const int32_t              iContrGto);
+    
     /**
      Computes vector of distances between center P of combined primitive GTOs
      and center C.
@@ -253,7 +337,6 @@ namespace intsfunc { // intsfunc namespace
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
-     coordinates.
      */
     void compDistancesPC(      CMemBlock2D<double>& pcDistances,
                          const CMemBlock2D<double>& pCoordinates,

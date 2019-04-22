@@ -15,9 +15,6 @@
 
 #include "NuclearPotentialMatrix.hpp"
 #include "GtoContainer.hpp"
-#include "SparseMatrix.hpp"
-#include "ThreeIndexes.hpp"
-#include "VecIndexes.hpp"
 #include "BoysFunction.hpp"
 #include "OneIntsDistributor.hpp"
 
@@ -74,40 +71,12 @@ class CNuclearPotentialIntegralsDriver
                                            const CGtoBlock&            ketGtoBlock) const;
     
     /**
-     Gets Obara-Saika recursion pattern for specific combination of GTOs blocks
-     on bra and ket sides.
-     
-     @param braGtoBlock the GTOs block on bra side.
-     @param ketGtoBlock the GTOs block on ket side.
-     @return the vector of three indexes object with recursion pattern.
-     */
-    CVecThreeIndexes _getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                          const CGtoBlock& ketGtoBlock) const;
-    
-    /**
-     Gets vector of unified indexes of primitive GTOs buffer for specific
-     Obara-Saika recursion pattern.
-     
-     @param recIndexes the vector of starting indexes of data blocks in recursion
-     pattern.
-     @param recPattern the recursion pattern.
-     @param maxPrimGtos the maximum number of primitive GTOs in contracted
-     GTO on bra side.
-     @return the total number of blocks in recursion pattern.
-     */
-    int32_t _getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                           const CVecThreeIndexes&     recPattern,
-                                           const int32_t               maxPrimGtos) const;
-        
-    /**
      Adds single point charge contribution from primitives recursion buffer to
      primitives accumulation buffer, which contains primitive nuclear potential
      integrals.
 
      @param accBuffer the primitive integrals accumulation buffer.
      @param primBuffer the primitives recursion buffer.
-     @param primIndex the index of specific integrals in primitives recursion
-            buffer.
      @param charges the vector of point charges.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
@@ -116,7 +85,6 @@ class CNuclearPotentialIntegralsDriver
      */
     void _addPointChargeContribution(      CMemBlock2D<double>& accBuffer,
                                      const CMemBlock2D<double>& primBuffer,
-                                     const int32_t              primIndex,
                                      const CMemBlock<double>&   charges,
                                      const CGtoBlock&           braGtoBlock,
                                      const CGtoBlock&           ketGtoBlock,
@@ -132,8 +100,7 @@ class CNuclearPotentialIntegralsDriver
      side).
      
      @param primBuffer the primitives buffer.
-     @param recPattern the recursion pattern.
-     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param auxBuffer the auxilary integrals buffer.
      @param bfTable the Boys function evaluator.
      @param bfArguments the vector of Boys function arguments.
      @param bfValues the vector of Boys function values.
@@ -143,13 +110,13 @@ class CNuclearPotentialIntegralsDriver
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
      @param pcDistances the vector of distances R(PC) = P - C.
+     @param pcComponents the number of tensor components of distances R(PC) = P - C.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
     void _compPrimNuclearPotentialInts(      CMemBlock2D<double>&  primBuffer,
-                                       const CVecThreeIndexes&     recPattern,
-                                       const std::vector<int32_t>& recIndexes,
+                                             CMemBlock2D<double>&  auxBuffer,
                                        const CBoysFunction&        bfTable,
                                              CMemBlock<double>&    bfArguments,
                                              CMemBlock2D<double>&  bfValues,
@@ -159,6 +126,7 @@ class CNuclearPotentialIntegralsDriver
                                        const CMemBlock2D<double>&  paDistances,
                                        const CMemBlock2D<double>&  pbDistances,
                                        const CMemBlock2D<double>&  pcDistances,
+                                       const int32_t               pcComponents, 
                                        const CGtoBlock&            braGtoBlock,
                                        const CGtoBlock&            ketGtoBlock,
                                        const int32_t               iContrGto) const;
