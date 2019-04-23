@@ -109,6 +109,50 @@ namespace npotrecfunc { // npotrecfunc namespace
                                    const int32_t              iContrGto);
 
     /**
+    Computes sub-batch (0,3) of primitive (S|A|D) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForSD_0_3(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& pbDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (3,6) of primitive (S|A|D) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForSD_3_6(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& pbDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
     Computes batch of primitive (D|A|S) nuclear potential integrals and stores
     results in primitives buffer.
 
@@ -129,6 +173,50 @@ namespace npotrecfunc { // npotrecfunc namespace
                                    const CGtoBlock&           braGtoBlock,
                                    const CGtoBlock&           ketGtoBlock,
                                    const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,3) of primitive (D|A|S) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForDS_0_3(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (3,6) of primitive (D|A|S) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForDS_3_6(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
 
     /**
     Computes batch of primitive (S|A|F) nuclear potential integrals and stores
@@ -153,6 +241,50 @@ namespace npotrecfunc { // npotrecfunc namespace
                                    const int32_t              iContrGto);
 
     /**
+    Computes sub-batch (0,5) of primitive (S|A|F) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForSF_0_5(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& pbDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (5,10) of primitive (S|A|F) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForSF_5_10(      CMemBlock2D<double>& primBuffer,
+                                        const CMemBlock2D<double>& auxBuffer,
+                                        const CMemBlock2D<double>& osFactors,
+                                        const CMemBlock2D<double>& pbDistances,
+                                        const CMemBlock2D<double>& pcDistances,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
+
+    /**
     Computes batch of primitive (F|A|S) nuclear potential integrals and stores
     results in primitives buffer.
 
@@ -173,6 +305,50 @@ namespace npotrecfunc { // npotrecfunc namespace
                                    const CGtoBlock&           braGtoBlock,
                                    const CGtoBlock&           ketGtoBlock,
                                    const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,5) of primitive (F|A|S) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForFS_0_5(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (5,10) of primitive (F|A|S) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForFS_5_10(      CMemBlock2D<double>& primBuffer,
+                                        const CMemBlock2D<double>& auxBuffer,
+                                        const CMemBlock2D<double>& osFactors,
+                                        const CMemBlock2D<double>& paDistances,
+                                        const CMemBlock2D<double>& pcDistances,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
 
     /**
     Computes batch of primitive (S|A|G) nuclear potential integrals and stores
@@ -197,7 +373,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                    const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (0,5) of primitive (S|A|G) nuclear potential integrals and stores
+    Computes sub-batch (0,3) of primitive (S|A|G) nuclear potential integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -209,7 +385,7 @@ namespace npotrecfunc { // npotrecfunc namespace
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compNuclearPotentialForSG_0_5(      CMemBlock2D<double>& primBuffer,
+    void compNuclearPotentialForSG_0_3(      CMemBlock2D<double>& primBuffer,
                                        const CMemBlock2D<double>& auxBuffer,
                                        const CMemBlock2D<double>& osFactors,
                                        const CMemBlock2D<double>& pbDistances,
@@ -219,7 +395,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                        const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (5,10) of primitive (S|A|G) nuclear potential integrals and stores
+    Computes sub-batch (3,6) of primitive (S|A|G) nuclear potential integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -231,7 +407,51 @@ namespace npotrecfunc { // npotrecfunc namespace
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compNuclearPotentialForSG_5_10(      CMemBlock2D<double>& primBuffer,
+    void compNuclearPotentialForSG_3_6(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& pbDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (6,9) of primitive (S|A|G) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForSG_6_9(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& pbDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (9,12) of primitive (S|A|G) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param pbDistances the vector of distances R(PB) = P - B.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForSG_9_12(      CMemBlock2D<double>& primBuffer,
                                         const CMemBlock2D<double>& auxBuffer,
                                         const CMemBlock2D<double>& osFactors,
                                         const CMemBlock2D<double>& pbDistances,
@@ -241,7 +461,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                         const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (10,15) of primitive (S|A|G) nuclear potential integrals and stores
+    Computes sub-batch (12,15) of primitive (S|A|G) nuclear potential integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -253,7 +473,7 @@ namespace npotrecfunc { // npotrecfunc namespace
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compNuclearPotentialForSG_10_15(      CMemBlock2D<double>& primBuffer,
+    void compNuclearPotentialForSG_12_15(      CMemBlock2D<double>& primBuffer,
                                          const CMemBlock2D<double>& auxBuffer,
                                          const CMemBlock2D<double>& osFactors,
                                          const CMemBlock2D<double>& pbDistances,
@@ -285,7 +505,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                    const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (0,5) of primitive (G|A|S) nuclear potential integrals and stores
+    Computes sub-batch (0,3) of primitive (G|A|S) nuclear potential integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -297,7 +517,7 @@ namespace npotrecfunc { // npotrecfunc namespace
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compNuclearPotentialForGS_0_5(      CMemBlock2D<double>& primBuffer,
+    void compNuclearPotentialForGS_0_3(      CMemBlock2D<double>& primBuffer,
                                        const CMemBlock2D<double>& auxBuffer,
                                        const CMemBlock2D<double>& osFactors,
                                        const CMemBlock2D<double>& paDistances,
@@ -307,7 +527,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                        const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (5,10) of primitive (G|A|S) nuclear potential integrals and stores
+    Computes sub-batch (3,6) of primitive (G|A|S) nuclear potential integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -319,7 +539,51 @@ namespace npotrecfunc { // npotrecfunc namespace
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compNuclearPotentialForGS_5_10(      CMemBlock2D<double>& primBuffer,
+    void compNuclearPotentialForGS_3_6(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (6,9) of primitive (G|A|S) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForGS_6_9(      CMemBlock2D<double>& primBuffer,
+                                       const CMemBlock2D<double>& auxBuffer,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CMemBlock2D<double>& pcDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (9,12) of primitive (G|A|S) nuclear potential integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param auxBuffer the auxilaries buffer.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pcDistances the vector of distances R(PC) = P - C.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compNuclearPotentialForGS_9_12(      CMemBlock2D<double>& primBuffer,
                                         const CMemBlock2D<double>& auxBuffer,
                                         const CMemBlock2D<double>& osFactors,
                                         const CMemBlock2D<double>& paDistances,
@@ -329,7 +593,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                         const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (10,15) of primitive (G|A|S) nuclear potential integrals and stores
+    Computes sub-batch (12,15) of primitive (G|A|S) nuclear potential integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -341,7 +605,7 @@ namespace npotrecfunc { // npotrecfunc namespace
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compNuclearPotentialForGS_10_15(      CMemBlock2D<double>& primBuffer,
+    void compNuclearPotentialForGS_12_15(      CMemBlock2D<double>& primBuffer,
                                          const CMemBlock2D<double>& auxBuffer,
                                          const CMemBlock2D<double>& osFactors,
                                          const CMemBlock2D<double>& paDistances,
