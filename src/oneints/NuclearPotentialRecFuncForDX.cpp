@@ -21,21 +21,33 @@ namespace npotrecfunc { // npotrecfunc namespace
                               const CGtoBlock&           ketGtoBlock,
                               const int32_t              iContrGto)
     {
-        npotrecfunc::compNuclearPotentialForDD_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+        npotrecfunc::compNuclearPotentialForDD_0_5(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
                                                    braGtoBlock, ketGtoBlock, iContrGto); 
 
-        npotrecfunc::compNuclearPotentialForDD_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+        npotrecfunc::compNuclearPotentialForDD_5_10(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
                                                     braGtoBlock, ketGtoBlock, iContrGto); 
 
-        npotrecfunc::compNuclearPotentialForDD_18_27(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+        npotrecfunc::compNuclearPotentialForDD_10_15(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
                                                      braGtoBlock, ketGtoBlock, iContrGto); 
 
-        npotrecfunc::compNuclearPotentialForDD_27_36(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+        npotrecfunc::compNuclearPotentialForDD_15_20(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+                                                     braGtoBlock, ketGtoBlock, iContrGto); 
+
+        npotrecfunc::compNuclearPotentialForDD_20_24(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+                                                     braGtoBlock, ketGtoBlock, iContrGto); 
+
+        npotrecfunc::compNuclearPotentialForDD_24_28(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+                                                     braGtoBlock, ketGtoBlock, iContrGto); 
+
+        npotrecfunc::compNuclearPotentialForDD_28_32(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
+                                                     braGtoBlock, ketGtoBlock, iContrGto); 
+
+        npotrecfunc::compNuclearPotentialForDD_32_36(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pcDistances, 
                                                      braGtoBlock, ketGtoBlock, iContrGto); 
     }
 
     void
-    compNuclearPotentialForDD_0_9(      CMemBlock2D<double>& primBuffer,
+    compNuclearPotentialForDD_0_5(      CMemBlock2D<double>& primBuffer,
                                   const CMemBlock2D<double>& auxBuffer,
                                   const CMemBlock2D<double>& osFactors,
                                   const CMemBlock2D<double>& paDistances,
@@ -45,7 +57,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto)
     {
-        // Batch of Integrals (0,9)
+        // Batch of Integrals (0,5)
 
         // set up pointers to primitives data on bra side
 
@@ -71,13 +83,9 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pa_x = paDistances.data(9 * idx);
 
-            auto pa_y = paDistances.data(9 * idx + 1);
-
             // set up pointers to 2-th order tensor of distance R(PA)
 
             auto pa_xx = paDistances.data(9 * idx + 3);
-
-            auto pa_xy = paDistances.data(9 * idx + 4);
 
             // set up pointers to 1-th order tensor of distance R(PB)
 
@@ -99,8 +107,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pb_yz = pbDistances.data(9 * idx + 7);
 
-            auto pb_zz = pbDistances.data(9 * idx + 8);
-
             // set up pointers to 1-th order tensor of distance R(PC)
 
             auto pc_x = pcDistances.data(34 * idx);
@@ -121,8 +127,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pc_yz = pcDistances.data(34 * idx + 7);
 
-            auto pc_zz = pcDistances.data(34 * idx + 8);
-
             // set up pointers to 3-th order tensor of distance R(PC)
 
             auto pc_xxx = pcDistances.data(34 * idx + 9);
@@ -135,8 +139,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pc_xyz = pcDistances.data(34 * idx + 13);
 
-            auto pc_xzz = pcDistances.data(34 * idx + 14);
-
             // set up pointers to 4-th order tensor of distance R(PC)
 
             auto pc_xxxx = pcDistances.data(34 * idx + 19);
@@ -148,8 +150,6 @@ namespace npotrecfunc { // npotrecfunc namespace
             auto pc_xxyy = pcDistances.data(34 * idx + 22);
 
             auto pc_xxyz = pcDistances.data(34 * idx + 23);
-
-            auto pc_xxzz = pcDistances.data(34 * idx + 24);
 
             // set up pointers to auxilary integrals
 
@@ -175,21 +175,12 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto t_xx_yz = primBuffer.data(36 * idx + 4);
 
-            auto t_xx_zz = primBuffer.data(36 * idx + 5);
+            // Batch of Integrals (0,5)
 
-            auto t_xy_xx = primBuffer.data(36 * idx + 6);
-
-            auto t_xy_xy = primBuffer.data(36 * idx + 7);
-
-            auto t_xy_xz = primBuffer.data(36 * idx + 8);
-
-            // Batch of Integrals (0,9)
-
-            #pragma omp simd aligned(fx, pa_x, pa_xx, pa_xy, pa_y, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_yz, pb_z, \
-                                     pb_zz, pc_x, pc_xx, pc_xxx, pc_xxxx, pc_xxxy, pc_xxxz, pc_xxy, pc_xxyy, pc_xxyz, \
-                                     pc_xxz, pc_xxzz, pc_xy, pc_xyy, pc_xyz, pc_xz, pc_xzz, pc_y, pc_yy, pc_yz, pc_z, pc_zz, \
-                                     s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_xx_xx, t_xx_xy, t_xx_xz, t_xx_yy, \
-                                     t_xx_yz, t_xx_zz, t_xy_xx, t_xy_xy, t_xy_xz: VLX_ALIGN)
+            #pragma omp simd aligned(fx, pa_x, pa_xx, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_yz, pb_z, pc_x, pc_xx, \
+                                     pc_xxx, pc_xxxx, pc_xxxy, pc_xxxz, pc_xxy, pc_xxyy, pc_xxyz, pc_xxz, pc_xy, pc_xyy, \
+                                     pc_xyz, pc_xz, pc_y, pc_yy, pc_yz, pc_z, s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, \
+                                     t_xx_xx, t_xx_xy, t_xx_xz, t_xx_yy, t_xx_yz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_s_0_0_0 = s_0_0_0[j];
@@ -255,6 +246,172 @@ namespace npotrecfunc { // npotrecfunc namespace
                 t_xx_yz[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_yz[j] - 2.0 * pa_x[j] * pc_xyz[j] - pc_xxz[j] * pb_y[j] - pc_xxy[j] * pb_z[j]);
 
                 t_xx_yz[j] += fl_s_0_0_4 * pc_xxyz[j];
+            }
+
+            idx++;
+        }
+    }
+
+    void
+    compNuclearPotentialForDD_5_10(      CMemBlock2D<double>& primBuffer,
+                                   const CMemBlock2D<double>& auxBuffer,
+                                   const CMemBlock2D<double>& osFactors,
+                                   const CMemBlock2D<double>& paDistances,
+                                   const CMemBlock2D<double>& pbDistances,
+                                   const CMemBlock2D<double>& pcDistances,
+                                   const CGtoBlock&           braGtoBlock,
+                                   const CGtoBlock&           ketGtoBlock,
+                                   const int32_t              iContrGto)
+    {
+        // Batch of Integrals (5,10)
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(3 * idx);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_x = paDistances.data(9 * idx);
+
+            auto pa_y = paDistances.data(9 * idx + 1);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_xx = paDistances.data(9 * idx + 3);
+
+            auto pa_xy = paDistances.data(9 * idx + 4);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(9 * idx);
+
+            auto pb_y = pbDistances.data(9 * idx + 1);
+
+            auto pb_z = pbDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xx = pbDistances.data(9 * idx + 3);
+
+            auto pb_xy = pbDistances.data(9 * idx + 4);
+
+            auto pb_xz = pbDistances.data(9 * idx + 5);
+
+            auto pb_yy = pbDistances.data(9 * idx + 6);
+
+            auto pb_zz = pbDistances.data(9 * idx + 8);
+
+            // set up pointers to 1-th order tensor of distance R(PC)
+
+            auto pc_x = pcDistances.data(34 * idx);
+
+            auto pc_y = pcDistances.data(34 * idx + 1);
+
+            auto pc_z = pcDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PC)
+
+            auto pc_xx = pcDistances.data(34 * idx + 3);
+
+            auto pc_xy = pcDistances.data(34 * idx + 4);
+
+            auto pc_xz = pcDistances.data(34 * idx + 5);
+
+            auto pc_yy = pcDistances.data(34 * idx + 6);
+
+            auto pc_yz = pcDistances.data(34 * idx + 7);
+
+            auto pc_zz = pcDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PC)
+
+            auto pc_xxx = pcDistances.data(34 * idx + 9);
+
+            auto pc_xxy = pcDistances.data(34 * idx + 10);
+
+            auto pc_xxz = pcDistances.data(34 * idx + 11);
+
+            auto pc_xyy = pcDistances.data(34 * idx + 12);
+
+            auto pc_xyz = pcDistances.data(34 * idx + 13);
+
+            auto pc_xzz = pcDistances.data(34 * idx + 14);
+
+            auto pc_yyy = pcDistances.data(34 * idx + 15);
+
+            // set up pointers to 4-th order tensor of distance R(PC)
+
+            auto pc_xxxy = pcDistances.data(34 * idx + 20);
+
+            auto pc_xxyy = pcDistances.data(34 * idx + 22);
+
+            auto pc_xxyz = pcDistances.data(34 * idx + 23);
+
+            auto pc_xxzz = pcDistances.data(34 * idx + 24);
+
+            auto pc_xyyy = pcDistances.data(34 * idx + 25);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0_0 = auxBuffer.data(5 * idx);
+
+            auto s_0_0_1 = auxBuffer.data(5 * idx + 1);
+
+            auto s_0_0_2 = auxBuffer.data(5 * idx + 2);
+
+            auto s_0_0_3 = auxBuffer.data(5 * idx + 3);
+
+            auto s_0_0_4 = auxBuffer.data(5 * idx + 4);
+
+            // set up pointers to integrals
+
+            auto t_xx_zz = primBuffer.data(36 * idx + 5);
+
+            auto t_xy_xx = primBuffer.data(36 * idx + 6);
+
+            auto t_xy_xy = primBuffer.data(36 * idx + 7);
+
+            auto t_xy_xz = primBuffer.data(36 * idx + 8);
+
+            auto t_xy_yy = primBuffer.data(36 * idx + 9);
+
+            // Batch of Integrals (5,10)
+
+            #pragma omp simd aligned(fx, pa_x, pa_xx, pa_xy, pa_y, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_z, pb_zz, \
+                                     pc_x, pc_xx, pc_xxx, pc_xxxy, pc_xxy, pc_xxyy, pc_xxyz, pc_xxz, pc_xxzz, pc_xy, \
+                                     pc_xyy, pc_xyyy, pc_xyz, pc_xz, pc_xzz, pc_y, pc_yy, pc_yyy, pc_yz, pc_z, pc_zz, s_0_0_0, \
+                                     s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_xx_zz, t_xy_xx, t_xy_xy, t_xy_xz, t_xy_yy: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                double fl_s_0_0_0 = s_0_0_0[j];
+
+                double fl_s_0_0_1 = s_0_0_1[j];
+
+                double fl_s_0_0_2 = s_0_0_2[j];
+
+                double fl_s_0_0_3 = s_0_0_3[j];
+
+                double fl_s_0_0_4 = s_0_0_4[j];
+
+                double fl1_fx = fx[j];
+
+                double fl2_fx = fx[j] * fx[j];
 
                 t_xx_zz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pa_xx[j] * pb_zz[j]);
 
@@ -295,6 +452,16 @@ namespace npotrecfunc { // npotrecfunc namespace
                 t_xy_xz[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_yz[j] - pa_x[j] * pc_xyz[j] - pc_xxz[j] * pa_y[j] - pc_xyz[j] * pb_x[j] - pc_xxy[j] * pb_z[j]);
 
                 t_xy_xz[j] += fl_s_0_0_4 * pc_xxyz[j];
+
+                t_xy_yy[j] = fl_s_0_0_0 * (0.5 * pa_xy[j] * fl1_fx + pa_x[j] * fl1_fx * pb_y[j] + pa_xy[j] * pb_yy[j]);
+
+                t_xy_yy[j] += fl_s_0_0_1 * (-0.5 * pa_xy[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * fl1_fx - pa_x[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx - pc_x[j] * fl1_fx * pb_y[j] - 2.0 * pa_xy[j] * pb_y[j] * pc_y[j] - pa_x[j] * pc_y[j] * pb_yy[j] - pc_x[j] * pa_y[j] * pb_yy[j]);
+
+                t_xy_yy[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pc_y[j] * fl1_fx + 0.5 * pc_x[j] * pa_y[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx + pc_x[j] * fl1_fx * pb_y[j] + pa_xy[j] * pc_yy[j] + 2.0 * pa_x[j] * pc_yy[j] * pb_y[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_y[j] + pc_xy[j] * pb_yy[j]);
+
+                t_xy_yy[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - pa_x[j] * pc_yyy[j] - pc_xyy[j] * pa_y[j] - 2.0 * pc_xyy[j] * pb_y[j]);
+
+                t_xy_yy[j] += fl_s_0_0_4 * pc_xyyy[j];
             }
 
             idx++;
@@ -302,17 +469,17 @@ namespace npotrecfunc { // npotrecfunc namespace
     }
 
     void
-    compNuclearPotentialForDD_9_18(      CMemBlock2D<double>& primBuffer,
-                                   const CMemBlock2D<double>& auxBuffer,
-                                   const CMemBlock2D<double>& osFactors,
-                                   const CMemBlock2D<double>& paDistances,
-                                   const CMemBlock2D<double>& pbDistances,
-                                   const CMemBlock2D<double>& pcDistances,
-                                   const CGtoBlock&           braGtoBlock,
-                                   const CGtoBlock&           ketGtoBlock,
-                                   const int32_t              iContrGto)
+    compNuclearPotentialForDD_10_15(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CMemBlock2D<double>& pcDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto)
     {
-        // Batch of Integrals (9,18)
+        // Batch of Integrals (10,15)
 
         // set up pointers to primitives data on bra side
 
@@ -364,8 +531,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pb_xz = pbDistances.data(9 * idx + 5);
 
-            auto pb_yy = pbDistances.data(9 * idx + 6);
-
             auto pb_yz = pbDistances.data(9 * idx + 7);
 
             auto pb_zz = pbDistances.data(9 * idx + 8);
@@ -406,13 +571,9 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pc_xzz = pcDistances.data(34 * idx + 14);
 
-            auto pc_yyy = pcDistances.data(34 * idx + 15);
-
             auto pc_yyz = pcDistances.data(34 * idx + 16);
 
             auto pc_yzz = pcDistances.data(34 * idx + 17);
-
-            auto pc_zzz = pcDistances.data(34 * idx + 18);
 
             // set up pointers to 4-th order tensor of distance R(PC)
 
@@ -422,13 +583,9 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pc_xxzz = pcDistances.data(34 * idx + 24);
 
-            auto pc_xyyy = pcDistances.data(34 * idx + 25);
-
             auto pc_xyyz = pcDistances.data(34 * idx + 26);
 
             auto pc_xyzz = pcDistances.data(34 * idx + 27);
-
-            auto pc_xzzz = pcDistances.data(34 * idx + 28);
 
             // set up pointers to auxilary integrals
 
@@ -444,8 +601,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             // set up pointers to integrals
 
-            auto t_xy_yy = primBuffer.data(36 * idx + 9);
-
             auto t_xy_yz = primBuffer.data(36 * idx + 10);
 
             auto t_xy_zz = primBuffer.data(36 * idx + 11);
@@ -456,20 +611,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto t_xz_xz = primBuffer.data(36 * idx + 14);
 
-            auto t_xz_yy = primBuffer.data(36 * idx + 15);
+            // Batch of Integrals (10,15)
 
-            auto t_xz_yz = primBuffer.data(36 * idx + 16);
-
-            auto t_xz_zz = primBuffer.data(36 * idx + 17);
-
-            // Batch of Integrals (9,18)
-
-            #pragma omp simd aligned(fx, pa_x, pa_xy, pa_xz, pa_y, pa_z, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_yz, \
-                                     pb_z, pb_zz, pc_x, pc_xx, pc_xxx, pc_xxxz, pc_xxy, pc_xxyz, pc_xxz, pc_xxzz, pc_xy, \
-                                     pc_xyy, pc_xyyy, pc_xyyz, pc_xyz, pc_xyzz, pc_xz, pc_xzz, pc_xzzz, pc_y, pc_yy, pc_yyy, \
-                                     pc_yyz, pc_yz, pc_yzz, pc_z, pc_zz, pc_zzz, s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, \
-                                     s_0_0_4, t_xy_yy, t_xy_yz, t_xy_zz, t_xz_xx, t_xz_xy, t_xz_xz, t_xz_yy, t_xz_yz, \
-                                     t_xz_zz: VLX_ALIGN)
+            #pragma omp simd aligned(fx, pa_x, pa_xy, pa_xz, pa_y, pa_z, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yz, pb_z, \
+                                     pb_zz, pc_x, pc_xx, pc_xxx, pc_xxxz, pc_xxy, pc_xxyz, pc_xxz, pc_xxzz, pc_xy, pc_xyy, \
+                                     pc_xyyz, pc_xyz, pc_xyzz, pc_xz, pc_xzz, pc_y, pc_yy, pc_yyz, pc_yz, pc_yzz, pc_z, pc_zz, \
+                                     s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_xy_yz, t_xy_zz, t_xz_xx, t_xz_xy, \
+                                     t_xz_xz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_s_0_0_0 = s_0_0_0[j];
@@ -485,16 +633,6 @@ namespace npotrecfunc { // npotrecfunc namespace
                 double fl1_fx = fx[j];
 
                 double fl2_fx = fx[j] * fx[j];
-
-                t_xy_yy[j] = fl_s_0_0_0 * (0.5 * pa_xy[j] * fl1_fx + pa_x[j] * fl1_fx * pb_y[j] + pa_xy[j] * pb_yy[j]);
-
-                t_xy_yy[j] += fl_s_0_0_1 * (-0.5 * pa_xy[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * fl1_fx - pa_x[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx - pc_x[j] * fl1_fx * pb_y[j] - 2.0 * pa_xy[j] * pb_y[j] * pc_y[j] - pa_x[j] * pc_y[j] * pb_yy[j] - pc_x[j] * pa_y[j] * pb_yy[j]);
-
-                t_xy_yy[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pc_y[j] * fl1_fx + 0.5 * pc_x[j] * pa_y[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx + pc_x[j] * fl1_fx * pb_y[j] + pa_xy[j] * pc_yy[j] + 2.0 * pa_x[j] * pc_yy[j] * pb_y[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_y[j] + pc_xy[j] * pb_yy[j]);
-
-                t_xy_yy[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - pa_x[j] * pc_yyy[j] - pc_xyy[j] * pa_y[j] - 2.0 * pc_xyy[j] * pb_y[j]);
-
-                t_xy_yy[j] += fl_s_0_0_4 * pc_xyyy[j];
 
                 t_xy_yz[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_xy[j] * pb_yz[j]);
 
@@ -545,6 +683,177 @@ namespace npotrecfunc { // npotrecfunc namespace
                 t_xz_xz[j] += fl_s_0_0_3 * (-0.5 * pc_xx[j] * fl1_fx - 0.5 * fl1_fx * pc_zz[j] - pa_x[j] * pc_xzz[j] - pc_xxz[j] * pa_z[j] - pc_xzz[j] * pb_x[j] - pc_xxz[j] * pb_z[j]);
 
                 t_xz_xz[j] += fl_s_0_0_4 * pc_xxzz[j];
+            }
+
+            idx++;
+        }
+    }
+
+    void
+    compNuclearPotentialForDD_15_20(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CMemBlock2D<double>& pcDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto)
+    {
+        // Batch of Integrals (15,20)
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(3 * idx);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_x = paDistances.data(9 * idx);
+
+            auto pa_y = paDistances.data(9 * idx + 1);
+
+            auto pa_z = paDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_xz = paDistances.data(9 * idx + 5);
+
+            auto pa_yy = paDistances.data(9 * idx + 6);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(9 * idx);
+
+            auto pb_y = pbDistances.data(9 * idx + 1);
+
+            auto pb_z = pbDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xx = pbDistances.data(9 * idx + 3);
+
+            auto pb_xy = pbDistances.data(9 * idx + 4);
+
+            auto pb_yy = pbDistances.data(9 * idx + 6);
+
+            auto pb_yz = pbDistances.data(9 * idx + 7);
+
+            auto pb_zz = pbDistances.data(9 * idx + 8);
+
+            // set up pointers to 1-th order tensor of distance R(PC)
+
+            auto pc_x = pcDistances.data(34 * idx);
+
+            auto pc_y = pcDistances.data(34 * idx + 1);
+
+            auto pc_z = pcDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PC)
+
+            auto pc_xx = pcDistances.data(34 * idx + 3);
+
+            auto pc_xy = pcDistances.data(34 * idx + 4);
+
+            auto pc_xz = pcDistances.data(34 * idx + 5);
+
+            auto pc_yy = pcDistances.data(34 * idx + 6);
+
+            auto pc_yz = pcDistances.data(34 * idx + 7);
+
+            auto pc_zz = pcDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PC)
+
+            auto pc_xxy = pcDistances.data(34 * idx + 10);
+
+            auto pc_xyy = pcDistances.data(34 * idx + 12);
+
+            auto pc_xyz = pcDistances.data(34 * idx + 13);
+
+            auto pc_xzz = pcDistances.data(34 * idx + 14);
+
+            auto pc_yyy = pcDistances.data(34 * idx + 15);
+
+            auto pc_yyz = pcDistances.data(34 * idx + 16);
+
+            auto pc_yzz = pcDistances.data(34 * idx + 17);
+
+            auto pc_zzz = pcDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PC)
+
+            auto pc_xxyy = pcDistances.data(34 * idx + 22);
+
+            auto pc_xyyy = pcDistances.data(34 * idx + 25);
+
+            auto pc_xyyz = pcDistances.data(34 * idx + 26);
+
+            auto pc_xyzz = pcDistances.data(34 * idx + 27);
+
+            auto pc_xzzz = pcDistances.data(34 * idx + 28);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0_0 = auxBuffer.data(5 * idx);
+
+            auto s_0_0_1 = auxBuffer.data(5 * idx + 1);
+
+            auto s_0_0_2 = auxBuffer.data(5 * idx + 2);
+
+            auto s_0_0_3 = auxBuffer.data(5 * idx + 3);
+
+            auto s_0_0_4 = auxBuffer.data(5 * idx + 4);
+
+            // set up pointers to integrals
+
+            auto t_xz_yy = primBuffer.data(36 * idx + 15);
+
+            auto t_xz_yz = primBuffer.data(36 * idx + 16);
+
+            auto t_xz_zz = primBuffer.data(36 * idx + 17);
+
+            auto t_yy_xx = primBuffer.data(36 * idx + 18);
+
+            auto t_yy_xy = primBuffer.data(36 * idx + 19);
+
+            // Batch of Integrals (15,20)
+
+            #pragma omp simd aligned(fx, pa_x, pa_xz, pa_y, pa_yy, pa_z, pb_x, pb_xx, pb_xy, pb_y, pb_yy, pb_yz, pb_z, \
+                                     pb_zz, pc_x, pc_xx, pc_xxy, pc_xxyy, pc_xy, pc_xyy, pc_xyyy, pc_xyyz, pc_xyz, pc_xyzz, \
+                                     pc_xz, pc_xzz, pc_xzzz, pc_y, pc_yy, pc_yyy, pc_yyz, pc_yz, pc_yzz, pc_z, pc_zz, pc_zzz, \
+                                     s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_xz_yy, t_xz_yz, t_xz_zz, t_yy_xx, \
+                                     t_yy_xy: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                double fl_s_0_0_0 = s_0_0_0[j];
+
+                double fl_s_0_0_1 = s_0_0_1[j];
+
+                double fl_s_0_0_2 = s_0_0_2[j];
+
+                double fl_s_0_0_3 = s_0_0_3[j];
+
+                double fl_s_0_0_4 = s_0_0_4[j];
+
+                double fl1_fx = fx[j];
+
+                double fl2_fx = fx[j] * fx[j];
 
                 t_xz_yy[j] = fl_s_0_0_0 * (0.5 * pa_xz[j] * fl1_fx + pa_xz[j] * pb_yy[j]);
 
@@ -575,6 +884,26 @@ namespace npotrecfunc { // npotrecfunc namespace
                 t_xz_zz[j] += fl_s_0_0_3 * (-1.5 * pc_xz[j] * fl1_fx - pa_x[j] * pc_zzz[j] - pc_xzz[j] * pa_z[j] - 2.0 * pc_xzz[j] * pb_z[j]);
 
                 t_xz_zz[j] += fl_s_0_0_4 * pc_xzzz[j];
+
+                t_yy_xx[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pb_xx[j] + pa_yy[j] * pb_xx[j]);
+
+                t_yy_xx[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - pa_y[j] * pc_y[j] * fl1_fx - fl1_fx * pb_x[j] * pc_x[j] - 0.5 * fl1_fx * pb_xx[j] - 2.0 * pa_yy[j] * pb_x[j] * pc_x[j] - 2.0 * pa_y[j] * pc_y[j] * pb_xx[j]);
+
+                t_yy_xx[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_xx[j] + fl1_fx * pb_x[j] * pc_x[j] + pa_yy[j] * pc_xx[j] + 4.0 * pa_y[j] * pc_xy[j] * pb_x[j] + pc_yy[j] * pb_xx[j]);
+
+                t_yy_xx[j] += fl_s_0_0_3 * (-0.5 * pc_yy[j] * fl1_fx - 0.5 * fl1_fx * pc_xx[j] - 2.0 * pa_y[j] * pc_xxy[j] - 2.0 * pc_xyy[j] * pb_x[j]);
+
+                t_yy_xx[j] += fl_s_0_0_4 * pc_xxyy[j];
+
+                t_yy_xy[j] = fl_s_0_0_0 * (pa_y[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pb_xy[j] + pa_yy[j] * pb_xy[j]);
+
+                t_yy_xy[j] += fl_s_0_0_1 * (-pa_y[j] * fl1_fx * pc_x[j] - pa_y[j] * fl1_fx * pb_x[j] - 1.5 * pc_y[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_x[j] * pb_y[j] - 0.5 * fl1_fx * pb_xy[j] - pa_yy[j] * pb_x[j] * pc_y[j] - pa_yy[j] * pc_x[j] * pb_y[j] - 2.0 * pa_y[j] * pc_y[j] * pb_xy[j]);
+
+                t_yy_xy[j] += fl_s_0_0_2 * (pa_y[j] * fl1_fx * pc_x[j] + 1.5 * pc_xy[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pc_x[j] * pb_y[j] + pa_yy[j] * pc_xy[j] + 2.0 * pa_y[j] * pc_yy[j] * pb_x[j] + 2.0 * pa_y[j] * pc_xy[j] * pb_y[j] + pc_yy[j] * pb_xy[j]);
+
+                t_yy_xy[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - 2.0 * pa_y[j] * pc_xyy[j] - pc_yyy[j] * pb_x[j] - pc_xyy[j] * pb_y[j]);
+
+                t_yy_xy[j] += fl_s_0_0_4 * pc_xyyy[j];
             }
 
             idx++;
@@ -582,7 +911,7 @@ namespace npotrecfunc { // npotrecfunc namespace
     }
 
     void
-    compNuclearPotentialForDD_18_27(      CMemBlock2D<double>& primBuffer,
+    compNuclearPotentialForDD_20_24(      CMemBlock2D<double>& primBuffer,
                                     const CMemBlock2D<double>& auxBuffer,
                                     const CMemBlock2D<double>& osFactors,
                                     const CMemBlock2D<double>& paDistances,
@@ -592,7 +921,197 @@ namespace npotrecfunc { // npotrecfunc namespace
                                     const CGtoBlock&           ketGtoBlock,
                                     const int32_t              iContrGto)
     {
-        // Batch of Integrals (18,27)
+        // Batch of Integrals (20,24)
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(3 * idx);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_y = paDistances.data(9 * idx + 1);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_yy = paDistances.data(9 * idx + 6);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(9 * idx);
+
+            auto pb_y = pbDistances.data(9 * idx + 1);
+
+            auto pb_z = pbDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xz = pbDistances.data(9 * idx + 5);
+
+            auto pb_yy = pbDistances.data(9 * idx + 6);
+
+            auto pb_yz = pbDistances.data(9 * idx + 7);
+
+            auto pb_zz = pbDistances.data(9 * idx + 8);
+
+            // set up pointers to 1-th order tensor of distance R(PC)
+
+            auto pc_x = pcDistances.data(34 * idx);
+
+            auto pc_y = pcDistances.data(34 * idx + 1);
+
+            auto pc_z = pcDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PC)
+
+            auto pc_xy = pcDistances.data(34 * idx + 4);
+
+            auto pc_xz = pcDistances.data(34 * idx + 5);
+
+            auto pc_yy = pcDistances.data(34 * idx + 6);
+
+            auto pc_yz = pcDistances.data(34 * idx + 7);
+
+            auto pc_zz = pcDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PC)
+
+            auto pc_xyy = pcDistances.data(34 * idx + 12);
+
+            auto pc_xyz = pcDistances.data(34 * idx + 13);
+
+            auto pc_yyy = pcDistances.data(34 * idx + 15);
+
+            auto pc_yyz = pcDistances.data(34 * idx + 16);
+
+            auto pc_yzz = pcDistances.data(34 * idx + 17);
+
+            // set up pointers to 4-th order tensor of distance R(PC)
+
+            auto pc_xyyz = pcDistances.data(34 * idx + 26);
+
+            auto pc_yyyy = pcDistances.data(34 * idx + 29);
+
+            auto pc_yyyz = pcDistances.data(34 * idx + 30);
+
+            auto pc_yyzz = pcDistances.data(34 * idx + 31);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0_0 = auxBuffer.data(5 * idx);
+
+            auto s_0_0_1 = auxBuffer.data(5 * idx + 1);
+
+            auto s_0_0_2 = auxBuffer.data(5 * idx + 2);
+
+            auto s_0_0_3 = auxBuffer.data(5 * idx + 3);
+
+            auto s_0_0_4 = auxBuffer.data(5 * idx + 4);
+
+            // set up pointers to integrals
+
+            auto t_yy_xz = primBuffer.data(36 * idx + 20);
+
+            auto t_yy_yy = primBuffer.data(36 * idx + 21);
+
+            auto t_yy_yz = primBuffer.data(36 * idx + 22);
+
+            auto t_yy_zz = primBuffer.data(36 * idx + 23);
+
+            // Batch of Integrals (20,24)
+
+            #pragma omp simd aligned(fx, pa_y, pa_yy, pb_x, pb_xz, pb_y, pb_yy, pb_yz, pb_z, pb_zz, pc_x, pc_xy, pc_xyy, \
+                                     pc_xyyz, pc_xyz, pc_xz, pc_y, pc_yy, pc_yyy, pc_yyyy, pc_yyyz, pc_yyz, pc_yyzz, pc_yz, \
+                                     pc_yzz, pc_z, pc_zz, s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_yy_xz, t_yy_yy, \
+                                     t_yy_yz, t_yy_zz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                double fl_s_0_0_0 = s_0_0_0[j];
+
+                double fl_s_0_0_1 = s_0_0_1[j];
+
+                double fl_s_0_0_2 = s_0_0_2[j];
+
+                double fl_s_0_0_3 = s_0_0_3[j];
+
+                double fl_s_0_0_4 = s_0_0_4[j];
+
+                double fl1_fx = fx[j];
+
+                double fl2_fx = fx[j] * fx[j];
+
+                t_yy_xz[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pb_xz[j] + pa_yy[j] * pb_xz[j]);
+
+                t_yy_xz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_x[j] * pc_z[j] - 0.5 * fl1_fx * pc_x[j] * pb_z[j] - 0.5 * fl1_fx * pb_xz[j] - pa_yy[j] * pb_x[j] * pc_z[j] - pa_yy[j] * pc_x[j] * pb_z[j] - 2.0 * pa_y[j] * pc_y[j] * pb_xz[j]);
+
+                t_yy_xz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xz[j] + 0.5 * fl1_fx * pb_x[j] * pc_z[j] + 0.5 * fl1_fx * pc_x[j] * pb_z[j] + pa_yy[j] * pc_xz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_x[j] + 2.0 * pa_y[j] * pc_xy[j] * pb_z[j] + pc_yy[j] * pb_xz[j]);
+
+                t_yy_xz[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_xz[j] - 2.0 * pa_y[j] * pc_xyz[j] - pc_yyz[j] * pb_x[j] - pc_xyy[j] * pb_z[j]);
+
+                t_yy_xz[j] += fl_s_0_0_4 * pc_xyyz[j];
+
+                t_yy_yy[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 2.0 * pa_y[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pb_yy[j] + pa_yy[j] * pb_yy[j]);
+
+                t_yy_yy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - 3.0 * pa_y[j] * pc_y[j] * fl1_fx - 2.0 * pa_y[j] * fl1_fx * pb_y[j] - 3.0 * pc_y[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pb_yy[j] - 2.0 * pa_yy[j] * pb_y[j] * pc_y[j] - 2.0 * pa_y[j] * pc_y[j] * pb_yy[j]);
+
+                t_yy_yy[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 3.0 * pa_y[j] * pc_y[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx + 3.0 * pc_y[j] * fl1_fx * pb_y[j] + pa_yy[j] * pc_yy[j] + 4.0 * pa_y[j] * pc_yy[j] * pb_y[j] + pc_yy[j] * pb_yy[j]);
+
+                t_yy_yy[j] += fl_s_0_0_3 * (-3.0 * pc_yy[j] * fl1_fx - 2.0 * pa_y[j] * pc_yyy[j] - 2.0 * pc_yyy[j] * pb_y[j]);
+
+                t_yy_yy[j] += fl_s_0_0_4 * pc_yyyy[j];
+
+                t_yy_yz[j] = fl_s_0_0_0 * (pa_y[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_yz[j] + pa_yy[j] * pb_yz[j]);
+
+                t_yy_yz[j] += fl_s_0_0_1 * (-pa_y[j] * fl1_fx * pc_z[j] - pa_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * fl1_fx * pb_yz[j] - pa_yy[j] * pb_y[j] * pc_z[j] - pa_yy[j] * pc_y[j] * pb_z[j] - 2.0 * pa_y[j] * pc_y[j] * pb_yz[j]);
+
+                t_yy_yz[j] += fl_s_0_0_2 * (pa_y[j] * fl1_fx * pc_z[j] + 1.5 * pc_yz[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_y[j] * pc_z[j] + pa_yy[j] * pc_yz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_y[j] + 2.0 * pa_y[j] * pc_yy[j] * pb_z[j] + pc_yy[j] * pb_yz[j]);
+
+                t_yy_yz[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - 2.0 * pa_y[j] * pc_yyz[j] - pc_yyz[j] * pb_y[j] - pc_yyy[j] * pb_z[j]);
+
+                t_yy_yz[j] += fl_s_0_0_4 * pc_yyyz[j];
+
+                t_yy_zz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pa_yy[j] * pb_zz[j]);
+
+                t_yy_zz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - pa_y[j] * pc_y[j] * fl1_fx - fl1_fx * pb_z[j] * pc_z[j] - 0.5 * fl1_fx * pb_zz[j] - 2.0 * pa_yy[j] * pb_z[j] * pc_z[j] - 2.0 * pa_y[j] * pc_y[j] * pb_zz[j]);
+
+                t_yy_zz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pb_z[j] * pc_z[j] + pa_yy[j] * pc_zz[j] + 4.0 * pa_y[j] * pc_yz[j] * pb_z[j] + pc_yy[j] * pb_zz[j]);
+
+                t_yy_zz[j] += fl_s_0_0_3 * (-0.5 * pc_yy[j] * fl1_fx - 0.5 * fl1_fx * pc_zz[j] - 2.0 * pa_y[j] * pc_yzz[j] - 2.0 * pc_yyz[j] * pb_z[j]);
+
+                t_yy_zz[j] += fl_s_0_0_4 * pc_yyzz[j];
+            }
+
+            idx++;
+        }
+    }
+
+    void
+    compNuclearPotentialForDD_24_28(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CMemBlock2D<double>& pcDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto)
+    {
+        // Batch of Integrals (24,28)
 
         // set up pointers to primitives data on bra side
 
@@ -622,8 +1141,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             // set up pointers to 2-th order tensor of distance R(PA)
 
-            auto pa_yy = paDistances.data(9 * idx + 6);
-
             auto pa_yz = paDistances.data(9 * idx + 7);
 
             // set up pointers to 1-th order tensor of distance R(PB)
@@ -643,10 +1160,6 @@ namespace npotrecfunc { // npotrecfunc namespace
             auto pb_xz = pbDistances.data(9 * idx + 5);
 
             auto pb_yy = pbDistances.data(9 * idx + 6);
-
-            auto pb_yz = pbDistances.data(9 * idx + 7);
-
-            auto pb_zz = pbDistances.data(9 * idx + 8);
 
             // set up pointers to 1-th order tensor of distance R(PC)
 
@@ -690,21 +1203,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             // set up pointers to 4-th order tensor of distance R(PC)
 
-            auto pc_xxyy = pcDistances.data(34 * idx + 22);
-
             auto pc_xxyz = pcDistances.data(34 * idx + 23);
-
-            auto pc_xyyy = pcDistances.data(34 * idx + 25);
 
             auto pc_xyyz = pcDistances.data(34 * idx + 26);
 
             auto pc_xyzz = pcDistances.data(34 * idx + 27);
 
-            auto pc_yyyy = pcDistances.data(34 * idx + 29);
-
             auto pc_yyyz = pcDistances.data(34 * idx + 30);
-
-            auto pc_yyzz = pcDistances.data(34 * idx + 31);
 
             // set up pointers to auxilary integrals
 
@@ -720,31 +1225,20 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             // set up pointers to integrals
 
-            auto t_yy_xx = primBuffer.data(36 * idx + 18);
-
-            auto t_yy_xy = primBuffer.data(36 * idx + 19);
-
-            auto t_yy_xz = primBuffer.data(36 * idx + 20);
-
-            auto t_yy_yy = primBuffer.data(36 * idx + 21);
-
-            auto t_yy_yz = primBuffer.data(36 * idx + 22);
-
-            auto t_yy_zz = primBuffer.data(36 * idx + 23);
-
             auto t_yz_xx = primBuffer.data(36 * idx + 24);
 
             auto t_yz_xy = primBuffer.data(36 * idx + 25);
 
             auto t_yz_xz = primBuffer.data(36 * idx + 26);
 
-            // Batch of Integrals (18,27)
+            auto t_yz_yy = primBuffer.data(36 * idx + 27);
 
-            #pragma omp simd aligned(fx, pa_y, pa_yy, pa_yz, pa_z, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_yz, pb_z, \
-                                     pb_zz, pc_x, pc_xx, pc_xxy, pc_xxyy, pc_xxyz, pc_xxz, pc_xy, pc_xyy, pc_xyyy, pc_xyyz, \
-                                     pc_xyz, pc_xyzz, pc_xz, pc_xzz, pc_y, pc_yy, pc_yyy, pc_yyyy, pc_yyyz, pc_yyz, pc_yyzz, \
-                                     pc_yz, pc_yzz, pc_z, pc_zz, s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_yy_xx, \
-                                     t_yy_xy, t_yy_xz, t_yy_yy, t_yy_yz, t_yy_zz, t_yz_xx, t_yz_xy, t_yz_xz: VLX_ALIGN)
+            // Batch of Integrals (24,28)
+
+            #pragma omp simd aligned(fx, pa_y, pa_yz, pa_z, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_z, pc_x, pc_xx, \
+                                     pc_xxy, pc_xxyz, pc_xxz, pc_xy, pc_xyy, pc_xyyz, pc_xyz, pc_xyzz, pc_xz, pc_xzz, pc_y, \
+                                     pc_yy, pc_yyy, pc_yyyz, pc_yyz, pc_yz, pc_yzz, pc_z, pc_zz, s_0_0_0, s_0_0_1, s_0_0_2, \
+                                     s_0_0_3, s_0_0_4, t_yz_xx, t_yz_xy, t_yz_xz, t_yz_yy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_s_0_0_0 = s_0_0_0[j];
@@ -758,68 +1252,6 @@ namespace npotrecfunc { // npotrecfunc namespace
                 double fl_s_0_0_4 = s_0_0_4[j];
 
                 double fl1_fx = fx[j];
-
-                double fl2_fx = fx[j] * fx[j];
-
-                t_yy_xx[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pb_xx[j] + pa_yy[j] * pb_xx[j]);
-
-                t_yy_xx[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - pa_y[j] * pc_y[j] * fl1_fx - fl1_fx * pb_x[j] * pc_x[j] - 0.5 * fl1_fx * pb_xx[j] - 2.0 * pa_yy[j] * pb_x[j] * pc_x[j] - 2.0 * pa_y[j] * pc_y[j] * pb_xx[j]);
-
-                t_yy_xx[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_xx[j] + fl1_fx * pb_x[j] * pc_x[j] + pa_yy[j] * pc_xx[j] + 4.0 * pa_y[j] * pc_xy[j] * pb_x[j] + pc_yy[j] * pb_xx[j]);
-
-                t_yy_xx[j] += fl_s_0_0_3 * (-0.5 * pc_yy[j] * fl1_fx - 0.5 * fl1_fx * pc_xx[j] - 2.0 * pa_y[j] * pc_xxy[j] - 2.0 * pc_xyy[j] * pb_x[j]);
-
-                t_yy_xx[j] += fl_s_0_0_4 * pc_xxyy[j];
-
-                t_yy_xy[j] = fl_s_0_0_0 * (pa_y[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pb_xy[j] + pa_yy[j] * pb_xy[j]);
-
-                t_yy_xy[j] += fl_s_0_0_1 * (-pa_y[j] * fl1_fx * pc_x[j] - pa_y[j] * fl1_fx * pb_x[j] - 1.5 * pc_y[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_x[j] * pb_y[j] - 0.5 * fl1_fx * pb_xy[j] - pa_yy[j] * pb_x[j] * pc_y[j] - pa_yy[j] * pc_x[j] * pb_y[j] - 2.0 * pa_y[j] * pc_y[j] * pb_xy[j]);
-
-                t_yy_xy[j] += fl_s_0_0_2 * (pa_y[j] * fl1_fx * pc_x[j] + 1.5 * pc_xy[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pc_x[j] * pb_y[j] + pa_yy[j] * pc_xy[j] + 2.0 * pa_y[j] * pc_yy[j] * pb_x[j] + 2.0 * pa_y[j] * pc_xy[j] * pb_y[j] + pc_yy[j] * pb_xy[j]);
-
-                t_yy_xy[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - 2.0 * pa_y[j] * pc_xyy[j] - pc_yyy[j] * pb_x[j] - pc_xyy[j] * pb_y[j]);
-
-                t_yy_xy[j] += fl_s_0_0_4 * pc_xyyy[j];
-
-                t_yy_xz[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pb_xz[j] + pa_yy[j] * pb_xz[j]);
-
-                t_yy_xz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_x[j] * pc_z[j] - 0.5 * fl1_fx * pc_x[j] * pb_z[j] - 0.5 * fl1_fx * pb_xz[j] - pa_yy[j] * pb_x[j] * pc_z[j] - pa_yy[j] * pc_x[j] * pb_z[j] - 2.0 * pa_y[j] * pc_y[j] * pb_xz[j]);
-
-                t_yy_xz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xz[j] + 0.5 * fl1_fx * pb_x[j] * pc_z[j] + 0.5 * fl1_fx * pc_x[j] * pb_z[j] + pa_yy[j] * pc_xz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_x[j] + 2.0 * pa_y[j] * pc_xy[j] * pb_z[j] + pc_yy[j] * pb_xz[j]);
-
-                t_yy_xz[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_xz[j] - 2.0 * pa_y[j] * pc_xyz[j] - pc_yyz[j] * pb_x[j] - pc_xyy[j] * pb_z[j]);
-
-                t_yy_xz[j] += fl_s_0_0_4 * pc_xyyz[j];
-
-                t_yy_yy[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 2.0 * pa_y[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pb_yy[j] + pa_yy[j] * pb_yy[j]);
-
-                t_yy_yy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - 3.0 * pa_y[j] * pc_y[j] * fl1_fx - 2.0 * pa_y[j] * fl1_fx * pb_y[j] - 3.0 * pc_y[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pb_yy[j] - 2.0 * pa_yy[j] * pb_y[j] * pc_y[j] - 2.0 * pa_y[j] * pc_y[j] * pb_yy[j]);
-
-                t_yy_yy[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 3.0 * pa_y[j] * pc_y[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx + 3.0 * pc_y[j] * fl1_fx * pb_y[j] + pa_yy[j] * pc_yy[j] + 4.0 * pa_y[j] * pc_yy[j] * pb_y[j] + pc_yy[j] * pb_yy[j]);
-
-                t_yy_yy[j] += fl_s_0_0_3 * (-3.0 * pc_yy[j] * fl1_fx - 2.0 * pa_y[j] * pc_yyy[j] - 2.0 * pc_yyy[j] * pb_y[j]);
-
-                t_yy_yy[j] += fl_s_0_0_4 * pc_yyyy[j];
-
-                t_yy_yz[j] = fl_s_0_0_0 * (pa_y[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_yz[j] + pa_yy[j] * pb_yz[j]);
-
-                t_yy_yz[j] += fl_s_0_0_1 * (-pa_y[j] * fl1_fx * pc_z[j] - pa_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * fl1_fx * pb_yz[j] - pa_yy[j] * pb_y[j] * pc_z[j] - pa_yy[j] * pc_y[j] * pb_z[j] - 2.0 * pa_y[j] * pc_y[j] * pb_yz[j]);
-
-                t_yy_yz[j] += fl_s_0_0_2 * (pa_y[j] * fl1_fx * pc_z[j] + 1.5 * pc_yz[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_y[j] * pc_z[j] + pa_yy[j] * pc_yz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_y[j] + 2.0 * pa_y[j] * pc_yy[j] * pb_z[j] + pc_yy[j] * pb_yz[j]);
-
-                t_yy_yz[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - 2.0 * pa_y[j] * pc_yyz[j] - pc_yyz[j] * pb_y[j] - pc_yyy[j] * pb_z[j]);
-
-                t_yy_yz[j] += fl_s_0_0_4 * pc_yyyz[j];
-
-                t_yy_zz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pa_yy[j] * pb_zz[j]);
-
-                t_yy_zz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - pa_y[j] * pc_y[j] * fl1_fx - fl1_fx * pb_z[j] * pc_z[j] - 0.5 * fl1_fx * pb_zz[j] - 2.0 * pa_yy[j] * pb_z[j] * pc_z[j] - 2.0 * pa_y[j] * pc_y[j] * pb_zz[j]);
-
-                t_yy_zz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pb_z[j] * pc_z[j] + pa_yy[j] * pc_zz[j] + 4.0 * pa_y[j] * pc_yz[j] * pb_z[j] + pc_yy[j] * pb_zz[j]);
-
-                t_yy_zz[j] += fl_s_0_0_3 * (-0.5 * pc_yy[j] * fl1_fx - 0.5 * fl1_fx * pc_zz[j] - 2.0 * pa_y[j] * pc_yzz[j] - 2.0 * pc_yyz[j] * pb_z[j]);
-
-                t_yy_zz[j] += fl_s_0_0_4 * pc_yyzz[j];
 
                 t_yz_xx[j] = fl_s_0_0_0 * (0.5 * pa_yz[j] * fl1_fx + pa_yz[j] * pb_xx[j]);
 
@@ -850,6 +1282,16 @@ namespace npotrecfunc { // npotrecfunc namespace
                 t_yz_xz[j] += fl_s_0_0_3 * (-0.5 * pc_xy[j] * fl1_fx - pa_y[j] * pc_xzz[j] - pc_xyz[j] * pa_z[j] - pc_yzz[j] * pb_x[j] - pc_xyz[j] * pb_z[j]);
 
                 t_yz_xz[j] += fl_s_0_0_4 * pc_xyzz[j];
+
+                t_yz_yy[j] = fl_s_0_0_0 * (0.5 * pa_yz[j] * fl1_fx + fl1_fx * pa_z[j] * pb_y[j] + pa_yz[j] * pb_yy[j]);
+
+                t_yz_yy[j] += fl_s_0_0_1 * (-0.5 * pa_yz[j] * fl1_fx - 0.5 * pa_y[j] * pc_z[j] * fl1_fx - 1.5 * pc_y[j] * pa_z[j] * fl1_fx - fl1_fx * pc_z[j] * pb_y[j] - fl1_fx * pa_z[j] * pb_y[j] - 2.0 * pa_yz[j] * pb_y[j] * pc_y[j] - pa_y[j] * pc_z[j] * pb_yy[j] - pc_y[j] * pa_z[j] * pb_yy[j]);
+
+                t_yz_yy[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pc_z[j] * fl1_fx + 1.5 * pc_y[j] * pa_z[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx + fl1_fx * pc_z[j] * pb_y[j] + pa_yz[j] * pc_yy[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_y[j] + 2.0 * pc_yy[j] * pa_z[j] * pb_y[j] + pc_yz[j] * pb_yy[j]);
+
+                t_yz_yy[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - pa_y[j] * pc_yyz[j] - pc_yyy[j] * pa_z[j] - 2.0 * pc_yyz[j] * pb_y[j]);
+
+                t_yz_yy[j] += fl_s_0_0_4 * pc_yyyz[j];
             }
 
             idx++;
@@ -857,7 +1299,7 @@ namespace npotrecfunc { // npotrecfunc namespace
     }
 
     void
-    compNuclearPotentialForDD_27_36(      CMemBlock2D<double>& primBuffer,
+    compNuclearPotentialForDD_28_32(      CMemBlock2D<double>& primBuffer,
                                     const CMemBlock2D<double>& auxBuffer,
                                     const CMemBlock2D<double>& osFactors,
                                     const CMemBlock2D<double>& paDistances,
@@ -867,7 +1309,7 @@ namespace npotrecfunc { // npotrecfunc namespace
                                     const CGtoBlock&           ketGtoBlock,
                                     const int32_t              iContrGto)
     {
-        // Batch of Integrals (27,36)
+        // Batch of Integrals (28,32)
 
         // set up pointers to primitives data on bra side
 
@@ -915,10 +1357,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pb_xy = pbDistances.data(9 * idx + 4);
 
-            auto pb_xz = pbDistances.data(9 * idx + 5);
-
-            auto pb_yy = pbDistances.data(9 * idx + 6);
-
             auto pb_yz = pbDistances.data(9 * idx + 7);
 
             auto pb_zz = pbDistances.data(9 * idx + 8);
@@ -953,8 +1391,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pc_xzz = pcDistances.data(34 * idx + 14);
 
-            auto pc_yyy = pcDistances.data(34 * idx + 15);
-
             auto pc_yyz = pcDistances.data(34 * idx + 16);
 
             auto pc_yzz = pcDistances.data(34 * idx + 17);
@@ -967,15 +1403,9 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto pc_xyzz = pcDistances.data(34 * idx + 27);
 
-            auto pc_xzzz = pcDistances.data(34 * idx + 28);
-
-            auto pc_yyyz = pcDistances.data(34 * idx + 30);
-
             auto pc_yyzz = pcDistances.data(34 * idx + 31);
 
             auto pc_yzzz = pcDistances.data(34 * idx + 32);
-
-            auto pc_zzzz = pcDistances.data(34 * idx + 33);
 
             // set up pointers to auxilary integrals
 
@@ -991,8 +1421,6 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             // set up pointers to integrals
 
-            auto t_yz_yy = primBuffer.data(36 * idx + 27);
-
             auto t_yz_yz = primBuffer.data(36 * idx + 28);
 
             auto t_yz_zz = primBuffer.data(36 * idx + 29);
@@ -1001,21 +1429,12 @@ namespace npotrecfunc { // npotrecfunc namespace
 
             auto t_zz_xy = primBuffer.data(36 * idx + 31);
 
-            auto t_zz_xz = primBuffer.data(36 * idx + 32);
+            // Batch of Integrals (28,32)
 
-            auto t_zz_yy = primBuffer.data(36 * idx + 33);
-
-            auto t_zz_yz = primBuffer.data(36 * idx + 34);
-
-            auto t_zz_zz = primBuffer.data(36 * idx + 35);
-
-            // Batch of Integrals (27,36)
-
-            #pragma omp simd aligned(fx, pa_y, pa_yz, pa_z, pa_zz, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_yz, pb_z, \
-                                     pb_zz, pc_x, pc_xx, pc_xxz, pc_xxzz, pc_xy, pc_xyz, pc_xyzz, pc_xz, pc_xzz, pc_xzzz, \
-                                     pc_y, pc_yy, pc_yyy, pc_yyyz, pc_yyz, pc_yyzz, pc_yz, pc_yzz, pc_yzzz, pc_z, pc_zz, \
-                                     pc_zzz, pc_zzzz, s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_yz_yy, t_yz_yz, \
-                                     t_yz_zz, t_zz_xx, t_zz_xy, t_zz_xz, t_zz_yy, t_zz_yz, t_zz_zz: VLX_ALIGN)
+            #pragma omp simd aligned(fx, pa_y, pa_yz, pa_z, pa_zz, pb_x, pb_xx, pb_xy, pb_y, pb_yz, pb_z, pb_zz, pc_x, \
+                                     pc_xx, pc_xxz, pc_xxzz, pc_xy, pc_xyz, pc_xyzz, pc_xz, pc_xzz, pc_y, pc_yy, pc_yyz, \
+                                     pc_yyzz, pc_yz, pc_yzz, pc_yzzz, pc_z, pc_zz, pc_zzz, s_0_0_0, s_0_0_1, s_0_0_2, \
+                                     s_0_0_3, s_0_0_4, t_yz_yz, t_yz_zz, t_zz_xx, t_zz_xy: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_s_0_0_0 = s_0_0_0[j];
@@ -1031,16 +1450,6 @@ namespace npotrecfunc { // npotrecfunc namespace
                 double fl1_fx = fx[j];
 
                 double fl2_fx = fx[j] * fx[j];
-
-                t_yz_yy[j] = fl_s_0_0_0 * (0.5 * pa_yz[j] * fl1_fx + fl1_fx * pa_z[j] * pb_y[j] + pa_yz[j] * pb_yy[j]);
-
-                t_yz_yy[j] += fl_s_0_0_1 * (-0.5 * pa_yz[j] * fl1_fx - 0.5 * pa_y[j] * pc_z[j] * fl1_fx - 1.5 * pc_y[j] * pa_z[j] * fl1_fx - fl1_fx * pc_z[j] * pb_y[j] - fl1_fx * pa_z[j] * pb_y[j] - 2.0 * pa_yz[j] * pb_y[j] * pc_y[j] - pa_y[j] * pc_z[j] * pb_yy[j] - pc_y[j] * pa_z[j] * pb_yy[j]);
-
-                t_yz_yy[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pc_z[j] * fl1_fx + 1.5 * pc_y[j] * pa_z[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx + fl1_fx * pc_z[j] * pb_y[j] + pa_yz[j] * pc_yy[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_y[j] + 2.0 * pc_yy[j] * pa_z[j] * pb_y[j] + pc_yz[j] * pb_yy[j]);
-
-                t_yz_yy[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - pa_y[j] * pc_yyz[j] - pc_yyy[j] * pa_z[j] - 2.0 * pc_yyz[j] * pb_y[j]);
-
-                t_yz_yy[j] += fl_s_0_0_4 * pc_yyyz[j];
 
                 t_yz_yz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_y[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_z[j] * pb_z[j] + pa_yz[j] * pb_yz[j]);
 
@@ -1081,6 +1490,152 @@ namespace npotrecfunc { // npotrecfunc namespace
                 t_zz_xy[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_xy[j] - 2.0 * pa_z[j] * pc_xyz[j] - pc_yzz[j] * pb_x[j] - pc_xzz[j] * pb_y[j]);
 
                 t_zz_xy[j] += fl_s_0_0_4 * pc_xyzz[j];
+            }
+
+            idx++;
+        }
+    }
+
+    void
+    compNuclearPotentialForDD_32_36(      CMemBlock2D<double>& primBuffer,
+                                    const CMemBlock2D<double>& auxBuffer,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CMemBlock2D<double>& pcDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto)
+    {
+        // Batch of Integrals (32,36)
+
+        // set up pointers to primitives data on bra side
+
+        auto spos = braGtoBlock.getStartPositions();
+
+        auto epos = braGtoBlock.getEndPositions();
+
+        // set up pointers to primitives data on ket side
+
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+        // loop over contracted GTO on bra side
+
+        int32_t idx = 0;
+
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+
+            auto fx = osFactors.data(3 * idx);
+
+            // set up pointers to 1-th order tensor of distance R(PA)
+
+            auto pa_z = paDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PA)
+
+            auto pa_zz = paDistances.data(9 * idx + 8);
+
+            // set up pointers to 1-th order tensor of distance R(PB)
+
+            auto pb_x = pbDistances.data(9 * idx);
+
+            auto pb_y = pbDistances.data(9 * idx + 1);
+
+            auto pb_z = pbDistances.data(9 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PB)
+
+            auto pb_xz = pbDistances.data(9 * idx + 5);
+
+            auto pb_yy = pbDistances.data(9 * idx + 6);
+
+            auto pb_yz = pbDistances.data(9 * idx + 7);
+
+            auto pb_zz = pbDistances.data(9 * idx + 8);
+
+            // set up pointers to 1-th order tensor of distance R(PC)
+
+            auto pc_x = pcDistances.data(34 * idx);
+
+            auto pc_y = pcDistances.data(34 * idx + 1);
+
+            auto pc_z = pcDistances.data(34 * idx + 2);
+
+            // set up pointers to 2-th order tensor of distance R(PC)
+
+            auto pc_xz = pcDistances.data(34 * idx + 5);
+
+            auto pc_yy = pcDistances.data(34 * idx + 6);
+
+            auto pc_yz = pcDistances.data(34 * idx + 7);
+
+            auto pc_zz = pcDistances.data(34 * idx + 8);
+
+            // set up pointers to 3-th order tensor of distance R(PC)
+
+            auto pc_xzz = pcDistances.data(34 * idx + 14);
+
+            auto pc_yyz = pcDistances.data(34 * idx + 16);
+
+            auto pc_yzz = pcDistances.data(34 * idx + 17);
+
+            auto pc_zzz = pcDistances.data(34 * idx + 18);
+
+            // set up pointers to 4-th order tensor of distance R(PC)
+
+            auto pc_xzzz = pcDistances.data(34 * idx + 28);
+
+            auto pc_yyzz = pcDistances.data(34 * idx + 31);
+
+            auto pc_yzzz = pcDistances.data(34 * idx + 32);
+
+            auto pc_zzzz = pcDistances.data(34 * idx + 33);
+
+            // set up pointers to auxilary integrals
+
+            auto s_0_0_0 = auxBuffer.data(5 * idx);
+
+            auto s_0_0_1 = auxBuffer.data(5 * idx + 1);
+
+            auto s_0_0_2 = auxBuffer.data(5 * idx + 2);
+
+            auto s_0_0_3 = auxBuffer.data(5 * idx + 3);
+
+            auto s_0_0_4 = auxBuffer.data(5 * idx + 4);
+
+            // set up pointers to integrals
+
+            auto t_zz_xz = primBuffer.data(36 * idx + 32);
+
+            auto t_zz_yy = primBuffer.data(36 * idx + 33);
+
+            auto t_zz_yz = primBuffer.data(36 * idx + 34);
+
+            auto t_zz_zz = primBuffer.data(36 * idx + 35);
+
+            // Batch of Integrals (32,36)
+
+            #pragma omp simd aligned(fx, pa_z, pa_zz, pb_x, pb_xz, pb_y, pb_yy, pb_yz, pb_z, pb_zz, pc_x, pc_xz, pc_xzz, \
+                                     pc_xzzz, pc_y, pc_yy, pc_yyz, pc_yyzz, pc_yz, pc_yzz, pc_yzzz, pc_z, pc_zz, pc_zzz, \
+                                     pc_zzzz, s_0_0_0, s_0_0_1, s_0_0_2, s_0_0_3, s_0_0_4, t_zz_xz, t_zz_yy, t_zz_yz, \
+                                     t_zz_zz: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                double fl_s_0_0_0 = s_0_0_0[j];
+
+                double fl_s_0_0_1 = s_0_0_1[j];
+
+                double fl_s_0_0_2 = s_0_0_2[j];
+
+                double fl_s_0_0_3 = s_0_0_3[j];
+
+                double fl_s_0_0_4 = s_0_0_4[j];
+
+                double fl1_fx = fx[j];
+
+                double fl2_fx = fx[j] * fx[j];
 
                 t_zz_xz[j] = fl_s_0_0_0 * (pa_z[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pb_xz[j] + pa_zz[j] * pb_xz[j]);
 
