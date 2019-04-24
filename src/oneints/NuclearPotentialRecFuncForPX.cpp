@@ -1824,9 +1824,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xxx[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 1.5 * pa_x[j] * pb_x[j] * fl1_fx + 1.5 * fl1_fx * pb_xx[j] + pa_x[j] * pb_xxx[j]);
 
-                t_x_xxx[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_x[j] * pb_x[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * fl1_fx - 4.5 * pc_x[j] * pb_x[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] - 3.0 * pa_x[j] * pb_xx[j] * pc_x[j] - pc_x[j] * pb_xxx[j]);
+                t_x_xxx[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_x[j] * pb_x[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * fl1_fx - 4.5 * pc_x[j] * pb_x[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j]);
 
-                t_x_xxx[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 1.5 * pa_x[j] * pc_x[j] * fl1_fx + 4.5 * pc_x[j] * pb_x[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx + 3.0 * pa_x[j] * pb_x[j] * pc_xx[j] + 3.0 * pc_xx[j] * pb_xx[j]);
+                t_x_xxx[j] += fl_s_0_0_1 * (- 3.0 * pa_x[j] * pb_xx[j] * pc_x[j] - pc_x[j] * pb_xxx[j]);
+
+                t_x_xxx[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 1.5 * pa_x[j] * pc_x[j] * fl1_fx + 4.5 * pc_x[j] * pb_x[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx + 3.0 * pa_x[j] * pb_x[j] * pc_xx[j]);
+
+                t_x_xxx[j] += fl_s_0_0_2 * 3.0 * pc_xx[j] * pb_xx[j];
 
                 t_x_xxx[j] += fl_s_0_0_3 * (-3.0 * pc_xx[j] * fl1_fx - pa_x[j] * pc_xxx[j] - 3.0 * pc_xxx[j] * pb_x[j]);
 
@@ -1834,9 +1838,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xxy[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_y[j] + fl1_fx * pb_xy[j] + pa_x[j] * pb_xxy[j]);
 
-                t_x_xxy[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_y[j] - 0.5 * pa_x[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * fl1_fx * pb_y[j] - fl1_fx * pb_x[j] * pc_y[j] - fl1_fx * pb_xy[j] - pa_x[j] * pb_xx[j] * pc_y[j] - 2.0 * pa_x[j] * pb_xy[j] * pc_x[j] - pc_x[j] * pb_xxy[j]);
+                t_x_xxy[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_y[j] - 0.5 * pa_x[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * fl1_fx * pb_y[j] - fl1_fx * pb_x[j] * pc_y[j] - fl1_fx * pb_xy[j]);
 
-                t_x_xxy[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_y[j] + 1.5 * pc_xy[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pb_y[j] + fl1_fx * pb_x[j] * pc_y[j] + 2.0 * pa_x[j] * pb_x[j] * pc_xy[j] + pa_x[j] * pc_xx[j] * pb_y[j] + pc_xy[j] * pb_xx[j] + 2.0 * pc_xx[j] * pb_xy[j]);
+                t_x_xxy[j] += fl_s_0_0_1 * (- pa_x[j] * pb_xx[j] * pc_y[j] - 2.0 * pa_x[j] * pb_xy[j] * pc_x[j] - pc_x[j] * pb_xxy[j]);
+
+                t_x_xxy[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_y[j] + 1.5 * pc_xy[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pb_y[j] + fl1_fx * pb_x[j] * pc_y[j] + 2.0 * pa_x[j] * pb_x[j] * pc_xy[j]);
+
+                t_x_xxy[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_xx[j] * pb_y[j] + pc_xy[j] * pb_xx[j] + 2.0 * pc_xx[j] * pb_xy[j]);
 
                 t_x_xxy[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - pa_x[j] * pc_xxy[j] - 2.0 * pc_xxy[j] * pb_x[j] - pc_xxx[j] * pb_y[j]);
 
@@ -1844,9 +1852,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xxz[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_z[j] + fl1_fx * pb_xz[j] + pa_x[j] * pb_xxz[j]);
 
-                t_x_xxz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_z[j] - fl1_fx * pb_xz[j] - pa_x[j] * pb_xx[j] * pc_z[j] - 2.0 * pa_x[j] * pb_xz[j] * pc_x[j] - pc_x[j] * pb_xxz[j]);
+                t_x_xxz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_z[j] - fl1_fx * pb_xz[j]);
 
-                t_x_xxz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 1.5 * pc_xz[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pb_z[j] + fl1_fx * pb_x[j] * pc_z[j] + 2.0 * pa_x[j] * pb_x[j] * pc_xz[j] + pa_x[j] * pc_xx[j] * pb_z[j] + pc_xz[j] * pb_xx[j] + 2.0 * pc_xx[j] * pb_xz[j]);
+                t_x_xxz[j] += fl_s_0_0_1 * (- pa_x[j] * pb_xx[j] * pc_z[j] - 2.0 * pa_x[j] * pb_xz[j] * pc_x[j] - pc_x[j] * pb_xxz[j]);
+
+                t_x_xxz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 1.5 * pc_xz[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pb_z[j] + fl1_fx * pb_x[j] * pc_z[j] + 2.0 * pa_x[j] * pb_x[j] * pc_xz[j]);
+
+                t_x_xxz[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_xx[j] * pb_z[j] + pc_xz[j] * pb_xx[j] + 2.0 * pc_xx[j] * pb_xz[j]);
 
                 t_x_xxz[j] += fl_s_0_0_3 * (-1.5 * pc_xz[j] * fl1_fx - pa_x[j] * pc_xxz[j] - 2.0 * pc_xxz[j] * pb_x[j] - pc_xxx[j] * pb_z[j]);
 
@@ -2008,9 +2020,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xyy[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pb_x[j] * fl1_fx + 0.5 * fl1_fx * pb_yy[j] + pa_x[j] * pb_xyy[j]);
 
-                t_x_xyy[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_x[j] * pb_x[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * fl1_fx - 0.5 * pc_x[j] * pb_x[j] * fl1_fx - fl1_fx * pb_y[j] * pc_y[j] - 0.5 * fl1_fx * pb_yy[j] - 2.0 * pa_x[j] * pb_xy[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yy[j] - pc_x[j] * pb_xyy[j]);
+                t_x_xyy[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_x[j] * pb_x[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * fl1_fx - 0.5 * pc_x[j] * pb_x[j] * fl1_fx - fl1_fx * pb_y[j] * pc_y[j]);
 
-                t_x_xyy[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_x[j] * pb_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_yy[j] + fl1_fx * pb_y[j] * pc_y[j] + pa_x[j] * pb_x[j] * pc_yy[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_y[j] + 2.0 * pc_xy[j] * pb_xy[j] + pc_xx[j] * pb_yy[j]);
+                t_x_xyy[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pb_yy[j] - 2.0 * pa_x[j] * pb_xy[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yy[j] - pc_x[j] * pb_xyy[j]);
+
+                t_x_xyy[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_x[j] * pb_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_yy[j]);
+
+                t_x_xyy[j] += fl_s_0_0_2 * (+ fl1_fx * pb_y[j] * pc_y[j] + pa_x[j] * pb_x[j] * pc_yy[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_y[j] + 2.0 * pc_xy[j] * pb_xy[j] + pc_xx[j] * pb_yy[j]);
 
                 t_x_xyy[j] += fl_s_0_0_3 * (-0.5 * pc_xx[j] * fl1_fx - 0.5 * fl1_fx * pc_yy[j] - pa_x[j] * pc_xyy[j] - pc_xyy[j] * pb_x[j] - 2.0 * pc_xxy[j] * pb_y[j]);
 
@@ -2018,9 +2034,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xyz[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pb_yz[j] + pa_x[j] * pb_xyz[j]);
 
-                t_x_xyz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * fl1_fx * pb_yz[j] - pa_x[j] * pb_xy[j] * pc_z[j] - pa_x[j] * pb_xz[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yz[j] - pc_x[j] * pb_xyz[j]);
+                t_x_xyz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * fl1_fx * pb_yz[j] - pa_x[j] * pb_xy[j] * pc_z[j] - pa_x[j] * pb_xz[j] * pc_y[j]);
 
-                t_x_xyz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pb_z[j] + pa_x[j] * pb_x[j] * pc_yz[j] + pa_x[j] * pc_xz[j] * pb_y[j] + pa_x[j] * pc_xy[j] * pb_z[j] + pc_xz[j] * pb_xy[j] + pc_xy[j] * pb_xz[j] + pc_xx[j] * pb_yz[j]);
+                t_x_xyz[j] += fl_s_0_0_1 * (- pa_x[j] * pc_x[j] * pb_yz[j] - pc_x[j] * pb_xyz[j]);
+
+                t_x_xyz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pb_z[j] + pa_x[j] * pb_x[j] * pc_yz[j] + pa_x[j] * pc_xz[j] * pb_y[j]);
+
+                t_x_xyz[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_xy[j] * pb_z[j] + pc_xz[j] * pb_xy[j] + pc_xy[j] * pb_xz[j] + pc_xx[j] * pb_yz[j]);
 
                 t_x_xyz[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_yz[j] - pa_x[j] * pc_xyz[j] - pc_xyz[j] * pb_x[j] - pc_xxz[j] * pb_y[j] - pc_xxy[j] * pb_z[j]);
 
@@ -2028,9 +2048,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xzz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pb_x[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pa_x[j] * pb_xzz[j]);
 
-                t_x_xzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_x[j] * pb_x[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * fl1_fx - 0.5 * pc_x[j] * pb_x[j] * fl1_fx - fl1_fx * pb_z[j] * pc_z[j] - 0.5 * fl1_fx * pb_zz[j] - 2.0 * pa_x[j] * pb_xz[j] * pc_z[j] - pa_x[j] * pc_x[j] * pb_zz[j] - pc_x[j] * pb_xzz[j]);
+                t_x_xzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_x[j] * pb_x[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * fl1_fx - 0.5 * pc_x[j] * pb_x[j] * fl1_fx - fl1_fx * pb_z[j] * pc_z[j]);
 
-                t_x_xzz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_x[j] * pb_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pb_z[j] * pc_z[j] + pa_x[j] * pb_x[j] * pc_zz[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_z[j] + 2.0 * pc_xz[j] * pb_xz[j] + pc_xx[j] * pb_zz[j]);
+                t_x_xzz[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pb_zz[j] - 2.0 * pa_x[j] * pb_xz[j] * pc_z[j] - pa_x[j] * pc_x[j] * pb_zz[j] - pc_x[j] * pb_xzz[j]);
+
+                t_x_xzz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_x[j] * pb_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j]);
+
+                t_x_xzz[j] += fl_s_0_0_2 * (+ fl1_fx * pb_z[j] * pc_z[j] + pa_x[j] * pb_x[j] * pc_zz[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_z[j] + 2.0 * pc_xz[j] * pb_xz[j] + pc_xx[j] * pb_zz[j]);
 
                 t_x_xzz[j] += fl_s_0_0_3 * (-0.5 * pc_xx[j] * fl1_fx - 0.5 * fl1_fx * pc_zz[j] - pa_x[j] * pc_xzz[j] - pc_xzz[j] * pb_x[j] - 2.0 * pc_xxz[j] * pb_z[j]);
 
@@ -2194,9 +2218,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_yyz[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_x[j] * pb_yyz[j]);
 
-                t_x_yyz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pb_z[j] - pa_x[j] * pb_yy[j] * pc_z[j] - 2.0 * pa_x[j] * pb_yz[j] * pc_y[j] - pc_x[j] * pb_yyz[j]);
+                t_x_yyz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pb_z[j] - pa_x[j] * pb_yy[j] * pc_z[j] - 2.0 * pa_x[j] * pb_yz[j] * pc_y[j]);
 
-                t_x_yyz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 0.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_z[j] + 2.0 * pa_x[j] * pb_y[j] * pc_yz[j] + pa_x[j] * pc_yy[j] * pb_z[j] + pc_xz[j] * pb_yy[j] + 2.0 * pc_xy[j] * pb_yz[j]);
+                t_x_yyz[j] += -fl_s_0_0_1 * pc_x[j] * pb_yyz[j];
+
+                t_x_yyz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 0.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_z[j] + 2.0 * pa_x[j] * pb_y[j] * pc_yz[j] + pa_x[j] * pc_yy[j] * pb_z[j]);
+
+                t_x_yyz[j] += fl_s_0_0_2 * (+ pc_xz[j] * pb_yy[j] + 2.0 * pc_xy[j] * pb_yz[j]);
 
                 t_x_yyz[j] += fl_s_0_0_3 * (-0.5 * pc_xz[j] * fl1_fx - pa_x[j] * pc_yyz[j] - 2.0 * pc_xyz[j] * pb_y[j] - pc_xyy[j] * pb_z[j]);
 
@@ -2204,9 +2232,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_yzz[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * pb_y[j] * fl1_fx + pa_x[j] * pb_yzz[j]);
 
-                t_x_yzz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * pb_y[j] * fl1_fx - 0.5 * pa_x[j] * pc_y[j] * fl1_fx - 0.5 * pc_x[j] * pb_y[j] * fl1_fx - 2.0 * pa_x[j] * pb_yz[j] * pc_z[j] - pa_x[j] * pc_y[j] * pb_zz[j] - pc_x[j] * pb_yzz[j]);
+                t_x_yzz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * pb_y[j] * fl1_fx - 0.5 * pa_x[j] * pc_y[j] * fl1_fx - 0.5 * pc_x[j] * pb_y[j] * fl1_fx - 2.0 * pa_x[j] * pb_yz[j] * pc_z[j] - pa_x[j] * pc_y[j] * pb_zz[j]);
 
-                t_x_yzz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * pc_y[j] * fl1_fx + 0.5 * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pc_xy[j] * fl1_fx + pa_x[j] * pb_y[j] * pc_zz[j] + 2.0 * pa_x[j] * pc_yz[j] * pb_z[j] + 2.0 * pc_xz[j] * pb_yz[j] + pc_xy[j] * pb_zz[j]);
+                t_x_yzz[j] += -fl_s_0_0_1 * pc_x[j] * pb_yzz[j];
+
+                t_x_yzz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * pc_y[j] * fl1_fx + 0.5 * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pc_xy[j] * fl1_fx + pa_x[j] * pb_y[j] * pc_zz[j] + 2.0 * pa_x[j] * pc_yz[j] * pb_z[j]);
+
+                t_x_yzz[j] += fl_s_0_0_2 * (+ 2.0 * pc_xz[j] * pb_yz[j] + pc_xy[j] * pb_zz[j]);
 
                 t_x_yzz[j] += fl_s_0_0_3 * (-0.5 * pc_xy[j] * fl1_fx - pa_x[j] * pc_yzz[j] - pc_xzz[j] * pb_y[j] - 2.0 * pc_xyz[j] * pb_z[j]);
 
@@ -2384,9 +2416,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xxy[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_y[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pb_xx[j] + pa_y[j] * pb_xxy[j]);
 
-                t_y_xxy[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_y[j] * fl1_fx * pc_y[j] - 0.5 * pa_y[j] * fl1_fx * pb_y[j] - 0.5 * pc_y[j] * fl1_fx * pb_y[j] - fl1_fx * pb_x[j] * pc_x[j] - 0.5 * fl1_fx * pb_xx[j] - pa_y[j] * pb_xx[j] * pc_y[j] - 2.0 * pa_y[j] * pb_xy[j] * pc_x[j] - pc_y[j] * pb_xxy[j]);
+                t_y_xxy[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_y[j] * fl1_fx * pc_y[j] - 0.5 * pa_y[j] * fl1_fx * pb_y[j] - 0.5 * pc_y[j] * fl1_fx * pb_y[j] - fl1_fx * pb_x[j] * pc_x[j]);
 
-                t_y_xxy[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_y[j] * fl1_fx * pc_y[j] + 0.5 * pc_yy[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pc_xx[j] + fl1_fx * pb_x[j] * pc_x[j] + 2.0 * pa_y[j] * pb_x[j] * pc_xy[j] + pa_y[j] * pc_xx[j] * pb_y[j] + pc_yy[j] * pb_xx[j] + 2.0 * pc_xy[j] * pb_xy[j]);
+                t_y_xxy[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pb_xx[j] - pa_y[j] * pb_xx[j] * pc_y[j] - 2.0 * pa_y[j] * pb_xy[j] * pc_x[j] - pc_y[j] * pb_xxy[j]);
+
+                t_y_xxy[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_y[j] * fl1_fx * pc_y[j] + 0.5 * pc_yy[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pc_xx[j]);
+
+                t_y_xxy[j] += fl_s_0_0_2 * (+ fl1_fx * pb_x[j] * pc_x[j] + 2.0 * pa_y[j] * pb_x[j] * pc_xy[j] + pa_y[j] * pc_xx[j] * pb_y[j] + pc_yy[j] * pb_xx[j] + 2.0 * pc_xy[j] * pb_xy[j]);
 
                 t_y_xxy[j] += fl_s_0_0_3 * (-0.5 * pc_yy[j] * fl1_fx - 0.5 * fl1_fx * pc_xx[j] - pa_y[j] * pc_xxy[j] - 2.0 * pc_xyy[j] * pb_x[j] - pc_xxy[j] * pb_y[j]);
 
@@ -2546,9 +2582,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xxz[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * fl1_fx * pb_z[j] + pa_y[j] * pb_xxz[j]);
 
-                t_y_xxz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl1_fx * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_z[j] - 0.5 * pc_y[j] * fl1_fx * pb_z[j] - pa_y[j] * pb_xx[j] * pc_z[j] - 2.0 * pa_y[j] * pb_xz[j] * pc_x[j] - pc_y[j] * pb_xxz[j]);
+                t_y_xxz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl1_fx * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_z[j] - 0.5 * pc_y[j] * fl1_fx * pb_z[j] - pa_y[j] * pb_xx[j] * pc_z[j] - 2.0 * pa_y[j] * pb_xz[j] * pc_x[j]);
 
-                t_y_xxz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl1_fx * pc_z[j] + 0.5 * pc_yz[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_z[j] + 2.0 * pa_y[j] * pb_x[j] * pc_xz[j] + pa_y[j] * pc_xx[j] * pb_z[j] + pc_yz[j] * pb_xx[j] + 2.0 * pc_xy[j] * pb_xz[j]);
+                t_y_xxz[j] += -fl_s_0_0_1 * pc_y[j] * pb_xxz[j];
+
+                t_y_xxz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl1_fx * pc_z[j] + 0.5 * pc_yz[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_z[j] + 2.0 * pa_y[j] * pb_x[j] * pc_xz[j] + pa_y[j] * pc_xx[j] * pb_z[j]);
+
+                t_y_xxz[j] += fl_s_0_0_2 * (+ pc_yz[j] * pb_xx[j] + 2.0 * pc_xy[j] * pb_xz[j]);
 
                 t_y_xxz[j] += fl_s_0_0_3 * (-0.5 * pc_yz[j] * fl1_fx - pa_y[j] * pc_xxz[j] - 2.0 * pc_xyz[j] * pb_x[j] - pc_xxy[j] * pb_z[j]);
 
@@ -2556,9 +2596,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xyy[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * pb_x[j] * fl1_fx + fl1_fx * pb_xy[j] + pa_y[j] * pb_xyy[j]);
 
-                t_y_xyy[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * pb_x[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * fl1_fx - 1.5 * pc_y[j] * pb_x[j] * fl1_fx - fl1_fx * pc_x[j] * pb_y[j] - fl1_fx * pb_xy[j] - 2.0 * pa_y[j] * pb_xy[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yy[j] - pc_y[j] * pb_xyy[j]);
+                t_y_xyy[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * pb_x[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * fl1_fx - 1.5 * pc_y[j] * pb_x[j] * fl1_fx - fl1_fx * pc_x[j] * pb_y[j] - fl1_fx * pb_xy[j]);
 
-                t_y_xyy[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pc_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_x[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx + fl1_fx * pc_x[j] * pb_y[j] + pa_y[j] * pb_x[j] * pc_yy[j] + 2.0 * pa_y[j] * pc_xy[j] * pb_y[j] + 2.0 * pc_yy[j] * pb_xy[j] + pc_xy[j] * pb_yy[j]);
+                t_y_xyy[j] += fl_s_0_0_1 * (- 2.0 * pa_y[j] * pb_xy[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yy[j] - pc_y[j] * pb_xyy[j]);
+
+                t_y_xyy[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pc_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_x[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx + fl1_fx * pc_x[j] * pb_y[j] + pa_y[j] * pb_x[j] * pc_yy[j]);
+
+                t_y_xyy[j] += fl_s_0_0_2 * (+ 2.0 * pa_y[j] * pc_xy[j] * pb_y[j] + 2.0 * pc_yy[j] * pb_xy[j] + pc_xy[j] * pb_yy[j]);
 
                 t_y_xyy[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - pa_y[j] * pc_xyy[j] - pc_yyy[j] * pb_x[j] - 2.0 * pc_xyy[j] * pb_y[j]);
 
@@ -2566,9 +2610,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xyz[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pb_xz[j] + pa_y[j] * pb_xyz[j]);
 
-                t_y_xyz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_x[j] * pc_z[j] - 0.5 * fl1_fx * pc_x[j] * pb_z[j] - 0.5 * fl1_fx * pb_xz[j] - pa_y[j] * pb_xy[j] * pc_z[j] - pa_y[j] * pb_xz[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yz[j] - pc_y[j] * pb_xyz[j]);
+                t_y_xyz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_x[j] * pc_z[j] - 0.5 * fl1_fx * pc_x[j] * pb_z[j] - 0.5 * fl1_fx * pb_xz[j] - pa_y[j] * pb_xy[j] * pc_z[j] - pa_y[j] * pb_xz[j] * pc_y[j]);
 
-                t_y_xyz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xz[j] + 0.5 * fl1_fx * pb_x[j] * pc_z[j] + 0.5 * fl1_fx * pc_x[j] * pb_z[j] + pa_y[j] * pb_x[j] * pc_yz[j] + pa_y[j] * pc_xz[j] * pb_y[j] + pa_y[j] * pc_xy[j] * pb_z[j] + pc_yz[j] * pb_xy[j] + pc_yy[j] * pb_xz[j] + pc_xy[j] * pb_yz[j]);
+                t_y_xyz[j] += fl_s_0_0_1 * (- pa_y[j] * pc_x[j] * pb_yz[j] - pc_y[j] * pb_xyz[j]);
+
+                t_y_xyz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xz[j] + 0.5 * fl1_fx * pb_x[j] * pc_z[j] + 0.5 * fl1_fx * pc_x[j] * pb_z[j] + pa_y[j] * pb_x[j] * pc_yz[j] + pa_y[j] * pc_xz[j] * pb_y[j]);
+
+                t_y_xyz[j] += fl_s_0_0_2 * (+ pa_y[j] * pc_xy[j] * pb_z[j] + pc_yz[j] * pb_xy[j] + pc_yy[j] * pb_xz[j] + pc_xy[j] * pb_yz[j]);
 
                 t_y_xyz[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_xz[j] - pa_y[j] * pc_xyz[j] - pc_yyz[j] * pb_x[j] - pc_xyz[j] * pb_y[j] - pc_xyy[j] * pb_z[j]);
 
@@ -2726,9 +2774,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xzz[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * pb_x[j] * fl1_fx + pa_y[j] * pb_xzz[j]);
 
-                t_y_xzz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * pb_x[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * fl1_fx - 0.5 * pc_y[j] * pb_x[j] * fl1_fx - 2.0 * pa_y[j] * pb_xz[j] * pc_z[j] - pa_y[j] * pc_x[j] * pb_zz[j] - pc_y[j] * pb_xzz[j]);
+                t_y_xzz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * pb_x[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * fl1_fx - 0.5 * pc_y[j] * pb_x[j] * fl1_fx - 2.0 * pa_y[j] * pb_xz[j] * pc_z[j] - pa_y[j] * pc_x[j] * pb_zz[j]);
 
-                t_y_xzz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pc_x[j] * fl1_fx + 0.5 * pc_y[j] * pb_x[j] * fl1_fx + 0.5 * pc_xy[j] * fl1_fx + pa_y[j] * pb_x[j] * pc_zz[j] + 2.0 * pa_y[j] * pc_xz[j] * pb_z[j] + 2.0 * pc_yz[j] * pb_xz[j] + pc_xy[j] * pb_zz[j]);
+                t_y_xzz[j] += -fl_s_0_0_1 * pc_y[j] * pb_xzz[j];
+
+                t_y_xzz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pc_x[j] * fl1_fx + 0.5 * pc_y[j] * pb_x[j] * fl1_fx + 0.5 * pc_xy[j] * fl1_fx + pa_y[j] * pb_x[j] * pc_zz[j] + 2.0 * pa_y[j] * pc_xz[j] * pb_z[j]);
+
+                t_y_xzz[j] += fl_s_0_0_2 * (+ 2.0 * pc_yz[j] * pb_xz[j] + pc_xy[j] * pb_zz[j]);
 
                 t_y_xzz[j] += fl_s_0_0_3 * (-0.5 * pc_xy[j] * fl1_fx - pa_y[j] * pc_xzz[j] - pc_yzz[j] * pb_x[j] - 2.0 * pc_xyz[j] * pb_z[j]);
 
@@ -2736,9 +2788,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_yyy[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 1.5 * pa_y[j] * pb_y[j] * fl1_fx + 1.5 * fl1_fx * pb_yy[j] + pa_y[j] * pb_yyy[j]);
 
-                t_y_yyy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_y[j] * pb_y[j] * fl1_fx - 1.5 * pa_y[j] * pc_y[j] * fl1_fx - 4.5 * pc_y[j] * pb_y[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j] - 3.0 * pa_y[j] * pb_yy[j] * pc_y[j] - pc_y[j] * pb_yyy[j]);
+                t_y_yyy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_y[j] * pb_y[j] * fl1_fx - 1.5 * pa_y[j] * pc_y[j] * fl1_fx - 4.5 * pc_y[j] * pb_y[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j]);
 
-                t_y_yyy[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 1.5 * pa_y[j] * pc_y[j] * fl1_fx + 4.5 * pc_y[j] * pb_y[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx + 3.0 * pa_y[j] * pb_y[j] * pc_yy[j] + 3.0 * pc_yy[j] * pb_yy[j]);
+                t_y_yyy[j] += fl_s_0_0_1 * (- 3.0 * pa_y[j] * pb_yy[j] * pc_y[j] - pc_y[j] * pb_yyy[j]);
+
+                t_y_yyy[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 1.5 * pa_y[j] * pc_y[j] * fl1_fx + 4.5 * pc_y[j] * pb_y[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx + 3.0 * pa_y[j] * pb_y[j] * pc_yy[j]);
+
+                t_y_yyy[j] += fl_s_0_0_2 * 3.0 * pc_yy[j] * pb_yy[j];
 
                 t_y_yyy[j] += fl_s_0_0_3 * (-3.0 * pc_yy[j] * fl1_fx - pa_y[j] * pc_yyy[j] - 3.0 * pc_yyy[j] * pb_y[j]);
 
@@ -2746,9 +2802,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_yyz[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * fl1_fx * pb_z[j] + fl1_fx * pb_yz[j] + pa_y[j] * pb_yyz[j]);
 
-                t_y_yyz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl1_fx * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * fl1_fx * pb_z[j] - fl1_fx * pb_y[j] * pc_z[j] - fl1_fx * pb_yz[j] - pa_y[j] * pb_yy[j] * pc_z[j] - 2.0 * pa_y[j] * pb_yz[j] * pc_y[j] - pc_y[j] * pb_yyz[j]);
+                t_y_yyz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl1_fx * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * fl1_fx * pb_z[j] - fl1_fx * pb_y[j] * pc_z[j] - fl1_fx * pb_yz[j]);
 
-                t_y_yyz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl1_fx * pc_z[j] + 1.5 * pc_yz[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_z[j] + fl1_fx * pb_y[j] * pc_z[j] + 2.0 * pa_y[j] * pb_y[j] * pc_yz[j] + pa_y[j] * pc_yy[j] * pb_z[j] + pc_yz[j] * pb_yy[j] + 2.0 * pc_yy[j] * pb_yz[j]);
+                t_y_yyz[j] += fl_s_0_0_1 * (- pa_y[j] * pb_yy[j] * pc_z[j] - 2.0 * pa_y[j] * pb_yz[j] * pc_y[j] - pc_y[j] * pb_yyz[j]);
+
+                t_y_yyz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl1_fx * pc_z[j] + 1.5 * pc_yz[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_z[j] + fl1_fx * pb_y[j] * pc_z[j] + 2.0 * pa_y[j] * pb_y[j] * pc_yz[j]);
+
+                t_y_yyz[j] += fl_s_0_0_2 * (+ pa_y[j] * pc_yy[j] * pb_z[j] + pc_yz[j] * pb_yy[j] + 2.0 * pc_yy[j] * pb_yz[j]);
 
                 t_y_yyz[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - pa_y[j] * pc_yyz[j] - 2.0 * pc_yyz[j] * pb_y[j] - pc_yyy[j] * pb_z[j]);
 
@@ -2906,9 +2966,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_yzz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_y[j] * pb_y[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pa_y[j] * pb_yzz[j]);
 
-                t_y_yzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_y[j] * pb_y[j] * fl1_fx - 0.5 * pa_y[j] * pc_y[j] * fl1_fx - 0.5 * pc_y[j] * pb_y[j] * fl1_fx - fl1_fx * pb_z[j] * pc_z[j] - 0.5 * fl1_fx * pb_zz[j] - 2.0 * pa_y[j] * pb_yz[j] * pc_z[j] - pa_y[j] * pc_y[j] * pb_zz[j] - pc_y[j] * pb_yzz[j]);
+                t_y_yzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_y[j] * pb_y[j] * fl1_fx - 0.5 * pa_y[j] * pc_y[j] * fl1_fx - 0.5 * pc_y[j] * pb_y[j] * fl1_fx - fl1_fx * pb_z[j] * pc_z[j]);
 
-                t_y_yzz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_y[j] * pb_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pb_z[j] * pc_z[j] + pa_y[j] * pb_y[j] * pc_zz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_z[j] + 2.0 * pc_yz[j] * pb_yz[j] + pc_yy[j] * pb_zz[j]);
+                t_y_yzz[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pb_zz[j] - 2.0 * pa_y[j] * pb_yz[j] * pc_z[j] - pa_y[j] * pc_y[j] * pb_zz[j] - pc_y[j] * pb_yzz[j]);
+
+                t_y_yzz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_y[j] * pb_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j]);
+
+                t_y_yzz[j] += fl_s_0_0_2 * (+ fl1_fx * pb_z[j] * pc_z[j] + pa_y[j] * pb_y[j] * pc_zz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_z[j] + 2.0 * pc_yz[j] * pb_yz[j] + pc_yy[j] * pb_zz[j]);
 
                 t_y_yzz[j] += fl_s_0_0_3 * (-0.5 * pc_yy[j] * fl1_fx - 0.5 * fl1_fx * pc_zz[j] - pa_y[j] * pc_yzz[j] - pc_yzz[j] * pb_y[j] - 2.0 * pc_yyz[j] * pb_z[j]);
 
@@ -3090,9 +3154,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xxy[j] = fl_s_0_0_0 * (0.5 * pa_z[j] * fl1_fx * pb_y[j] + pa_z[j] * pb_xxy[j]);
 
-                t_z_xxy[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl1_fx * pc_y[j] - 0.5 * pa_z[j] * fl1_fx * pb_y[j] - 0.5 * pc_z[j] * fl1_fx * pb_y[j] - pa_z[j] * pb_xx[j] * pc_y[j] - 2.0 * pa_z[j] * pb_xy[j] * pc_x[j] - pc_z[j] * pb_xxy[j]);
+                t_z_xxy[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl1_fx * pc_y[j] - 0.5 * pa_z[j] * fl1_fx * pb_y[j] - 0.5 * pc_z[j] * fl1_fx * pb_y[j] - pa_z[j] * pb_xx[j] * pc_y[j] - 2.0 * pa_z[j] * pb_xy[j] * pc_x[j]);
 
-                t_z_xxy[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * fl1_fx * pc_y[j] + 0.5 * pc_yz[j] * fl1_fx + 0.5 * pc_z[j] * fl1_fx * pb_y[j] + 2.0 * pa_z[j] * pb_x[j] * pc_xy[j] + pa_z[j] * pc_xx[j] * pb_y[j] + pc_yz[j] * pb_xx[j] + 2.0 * pc_xz[j] * pb_xy[j]);
+                t_z_xxy[j] += -fl_s_0_0_1 * pc_z[j] * pb_xxy[j];
+
+                t_z_xxy[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * fl1_fx * pc_y[j] + 0.5 * pc_yz[j] * fl1_fx + 0.5 * pc_z[j] * fl1_fx * pb_y[j] + 2.0 * pa_z[j] * pb_x[j] * pc_xy[j] + pa_z[j] * pc_xx[j] * pb_y[j]);
+
+                t_z_xxy[j] += fl_s_0_0_2 * (+ pc_yz[j] * pb_xx[j] + 2.0 * pc_xz[j] * pb_xy[j]);
 
                 t_z_xxy[j] += fl_s_0_0_3 * (-0.5 * pc_yz[j] * fl1_fx - pa_z[j] * pc_xxy[j] - 2.0 * pc_xyz[j] * pb_x[j] - pc_xxz[j] * pb_y[j]);
 
@@ -3100,9 +3168,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xxz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_xx[j] + pa_z[j] * pb_xxz[j]);
 
-                t_z_xxz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_z[j] * fl1_fx * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_z[j] - 0.5 * pc_z[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_x[j] - 0.5 * fl1_fx * pb_xx[j] - pa_z[j] * pb_xx[j] * pc_z[j] - 2.0 * pa_z[j] * pb_xz[j] * pc_x[j] - pc_z[j] * pb_xxz[j]);
+                t_z_xxz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_z[j] * fl1_fx * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_z[j] - 0.5 * pc_z[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_x[j]);
 
-                t_z_xxz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pc_z[j] + 0.5 * pc_zz[j] * fl1_fx + 0.5 * pc_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pc_xx[j] + fl1_fx * pb_x[j] * pc_x[j] + 2.0 * pa_z[j] * pb_x[j] * pc_xz[j] + pa_z[j] * pc_xx[j] * pb_z[j] + pc_zz[j] * pb_xx[j] + 2.0 * pc_xz[j] * pb_xz[j]);
+                t_z_xxz[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pb_xx[j] - pa_z[j] * pb_xx[j] * pc_z[j] - 2.0 * pa_z[j] * pb_xz[j] * pc_x[j] - pc_z[j] * pb_xxz[j]);
+
+                t_z_xxz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pc_z[j] + 0.5 * pc_zz[j] * fl1_fx + 0.5 * pc_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pc_xx[j]);
+
+                t_z_xxz[j] += fl_s_0_0_2 * (+ fl1_fx * pb_x[j] * pc_x[j] + 2.0 * pa_z[j] * pb_x[j] * pc_xz[j] + pa_z[j] * pc_xx[j] * pb_z[j] + pc_zz[j] * pb_xx[j] + 2.0 * pc_xz[j] * pb_xz[j]);
 
                 t_z_xxz[j] += fl_s_0_0_3 * (-0.5 * pc_zz[j] * fl1_fx - 0.5 * fl1_fx * pc_xx[j] - pa_z[j] * pc_xxz[j] - 2.0 * pc_xzz[j] * pb_x[j] - pc_xxz[j] * pb_z[j]);
 
@@ -3110,9 +3182,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xyy[j] = fl_s_0_0_0 * (0.5 * pa_z[j] * pb_x[j] * fl1_fx + pa_z[j] * pb_xyy[j]);
 
-                t_z_xyy[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_x[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * fl1_fx - 0.5 * pc_z[j] * pb_x[j] * fl1_fx - 2.0 * pa_z[j] * pb_xy[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yy[j] - pc_z[j] * pb_xyy[j]);
+                t_z_xyy[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_x[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * fl1_fx - 0.5 * pc_z[j] * pb_x[j] * fl1_fx - 2.0 * pa_z[j] * pb_xy[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yy[j]);
 
-                t_z_xyy[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pc_x[j] * fl1_fx + 0.5 * pc_z[j] * pb_x[j] * fl1_fx + 0.5 * pc_xz[j] * fl1_fx + pa_z[j] * pb_x[j] * pc_yy[j] + 2.0 * pa_z[j] * pc_xy[j] * pb_y[j] + 2.0 * pc_yz[j] * pb_xy[j] + pc_xz[j] * pb_yy[j]);
+                t_z_xyy[j] += -fl_s_0_0_1 * pc_z[j] * pb_xyy[j];
+
+                t_z_xyy[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pc_x[j] * fl1_fx + 0.5 * pc_z[j] * pb_x[j] * fl1_fx + 0.5 * pc_xz[j] * fl1_fx + pa_z[j] * pb_x[j] * pc_yy[j] + 2.0 * pa_z[j] * pc_xy[j] * pb_y[j]);
+
+                t_z_xyy[j] += fl_s_0_0_2 * (+ 2.0 * pc_yz[j] * pb_xy[j] + pc_xz[j] * pb_yy[j]);
 
                 t_z_xyy[j] += fl_s_0_0_3 * (-0.5 * pc_xz[j] * fl1_fx - pa_z[j] * pc_xyy[j] - pc_yyz[j] * pb_x[j] - 2.0 * pc_xyz[j] * pb_y[j]);
 
@@ -3272,9 +3348,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xyz[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pb_xy[j] + pa_z[j] * pb_xyz[j]);
 
-                t_z_xyz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_x[j] * pc_y[j] - 0.5 * fl1_fx * pc_x[j] * pb_y[j] - 0.5 * fl1_fx * pb_xy[j] - pa_z[j] * pb_xy[j] * pc_z[j] - pa_z[j] * pb_xz[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yz[j] - pc_z[j] * pb_xyz[j]);
+                t_z_xyz[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pb_x[j] * pc_y[j] - 0.5 * fl1_fx * pc_x[j] * pb_y[j] - 0.5 * fl1_fx * pb_xy[j] - pa_z[j] * pb_xy[j] * pc_z[j] - pa_z[j] * pb_xz[j] * pc_y[j]);
 
-                t_z_xyz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xy[j] + 0.5 * fl1_fx * pb_x[j] * pc_y[j] + 0.5 * fl1_fx * pc_x[j] * pb_y[j] + pa_z[j] * pb_x[j] * pc_yz[j] + pa_z[j] * pc_xz[j] * pb_y[j] + pa_z[j] * pc_xy[j] * pb_z[j] + pc_zz[j] * pb_xy[j] + pc_yz[j] * pb_xz[j] + pc_xz[j] * pb_yz[j]);
+                t_z_xyz[j] += fl_s_0_0_1 * (- pa_z[j] * pc_x[j] * pb_yz[j] - pc_z[j] * pb_xyz[j]);
+
+                t_z_xyz[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xy[j] + 0.5 * fl1_fx * pb_x[j] * pc_y[j] + 0.5 * fl1_fx * pc_x[j] * pb_y[j] + pa_z[j] * pb_x[j] * pc_yz[j] + pa_z[j] * pc_xz[j] * pb_y[j]);
+
+                t_z_xyz[j] += fl_s_0_0_2 * (+ pa_z[j] * pc_xy[j] * pb_z[j] + pc_zz[j] * pb_xy[j] + pc_yz[j] * pb_xz[j] + pc_xz[j] * pb_yz[j]);
 
                 t_z_xyz[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_xy[j] - pa_z[j] * pc_xyz[j] - pc_yzz[j] * pb_x[j] - pc_xzz[j] * pb_y[j] - pc_xyz[j] * pb_z[j]);
 
@@ -3282,9 +3362,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xzz[j] = fl_s_0_0_0 * (0.5 * pa_z[j] * pb_x[j] * fl1_fx + fl1_fx * pb_xz[j] + pa_z[j] * pb_xzz[j]);
 
-                t_z_xzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_x[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * fl1_fx - 1.5 * pc_z[j] * pb_x[j] * fl1_fx - fl1_fx * pc_x[j] * pb_z[j] - fl1_fx * pb_xz[j] - 2.0 * pa_z[j] * pb_xz[j] * pc_z[j] - pa_z[j] * pc_x[j] * pb_zz[j] - pc_z[j] * pb_xzz[j]);
+                t_z_xzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_x[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * fl1_fx - 1.5 * pc_z[j] * pb_x[j] * fl1_fx - fl1_fx * pc_x[j] * pb_z[j] - fl1_fx * pb_xz[j]);
 
-                t_z_xzz[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pc_x[j] * fl1_fx + 1.5 * pc_z[j] * pb_x[j] * fl1_fx + 1.5 * pc_xz[j] * fl1_fx + fl1_fx * pc_x[j] * pb_z[j] + pa_z[j] * pb_x[j] * pc_zz[j] + 2.0 * pa_z[j] * pc_xz[j] * pb_z[j] + 2.0 * pc_zz[j] * pb_xz[j] + pc_xz[j] * pb_zz[j]);
+                t_z_xzz[j] += fl_s_0_0_1 * (- 2.0 * pa_z[j] * pb_xz[j] * pc_z[j] - pa_z[j] * pc_x[j] * pb_zz[j] - pc_z[j] * pb_xzz[j]);
+
+                t_z_xzz[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pc_x[j] * fl1_fx + 1.5 * pc_z[j] * pb_x[j] * fl1_fx + 1.5 * pc_xz[j] * fl1_fx + fl1_fx * pc_x[j] * pb_z[j] + pa_z[j] * pb_x[j] * pc_zz[j]);
+
+                t_z_xzz[j] += fl_s_0_0_2 * (+ 2.0 * pa_z[j] * pc_xz[j] * pb_z[j] + 2.0 * pc_zz[j] * pb_xz[j] + pc_xz[j] * pb_zz[j]);
 
                 t_z_xzz[j] += fl_s_0_0_3 * (-1.5 * pc_xz[j] * fl1_fx - pa_z[j] * pc_xzz[j] - pc_zzz[j] * pb_x[j] - 2.0 * pc_xzz[j] * pb_z[j]);
 
@@ -3437,9 +3521,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_yyz[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_yy[j] + pa_z[j] * pb_yyz[j]);
 
-                t_z_yyz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_z[j] * fl1_fx * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_z[j] - 0.5 * pc_z[j] * fl1_fx * pb_z[j] - fl1_fx * pb_y[j] * pc_y[j] - 0.5 * fl1_fx * pb_yy[j] - pa_z[j] * pb_yy[j] * pc_z[j] - 2.0 * pa_z[j] * pb_yz[j] * pc_y[j] - pc_z[j] * pb_yyz[j]);
+                t_z_yyz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_z[j] * fl1_fx * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_z[j] - 0.5 * pc_z[j] * fl1_fx * pb_z[j] - fl1_fx * pb_y[j] * pc_y[j]);
 
-                t_z_yyz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pc_z[j] + 0.5 * pc_zz[j] * fl1_fx + 0.5 * pc_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pc_yy[j] + fl1_fx * pb_y[j] * pc_y[j] + 2.0 * pa_z[j] * pb_y[j] * pc_yz[j] + pa_z[j] * pc_yy[j] * pb_z[j] + pc_zz[j] * pb_yy[j] + 2.0 * pc_yz[j] * pb_yz[j]);
+                t_z_yyz[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pb_yy[j] - pa_z[j] * pb_yy[j] * pc_z[j] - 2.0 * pa_z[j] * pb_yz[j] * pc_y[j] - pc_z[j] * pb_yyz[j]);
+
+                t_z_yyz[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pc_z[j] + 0.5 * pc_zz[j] * fl1_fx + 0.5 * pc_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pc_yy[j]);
+
+                t_z_yyz[j] += fl_s_0_0_2 * (+ fl1_fx * pb_y[j] * pc_y[j] + 2.0 * pa_z[j] * pb_y[j] * pc_yz[j] + pa_z[j] * pc_yy[j] * pb_z[j] + pc_zz[j] * pb_yy[j] + 2.0 * pc_yz[j] * pb_yz[j]);
 
                 t_z_yyz[j] += fl_s_0_0_3 * (-0.5 * pc_zz[j] * fl1_fx - 0.5 * fl1_fx * pc_yy[j] - pa_z[j] * pc_yyz[j] - 2.0 * pc_yzz[j] * pb_y[j] - pc_yyz[j] * pb_z[j]);
 
@@ -3447,9 +3535,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_yzz[j] = fl_s_0_0_0 * (0.5 * pa_z[j] * pb_y[j] * fl1_fx + fl1_fx * pb_yz[j] + pa_z[j] * pb_yzz[j]);
 
-                t_z_yzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_y[j] * fl1_fx - 0.5 * pa_z[j] * pc_y[j] * fl1_fx - 1.5 * pc_z[j] * pb_y[j] * fl1_fx - fl1_fx * pc_y[j] * pb_z[j] - fl1_fx * pb_yz[j] - 2.0 * pa_z[j] * pb_yz[j] * pc_z[j] - pa_z[j] * pc_y[j] * pb_zz[j] - pc_z[j] * pb_yzz[j]);
+                t_z_yzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_y[j] * fl1_fx - 0.5 * pa_z[j] * pc_y[j] * fl1_fx - 1.5 * pc_z[j] * pb_y[j] * fl1_fx - fl1_fx * pc_y[j] * pb_z[j] - fl1_fx * pb_yz[j]);
 
-                t_z_yzz[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pc_y[j] * fl1_fx + 1.5 * pc_z[j] * pb_y[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx + fl1_fx * pc_y[j] * pb_z[j] + pa_z[j] * pb_y[j] * pc_zz[j] + 2.0 * pa_z[j] * pc_yz[j] * pb_z[j] + 2.0 * pc_zz[j] * pb_yz[j] + pc_yz[j] * pb_zz[j]);
+                t_z_yzz[j] += fl_s_0_0_1 * (- 2.0 * pa_z[j] * pb_yz[j] * pc_z[j] - pa_z[j] * pc_y[j] * pb_zz[j] - pc_z[j] * pb_yzz[j]);
+
+                t_z_yzz[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pc_y[j] * fl1_fx + 1.5 * pc_z[j] * pb_y[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx + fl1_fx * pc_y[j] * pb_z[j] + pa_z[j] * pb_y[j] * pc_zz[j]);
+
+                t_z_yzz[j] += fl_s_0_0_2 * (+ 2.0 * pa_z[j] * pc_yz[j] * pb_z[j] + 2.0 * pc_zz[j] * pb_yz[j] + pc_yz[j] * pb_zz[j]);
 
                 t_z_yzz[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - pa_z[j] * pc_yzz[j] - pc_zzz[j] * pb_y[j] - 2.0 * pc_yzz[j] * pb_z[j]);
 
@@ -3457,9 +3549,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_zzz[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 1.5 * pa_z[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pb_zz[j] + pa_z[j] * pb_zzz[j]);
 
-                t_z_zzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_z[j] * pb_z[j] * fl1_fx - 1.5 * pa_z[j] * pc_z[j] * fl1_fx - 4.5 * pc_z[j] * pb_z[j] * fl1_fx - 1.5 * fl1_fx * pb_zz[j] - 3.0 * pa_z[j] * pb_zz[j] * pc_z[j] - pc_z[j] * pb_zzz[j]);
+                t_z_zzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_z[j] * pb_z[j] * fl1_fx - 1.5 * pa_z[j] * pc_z[j] * fl1_fx - 4.5 * pc_z[j] * pb_z[j] * fl1_fx - 1.5 * fl1_fx * pb_zz[j]);
 
-                t_z_zzz[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 1.5 * pa_z[j] * pc_z[j] * fl1_fx + 4.5 * pc_z[j] * pb_z[j] * fl1_fx + 3.0 * pc_zz[j] * fl1_fx + 3.0 * pa_z[j] * pb_z[j] * pc_zz[j] + 3.0 * pc_zz[j] * pb_zz[j]);
+                t_z_zzz[j] += fl_s_0_0_1 * (- 3.0 * pa_z[j] * pb_zz[j] * pc_z[j] - pc_z[j] * pb_zzz[j]);
+
+                t_z_zzz[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 1.5 * pa_z[j] * pc_z[j] * fl1_fx + 4.5 * pc_z[j] * pb_z[j] * fl1_fx + 3.0 * pc_zz[j] * fl1_fx + 3.0 * pa_z[j] * pb_z[j] * pc_zz[j]);
+
+                t_z_zzz[j] += fl_s_0_0_2 * 3.0 * pc_zz[j] * pb_zz[j];
 
                 t_z_zzz[j] += fl_s_0_0_3 * (-3.0 * pc_zz[j] * fl1_fx - pa_z[j] * pc_zzz[j] - 3.0 * pc_zzz[j] * pb_z[j]);
 
@@ -3640,9 +3736,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxx_x[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 1.5 * pa_xx[j] * fl1_fx + 1.5 * pa_x[j] * fl1_fx * pb_x[j] + pa_xxx[j] * pb_x[j]);
 
-                t_xxx_x[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_xx[j] * fl1_fx - 4.5 * pa_x[j] * pc_x[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * fl1_fx * pb_x[j] - pa_xxx[j] * pc_x[j] - 3.0 * pa_xx[j] * pc_x[j] * pb_x[j]);
+                t_xxx_x[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_xx[j] * fl1_fx - 4.5 * pa_x[j] * pc_x[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * fl1_fx * pb_x[j]);
 
-                t_xxx_x[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 4.5 * pa_x[j] * pc_x[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pb_x[j] + 3.0 * pa_xx[j] * pc_xx[j] + 3.0 * pa_x[j] * pc_xx[j] * pb_x[j]);
+                t_xxx_x[j] += fl_s_0_0_1 * (- pa_xxx[j] * pc_x[j] - 3.0 * pa_xx[j] * pc_x[j] * pb_x[j]);
+
+                t_xxx_x[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 4.5 * pa_x[j] * pc_x[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pb_x[j] + 3.0 * pa_xx[j] * pc_xx[j]);
+
+                t_xxx_x[j] += fl_s_0_0_2 * 3.0 * pa_x[j] * pc_xx[j] * pb_x[j];
 
                 t_xxx_x[j] += fl_s_0_0_3 * (-3.0 * pc_xx[j] * fl1_fx - 3.0 * pa_x[j] * pc_xxx[j] - pc_xxx[j] * pb_x[j]);
 
@@ -3813,9 +3913,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxy_x[j] = fl_s_0_0_0 * (pa_xy[j] * fl1_fx + 0.5 * fl1_fx * pa_y[j] * pb_x[j] + pa_xxy[j] * pb_x[j]);
 
-                t_xxy_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl1_fx * pc_y[j] - pa_xy[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_y[j] - 0.5 * fl1_fx * pc_y[j] * pb_x[j] - 0.5 * fl1_fx * pa_y[j] * pb_x[j] - pa_xxy[j] * pc_x[j] - pa_xx[j] * pc_y[j] * pb_x[j] - 2.0 * pa_xy[j] * pc_x[j] * pb_x[j]);
+                t_xxy_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl1_fx * pc_y[j] - pa_xy[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_y[j] - 0.5 * fl1_fx * pc_y[j] * pb_x[j] - 0.5 * fl1_fx * pa_y[j] * pb_x[j]);
 
-                t_xxy_x[j] += fl_s_0_0_2 * (pa_x[j] * fl1_fx * pc_y[j] + 1.5 * pc_xy[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pa_y[j] + 0.5 * fl1_fx * pc_y[j] * pb_x[j] + pa_xx[j] * pc_xy[j] + 2.0 * pa_xy[j] * pc_xx[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_x[j] + pc_xx[j] * pa_y[j] * pb_x[j]);
+                t_xxy_x[j] += fl_s_0_0_1 * (- pa_xxy[j] * pc_x[j] - pa_xx[j] * pc_y[j] * pb_x[j] - 2.0 * pa_xy[j] * pc_x[j] * pb_x[j]);
+
+                t_xxy_x[j] += fl_s_0_0_2 * (pa_x[j] * fl1_fx * pc_y[j] + 1.5 * pc_xy[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pa_y[j] + 0.5 * fl1_fx * pc_y[j] * pb_x[j] + pa_xx[j] * pc_xy[j]);
+
+                t_xxy_x[j] += fl_s_0_0_2 * (+ 2.0 * pa_xy[j] * pc_xx[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_x[j] + pc_xx[j] * pa_y[j] * pb_x[j]);
 
                 t_xxy_x[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - 2.0 * pa_x[j] * pc_xxy[j] - pc_xxx[j] * pa_y[j] - pc_xxy[j] * pb_x[j]);
 
@@ -3823,9 +3927,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxy_y[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_y[j] * pb_y[j] + pa_xxy[j] * pb_y[j]);
 
-                t_xxy_y[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_xx[j] * fl1_fx - pa_x[j] * pc_x[j] * fl1_fx - 0.5 * fl1_fx * pa_y[j] * pc_y[j] - 0.5 * fl1_fx * pc_y[j] * pb_y[j] - 0.5 * fl1_fx * pa_y[j] * pb_y[j] - pa_xxy[j] * pc_y[j] - pa_xx[j] * pc_y[j] * pb_y[j] - 2.0 * pa_xy[j] * pc_x[j] * pb_y[j]);
+                t_xxy_y[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_xx[j] * fl1_fx - pa_x[j] * pc_x[j] * fl1_fx - 0.5 * fl1_fx * pa_y[j] * pc_y[j] - 0.5 * fl1_fx * pc_y[j] * pb_y[j]);
 
-                t_xxy_y[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_yy[j] + 0.5 * fl1_fx * pa_y[j] * pc_y[j] + 0.5 * fl1_fx * pc_y[j] * pb_y[j] + pa_xx[j] * pc_yy[j] + 2.0 * pa_xy[j] * pc_xy[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_y[j] + pc_xx[j] * pa_y[j] * pb_y[j]);
+                t_xxy_y[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_y[j] * pb_y[j] - pa_xxy[j] * pc_y[j] - pa_xx[j] * pc_y[j] * pb_y[j] - 2.0 * pa_xy[j] * pc_x[j] * pb_y[j]);
+
+                t_xxy_y[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_yy[j] + 0.5 * fl1_fx * pa_y[j] * pc_y[j]);
+
+                t_xxy_y[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pc_y[j] * pb_y[j] + pa_xx[j] * pc_yy[j] + 2.0 * pa_xy[j] * pc_xy[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_y[j] + pc_xx[j] * pa_y[j] * pb_y[j]);
 
                 t_xxy_y[j] += fl_s_0_0_3 * (-0.5 * pc_xx[j] * fl1_fx - 0.5 * fl1_fx * pc_yy[j] - 2.0 * pa_x[j] * pc_xyy[j] - pc_xxy[j] * pa_y[j] - pc_xxy[j] * pb_y[j]);
 
@@ -3833,9 +3941,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxy_z[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pa_y[j] * pb_z[j] + pa_xxy[j] * pb_z[j]);
 
-                t_xxy_z[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_y[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * fl1_fx * pa_y[j] * pb_z[j] - pa_xxy[j] * pc_z[j] - pa_xx[j] * pc_y[j] * pb_z[j] - 2.0 * pa_xy[j] * pc_x[j] * pb_z[j]);
+                t_xxy_z[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_y[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * fl1_fx * pa_y[j] * pb_z[j] - pa_xxy[j] * pc_z[j] - pa_xx[j] * pc_y[j] * pb_z[j]);
 
-                t_xxy_z[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pb_z[j] + pa_xx[j] * pc_yz[j] + 2.0 * pa_xy[j] * pc_xz[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_z[j] + pc_xx[j] * pa_y[j] * pb_z[j]);
+                t_xxy_z[j] += -fl_s_0_0_1 * 2.0 * pa_xy[j] * pc_x[j] * pb_z[j];
+
+                t_xxy_z[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pb_z[j] + pa_xx[j] * pc_yz[j] + 2.0 * pa_xy[j] * pc_xz[j]);
+
+                t_xxy_z[j] += fl_s_0_0_2 * (+ 2.0 * pa_x[j] * pc_xy[j] * pb_z[j] + pc_xx[j] * pa_y[j] * pb_z[j]);
 
                 t_xxy_z[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_yz[j] - 2.0 * pa_x[j] * pc_xyz[j] - pc_xxz[j] * pa_y[j] - pc_xxy[j] * pb_z[j]);
 
@@ -3986,9 +4098,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxz_x[j] = fl_s_0_0_0 * (pa_xz[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_x[j] + pa_xxz[j] * pb_x[j]);
 
-                t_xxz_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl1_fx * pc_z[j] - pa_xz[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_z[j] * pb_x[j] - pa_xxz[j] * pc_x[j] - pa_xx[j] * pc_z[j] * pb_x[j] - 2.0 * pa_xz[j] * pc_x[j] * pb_x[j]);
+                t_xxz_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl1_fx * pc_z[j] - pa_xz[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_z[j] * pb_x[j]);
 
-                t_xxz_x[j] += fl_s_0_0_2 * (pa_x[j] * fl1_fx * pc_z[j] + 1.5 * pc_xz[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pa_z[j] + 0.5 * fl1_fx * pc_z[j] * pb_x[j] + pa_xx[j] * pc_xz[j] + 2.0 * pa_xz[j] * pc_xx[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_x[j] + pc_xx[j] * pa_z[j] * pb_x[j]);
+                t_xxz_x[j] += fl_s_0_0_1 * (- pa_xxz[j] * pc_x[j] - pa_xx[j] * pc_z[j] * pb_x[j] - 2.0 * pa_xz[j] * pc_x[j] * pb_x[j]);
+
+                t_xxz_x[j] += fl_s_0_0_2 * (pa_x[j] * fl1_fx * pc_z[j] + 1.5 * pc_xz[j] * fl1_fx + 1.5 * pc_x[j] * fl1_fx * pa_z[j] + 0.5 * fl1_fx * pc_z[j] * pb_x[j] + pa_xx[j] * pc_xz[j]);
+
+                t_xxz_x[j] += fl_s_0_0_2 * (+ 2.0 * pa_xz[j] * pc_xx[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_x[j] + pc_xx[j] * pa_z[j] * pb_x[j]);
 
                 t_xxz_x[j] += fl_s_0_0_3 * (-1.5 * pc_xz[j] * fl1_fx - 2.0 * pa_x[j] * pc_xxz[j] - pc_xxx[j] * pa_z[j] - pc_xxz[j] * pb_x[j]);
 
@@ -3996,9 +4112,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxz_y[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pa_z[j] * pb_y[j] + pa_xxz[j] * pb_y[j]);
 
-                t_xxz_y[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_z[j] * pc_y[j] - 0.5 * fl1_fx * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_z[j] * pb_y[j] - pa_xxz[j] * pc_y[j] - pa_xx[j] * pc_z[j] * pb_y[j] - 2.0 * pa_xz[j] * pc_x[j] * pb_y[j]);
+                t_xxz_y[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_z[j] * pc_y[j] - 0.5 * fl1_fx * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_z[j] * pb_y[j] - pa_xxz[j] * pc_y[j] - pa_xx[j] * pc_z[j] * pb_y[j]);
 
-                t_xxz_y[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pa_z[j] * pc_y[j] + 0.5 * fl1_fx * pc_z[j] * pb_y[j] + pa_xx[j] * pc_yz[j] + 2.0 * pa_xz[j] * pc_xy[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_y[j] + pc_xx[j] * pa_z[j] * pb_y[j]);
+                t_xxz_y[j] += -fl_s_0_0_1 * 2.0 * pa_xz[j] * pc_x[j] * pb_y[j];
+
+                t_xxz_y[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pa_z[j] * pc_y[j] + 0.5 * fl1_fx * pc_z[j] * pb_y[j] + pa_xx[j] * pc_yz[j] + 2.0 * pa_xz[j] * pc_xy[j]);
+
+                t_xxz_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_x[j] * pc_xz[j] * pb_y[j] + pc_xx[j] * pa_z[j] * pb_y[j]);
 
                 t_xxz_y[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_yz[j] - 2.0 * pa_x[j] * pc_xyz[j] - pc_xxy[j] * pa_z[j] - pc_xxz[j] * pb_y[j]);
 
@@ -4006,9 +4126,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxz_z[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_z[j] + pa_xxz[j] * pb_z[j]);
 
-                t_xxz_z[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_xx[j] * fl1_fx - pa_x[j] * pc_x[j] * fl1_fx - 0.5 * fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_z[j] - 0.5 * fl1_fx * pa_z[j] * pb_z[j] - pa_xxz[j] * pc_z[j] - pa_xx[j] * pc_z[j] * pb_z[j] - 2.0 * pa_xz[j] * pc_x[j] * pb_z[j]);
+                t_xxz_z[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_xx[j] * fl1_fx - pa_x[j] * pc_x[j] * fl1_fx - 0.5 * fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_z[j]);
 
-                t_xxz_z[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + 0.5 * fl1_fx * pa_z[j] * pc_z[j] + 0.5 * fl1_fx * pc_z[j] * pb_z[j] + pa_xx[j] * pc_zz[j] + 2.0 * pa_xz[j] * pc_xz[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_z[j] + pc_xx[j] * pa_z[j] * pb_z[j]);
+                t_xxz_z[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_z[j] * pb_z[j] - pa_xxz[j] * pc_z[j] - pa_xx[j] * pc_z[j] * pb_z[j] - 2.0 * pa_xz[j] * pc_x[j] * pb_z[j]);
+
+                t_xxz_z[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_x[j] * pc_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + 0.5 * fl1_fx * pa_z[j] * pc_z[j]);
+
+                t_xxz_z[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pc_z[j] * pb_z[j] + pa_xx[j] * pc_zz[j] + 2.0 * pa_xz[j] * pc_xz[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_z[j] + pc_xx[j] * pa_z[j] * pb_z[j]);
 
                 t_xxz_z[j] += fl_s_0_0_3 * (-0.5 * pc_xx[j] * fl1_fx - 0.5 * fl1_fx * pc_zz[j] - 2.0 * pa_x[j] * pc_xzz[j] - pc_xxz[j] * pa_z[j] - pc_xxz[j] * pb_z[j]);
 
@@ -4159,9 +4283,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyy_x[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * fl1_fx * pa_yy[j] + 0.5 * pa_x[j] * fl1_fx * pb_x[j] + pa_xyy[j] * pb_x[j]);
 
-                t_xyy_x[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - fl1_fx * pa_y[j] * pc_y[j] - 0.5 * fl1_fx * pa_yy[j] - 0.5 * pa_x[j] * fl1_fx * pc_x[j] - 0.5 * pa_x[j] * fl1_fx * pb_x[j] - 0.5 * pc_x[j] * fl1_fx * pb_x[j] - pa_xyy[j] * pc_x[j] - 2.0 * pa_xy[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yy[j] * pb_x[j]);
+                t_xyy_x[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - fl1_fx * pa_y[j] * pc_y[j] - 0.5 * fl1_fx * pa_yy[j] - 0.5 * pa_x[j] * fl1_fx * pc_x[j] - 0.5 * pa_x[j] * fl1_fx * pb_x[j]);
 
-                t_xyy_x[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * fl1_fx * pc_yy[j] + fl1_fx * pa_y[j] * pc_y[j] + 0.5 * pa_x[j] * fl1_fx * pc_x[j] + 0.5 * pc_xx[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_x[j] + 2.0 * pa_xy[j] * pc_xy[j] + pa_x[j] * pc_yy[j] * pb_x[j] + pc_xx[j] * pa_yy[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_x[j]);
+                t_xyy_x[j] += fl_s_0_0_1 * (- 0.5 * pc_x[j] * fl1_fx * pb_x[j] - pa_xyy[j] * pc_x[j] - 2.0 * pa_xy[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yy[j] * pb_x[j]);
+
+                t_xyy_x[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * fl1_fx * pc_yy[j] + fl1_fx * pa_y[j] * pc_y[j] + 0.5 * pa_x[j] * fl1_fx * pc_x[j] + 0.5 * pc_xx[j] * fl1_fx);
+
+                t_xyy_x[j] += fl_s_0_0_2 * (+ 0.5 * pc_x[j] * fl1_fx * pb_x[j] + 2.0 * pa_xy[j] * pc_xy[j] + pa_x[j] * pc_yy[j] * pb_x[j] + pc_xx[j] * pa_yy[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_x[j]);
 
                 t_xyy_x[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_yy[j] - 0.5 * pc_xx[j] * fl1_fx - pa_x[j] * pc_xyy[j] - 2.0 * pc_xxy[j] * pa_y[j] - pc_xyy[j] * pb_x[j]);
 
@@ -4169,9 +4297,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyy_y[j] = fl_s_0_0_0 * (pa_xy[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_y[j] + pa_xyy[j] * pb_y[j]);
 
-                t_xyy_y[j] += fl_s_0_0_1 * (-pa_xy[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * fl1_fx - pc_x[j] * pa_y[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * fl1_fx * pb_y[j] - pa_xyy[j] * pc_y[j] - 2.0 * pa_xy[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yy[j] * pb_y[j]);
+                t_xyy_y[j] += fl_s_0_0_1 * (-pa_xy[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * fl1_fx - pc_x[j] * pa_y[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * fl1_fx * pb_y[j]);
 
-                t_xyy_y[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pc_y[j] * fl1_fx + pc_x[j] * pa_y[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_y[j] + 2.0 * pa_xy[j] * pc_yy[j] + pa_x[j] * pc_yy[j] * pb_y[j] + pc_xy[j] * pa_yy[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_y[j]);
+                t_xyy_y[j] += fl_s_0_0_1 * (- pa_xyy[j] * pc_y[j] - 2.0 * pa_xy[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yy[j] * pb_y[j]);
+
+                t_xyy_y[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pc_y[j] * fl1_fx + pc_x[j] * pa_y[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_y[j] + 2.0 * pa_xy[j] * pc_yy[j]);
+
+                t_xyy_y[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_yy[j] * pb_y[j] + pc_xy[j] * pa_yy[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_y[j]);
 
                 t_xyy_y[j] += fl_s_0_0_3 * (-1.5 * pc_xy[j] * fl1_fx - pa_x[j] * pc_yyy[j] - 2.0 * pc_xyy[j] * pa_y[j] - pc_xyy[j] * pb_y[j]);
 
@@ -4179,9 +4311,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyy_z[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_xyy[j] * pb_z[j]);
 
-                t_xyy_z[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pb_z[j] - pa_xyy[j] * pc_z[j] - 2.0 * pa_xy[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yy[j] * pb_z[j]);
+                t_xyy_z[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pb_z[j] - pa_xyy[j] * pc_z[j] - 2.0 * pa_xy[j] * pc_y[j] * pb_z[j]);
 
-                t_xyy_z[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 0.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_z[j] + 2.0 * pa_xy[j] * pc_yz[j] + pa_x[j] * pc_yy[j] * pb_z[j] + pc_xz[j] * pa_yy[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_z[j]);
+                t_xyy_z[j] += -fl_s_0_0_1 * pc_x[j] * pa_yy[j] * pb_z[j];
+
+                t_xyy_z[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 0.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_z[j] + 2.0 * pa_xy[j] * pc_yz[j] + pa_x[j] * pc_yy[j] * pb_z[j]);
+
+                t_xyy_z[j] += fl_s_0_0_2 * (+ pc_xz[j] * pa_yy[j] + 2.0 * pc_xy[j] * pa_y[j] * pb_z[j]);
 
                 t_xyy_z[j] += fl_s_0_0_3 * (-0.5 * pc_xz[j] * fl1_fx - pa_x[j] * pc_yyz[j] - 2.0 * pc_xyz[j] * pa_y[j] - pc_xyy[j] * pb_z[j]);
 
@@ -4341,9 +4477,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyz_x[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pa_yz[j] + pa_xyz[j] * pb_x[j]);
 
-                t_xyz_x[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_y[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pa_z[j] - 0.5 * fl1_fx * pa_yz[j] - pa_xyz[j] * pc_x[j] - pa_xy[j] * pc_z[j] * pb_x[j] - pa_xz[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yz[j] * pb_x[j]);
+                t_xyz_x[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_y[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pa_z[j] - 0.5 * fl1_fx * pa_yz[j] - pa_xyz[j] * pc_x[j] - pa_xy[j] * pc_z[j] * pb_x[j]);
 
-                t_xyz_x[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] + pa_xy[j] * pc_xz[j] + pa_xz[j] * pc_xy[j] + pa_x[j] * pc_yz[j] * pb_x[j] + pc_xx[j] * pa_yz[j] + pc_xz[j] * pa_y[j] * pb_x[j] + pc_xy[j] * pa_z[j] * pb_x[j]);
+                t_xyz_x[j] += fl_s_0_0_1 * (- pa_xz[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yz[j] * pb_x[j]);
+
+                t_xyz_x[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_yz[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] + pa_xy[j] * pc_xz[j] + pa_xz[j] * pc_xy[j]);
+
+                t_xyz_x[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_yz[j] * pb_x[j] + pc_xx[j] * pa_yz[j] + pc_xz[j] * pa_y[j] * pb_x[j] + pc_xy[j] * pa_z[j] * pb_x[j]);
 
                 t_xyz_x[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_yz[j] - pa_x[j] * pc_xyz[j] - pc_xxz[j] * pa_y[j] - pc_xxy[j] * pa_z[j] - pc_xyz[j] * pb_x[j]);
 
@@ -4351,9 +4491,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyz_y[j] = fl_s_0_0_0 * (0.5 * pa_xz[j] * fl1_fx + pa_xyz[j] * pb_y[j]);
 
-                t_xyz_y[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_xz[j] * fl1_fx - 0.5 * pc_x[j] * fl1_fx * pa_z[j] - pa_xyz[j] * pc_y[j] - pa_xy[j] * pc_z[j] * pb_y[j] - pa_xz[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yz[j] * pb_y[j]);
+                t_xyz_y[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_xz[j] * fl1_fx - 0.5 * pc_x[j] * fl1_fx * pa_z[j] - pa_xyz[j] * pc_y[j] - pa_xy[j] * pc_z[j] * pb_y[j]);
 
-                t_xyz_y[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 0.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pa_z[j] + pa_xy[j] * pc_yz[j] + pa_xz[j] * pc_yy[j] + pa_x[j] * pc_yz[j] * pb_y[j] + pc_xy[j] * pa_yz[j] + pc_xz[j] * pa_y[j] * pb_y[j] + pc_xy[j] * pa_z[j] * pb_y[j]);
+                t_xyz_y[j] += fl_s_0_0_1 * (- pa_xz[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yz[j] * pb_y[j]);
+
+                t_xyz_y[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_z[j] + 0.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pa_z[j] + pa_xy[j] * pc_yz[j] + pa_xz[j] * pc_yy[j]);
+
+                t_xyz_y[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_yz[j] * pb_y[j] + pc_xy[j] * pa_yz[j] + pc_xz[j] * pa_y[j] * pb_y[j] + pc_xy[j] * pa_z[j] * pb_y[j]);
 
                 t_xyz_y[j] += fl_s_0_0_3 * (-0.5 * pc_xz[j] * fl1_fx - pa_x[j] * pc_yyz[j] - pc_xyz[j] * pa_y[j] - pc_xyy[j] * pa_z[j] - pc_xyz[j] * pb_y[j]);
 
@@ -4361,9 +4505,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyz_z[j] = fl_s_0_0_0 * (0.5 * pa_xy[j] * fl1_fx + pa_xyz[j] * pb_z[j]);
 
-                t_xyz_z[j] += fl_s_0_0_1 * (-0.5 * pa_xy[j] * fl1_fx - 0.5 * pa_x[j] * pc_y[j] * fl1_fx - 0.5 * pc_x[j] * pa_y[j] * fl1_fx - pa_xyz[j] * pc_z[j] - pa_xy[j] * pc_z[j] * pb_z[j] - pa_xz[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yz[j] * pb_z[j]);
+                t_xyz_z[j] += fl_s_0_0_1 * (-0.5 * pa_xy[j] * fl1_fx - 0.5 * pa_x[j] * pc_y[j] * fl1_fx - 0.5 * pc_x[j] * pa_y[j] * fl1_fx - pa_xyz[j] * pc_z[j] - pa_xy[j] * pc_z[j] * pb_z[j]);
 
-                t_xyz_z[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * pc_y[j] * fl1_fx + 0.5 * pc_x[j] * pa_y[j] * fl1_fx + 0.5 * pc_xy[j] * fl1_fx + pa_xy[j] * pc_zz[j] + pa_xz[j] * pc_yz[j] + pa_x[j] * pc_yz[j] * pb_z[j] + pc_xz[j] * pa_yz[j] + pc_xz[j] * pa_y[j] * pb_z[j] + pc_xy[j] * pa_z[j] * pb_z[j]);
+                t_xyz_z[j] += fl_s_0_0_1 * (- pa_xz[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yz[j] * pb_z[j]);
+
+                t_xyz_z[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * pc_y[j] * fl1_fx + 0.5 * pc_x[j] * pa_y[j] * fl1_fx + 0.5 * pc_xy[j] * fl1_fx + pa_xy[j] * pc_zz[j] + pa_xz[j] * pc_yz[j]);
+
+                t_xyz_z[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_yz[j] * pb_z[j] + pc_xz[j] * pa_yz[j] + pc_xz[j] * pa_y[j] * pb_z[j] + pc_xy[j] * pa_z[j] * pb_z[j]);
 
                 t_xyz_z[j] += fl_s_0_0_3 * (-0.5 * pc_xy[j] * fl1_fx - pa_x[j] * pc_yzz[j] - pc_xzz[j] * pa_y[j] - pc_xyz[j] * pa_z[j] - pc_xyz[j] * pb_z[j]);
 
@@ -4514,9 +4662,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xzz_x[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * fl1_fx * pa_zz[j] + 0.5 * pa_x[j] * fl1_fx * pb_x[j] + pa_xzz[j] * pb_x[j]);
 
-                t_xzz_x[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pa_zz[j] - 0.5 * pa_x[j] * fl1_fx * pc_x[j] - 0.5 * pa_x[j] * fl1_fx * pb_x[j] - 0.5 * pc_x[j] * fl1_fx * pb_x[j] - pa_xzz[j] * pc_x[j] - 2.0 * pa_xz[j] * pc_z[j] * pb_x[j] - pc_x[j] * pa_zz[j] * pb_x[j]);
+                t_xzz_x[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pa_zz[j] - 0.5 * pa_x[j] * fl1_fx * pc_x[j] - 0.5 * pa_x[j] * fl1_fx * pb_x[j]);
 
-                t_xzz_x[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pa_z[j] * pc_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_x[j] + 0.5 * pc_xx[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_x[j] + 2.0 * pa_xz[j] * pc_xz[j] + pa_x[j] * pc_zz[j] * pb_x[j] + pc_xx[j] * pa_zz[j] + 2.0 * pc_xz[j] * pa_z[j] * pb_x[j]);
+                t_xzz_x[j] += fl_s_0_0_1 * (- 0.5 * pc_x[j] * fl1_fx * pb_x[j] - pa_xzz[j] * pc_x[j] - 2.0 * pa_xz[j] * pc_z[j] * pb_x[j] - pc_x[j] * pa_zz[j] * pb_x[j]);
+
+                t_xzz_x[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pa_z[j] * pc_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_x[j] + 0.5 * pc_xx[j] * fl1_fx);
+
+                t_xzz_x[j] += fl_s_0_0_2 * (+ 0.5 * pc_x[j] * fl1_fx * pb_x[j] + 2.0 * pa_xz[j] * pc_xz[j] + pa_x[j] * pc_zz[j] * pb_x[j] + pc_xx[j] * pa_zz[j] + 2.0 * pc_xz[j] * pa_z[j] * pb_x[j]);
 
                 t_xzz_x[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_zz[j] - 0.5 * pc_xx[j] * fl1_fx - pa_x[j] * pc_xzz[j] - 2.0 * pc_xxz[j] * pa_z[j] - pc_xzz[j] * pb_x[j]);
 
@@ -4524,9 +4676,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xzz_y[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_y[j] + pa_xzz[j] * pb_y[j]);
 
-                t_xzz_y[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_y[j] - 0.5 * pa_x[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * fl1_fx * pb_y[j] - pa_xzz[j] * pc_y[j] - 2.0 * pa_xz[j] * pc_z[j] * pb_y[j] - pc_x[j] * pa_zz[j] * pb_y[j]);
+                t_xzz_y[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pc_y[j] - 0.5 * pa_x[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * fl1_fx * pb_y[j] - pa_xzz[j] * pc_y[j] - 2.0 * pa_xz[j] * pc_z[j] * pb_y[j]);
 
-                t_xzz_y[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_y[j] + 0.5 * pc_xy[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_y[j] + 2.0 * pa_xz[j] * pc_yz[j] + pa_x[j] * pc_zz[j] * pb_y[j] + pc_xy[j] * pa_zz[j] + 2.0 * pc_xz[j] * pa_z[j] * pb_y[j]);
+                t_xzz_y[j] += -fl_s_0_0_1 * pc_x[j] * pa_zz[j] * pb_y[j];
+
+                t_xzz_y[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_y[j] + 0.5 * pc_xy[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_y[j] + 2.0 * pa_xz[j] * pc_yz[j] + pa_x[j] * pc_zz[j] * pb_y[j]);
+
+                t_xzz_y[j] += fl_s_0_0_2 * (+ pc_xy[j] * pa_zz[j] + 2.0 * pc_xz[j] * pa_z[j] * pb_y[j]);
 
                 t_xzz_y[j] += fl_s_0_0_3 * (-0.5 * pc_xy[j] * fl1_fx - pa_x[j] * pc_yzz[j] - 2.0 * pc_xyz[j] * pa_z[j] - pc_xzz[j] * pb_y[j]);
 
@@ -4534,9 +4690,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xzz_z[j] = fl_s_0_0_0 * (pa_xz[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_xzz[j] * pb_z[j]);
 
-                t_xzz_z[j] += fl_s_0_0_1 * (-pa_xz[j] * fl1_fx - 1.5 * pa_x[j] * pc_z[j] * fl1_fx - pc_x[j] * pa_z[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pb_z[j] - pa_xzz[j] * pc_z[j] - 2.0 * pa_xz[j] * pc_z[j] * pb_z[j] - pc_x[j] * pa_zz[j] * pb_z[j]);
+                t_xzz_z[j] += fl_s_0_0_1 * (-pa_xz[j] * fl1_fx - 1.5 * pa_x[j] * pc_z[j] * fl1_fx - pc_x[j] * pa_z[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pb_z[j]);
 
-                t_xzz_z[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pc_z[j] * fl1_fx + pc_x[j] * pa_z[j] * fl1_fx + 1.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_z[j] + 2.0 * pa_xz[j] * pc_zz[j] + pa_x[j] * pc_zz[j] * pb_z[j] + pc_xz[j] * pa_zz[j] + 2.0 * pc_xz[j] * pa_z[j] * pb_z[j]);
+                t_xzz_z[j] += fl_s_0_0_1 * (- pa_xzz[j] * pc_z[j] - 2.0 * pa_xz[j] * pc_z[j] * pb_z[j] - pc_x[j] * pa_zz[j] * pb_z[j]);
+
+                t_xzz_z[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pc_z[j] * fl1_fx + pc_x[j] * pa_z[j] * fl1_fx + 1.5 * pc_xz[j] * fl1_fx + 0.5 * pc_x[j] * fl1_fx * pb_z[j] + 2.0 * pa_xz[j] * pc_zz[j]);
+
+                t_xzz_z[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_zz[j] * pb_z[j] + pc_xz[j] * pa_zz[j] + 2.0 * pc_xz[j] * pa_z[j] * pb_z[j]);
 
                 t_xzz_z[j] += fl_s_0_0_3 * (-1.5 * pc_xz[j] * fl1_fx - pa_x[j] * pc_zzz[j] - 2.0 * pc_xzz[j] * pa_z[j] - pc_xzz[j] * pb_z[j]);
 
@@ -4685,9 +4845,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyy_y[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 1.5 * pa_yy[j] * fl1_fx + 1.5 * pa_y[j] * fl1_fx * pb_y[j] + pa_yyy[j] * pb_y[j]);
 
-                t_yyy_y[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_yy[j] * fl1_fx - 4.5 * pa_y[j] * pc_y[j] * fl1_fx - 1.5 * pa_y[j] * fl1_fx * pb_y[j] - 1.5 * pc_y[j] * fl1_fx * pb_y[j] - pa_yyy[j] * pc_y[j] - 3.0 * pa_yy[j] * pc_y[j] * pb_y[j]);
+                t_yyy_y[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_yy[j] * fl1_fx - 4.5 * pa_y[j] * pc_y[j] * fl1_fx - 1.5 * pa_y[j] * fl1_fx * pb_y[j] - 1.5 * pc_y[j] * fl1_fx * pb_y[j]);
 
-                t_yyy_y[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 4.5 * pa_y[j] * pc_y[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_y[j] + 3.0 * pa_yy[j] * pc_yy[j] + 3.0 * pa_y[j] * pc_yy[j] * pb_y[j]);
+                t_yyy_y[j] += fl_s_0_0_1 * (- pa_yyy[j] * pc_y[j] - 3.0 * pa_yy[j] * pc_y[j] * pb_y[j]);
+
+                t_yyy_y[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 4.5 * pa_y[j] * pc_y[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pb_y[j] + 3.0 * pa_yy[j] * pc_yy[j]);
+
+                t_yyy_y[j] += fl_s_0_0_2 * 3.0 * pa_y[j] * pc_yy[j] * pb_y[j];
 
                 t_yyy_y[j] += fl_s_0_0_3 * (-3.0 * pc_yy[j] * fl1_fx - 3.0 * pa_y[j] * pc_yyy[j] - pc_yyy[j] * pb_y[j]);
 
@@ -4848,9 +5012,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyz_x[j] = fl_s_0_0_0 * (0.5 * fl1_fx * pa_z[j] * pb_x[j] + pa_yyz[j] * pb_x[j]);
 
-                t_yyz_x[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_z[j] * pc_x[j] - 0.5 * fl1_fx * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_z[j] * pb_x[j] - pa_yyz[j] * pc_x[j] - pa_yy[j] * pc_z[j] * pb_x[j] - 2.0 * pa_yz[j] * pc_y[j] * pb_x[j]);
+                t_yyz_x[j] += fl_s_0_0_1 * (-0.5 * fl1_fx * pa_z[j] * pc_x[j] - 0.5 * fl1_fx * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_z[j] * pb_x[j] - pa_yyz[j] * pc_x[j] - pa_yy[j] * pc_z[j] * pb_x[j]);
 
-                t_yyz_x[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xz[j] + 0.5 * fl1_fx * pa_z[j] * pc_x[j] + 0.5 * fl1_fx * pc_z[j] * pb_x[j] + pa_yy[j] * pc_xz[j] + 2.0 * pa_yz[j] * pc_xy[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_x[j] + pc_yy[j] * pa_z[j] * pb_x[j]);
+                t_yyz_x[j] += -fl_s_0_0_1 * 2.0 * pa_yz[j] * pc_y[j] * pb_x[j];
+
+                t_yyz_x[j] += fl_s_0_0_2 * (0.5 * fl1_fx * pc_xz[j] + 0.5 * fl1_fx * pa_z[j] * pc_x[j] + 0.5 * fl1_fx * pc_z[j] * pb_x[j] + pa_yy[j] * pc_xz[j] + 2.0 * pa_yz[j] * pc_xy[j]);
+
+                t_yyz_x[j] += fl_s_0_0_2 * (+ 2.0 * pa_y[j] * pc_yz[j] * pb_x[j] + pc_yy[j] * pa_z[j] * pb_x[j]);
 
                 t_yyz_x[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_xz[j] - 2.0 * pa_y[j] * pc_xyz[j] - pc_xyy[j] * pa_z[j] - pc_yyz[j] * pb_x[j]);
 
@@ -4858,9 +5026,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyz_y[j] = fl_s_0_0_0 * (pa_yz[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_y[j] + pa_yyz[j] * pb_y[j]);
 
-                t_yyz_y[j] += fl_s_0_0_1 * (-pa_y[j] * fl1_fx * pc_z[j] - pa_yz[j] * fl1_fx - 1.5 * pc_y[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_z[j] * pb_y[j] - pa_yyz[j] * pc_y[j] - pa_yy[j] * pc_z[j] * pb_y[j] - 2.0 * pa_yz[j] * pc_y[j] * pb_y[j]);
+                t_yyz_y[j] += fl_s_0_0_1 * (-pa_y[j] * fl1_fx * pc_z[j] - pa_yz[j] * fl1_fx - 1.5 * pc_y[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_z[j] * pb_y[j]);
 
-                t_yyz_y[j] += fl_s_0_0_2 * (pa_y[j] * fl1_fx * pc_z[j] + 1.5 * pc_yz[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pa_z[j] + 0.5 * fl1_fx * pc_z[j] * pb_y[j] + pa_yy[j] * pc_yz[j] + 2.0 * pa_yz[j] * pc_yy[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_y[j] + pc_yy[j] * pa_z[j] * pb_y[j]);
+                t_yyz_y[j] += fl_s_0_0_1 * (- pa_yyz[j] * pc_y[j] - pa_yy[j] * pc_z[j] * pb_y[j] - 2.0 * pa_yz[j] * pc_y[j] * pb_y[j]);
+
+                t_yyz_y[j] += fl_s_0_0_2 * (pa_y[j] * fl1_fx * pc_z[j] + 1.5 * pc_yz[j] * fl1_fx + 1.5 * pc_y[j] * fl1_fx * pa_z[j] + 0.5 * fl1_fx * pc_z[j] * pb_y[j] + pa_yy[j] * pc_yz[j]);
+
+                t_yyz_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_yz[j] * pc_yy[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_y[j] + pc_yy[j] * pa_z[j] * pb_y[j]);
 
                 t_yyz_y[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - 2.0 * pa_y[j] * pc_yyz[j] - pc_yyy[j] * pa_z[j] - pc_yyz[j] * pb_y[j]);
 
@@ -4868,9 +5040,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyz_z[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_z[j] + pa_yyz[j] * pb_z[j]);
 
-                t_yyz_z[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - pa_y[j] * pc_y[j] * fl1_fx - 0.5 * fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_z[j] - 0.5 * fl1_fx * pa_z[j] * pb_z[j] - pa_yyz[j] * pc_z[j] - pa_yy[j] * pc_z[j] * pb_z[j] - 2.0 * pa_yz[j] * pc_y[j] * pb_z[j]);
+                t_yyz_z[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - 0.5 * pa_yy[j] * fl1_fx - pa_y[j] * pc_y[j] * fl1_fx - 0.5 * fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pc_z[j] * pb_z[j]);
 
-                t_yyz_z[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + 0.5 * fl1_fx * pa_z[j] * pc_z[j] + 0.5 * fl1_fx * pc_z[j] * pb_z[j] + pa_yy[j] * pc_zz[j] + 2.0 * pa_yz[j] * pc_yz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_z[j] + pc_yy[j] * pa_z[j] * pb_z[j]);
+                t_yyz_z[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_z[j] * pb_z[j] - pa_yyz[j] * pc_z[j] - pa_yy[j] * pc_z[j] * pb_z[j] - 2.0 * pa_yz[j] * pc_y[j] * pb_z[j]);
+
+                t_yyz_z[j] += fl_s_0_0_2 * (0.25 * fl2_fx + pa_y[j] * pc_y[j] * fl1_fx + 0.5 * pc_yy[j] * fl1_fx + 0.5 * fl1_fx * pc_zz[j] + 0.5 * fl1_fx * pa_z[j] * pc_z[j]);
+
+                t_yyz_z[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pc_z[j] * pb_z[j] + pa_yy[j] * pc_zz[j] + 2.0 * pa_yz[j] * pc_yz[j] + 2.0 * pa_y[j] * pc_yz[j] * pb_z[j] + pc_yy[j] * pa_z[j] * pb_z[j]);
 
                 t_yyz_z[j] += fl_s_0_0_3 * (-0.5 * pc_yy[j] * fl1_fx - 0.5 * fl1_fx * pc_zz[j] - 2.0 * pa_y[j] * pc_yzz[j] - pc_yyz[j] * pa_z[j] - pc_yyz[j] * pb_z[j]);
 
@@ -5021,9 +5197,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yzz_x[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * fl1_fx * pb_x[j] + pa_yzz[j] * pb_x[j]);
 
-                t_yzz_x[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl1_fx * pc_x[j] - 0.5 * pa_y[j] * fl1_fx * pb_x[j] - 0.5 * pc_y[j] * fl1_fx * pb_x[j] - pa_yzz[j] * pc_x[j] - 2.0 * pa_yz[j] * pc_z[j] * pb_x[j] - pc_y[j] * pa_zz[j] * pb_x[j]);
+                t_yzz_x[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl1_fx * pc_x[j] - 0.5 * pa_y[j] * fl1_fx * pb_x[j] - 0.5 * pc_y[j] * fl1_fx * pb_x[j] - pa_yzz[j] * pc_x[j] - 2.0 * pa_yz[j] * pc_z[j] * pb_x[j]);
 
-                t_yzz_x[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl1_fx * pc_x[j] + 0.5 * pc_xy[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_x[j] + 2.0 * pa_yz[j] * pc_xz[j] + pa_y[j] * pc_zz[j] * pb_x[j] + pc_xy[j] * pa_zz[j] + 2.0 * pc_yz[j] * pa_z[j] * pb_x[j]);
+                t_yzz_x[j] += -fl_s_0_0_1 * pc_y[j] * pa_zz[j] * pb_x[j];
+
+                t_yzz_x[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl1_fx * pc_x[j] + 0.5 * pc_xy[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_x[j] + 2.0 * pa_yz[j] * pc_xz[j] + pa_y[j] * pc_zz[j] * pb_x[j]);
+
+                t_yzz_x[j] += fl_s_0_0_2 * (+ pc_xy[j] * pa_zz[j] + 2.0 * pc_yz[j] * pa_z[j] * pb_x[j]);
 
                 t_yzz_x[j] += fl_s_0_0_3 * (-0.5 * pc_xy[j] * fl1_fx - pa_y[j] * pc_xzz[j] - 2.0 * pc_xyz[j] * pa_z[j] - pc_yzz[j] * pb_x[j]);
 
@@ -5031,9 +5211,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yzz_y[j] = fl_s_0_0_0 * (0.25 * fl2_fx + 0.5 * fl1_fx * pa_zz[j] + 0.5 * pa_y[j] * fl1_fx * pb_y[j] + pa_yzz[j] * pb_y[j]);
 
-                t_yzz_y[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pa_zz[j] - 0.5 * pa_y[j] * fl1_fx * pc_y[j] - 0.5 * pa_y[j] * fl1_fx * pb_y[j] - 0.5 * pc_y[j] * fl1_fx * pb_y[j] - pa_yzz[j] * pc_y[j] - 2.0 * pa_yz[j] * pc_z[j] * pb_y[j] - pc_y[j] * pa_zz[j] * pb_y[j]);
+                t_yzz_y[j] += fl_s_0_0_1 * (-0.5 * fl2_fx - fl1_fx * pa_z[j] * pc_z[j] - 0.5 * fl1_fx * pa_zz[j] - 0.5 * pa_y[j] * fl1_fx * pc_y[j] - 0.5 * pa_y[j] * fl1_fx * pb_y[j]);
 
-                t_yzz_y[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pa_z[j] * pc_z[j] + 0.5 * pa_y[j] * fl1_fx * pc_y[j] + 0.5 * pc_yy[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_y[j] + 2.0 * pa_yz[j] * pc_yz[j] + pa_y[j] * pc_zz[j] * pb_y[j] + pc_yy[j] * pa_zz[j] + 2.0 * pc_yz[j] * pa_z[j] * pb_y[j]);
+                t_yzz_y[j] += fl_s_0_0_1 * (- 0.5 * pc_y[j] * fl1_fx * pb_y[j] - pa_yzz[j] * pc_y[j] - 2.0 * pa_yz[j] * pc_z[j] * pb_y[j] - pc_y[j] * pa_zz[j] * pb_y[j]);
+
+                t_yzz_y[j] += fl_s_0_0_2 * (0.25 * fl2_fx + 0.5 * fl1_fx * pc_zz[j] + fl1_fx * pa_z[j] * pc_z[j] + 0.5 * pa_y[j] * fl1_fx * pc_y[j] + 0.5 * pc_yy[j] * fl1_fx);
+
+                t_yzz_y[j] += fl_s_0_0_2 * (+ 0.5 * pc_y[j] * fl1_fx * pb_y[j] + 2.0 * pa_yz[j] * pc_yz[j] + pa_y[j] * pc_zz[j] * pb_y[j] + pc_yy[j] * pa_zz[j] + 2.0 * pc_yz[j] * pa_z[j] * pb_y[j]);
 
                 t_yzz_y[j] += fl_s_0_0_3 * (-0.5 * fl1_fx * pc_zz[j] - 0.5 * pc_yy[j] * fl1_fx - pa_y[j] * pc_yzz[j] - 2.0 * pc_yyz[j] * pa_z[j] - pc_yzz[j] * pb_y[j]);
 
@@ -5041,9 +5225,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yzz_z[j] = fl_s_0_0_0 * (pa_yz[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_z[j] + pa_yzz[j] * pb_z[j]);
 
-                t_yzz_z[j] += fl_s_0_0_1 * (-pa_yz[j] * fl1_fx - 1.5 * pa_y[j] * pc_z[j] * fl1_fx - pc_y[j] * pa_z[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pb_z[j] - 0.5 * pc_y[j] * fl1_fx * pb_z[j] - pa_yzz[j] * pc_z[j] - 2.0 * pa_yz[j] * pc_z[j] * pb_z[j] - pc_y[j] * pa_zz[j] * pb_z[j]);
+                t_yzz_z[j] += fl_s_0_0_1 * (-pa_yz[j] * fl1_fx - 1.5 * pa_y[j] * pc_z[j] * fl1_fx - pc_y[j] * pa_z[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pb_z[j] - 0.5 * pc_y[j] * fl1_fx * pb_z[j]);
 
-                t_yzz_z[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * pc_z[j] * fl1_fx + pc_y[j] * pa_z[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_z[j] + 2.0 * pa_yz[j] * pc_zz[j] + pa_y[j] * pc_zz[j] * pb_z[j] + pc_yz[j] * pa_zz[j] + 2.0 * pc_yz[j] * pa_z[j] * pb_z[j]);
+                t_yzz_z[j] += fl_s_0_0_1 * (- pa_yzz[j] * pc_z[j] - 2.0 * pa_yz[j] * pc_z[j] * pb_z[j] - pc_y[j] * pa_zz[j] * pb_z[j]);
+
+                t_yzz_z[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * pc_z[j] * fl1_fx + pc_y[j] * pa_z[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx + 0.5 * pc_y[j] * fl1_fx * pb_z[j] + 2.0 * pa_yz[j] * pc_zz[j]);
+
+                t_yzz_z[j] += fl_s_0_0_2 * (+ pa_y[j] * pc_zz[j] * pb_z[j] + pc_yz[j] * pa_zz[j] + 2.0 * pc_yz[j] * pa_z[j] * pb_z[j]);
 
                 t_yzz_z[j] += fl_s_0_0_3 * (-1.5 * pc_yz[j] * fl1_fx - pa_y[j] * pc_zzz[j] - 2.0 * pc_yzz[j] * pa_z[j] - pc_yzz[j] * pb_z[j]);
 
@@ -5202,9 +5390,13 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_zzz_z[j] = fl_s_0_0_0 * (0.75 * fl2_fx + 1.5 * pa_zz[j] * fl1_fx + 1.5 * pa_z[j] * fl1_fx * pb_z[j] + pa_zzz[j] * pb_z[j]);
 
-                t_zzz_z[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_zz[j] * fl1_fx - 4.5 * pa_z[j] * pc_z[j] * fl1_fx - 1.5 * pa_z[j] * fl1_fx * pb_z[j] - 1.5 * pc_z[j] * fl1_fx * pb_z[j] - pa_zzz[j] * pc_z[j] - 3.0 * pa_zz[j] * pc_z[j] * pb_z[j]);
+                t_zzz_z[j] += fl_s_0_0_1 * (-1.5 * fl2_fx - 1.5 * pa_zz[j] * fl1_fx - 4.5 * pa_z[j] * pc_z[j] * fl1_fx - 1.5 * pa_z[j] * fl1_fx * pb_z[j] - 1.5 * pc_z[j] * fl1_fx * pb_z[j]);
 
-                t_zzz_z[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 4.5 * pa_z[j] * pc_z[j] * fl1_fx + 3.0 * pc_zz[j] * fl1_fx + 1.5 * pc_z[j] * fl1_fx * pb_z[j] + 3.0 * pa_zz[j] * pc_zz[j] + 3.0 * pa_z[j] * pc_zz[j] * pb_z[j]);
+                t_zzz_z[j] += fl_s_0_0_1 * (- pa_zzz[j] * pc_z[j] - 3.0 * pa_zz[j] * pc_z[j] * pb_z[j]);
+
+                t_zzz_z[j] += fl_s_0_0_2 * (0.75 * fl2_fx + 4.5 * pa_z[j] * pc_z[j] * fl1_fx + 3.0 * pc_zz[j] * fl1_fx + 1.5 * pc_z[j] * fl1_fx * pb_z[j] + 3.0 * pa_zz[j] * pc_zz[j]);
+
+                t_zzz_z[j] += fl_s_0_0_2 * 3.0 * pa_z[j] * pc_zz[j] * pb_z[j];
 
                 t_zzz_z[j] += fl_s_0_0_3 * (-3.0 * pc_zz[j] * fl1_fx - 3.0 * pa_z[j] * pc_zzz[j] - pc_zzz[j] * pb_z[j]);
 
@@ -5429,11 +5621,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xxxx[j] = fl_s_0_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * fl2_fx * pb_x[j] + 3.0 * pa_x[j] * pb_xx[j] * fl1_fx + 2.0 * fl1_fx * pb_xxx[j] + pa_x[j] * pb_xxxx[j]);
 
-                t_x_xxxx[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 3.75 * pc_x[j] * fl2_fx - 6.0 * fl2_fx * pb_x[j] - 3.0 * pa_x[j] * pb_xx[j] * fl1_fx - 6.0 * pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx - 9.0 * pc_x[j] * pb_xx[j] * fl1_fx - 2.0 * fl1_fx * pb_xxx[j] - 4.0 * pa_x[j] * pb_xxx[j] * pc_x[j] - pc_x[j] * pb_xxxx[j]);
+                t_x_xxxx[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 3.75 * pc_x[j] * fl2_fx - 6.0 * fl2_fx * pb_x[j] - 3.0 * pa_x[j] * pb_xx[j] * fl1_fx - 6.0 * pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx);
 
-                t_x_xxxx[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 7.5 * pc_x[j] * fl2_fx + 3.0 * fl2_fx * pb_x[j] + 6.0 * pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx + 3.0 * pa_x[j] * pc_xx[j] * fl1_fx + 9.0 * pc_x[j] * pb_xx[j] * fl1_fx + 12.0 * pc_xx[j] * pb_x[j] * fl1_fx + 6.0 * pa_x[j] * pb_xx[j] * pc_xx[j] + 4.0 * pc_xx[j] * pb_xxx[j]);
+                t_x_xxxx[j] += fl_s_0_0_1 * (- 9.0 * pc_x[j] * pb_xx[j] * fl1_fx - 2.0 * fl1_fx * pb_xxx[j] - 4.0 * pa_x[j] * pb_xxx[j] * pc_x[j] - pc_x[j] * pb_xxxx[j]);
 
-                t_x_xxxx[j] += fl_s_0_0_3 * (-3.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_xx[j] * fl1_fx - 12.0 * pc_xx[j] * pb_x[j] * fl1_fx - 5.0 * pc_xxx[j] * fl1_fx - 4.0 * pa_x[j] * pb_x[j] * pc_xxx[j] - 6.0 * pc_xxx[j] * pb_xx[j]);
+                t_x_xxxx[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 7.5 * pc_x[j] * fl2_fx + 3.0 * fl2_fx * pb_x[j] + 6.0 * pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx + 3.0 * pa_x[j] * pc_xx[j] * fl1_fx);
+
+                t_x_xxxx[j] += fl_s_0_0_2 * (+ 9.0 * pc_x[j] * pb_xx[j] * fl1_fx + 12.0 * pc_xx[j] * pb_x[j] * fl1_fx + 6.0 * pa_x[j] * pb_xx[j] * pc_xx[j] + 4.0 * pc_xx[j] * pb_xxx[j]);
+
+                t_x_xxxx[j] += fl_s_0_0_3 * (-3.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_xx[j] * fl1_fx - 12.0 * pc_xx[j] * pb_x[j] * fl1_fx - 5.0 * pc_xxx[j] * fl1_fx - 4.0 * pa_x[j] * pb_x[j] * pc_xxx[j]);
+
+                t_x_xxxx[j] += -fl_s_0_0_3 * 6.0 * pc_xxx[j] * pb_xx[j];
 
                 t_x_xxxx[j] += fl_s_0_0_4 * (5.0 * pc_xxx[j] * fl1_fx + pa_x[j] * pc_xxxx[j] + 4.0 * pc_xxxx[j] * pb_x[j]);
 
@@ -5441,11 +5639,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xxxy[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_xy[j] * fl1_fx + 1.5 * fl1_fx * pb_xxy[j] + pa_x[j] * pb_xxxy[j]);
 
-                t_x_xxxy[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pb_y[j] - 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_y[j] - 1.5 * pa_x[j] * pb_xy[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] - 4.5 * pc_x[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_y[j] - 1.5 * fl1_fx * pb_xxy[j] - pa_x[j] * pb_xxx[j] * pc_y[j] - 3.0 * pa_x[j] * pb_xxy[j] * pc_x[j] - pc_x[j] * pb_xxxy[j]);
+                t_x_xxxy[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pb_y[j] - 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_y[j] - 1.5 * pa_x[j] * pb_xy[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j]);
 
-                t_x_xxxy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * pc_xy[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] + 4.5 * pc_xy[j] * pb_x[j] * fl1_fx + 4.5 * pc_x[j] * pb_xy[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx * pb_y[j] + 1.5 * fl1_fx * pb_xx[j] * pc_y[j] + 3.0 * pa_x[j] * pb_xx[j] * pc_xy[j] + 3.0 * pa_x[j] * pb_xy[j] * pc_xx[j] + pc_xy[j] * pb_xxx[j] + 3.0 * pc_xx[j] * pb_xxy[j]);
+                t_x_xxxy[j] += fl_s_0_0_1 * (- 4.5 * pc_x[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_y[j] - 1.5 * fl1_fx * pb_xxy[j] - pa_x[j] * pb_xxx[j] * pc_y[j] - 3.0 * pa_x[j] * pb_xxy[j] * pc_x[j]);
 
-                t_x_xxxy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_x[j] * pc_xy[j] * fl1_fx - 4.5 * pc_xy[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_y[j] - 3.0 * pa_x[j] * pb_x[j] * pc_xxy[j] - pa_x[j] * pc_xxx[j] * pb_y[j] - 3.0 * pc_xxy[j] * pb_xx[j] - 3.0 * pc_xxx[j] * pb_xy[j]);
+                t_x_xxxy[j] += -fl_s_0_0_1 * pc_x[j] * pb_xxxy[j];
+
+                t_x_xxxy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * pc_xy[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j]);
+
+                t_x_xxxy[j] += fl_s_0_0_2 * (+ 4.5 * pc_xy[j] * pb_x[j] * fl1_fx + 4.5 * pc_x[j] * pb_xy[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx * pb_y[j] + 1.5 * fl1_fx * pb_xx[j] * pc_y[j] + 3.0 * pa_x[j] * pb_xx[j] * pc_xy[j]);
+
+                t_x_xxxy[j] += fl_s_0_0_2 * (+ 3.0 * pa_x[j] * pb_xy[j] * pc_xx[j] + pc_xy[j] * pb_xxx[j] + 3.0 * pc_xx[j] * pb_xxy[j]);
+
+                t_x_xxxy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_x[j] * pc_xy[j] * fl1_fx - 4.5 * pc_xy[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_y[j]);
+
+                t_x_xxxy[j] += fl_s_0_0_3 * (- 3.0 * pa_x[j] * pb_x[j] * pc_xxy[j] - pa_x[j] * pc_xxx[j] * pb_y[j] - 3.0 * pc_xxy[j] * pb_xx[j] - 3.0 * pc_xxx[j] * pb_xy[j]);
 
                 t_x_xxxy[j] += fl_s_0_0_4 * (3.0 * pc_xxy[j] * fl1_fx + pa_x[j] * pc_xxxy[j] + 3.0 * pc_xxxy[j] * pb_x[j] + pc_xxxx[j] * pb_y[j]);
 
@@ -5453,11 +5661,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xxxz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_xz[j] * fl1_fx + 1.5 * fl1_fx * pb_xxz[j] + pa_x[j] * pb_xxxz[j]);
 
-                t_x_xxxz[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] - 1.5 * pa_x[j] * pb_xz[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] - 4.5 * pc_x[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_z[j] - 1.5 * fl1_fx * pb_xxz[j] - pa_x[j] * pb_xxx[j] * pc_z[j] - 3.0 * pa_x[j] * pb_xxz[j] * pc_x[j] - pc_x[j] * pb_xxxz[j]);
+                t_x_xxxz[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] - 1.5 * pa_x[j] * pb_xz[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
 
-                t_x_xxxz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_xz[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] + 4.5 * pc_xz[j] * pb_x[j] * fl1_fx + 4.5 * pc_x[j] * pb_xz[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_xx[j] * pc_z[j] + 3.0 * pa_x[j] * pb_xx[j] * pc_xz[j] + 3.0 * pa_x[j] * pb_xz[j] * pc_xx[j] + pc_xz[j] * pb_xxx[j] + 3.0 * pc_xx[j] * pb_xxz[j]);
+                t_x_xxxz[j] += fl_s_0_0_1 * (- 4.5 * pc_x[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_z[j] - 1.5 * fl1_fx * pb_xxz[j] - pa_x[j] * pb_xxx[j] * pc_z[j] - 3.0 * pa_x[j] * pb_xxz[j] * pc_x[j]);
 
-                t_x_xxxz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_x[j] * pc_xz[j] * fl1_fx - 4.5 * pc_xz[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_z[j] - 3.0 * pa_x[j] * pb_x[j] * pc_xxz[j] - pa_x[j] * pc_xxx[j] * pb_z[j] - 3.0 * pc_xxz[j] * pb_xx[j] - 3.0 * pc_xxx[j] * pb_xz[j]);
+                t_x_xxxz[j] += -fl_s_0_0_1 * pc_x[j] * pb_xxxz[j];
+
+                t_x_xxxz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_xz[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
+
+                t_x_xxxz[j] += fl_s_0_0_2 * (+ 4.5 * pc_xz[j] * pb_x[j] * fl1_fx + 4.5 * pc_x[j] * pb_xz[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_xx[j] * pc_z[j] + 3.0 * pa_x[j] * pb_xx[j] * pc_xz[j]);
+
+                t_x_xxxz[j] += fl_s_0_0_2 * (+ 3.0 * pa_x[j] * pb_xz[j] * pc_xx[j] + pc_xz[j] * pb_xxx[j] + 3.0 * pc_xx[j] * pb_xxz[j]);
+
+                t_x_xxxz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_x[j] * pc_xz[j] * fl1_fx - 4.5 * pc_xz[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_z[j]);
+
+                t_x_xxxz[j] += fl_s_0_0_3 * (- 3.0 * pa_x[j] * pb_x[j] * pc_xxz[j] - pa_x[j] * pc_xxx[j] * pb_z[j] - 3.0 * pc_xxz[j] * pb_xx[j] - 3.0 * pc_xxx[j] * pb_xz[j]);
 
                 t_x_xxxz[j] += fl_s_0_0_4 * (3.0 * pc_xxz[j] * fl1_fx + pa_x[j] * pc_xxxz[j] + 3.0 * pc_xxxz[j] * pb_x[j] + pc_xxxx[j] * pb_z[j]);
 
@@ -5650,13 +5868,29 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_x_xxyy[j] = fl_s_0_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + 0.5 * pa_x[j] * pb_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_xyy[j] + pa_x[j] * pb_xxyy[j]);
+                t_x_xxyy[j] = fl_s_0_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + 0.5 * pa_x[j] * pb_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_xyy[j]);
 
-                t_x_xxyy[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - fl2_fx * pb_x[j] - 0.5 * pa_x[j] * pb_xx[j] * fl1_fx - pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_x[j] * fl1_fx * pb_y[j] * pc_y[j] - 0.5 * pa_x[j] * fl1_fx * pb_yy[j] - 0.5 * pc_x[j] * pb_xx[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pb_yy[j] - 2.0 * fl1_fx * pb_xy[j] * pc_y[j] - fl1_fx * pb_xyy[j] - 2.0 * pa_x[j] * pb_xxy[j] * pc_y[j] - 2.0 * pa_x[j] * pb_xyy[j] * pc_x[j] - pc_x[j] * pb_xxyy[j]);
+                t_x_xxyy[j] += fl_s_0_0_0 * pa_x[j] * pb_xxyy[j];
 
-                t_x_xxyy[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_x[j] * pc_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pc_yy[j] + pa_x[j] * fl1_fx * pb_y[j] * pc_y[j] + 0.5 * pc_x[j] * pb_xx[j] * fl1_fx + pc_xx[j] * pb_x[j] * fl1_fx + 3.0 * pc_xy[j] * fl1_fx * pb_y[j] + 1.5 * pc_x[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_x[j] * pc_yy[j] + 2.0 * fl1_fx * pb_xy[j] * pc_y[j] + pa_x[j] * pb_xx[j] * pc_yy[j] + 4.0 * pa_x[j] * pb_xy[j] * pc_xy[j] + pa_x[j] * pc_xx[j] * pb_yy[j] + 2.0 * pc_xy[j] * pb_xxy[j] + 2.0 * pc_xx[j] * pb_xyy[j]);
+                t_x_xxyy[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - fl2_fx * pb_x[j] - 0.5 * pa_x[j] * pb_xx[j] * fl1_fx - pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx);
 
-                t_x_xxyy[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_yy[j] - pc_xx[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 1.5 * pc_xyy[j] * fl1_fx - 3.0 * pc_xy[j] * fl1_fx * pb_y[j] - fl1_fx * pb_x[j] * pc_yy[j] - 2.0 * pa_x[j] * pb_x[j] * pc_xyy[j] - 2.0 * pa_x[j] * pc_xxy[j] * pb_y[j] - pc_xyy[j] * pb_xx[j] - 4.0 * pc_xxy[j] * pb_xy[j] - pc_xxx[j] * pb_yy[j]);
+                t_x_xxyy[j] += fl_s_0_0_1 * (- pa_x[j] * fl1_fx * pb_y[j] * pc_y[j] - 0.5 * pa_x[j] * fl1_fx * pb_yy[j] - 0.5 * pc_x[j] * pb_xx[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pb_yy[j] - 2.0 * fl1_fx * pb_xy[j] * pc_y[j]);
+
+                t_x_xxyy[j] += fl_s_0_0_1 * (- fl1_fx * pb_xyy[j] - 2.0 * pa_x[j] * pb_xxy[j] * pc_y[j] - 2.0 * pa_x[j] * pb_xyy[j] * pc_x[j] - pc_x[j] * pb_xxyy[j]);
+
+                t_x_xxyy[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_x[j] * pc_xx[j] * fl1_fx);
+
+                t_x_xxyy[j] += fl_s_0_0_2 * (+ 0.5 * pa_x[j] * fl1_fx * pc_yy[j] + pa_x[j] * fl1_fx * pb_y[j] * pc_y[j] + 0.5 * pc_x[j] * pb_xx[j] * fl1_fx + pc_xx[j] * pb_x[j] * fl1_fx + 3.0 * pc_xy[j] * fl1_fx * pb_y[j]);
+
+                t_x_xxyy[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_x[j] * pc_yy[j] + 2.0 * fl1_fx * pb_xy[j] * pc_y[j] + pa_x[j] * pb_xx[j] * pc_yy[j] + 4.0 * pa_x[j] * pb_xy[j] * pc_xy[j]);
+
+                t_x_xxyy[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_xx[j] * pb_yy[j] + 2.0 * pc_xy[j] * pb_xxy[j] + 2.0 * pc_xx[j] * pb_xyy[j]);
+
+                t_x_xxyy[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_yy[j] - pc_xx[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx);
+
+                t_x_xxyy[j] += fl_s_0_0_3 * (- 1.5 * pc_xyy[j] * fl1_fx - 3.0 * pc_xy[j] * fl1_fx * pb_y[j] - fl1_fx * pb_x[j] * pc_yy[j] - 2.0 * pa_x[j] * pb_x[j] * pc_xyy[j] - 2.0 * pa_x[j] * pc_xxy[j] * pb_y[j]);
+
+                t_x_xxyy[j] += fl_s_0_0_3 * (- pc_xyy[j] * pb_xx[j] - 4.0 * pc_xxy[j] * pb_xy[j] - pc_xxx[j] * pb_yy[j]);
 
                 t_x_xxyy[j] += fl_s_0_0_4 * (0.5 * pc_xxx[j] * fl1_fx + 1.5 * pc_xyy[j] * fl1_fx + pa_x[j] * pc_xxyy[j] + 2.0 * pc_xxyy[j] * pb_x[j] + 2.0 * pc_xxxy[j] * pb_y[j]);
 
@@ -5664,23 +5898,53 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xxyz[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_xyz[j] + pa_x[j] * pb_xxyz[j]);
 
-                t_x_xxyz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_yz[j] - 1.5 * pc_x[j] * fl1_fx * pb_yz[j] - fl1_fx * pb_xy[j] * pc_z[j] - fl1_fx * pb_xz[j] * pc_y[j] - fl1_fx * pb_xyz[j] - pa_x[j] * pb_xxy[j] * pc_z[j] - pa_x[j] * pb_xxz[j] * pc_y[j] - 2.0 * pa_x[j] * pb_xyz[j] * pc_x[j] - pc_x[j] * pb_xxyz[j]);
+                t_x_xxyz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_yz[j] - 1.5 * pc_x[j] * fl1_fx * pb_yz[j] - fl1_fx * pb_xy[j] * pc_z[j]);
 
-                t_x_xxyz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_yz[j] + 0.5 * pa_x[j] * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 1.5 * pc_x[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_x[j] * pc_yz[j] + fl1_fx * pb_xy[j] * pc_z[j] + fl1_fx * pb_xz[j] * pc_y[j] + pa_x[j] * pb_xx[j] * pc_yz[j] + 2.0 * pa_x[j] * pb_xy[j] * pc_xz[j] + 2.0 * pa_x[j] * pb_xz[j] * pc_xy[j] + pa_x[j] * pc_xx[j] * pb_yz[j] + pc_xz[j] * pb_xxy[j] + pc_xy[j] * pb_xxz[j] + 2.0 * pc_xx[j] * pb_xyz[j]);
+                t_x_xxyz[j] += fl_s_0_0_1 * (- fl1_fx * pb_xz[j] * pc_y[j] - fl1_fx * pb_xyz[j] - pa_x[j] * pb_xxy[j] * pc_z[j] - pa_x[j] * pb_xxz[j] * pc_y[j] - 2.0 * pa_x[j] * pb_xyz[j] * pc_x[j]);
 
-                t_x_xxyz[j] += fl_s_0_0_3 * (-0.5 * pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_yz[j] - 2.0 * pa_x[j] * pb_x[j] * pc_xyz[j] - pa_x[j] * pc_xxz[j] * pb_y[j] - pa_x[j] * pc_xxy[j] * pb_z[j] - pc_xyz[j] * pb_xx[j] - 2.0 * pc_xxz[j] * pb_xy[j] - 2.0 * pc_xxy[j] * pb_xz[j] - pc_xxx[j] * pb_yz[j]);
+                t_x_xxyz[j] += -fl_s_0_0_1 * pc_x[j] * pb_xxyz[j];
+
+                t_x_xxyz[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl1_fx * pc_yz[j] + 0.5 * pa_x[j] * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_z[j]);
+
+                t_x_xxyz[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_x[j] * pc_yz[j] + fl1_fx * pb_xy[j] * pc_z[j] + fl1_fx * pb_xz[j] * pc_y[j] + pa_x[j] * pb_xx[j] * pc_yz[j]);
+
+                t_x_xxyz[j] += fl_s_0_0_2 * (+ 2.0 * pa_x[j] * pb_xy[j] * pc_xz[j] + 2.0 * pa_x[j] * pb_xz[j] * pc_xy[j] + pa_x[j] * pc_xx[j] * pb_yz[j] + pc_xz[j] * pb_xxy[j] + pc_xy[j] * pb_xxz[j]);
+
+                t_x_xxyz[j] += fl_s_0_0_2 * 2.0 * pc_xx[j] * pb_xyz[j];
+
+                t_x_xxyz[j] += fl_s_0_0_3 * (-0.5 * pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_yz[j]);
+
+                t_x_xxyz[j] += fl_s_0_0_3 * (- 2.0 * pa_x[j] * pb_x[j] * pc_xyz[j] - pa_x[j] * pc_xxz[j] * pb_y[j] - pa_x[j] * pc_xxy[j] * pb_z[j] - pc_xyz[j] * pb_xx[j] - 2.0 * pc_xxz[j] * pb_xy[j]);
+
+                t_x_xxyz[j] += fl_s_0_0_3 * (- 2.0 * pc_xxy[j] * pb_xz[j] - pc_xxx[j] * pb_yz[j]);
 
                 t_x_xxyz[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_x[j] * pc_xxyz[j] + 2.0 * pc_xxyz[j] * pb_x[j] + pc_xxxz[j] * pb_y[j] + pc_xxxy[j] * pb_z[j]);
 
                 t_x_xxyz[j] += -fl_s_0_0_5 * pc_xxxyz[j];
 
-                t_x_xxzz[j] = fl_s_0_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + 0.5 * pa_x[j] * pb_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_xzz[j] + pa_x[j] * pb_xxzz[j]);
+                t_x_xxzz[j] = fl_s_0_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + 0.5 * pa_x[j] * pb_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_xzz[j]);
 
-                t_x_xxzz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - fl2_fx * pb_x[j] - 0.5 * pa_x[j] * pb_xx[j] * fl1_fx - pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_x[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_zz[j] - 0.5 * pc_x[j] * pb_xx[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_xz[j] * pc_z[j] - fl1_fx * pb_xzz[j] - 2.0 * pa_x[j] * pb_xxz[j] * pc_z[j] - 2.0 * pa_x[j] * pb_xzz[j] * pc_x[j] - pc_x[j] * pb_xxzz[j]);
+                t_x_xxzz[j] += fl_s_0_0_0 * pa_x[j] * pb_xxzz[j];
 
-                t_x_xxzz[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_x[j] * pc_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pc_zz[j] + pa_x[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_x[j] * pb_xx[j] * fl1_fx + pc_xx[j] * pb_x[j] * fl1_fx + 3.0 * pc_xz[j] * fl1_fx * pb_z[j] + 1.5 * pc_x[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_x[j] * pc_zz[j] + 2.0 * fl1_fx * pb_xz[j] * pc_z[j] + pa_x[j] * pb_xx[j] * pc_zz[j] + 4.0 * pa_x[j] * pb_xz[j] * pc_xz[j] + pa_x[j] * pc_xx[j] * pb_zz[j] + 2.0 * pc_xz[j] * pb_xxz[j] + 2.0 * pc_xx[j] * pb_xzz[j]);
+                t_x_xxzz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - fl2_fx * pb_x[j] - 0.5 * pa_x[j] * pb_xx[j] * fl1_fx - pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx);
 
-                t_x_xxzz[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j] - pc_xx[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 1.5 * pc_xzz[j] * fl1_fx - 3.0 * pc_xz[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_zz[j] - 2.0 * pa_x[j] * pb_x[j] * pc_xzz[j] - 2.0 * pa_x[j] * pc_xxz[j] * pb_z[j] - pc_xzz[j] * pb_xx[j] - 4.0 * pc_xxz[j] * pb_xz[j] - pc_xxx[j] * pb_zz[j]);
+                t_x_xxzz[j] += fl_s_0_0_1 * (- pa_x[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_zz[j] - 0.5 * pc_x[j] * pb_xx[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_xz[j] * pc_z[j]);
+
+                t_x_xxzz[j] += fl_s_0_0_1 * (- fl1_fx * pb_xzz[j] - 2.0 * pa_x[j] * pb_xxz[j] * pc_z[j] - 2.0 * pa_x[j] * pb_xzz[j] * pc_x[j] - pc_x[j] * pb_xxzz[j]);
+
+                t_x_xxzz[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + pa_x[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_x[j] * pc_xx[j] * fl1_fx);
+
+                t_x_xxzz[j] += fl_s_0_0_2 * (+ 0.5 * pa_x[j] * fl1_fx * pc_zz[j] + pa_x[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_x[j] * pb_xx[j] * fl1_fx + pc_xx[j] * pb_x[j] * fl1_fx + 3.0 * pc_xz[j] * fl1_fx * pb_z[j]);
+
+                t_x_xxzz[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_x[j] * pc_zz[j] + 2.0 * fl1_fx * pb_xz[j] * pc_z[j] + pa_x[j] * pb_xx[j] * pc_zz[j] + 4.0 * pa_x[j] * pb_xz[j] * pc_xz[j]);
+
+                t_x_xxzz[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_xx[j] * pb_zz[j] + 2.0 * pc_xz[j] * pb_xxz[j] + 2.0 * pc_xx[j] * pb_xzz[j]);
+
+                t_x_xxzz[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j] - pc_xx[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx);
+
+                t_x_xxzz[j] += fl_s_0_0_3 * (- 1.5 * pc_xzz[j] * fl1_fx - 3.0 * pc_xz[j] * fl1_fx * pb_z[j] - fl1_fx * pb_x[j] * pc_zz[j] - 2.0 * pa_x[j] * pb_x[j] * pc_xzz[j] - 2.0 * pa_x[j] * pc_xxz[j] * pb_z[j]);
+
+                t_x_xxzz[j] += fl_s_0_0_3 * (- pc_xzz[j] * pb_xx[j] - 4.0 * pc_xxz[j] * pb_xz[j] - pc_xxx[j] * pb_zz[j]);
 
                 t_x_xxzz[j] += fl_s_0_0_4 * (0.5 * pc_xxx[j] * fl1_fx + 1.5 * pc_xzz[j] * fl1_fx + pa_x[j] * pc_xxzz[j] + 2.0 * pc_xxzz[j] * pb_x[j] + 2.0 * pc_xxxz[j] * pb_z[j]);
 
@@ -5882,11 +6146,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xyyy[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_yyy[j] + pa_x[j] * pb_xyyy[j]);
 
-                t_x_xyyy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * pa_x[j] * pb_xy[j] * fl1_fx - 1.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx - 1.5 * pc_x[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j] * pc_y[j] - 0.5 * fl1_fx * pb_yyy[j] - 3.0 * pa_x[j] * pb_xyy[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yyy[j] - pc_x[j] * pb_xyyy[j]);
+                t_x_xyyy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * pa_x[j] * pb_xy[j] * fl1_fx - 1.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx);
 
-                t_x_xyyy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_xy[j] * fl1_fx + 1.5 * pc_x[j] * pb_xy[j] * fl1_fx + 1.5 * pc_xy[j] * pb_x[j] * fl1_fx + 1.5 * pc_xx[j] * pb_y[j] * fl1_fx + 1.5 * fl1_fx * pb_y[j] * pc_yy[j] + 1.5 * fl1_fx * pb_yy[j] * pc_y[j] + 3.0 * pa_x[j] * pb_xy[j] * pc_yy[j] + 3.0 * pa_x[j] * pc_xy[j] * pb_yy[j] + 3.0 * pc_xy[j] * pb_xyy[j] + pc_xx[j] * pb_yyy[j]);
+                t_x_xyyy[j] += fl_s_0_0_1 * (- 1.5 * pc_x[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j] * pc_y[j] - 0.5 * fl1_fx * pb_yyy[j] - 3.0 * pa_x[j] * pb_xyy[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yyy[j]);
 
-                t_x_xyyy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_x[j] * pc_xy[j] * fl1_fx - 1.5 * pc_xy[j] * pb_x[j] * fl1_fx - 1.5 * pc_xx[j] * pb_y[j] * fl1_fx - 1.5 * pc_xxy[j] * fl1_fx - 0.5 * fl1_fx * pc_yyy[j] - 1.5 * fl1_fx * pb_y[j] * pc_yy[j] - pa_x[j] * pb_x[j] * pc_yyy[j] - 3.0 * pa_x[j] * pc_xyy[j] * pb_y[j] - 3.0 * pc_xyy[j] * pb_xy[j] - 3.0 * pc_xxy[j] * pb_yy[j]);
+                t_x_xyyy[j] += -fl_s_0_0_1 * pc_x[j] * pb_xyyy[j];
+
+                t_x_xyyy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_xy[j] * fl1_fx);
+
+                t_x_xyyy[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * pb_xy[j] * fl1_fx + 1.5 * pc_xy[j] * pb_x[j] * fl1_fx + 1.5 * pc_xx[j] * pb_y[j] * fl1_fx + 1.5 * fl1_fx * pb_y[j] * pc_yy[j] + 1.5 * fl1_fx * pb_yy[j] * pc_y[j]);
+
+                t_x_xyyy[j] += fl_s_0_0_2 * (+ 3.0 * pa_x[j] * pb_xy[j] * pc_yy[j] + 3.0 * pa_x[j] * pc_xy[j] * pb_yy[j] + 3.0 * pc_xy[j] * pb_xyy[j] + pc_xx[j] * pb_yyy[j]);
+
+                t_x_xyyy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_x[j] * pc_xy[j] * fl1_fx - 1.5 * pc_xy[j] * pb_x[j] * fl1_fx - 1.5 * pc_xx[j] * pb_y[j] * fl1_fx - 1.5 * pc_xxy[j] * fl1_fx);
+
+                t_x_xyyy[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_yyy[j] - 1.5 * fl1_fx * pb_y[j] * pc_yy[j] - pa_x[j] * pb_x[j] * pc_yyy[j] - 3.0 * pa_x[j] * pc_xyy[j] * pb_y[j] - 3.0 * pc_xyy[j] * pb_xy[j]);
+
+                t_x_xyyy[j] += -fl_s_0_0_3 * 3.0 * pc_xxy[j] * pb_yy[j];
 
                 t_x_xyyy[j] += fl_s_0_0_4 * (1.5 * pc_xxy[j] * fl1_fx + 0.5 * fl1_fx * pc_yyy[j] + pa_x[j] * pc_xyyy[j] + pc_xyyy[j] * pb_x[j] + 3.0 * pc_xxyy[j] * pb_y[j]);
 
@@ -5894,25 +6170,57 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xyyz[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_z[j] + 0.5 * pa_x[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_yyz[j] + pa_x[j] * pb_xyyz[j]);
 
-                t_x_xyyz[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * pb_xz[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * pb_xz[j] * fl1_fx - 0.5 * fl1_fx * pb_yy[j] * pc_z[j] - fl1_fx * pb_yz[j] * pc_y[j] - 0.5 * fl1_fx * pb_yyz[j] - pa_x[j] * pb_xyy[j] * pc_z[j] - 2.0 * pa_x[j] * pb_xyz[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yyz[j] - pc_x[j] * pb_xyyz[j]);
+                t_x_xyyz[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * pb_xz[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
 
-                t_x_xyyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] + 0.5 * pa_x[j] * pc_xz[j] * fl1_fx + 0.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] + 0.5 * pc_xz[j] * pb_x[j] * fl1_fx + 0.5 * pc_x[j] * pb_xz[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx * pb_z[j] + fl1_fx * pb_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pb_z[j] + 0.5 * fl1_fx * pb_yy[j] * pc_z[j] + fl1_fx * pb_yz[j] * pc_y[j] + 2.0 * pa_x[j] * pb_xy[j] * pc_yz[j] + pa_x[j] * pb_xz[j] * pc_yy[j] + pa_x[j] * pc_xz[j] * pb_yy[j] + 2.0 * pa_x[j] * pc_xy[j] * pb_yz[j] + pc_xz[j] * pb_xyy[j] + 2.0 * pc_xy[j] * pb_xyz[j] + pc_xx[j] * pb_yyz[j]);
+                t_x_xyyz[j] += fl_s_0_0_1 * (- 0.5 * pc_x[j] * pb_xz[j] * fl1_fx - 0.5 * fl1_fx * pb_yy[j] * pc_z[j] - fl1_fx * pb_yz[j] * pc_y[j] - 0.5 * fl1_fx * pb_yyz[j] - pa_x[j] * pb_xyy[j] * pc_z[j]);
 
-                t_x_xyyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * pa_x[j] * pc_xz[j] * fl1_fx - 0.5 * pc_xz[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_yyz[j] - fl1_fx * pb_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pb_z[j] - pa_x[j] * pb_x[j] * pc_yyz[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_y[j] - pa_x[j] * pc_xyy[j] * pb_z[j] - 2.0 * pc_xyz[j] * pb_xy[j] - pc_xyy[j] * pb_xz[j] - pc_xxz[j] * pb_yy[j] - 2.0 * pc_xxy[j] * pb_yz[j]);
+                t_x_xyyz[j] += fl_s_0_0_1 * (- 2.0 * pa_x[j] * pb_xyz[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yyz[j] - pc_x[j] * pb_xyyz[j]);
 
-                t_x_xyyz[j] += fl_s_0_0_4 * (0.5 * pc_xxz[j] * fl1_fx + 0.5 * fl1_fx * pc_yyz[j] + pa_x[j] * pc_xyyz[j] + pc_xyyz[j] * pb_x[j] + 2.0 * pc_xxyz[j] * pb_y[j] + pc_xxyy[j] * pb_z[j]);
+                t_x_xyyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_x[j] * pb_x[j] * fl1_fx * pc_z[j] + 0.5 * pa_x[j] * pc_xz[j] * fl1_fx + 0.5 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_2 * (+ 0.5 * pc_xz[j] * pb_x[j] * fl1_fx + 0.5 * pc_x[j] * pb_xz[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx * pb_z[j] + fl1_fx * pb_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pb_z[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pb_yy[j] * pc_z[j] + fl1_fx * pb_yz[j] * pc_y[j] + 2.0 * pa_x[j] * pb_xy[j] * pc_yz[j] + pa_x[j] * pb_xz[j] * pc_yy[j] + pa_x[j] * pc_xz[j] * pb_yy[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_2 * (+ 2.0 * pa_x[j] * pc_xy[j] * pb_yz[j] + pc_xz[j] * pb_xyy[j] + 2.0 * pc_xy[j] * pb_xyz[j] + pc_xx[j] * pb_yyz[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * pa_x[j] * pc_xz[j] * fl1_fx - 0.5 * pc_xz[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_z[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_yyz[j] - fl1_fx * pb_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pb_z[j] - pa_x[j] * pb_x[j] * pc_yyz[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_y[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_3 * (- pa_x[j] * pc_xyy[j] * pb_z[j] - 2.0 * pc_xyz[j] * pb_xy[j] - pc_xyy[j] * pb_xz[j] - pc_xxz[j] * pb_yy[j] - 2.0 * pc_xxy[j] * pb_yz[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_4 * (0.5 * pc_xxz[j] * fl1_fx + 0.5 * fl1_fx * pc_yyz[j] + pa_x[j] * pc_xyyz[j] + pc_xyyz[j] * pb_x[j] + 2.0 * pc_xxyz[j] * pb_y[j]);
+
+                t_x_xyyz[j] += fl_s_0_0_4 * pc_xxyy[j] * pb_z[j];
 
                 t_x_xyyz[j] += -fl_s_0_0_5 * pc_xxyyz[j];
 
                 t_x_xyzz[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_y[j] + 0.5 * pa_x[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_yzz[j] + pa_x[j] * pb_xyzz[j]);
 
-                t_x_xyzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pb_y[j] - 0.25 * fl2_fx * pc_y[j] - 0.5 * pa_x[j] * pb_xy[j] * fl1_fx - 0.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx - 0.5 * pc_x[j] * pb_xy[j] * fl1_fx - fl1_fx * pb_yz[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pb_zz[j] - 0.5 * fl1_fx * pb_yzz[j] - 2.0 * pa_x[j] * pb_xyz[j] * pc_z[j] - pa_x[j] * pb_xzz[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yzz[j] - pc_x[j] * pb_xyzz[j]);
+                t_x_xyzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pb_y[j] - 0.25 * fl2_fx * pc_y[j] - 0.5 * pa_x[j] * pb_xy[j] * fl1_fx - 0.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx - 0.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx);
 
-                t_x_xyzz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_xy[j] * fl1_fx + 0.5 * pc_x[j] * pb_xy[j] * fl1_fx + 0.5 * pc_xy[j] * pb_x[j] * fl1_fx + 0.5 * pc_xx[j] * pb_y[j] * fl1_fx + 0.5 * fl1_fx * pb_y[j] * pc_zz[j] + fl1_fx * pc_yz[j] * pb_z[j] + fl1_fx * pb_yz[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pb_zz[j] + pa_x[j] * pb_xy[j] * pc_zz[j] + 2.0 * pa_x[j] * pb_xz[j] * pc_yz[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_yz[j] + pa_x[j] * pc_xy[j] * pb_zz[j] + 2.0 * pc_xz[j] * pb_xyz[j] + pc_xy[j] * pb_xzz[j] + pc_xx[j] * pb_yzz[j]);
+                t_x_xyzz[j] += fl_s_0_0_1 * (- 0.5 * pc_x[j] * pb_xy[j] * fl1_fx - fl1_fx * pb_yz[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pb_zz[j] - 0.5 * fl1_fx * pb_yzz[j] - 2.0 * pa_x[j] * pb_xyz[j] * pc_z[j]);
 
-                t_x_xyzz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * pa_x[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xy[j] * pb_x[j] * fl1_fx - 0.5 * pc_xx[j] * pb_y[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * fl1_fx * pc_yzz[j] - 0.5 * fl1_fx * pb_y[j] * pc_zz[j] - fl1_fx * pc_yz[j] * pb_z[j] - pa_x[j] * pb_x[j] * pc_yzz[j] - pa_x[j] * pc_xzz[j] * pb_y[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_z[j] - pc_xzz[j] * pb_xy[j] - 2.0 * pc_xyz[j] * pb_xz[j] - 2.0 * pc_xxz[j] * pb_yz[j] - pc_xxy[j] * pb_zz[j]);
+                t_x_xyzz[j] += fl_s_0_0_1 * (- pa_x[j] * pb_xzz[j] * pc_y[j] - pa_x[j] * pc_x[j] * pb_yzz[j] - pc_x[j] * pb_xyzz[j]);
 
-                t_x_xyzz[j] += fl_s_0_0_4 * (0.5 * pc_xxy[j] * fl1_fx + 0.5 * fl1_fx * pc_yzz[j] + pa_x[j] * pc_xyzz[j] + pc_xyzz[j] * pb_x[j] + pc_xxzz[j] * pb_y[j] + 2.0 * pc_xxyz[j] * pb_z[j]);
+                t_x_xyzz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_x[j] * pb_x[j] * pc_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_xy[j] * fl1_fx);
+
+                t_x_xyzz[j] += fl_s_0_0_2 * (+ 0.5 * pc_x[j] * pb_xy[j] * fl1_fx + 0.5 * pc_xy[j] * pb_x[j] * fl1_fx + 0.5 * pc_xx[j] * pb_y[j] * fl1_fx + 0.5 * fl1_fx * pb_y[j] * pc_zz[j] + fl1_fx * pc_yz[j] * pb_z[j]);
+
+                t_x_xyzz[j] += fl_s_0_0_2 * (+ fl1_fx * pb_yz[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pb_zz[j] + pa_x[j] * pb_xy[j] * pc_zz[j] + 2.0 * pa_x[j] * pb_xz[j] * pc_yz[j] + 2.0 * pa_x[j] * pc_xz[j] * pb_yz[j]);
+
+                t_x_xyzz[j] += fl_s_0_0_2 * (+ pa_x[j] * pc_xy[j] * pb_zz[j] + 2.0 * pc_xz[j] * pb_xyz[j] + pc_xy[j] * pb_xzz[j] + pc_xx[j] * pb_yzz[j]);
+
+                t_x_xyzz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * pa_x[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xy[j] * pb_x[j] * fl1_fx - 0.5 * pc_xx[j] * pb_y[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx);
+
+                t_x_xyzz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_yzz[j] - 0.5 * fl1_fx * pb_y[j] * pc_zz[j] - fl1_fx * pc_yz[j] * pb_z[j] - pa_x[j] * pb_x[j] * pc_yzz[j] - pa_x[j] * pc_xzz[j] * pb_y[j]);
+
+                t_x_xyzz[j] += fl_s_0_0_3 * (- 2.0 * pa_x[j] * pc_xyz[j] * pb_z[j] - pc_xzz[j] * pb_xy[j] - 2.0 * pc_xyz[j] * pb_xz[j] - 2.0 * pc_xxz[j] * pb_yz[j] - pc_xxy[j] * pb_zz[j]);
+
+                t_x_xyzz[j] += fl_s_0_0_4 * (0.5 * pc_xxy[j] * fl1_fx + 0.5 * fl1_fx * pc_yzz[j] + pa_x[j] * pc_xyzz[j] + pc_xyzz[j] * pb_x[j] + pc_xxzz[j] * pb_y[j]);
+
+                t_x_xyzz[j] += fl_s_0_0_4 * 2.0 * pc_xxyz[j] * pb_z[j];
 
                 t_x_xyzz[j] += -fl_s_0_0_5 * pc_xxyzz[j];
             }
@@ -6103,11 +6411,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_xzzz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_zzz[j] + pa_x[j] * pb_xzzz[j]);
 
-                t_x_xzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * pa_x[j] * pb_xz[j] * fl1_fx - 1.5 * pa_x[j] * pb_x[j] * pc_z[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * pb_z[j] * fl1_fx - 1.5 * pc_x[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pb_zz[j] * pc_z[j] - 0.5 * fl1_fx * pb_zzz[j] - 3.0 * pa_x[j] * pb_xzz[j] * pc_z[j] - pa_x[j] * pc_x[j] * pb_zzz[j] - pc_x[j] * pb_xzzz[j]);
+                t_x_xzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * pa_x[j] * pb_xz[j] * fl1_fx - 1.5 * pa_x[j] * pb_x[j] * pc_z[j] * fl1_fx - 1.5 * pa_x[j] * pc_x[j] * pb_z[j] * fl1_fx);
 
-                t_x_xzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_x[j] * pc_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * pb_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_xz[j] * fl1_fx + 1.5 * pc_x[j] * pb_xz[j] * fl1_fx + 1.5 * pc_xz[j] * pb_x[j] * fl1_fx + 1.5 * pc_xx[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pb_z[j] * pc_zz[j] + 1.5 * fl1_fx * pb_zz[j] * pc_z[j] + 3.0 * pa_x[j] * pb_xz[j] * pc_zz[j] + 3.0 * pa_x[j] * pc_xz[j] * pb_zz[j] + 3.0 * pc_xz[j] * pb_xzz[j] + pc_xx[j] * pb_zzz[j]);
+                t_x_xzzz[j] += fl_s_0_0_1 * (- 1.5 * pc_x[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pb_zz[j] * pc_z[j] - 0.5 * fl1_fx * pb_zzz[j] - 3.0 * pa_x[j] * pb_xzz[j] * pc_z[j] - pa_x[j] * pc_x[j] * pb_zzz[j]);
 
-                t_x_xzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_x[j] * pc_xz[j] * fl1_fx - 1.5 * pc_xz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xx[j] * pb_z[j] * fl1_fx - 1.5 * pc_xxz[j] * fl1_fx - 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pb_z[j] * pc_zz[j] - pa_x[j] * pb_x[j] * pc_zzz[j] - 3.0 * pa_x[j] * pc_xzz[j] * pb_z[j] - 3.0 * pc_xzz[j] * pb_xz[j] - 3.0 * pc_xxz[j] * pb_zz[j]);
+                t_x_xzzz[j] += -fl_s_0_0_1 * pc_x[j] * pb_xzzz[j];
+
+                t_x_xzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_x[j] * pc_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_x[j] * pb_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_xz[j] * fl1_fx);
+
+                t_x_xzzz[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * pb_xz[j] * fl1_fx + 1.5 * pc_xz[j] * pb_x[j] * fl1_fx + 1.5 * pc_xx[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pb_z[j] * pc_zz[j] + 1.5 * fl1_fx * pb_zz[j] * pc_z[j]);
+
+                t_x_xzzz[j] += fl_s_0_0_2 * (+ 3.0 * pa_x[j] * pb_xz[j] * pc_zz[j] + 3.0 * pa_x[j] * pc_xz[j] * pb_zz[j] + 3.0 * pc_xz[j] * pb_xzz[j] + pc_xx[j] * pb_zzz[j]);
+
+                t_x_xzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_x[j] * pc_xz[j] * fl1_fx - 1.5 * pc_xz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xx[j] * pb_z[j] * fl1_fx - 1.5 * pc_xxz[j] * fl1_fx);
+
+                t_x_xzzz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pb_z[j] * pc_zz[j] - pa_x[j] * pb_x[j] * pc_zzz[j] - 3.0 * pa_x[j] * pc_xzz[j] * pb_z[j] - 3.0 * pc_xzz[j] * pb_xz[j]);
+
+                t_x_xzzz[j] += -fl_s_0_0_3 * 3.0 * pc_xxz[j] * pb_zz[j];
 
                 t_x_xzzz[j] += fl_s_0_0_4 * (1.5 * pc_xxz[j] * fl1_fx + 0.5 * fl1_fx * pc_zzz[j] + pa_x[j] * pc_xzzz[j] + pc_xzzz[j] * pb_x[j] + 3.0 * pc_xxzz[j] * pb_z[j]);
 
@@ -6115,11 +6435,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_yyyy[j] = fl_s_0_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * pa_x[j] * pb_yy[j] * fl1_fx + pa_x[j] * pb_yyyy[j]);
 
-                t_x_yyyy[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pb_yy[j] * fl1_fx - 6.0 * pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx - 3.0 * pc_x[j] * pb_yy[j] * fl1_fx - 4.0 * pa_x[j] * pb_yyy[j] * pc_y[j] - pc_x[j] * pb_yyyy[j]);
+                t_x_yyyy[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pb_yy[j] * fl1_fx - 6.0 * pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx - 3.0 * pc_x[j] * pb_yy[j] * fl1_fx);
 
-                t_x_yyyy[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 6.0 * pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx + 3.0 * pa_x[j] * pc_yy[j] * fl1_fx + 3.0 * pc_x[j] * pb_yy[j] * fl1_fx + 6.0 * pc_xy[j] * pb_y[j] * fl1_fx + 6.0 * pa_x[j] * pb_yy[j] * pc_yy[j] + 4.0 * pc_xy[j] * pb_yyy[j]);
+                t_x_yyyy[j] += fl_s_0_0_1 * (- 4.0 * pa_x[j] * pb_yyy[j] * pc_y[j] - pc_x[j] * pb_yyyy[j]);
 
-                t_x_yyyy[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_yy[j] * fl1_fx - 6.0 * pc_xy[j] * pb_y[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx - 4.0 * pa_x[j] * pb_y[j] * pc_yyy[j] - 6.0 * pc_xyy[j] * pb_yy[j]);
+                t_x_yyyy[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 6.0 * pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx + 3.0 * pa_x[j] * pc_yy[j] * fl1_fx + 3.0 * pc_x[j] * pb_yy[j] * fl1_fx);
+
+                t_x_yyyy[j] += fl_s_0_0_2 * (+ 6.0 * pc_xy[j] * pb_y[j] * fl1_fx + 6.0 * pa_x[j] * pb_yy[j] * pc_yy[j] + 4.0 * pc_xy[j] * pb_yyy[j]);
+
+                t_x_yyyy[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_yy[j] * fl1_fx - 6.0 * pc_xy[j] * pb_y[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx - 4.0 * pa_x[j] * pb_y[j] * pc_yyy[j]);
+
+                t_x_yyyy[j] += -fl_s_0_0_3 * 6.0 * pc_xyy[j] * pb_yy[j];
 
                 t_x_yyyy[j] += fl_s_0_0_4 * (3.0 * pc_xyy[j] * fl1_fx + pa_x[j] * pc_yyyy[j] + 4.0 * pc_xyyy[j] * pb_y[j]);
 
@@ -6127,11 +6453,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_yyyz[j] = fl_s_0_0_0 * (1.5 * pa_x[j] * pb_yz[j] * fl1_fx + pa_x[j] * pb_yyyz[j]);
 
-                t_x_yyyz[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * pb_y[j] * fl1_fx * pc_z[j] - 1.5 * pa_x[j] * pb_yz[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * pb_yz[j] * fl1_fx - pa_x[j] * pb_yyy[j] * pc_z[j] - 3.0 * pa_x[j] * pb_yyz[j] * pc_y[j] - pc_x[j] * pb_yyyz[j]);
+                t_x_yyyz[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * pb_y[j] * fl1_fx * pc_z[j] - 1.5 * pa_x[j] * pb_yz[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * pb_yz[j] * fl1_fx - pa_x[j] * pb_yyy[j] * pc_z[j]);
 
-                t_x_yyyz[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pb_y[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] + 1.5 * pc_xz[j] * pb_y[j] * fl1_fx + 1.5 * pc_x[j] * pb_yz[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 3.0 * pa_x[j] * pb_yy[j] * pc_yz[j] + 3.0 * pa_x[j] * pb_yz[j] * pc_yy[j] + pc_xz[j] * pb_yyy[j] + 3.0 * pc_xy[j] * pb_yyz[j]);
+                t_x_yyyz[j] += fl_s_0_0_1 * (- 3.0 * pa_x[j] * pb_yyz[j] * pc_y[j] - pc_x[j] * pb_yyyz[j]);
 
-                t_x_yyyz[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_x[j] * pb_y[j] * pc_yyz[j] - pa_x[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_xyz[j] * pb_yy[j] - 3.0 * pc_xyy[j] * pb_yz[j]);
+                t_x_yyyz[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pb_y[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] + 1.5 * pc_xz[j] * pb_y[j] * fl1_fx + 1.5 * pc_x[j] * pb_yz[j] * fl1_fx);
+
+                t_x_yyyz[j] += fl_s_0_0_2 * (+ 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 3.0 * pa_x[j] * pb_yy[j] * pc_yz[j] + 3.0 * pa_x[j] * pb_yz[j] * pc_yy[j] + pc_xz[j] * pb_yyy[j] + 3.0 * pc_xy[j] * pb_yyz[j]);
+
+                t_x_yyyz[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_x[j] * pb_y[j] * pc_yyz[j]);
+
+                t_x_yyyz[j] += fl_s_0_0_3 * (- pa_x[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_xyz[j] * pb_yy[j] - 3.0 * pc_xyy[j] * pb_yz[j]);
 
                 t_x_yyyz[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_x[j] * pc_yyyz[j] + 3.0 * pc_xyyz[j] * pb_y[j] + pc_xyyy[j] * pb_z[j]);
 
@@ -6314,11 +6646,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_yyzz[j] = fl_s_0_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_x[j] * pb_yy[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_zz[j] + pa_x[j] * pb_yyzz[j]);
 
-                t_x_yyzz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pb_yy[j] * fl1_fx - pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx - pa_x[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pb_zz[j] - 0.5 * pc_x[j] * pb_yy[j] * fl1_fx - 0.5 * pc_x[j] * fl1_fx * pb_zz[j] - 2.0 * pa_x[j] * pb_yyz[j] * pc_z[j] - 2.0 * pa_x[j] * pb_yzz[j] * pc_y[j] - pc_x[j] * pb_yyzz[j]);
+                t_x_yyzz[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pb_yy[j] * fl1_fx - pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx - pa_x[j] * fl1_fx * pb_z[j] * pc_z[j]);
 
-                t_x_yyzz[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pc_x[j] * fl2_fx + pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_yy[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pc_zz[j] + pa_x[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_x[j] * pb_yy[j] * fl1_fx + pc_xy[j] * pb_y[j] * fl1_fx + pc_xz[j] * fl1_fx * pb_z[j] + 0.5 * pc_x[j] * fl1_fx * pb_zz[j] + pa_x[j] * pb_yy[j] * pc_zz[j] + 4.0 * pa_x[j] * pb_yz[j] * pc_yz[j] + pa_x[j] * pc_yy[j] * pb_zz[j] + 2.0 * pc_xz[j] * pb_yyz[j] + 2.0 * pc_xy[j] * pb_yzz[j]);
+                t_x_yyzz[j] += fl_s_0_0_1 * (- 0.5 * pa_x[j] * fl1_fx * pb_zz[j] - 0.5 * pc_x[j] * pb_yy[j] * fl1_fx - 0.5 * pc_x[j] * fl1_fx * pb_zz[j] - 2.0 * pa_x[j] * pb_yyz[j] * pc_z[j] - 2.0 * pa_x[j] * pb_yzz[j] * pc_y[j]);
 
-                t_x_yyzz[j] += fl_s_0_0_3 * (-0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_yy[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j] - pc_xy[j] * pb_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * pc_xzz[j] * fl1_fx - pc_xz[j] * fl1_fx * pb_z[j] - 2.0 * pa_x[j] * pb_y[j] * pc_yzz[j] - 2.0 * pa_x[j] * pc_yyz[j] * pb_z[j] - pc_xzz[j] * pb_yy[j] - 4.0 * pc_xyz[j] * pb_yz[j] - pc_xyy[j] * pb_zz[j]);
+                t_x_yyzz[j] += -fl_s_0_0_1 * pc_x[j] * pb_yyzz[j];
+
+                t_x_yyzz[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pc_x[j] * fl2_fx + pa_x[j] * pb_y[j] * pc_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_yy[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pc_zz[j]);
+
+                t_x_yyzz[j] += fl_s_0_0_2 * (+ pa_x[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_x[j] * pb_yy[j] * fl1_fx + pc_xy[j] * pb_y[j] * fl1_fx + pc_xz[j] * fl1_fx * pb_z[j] + 0.5 * pc_x[j] * fl1_fx * pb_zz[j]);
+
+                t_x_yyzz[j] += fl_s_0_0_2 * (+ pa_x[j] * pb_yy[j] * pc_zz[j] + 4.0 * pa_x[j] * pb_yz[j] * pc_yz[j] + pa_x[j] * pc_yy[j] * pb_zz[j] + 2.0 * pc_xz[j] * pb_yyz[j] + 2.0 * pc_xy[j] * pb_yzz[j]);
+
+                t_x_yyzz[j] += fl_s_0_0_3 * (-0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_yy[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j] - pc_xy[j] * pb_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx);
+
+                t_x_yyzz[j] += fl_s_0_0_3 * (- 0.5 * pc_xzz[j] * fl1_fx - pc_xz[j] * fl1_fx * pb_z[j] - 2.0 * pa_x[j] * pb_y[j] * pc_yzz[j] - 2.0 * pa_x[j] * pc_yyz[j] * pb_z[j] - pc_xzz[j] * pb_yy[j]);
+
+                t_x_yyzz[j] += fl_s_0_0_3 * (- 4.0 * pc_xyz[j] * pb_yz[j] - pc_xyy[j] * pb_zz[j]);
 
                 t_x_yyzz[j] += fl_s_0_0_4 * (0.5 * pc_xyy[j] * fl1_fx + 0.5 * pc_xzz[j] * fl1_fx + pa_x[j] * pc_yyzz[j] + 2.0 * pc_xyzz[j] * pb_y[j] + 2.0 * pc_xyyz[j] * pb_z[j]);
 
@@ -6326,11 +6670,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_yzzz[j] = fl_s_0_0_0 * (1.5 * pa_x[j] * pb_yz[j] * fl1_fx + pa_x[j] * pb_yzzz[j]);
 
-                t_x_yzzz[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * pb_yz[j] * fl1_fx - 1.5 * pa_x[j] * pb_y[j] * pc_z[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * pb_z[j] * fl1_fx - 1.5 * pc_x[j] * pb_yz[j] * fl1_fx - 3.0 * pa_x[j] * pb_yzz[j] * pc_z[j] - pa_x[j] * pc_y[j] * pb_zzz[j] - pc_x[j] * pb_yzzz[j]);
+                t_x_yzzz[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * pb_yz[j] * fl1_fx - 1.5 * pa_x[j] * pb_y[j] * pc_z[j] * fl1_fx - 1.5 * pa_x[j] * pc_y[j] * pb_z[j] * fl1_fx - 1.5 * pc_x[j] * pb_yz[j] * fl1_fx - 3.0 * pa_x[j] * pb_yzz[j] * pc_z[j]);
 
-                t_x_yzzz[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pb_y[j] * pc_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * pb_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pc_x[j] * pb_yz[j] * fl1_fx + 1.5 * pc_xz[j] * pb_y[j] * fl1_fx + 1.5 * pc_xy[j] * pb_z[j] * fl1_fx + 3.0 * pa_x[j] * pb_yz[j] * pc_zz[j] + 3.0 * pa_x[j] * pc_yz[j] * pb_zz[j] + 3.0 * pc_xz[j] * pb_yzz[j] + pc_xy[j] * pb_zzz[j]);
+                t_x_yzzz[j] += fl_s_0_0_1 * (- pa_x[j] * pc_y[j] * pb_zzz[j] - pc_x[j] * pb_yzzz[j]);
 
-                t_x_yzzz[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xy[j] * pb_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - pa_x[j] * pb_y[j] * pc_zzz[j] - 3.0 * pa_x[j] * pc_yzz[j] * pb_z[j] - 3.0 * pc_xzz[j] * pb_yz[j] - 3.0 * pc_xyz[j] * pb_zz[j]);
+                t_x_yzzz[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * pb_y[j] * pc_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * pb_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pc_x[j] * pb_yz[j] * fl1_fx + 1.5 * pc_xz[j] * pb_y[j] * fl1_fx);
+
+                t_x_yzzz[j] += fl_s_0_0_2 * (+ 1.5 * pc_xy[j] * pb_z[j] * fl1_fx + 3.0 * pa_x[j] * pb_yz[j] * pc_zz[j] + 3.0 * pa_x[j] * pc_yz[j] * pb_zz[j] + 3.0 * pc_xz[j] * pb_yzz[j] + pc_xy[j] * pb_zzz[j]);
+
+                t_x_yzzz[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xy[j] * pb_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - pa_x[j] * pb_y[j] * pc_zzz[j]);
+
+                t_x_yzzz[j] += fl_s_0_0_3 * (- 3.0 * pa_x[j] * pc_yzz[j] * pb_z[j] - 3.0 * pc_xzz[j] * pb_yz[j] - 3.0 * pc_xyz[j] * pb_zz[j]);
 
                 t_x_yzzz[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_x[j] * pc_yzzz[j] + pc_xzzz[j] * pb_y[j] + 3.0 * pc_xyzz[j] * pb_z[j]);
 
@@ -6338,11 +6688,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_x_zzzz[j] = fl_s_0_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * pa_x[j] * pb_zz[j] * fl1_fx + pa_x[j] * pb_zzzz[j]);
 
-                t_x_zzzz[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pb_zz[j] * fl1_fx - 6.0 * pa_x[j] * pb_z[j] * pc_z[j] * fl1_fx - 3.0 * pc_x[j] * pb_zz[j] * fl1_fx - 4.0 * pa_x[j] * pb_zzz[j] * pc_z[j] - pc_x[j] * pb_zzzz[j]);
+                t_x_zzzz[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pb_zz[j] * fl1_fx - 6.0 * pa_x[j] * pb_z[j] * pc_z[j] * fl1_fx - 3.0 * pc_x[j] * pb_zz[j] * fl1_fx);
 
-                t_x_zzzz[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 6.0 * pa_x[j] * pb_z[j] * pc_z[j] * fl1_fx + 3.0 * pa_x[j] * pc_zz[j] * fl1_fx + 3.0 * pc_x[j] * pb_zz[j] * fl1_fx + 6.0 * pc_xz[j] * pb_z[j] * fl1_fx + 6.0 * pa_x[j] * pb_zz[j] * pc_zz[j] + 4.0 * pc_xz[j] * pb_zzz[j]);
+                t_x_zzzz[j] += fl_s_0_0_1 * (- 4.0 * pa_x[j] * pb_zzz[j] * pc_z[j] - pc_x[j] * pb_zzzz[j]);
 
-                t_x_zzzz[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_zz[j] * fl1_fx - 6.0 * pc_xz[j] * pb_z[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx - 4.0 * pa_x[j] * pb_z[j] * pc_zzz[j] - 6.0 * pc_xzz[j] * pb_zz[j]);
+                t_x_zzzz[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 6.0 * pa_x[j] * pb_z[j] * pc_z[j] * fl1_fx + 3.0 * pa_x[j] * pc_zz[j] * fl1_fx + 3.0 * pc_x[j] * pb_zz[j] * fl1_fx);
+
+                t_x_zzzz[j] += fl_s_0_0_2 * (+ 6.0 * pc_xz[j] * pb_z[j] * fl1_fx + 6.0 * pa_x[j] * pb_zz[j] * pc_zz[j] + 4.0 * pc_xz[j] * pb_zzz[j]);
+
+                t_x_zzzz[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_zz[j] * fl1_fx - 6.0 * pc_xz[j] * pb_z[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx - 4.0 * pa_x[j] * pb_z[j] * pc_zzz[j]);
+
+                t_x_zzzz[j] += -fl_s_0_0_3 * 6.0 * pc_xzz[j] * pb_zz[j];
 
                 t_x_zzzz[j] += fl_s_0_0_4 * (3.0 * pc_xzz[j] * fl1_fx + pa_x[j] * pc_zzzz[j] + 4.0 * pc_xzzz[j] * pb_z[j]);
 
@@ -6523,11 +6879,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xxxx[j] = fl_s_0_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * pa_y[j] * pb_xx[j] * fl1_fx + pa_y[j] * pb_xxxx[j]);
 
-                t_y_xxxx[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pb_xx[j] * fl1_fx - 6.0 * pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx - 3.0 * pc_y[j] * pb_xx[j] * fl1_fx - 4.0 * pa_y[j] * pb_xxx[j] * pc_x[j] - pc_y[j] * pb_xxxx[j]);
+                t_y_xxxx[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pb_xx[j] * fl1_fx - 6.0 * pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx - 3.0 * pc_y[j] * pb_xx[j] * fl1_fx);
 
-                t_y_xxxx[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 6.0 * pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx + 3.0 * pa_y[j] * pc_xx[j] * fl1_fx + 3.0 * pc_y[j] * pb_xx[j] * fl1_fx + 6.0 * pc_xy[j] * pb_x[j] * fl1_fx + 6.0 * pa_y[j] * pb_xx[j] * pc_xx[j] + 4.0 * pc_xy[j] * pb_xxx[j]);
+                t_y_xxxx[j] += fl_s_0_0_1 * (- 4.0 * pa_y[j] * pb_xxx[j] * pc_x[j] - pc_y[j] * pb_xxxx[j]);
 
-                t_y_xxxx[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_xx[j] * fl1_fx - 6.0 * pc_xy[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 4.0 * pa_y[j] * pb_x[j] * pc_xxx[j] - 6.0 * pc_xxy[j] * pb_xx[j]);
+                t_y_xxxx[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 6.0 * pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx + 3.0 * pa_y[j] * pc_xx[j] * fl1_fx + 3.0 * pc_y[j] * pb_xx[j] * fl1_fx);
+
+                t_y_xxxx[j] += fl_s_0_0_2 * (+ 6.0 * pc_xy[j] * pb_x[j] * fl1_fx + 6.0 * pa_y[j] * pb_xx[j] * pc_xx[j] + 4.0 * pc_xy[j] * pb_xxx[j]);
+
+                t_y_xxxx[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_xx[j] * fl1_fx - 6.0 * pc_xy[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 4.0 * pa_y[j] * pb_x[j] * pc_xxx[j]);
+
+                t_y_xxxx[j] += -fl_s_0_0_3 * 6.0 * pc_xxy[j] * pb_xx[j];
 
                 t_y_xxxx[j] += fl_s_0_0_4 * (3.0 * pc_xxy[j] * fl1_fx + pa_y[j] * pc_xxxx[j] + 4.0 * pc_xxxy[j] * pb_x[j]);
 
@@ -6535,11 +6897,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xxxy[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_xxx[j] + pa_y[j] * pb_xxxy[j]);
 
-                t_y_xxxy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_y[j] - 1.5 * pa_y[j] * pb_xy[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_y[j] - 1.5 * pc_y[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxx[j] - pa_y[j] * pb_xxx[j] * pc_y[j] - 3.0 * pa_y[j] * pb_xxy[j] * pc_x[j] - pc_y[j] * pb_xxxy[j]);
+                t_y_xxxy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_y[j] - 1.5 * pa_y[j] * pb_xy[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_y[j]);
 
-                t_y_xxxy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_y[j] + 1.5 * pa_y[j] * pc_xy[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_y[j] + 1.5 * pc_yy[j] * pb_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_xy[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx * pb_y[j] + 1.5 * fl1_fx * pb_x[j] * pc_xx[j] + 1.5 * fl1_fx * pb_xx[j] * pc_x[j] + 3.0 * pa_y[j] * pb_xx[j] * pc_xy[j] + 3.0 * pa_y[j] * pb_xy[j] * pc_xx[j] + pc_yy[j] * pb_xxx[j] + 3.0 * pc_xy[j] * pb_xxy[j]);
+                t_y_xxxy[j] += fl_s_0_0_1 * (- 1.5 * pc_y[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxx[j] - pa_y[j] * pb_xxx[j] * pc_y[j] - 3.0 * pa_y[j] * pb_xxy[j] * pc_x[j]);
 
-                t_y_xxxy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yy[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyy[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pc_xxx[j] - 1.5 * fl1_fx * pb_x[j] * pc_xx[j] - 3.0 * pa_y[j] * pb_x[j] * pc_xxy[j] - pa_y[j] * pc_xxx[j] * pb_y[j] - 3.0 * pc_xyy[j] * pb_xx[j] - 3.0 * pc_xxy[j] * pb_xy[j]);
+                t_y_xxxy[j] += -fl_s_0_0_1 * pc_y[j] * pb_xxxy[j];
+
+                t_y_xxxy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_y[j] + 1.5 * pa_y[j] * pc_xy[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_y[j]);
+
+                t_y_xxxy[j] += fl_s_0_0_2 * (+ 1.5 * pc_yy[j] * pb_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_xy[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx * pb_y[j] + 1.5 * fl1_fx * pb_x[j] * pc_xx[j] + 1.5 * fl1_fx * pb_xx[j] * pc_x[j]);
+
+                t_y_xxxy[j] += fl_s_0_0_2 * (+ 3.0 * pa_y[j] * pb_xx[j] * pc_xy[j] + 3.0 * pa_y[j] * pb_xy[j] * pc_xx[j] + pc_yy[j] * pb_xxx[j] + 3.0 * pc_xy[j] * pb_xxy[j]);
+
+                t_y_xxxy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yy[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyy[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_y[j]);
+
+                t_y_xxxy[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_xxx[j] - 1.5 * fl1_fx * pb_x[j] * pc_xx[j] - 3.0 * pa_y[j] * pb_x[j] * pc_xxy[j] - pa_y[j] * pc_xxx[j] * pb_y[j] - 3.0 * pc_xyy[j] * pb_xx[j]);
+
+                t_y_xxxy[j] += -fl_s_0_0_3 * 3.0 * pc_xxy[j] * pb_xy[j];
 
                 t_y_xxxy[j] += fl_s_0_0_4 * (1.5 * pc_xyy[j] * fl1_fx + 0.5 * fl1_fx * pc_xxx[j] + pa_y[j] * pc_xxxy[j] + 3.0 * pc_xxyy[j] * pb_x[j] + pc_xxxy[j] * pb_y[j]);
 
@@ -6547,11 +6921,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xxxz[j] = fl_s_0_0_0 * (1.5 * pa_y[j] * pb_xz[j] * fl1_fx + pa_y[j] * pb_xxxz[j]);
 
-                t_y_xxxz[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] - 1.5 * pa_y[j] * pb_xz[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * pb_xz[j] * fl1_fx - pa_y[j] * pb_xxx[j] * pc_z[j] - 3.0 * pa_y[j] * pb_xxz[j] * pc_x[j] - pc_y[j] * pb_xxxz[j]);
+                t_y_xxxz[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] - 1.5 * pa_y[j] * pb_xz[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * pb_xz[j] * fl1_fx - pa_y[j] * pb_xxx[j] * pc_z[j]);
 
-                t_y_xxxz[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] + 1.5 * pa_y[j] * pc_xz[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_xz[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 3.0 * pa_y[j] * pb_xx[j] * pc_xz[j] + 3.0 * pa_y[j] * pb_xz[j] * pc_xx[j] + pc_yz[j] * pb_xxx[j] + 3.0 * pc_xy[j] * pb_xxz[j]);
+                t_y_xxxz[j] += fl_s_0_0_1 * (- 3.0 * pa_y[j] * pb_xxz[j] * pc_x[j] - pc_y[j] * pb_xxxz[j]);
 
-                t_y_xxxz[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_y[j] * pb_x[j] * pc_xxz[j] - pa_y[j] * pc_xxx[j] * pb_z[j] - 3.0 * pc_xyz[j] * pb_xx[j] - 3.0 * pc_xxy[j] * pb_xz[j]);
+                t_y_xxxz[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] + 1.5 * pa_y[j] * pc_xz[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_xz[j] * fl1_fx);
+
+                t_y_xxxz[j] += fl_s_0_0_2 * (+ 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 3.0 * pa_y[j] * pb_xx[j] * pc_xz[j] + 3.0 * pa_y[j] * pb_xz[j] * pc_xx[j] + pc_yz[j] * pb_xxx[j] + 3.0 * pc_xy[j] * pb_xxz[j]);
+
+                t_y_xxxz[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_y[j] * pb_x[j] * pc_xxz[j]);
+
+                t_y_xxxz[j] += fl_s_0_0_3 * (- pa_y[j] * pc_xxx[j] * pb_z[j] - 3.0 * pc_xyz[j] * pb_xx[j] - 3.0 * pc_xxy[j] * pb_xz[j]);
 
                 t_y_xxxz[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_y[j] * pc_xxxz[j] + 3.0 * pc_xxyz[j] * pb_x[j] + pc_xxxy[j] * pb_z[j]);
 
@@ -6751,13 +7131,29 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_y_xxyy[j] = fl_s_0_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + 0.5 * pa_y[j] * pb_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_xxy[j] + pa_y[j] * pb_xxyy[j]);
+                t_y_xxyy[j] = fl_s_0_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + 0.5 * pa_y[j] * pb_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_xxy[j]);
 
-                t_y_xxyy[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - fl2_fx * pb_y[j] - 0.5 * pa_y[j] * pb_xx[j] * fl1_fx - pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_y[j] * fl1_fx * pb_y[j] * pc_y[j] - 0.5 * pa_y[j] * fl1_fx * pb_yy[j] - 1.5 * pc_y[j] * pb_xx[j] * fl1_fx - 0.5 * pc_y[j] * fl1_fx * pb_yy[j] - 2.0 * fl1_fx * pb_xy[j] * pc_x[j] - fl1_fx * pb_xxy[j] - 2.0 * pa_y[j] * pb_xxy[j] * pc_y[j] - 2.0 * pa_y[j] * pb_xyy[j] * pc_x[j] - pc_y[j] * pb_xxyy[j]);
+                t_y_xxyy[j] += fl_s_0_0_0 * pa_y[j] * pb_xxyy[j];
 
-                t_y_xxyy[j] += fl_s_0_0_2 * (0.25 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_y[j] * pc_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pc_yy[j] + pa_y[j] * fl1_fx * pb_y[j] * pc_y[j] + 1.5 * pc_y[j] * pb_xx[j] * fl1_fx + 3.0 * pc_xy[j] * pb_x[j] * fl1_fx + pc_yy[j] * fl1_fx * pb_y[j] + 0.5 * pc_y[j] * fl1_fx * pb_yy[j] + fl1_fx * pc_xx[j] * pb_y[j] + 2.0 * fl1_fx * pb_xy[j] * pc_x[j] + pa_y[j] * pb_xx[j] * pc_yy[j] + 4.0 * pa_y[j] * pb_xy[j] * pc_xy[j] + pa_y[j] * pc_xx[j] * pb_yy[j] + 2.0 * pc_yy[j] * pb_xxy[j] + 2.0 * pc_xy[j] * pb_xyy[j]);
+                t_y_xxyy[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - fl2_fx * pb_y[j] - 0.5 * pa_y[j] * pb_xx[j] * fl1_fx - pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx);
 
-                t_y_xxyy[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pc_xx[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pc_yy[j] - 3.0 * pc_xy[j] * pb_x[j] * fl1_fx - 1.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_yyy[j] * fl1_fx - pc_yy[j] * fl1_fx * pb_y[j] - fl1_fx * pc_xx[j] * pb_y[j] - 2.0 * pa_y[j] * pb_x[j] * pc_xyy[j] - 2.0 * pa_y[j] * pc_xxy[j] * pb_y[j] - pc_yyy[j] * pb_xx[j] - 4.0 * pc_xyy[j] * pb_xy[j] - pc_xxy[j] * pb_yy[j]);
+                t_y_xxyy[j] += fl_s_0_0_1 * (- pa_y[j] * fl1_fx * pb_y[j] * pc_y[j] - 0.5 * pa_y[j] * fl1_fx * pb_yy[j] - 1.5 * pc_y[j] * pb_xx[j] * fl1_fx - 0.5 * pc_y[j] * fl1_fx * pb_yy[j] - 2.0 * fl1_fx * pb_xy[j] * pc_x[j]);
+
+                t_y_xxyy[j] += fl_s_0_0_1 * (- fl1_fx * pb_xxy[j] - 2.0 * pa_y[j] * pb_xxy[j] * pc_y[j] - 2.0 * pa_y[j] * pb_xyy[j] * pc_x[j] - pc_y[j] * pb_xxyy[j]);
+
+                t_y_xxyy[j] += fl_s_0_0_2 * (0.25 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_y[j] * pc_xx[j] * fl1_fx);
+
+                t_y_xxyy[j] += fl_s_0_0_2 * (+ 0.5 * pa_y[j] * fl1_fx * pc_yy[j] + pa_y[j] * fl1_fx * pb_y[j] * pc_y[j] + 1.5 * pc_y[j] * pb_xx[j] * fl1_fx + 3.0 * pc_xy[j] * pb_x[j] * fl1_fx + pc_yy[j] * fl1_fx * pb_y[j]);
+
+                t_y_xxyy[j] += fl_s_0_0_2 * (+ 0.5 * pc_y[j] * fl1_fx * pb_yy[j] + fl1_fx * pc_xx[j] * pb_y[j] + 2.0 * fl1_fx * pb_xy[j] * pc_x[j] + pa_y[j] * pb_xx[j] * pc_yy[j] + 4.0 * pa_y[j] * pb_xy[j] * pc_xy[j]);
+
+                t_y_xxyy[j] += fl_s_0_0_2 * (+ pa_y[j] * pc_xx[j] * pb_yy[j] + 2.0 * pc_yy[j] * pb_xxy[j] + 2.0 * pc_xy[j] * pb_xyy[j]);
+
+                t_y_xxyy[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pc_xx[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pc_yy[j] - 3.0 * pc_xy[j] * pb_x[j] * fl1_fx - 1.5 * pc_xxy[j] * fl1_fx);
+
+                t_y_xxyy[j] += fl_s_0_0_3 * (- 0.5 * pc_yyy[j] * fl1_fx - pc_yy[j] * fl1_fx * pb_y[j] - fl1_fx * pc_xx[j] * pb_y[j] - 2.0 * pa_y[j] * pb_x[j] * pc_xyy[j] - 2.0 * pa_y[j] * pc_xxy[j] * pb_y[j]);
+
+                t_y_xxyy[j] += fl_s_0_0_3 * (- pc_yyy[j] * pb_xx[j] - 4.0 * pc_xyy[j] * pb_xy[j] - pc_xxy[j] * pb_yy[j]);
 
                 t_y_xxyy[j] += fl_s_0_0_4 * (1.5 * pc_xxy[j] * fl1_fx + 0.5 * pc_yyy[j] * fl1_fx + pa_y[j] * pc_xxyy[j] + 2.0 * pc_xyyy[j] * pb_x[j] + 2.0 * pc_xxyy[j] * pb_y[j]);
 
@@ -6765,23 +7161,51 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xxyz[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_z[j] + 0.5 * pa_y[j] * fl1_fx * pb_yz[j] + 0.5 * fl1_fx * pb_xxz[j] + pa_y[j] * pb_xxyz[j]);
 
-                t_y_xxyz[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_yz[j] - 0.5 * pc_y[j] * fl1_fx * pb_yz[j] - 0.5 * fl1_fx * pb_xx[j] * pc_z[j] - fl1_fx * pb_xz[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxz[j] - pa_y[j] * pb_xxy[j] * pc_z[j] - pa_y[j] * pb_xxz[j] * pc_y[j] - 2.0 * pa_y[j] * pb_xyz[j] * pc_x[j] - pc_y[j] * pb_xxyz[j]);
+                t_y_xxyz[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_yz[j]);
 
-                t_y_xxyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_y[j] * fl1_fx * pc_yz[j] + 0.5 * pa_y[j] * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * pa_y[j] * fl1_fx * pc_y[j] * pb_z[j] + 0.5 * pc_yz[j] * fl1_fx * pb_y[j] + 0.5 * pc_yy[j] * fl1_fx * pb_z[j] + 0.5 * pc_y[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_x[j] * pc_xz[j] + 0.5 * fl1_fx * pc_xx[j] * pb_z[j] + 0.5 * fl1_fx * pb_xx[j] * pc_z[j] + fl1_fx * pb_xz[j] * pc_x[j] + pa_y[j] * pb_xx[j] * pc_yz[j] + 2.0 * pa_y[j] * pb_xy[j] * pc_xz[j] + 2.0 * pa_y[j] * pb_xz[j] * pc_xy[j] + pa_y[j] * pc_xx[j] * pb_yz[j] + pc_yz[j] * pb_xxy[j] + pc_yy[j] * pb_xxz[j] + 2.0 * pc_xy[j] * pb_xyz[j]);
+                t_y_xxyz[j] += fl_s_0_0_1 * (- 0.5 * pc_y[j] * fl1_fx * pb_yz[j] - 0.5 * fl1_fx * pb_xx[j] * pc_z[j] - fl1_fx * pb_xz[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxz[j] - pa_y[j] * pb_xxy[j] * pc_z[j]);
 
-                t_y_xxyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pc_yz[j] - 0.5 * pc_yyz[j] * fl1_fx - 0.5 * pc_yz[j] * fl1_fx * pb_y[j] - 0.5 * pc_yy[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_xxz[j] - fl1_fx * pb_x[j] * pc_xz[j] - 0.5 * fl1_fx * pc_xx[j] * pb_z[j] - 2.0 * pa_y[j] * pb_x[j] * pc_xyz[j] - pa_y[j] * pc_xxz[j] * pb_y[j] - pa_y[j] * pc_xxy[j] * pb_z[j] - pc_yyz[j] * pb_xx[j] - 2.0 * pc_xyz[j] * pb_xy[j] - 2.0 * pc_xyy[j] * pb_xz[j] - pc_xxy[j] * pb_yz[j]);
+                t_y_xxyz[j] += fl_s_0_0_1 * (- pa_y[j] * pb_xxz[j] * pc_y[j] - 2.0 * pa_y[j] * pb_xyz[j] * pc_x[j] - pc_y[j] * pb_xxyz[j]);
 
-                t_y_xxyz[j] += fl_s_0_0_4 * (0.5 * pc_yyz[j] * fl1_fx + 0.5 * fl1_fx * pc_xxz[j] + pa_y[j] * pc_xxyz[j] + 2.0 * pc_xyyz[j] * pb_x[j] + pc_xxyz[j] * pb_y[j] + pc_xxyy[j] * pb_z[j]);
+                t_y_xxyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_y[j] * fl1_fx * pc_yz[j] + 0.5 * pa_y[j] * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * pa_y[j] * fl1_fx * pc_y[j] * pb_z[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_2 * (+ 0.5 * pc_yz[j] * fl1_fx * pb_y[j] + 0.5 * pc_yy[j] * fl1_fx * pb_z[j] + 0.5 * pc_y[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_x[j] * pc_xz[j] + 0.5 * fl1_fx * pc_xx[j] * pb_z[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pb_xx[j] * pc_z[j] + fl1_fx * pb_xz[j] * pc_x[j] + pa_y[j] * pb_xx[j] * pc_yz[j] + 2.0 * pa_y[j] * pb_xy[j] * pc_xz[j] + 2.0 * pa_y[j] * pb_xz[j] * pc_xy[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_2 * (+ pa_y[j] * pc_xx[j] * pb_yz[j] + pc_yz[j] * pb_xxy[j] + pc_yy[j] * pb_xxz[j] + 2.0 * pc_xy[j] * pb_xyz[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pc_yz[j] - 0.5 * pc_yyz[j] * fl1_fx - 0.5 * pc_yz[j] * fl1_fx * pb_y[j] - 0.5 * pc_yy[j] * fl1_fx * pb_z[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_xxz[j] - fl1_fx * pb_x[j] * pc_xz[j] - 0.5 * fl1_fx * pc_xx[j] * pb_z[j] - 2.0 * pa_y[j] * pb_x[j] * pc_xyz[j] - pa_y[j] * pc_xxz[j] * pb_y[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_3 * (- pa_y[j] * pc_xxy[j] * pb_z[j] - pc_yyz[j] * pb_xx[j] - 2.0 * pc_xyz[j] * pb_xy[j] - 2.0 * pc_xyy[j] * pb_xz[j] - pc_xxy[j] * pb_yz[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_4 * (0.5 * pc_yyz[j] * fl1_fx + 0.5 * fl1_fx * pc_xxz[j] + pa_y[j] * pc_xxyz[j] + 2.0 * pc_xyyz[j] * pb_x[j] + pc_xxyz[j] * pb_y[j]);
+
+                t_y_xxyz[j] += fl_s_0_0_4 * pc_xxyy[j] * pb_z[j];
 
                 t_y_xxyz[j] += -fl_s_0_0_5 * pc_xxyyz[j];
 
                 t_y_xxzz[j] = fl_s_0_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pa_y[j] * pb_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_zz[j] + pa_y[j] * pb_xxzz[j]);
 
-                t_y_xxzz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl2_fx - 0.25 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pb_xx[j] * fl1_fx - pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_y[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_zz[j] - 0.5 * pc_y[j] * pb_xx[j] * fl1_fx - 0.5 * pc_y[j] * fl1_fx * pb_zz[j] - 2.0 * pa_y[j] * pb_xxz[j] * pc_z[j] - 2.0 * pa_y[j] * pb_xzz[j] * pc_x[j] - pc_y[j] * pb_xxzz[j]);
+                t_y_xxzz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl2_fx - 0.25 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pb_xx[j] * fl1_fx - pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_y[j] * fl1_fx * pb_z[j] * pc_z[j]);
 
-                t_y_xxzz[j] += fl_s_0_0_2 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pc_y[j] * fl2_fx + pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_y[j] * pc_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pc_zz[j] + pa_y[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_y[j] * pb_xx[j] * fl1_fx + pc_xy[j] * pb_x[j] * fl1_fx + pc_yz[j] * fl1_fx * pb_z[j] + 0.5 * pc_y[j] * fl1_fx * pb_zz[j] + pa_y[j] * pb_xx[j] * pc_zz[j] + 4.0 * pa_y[j] * pb_xz[j] * pc_xz[j] + pa_y[j] * pc_xx[j] * pb_zz[j] + 2.0 * pc_yz[j] * pb_xxz[j] + 2.0 * pc_xy[j] * pb_xzz[j]);
+                t_y_xxzz[j] += fl_s_0_0_1 * (- 0.5 * pa_y[j] * fl1_fx * pb_zz[j] - 0.5 * pc_y[j] * pb_xx[j] * fl1_fx - 0.5 * pc_y[j] * fl1_fx * pb_zz[j] - 2.0 * pa_y[j] * pb_xxz[j] * pc_z[j] - 2.0 * pa_y[j] * pb_xzz[j] * pc_x[j]);
 
-                t_y_xxzz[j] += fl_s_0_0_3 * (-0.25 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pc_xx[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pc_zz[j] - pc_xy[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_yzz[j] * fl1_fx - pc_yz[j] * fl1_fx * pb_z[j] - 2.0 * pa_y[j] * pb_x[j] * pc_xzz[j] - 2.0 * pa_y[j] * pc_xxz[j] * pb_z[j] - pc_yzz[j] * pb_xx[j] - 4.0 * pc_xyz[j] * pb_xz[j] - pc_xxy[j] * pb_zz[j]);
+                t_y_xxzz[j] += -fl_s_0_0_1 * pc_y[j] * pb_xxzz[j];
+
+                t_y_xxzz[j] += fl_s_0_0_2 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pc_y[j] * fl2_fx + pa_y[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_y[j] * pc_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pc_zz[j]);
+
+                t_y_xxzz[j] += fl_s_0_0_2 * (+ pa_y[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_y[j] * pb_xx[j] * fl1_fx + pc_xy[j] * pb_x[j] * fl1_fx + pc_yz[j] * fl1_fx * pb_z[j] + 0.5 * pc_y[j] * fl1_fx * pb_zz[j]);
+
+                t_y_xxzz[j] += fl_s_0_0_2 * (+ pa_y[j] * pb_xx[j] * pc_zz[j] + 4.0 * pa_y[j] * pb_xz[j] * pc_xz[j] + pa_y[j] * pc_xx[j] * pb_zz[j] + 2.0 * pc_yz[j] * pb_xxz[j] + 2.0 * pc_xy[j] * pb_xzz[j]);
+
+                t_y_xxzz[j] += fl_s_0_0_3 * (-0.25 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pc_xx[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pc_zz[j] - pc_xy[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx);
+
+                t_y_xxzz[j] += fl_s_0_0_3 * (- 0.5 * pc_yzz[j] * fl1_fx - pc_yz[j] * fl1_fx * pb_z[j] - 2.0 * pa_y[j] * pb_x[j] * pc_xzz[j] - 2.0 * pa_y[j] * pc_xxz[j] * pb_z[j] - pc_yzz[j] * pb_xx[j]);
+
+                t_y_xxzz[j] += fl_s_0_0_3 * (- 4.0 * pc_xyz[j] * pb_xz[j] - pc_xxy[j] * pb_zz[j]);
 
                 t_y_xxzz[j] += fl_s_0_0_4 * (0.5 * pc_xxy[j] * fl1_fx + 0.5 * pc_yzz[j] * fl1_fx + pa_y[j] * pc_xxzz[j] + 2.0 * pc_xyzz[j] * pb_x[j] + 2.0 * pc_xxyz[j] * pb_z[j]);
 
@@ -6976,11 +7400,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xyyy[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_xy[j] * fl1_fx + 1.5 * fl1_fx * pb_xyy[j] + pa_y[j] * pb_xyyy[j]);
 
-                t_y_xyyy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pb_xy[j] * fl1_fx - 1.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx - 4.5 * pc_y[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pc_x[j] * pb_yy[j] - 1.5 * fl1_fx * pb_xyy[j] - 3.0 * pa_y[j] * pb_xyy[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yyy[j] - pc_y[j] * pb_xyyy[j]);
+                t_y_xyyy[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pb_xy[j] * fl1_fx - 1.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx);
 
-                t_y_xyyy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx + 1.5 * pa_y[j] * pc_xy[j] * fl1_fx + 4.5 * pc_y[j] * pb_xy[j] * fl1_fx + 3.0 * pc_yy[j] * pb_x[j] * fl1_fx + 4.5 * pc_xy[j] * pb_y[j] * fl1_fx + 1.5 * fl1_fx * pc_x[j] * pb_yy[j] + 3.0 * pa_y[j] * pb_xy[j] * pc_yy[j] + 3.0 * pa_y[j] * pc_xy[j] * pb_yy[j] + 3.0 * pc_yy[j] * pb_xyy[j] + pc_xy[j] * pb_yyy[j]);
+                t_y_xyyy[j] += fl_s_0_0_1 * (- 4.5 * pc_y[j] * pb_xy[j] * fl1_fx - 1.5 * fl1_fx * pc_x[j] * pb_yy[j] - 1.5 * fl1_fx * pb_xyy[j] - 3.0 * pa_y[j] * pb_xyy[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yyy[j]);
 
-                t_y_xyyy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pc_xy[j] * fl1_fx - 3.0 * pc_yy[j] * pb_x[j] * fl1_fx - 4.5 * pc_xy[j] * pb_y[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx - pa_y[j] * pb_x[j] * pc_yyy[j] - 3.0 * pa_y[j] * pc_xyy[j] * pb_y[j] - 3.0 * pc_yyy[j] * pb_xy[j] - 3.0 * pc_xyy[j] * pb_yy[j]);
+                t_y_xyyy[j] += -fl_s_0_0_1 * pc_y[j] * pb_xyyy[j];
+
+                t_y_xyyy[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx + 1.5 * pa_y[j] * pc_xy[j] * fl1_fx);
+
+                t_y_xyyy[j] += fl_s_0_0_2 * (+ 4.5 * pc_y[j] * pb_xy[j] * fl1_fx + 3.0 * pc_yy[j] * pb_x[j] * fl1_fx + 4.5 * pc_xy[j] * pb_y[j] * fl1_fx + 1.5 * fl1_fx * pc_x[j] * pb_yy[j] + 3.0 * pa_y[j] * pb_xy[j] * pc_yy[j]);
+
+                t_y_xyyy[j] += fl_s_0_0_2 * (+ 3.0 * pa_y[j] * pc_xy[j] * pb_yy[j] + 3.0 * pc_yy[j] * pb_xyy[j] + pc_xy[j] * pb_yyy[j]);
+
+                t_y_xyyy[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_y[j] * pc_xy[j] * fl1_fx - 3.0 * pc_yy[j] * pb_x[j] * fl1_fx - 4.5 * pc_xy[j] * pb_y[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx);
+
+                t_y_xyyy[j] += fl_s_0_0_3 * (- pa_y[j] * pb_x[j] * pc_yyy[j] - 3.0 * pa_y[j] * pc_xyy[j] * pb_y[j] - 3.0 * pc_yyy[j] * pb_xy[j] - 3.0 * pc_xyy[j] * pb_yy[j]);
 
                 t_y_xyyy[j] += fl_s_0_0_4 * (3.0 * pc_xyy[j] * fl1_fx + pa_y[j] * pc_xyyy[j] + pc_yyyy[j] * pb_x[j] + 3.0 * pc_xyyy[j] * pb_y[j]);
 
@@ -6988,11 +7422,25 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xyyz[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * pb_xz[j] * fl1_fx + fl1_fx * pb_xyz[j] + pa_y[j] * pb_xyyz[j]);
 
-                t_y_xyyz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_y[j] * pb_xz[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * pb_xz[j] * fl1_fx - fl1_fx * pb_xy[j] * pc_z[j] - fl1_fx * pc_x[j] * pb_yz[j] - fl1_fx * pb_xyz[j] - pa_y[j] * pb_xyy[j] * pc_z[j] - 2.0 * pa_y[j] * pb_xyz[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yyz[j] - pc_y[j] * pb_xyyz[j]);
+                t_y_xyyz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_y[j] * pb_xz[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * pb_xz[j] * fl1_fx - fl1_fx * pb_xy[j] * pc_z[j]);
 
-                t_y_xyyz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] + 0.5 * pa_y[j] * pc_xz[j] * fl1_fx + 0.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_xz[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + fl1_fx * pc_xz[j] * pb_y[j] + fl1_fx * pb_xy[j] * pc_z[j] + fl1_fx * pc_x[j] * pb_yz[j] + 2.0 * pa_y[j] * pb_xy[j] * pc_yz[j] + pa_y[j] * pb_xz[j] * pc_yy[j] + pa_y[j] * pc_xz[j] * pb_yy[j] + 2.0 * pa_y[j] * pc_xy[j] * pb_yz[j] + pc_yz[j] * pb_xyy[j] + 2.0 * pc_yy[j] * pb_xyz[j] + pc_xy[j] * pb_yyz[j]);
+                t_y_xyyz[j] += fl_s_0_0_1 * (- fl1_fx * pc_x[j] * pb_yz[j] - fl1_fx * pb_xyz[j] - pa_y[j] * pb_xyy[j] * pc_z[j] - 2.0 * pa_y[j] * pb_xyz[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yyz[j]);
 
-                t_y_xyyz[j] += fl_s_0_0_3 * (-0.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - fl1_fx * pc_xz[j] * pb_y[j] - pa_y[j] * pb_x[j] * pc_yyz[j] - 2.0 * pa_y[j] * pc_xyz[j] * pb_y[j] - pa_y[j] * pc_xyy[j] * pb_z[j] - 2.0 * pc_yyz[j] * pb_xy[j] - pc_yyy[j] * pb_xz[j] - pc_xyz[j] * pb_yy[j] - 2.0 * pc_xyy[j] * pb_yz[j]);
+                t_y_xyyz[j] += -fl_s_0_0_1 * pc_y[j] * pb_xyyz[j];
+
+                t_y_xyyz[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * pb_x[j] * fl1_fx * pc_z[j] + 0.5 * pa_y[j] * pc_xz[j] * fl1_fx + 0.5 * pa_y[j] * pc_x[j] * fl1_fx * pb_z[j] + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_y[j] * pb_xz[j] * fl1_fx);
+
+                t_y_xyyz[j] += fl_s_0_0_2 * (+ 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + fl1_fx * pc_xz[j] * pb_y[j] + fl1_fx * pb_xy[j] * pc_z[j] + fl1_fx * pc_x[j] * pb_yz[j] + 2.0 * pa_y[j] * pb_xy[j] * pc_yz[j]);
+
+                t_y_xyyz[j] += fl_s_0_0_2 * (+ pa_y[j] * pb_xz[j] * pc_yy[j] + pa_y[j] * pc_xz[j] * pb_yy[j] + 2.0 * pa_y[j] * pc_xy[j] * pb_yz[j] + pc_yz[j] * pb_xyy[j] + 2.0 * pc_yy[j] * pb_xyz[j]);
+
+                t_y_xyyz[j] += fl_s_0_0_2 * pc_xy[j] * pb_yyz[j];
+
+                t_y_xyyz[j] += fl_s_0_0_3 * (-0.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - fl1_fx * pc_xz[j] * pb_y[j]);
+
+                t_y_xyyz[j] += fl_s_0_0_3 * (- pa_y[j] * pb_x[j] * pc_yyz[j] - 2.0 * pa_y[j] * pc_xyz[j] * pb_y[j] - pa_y[j] * pc_xyy[j] * pb_z[j] - 2.0 * pc_yyz[j] * pb_xy[j] - pc_yyy[j] * pb_xz[j]);
+
+                t_y_xyyz[j] += fl_s_0_0_3 * (- pc_xyz[j] * pb_yy[j] - 2.0 * pc_xyy[j] * pb_yz[j]);
 
                 t_y_xyyz[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_y[j] * pc_xyyz[j] + pc_yyyz[j] * pb_x[j] + 2.0 * pc_xyyz[j] * pb_y[j] + pc_xyyy[j] * pb_z[j]);
 
@@ -7000,13 +7448,29 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xyzz[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_x[j] + 0.5 * pa_y[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_xzz[j] + pa_y[j] * pb_xyzz[j]);
 
-                t_y_xyzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pb_x[j] - 0.25 * fl2_fx * pc_x[j] - 0.5 * pa_y[j] * pb_xy[j] * fl1_fx - 0.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx - 0.5 * pc_y[j] * pb_xy[j] * fl1_fx - fl1_fx * pb_xz[j] * pc_z[j] - 0.5 * fl1_fx * pc_x[j] * pb_zz[j] - 0.5 * fl1_fx * pb_xzz[j] - 2.0 * pa_y[j] * pb_xyz[j] * pc_z[j] - pa_y[j] * pb_xzz[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yzz[j] - pc_y[j] * pb_xyzz[j]);
+                t_y_xyzz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pb_x[j] - 0.25 * fl2_fx * pc_x[j] - 0.5 * pa_y[j] * pb_xy[j] * fl1_fx - 0.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx - 0.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx);
 
-                t_y_xyzz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_x[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx + 0.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pa_y[j] * pc_xy[j] * fl1_fx + 0.5 * pc_y[j] * pb_xy[j] * fl1_fx + 0.5 * pc_yy[j] * pb_x[j] * fl1_fx + 0.5 * pc_xy[j] * pb_y[j] * fl1_fx + 0.5 * fl1_fx * pb_x[j] * pc_zz[j] + fl1_fx * pc_xz[j] * pb_z[j] + fl1_fx * pb_xz[j] * pc_z[j] + 0.5 * fl1_fx * pc_x[j] * pb_zz[j] + pa_y[j] * pb_xy[j] * pc_zz[j] + 2.0 * pa_y[j] * pb_xz[j] * pc_yz[j] + 2.0 * pa_y[j] * pc_xz[j] * pb_yz[j] + pa_y[j] * pc_xy[j] * pb_zz[j] + 2.0 * pc_yz[j] * pb_xyz[j] + pc_yy[j] * pb_xzz[j] + pc_xy[j] * pb_yzz[j]);
+                t_y_xyzz[j] += fl_s_0_0_1 * (- 0.5 * pc_y[j] * pb_xy[j] * fl1_fx - fl1_fx * pb_xz[j] * pc_z[j] - 0.5 * fl1_fx * pc_x[j] * pb_zz[j] - 0.5 * fl1_fx * pb_xzz[j] - 2.0 * pa_y[j] * pb_xyz[j] * pc_z[j]);
 
-                t_y_xyzz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_x[j] - 0.5 * pa_y[j] * pc_xy[j] * fl1_fx - 0.5 * pc_yy[j] * pb_x[j] * fl1_fx - 0.5 * pc_xy[j] * pb_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * fl1_fx * pc_xzz[j] - 0.5 * fl1_fx * pb_x[j] * pc_zz[j] - fl1_fx * pc_xz[j] * pb_z[j] - pa_y[j] * pb_x[j] * pc_yzz[j] - pa_y[j] * pc_xzz[j] * pb_y[j] - 2.0 * pa_y[j] * pc_xyz[j] * pb_z[j] - pc_yzz[j] * pb_xy[j] - 2.0 * pc_yyz[j] * pb_xz[j] - 2.0 * pc_xyz[j] * pb_yz[j] - pc_xyy[j] * pb_zz[j]);
+                t_y_xyzz[j] += fl_s_0_0_1 * (- pa_y[j] * pb_xzz[j] * pc_y[j] - pa_y[j] * pc_x[j] * pb_yzz[j] - pc_y[j] * pb_xyzz[j]);
 
-                t_y_xyzz[j] += fl_s_0_0_4 * (0.5 * pc_xyy[j] * fl1_fx + 0.5 * fl1_fx * pc_xzz[j] + pa_y[j] * pc_xyzz[j] + pc_yyzz[j] * pb_x[j] + pc_xyzz[j] * pb_y[j] + 2.0 * pc_xyyz[j] * pb_z[j]);
+                t_y_xyzz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_x[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_y[j] * pb_x[j] * pc_y[j] * fl1_fx + 0.5 * pa_y[j] * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pa_y[j] * pc_xy[j] * fl1_fx);
+
+                t_y_xyzz[j] += fl_s_0_0_2 * (+ 0.5 * pc_y[j] * pb_xy[j] * fl1_fx + 0.5 * pc_yy[j] * pb_x[j] * fl1_fx + 0.5 * pc_xy[j] * pb_y[j] * fl1_fx + 0.5 * fl1_fx * pb_x[j] * pc_zz[j] + fl1_fx * pc_xz[j] * pb_z[j]);
+
+                t_y_xyzz[j] += fl_s_0_0_2 * (+ fl1_fx * pb_xz[j] * pc_z[j] + 0.5 * fl1_fx * pc_x[j] * pb_zz[j] + pa_y[j] * pb_xy[j] * pc_zz[j] + 2.0 * pa_y[j] * pb_xz[j] * pc_yz[j] + 2.0 * pa_y[j] * pc_xz[j] * pb_yz[j]);
+
+                t_y_xyzz[j] += fl_s_0_0_2 * (+ pa_y[j] * pc_xy[j] * pb_zz[j] + 2.0 * pc_yz[j] * pb_xyz[j] + pc_yy[j] * pb_xzz[j] + pc_xy[j] * pb_yzz[j]);
+
+                t_y_xyzz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_x[j] - 0.5 * pa_y[j] * pc_xy[j] * fl1_fx - 0.5 * pc_yy[j] * pb_x[j] * fl1_fx - 0.5 * pc_xy[j] * pb_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx);
+
+                t_y_xyzz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_xzz[j] - 0.5 * fl1_fx * pb_x[j] * pc_zz[j] - fl1_fx * pc_xz[j] * pb_z[j] - pa_y[j] * pb_x[j] * pc_yzz[j] - pa_y[j] * pc_xzz[j] * pb_y[j]);
+
+                t_y_xyzz[j] += fl_s_0_0_3 * (- 2.0 * pa_y[j] * pc_xyz[j] * pb_z[j] - pc_yzz[j] * pb_xy[j] - 2.0 * pc_yyz[j] * pb_xz[j] - 2.0 * pc_xyz[j] * pb_yz[j] - pc_xyy[j] * pb_zz[j]);
+
+                t_y_xyzz[j] += fl_s_0_0_4 * (0.5 * pc_xyy[j] * fl1_fx + 0.5 * fl1_fx * pc_xzz[j] + pa_y[j] * pc_xyzz[j] + pc_yyzz[j] * pb_x[j] + pc_xyzz[j] * pb_y[j]);
+
+                t_y_xyzz[j] += fl_s_0_0_4 * 2.0 * pc_xyyz[j] * pb_z[j];
 
                 t_y_xyzz[j] += -fl_s_0_0_5 * pc_xyyzz[j];
             }
@@ -7191,11 +7655,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_xzzz[j] = fl_s_0_0_0 * (1.5 * pa_y[j] * pb_xz[j] * fl1_fx + pa_y[j] * pb_xzzz[j]);
 
-                t_y_xzzz[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * pb_xz[j] * fl1_fx - 1.5 * pa_y[j] * pb_x[j] * pc_z[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * pb_z[j] * fl1_fx - 1.5 * pc_y[j] * pb_xz[j] * fl1_fx - 3.0 * pa_y[j] * pb_xzz[j] * pc_z[j] - pa_y[j] * pc_x[j] * pb_zzz[j] - pc_y[j] * pb_xzzz[j]);
+                t_y_xzzz[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * pb_xz[j] * fl1_fx - 1.5 * pa_y[j] * pb_x[j] * pc_z[j] * fl1_fx - 1.5 * pa_y[j] * pc_x[j] * pb_z[j] * fl1_fx - 1.5 * pc_y[j] * pb_xz[j] * fl1_fx - 3.0 * pa_y[j] * pb_xzz[j] * pc_z[j]);
 
-                t_y_xzzz[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * pb_x[j] * pc_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * pb_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_xz[j] * fl1_fx + 1.5 * pc_y[j] * pb_xz[j] * fl1_fx + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_xy[j] * pb_z[j] * fl1_fx + 3.0 * pa_y[j] * pb_xz[j] * pc_zz[j] + 3.0 * pa_y[j] * pc_xz[j] * pb_zz[j] + 3.0 * pc_yz[j] * pb_xzz[j] + pc_xy[j] * pb_zzz[j]);
+                t_y_xzzz[j] += fl_s_0_0_1 * (- pa_y[j] * pc_x[j] * pb_zzz[j] - pc_y[j] * pb_xzzz[j]);
 
-                t_y_xzzz[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xy[j] * pb_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - pa_y[j] * pb_x[j] * pc_zzz[j] - 3.0 * pa_y[j] * pc_xzz[j] * pb_z[j] - 3.0 * pc_yzz[j] * pb_xz[j] - 3.0 * pc_xyz[j] * pb_zz[j]);
+                t_y_xzzz[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * pb_x[j] * pc_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_x[j] * pb_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_xz[j] * fl1_fx + 1.5 * pc_y[j] * pb_xz[j] * fl1_fx + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx);
+
+                t_y_xzzz[j] += fl_s_0_0_2 * (+ 1.5 * pc_xy[j] * pb_z[j] * fl1_fx + 3.0 * pa_y[j] * pb_xz[j] * pc_zz[j] + 3.0 * pa_y[j] * pc_xz[j] * pb_zz[j] + 3.0 * pc_yz[j] * pb_xzz[j] + pc_xy[j] * pb_zzz[j]);
+
+                t_y_xzzz[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xy[j] * pb_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - pa_y[j] * pb_x[j] * pc_zzz[j]);
+
+                t_y_xzzz[j] += fl_s_0_0_3 * (- 3.0 * pa_y[j] * pc_xzz[j] * pb_z[j] - 3.0 * pc_yzz[j] * pb_xz[j] - 3.0 * pc_xyz[j] * pb_zz[j]);
 
                 t_y_xzzz[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_y[j] * pc_xzzz[j] + pc_yzzz[j] * pb_x[j] + 3.0 * pc_xyzz[j] * pb_z[j]);
 
@@ -7203,11 +7673,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_yyyy[j] = fl_s_0_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * fl2_fx * pb_y[j] + 3.0 * pa_y[j] * pb_yy[j] * fl1_fx + 2.0 * fl1_fx * pb_yyy[j] + pa_y[j] * pb_yyyy[j]);
 
-                t_y_yyyy[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 3.75 * pc_y[j] * fl2_fx - 6.0 * fl2_fx * pb_y[j] - 3.0 * pa_y[j] * pb_yy[j] * fl1_fx - 6.0 * pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx - 9.0 * pc_y[j] * pb_yy[j] * fl1_fx - 2.0 * fl1_fx * pb_yyy[j] - 4.0 * pa_y[j] * pb_yyy[j] * pc_y[j] - pc_y[j] * pb_yyyy[j]);
+                t_y_yyyy[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 3.75 * pc_y[j] * fl2_fx - 6.0 * fl2_fx * pb_y[j] - 3.0 * pa_y[j] * pb_yy[j] * fl1_fx - 6.0 * pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx);
 
-                t_y_yyyy[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 7.5 * pc_y[j] * fl2_fx + 3.0 * fl2_fx * pb_y[j] + 6.0 * pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx + 3.0 * pa_y[j] * pc_yy[j] * fl1_fx + 9.0 * pc_y[j] * pb_yy[j] * fl1_fx + 12.0 * pc_yy[j] * pb_y[j] * fl1_fx + 6.0 * pa_y[j] * pb_yy[j] * pc_yy[j] + 4.0 * pc_yy[j] * pb_yyy[j]);
+                t_y_yyyy[j] += fl_s_0_0_1 * (- 9.0 * pc_y[j] * pb_yy[j] * fl1_fx - 2.0 * fl1_fx * pb_yyy[j] - 4.0 * pa_y[j] * pb_yyy[j] * pc_y[j] - pc_y[j] * pb_yyyy[j]);
 
-                t_y_yyyy[j] += fl_s_0_0_3 * (-3.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_yy[j] * fl1_fx - 12.0 * pc_yy[j] * pb_y[j] * fl1_fx - 5.0 * pc_yyy[j] * fl1_fx - 4.0 * pa_y[j] * pb_y[j] * pc_yyy[j] - 6.0 * pc_yyy[j] * pb_yy[j]);
+                t_y_yyyy[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 7.5 * pc_y[j] * fl2_fx + 3.0 * fl2_fx * pb_y[j] + 6.0 * pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx + 3.0 * pa_y[j] * pc_yy[j] * fl1_fx);
+
+                t_y_yyyy[j] += fl_s_0_0_2 * (+ 9.0 * pc_y[j] * pb_yy[j] * fl1_fx + 12.0 * pc_yy[j] * pb_y[j] * fl1_fx + 6.0 * pa_y[j] * pb_yy[j] * pc_yy[j] + 4.0 * pc_yy[j] * pb_yyy[j]);
+
+                t_y_yyyy[j] += fl_s_0_0_3 * (-3.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_yy[j] * fl1_fx - 12.0 * pc_yy[j] * pb_y[j] * fl1_fx - 5.0 * pc_yyy[j] * fl1_fx - 4.0 * pa_y[j] * pb_y[j] * pc_yyy[j]);
+
+                t_y_yyyy[j] += -fl_s_0_0_3 * 6.0 * pc_yyy[j] * pb_yy[j];
 
                 t_y_yyyy[j] += fl_s_0_0_4 * (5.0 * pc_yyy[j] * fl1_fx + pa_y[j] * pc_yyyy[j] + 4.0 * pc_yyyy[j] * pb_y[j]);
 
@@ -7215,11 +7691,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_yyyz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_yz[j] * fl1_fx + 1.5 * fl1_fx * pb_yyz[j] + pa_y[j] * pb_yyyz[j]);
 
-                t_y_yyyz[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 1.5 * pa_y[j] * pb_y[j] * fl1_fx * pc_z[j] - 1.5 * pa_y[j] * pb_yz[j] * fl1_fx - 1.5 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] - 4.5 * pc_y[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j] * pc_z[j] - 1.5 * fl1_fx * pb_yyz[j] - pa_y[j] * pb_yyy[j] * pc_z[j] - 3.0 * pa_y[j] * pb_yyz[j] * pc_y[j] - pc_y[j] * pb_yyyz[j]);
+                t_y_yyyz[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 1.5 * pa_y[j] * pb_y[j] * fl1_fx * pc_z[j] - 1.5 * pa_y[j] * pb_yz[j] * fl1_fx - 1.5 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j]);
 
-                t_y_yyyz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_y[j] * fl1_fx * pc_z[j] + 1.5 * pa_y[j] * pc_yz[j] * fl1_fx + 1.5 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] + 4.5 * pc_yz[j] * pb_y[j] * fl1_fx + 4.5 * pc_y[j] * pb_yz[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_yy[j] * pc_z[j] + 3.0 * pa_y[j] * pb_yy[j] * pc_yz[j] + 3.0 * pa_y[j] * pb_yz[j] * pc_yy[j] + pc_yz[j] * pb_yyy[j] + 3.0 * pc_yy[j] * pb_yyz[j]);
+                t_y_yyyz[j] += fl_s_0_0_1 * (- 4.5 * pc_y[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j] * pc_z[j] - 1.5 * fl1_fx * pb_yyz[j] - pa_y[j] * pb_yyy[j] * pc_z[j] - 3.0 * pa_y[j] * pb_yyz[j] * pc_y[j]);
 
-                t_y_yyyz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_y[j] * pc_yz[j] * fl1_fx - 4.5 * pc_yz[j] * pb_y[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_z[j] - 3.0 * pa_y[j] * pb_y[j] * pc_yyz[j] - pa_y[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_yyz[j] * pb_yy[j] - 3.0 * pc_yyy[j] * pb_yz[j]);
+                t_y_yyyz[j] += -fl_s_0_0_1 * pc_y[j] * pb_yyyz[j];
+
+                t_y_yyyz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_y[j] * fl1_fx * pc_z[j] + 1.5 * pa_y[j] * pc_yz[j] * fl1_fx + 1.5 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j]);
+
+                t_y_yyyz[j] += fl_s_0_0_2 * (+ 4.5 * pc_yz[j] * pb_y[j] * fl1_fx + 4.5 * pc_y[j] * pb_yz[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_yy[j] * pc_z[j] + 3.0 * pa_y[j] * pb_yy[j] * pc_yz[j]);
+
+                t_y_yyyz[j] += fl_s_0_0_2 * (+ 3.0 * pa_y[j] * pb_yz[j] * pc_yy[j] + pc_yz[j] * pb_yyy[j] + 3.0 * pc_yy[j] * pb_yyz[j]);
+
+                t_y_yyyz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_y[j] * pc_yz[j] * fl1_fx - 4.5 * pc_yz[j] * pb_y[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_z[j]);
+
+                t_y_yyyz[j] += fl_s_0_0_3 * (- 3.0 * pa_y[j] * pb_y[j] * pc_yyz[j] - pa_y[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_yyz[j] * pb_yy[j] - 3.0 * pc_yyy[j] * pb_yz[j]);
 
                 t_y_yyyz[j] += fl_s_0_0_4 * (3.0 * pc_yyz[j] * fl1_fx + pa_y[j] * pc_yyyz[j] + 3.0 * pc_yyyz[j] * pb_y[j] + pc_yyyy[j] * pb_z[j]);
 
@@ -7385,13 +7871,29 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_y_yyzz[j] = fl_s_0_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + 0.5 * pa_y[j] * pb_yy[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_yzz[j] + pa_y[j] * pb_yyzz[j]);
+                t_y_yyzz[j] = fl_s_0_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + 0.5 * pa_y[j] * pb_yy[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_yzz[j]);
 
-                t_y_yyzz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - fl2_fx * pb_y[j] - 0.5 * pa_y[j] * pb_yy[j] * fl1_fx - pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx - pa_y[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_zz[j] - 0.5 * pc_y[j] * pb_yy[j] * fl1_fx - 1.5 * pc_y[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_yz[j] * pc_z[j] - fl1_fx * pb_yzz[j] - 2.0 * pa_y[j] * pb_yyz[j] * pc_z[j] - 2.0 * pa_y[j] * pb_yzz[j] * pc_y[j] - pc_y[j] * pb_yyzz[j]);
+                t_y_yyzz[j] += fl_s_0_0_0 * pa_y[j] * pb_yyzz[j];
 
-                t_y_yyzz[j] += fl_s_0_0_2 * (0.25 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx + 0.5 * pa_y[j] * pc_yy[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pc_zz[j] + pa_y[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_y[j] * pb_yy[j] * fl1_fx + pc_yy[j] * pb_y[j] * fl1_fx + 3.0 * pc_yz[j] * fl1_fx * pb_z[j] + 1.5 * pc_y[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_y[j] * pc_zz[j] + 2.0 * fl1_fx * pb_yz[j] * pc_z[j] + pa_y[j] * pb_yy[j] * pc_zz[j] + 4.0 * pa_y[j] * pb_yz[j] * pc_yz[j] + pa_y[j] * pc_yy[j] * pb_zz[j] + 2.0 * pc_yz[j] * pb_yyz[j] + 2.0 * pc_yy[j] * pb_yzz[j]);
+                t_y_yyzz[j] += fl_s_0_0_1 * (-0.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - fl2_fx * pb_y[j] - 0.5 * pa_y[j] * pb_yy[j] * fl1_fx - pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx);
 
-                t_y_yyzz[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pc_yy[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pc_zz[j] - pc_yy[j] * pb_y[j] * fl1_fx - 0.5 * pc_yyy[j] * fl1_fx - 1.5 * pc_yzz[j] * fl1_fx - 3.0 * pc_yz[j] * fl1_fx * pb_z[j] - fl1_fx * pb_y[j] * pc_zz[j] - 2.0 * pa_y[j] * pb_y[j] * pc_yzz[j] - 2.0 * pa_y[j] * pc_yyz[j] * pb_z[j] - pc_yzz[j] * pb_yy[j] - 4.0 * pc_yyz[j] * pb_yz[j] - pc_yyy[j] * pb_zz[j]);
+                t_y_yyzz[j] += fl_s_0_0_1 * (- pa_y[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_y[j] * fl1_fx * pb_zz[j] - 0.5 * pc_y[j] * pb_yy[j] * fl1_fx - 1.5 * pc_y[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_yz[j] * pc_z[j]);
+
+                t_y_yyzz[j] += fl_s_0_0_1 * (- fl1_fx * pb_yzz[j] - 2.0 * pa_y[j] * pb_yyz[j] * pc_z[j] - 2.0 * pa_y[j] * pb_yzz[j] * pc_y[j] - pc_y[j] * pb_yyzz[j]);
+
+                t_y_yyzz[j] += fl_s_0_0_2 * (0.25 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + pa_y[j] * pb_y[j] * pc_y[j] * fl1_fx + 0.5 * pa_y[j] * pc_yy[j] * fl1_fx);
+
+                t_y_yyzz[j] += fl_s_0_0_2 * (+ 0.5 * pa_y[j] * fl1_fx * pc_zz[j] + pa_y[j] * fl1_fx * pb_z[j] * pc_z[j] + 0.5 * pc_y[j] * pb_yy[j] * fl1_fx + pc_yy[j] * pb_y[j] * fl1_fx + 3.0 * pc_yz[j] * fl1_fx * pb_z[j]);
+
+                t_y_yyzz[j] += fl_s_0_0_2 * (+ 1.5 * pc_y[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_y[j] * pc_zz[j] + 2.0 * fl1_fx * pb_yz[j] * pc_z[j] + pa_y[j] * pb_yy[j] * pc_zz[j] + 4.0 * pa_y[j] * pb_yz[j] * pc_yz[j]);
+
+                t_y_yyzz[j] += fl_s_0_0_2 * (+ pa_y[j] * pc_yy[j] * pb_zz[j] + 2.0 * pc_yz[j] * pb_yyz[j] + 2.0 * pc_yy[j] * pb_yzz[j]);
+
+                t_y_yyzz[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 0.5 * pa_y[j] * pc_yy[j] * fl1_fx - 0.5 * pa_y[j] * fl1_fx * pc_zz[j] - pc_yy[j] * pb_y[j] * fl1_fx - 0.5 * pc_yyy[j] * fl1_fx);
+
+                t_y_yyzz[j] += fl_s_0_0_3 * (- 1.5 * pc_yzz[j] * fl1_fx - 3.0 * pc_yz[j] * fl1_fx * pb_z[j] - fl1_fx * pb_y[j] * pc_zz[j] - 2.0 * pa_y[j] * pb_y[j] * pc_yzz[j] - 2.0 * pa_y[j] * pc_yyz[j] * pb_z[j]);
+
+                t_y_yyzz[j] += fl_s_0_0_3 * (- pc_yzz[j] * pb_yy[j] - 4.0 * pc_yyz[j] * pb_yz[j] - pc_yyy[j] * pb_zz[j]);
 
                 t_y_yyzz[j] += fl_s_0_0_4 * (0.5 * pc_yyy[j] * fl1_fx + 1.5 * pc_yzz[j] * fl1_fx + pa_y[j] * pc_yyzz[j] + 2.0 * pc_yyzz[j] * pb_y[j] + 2.0 * pc_yyyz[j] * pb_z[j]);
 
@@ -7399,11 +7901,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_yzzz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_yz[j] * fl1_fx + 0.5 * fl1_fx * pb_zzz[j] + pa_y[j] * pb_yzzz[j]);
 
-                t_y_yzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * pa_y[j] * pb_yz[j] * fl1_fx - 1.5 * pa_y[j] * pb_y[j] * pc_z[j] * fl1_fx - 1.5 * pa_y[j] * pc_y[j] * pb_z[j] * fl1_fx - 1.5 * pc_y[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pb_zz[j] * pc_z[j] - 0.5 * fl1_fx * pb_zzz[j] - 3.0 * pa_y[j] * pb_yzz[j] * pc_z[j] - pa_y[j] * pc_y[j] * pb_zzz[j] - pc_y[j] * pb_yzzz[j]);
+                t_y_yzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * pa_y[j] * pb_yz[j] * fl1_fx - 1.5 * pa_y[j] * pb_y[j] * pc_z[j] * fl1_fx - 1.5 * pa_y[j] * pc_y[j] * pb_z[j] * fl1_fx);
 
-                t_y_yzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_y[j] * pc_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_y[j] * pb_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_yz[j] * fl1_fx + 1.5 * pc_y[j] * pb_yz[j] * fl1_fx + 1.5 * pc_yz[j] * pb_y[j] * fl1_fx + 1.5 * pc_yy[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pb_z[j] * pc_zz[j] + 1.5 * fl1_fx * pb_zz[j] * pc_z[j] + 3.0 * pa_y[j] * pb_yz[j] * pc_zz[j] + 3.0 * pa_y[j] * pc_yz[j] * pb_zz[j] + 3.0 * pc_yz[j] * pb_yzz[j] + pc_yy[j] * pb_zzz[j]);
+                t_y_yzzz[j] += fl_s_0_0_1 * (- 1.5 * pc_y[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pb_zz[j] * pc_z[j] - 0.5 * fl1_fx * pb_zzz[j] - 3.0 * pa_y[j] * pb_yzz[j] * pc_z[j] - pa_y[j] * pc_y[j] * pb_zzz[j]);
 
-                t_y_yzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_y[j] * pc_yz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_y[j] * fl1_fx - 1.5 * pc_yy[j] * pb_z[j] * fl1_fx - 1.5 * pc_yyz[j] * fl1_fx - 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pb_z[j] * pc_zz[j] - pa_y[j] * pb_y[j] * pc_zzz[j] - 3.0 * pa_y[j] * pc_yzz[j] * pb_z[j] - 3.0 * pc_yzz[j] * pb_yz[j] - 3.0 * pc_yyz[j] * pb_zz[j]);
+                t_y_yzzz[j] += -fl_s_0_0_1 * pc_y[j] * pb_yzzz[j];
+
+                t_y_yzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_y[j] * pc_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_y[j] * pb_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_yz[j] * fl1_fx);
+
+                t_y_yzzz[j] += fl_s_0_0_2 * (+ 1.5 * pc_y[j] * pb_yz[j] * fl1_fx + 1.5 * pc_yz[j] * pb_y[j] * fl1_fx + 1.5 * pc_yy[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pb_z[j] * pc_zz[j] + 1.5 * fl1_fx * pb_zz[j] * pc_z[j]);
+
+                t_y_yzzz[j] += fl_s_0_0_2 * (+ 3.0 * pa_y[j] * pb_yz[j] * pc_zz[j] + 3.0 * pa_y[j] * pc_yz[j] * pb_zz[j] + 3.0 * pc_yz[j] * pb_yzz[j] + pc_yy[j] * pb_zzz[j]);
+
+                t_y_yzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * pa_y[j] * pc_yz[j] * fl1_fx - 1.5 * pc_yz[j] * pb_y[j] * fl1_fx - 1.5 * pc_yy[j] * pb_z[j] * fl1_fx - 1.5 * pc_yyz[j] * fl1_fx);
+
+                t_y_yzzz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pb_z[j] * pc_zz[j] - pa_y[j] * pb_y[j] * pc_zzz[j] - 3.0 * pa_y[j] * pc_yzz[j] * pb_z[j] - 3.0 * pc_yzz[j] * pb_yz[j]);
+
+                t_y_yzzz[j] += -fl_s_0_0_3 * 3.0 * pc_yyz[j] * pb_zz[j];
 
                 t_y_yzzz[j] += fl_s_0_0_4 * (1.5 * pc_yyz[j] * fl1_fx + 0.5 * fl1_fx * pc_zzz[j] + pa_y[j] * pc_yzzz[j] + pc_yzzz[j] * pb_y[j] + 3.0 * pc_yyzz[j] * pb_z[j]);
 
@@ -7411,11 +7925,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_y_zzzz[j] = fl_s_0_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * pa_y[j] * pb_zz[j] * fl1_fx + pa_y[j] * pb_zzzz[j]);
 
-                t_y_zzzz[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pb_zz[j] * fl1_fx - 6.0 * pa_y[j] * pb_z[j] * pc_z[j] * fl1_fx - 3.0 * pc_y[j] * pb_zz[j] * fl1_fx - 4.0 * pa_y[j] * pb_zzz[j] * pc_z[j] - pc_y[j] * pb_zzzz[j]);
+                t_y_zzzz[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pb_zz[j] * fl1_fx - 6.0 * pa_y[j] * pb_z[j] * pc_z[j] * fl1_fx - 3.0 * pc_y[j] * pb_zz[j] * fl1_fx);
 
-                t_y_zzzz[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 6.0 * pa_y[j] * pb_z[j] * pc_z[j] * fl1_fx + 3.0 * pa_y[j] * pc_zz[j] * fl1_fx + 3.0 * pc_y[j] * pb_zz[j] * fl1_fx + 6.0 * pc_yz[j] * pb_z[j] * fl1_fx + 6.0 * pa_y[j] * pb_zz[j] * pc_zz[j] + 4.0 * pc_yz[j] * pb_zzz[j]);
+                t_y_zzzz[j] += fl_s_0_0_1 * (- 4.0 * pa_y[j] * pb_zzz[j] * pc_z[j] - pc_y[j] * pb_zzzz[j]);
 
-                t_y_zzzz[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_zz[j] * fl1_fx - 6.0 * pc_yz[j] * pb_z[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx - 4.0 * pa_y[j] * pb_z[j] * pc_zzz[j] - 6.0 * pc_yzz[j] * pb_zz[j]);
+                t_y_zzzz[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 6.0 * pa_y[j] * pb_z[j] * pc_z[j] * fl1_fx + 3.0 * pa_y[j] * pc_zz[j] * fl1_fx + 3.0 * pc_y[j] * pb_zz[j] * fl1_fx);
+
+                t_y_zzzz[j] += fl_s_0_0_2 * (+ 6.0 * pc_yz[j] * pb_z[j] * fl1_fx + 6.0 * pa_y[j] * pb_zz[j] * pc_zz[j] + 4.0 * pc_yz[j] * pb_zzz[j]);
+
+                t_y_zzzz[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_zz[j] * fl1_fx - 6.0 * pc_yz[j] * pb_z[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx - 4.0 * pa_y[j] * pb_z[j] * pc_zzz[j]);
+
+                t_y_zzzz[j] += -fl_s_0_0_3 * 6.0 * pc_yzz[j] * pb_zz[j];
 
                 t_y_zzzz[j] += fl_s_0_0_4 * (3.0 * pc_yzz[j] * fl1_fx + pa_y[j] * pc_zzzz[j] + 4.0 * pc_yzzz[j] * pb_z[j]);
 
@@ -7596,11 +8116,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xxxx[j] = fl_s_0_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * pa_z[j] * pb_xx[j] * fl1_fx + pa_z[j] * pb_xxxx[j]);
 
-                t_z_xxxx[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pb_xx[j] * fl1_fx - 6.0 * pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx - 3.0 * pc_z[j] * pb_xx[j] * fl1_fx - 4.0 * pa_z[j] * pb_xxx[j] * pc_x[j] - pc_z[j] * pb_xxxx[j]);
+                t_z_xxxx[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pb_xx[j] * fl1_fx - 6.0 * pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx - 3.0 * pc_z[j] * pb_xx[j] * fl1_fx);
 
-                t_z_xxxx[j] += fl_s_0_0_2 * (0.75 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 6.0 * pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx + 3.0 * pa_z[j] * pc_xx[j] * fl1_fx + 3.0 * pc_z[j] * pb_xx[j] * fl1_fx + 6.0 * pc_xz[j] * pb_x[j] * fl1_fx + 6.0 * pa_z[j] * pb_xx[j] * pc_xx[j] + 4.0 * pc_xz[j] * pb_xxx[j]);
+                t_z_xxxx[j] += fl_s_0_0_1 * (- 4.0 * pa_z[j] * pb_xxx[j] * pc_x[j] - pc_z[j] * pb_xxxx[j]);
 
-                t_z_xxxx[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pc_xx[j] * fl1_fx - 6.0 * pc_xz[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 4.0 * pa_z[j] * pb_x[j] * pc_xxx[j] - 6.0 * pc_xxz[j] * pb_xx[j]);
+                t_z_xxxx[j] += fl_s_0_0_2 * (0.75 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 6.0 * pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx + 3.0 * pa_z[j] * pc_xx[j] * fl1_fx + 3.0 * pc_z[j] * pb_xx[j] * fl1_fx);
+
+                t_z_xxxx[j] += fl_s_0_0_2 * (+ 6.0 * pc_xz[j] * pb_x[j] * fl1_fx + 6.0 * pa_z[j] * pb_xx[j] * pc_xx[j] + 4.0 * pc_xz[j] * pb_xxx[j]);
+
+                t_z_xxxx[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pc_xx[j] * fl1_fx - 6.0 * pc_xz[j] * pb_x[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 4.0 * pa_z[j] * pb_x[j] * pc_xxx[j]);
+
+                t_z_xxxx[j] += -fl_s_0_0_3 * 6.0 * pc_xxz[j] * pb_xx[j];
 
                 t_z_xxxx[j] += fl_s_0_0_4 * (3.0 * pc_xxz[j] * fl1_fx + pa_z[j] * pc_xxxx[j] + 4.0 * pc_xxxz[j] * pb_x[j]);
 
@@ -7608,11 +8134,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xxxy[j] = fl_s_0_0_0 * (1.5 * pa_z[j] * pb_xy[j] * fl1_fx + pa_z[j] * pb_xxxy[j]);
 
-                t_z_xxxy[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_y[j] - 1.5 * pa_z[j] * pb_xy[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_y[j] - 1.5 * pc_z[j] * pb_xy[j] * fl1_fx - pa_z[j] * pb_xxx[j] * pc_y[j] - 3.0 * pa_z[j] * pb_xxy[j] * pc_x[j] - pc_z[j] * pb_xxxy[j]);
+                t_z_xxxy[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_y[j] - 1.5 * pa_z[j] * pb_xy[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_y[j] - 1.5 * pc_z[j] * pb_xy[j] * fl1_fx - pa_z[j] * pb_xxx[j] * pc_y[j]);
 
-                t_z_xxxy[j] += fl_s_0_0_2 * (1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_y[j] + 1.5 * pa_z[j] * pc_xy[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_y[j] + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_z[j] * pb_xy[j] * fl1_fx + 1.5 * pc_xz[j] * fl1_fx * pb_y[j] + 3.0 * pa_z[j] * pb_xx[j] * pc_xy[j] + 3.0 * pa_z[j] * pb_xy[j] * pc_xx[j] + pc_yz[j] * pb_xxx[j] + 3.0 * pc_xz[j] * pb_xxy[j]);
+                t_z_xxxy[j] += fl_s_0_0_1 * (- 3.0 * pa_z[j] * pb_xxy[j] * pc_x[j] - pc_z[j] * pb_xxxy[j]);
 
-                t_z_xxxy[j] += fl_s_0_0_3 * (-1.5 * pa_z[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 3.0 * pa_z[j] * pb_x[j] * pc_xxy[j] - pa_z[j] * pc_xxx[j] * pb_y[j] - 3.0 * pc_xyz[j] * pb_xx[j] - 3.0 * pc_xxz[j] * pb_xy[j]);
+                t_z_xxxy[j] += fl_s_0_0_2 * (1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_y[j] + 1.5 * pa_z[j] * pc_xy[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_y[j] + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_z[j] * pb_xy[j] * fl1_fx);
+
+                t_z_xxxy[j] += fl_s_0_0_2 * (+ 1.5 * pc_xz[j] * fl1_fx * pb_y[j] + 3.0 * pa_z[j] * pb_xx[j] * pc_xy[j] + 3.0 * pa_z[j] * pb_xy[j] * pc_xx[j] + pc_yz[j] * pb_xxx[j] + 3.0 * pc_xz[j] * pb_xxy[j]);
+
+                t_z_xxxy[j] += fl_s_0_0_3 * (-1.5 * pa_z[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 3.0 * pa_z[j] * pb_x[j] * pc_xxy[j]);
+
+                t_z_xxxy[j] += fl_s_0_0_3 * (- pa_z[j] * pc_xxx[j] * pb_y[j] - 3.0 * pc_xyz[j] * pb_xx[j] - 3.0 * pc_xxz[j] * pb_xy[j]);
 
                 t_z_xxxy[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_z[j] * pc_xxxy[j] + 3.0 * pc_xxyz[j] * pb_x[j] + pc_xxxz[j] * pb_y[j]);
 
@@ -7620,11 +8152,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xxxz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_xxx[j] + pa_z[j] * pb_xxxz[j]);
 
-                t_z_xxxz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] - 1.5 * pa_z[j] * pb_xz[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j] - 1.5 * pc_z[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxx[j] - pa_z[j] * pb_xxx[j] * pc_z[j] - 3.0 * pa_z[j] * pb_xxz[j] * pc_x[j] - pc_z[j] * pb_xxxz[j]);
+                t_z_xxxz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] - 1.5 * pa_z[j] * pb_xz[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j]);
 
-                t_z_xxxz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] + 1.5 * pa_z[j] * pc_xz[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j] + 1.5 * pc_zz[j] * pb_x[j] * fl1_fx + 1.5 * pc_z[j] * pb_xz[j] * fl1_fx + 1.5 * pc_xz[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_x[j] * pc_xx[j] + 1.5 * fl1_fx * pb_xx[j] * pc_x[j] + 3.0 * pa_z[j] * pb_xx[j] * pc_xz[j] + 3.0 * pa_z[j] * pb_xz[j] * pc_xx[j] + pc_zz[j] * pb_xxx[j] + 3.0 * pc_xz[j] * pb_xxz[j]);
+                t_z_xxxz[j] += fl_s_0_0_1 * (- 1.5 * pc_z[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pb_xx[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxx[j] - pa_z[j] * pb_xxx[j] * pc_z[j] - 3.0 * pa_z[j] * pb_xxz[j] * pc_x[j]);
 
-                t_z_xxxz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pc_xz[j] * fl1_fx - 1.5 * pc_zz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xzz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_xxx[j] - 1.5 * fl1_fx * pb_x[j] * pc_xx[j] - 3.0 * pa_z[j] * pb_x[j] * pc_xxz[j] - pa_z[j] * pc_xxx[j] * pb_z[j] - 3.0 * pc_xzz[j] * pb_xx[j] - 3.0 * pc_xxz[j] * pb_xz[j]);
+                t_z_xxxz[j] += -fl_s_0_0_1 * pc_z[j] * pb_xxxz[j];
+
+                t_z_xxxz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] + 1.5 * pa_z[j] * pc_xz[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j]);
+
+                t_z_xxxz[j] += fl_s_0_0_2 * (+ 1.5 * pc_zz[j] * pb_x[j] * fl1_fx + 1.5 * pc_z[j] * pb_xz[j] * fl1_fx + 1.5 * pc_xz[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_x[j] * pc_xx[j] + 1.5 * fl1_fx * pb_xx[j] * pc_x[j]);
+
+                t_z_xxxz[j] += fl_s_0_0_2 * (+ 3.0 * pa_z[j] * pb_xx[j] * pc_xz[j] + 3.0 * pa_z[j] * pb_xz[j] * pc_xx[j] + pc_zz[j] * pb_xxx[j] + 3.0 * pc_xz[j] * pb_xxz[j]);
+
+                t_z_xxxz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pc_xz[j] * fl1_fx - 1.5 * pc_zz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xzz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_z[j]);
+
+                t_z_xxxz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_xxx[j] - 1.5 * fl1_fx * pb_x[j] * pc_xx[j] - 3.0 * pa_z[j] * pb_x[j] * pc_xxz[j] - pa_z[j] * pc_xxx[j] * pb_z[j] - 3.0 * pc_xzz[j] * pb_xx[j]);
+
+                t_z_xxxz[j] += -fl_s_0_0_3 * 3.0 * pc_xxz[j] * pb_xz[j];
 
                 t_z_xxxz[j] += fl_s_0_0_4 * (1.5 * pc_xzz[j] * fl1_fx + 0.5 * fl1_fx * pc_xxx[j] + pa_z[j] * pc_xxxz[j] + 3.0 * pc_xxzz[j] * pb_x[j] + pc_xxxz[j] * pb_z[j]);
 
@@ -7825,11 +8369,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xxyy[j] = fl_s_0_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pa_z[j] * pb_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_yy[j] + pa_z[j] * pb_xxyy[j]);
 
-                t_z_xxyy[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl2_fx - 0.25 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pb_xx[j] * fl1_fx - pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_z[j] * fl1_fx * pb_y[j] * pc_y[j] - 0.5 * pa_z[j] * fl1_fx * pb_yy[j] - 0.5 * pc_z[j] * pb_xx[j] * fl1_fx - 0.5 * pc_z[j] * fl1_fx * pb_yy[j] - 2.0 * pa_z[j] * pb_xxy[j] * pc_y[j] - 2.0 * pa_z[j] * pb_xyy[j] * pc_x[j] - pc_z[j] * pb_xxyy[j]);
+                t_z_xxyy[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl2_fx - 0.25 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pb_xx[j] * fl1_fx - pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_z[j] * fl1_fx * pb_y[j] * pc_y[j]);
 
-                t_z_xxyy[j] += fl_s_0_0_2 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pc_z[j] * fl2_fx + pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_z[j] * pc_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pc_yy[j] + pa_z[j] * fl1_fx * pb_y[j] * pc_y[j] + 0.5 * pc_z[j] * pb_xx[j] * fl1_fx + pc_xz[j] * pb_x[j] * fl1_fx + pc_yz[j] * fl1_fx * pb_y[j] + 0.5 * pc_z[j] * fl1_fx * pb_yy[j] + pa_z[j] * pb_xx[j] * pc_yy[j] + 4.0 * pa_z[j] * pb_xy[j] * pc_xy[j] + pa_z[j] * pc_xx[j] * pb_yy[j] + 2.0 * pc_yz[j] * pb_xxy[j] + 2.0 * pc_xz[j] * pb_xyy[j]);
+                t_z_xxyy[j] += fl_s_0_0_1 * (- 0.5 * pa_z[j] * fl1_fx * pb_yy[j] - 0.5 * pc_z[j] * pb_xx[j] * fl1_fx - 0.5 * pc_z[j] * fl1_fx * pb_yy[j] - 2.0 * pa_z[j] * pb_xxy[j] * pc_y[j] - 2.0 * pa_z[j] * pb_xyy[j] * pc_x[j]);
 
-                t_z_xxyy[j] += fl_s_0_0_3 * (-0.25 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pc_xx[j] * fl1_fx - 0.5 * pa_z[j] * fl1_fx * pc_yy[j] - pc_xz[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_yyz[j] * fl1_fx - pc_yz[j] * fl1_fx * pb_y[j] - 2.0 * pa_z[j] * pb_x[j] * pc_xyy[j] - 2.0 * pa_z[j] * pc_xxy[j] * pb_y[j] - pc_yyz[j] * pb_xx[j] - 4.0 * pc_xyz[j] * pb_xy[j] - pc_xxz[j] * pb_yy[j]);
+                t_z_xxyy[j] += -fl_s_0_0_1 * pc_z[j] * pb_xxyy[j];
+
+                t_z_xxyy[j] += fl_s_0_0_2 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pc_z[j] * fl2_fx + pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_z[j] * pc_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pc_yy[j]);
+
+                t_z_xxyy[j] += fl_s_0_0_2 * (+ pa_z[j] * fl1_fx * pb_y[j] * pc_y[j] + 0.5 * pc_z[j] * pb_xx[j] * fl1_fx + pc_xz[j] * pb_x[j] * fl1_fx + pc_yz[j] * fl1_fx * pb_y[j] + 0.5 * pc_z[j] * fl1_fx * pb_yy[j]);
+
+                t_z_xxyy[j] += fl_s_0_0_2 * (+ pa_z[j] * pb_xx[j] * pc_yy[j] + 4.0 * pa_z[j] * pb_xy[j] * pc_xy[j] + pa_z[j] * pc_xx[j] * pb_yy[j] + 2.0 * pc_yz[j] * pb_xxy[j] + 2.0 * pc_xz[j] * pb_xyy[j]);
+
+                t_z_xxyy[j] += fl_s_0_0_3 * (-0.25 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pc_xx[j] * fl1_fx - 0.5 * pa_z[j] * fl1_fx * pc_yy[j] - pc_xz[j] * pb_x[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx);
+
+                t_z_xxyy[j] += fl_s_0_0_3 * (- 0.5 * pc_yyz[j] * fl1_fx - pc_yz[j] * fl1_fx * pb_y[j] - 2.0 * pa_z[j] * pb_x[j] * pc_xyy[j] - 2.0 * pa_z[j] * pc_xxy[j] * pb_y[j] - pc_yyz[j] * pb_xx[j]);
+
+                t_z_xxyy[j] += fl_s_0_0_3 * (- 4.0 * pc_xyz[j] * pb_xy[j] - pc_xxz[j] * pb_yy[j]);
 
                 t_z_xxyy[j] += fl_s_0_0_4 * (0.5 * pc_xxz[j] * fl1_fx + 0.5 * pc_yyz[j] * fl1_fx + pa_z[j] * pc_xxyy[j] + 2.0 * pc_xyyz[j] * pb_x[j] + 2.0 * pc_xxyz[j] * pb_y[j]);
 
@@ -7837,23 +8393,55 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xxyz[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_y[j] + 0.5 * pa_z[j] * fl1_fx * pb_yz[j] + 0.5 * fl1_fx * pb_xxy[j] + pa_z[j] * pb_xxyz[j]);
 
-                t_z_xxyz[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_z[j] * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_yz[j] - 0.5 * pc_z[j] * fl1_fx * pb_yz[j] - 0.5 * fl1_fx * pb_xx[j] * pc_y[j] - fl1_fx * pb_xy[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxy[j] - pa_z[j] * pb_xxy[j] * pc_z[j] - pa_z[j] * pb_xxz[j] * pc_y[j] - 2.0 * pa_z[j] * pb_xyz[j] * pc_x[j] - pc_z[j] * pb_xxyz[j]);
+                t_z_xxyz[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_z[j] * fl1_fx * pb_y[j] * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pc_y[j] * pb_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_yz[j]);
 
-                t_z_xxyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_z[j] * fl1_fx * pc_yz[j] + 0.5 * pa_z[j] * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * pa_z[j] * fl1_fx * pc_y[j] * pb_z[j] + 0.5 * pc_zz[j] * fl1_fx * pb_y[j] + 0.5 * pc_yz[j] * fl1_fx * pb_z[j] + 0.5 * pc_z[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_x[j] * pc_xy[j] + 0.5 * fl1_fx * pc_xx[j] * pb_y[j] + 0.5 * fl1_fx * pb_xx[j] * pc_y[j] + fl1_fx * pb_xy[j] * pc_x[j] + pa_z[j] * pb_xx[j] * pc_yz[j] + 2.0 * pa_z[j] * pb_xy[j] * pc_xz[j] + 2.0 * pa_z[j] * pb_xz[j] * pc_xy[j] + pa_z[j] * pc_xx[j] * pb_yz[j] + pc_zz[j] * pb_xxy[j] + pc_yz[j] * pb_xxz[j] + 2.0 * pc_xz[j] * pb_xyz[j]);
+                t_z_xxyz[j] += fl_s_0_0_1 * (- 0.5 * pc_z[j] * fl1_fx * pb_yz[j] - 0.5 * fl1_fx * pb_xx[j] * pc_y[j] - fl1_fx * pb_xy[j] * pc_x[j] - 0.5 * fl1_fx * pb_xxy[j] - pa_z[j] * pb_xxy[j] * pc_z[j]);
 
-                t_z_xxyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * pa_z[j] * fl1_fx * pc_yz[j] - 0.5 * pc_yzz[j] * fl1_fx - 0.5 * pc_zz[j] * fl1_fx * pb_y[j] - 0.5 * pc_yz[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_xxy[j] - fl1_fx * pb_x[j] * pc_xy[j] - 0.5 * fl1_fx * pc_xx[j] * pb_y[j] - 2.0 * pa_z[j] * pb_x[j] * pc_xyz[j] - pa_z[j] * pc_xxz[j] * pb_y[j] - pa_z[j] * pc_xxy[j] * pb_z[j] - pc_yzz[j] * pb_xx[j] - 2.0 * pc_xzz[j] * pb_xy[j] - 2.0 * pc_xyz[j] * pb_xz[j] - pc_xxz[j] * pb_yz[j]);
+                t_z_xxyz[j] += fl_s_0_0_1 * (- pa_z[j] * pb_xxz[j] * pc_y[j] - 2.0 * pa_z[j] * pb_xyz[j] * pc_x[j] - pc_z[j] * pb_xxyz[j]);
 
-                t_z_xxyz[j] += fl_s_0_0_4 * (0.5 * pc_yzz[j] * fl1_fx + 0.5 * fl1_fx * pc_xxy[j] + pa_z[j] * pc_xxyz[j] + 2.0 * pc_xyzz[j] * pb_x[j] + pc_xxzz[j] * pb_y[j] + pc_xxyz[j] * pb_z[j]);
+                t_z_xxyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_z[j] * fl1_fx * pc_yz[j] + 0.5 * pa_z[j] * fl1_fx * pb_y[j] * pc_z[j] + 0.5 * pa_z[j] * fl1_fx * pc_y[j] * pb_z[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_2 * (+ 0.5 * pc_zz[j] * fl1_fx * pb_y[j] + 0.5 * pc_yz[j] * fl1_fx * pb_z[j] + 0.5 * pc_z[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_x[j] * pc_xy[j] + 0.5 * fl1_fx * pc_xx[j] * pb_y[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pb_xx[j] * pc_y[j] + fl1_fx * pb_xy[j] * pc_x[j] + pa_z[j] * pb_xx[j] * pc_yz[j] + 2.0 * pa_z[j] * pb_xy[j] * pc_xz[j] + 2.0 * pa_z[j] * pb_xz[j] * pc_xy[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_2 * (+ pa_z[j] * pc_xx[j] * pb_yz[j] + pc_zz[j] * pb_xxy[j] + pc_yz[j] * pb_xxz[j] + 2.0 * pc_xz[j] * pb_xyz[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * pa_z[j] * fl1_fx * pc_yz[j] - 0.5 * pc_yzz[j] * fl1_fx - 0.5 * pc_zz[j] * fl1_fx * pb_y[j] - 0.5 * pc_yz[j] * fl1_fx * pb_z[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_xxy[j] - fl1_fx * pb_x[j] * pc_xy[j] - 0.5 * fl1_fx * pc_xx[j] * pb_y[j] - 2.0 * pa_z[j] * pb_x[j] * pc_xyz[j] - pa_z[j] * pc_xxz[j] * pb_y[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_3 * (- pa_z[j] * pc_xxy[j] * pb_z[j] - pc_yzz[j] * pb_xx[j] - 2.0 * pc_xzz[j] * pb_xy[j] - 2.0 * pc_xyz[j] * pb_xz[j] - pc_xxz[j] * pb_yz[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_4 * (0.5 * pc_yzz[j] * fl1_fx + 0.5 * fl1_fx * pc_xxy[j] + pa_z[j] * pc_xxyz[j] + 2.0 * pc_xyzz[j] * pb_x[j] + pc_xxzz[j] * pb_y[j]);
+
+                t_z_xxyz[j] += fl_s_0_0_4 * pc_xxyz[j] * pb_z[j];
 
                 t_z_xxyz[j] += -fl_s_0_0_5 * pc_xxyzz[j];
 
-                t_z_xxzz[j] = fl_s_0_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + 0.5 * pa_z[j] * pb_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_xxz[j] + pa_z[j] * pb_xxzz[j]);
+                t_z_xxzz[j] = fl_s_0_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + 0.5 * pa_z[j] * pb_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_xxz[j]);
 
-                t_z_xxzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - fl2_fx * pb_z[j] - 0.5 * pa_z[j] * pb_xx[j] * fl1_fx - pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx - pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_zz[j] - 1.5 * pc_z[j] * pb_xx[j] * fl1_fx - 0.5 * pc_z[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_xz[j] * pc_x[j] - fl1_fx * pb_xxz[j] - 2.0 * pa_z[j] * pb_xxz[j] * pc_z[j] - 2.0 * pa_z[j] * pb_xzz[j] * pc_x[j] - pc_z[j] * pb_xxzz[j]);
+                t_z_xxzz[j] += fl_s_0_0_0 * pa_z[j] * pb_xxzz[j];
 
-                t_z_xxzz[j] += fl_s_0_0_2 * (0.25 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_z[j] * pc_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pc_zz[j] + pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] + 1.5 * pc_z[j] * pb_xx[j] * fl1_fx + 3.0 * pc_xz[j] * pb_x[j] * fl1_fx + pc_zz[j] * fl1_fx * pb_z[j] + 0.5 * pc_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pc_xx[j] * pb_z[j] + 2.0 * fl1_fx * pb_xz[j] * pc_x[j] + pa_z[j] * pb_xx[j] * pc_zz[j] + 4.0 * pa_z[j] * pb_xz[j] * pc_xz[j] + pa_z[j] * pc_xx[j] * pb_zz[j] + 2.0 * pc_zz[j] * pb_xxz[j] + 2.0 * pc_xz[j] * pb_xzz[j]);
+                t_z_xxzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - fl2_fx * pb_z[j] - 0.5 * pa_z[j] * pb_xx[j] * fl1_fx - pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx);
 
-                t_z_xxzz[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pc_xx[j] * fl1_fx - 0.5 * pa_z[j] * fl1_fx * pc_zz[j] - 3.0 * pc_xz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_zzz[j] * fl1_fx - pc_zz[j] * fl1_fx * pb_z[j] - fl1_fx * pc_xx[j] * pb_z[j] - 2.0 * pa_z[j] * pb_x[j] * pc_xzz[j] - 2.0 * pa_z[j] * pc_xxz[j] * pb_z[j] - pc_zzz[j] * pb_xx[j] - 4.0 * pc_xzz[j] * pb_xz[j] - pc_xxz[j] * pb_zz[j]);
+                t_z_xxzz[j] += fl_s_0_0_1 * (- pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_zz[j] - 1.5 * pc_z[j] * pb_xx[j] * fl1_fx - 0.5 * pc_z[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_xz[j] * pc_x[j]);
+
+                t_z_xxzz[j] += fl_s_0_0_1 * (- fl1_fx * pb_xxz[j] - 2.0 * pa_z[j] * pb_xxz[j] * pc_z[j] - 2.0 * pa_z[j] * pb_xzz[j] * pc_x[j] - pc_z[j] * pb_xxzz[j]);
+
+                t_z_xxzz[j] += fl_s_0_0_2 * (0.25 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + pa_z[j] * pb_x[j] * pc_x[j] * fl1_fx + 0.5 * pa_z[j] * pc_xx[j] * fl1_fx);
+
+                t_z_xxzz[j] += fl_s_0_0_2 * (+ 0.5 * pa_z[j] * fl1_fx * pc_zz[j] + pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] + 1.5 * pc_z[j] * pb_xx[j] * fl1_fx + 3.0 * pc_xz[j] * pb_x[j] * fl1_fx + pc_zz[j] * fl1_fx * pb_z[j]);
+
+                t_z_xxzz[j] += fl_s_0_0_2 * (+ 0.5 * pc_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pc_xx[j] * pb_z[j] + 2.0 * fl1_fx * pb_xz[j] * pc_x[j] + pa_z[j] * pb_xx[j] * pc_zz[j] + 4.0 * pa_z[j] * pb_xz[j] * pc_xz[j]);
+
+                t_z_xxzz[j] += fl_s_0_0_2 * (+ pa_z[j] * pc_xx[j] * pb_zz[j] + 2.0 * pc_zz[j] * pb_xxz[j] + 2.0 * pc_xz[j] * pb_xzz[j]);
+
+                t_z_xxzz[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pc_xx[j] * fl1_fx - 0.5 * pa_z[j] * fl1_fx * pc_zz[j] - 3.0 * pc_xz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xxz[j] * fl1_fx);
+
+                t_z_xxzz[j] += fl_s_0_0_3 * (- 0.5 * pc_zzz[j] * fl1_fx - pc_zz[j] * fl1_fx * pb_z[j] - fl1_fx * pc_xx[j] * pb_z[j] - 2.0 * pa_z[j] * pb_x[j] * pc_xzz[j] - 2.0 * pa_z[j] * pc_xxz[j] * pb_z[j]);
+
+                t_z_xxzz[j] += fl_s_0_0_3 * (- pc_zzz[j] * pb_xx[j] - 4.0 * pc_xzz[j] * pb_xz[j] - pc_xxz[j] * pb_zz[j]);
 
                 t_z_xxzz[j] += fl_s_0_0_4 * (1.5 * pc_xxz[j] * fl1_fx + 0.5 * pc_zzz[j] * fl1_fx + pa_z[j] * pc_xxzz[j] + 2.0 * pc_xzzz[j] * pb_x[j] + 2.0 * pc_xxzz[j] * pb_z[j]);
 
@@ -8052,11 +8640,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xyyy[j] = fl_s_0_0_0 * (1.5 * pa_z[j] * pb_xy[j] * fl1_fx + pa_z[j] * pb_xyyy[j]);
 
-                t_z_xyyy[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * pb_xy[j] * fl1_fx - 1.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx - 1.5 * pc_z[j] * pb_xy[j] * fl1_fx - 3.0 * pa_z[j] * pb_xyy[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yyy[j] - pc_z[j] * pb_xyyy[j]);
+                t_z_xyyy[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * pb_xy[j] * fl1_fx - 1.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx - 1.5 * pc_z[j] * pb_xy[j] * fl1_fx - 3.0 * pa_z[j] * pb_xyy[j] * pc_y[j]);
 
-                t_z_xyyy[j] += fl_s_0_0_2 * (1.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx + 1.5 * pa_z[j] * pc_xy[j] * fl1_fx + 1.5 * pc_z[j] * pb_xy[j] * fl1_fx + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_xz[j] * pb_y[j] * fl1_fx + 3.0 * pa_z[j] * pb_xy[j] * pc_yy[j] + 3.0 * pa_z[j] * pc_xy[j] * pb_yy[j] + 3.0 * pc_yz[j] * pb_xyy[j] + pc_xz[j] * pb_yyy[j]);
+                t_z_xyyy[j] += fl_s_0_0_1 * (- pa_z[j] * pc_x[j] * pb_yyy[j] - pc_z[j] * pb_xyyy[j]);
 
-                t_z_xyyy[j] += fl_s_0_0_3 * (-1.5 * pa_z[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - pa_z[j] * pb_x[j] * pc_yyy[j] - 3.0 * pa_z[j] * pc_xyy[j] * pb_y[j] - 3.0 * pc_yyz[j] * pb_xy[j] - 3.0 * pc_xyz[j] * pb_yy[j]);
+                t_z_xyyy[j] += fl_s_0_0_2 * (1.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx + 1.5 * pa_z[j] * pc_xy[j] * fl1_fx + 1.5 * pc_z[j] * pb_xy[j] * fl1_fx + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx);
+
+                t_z_xyyy[j] += fl_s_0_0_2 * (+ 1.5 * pc_xz[j] * pb_y[j] * fl1_fx + 3.0 * pa_z[j] * pb_xy[j] * pc_yy[j] + 3.0 * pa_z[j] * pc_xy[j] * pb_yy[j] + 3.0 * pc_yz[j] * pb_xyy[j] + pc_xz[j] * pb_yyy[j]);
+
+                t_z_xyyy[j] += fl_s_0_0_3 * (-1.5 * pa_z[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - pa_z[j] * pb_x[j] * pc_yyy[j]);
+
+                t_z_xyyy[j] += fl_s_0_0_3 * (- 3.0 * pa_z[j] * pc_xyy[j] * pb_y[j] - 3.0 * pc_yyz[j] * pb_xy[j] - 3.0 * pc_xyz[j] * pb_yy[j]);
 
                 t_z_xyyy[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_z[j] * pc_xyyy[j] + pc_yyyz[j] * pb_x[j] + 3.0 * pc_xyyz[j] * pb_y[j]);
 
@@ -8064,23 +8658,53 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xyyz[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_x[j] + 0.5 * pa_z[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_xyy[j] + pa_z[j] * pb_xyyz[j]);
 
-                t_z_xyyz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pb_x[j] - 0.25 * fl2_fx * pc_x[j] - 0.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_z[j] * pb_xz[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j] - 0.5 * pc_z[j] * pb_xz[j] * fl1_fx - fl1_fx * pb_xy[j] * pc_y[j] - 0.5 * fl1_fx * pc_x[j] * pb_yy[j] - 0.5 * fl1_fx * pb_xyy[j] - pa_z[j] * pb_xyy[j] * pc_z[j] - 2.0 * pa_z[j] * pb_xyz[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yyz[j] - pc_z[j] * pb_xyyz[j]);
+                t_z_xyyz[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pb_x[j] - 0.25 * fl2_fx * pc_x[j] - 0.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] - 0.5 * pa_z[j] * pb_xz[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j]);
 
-                t_z_xyyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_x[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] + 0.5 * pa_z[j] * pc_xz[j] * fl1_fx + 0.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j] + 0.5 * pc_zz[j] * pb_x[j] * fl1_fx + 0.5 * pc_z[j] * pb_xz[j] * fl1_fx + 0.5 * pc_xz[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_x[j] * pc_yy[j] + fl1_fx * pc_xy[j] * pb_y[j] + fl1_fx * pb_xy[j] * pc_y[j] + 0.5 * fl1_fx * pc_x[j] * pb_yy[j] + 2.0 * pa_z[j] * pb_xy[j] * pc_yz[j] + pa_z[j] * pb_xz[j] * pc_yy[j] + pa_z[j] * pc_xz[j] * pb_yy[j] + 2.0 * pa_z[j] * pc_xy[j] * pb_yz[j] + pc_zz[j] * pb_xyy[j] + 2.0 * pc_yz[j] * pb_xyz[j] + pc_xz[j] * pb_yyz[j]);
+                t_z_xyyz[j] += fl_s_0_0_1 * (- 0.5 * pc_z[j] * pb_xz[j] * fl1_fx - fl1_fx * pb_xy[j] * pc_y[j] - 0.5 * fl1_fx * pc_x[j] * pb_yy[j] - 0.5 * fl1_fx * pb_xyy[j] - pa_z[j] * pb_xyy[j] * pc_z[j]);
 
-                t_z_xyyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_x[j] - 0.5 * pa_z[j] * pc_xz[j] * fl1_fx - 0.5 * pc_zz[j] * pb_x[j] * fl1_fx - 0.5 * pc_xzz[j] * fl1_fx - 0.5 * pc_xz[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_xyy[j] - 0.5 * fl1_fx * pb_x[j] * pc_yy[j] - fl1_fx * pc_xy[j] * pb_y[j] - pa_z[j] * pb_x[j] * pc_yyz[j] - 2.0 * pa_z[j] * pc_xyz[j] * pb_y[j] - pa_z[j] * pc_xyy[j] * pb_z[j] - 2.0 * pc_yzz[j] * pb_xy[j] - pc_yyz[j] * pb_xz[j] - pc_xzz[j] * pb_yy[j] - 2.0 * pc_xyz[j] * pb_yz[j]);
+                t_z_xyyz[j] += fl_s_0_0_1 * (- 2.0 * pa_z[j] * pb_xyz[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yyz[j] - pc_z[j] * pb_xyyz[j]);
 
-                t_z_xyyz[j] += fl_s_0_0_4 * (0.5 * pc_xzz[j] * fl1_fx + 0.5 * fl1_fx * pc_xyy[j] + pa_z[j] * pc_xyyz[j] + pc_yyzz[j] * pb_x[j] + 2.0 * pc_xyzz[j] * pb_y[j] + pc_xyyz[j] * pb_z[j]);
+                t_z_xyyz[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_x[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_z[j] * pb_x[j] * fl1_fx * pc_z[j] + 0.5 * pa_z[j] * pc_xz[j] * fl1_fx + 0.5 * pa_z[j] * pc_x[j] * fl1_fx * pb_z[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_2 * (+ 0.5 * pc_zz[j] * pb_x[j] * fl1_fx + 0.5 * pc_z[j] * pb_xz[j] * fl1_fx + 0.5 * pc_xz[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_x[j] * pc_yy[j] + fl1_fx * pc_xy[j] * pb_y[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_2 * (+ fl1_fx * pb_xy[j] * pc_y[j] + 0.5 * fl1_fx * pc_x[j] * pb_yy[j] + 2.0 * pa_z[j] * pb_xy[j] * pc_yz[j] + pa_z[j] * pb_xz[j] * pc_yy[j] + pa_z[j] * pc_xz[j] * pb_yy[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_2 * (+ 2.0 * pa_z[j] * pc_xy[j] * pb_yz[j] + pc_zz[j] * pb_xyy[j] + 2.0 * pc_yz[j] * pb_xyz[j] + pc_xz[j] * pb_yyz[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_x[j] - 0.5 * pa_z[j] * pc_xz[j] * fl1_fx - 0.5 * pc_zz[j] * pb_x[j] * fl1_fx - 0.5 * pc_xzz[j] * fl1_fx - 0.5 * pc_xz[j] * fl1_fx * pb_z[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_xyy[j] - 0.5 * fl1_fx * pb_x[j] * pc_yy[j] - fl1_fx * pc_xy[j] * pb_y[j] - pa_z[j] * pb_x[j] * pc_yyz[j] - 2.0 * pa_z[j] * pc_xyz[j] * pb_y[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_3 * (- pa_z[j] * pc_xyy[j] * pb_z[j] - 2.0 * pc_yzz[j] * pb_xy[j] - pc_yyz[j] * pb_xz[j] - pc_xzz[j] * pb_yy[j] - 2.0 * pc_xyz[j] * pb_yz[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_4 * (0.5 * pc_xzz[j] * fl1_fx + 0.5 * fl1_fx * pc_xyy[j] + pa_z[j] * pc_xyyz[j] + pc_yyzz[j] * pb_x[j] + 2.0 * pc_xyzz[j] * pb_y[j]);
+
+                t_z_xyyz[j] += fl_s_0_0_4 * pc_xyyz[j] * pb_z[j];
 
                 t_z_xyyz[j] += -fl_s_0_0_5 * pc_xyyzz[j];
 
                 t_z_xyzz[j] = fl_s_0_0_0 * (0.5 * pa_z[j] * pb_xy[j] * fl1_fx + fl1_fx * pb_xyz[j] + pa_z[j] * pb_xyzz[j]);
 
-                t_z_xyzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_xy[j] * fl1_fx - 0.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx - 1.5 * pc_z[j] * pb_xy[j] * fl1_fx - fl1_fx * pb_xz[j] * pc_y[j] - fl1_fx * pc_x[j] * pb_yz[j] - fl1_fx * pb_xyz[j] - 2.0 * pa_z[j] * pb_xyz[j] * pc_z[j] - pa_z[j] * pb_xzz[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yzz[j] - pc_z[j] * pb_xyzz[j]);
+                t_z_xyzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * pb_xy[j] * fl1_fx - 0.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx - 0.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx - 1.5 * pc_z[j] * pb_xy[j] * fl1_fx - fl1_fx * pb_xz[j] * pc_y[j]);
 
-                t_z_xyzz[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx + 0.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pa_z[j] * pc_xy[j] * fl1_fx + 1.5 * pc_z[j] * pb_xy[j] * fl1_fx + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx + 1.5 * pc_xz[j] * pb_y[j] * fl1_fx + fl1_fx * pc_xy[j] * pb_z[j] + fl1_fx * pb_xz[j] * pc_y[j] + fl1_fx * pc_x[j] * pb_yz[j] + pa_z[j] * pb_xy[j] * pc_zz[j] + 2.0 * pa_z[j] * pb_xz[j] * pc_yz[j] + 2.0 * pa_z[j] * pc_xz[j] * pb_yz[j] + pa_z[j] * pc_xy[j] * pb_zz[j] + 2.0 * pc_zz[j] * pb_xyz[j] + pc_yz[j] * pb_xzz[j] + pc_xz[j] * pb_yzz[j]);
+                t_z_xyzz[j] += fl_s_0_0_1 * (- fl1_fx * pc_x[j] * pb_yz[j] - fl1_fx * pb_xyz[j] - 2.0 * pa_z[j] * pb_xyz[j] * pc_z[j] - pa_z[j] * pb_xzz[j] * pc_y[j] - pa_z[j] * pc_x[j] * pb_yzz[j]);
 
-                t_z_xyzz[j] += fl_s_0_0_3 * (-0.5 * pa_z[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - fl1_fx * pc_xy[j] * pb_z[j] - pa_z[j] * pb_x[j] * pc_yzz[j] - pa_z[j] * pc_xzz[j] * pb_y[j] - 2.0 * pa_z[j] * pc_xyz[j] * pb_z[j] - pc_zzz[j] * pb_xy[j] - 2.0 * pc_yzz[j] * pb_xz[j] - 2.0 * pc_xzz[j] * pb_yz[j] - pc_xyz[j] * pb_zz[j]);
+                t_z_xyzz[j] += -fl_s_0_0_1 * pc_z[j] * pb_xyzz[j];
+
+                t_z_xyzz[j] += fl_s_0_0_2 * (0.5 * pa_z[j] * pb_x[j] * pc_y[j] * fl1_fx + 0.5 * pa_z[j] * pc_x[j] * pb_y[j] * fl1_fx + 0.5 * pa_z[j] * pc_xy[j] * fl1_fx + 1.5 * pc_z[j] * pb_xy[j] * fl1_fx + 1.5 * pc_yz[j] * pb_x[j] * fl1_fx);
+
+                t_z_xyzz[j] += fl_s_0_0_2 * (+ 1.5 * pc_xz[j] * pb_y[j] * fl1_fx + fl1_fx * pc_xy[j] * pb_z[j] + fl1_fx * pb_xz[j] * pc_y[j] + fl1_fx * pc_x[j] * pb_yz[j] + pa_z[j] * pb_xy[j] * pc_zz[j]);
+
+                t_z_xyzz[j] += fl_s_0_0_2 * (+ 2.0 * pa_z[j] * pb_xz[j] * pc_yz[j] + 2.0 * pa_z[j] * pc_xz[j] * pb_yz[j] + pa_z[j] * pc_xy[j] * pb_zz[j] + 2.0 * pc_zz[j] * pb_xyz[j] + pc_yz[j] * pb_xzz[j]);
+
+                t_z_xyzz[j] += fl_s_0_0_2 * pc_xz[j] * pb_yzz[j];
+
+                t_z_xyzz[j] += fl_s_0_0_3 * (-0.5 * pa_z[j] * pc_xy[j] * fl1_fx - 1.5 * pc_yz[j] * pb_x[j] * fl1_fx - 1.5 * pc_xz[j] * pb_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - fl1_fx * pc_xy[j] * pb_z[j]);
+
+                t_z_xyzz[j] += fl_s_0_0_3 * (- pa_z[j] * pb_x[j] * pc_yzz[j] - pa_z[j] * pc_xzz[j] * pb_y[j] - 2.0 * pa_z[j] * pc_xyz[j] * pb_z[j] - pc_zzz[j] * pb_xy[j] - 2.0 * pc_yzz[j] * pb_xz[j]);
+
+                t_z_xyzz[j] += fl_s_0_0_3 * (- 2.0 * pc_xzz[j] * pb_yz[j] - pc_xyz[j] * pb_zz[j]);
 
                 t_z_xyzz[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_z[j] * pc_xyzz[j] + pc_yzzz[j] * pb_x[j] + pc_xzzz[j] * pb_y[j] + 2.0 * pc_xyzz[j] * pb_z[j]);
 
@@ -8263,11 +8887,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_xzzz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_xz[j] * fl1_fx + 1.5 * fl1_fx * pb_xzz[j] + pa_z[j] * pb_xzzz[j]);
 
-                t_z_xzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pb_xz[j] * fl1_fx - 1.5 * pa_z[j] * pb_x[j] * pc_z[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * pb_z[j] * fl1_fx - 4.5 * pc_z[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pc_x[j] * pb_zz[j] - 1.5 * fl1_fx * pb_xzz[j] - 3.0 * pa_z[j] * pb_xzz[j] * pc_z[j] - pa_z[j] * pc_x[j] * pb_zzz[j] - pc_z[j] * pb_xzzz[j]);
+                t_z_xzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_x[j] - 0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pb_xz[j] * fl1_fx - 1.5 * pa_z[j] * pb_x[j] * pc_z[j] * fl1_fx - 1.5 * pa_z[j] * pc_x[j] * pb_z[j] * fl1_fx);
 
-                t_z_xzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_x[j] * pc_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * pb_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_xz[j] * fl1_fx + 4.5 * pc_z[j] * pb_xz[j] * fl1_fx + 3.0 * pc_zz[j] * pb_x[j] * fl1_fx + 4.5 * pc_xz[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pc_x[j] * pb_zz[j] + 3.0 * pa_z[j] * pb_xz[j] * pc_zz[j] + 3.0 * pa_z[j] * pc_xz[j] * pb_zz[j] + 3.0 * pc_zz[j] * pb_xzz[j] + pc_xz[j] * pb_zzz[j]);
+                t_z_xzzz[j] += fl_s_0_0_1 * (- 4.5 * pc_z[j] * pb_xz[j] * fl1_fx - 1.5 * fl1_fx * pc_x[j] * pb_zz[j] - 1.5 * fl1_fx * pb_xzz[j] - 3.0 * pa_z[j] * pb_xzz[j] * pc_z[j] - pa_z[j] * pc_x[j] * pb_zzz[j]);
 
-                t_z_xzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pc_xz[j] * fl1_fx - 3.0 * pc_zz[j] * pb_x[j] * fl1_fx - 4.5 * pc_xz[j] * pb_z[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx - pa_z[j] * pb_x[j] * pc_zzz[j] - 3.0 * pa_z[j] * pc_xzz[j] * pb_z[j] - 3.0 * pc_zzz[j] * pb_xz[j] - 3.0 * pc_xzz[j] * pb_zz[j]);
+                t_z_xzzz[j] += -fl_s_0_0_1 * pc_z[j] * pb_xzzz[j];
+
+                t_z_xzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_x[j] * pc_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_x[j] * pb_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_xz[j] * fl1_fx);
+
+                t_z_xzzz[j] += fl_s_0_0_2 * (+ 4.5 * pc_z[j] * pb_xz[j] * fl1_fx + 3.0 * pc_zz[j] * pb_x[j] * fl1_fx + 4.5 * pc_xz[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pc_x[j] * pb_zz[j] + 3.0 * pa_z[j] * pb_xz[j] * pc_zz[j]);
+
+                t_z_xzzz[j] += fl_s_0_0_2 * (+ 3.0 * pa_z[j] * pc_xz[j] * pb_zz[j] + 3.0 * pc_zz[j] * pb_xzz[j] + pc_xz[j] * pb_zzz[j]);
+
+                t_z_xzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * pa_z[j] * pc_xz[j] * fl1_fx - 3.0 * pc_zz[j] * pb_x[j] * fl1_fx - 4.5 * pc_xz[j] * pb_z[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx);
+
+                t_z_xzzz[j] += fl_s_0_0_3 * (- pa_z[j] * pb_x[j] * pc_zzz[j] - 3.0 * pa_z[j] * pc_xzz[j] * pb_z[j] - 3.0 * pc_zzz[j] * pb_xz[j] - 3.0 * pc_xzz[j] * pb_zz[j]);
 
                 t_z_xzzz[j] += fl_s_0_0_4 * (3.0 * pc_xzz[j] * fl1_fx + pa_z[j] * pc_xzzz[j] + pc_zzzz[j] * pb_x[j] + 3.0 * pc_xzzz[j] * pb_z[j]);
 
@@ -8275,11 +8909,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_yyyy[j] = fl_s_0_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * pa_z[j] * pb_yy[j] * fl1_fx + pa_z[j] * pb_yyyy[j]);
 
-                t_z_yyyy[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pb_yy[j] * fl1_fx - 6.0 * pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx - 3.0 * pc_z[j] * pb_yy[j] * fl1_fx - 4.0 * pa_z[j] * pb_yyy[j] * pc_y[j] - pc_z[j] * pb_yyyy[j]);
+                t_z_yyyy[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pb_yy[j] * fl1_fx - 6.0 * pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx - 3.0 * pc_z[j] * pb_yy[j] * fl1_fx);
 
-                t_z_yyyy[j] += fl_s_0_0_2 * (0.75 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 6.0 * pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx + 3.0 * pa_z[j] * pc_yy[j] * fl1_fx + 3.0 * pc_z[j] * pb_yy[j] * fl1_fx + 6.0 * pc_yz[j] * pb_y[j] * fl1_fx + 6.0 * pa_z[j] * pb_yy[j] * pc_yy[j] + 4.0 * pc_yz[j] * pb_yyy[j]);
+                t_z_yyyy[j] += fl_s_0_0_1 * (- 4.0 * pa_z[j] * pb_yyy[j] * pc_y[j] - pc_z[j] * pb_yyyy[j]);
 
-                t_z_yyyy[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pc_yy[j] * fl1_fx - 6.0 * pc_yz[j] * pb_y[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 4.0 * pa_z[j] * pb_y[j] * pc_yyy[j] - 6.0 * pc_yyz[j] * pb_yy[j]);
+                t_z_yyyy[j] += fl_s_0_0_2 * (0.75 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 6.0 * pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx + 3.0 * pa_z[j] * pc_yy[j] * fl1_fx + 3.0 * pc_z[j] * pb_yy[j] * fl1_fx);
+
+                t_z_yyyy[j] += fl_s_0_0_2 * (+ 6.0 * pc_yz[j] * pb_y[j] * fl1_fx + 6.0 * pa_z[j] * pb_yy[j] * pc_yy[j] + 4.0 * pc_yz[j] * pb_yyy[j]);
+
+                t_z_yyyy[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pc_yy[j] * fl1_fx - 6.0 * pc_yz[j] * pb_y[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 4.0 * pa_z[j] * pb_y[j] * pc_yyy[j]);
+
+                t_z_yyyy[j] += -fl_s_0_0_3 * 6.0 * pc_yyz[j] * pb_yy[j];
 
                 t_z_yyyy[j] += fl_s_0_0_4 * (3.0 * pc_yyz[j] * fl1_fx + pa_z[j] * pc_yyyy[j] + 4.0 * pc_yyyz[j] * pb_y[j]);
 
@@ -8287,11 +8927,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_yyyz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_yz[j] * fl1_fx + 0.5 * fl1_fx * pb_yyy[j] + pa_z[j] * pb_yyyz[j]);
 
-                t_z_yyyz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pb_y[j] * fl1_fx * pc_z[j] - 1.5 * pa_z[j] * pb_yz[j] * fl1_fx - 1.5 * pa_z[j] * pc_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_z[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j] * pc_y[j] - 0.5 * fl1_fx * pb_yyy[j] - pa_z[j] * pb_yyy[j] * pc_z[j] - 3.0 * pa_z[j] * pb_yyz[j] * pc_y[j] - pc_z[j] * pb_yyyz[j]);
+                t_z_yyyz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pb_y[j] * fl1_fx * pc_z[j] - 1.5 * pa_z[j] * pb_yz[j] * fl1_fx - 1.5 * pa_z[j] * pc_y[j] * fl1_fx * pb_z[j]);
 
-                t_z_yyyz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_y[j] * fl1_fx * pc_z[j] + 1.5 * pa_z[j] * pc_yz[j] * fl1_fx + 1.5 * pa_z[j] * pc_y[j] * fl1_fx * pb_z[j] + 1.5 * pc_zz[j] * pb_y[j] * fl1_fx + 1.5 * pc_z[j] * pb_yz[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_y[j] * pc_yy[j] + 1.5 * fl1_fx * pb_yy[j] * pc_y[j] + 3.0 * pa_z[j] * pb_yy[j] * pc_yz[j] + 3.0 * pa_z[j] * pb_yz[j] * pc_yy[j] + pc_zz[j] * pb_yyy[j] + 3.0 * pc_yz[j] * pb_yyz[j]);
+                t_z_yyyz[j] += fl_s_0_0_1 * (- 1.5 * pc_z[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pb_yy[j] * pc_y[j] - 0.5 * fl1_fx * pb_yyy[j] - pa_z[j] * pb_yyy[j] * pc_z[j] - 3.0 * pa_z[j] * pb_yyz[j] * pc_y[j]);
 
-                t_z_yyyz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pc_yz[j] * fl1_fx - 1.5 * pc_zz[j] * pb_y[j] * fl1_fx - 1.5 * pc_yzz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_yyy[j] - 1.5 * fl1_fx * pb_y[j] * pc_yy[j] - 3.0 * pa_z[j] * pb_y[j] * pc_yyz[j] - pa_z[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_yzz[j] * pb_yy[j] - 3.0 * pc_yyz[j] * pb_yz[j]);
+                t_z_yyyz[j] += -fl_s_0_0_1 * pc_z[j] * pb_yyyz[j];
+
+                t_z_yyyz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_y[j] * fl1_fx * pc_z[j] + 1.5 * pa_z[j] * pc_yz[j] * fl1_fx + 1.5 * pa_z[j] * pc_y[j] * fl1_fx * pb_z[j]);
+
+                t_z_yyyz[j] += fl_s_0_0_2 * (+ 1.5 * pc_zz[j] * pb_y[j] * fl1_fx + 1.5 * pc_z[j] * pb_yz[j] * fl1_fx + 1.5 * pc_yz[j] * fl1_fx * pb_z[j] + 1.5 * fl1_fx * pb_y[j] * pc_yy[j] + 1.5 * fl1_fx * pb_yy[j] * pc_y[j]);
+
+                t_z_yyyz[j] += fl_s_0_0_2 * (+ 3.0 * pa_z[j] * pb_yy[j] * pc_yz[j] + 3.0 * pa_z[j] * pb_yz[j] * pc_yy[j] + pc_zz[j] * pb_yyy[j] + 3.0 * pc_yz[j] * pb_yyz[j]);
+
+                t_z_yyyz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pc_yz[j] * fl1_fx - 1.5 * pc_zz[j] * pb_y[j] * fl1_fx - 1.5 * pc_yzz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_z[j]);
+
+                t_z_yyyz[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_yyy[j] - 1.5 * fl1_fx * pb_y[j] * pc_yy[j] - 3.0 * pa_z[j] * pb_y[j] * pc_yyz[j] - pa_z[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_yzz[j] * pb_yy[j]);
+
+                t_z_yyyz[j] += -fl_s_0_0_3 * 3.0 * pc_yyz[j] * pb_yz[j];
 
                 t_z_yyyz[j] += fl_s_0_0_4 * (1.5 * pc_yzz[j] * fl1_fx + 0.5 * fl1_fx * pc_yyy[j] + pa_z[j] * pc_yyyz[j] + 3.0 * pc_yyzz[j] * pb_y[j] + pc_yyyz[j] * pb_z[j]);
 
@@ -8453,13 +9105,29 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_z_yyzz[j] = fl_s_0_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + 0.5 * pa_z[j] * pb_yy[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_yyz[j] + pa_z[j] * pb_yyzz[j]);
+                t_z_yyzz[j] = fl_s_0_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + 0.5 * pa_z[j] * pb_yy[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_yyz[j]);
 
-                t_z_yyzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - fl2_fx * pb_z[j] - 0.5 * pa_z[j] * pb_yy[j] * fl1_fx - pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx - pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_zz[j] - 1.5 * pc_z[j] * pb_yy[j] * fl1_fx - 0.5 * pc_z[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_yz[j] * pc_y[j] - fl1_fx * pb_yyz[j] - 2.0 * pa_z[j] * pb_yyz[j] * pc_z[j] - 2.0 * pa_z[j] * pb_yzz[j] * pc_y[j] - pc_z[j] * pb_yyzz[j]);
+                t_z_yyzz[j] += fl_s_0_0_0 * pa_z[j] * pb_yyzz[j];
 
-                t_z_yyzz[j] += fl_s_0_0_2 * (0.25 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx + 0.5 * pa_z[j] * pc_yy[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pc_zz[j] + pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] + 1.5 * pc_z[j] * pb_yy[j] * fl1_fx + 3.0 * pc_yz[j] * pb_y[j] * fl1_fx + pc_zz[j] * fl1_fx * pb_z[j] + 0.5 * pc_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pc_yy[j] * pb_z[j] + 2.0 * fl1_fx * pb_yz[j] * pc_y[j] + pa_z[j] * pb_yy[j] * pc_zz[j] + 4.0 * pa_z[j] * pb_yz[j] * pc_yz[j] + pa_z[j] * pc_yy[j] * pb_zz[j] + 2.0 * pc_zz[j] * pb_yyz[j] + 2.0 * pc_yz[j] * pb_yzz[j]);
+                t_z_yyzz[j] += fl_s_0_0_1 * (-0.5 * pa_z[j] * fl2_fx - 0.75 * pc_z[j] * fl2_fx - fl2_fx * pb_z[j] - 0.5 * pa_z[j] * pb_yy[j] * fl1_fx - pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx);
 
-                t_z_yyzz[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pc_yy[j] * fl1_fx - 0.5 * pa_z[j] * fl1_fx * pc_zz[j] - 3.0 * pc_yz[j] * pb_y[j] * fl1_fx - 1.5 * pc_yyz[j] * fl1_fx - 0.5 * pc_zzz[j] * fl1_fx - pc_zz[j] * fl1_fx * pb_z[j] - fl1_fx * pc_yy[j] * pb_z[j] - 2.0 * pa_z[j] * pb_y[j] * pc_yzz[j] - 2.0 * pa_z[j] * pc_yyz[j] * pb_z[j] - pc_zzz[j] * pb_yy[j] - 4.0 * pc_yzz[j] * pb_yz[j] - pc_yyz[j] * pb_zz[j]);
+                t_z_yyzz[j] += fl_s_0_0_1 * (- pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] - 0.5 * pa_z[j] * fl1_fx * pb_zz[j] - 1.5 * pc_z[j] * pb_yy[j] * fl1_fx - 0.5 * pc_z[j] * fl1_fx * pb_zz[j] - 2.0 * fl1_fx * pb_yz[j] * pc_y[j]);
+
+                t_z_yyzz[j] += fl_s_0_0_1 * (- fl1_fx * pb_yyz[j] - 2.0 * pa_z[j] * pb_yyz[j] * pc_z[j] - 2.0 * pa_z[j] * pb_yzz[j] * pc_y[j] - pc_z[j] * pb_yyzz[j]);
+
+                t_z_yyzz[j] += fl_s_0_0_2 * (0.25 * pa_z[j] * fl2_fx + 1.5 * pc_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + pa_z[j] * pb_y[j] * pc_y[j] * fl1_fx + 0.5 * pa_z[j] * pc_yy[j] * fl1_fx);
+
+                t_z_yyzz[j] += fl_s_0_0_2 * (+ 0.5 * pa_z[j] * fl1_fx * pc_zz[j] + pa_z[j] * fl1_fx * pb_z[j] * pc_z[j] + 1.5 * pc_z[j] * pb_yy[j] * fl1_fx + 3.0 * pc_yz[j] * pb_y[j] * fl1_fx + pc_zz[j] * fl1_fx * pb_z[j]);
+
+                t_z_yyzz[j] += fl_s_0_0_2 * (+ 0.5 * pc_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pc_yy[j] * pb_z[j] + 2.0 * fl1_fx * pb_yz[j] * pc_y[j] + pa_z[j] * pb_yy[j] * pc_zz[j] + 4.0 * pa_z[j] * pb_yz[j] * pc_yz[j]);
+
+                t_z_yyzz[j] += fl_s_0_0_2 * (+ pa_z[j] * pc_yy[j] * pb_zz[j] + 2.0 * pc_zz[j] * pb_yyz[j] + 2.0 * pc_yz[j] * pb_yzz[j]);
+
+                t_z_yyzz[j] += fl_s_0_0_3 * (-0.75 * pc_z[j] * fl2_fx - 0.5 * pa_z[j] * pc_yy[j] * fl1_fx - 0.5 * pa_z[j] * fl1_fx * pc_zz[j] - 3.0 * pc_yz[j] * pb_y[j] * fl1_fx - 1.5 * pc_yyz[j] * fl1_fx);
+
+                t_z_yyzz[j] += fl_s_0_0_3 * (- 0.5 * pc_zzz[j] * fl1_fx - pc_zz[j] * fl1_fx * pb_z[j] - fl1_fx * pc_yy[j] * pb_z[j] - 2.0 * pa_z[j] * pb_y[j] * pc_yzz[j] - 2.0 * pa_z[j] * pc_yyz[j] * pb_z[j]);
+
+                t_z_yyzz[j] += fl_s_0_0_3 * (- pc_zzz[j] * pb_yy[j] - 4.0 * pc_yzz[j] * pb_yz[j] - pc_yyz[j] * pb_zz[j]);
 
                 t_z_yyzz[j] += fl_s_0_0_4 * (1.5 * pc_yyz[j] * fl1_fx + 0.5 * pc_zzz[j] * fl1_fx + pa_z[j] * pc_yyzz[j] + 2.0 * pc_yzzz[j] * pb_y[j] + 2.0 * pc_yyzz[j] * pb_z[j]);
 
@@ -8467,11 +9135,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_yzzz[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_yz[j] * fl1_fx + 1.5 * fl1_fx * pb_yzz[j] + pa_z[j] * pb_yzzz[j]);
 
-                t_z_yzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pb_yz[j] * fl1_fx - 1.5 * pa_z[j] * pb_y[j] * pc_z[j] * fl1_fx - 1.5 * pa_z[j] * pc_y[j] * pb_z[j] * fl1_fx - 4.5 * pc_z[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pc_y[j] * pb_zz[j] - 1.5 * fl1_fx * pb_yzz[j] - 3.0 * pa_z[j] * pb_yzz[j] * pc_z[j] - pa_z[j] * pc_y[j] * pb_zzz[j] - pc_z[j] * pb_yzzz[j]);
+                t_z_yzzz[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pb_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pb_yz[j] * fl1_fx - 1.5 * pa_z[j] * pb_y[j] * pc_z[j] * fl1_fx - 1.5 * pa_z[j] * pc_y[j] * pb_z[j] * fl1_fx);
 
-                t_z_yzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_y[j] * pc_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_y[j] * pb_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_yz[j] * fl1_fx + 4.5 * pc_z[j] * pb_yz[j] * fl1_fx + 3.0 * pc_zz[j] * pb_y[j] * fl1_fx + 4.5 * pc_yz[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pc_y[j] * pb_zz[j] + 3.0 * pa_z[j] * pb_yz[j] * pc_zz[j] + 3.0 * pa_z[j] * pc_yz[j] * pb_zz[j] + 3.0 * pc_zz[j] * pb_yzz[j] + pc_yz[j] * pb_zzz[j]);
+                t_z_yzzz[j] += fl_s_0_0_1 * (- 4.5 * pc_z[j] * pb_yz[j] * fl1_fx - 1.5 * fl1_fx * pc_y[j] * pb_zz[j] - 1.5 * fl1_fx * pb_yzz[j] - 3.0 * pa_z[j] * pb_yzz[j] * pc_z[j] - pa_z[j] * pc_y[j] * pb_zzz[j]);
 
-                t_z_yzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pc_yz[j] * fl1_fx - 3.0 * pc_zz[j] * pb_y[j] * fl1_fx - 4.5 * pc_yz[j] * pb_z[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx - pa_z[j] * pb_y[j] * pc_zzz[j] - 3.0 * pa_z[j] * pc_yzz[j] * pb_z[j] - 3.0 * pc_zzz[j] * pb_yz[j] - 3.0 * pc_yzz[j] * pb_zz[j]);
+                t_z_yzzz[j] += -fl_s_0_0_1 * pc_z[j] * pb_yzzz[j];
+
+                t_z_yzzz[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_y[j] * pc_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_y[j] * pb_z[j] * fl1_fx + 1.5 * pa_z[j] * pc_yz[j] * fl1_fx);
+
+                t_z_yzzz[j] += fl_s_0_0_2 * (+ 4.5 * pc_z[j] * pb_yz[j] * fl1_fx + 3.0 * pc_zz[j] * pb_y[j] * fl1_fx + 4.5 * pc_yz[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pc_y[j] * pb_zz[j] + 3.0 * pa_z[j] * pb_yz[j] * pc_zz[j]);
+
+                t_z_yzzz[j] += fl_s_0_0_2 * (+ 3.0 * pa_z[j] * pc_yz[j] * pb_zz[j] + 3.0 * pc_zz[j] * pb_yzz[j] + pc_yz[j] * pb_zzz[j]);
+
+                t_z_yzzz[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * pa_z[j] * pc_yz[j] * fl1_fx - 3.0 * pc_zz[j] * pb_y[j] * fl1_fx - 4.5 * pc_yz[j] * pb_z[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx);
+
+                t_z_yzzz[j] += fl_s_0_0_3 * (- pa_z[j] * pb_y[j] * pc_zzz[j] - 3.0 * pa_z[j] * pc_yzz[j] * pb_z[j] - 3.0 * pc_zzz[j] * pb_yz[j] - 3.0 * pc_yzz[j] * pb_zz[j]);
 
                 t_z_yzzz[j] += fl_s_0_0_4 * (3.0 * pc_yzz[j] * fl1_fx + pa_z[j] * pc_yzzz[j] + pc_zzzz[j] * pb_y[j] + 3.0 * pc_yzzz[j] * pb_z[j]);
 
@@ -8479,11 +9157,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_z_zzzz[j] = fl_s_0_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * fl2_fx * pb_z[j] + 3.0 * pa_z[j] * pb_zz[j] * fl1_fx + 2.0 * fl1_fx * pb_zzz[j] + pa_z[j] * pb_zzzz[j]);
 
-                t_z_zzzz[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * fl2_fx - 3.75 * pc_z[j] * fl2_fx - 6.0 * fl2_fx * pb_z[j] - 3.0 * pa_z[j] * pb_zz[j] * fl1_fx - 6.0 * pa_z[j] * pb_z[j] * pc_z[j] * fl1_fx - 9.0 * pc_z[j] * pb_zz[j] * fl1_fx - 2.0 * fl1_fx * pb_zzz[j] - 4.0 * pa_z[j] * pb_zzz[j] * pc_z[j] - pc_z[j] * pb_zzzz[j]);
+                t_z_zzzz[j] += fl_s_0_0_1 * (-1.5 * pa_z[j] * fl2_fx - 3.75 * pc_z[j] * fl2_fx - 6.0 * fl2_fx * pb_z[j] - 3.0 * pa_z[j] * pb_zz[j] * fl1_fx - 6.0 * pa_z[j] * pb_z[j] * pc_z[j] * fl1_fx);
 
-                t_z_zzzz[j] += fl_s_0_0_2 * (0.75 * pa_z[j] * fl2_fx + 7.5 * pc_z[j] * fl2_fx + 3.0 * fl2_fx * pb_z[j] + 6.0 * pa_z[j] * pb_z[j] * pc_z[j] * fl1_fx + 3.0 * pa_z[j] * pc_zz[j] * fl1_fx + 9.0 * pc_z[j] * pb_zz[j] * fl1_fx + 12.0 * pc_zz[j] * pb_z[j] * fl1_fx + 6.0 * pa_z[j] * pb_zz[j] * pc_zz[j] + 4.0 * pc_zz[j] * pb_zzz[j]);
+                t_z_zzzz[j] += fl_s_0_0_1 * (- 9.0 * pc_z[j] * pb_zz[j] * fl1_fx - 2.0 * fl1_fx * pb_zzz[j] - 4.0 * pa_z[j] * pb_zzz[j] * pc_z[j] - pc_z[j] * pb_zzzz[j]);
 
-                t_z_zzzz[j] += fl_s_0_0_3 * (-3.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pc_zz[j] * fl1_fx - 12.0 * pc_zz[j] * pb_z[j] * fl1_fx - 5.0 * pc_zzz[j] * fl1_fx - 4.0 * pa_z[j] * pb_z[j] * pc_zzz[j] - 6.0 * pc_zzz[j] * pb_zz[j]);
+                t_z_zzzz[j] += fl_s_0_0_2 * (0.75 * pa_z[j] * fl2_fx + 7.5 * pc_z[j] * fl2_fx + 3.0 * fl2_fx * pb_z[j] + 6.0 * pa_z[j] * pb_z[j] * pc_z[j] * fl1_fx + 3.0 * pa_z[j] * pc_zz[j] * fl1_fx);
+
+                t_z_zzzz[j] += fl_s_0_0_2 * (+ 9.0 * pc_z[j] * pb_zz[j] * fl1_fx + 12.0 * pc_zz[j] * pb_z[j] * fl1_fx + 6.0 * pa_z[j] * pb_zz[j] * pc_zz[j] + 4.0 * pc_zz[j] * pb_zzz[j]);
+
+                t_z_zzzz[j] += fl_s_0_0_3 * (-3.75 * pc_z[j] * fl2_fx - 3.0 * pa_z[j] * pc_zz[j] * fl1_fx - 12.0 * pc_zz[j] * pb_z[j] * fl1_fx - 5.0 * pc_zzz[j] * fl1_fx - 4.0 * pa_z[j] * pb_z[j] * pc_zzz[j]);
+
+                t_z_zzzz[j] += -fl_s_0_0_3 * 6.0 * pc_zzz[j] * pb_zz[j];
 
                 t_z_zzzz[j] += fl_s_0_0_4 * (5.0 * pc_zzz[j] * fl1_fx + pa_z[j] * pc_zzzz[j] + 4.0 * pc_zzzz[j] * pb_z[j]);
 
@@ -8695,11 +9379,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxx_x[j] = fl_s_0_0_0 * (3.0 * pa_x[j] * fl2_fx + 2.0 * pa_xxx[j] * fl1_fx + 0.75 * fl2_fx * pb_x[j] + 3.0 * pa_xx[j] * fl1_fx * pb_x[j] + pa_xxxx[j] * pb_x[j]);
 
-                t_xxxx_x[j] += fl_s_0_0_1 * (-6.0 * pa_x[j] * fl2_fx - 3.75 * pc_x[j] * fl2_fx - 2.0 * pa_xxx[j] * fl1_fx - 9.0 * pa_xx[j] * pc_x[j] * fl1_fx - 1.5 * fl2_fx * pb_x[j] - 3.0 * pa_xx[j] * fl1_fx * pb_x[j] - 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] - pa_xxxx[j] * pc_x[j] - 4.0 * pa_xxx[j] * pc_x[j] * pb_x[j]);
+                t_xxxx_x[j] += fl_s_0_0_1 * (-6.0 * pa_x[j] * fl2_fx - 3.75 * pc_x[j] * fl2_fx - 2.0 * pa_xxx[j] * fl1_fx - 9.0 * pa_xx[j] * pc_x[j] * fl1_fx - 1.5 * fl2_fx * pb_x[j]);
 
-                t_xxxx_x[j] += fl_s_0_0_2 * (3.0 * pa_x[j] * fl2_fx + 7.5 * pc_x[j] * fl2_fx + 9.0 * pa_xx[j] * pc_x[j] * fl1_fx + 12.0 * pa_x[j] * pc_xx[j] * fl1_fx + 0.75 * fl2_fx * pb_x[j] + 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] + 3.0 * pc_xx[j] * fl1_fx * pb_x[j] + 4.0 * pa_xxx[j] * pc_xx[j] + 6.0 * pa_xx[j] * pc_xx[j] * pb_x[j]);
+                t_xxxx_x[j] += fl_s_0_0_1 * (- 3.0 * pa_xx[j] * fl1_fx * pb_x[j] - 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] - pa_xxxx[j] * pc_x[j] - 4.0 * pa_xxx[j] * pc_x[j] * pb_x[j]);
 
-                t_xxxx_x[j] += fl_s_0_0_3 * (-3.75 * pc_x[j] * fl2_fx - 12.0 * pa_x[j] * pc_xx[j] * fl1_fx - 5.0 * pc_xxx[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_x[j] - 6.0 * pa_xx[j] * pc_xxx[j] - 4.0 * pa_x[j] * pc_xxx[j] * pb_x[j]);
+                t_xxxx_x[j] += fl_s_0_0_2 * (3.0 * pa_x[j] * fl2_fx + 7.5 * pc_x[j] * fl2_fx + 9.0 * pa_xx[j] * pc_x[j] * fl1_fx + 12.0 * pa_x[j] * pc_xx[j] * fl1_fx + 0.75 * fl2_fx * pb_x[j]);
+
+                t_xxxx_x[j] += fl_s_0_0_2 * (+ 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] + 3.0 * pc_xx[j] * fl1_fx * pb_x[j] + 4.0 * pa_xxx[j] * pc_xx[j] + 6.0 * pa_xx[j] * pc_xx[j] * pb_x[j]);
+
+                t_xxxx_x[j] += fl_s_0_0_3 * (-3.75 * pc_x[j] * fl2_fx - 12.0 * pa_x[j] * pc_xx[j] * fl1_fx - 5.0 * pc_xxx[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_x[j] - 6.0 * pa_xx[j] * pc_xxx[j]);
+
+                t_xxxx_x[j] += -fl_s_0_0_3 * 4.0 * pa_x[j] * pc_xxx[j] * pb_x[j];
 
                 t_xxxx_x[j] += fl_s_0_0_4 * (5.0 * pc_xxx[j] * fl1_fx + 4.0 * pa_x[j] * pc_xxxx[j] + pc_xxxx[j] * pb_x[j]);
 
@@ -8707,11 +9397,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxx_y[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_y[j] + 3.0 * pa_xx[j] * fl1_fx * pb_y[j] + pa_xxxx[j] * pb_y[j]);
 
-                t_xxxx_y[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pb_y[j] - 3.0 * pa_xx[j] * fl1_fx * pc_y[j] - 3.0 * pa_xx[j] * fl1_fx * pb_y[j] - 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] - pa_xxxx[j] * pc_y[j] - 4.0 * pa_xxx[j] * pc_x[j] * pb_y[j]);
+                t_xxxx_y[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pb_y[j] - 3.0 * pa_xx[j] * fl1_fx * pc_y[j] - 3.0 * pa_xx[j] * fl1_fx * pb_y[j] - 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j]);
 
-                t_xxxx_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 3.0 * pa_xx[j] * fl1_fx * pc_y[j] + 6.0 * pa_x[j] * pc_xy[j] * fl1_fx + 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] + 3.0 * pc_xx[j] * fl1_fx * pb_y[j] + 4.0 * pa_xxx[j] * pc_xy[j] + 6.0 * pa_xx[j] * pc_xx[j] * pb_y[j]);
+                t_xxxx_y[j] += fl_s_0_0_1 * (- pa_xxxx[j] * pc_y[j] - 4.0 * pa_xxx[j] * pc_x[j] * pb_y[j]);
 
-                t_xxxx_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 6.0 * pa_x[j] * pc_xy[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_y[j] - 6.0 * pa_xx[j] * pc_xxy[j] - 4.0 * pa_x[j] * pc_xxx[j] * pb_y[j]);
+                t_xxxx_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 3.0 * pa_xx[j] * fl1_fx * pc_y[j] + 6.0 * pa_x[j] * pc_xy[j] * fl1_fx + 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_y[j]);
+
+                t_xxxx_y[j] += fl_s_0_0_2 * (+ 3.0 * pc_xx[j] * fl1_fx * pb_y[j] + 4.0 * pa_xxx[j] * pc_xy[j] + 6.0 * pa_xx[j] * pc_xx[j] * pb_y[j]);
+
+                t_xxxx_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 6.0 * pa_x[j] * pc_xy[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_y[j] - 6.0 * pa_xx[j] * pc_xxy[j]);
+
+                t_xxxx_y[j] += -fl_s_0_0_3 * 4.0 * pa_x[j] * pc_xxx[j] * pb_y[j];
 
                 t_xxxx_y[j] += fl_s_0_0_4 * (3.0 * pc_xxy[j] * fl1_fx + 4.0 * pa_x[j] * pc_xxxy[j] + pc_xxxx[j] * pb_y[j]);
 
@@ -8719,11 +9415,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxx_z[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_z[j] + 3.0 * pa_xx[j] * fl1_fx * pb_z[j] + pa_xxxx[j] * pb_z[j]);
 
-                t_xxxx_z[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 3.0 * pa_xx[j] * fl1_fx * pc_z[j] - 3.0 * pa_xx[j] * fl1_fx * pb_z[j] - 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] - pa_xxxx[j] * pc_z[j] - 4.0 * pa_xxx[j] * pc_x[j] * pb_z[j]);
+                t_xxxx_z[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 3.0 * pa_xx[j] * fl1_fx * pc_z[j] - 3.0 * pa_xx[j] * fl1_fx * pb_z[j] - 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
 
-                t_xxxx_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 3.0 * pa_xx[j] * fl1_fx * pc_z[j] + 6.0 * pa_x[j] * pc_xz[j] * fl1_fx + 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] + 3.0 * pc_xx[j] * fl1_fx * pb_z[j] + 4.0 * pa_xxx[j] * pc_xz[j] + 6.0 * pa_xx[j] * pc_xx[j] * pb_z[j]);
+                t_xxxx_z[j] += fl_s_0_0_1 * (- pa_xxxx[j] * pc_z[j] - 4.0 * pa_xxx[j] * pc_x[j] * pb_z[j]);
 
-                t_xxxx_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 6.0 * pa_x[j] * pc_xz[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_z[j] - 6.0 * pa_xx[j] * pc_xxz[j] - 4.0 * pa_x[j] * pc_xxx[j] * pb_z[j]);
+                t_xxxx_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 3.0 * pa_xx[j] * fl1_fx * pc_z[j] + 6.0 * pa_x[j] * pc_xz[j] * fl1_fx + 6.0 * pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
+
+                t_xxxx_z[j] += fl_s_0_0_2 * (+ 3.0 * pc_xx[j] * fl1_fx * pb_z[j] + 4.0 * pa_xxx[j] * pc_xz[j] + 6.0 * pa_xx[j] * pc_xx[j] * pb_z[j]);
+
+                t_xxxx_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 6.0 * pa_x[j] * pc_xz[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pb_z[j] - 6.0 * pa_xx[j] * pc_xxz[j]);
+
+                t_xxxx_z[j] += -fl_s_0_0_3 * 4.0 * pa_x[j] * pc_xxx[j] * pb_z[j];
 
                 t_xxxx_z[j] += fl_s_0_0_4 * (3.0 * pc_xxz[j] * fl1_fx + 4.0 * pa_x[j] * pc_xxxz[j] + pc_xxxx[j] * pb_z[j]);
 
@@ -8897,11 +9599,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxy_x[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pa_y[j] + 1.5 * pa_xxy[j] * fl1_fx + 1.5 * pa_xy[j] * fl1_fx * pb_x[j] + pa_xxxy[j] * pb_x[j]);
 
-                t_xxxy_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pa_y[j] - 1.5 * pa_xx[j] * fl1_fx * pc_y[j] - 1.5 * pa_xxy[j] * fl1_fx - 4.5 * pa_xy[j] * pc_x[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_x[j] - 1.5 * pa_xy[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_x[j] - pa_xxxy[j] * pc_x[j] - pa_xxx[j] * pc_y[j] * pb_x[j] - 3.0 * pa_xxy[j] * pc_x[j] * pb_x[j]);
+                t_xxxy_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pa_y[j] - 1.5 * pa_xx[j] * fl1_fx * pc_y[j] - 1.5 * pa_xxy[j] * fl1_fx - 4.5 * pa_xy[j] * pc_x[j] * fl1_fx);
 
-                t_xxxy_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pa_y[j] + 1.5 * pa_xx[j] * fl1_fx * pc_y[j] + 4.5 * pa_x[j] * pc_xy[j] * fl1_fx + 4.5 * pa_xy[j] * pc_x[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx * pa_y[j] + 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_x[j] + 1.5 * pc_xy[j] * fl1_fx * pb_x[j] + 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_x[j] + pa_xxx[j] * pc_xy[j] + 3.0 * pa_xxy[j] * pc_xx[j] + 3.0 * pa_xx[j] * pc_xy[j] * pb_x[j] + 3.0 * pa_xy[j] * pc_xx[j] * pb_x[j]);
+                t_xxxy_x[j] += fl_s_0_0_1 * (- 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_x[j] - 1.5 * pa_xy[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_x[j] - pa_xxxy[j] * pc_x[j] - pa_xxx[j] * pc_y[j] * pb_x[j]);
 
-                t_xxxy_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 4.5 * pa_x[j] * pc_xy[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_x[j] - 3.0 * pa_xx[j] * pc_xxy[j] - 3.0 * pa_xy[j] * pc_xxx[j] - 3.0 * pa_x[j] * pc_xxy[j] * pb_x[j] - pc_xxx[j] * pa_y[j] * pb_x[j]);
+                t_xxxy_x[j] += -fl_s_0_0_1 * 3.0 * pa_xxy[j] * pc_x[j] * pb_x[j];
+
+                t_xxxy_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pa_y[j] + 1.5 * pa_xx[j] * fl1_fx * pc_y[j] + 4.5 * pa_x[j] * pc_xy[j] * fl1_fx + 4.5 * pa_xy[j] * pc_x[j] * fl1_fx);
+
+                t_xxxy_x[j] += fl_s_0_0_2 * (+ 3.0 * pc_xx[j] * fl1_fx * pa_y[j] + 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_x[j] + 1.5 * pc_xy[j] * fl1_fx * pb_x[j] + 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_x[j] + pa_xxx[j] * pc_xy[j]);
+
+                t_xxxy_x[j] += fl_s_0_0_2 * (+ 3.0 * pa_xxy[j] * pc_xx[j] + 3.0 * pa_xx[j] * pc_xy[j] * pb_x[j] + 3.0 * pa_xy[j] * pc_xx[j] * pb_x[j]);
+
+                t_xxxy_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 4.5 * pa_x[j] * pc_xy[j] * fl1_fx - 3.0 * pc_xxy[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_x[j]);
+
+                t_xxxy_x[j] += fl_s_0_0_3 * (- 3.0 * pa_xx[j] * pc_xxy[j] - 3.0 * pa_xy[j] * pc_xxx[j] - 3.0 * pa_x[j] * pc_xxy[j] * pb_x[j] - pc_xxx[j] * pa_y[j] * pb_x[j]);
 
                 t_xxxy_x[j] += fl_s_0_0_4 * (3.0 * pc_xxy[j] * fl1_fx + 3.0 * pa_x[j] * pc_xxxy[j] + pc_xxxx[j] * pa_y[j] + pc_xxxy[j] * pb_x[j]);
 
@@ -8909,11 +9621,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxy_y[j] = fl_s_0_0_0 * (0.75 * pa_x[j] * fl2_fx + 0.5 * pa_xxx[j] * fl1_fx + 1.5 * pa_xy[j] * fl1_fx * pb_y[j] + pa_xxxy[j] * pb_y[j]);
 
-                t_xxxy_y[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 0.5 * pa_xxx[j] * fl1_fx - 1.5 * pa_xx[j] * pc_x[j] * fl1_fx - 1.5 * pa_xy[j] * fl1_fx * pc_y[j] - 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_y[j] - 1.5 * pa_xy[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_y[j] - pa_xxxy[j] * pc_y[j] - pa_xxx[j] * pc_y[j] * pb_y[j] - 3.0 * pa_xxy[j] * pc_x[j] * pb_y[j]);
+                t_xxxy_y[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 0.5 * pa_xxx[j] * fl1_fx - 1.5 * pa_xx[j] * pc_x[j] * fl1_fx - 1.5 * pa_xy[j] * fl1_fx * pc_y[j]);
 
-                t_xxxy_y[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 1.5 * pa_xx[j] * pc_x[j] * fl1_fx + 1.5 * pa_x[j] * pc_xx[j] * fl1_fx + 1.5 * pa_x[j] * fl1_fx * pc_yy[j] + 1.5 * pa_xy[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pa_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_y[j] + 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_y[j] + pa_xxx[j] * pc_yy[j] + 3.0 * pa_xxy[j] * pc_xy[j] + 3.0 * pa_xx[j] * pc_xy[j] * pb_y[j] + 3.0 * pa_xy[j] * pc_xx[j] * pb_y[j]);
+                t_xxxy_y[j] += fl_s_0_0_1 * (- 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_y[j] - 1.5 * pa_xy[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_y[j] - pa_xxxy[j] * pc_y[j] - pa_xxx[j] * pc_y[j] * pb_y[j]);
 
-                t_xxxy_y[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 1.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pc_yy[j] - 1.5 * pc_xyy[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_y[j] - 3.0 * pa_xx[j] * pc_xyy[j] - 3.0 * pa_xy[j] * pc_xxy[j] - 3.0 * pa_x[j] * pc_xxy[j] * pb_y[j] - pc_xxx[j] * pa_y[j] * pb_y[j]);
+                t_xxxy_y[j] += -fl_s_0_0_1 * 3.0 * pa_xxy[j] * pc_x[j] * pb_y[j];
+
+                t_xxxy_y[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 1.5 * pa_xx[j] * pc_x[j] * fl1_fx + 1.5 * pa_x[j] * pc_xx[j] * fl1_fx + 1.5 * pa_x[j] * fl1_fx * pc_yy[j]);
+
+                t_xxxy_y[j] += fl_s_0_0_2 * (+ 1.5 * pa_xy[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pa_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_y[j] + 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_y[j]);
+
+                t_xxxy_y[j] += fl_s_0_0_2 * (+ pa_xxx[j] * pc_yy[j] + 3.0 * pa_xxy[j] * pc_xy[j] + 3.0 * pa_xx[j] * pc_xy[j] * pb_y[j] + 3.0 * pa_xy[j] * pc_xx[j] * pb_y[j]);
+
+                t_xxxy_y[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 1.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pc_yy[j] - 1.5 * pc_xyy[j] * fl1_fx);
+
+                t_xxxy_y[j] += fl_s_0_0_3 * (- 1.5 * pc_xy[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_y[j] - 3.0 * pa_xx[j] * pc_xyy[j] - 3.0 * pa_xy[j] * pc_xxy[j] - 3.0 * pa_x[j] * pc_xxy[j] * pb_y[j]);
+
+                t_xxxy_y[j] += -fl_s_0_0_3 * pc_xxx[j] * pa_y[j] * pb_y[j];
 
                 t_xxxy_y[j] += fl_s_0_0_4 * (0.5 * pc_xxx[j] * fl1_fx + 1.5 * pc_xyy[j] * fl1_fx + 3.0 * pa_x[j] * pc_xxyy[j] + pc_xxxy[j] * pa_y[j] + pc_xxxy[j] * pb_y[j]);
 
@@ -8921,11 +9645,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxy_z[j] = fl_s_0_0_0 * (1.5 * pa_xy[j] * fl1_fx * pb_z[j] + pa_xxxy[j] * pb_z[j]);
 
-                t_xxxy_z[j] += fl_s_0_0_1 * (-1.5 * pa_xy[j] * fl1_fx * pc_z[j] - 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] - 1.5 * pa_xy[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_z[j] - pa_xxxy[j] * pc_z[j] - pa_xxx[j] * pc_y[j] * pb_z[j] - 3.0 * pa_xxy[j] * pc_x[j] * pb_z[j]);
+                t_xxxy_z[j] += fl_s_0_0_1 * (-1.5 * pa_xy[j] * fl1_fx * pc_z[j] - 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] - 1.5 * pa_xy[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_z[j] - pa_xxxy[j] * pc_z[j]);
 
-                t_xxxy_z[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * fl1_fx * pc_yz[j] + 1.5 * pa_xy[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pa_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_z[j] + pa_xxx[j] * pc_yz[j] + 3.0 * pa_xxy[j] * pc_xz[j] + 3.0 * pa_xx[j] * pc_xy[j] * pb_z[j] + 3.0 * pa_xy[j] * pc_xx[j] * pb_z[j]);
+                t_xxxy_z[j] += fl_s_0_0_1 * (- pa_xxx[j] * pc_y[j] * pb_z[j] - 3.0 * pa_xxy[j] * pc_x[j] * pb_z[j]);
 
-                t_xxxy_z[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_xx[j] * pc_xyz[j] - 3.0 * pa_xy[j] * pc_xxz[j] - 3.0 * pa_x[j] * pc_xxy[j] * pb_z[j] - pc_xxx[j] * pa_y[j] * pb_z[j]);
+                t_xxxy_z[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * fl1_fx * pc_yz[j] + 1.5 * pa_xy[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * fl1_fx * pc_y[j] * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pa_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_z[j]);
+
+                t_xxxy_z[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pa_y[j] * pb_z[j] + pa_xxx[j] * pc_yz[j] + 3.0 * pa_xxy[j] * pc_xz[j] + 3.0 * pa_xx[j] * pc_xy[j] * pb_z[j] + 3.0 * pa_xy[j] * pc_xx[j] * pb_z[j]);
+
+                t_xxxy_z[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_xx[j] * pc_xyz[j]);
+
+                t_xxxy_z[j] += fl_s_0_0_3 * (- 3.0 * pa_xy[j] * pc_xxz[j] - 3.0 * pa_x[j] * pc_xxy[j] * pb_z[j] - pc_xxx[j] * pa_y[j] * pb_z[j]);
 
                 t_xxxy_z[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + 3.0 * pa_x[j] * pc_xxyz[j] + pc_xxxz[j] * pa_y[j] + pc_xxxy[j] * pb_z[j]);
 
@@ -9099,11 +9829,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxz_x[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pa_z[j] + 1.5 * pa_xxz[j] * fl1_fx + 1.5 * pa_xz[j] * fl1_fx * pb_x[j] + pa_xxxz[j] * pb_x[j]);
 
-                t_xxxz_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pa_z[j] - 1.5 * pa_xx[j] * fl1_fx * pc_z[j] - 1.5 * pa_xxz[j] * fl1_fx - 4.5 * pa_xz[j] * pc_x[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] - 1.5 * pa_xz[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] - pa_xxxz[j] * pc_x[j] - pa_xxx[j] * pc_z[j] * pb_x[j] - 3.0 * pa_xxz[j] * pc_x[j] * pb_x[j]);
+                t_xxxz_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pa_z[j] - 1.5 * pa_xx[j] * fl1_fx * pc_z[j] - 1.5 * pa_xxz[j] * fl1_fx - 4.5 * pa_xz[j] * pc_x[j] * fl1_fx);
 
-                t_xxxz_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * pa_xx[j] * fl1_fx * pc_z[j] + 4.5 * pa_x[j] * pc_xz[j] * fl1_fx + 4.5 * pa_xz[j] * pc_x[j] * fl1_fx + 3.0 * pc_xx[j] * fl1_fx * pa_z[j] + 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] + 1.5 * pc_xz[j] * fl1_fx * pb_x[j] + 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] + pa_xxx[j] * pc_xz[j] + 3.0 * pa_xxz[j] * pc_xx[j] + 3.0 * pa_xx[j] * pc_xz[j] * pb_x[j] + 3.0 * pa_xz[j] * pc_xx[j] * pb_x[j]);
+                t_xxxz_x[j] += fl_s_0_0_1 * (- 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] - 1.5 * pa_xz[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] - pa_xxxz[j] * pc_x[j] - pa_xxx[j] * pc_z[j] * pb_x[j]);
 
-                t_xxxz_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 4.5 * pa_x[j] * pc_xz[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pa_z[j] - 1.5 * pc_xz[j] * fl1_fx * pb_x[j] - 3.0 * pa_xx[j] * pc_xxz[j] - 3.0 * pa_xz[j] * pc_xxx[j] - 3.0 * pa_x[j] * pc_xxz[j] * pb_x[j] - pc_xxx[j] * pa_z[j] * pb_x[j]);
+                t_xxxz_x[j] += -fl_s_0_0_1 * 3.0 * pa_xxz[j] * pc_x[j] * pb_x[j];
+
+                t_xxxz_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * pa_xx[j] * fl1_fx * pc_z[j] + 4.5 * pa_x[j] * pc_xz[j] * fl1_fx + 4.5 * pa_xz[j] * pc_x[j] * fl1_fx);
+
+                t_xxxz_x[j] += fl_s_0_0_2 * (+ 3.0 * pc_xx[j] * fl1_fx * pa_z[j] + 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] + 1.5 * pc_xz[j] * fl1_fx * pb_x[j] + 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] + pa_xxx[j] * pc_xz[j]);
+
+                t_xxxz_x[j] += fl_s_0_0_2 * (+ 3.0 * pa_xxz[j] * pc_xx[j] + 3.0 * pa_xx[j] * pc_xz[j] * pb_x[j] + 3.0 * pa_xz[j] * pc_xx[j] * pb_x[j]);
+
+                t_xxxz_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 4.5 * pa_x[j] * pc_xz[j] * fl1_fx - 3.0 * pc_xxz[j] * fl1_fx - 3.0 * pc_xx[j] * fl1_fx * pa_z[j] - 1.5 * pc_xz[j] * fl1_fx * pb_x[j]);
+
+                t_xxxz_x[j] += fl_s_0_0_3 * (- 3.0 * pa_xx[j] * pc_xxz[j] - 3.0 * pa_xz[j] * pc_xxx[j] - 3.0 * pa_x[j] * pc_xxz[j] * pb_x[j] - pc_xxx[j] * pa_z[j] * pb_x[j]);
 
                 t_xxxz_x[j] += fl_s_0_0_4 * (3.0 * pc_xxz[j] * fl1_fx + 3.0 * pa_x[j] * pc_xxxz[j] + pc_xxxx[j] * pa_z[j] + pc_xxxz[j] * pb_x[j]);
 
@@ -9111,11 +9851,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxz_y[j] = fl_s_0_0_0 * (1.5 * pa_xz[j] * fl1_fx * pb_y[j] + pa_xxxz[j] * pb_y[j]);
 
-                t_xxxz_y[j] += fl_s_0_0_1 * (-1.5 * pa_xz[j] * fl1_fx * pc_y[j] - 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j] - 1.5 * pa_xz[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] - pa_xxxz[j] * pc_y[j] - pa_xxx[j] * pc_z[j] * pb_y[j] - 3.0 * pa_xxz[j] * pc_x[j] * pb_y[j]);
+                t_xxxz_y[j] += fl_s_0_0_1 * (-1.5 * pa_xz[j] * fl1_fx * pc_y[j] - 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j] - 1.5 * pa_xz[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] - pa_xxxz[j] * pc_y[j]);
 
-                t_xxxz_y[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * fl1_fx * pc_yz[j] + 1.5 * pa_xz[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pa_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_y[j] + 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] + pa_xxx[j] * pc_yz[j] + 3.0 * pa_xxz[j] * pc_xy[j] + 3.0 * pa_xx[j] * pc_xz[j] * pb_y[j] + 3.0 * pa_xz[j] * pc_xx[j] * pb_y[j]);
+                t_xxxz_y[j] += fl_s_0_0_1 * (- pa_xxx[j] * pc_z[j] * pb_y[j] - 3.0 * pa_xxz[j] * pc_x[j] * pb_y[j]);
 
-                t_xxxz_y[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 3.0 * pa_xx[j] * pc_xyz[j] - 3.0 * pa_xz[j] * pc_xxy[j] - 3.0 * pa_x[j] * pc_xxz[j] * pb_y[j] - pc_xxx[j] * pa_z[j] * pb_y[j]);
+                t_xxxz_y[j] += fl_s_0_0_2 * (1.5 * pa_x[j] * fl1_fx * pc_yz[j] + 1.5 * pa_xz[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pa_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_y[j]);
+
+                t_xxxz_y[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] + pa_xxx[j] * pc_yz[j] + 3.0 * pa_xxz[j] * pc_xy[j] + 3.0 * pa_xx[j] * pc_xz[j] * pb_y[j] + 3.0 * pa_xz[j] * pc_xx[j] * pb_y[j]);
+
+                t_xxxz_y[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 3.0 * pa_xx[j] * pc_xyz[j]);
+
+                t_xxxz_y[j] += fl_s_0_0_3 * (- 3.0 * pa_xz[j] * pc_xxy[j] - 3.0 * pa_x[j] * pc_xxz[j] * pb_y[j] - pc_xxx[j] * pa_z[j] * pb_y[j]);
 
                 t_xxxz_y[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + 3.0 * pa_x[j] * pc_xxyz[j] + pc_xxxy[j] * pa_z[j] + pc_xxxz[j] * pb_y[j]);
 
@@ -9123,11 +9869,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxxz_z[j] = fl_s_0_0_0 * (0.75 * pa_x[j] * fl2_fx + 0.5 * pa_xxx[j] * fl1_fx + 1.5 * pa_xz[j] * fl1_fx * pb_z[j] + pa_xxxz[j] * pb_z[j]);
 
-                t_xxxz_z[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 0.5 * pa_xxx[j] * fl1_fx - 1.5 * pa_xx[j] * pc_x[j] * fl1_fx - 1.5 * pa_xz[j] * fl1_fx * pc_z[j] - 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] - 1.5 * pa_xz[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j] - pa_xxxz[j] * pc_z[j] - pa_xxx[j] * pc_z[j] * pb_z[j] - 3.0 * pa_xxz[j] * pc_x[j] * pb_z[j]);
+                t_xxxz_z[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 0.5 * pa_xxx[j] * fl1_fx - 1.5 * pa_xx[j] * pc_x[j] * fl1_fx - 1.5 * pa_xz[j] * fl1_fx * pc_z[j]);
 
-                t_xxxz_z[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 1.5 * pa_xx[j] * pc_x[j] * fl1_fx + 1.5 * pa_x[j] * pc_xx[j] * fl1_fx + 1.5 * pa_x[j] * fl1_fx * pc_zz[j] + 1.5 * pa_xz[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pa_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_z[j] + 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j] + pa_xxx[j] * pc_zz[j] + 3.0 * pa_xxz[j] * pc_xz[j] + 3.0 * pa_xx[j] * pc_xz[j] * pb_z[j] + 3.0 * pa_xz[j] * pc_xx[j] * pb_z[j]);
+                t_xxxz_z[j] += fl_s_0_0_1 * (- 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] - 1.5 * pa_xz[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j] - pa_xxxz[j] * pc_z[j] - pa_xxx[j] * pc_z[j] * pb_z[j]);
 
-                t_xxxz_z[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 1.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pc_zz[j] - 1.5 * pc_xzz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pa_z[j] - 1.5 * pc_xz[j] * fl1_fx * pb_z[j] - 3.0 * pa_xx[j] * pc_xzz[j] - 3.0 * pa_xz[j] * pc_xxz[j] - 3.0 * pa_x[j] * pc_xxz[j] * pb_z[j] - pc_xxx[j] * pa_z[j] * pb_z[j]);
+                t_xxxz_z[j] += -fl_s_0_0_1 * 3.0 * pa_xxz[j] * pc_x[j] * pb_z[j];
+
+                t_xxxz_z[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 1.5 * pa_xx[j] * pc_x[j] * fl1_fx + 1.5 * pa_x[j] * pc_xx[j] * fl1_fx + 1.5 * pa_x[j] * fl1_fx * pc_zz[j]);
+
+                t_xxxz_z[j] += fl_s_0_0_2 * (+ 1.5 * pa_xz[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pa_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_z[j] + 1.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j]);
+
+                t_xxxz_z[j] += fl_s_0_0_2 * (+ pa_xxx[j] * pc_zz[j] + 3.0 * pa_xxz[j] * pc_xz[j] + 3.0 * pa_xx[j] * pc_xz[j] * pb_z[j] + 3.0 * pa_xz[j] * pc_xx[j] * pb_z[j]);
+
+                t_xxxz_z[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 1.5 * pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 1.5 * pa_x[j] * fl1_fx * pc_zz[j] - 1.5 * pc_xzz[j] * fl1_fx);
+
+                t_xxxz_z[j] += fl_s_0_0_3 * (- 1.5 * pc_xz[j] * fl1_fx * pa_z[j] - 1.5 * pc_xz[j] * fl1_fx * pb_z[j] - 3.0 * pa_xx[j] * pc_xzz[j] - 3.0 * pa_xz[j] * pc_xxz[j] - 3.0 * pa_x[j] * pc_xxz[j] * pb_z[j]);
+
+                t_xxxz_z[j] += -fl_s_0_0_3 * pc_xxx[j] * pa_z[j] * pb_z[j];
 
                 t_xxxz_z[j] += fl_s_0_0_4 * (0.5 * pc_xxx[j] * fl1_fx + 1.5 * pc_xzz[j] * fl1_fx + 3.0 * pa_x[j] * pc_xxzz[j] + pc_xxxz[j] * pa_z[j] + pc_xxxz[j] * pb_z[j]);
 
@@ -9306,25 +10064,57 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xxyy_x[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xyy[j] * fl1_fx + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_yy[j] * pb_x[j] + pa_xxyy[j] * pb_x[j]);
+                t_xxyy_x[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xyy[j] * fl1_fx + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_yy[j] * pb_x[j]);
 
-                t_xxyy_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 2.0 * pa_xy[j] * fl1_fx * pc_y[j] - pa_xyy[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_yy[j] - 0.5 * fl2_fx * pb_x[j] - 0.5 * pa_xx[j] * fl1_fx * pc_x[j] - 0.5 * pa_xx[j] * fl1_fx * pb_x[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] - fl1_fx * pa_y[j] * pc_y[j] * pb_x[j] - 0.5 * fl1_fx * pa_yy[j] * pb_x[j] - pa_xxyy[j] * pc_x[j] - 2.0 * pa_xxy[j] * pc_y[j] * pb_x[j] - 2.0 * pa_xyy[j] * pc_x[j] * pb_x[j]);
+                t_xxyy_x[j] += fl_s_0_0_0 * pa_xxyy[j] * pb_x[j];
 
-                t_xxyy_x[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + pa_x[j] * fl1_fx * pc_yy[j] + 2.0 * pa_xy[j] * fl1_fx * pc_y[j] + 3.0 * pc_xy[j] * fl1_fx * pa_y[j] + 1.5 * pc_x[j] * fl1_fx * pa_yy[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pc_x[j] + pa_x[j] * pc_xx[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] + 0.5 * pc_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pc_yy[j] * pb_x[j] + fl1_fx * pa_y[j] * pc_y[j] * pb_x[j] + 2.0 * pa_xxy[j] * pc_xy[j] + pa_xx[j] * pc_yy[j] * pb_x[j] + 2.0 * pa_xyy[j] * pc_xx[j] + 4.0 * pa_xy[j] * pc_xy[j] * pb_x[j] + pc_xx[j] * pa_yy[j] * pb_x[j]);
+                t_xxyy_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 2.0 * pa_xy[j] * fl1_fx * pc_y[j] - pa_xyy[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_yy[j]);
 
-                t_xxyy_x[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - pa_x[j] * fl1_fx * pc_yy[j] - 1.5 * pc_xyy[j] * fl1_fx - 3.0 * pc_xy[j] * fl1_fx * pa_y[j] - pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_yy[j] * pb_x[j] - pa_xx[j] * pc_xyy[j] - 4.0 * pa_xy[j] * pc_xxy[j] - 2.0 * pa_x[j] * pc_xyy[j] * pb_x[j] - pc_xxx[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_y[j] * pb_x[j]);
+                t_xxyy_x[j] += fl_s_0_0_1 * (- 0.5 * fl2_fx * pb_x[j] - 0.5 * pa_xx[j] * fl1_fx * pc_x[j] - 0.5 * pa_xx[j] * fl1_fx * pb_x[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] - fl1_fx * pa_y[j] * pc_y[j] * pb_x[j]);
+
+                t_xxyy_x[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_yy[j] * pb_x[j] - pa_xxyy[j] * pc_x[j] - 2.0 * pa_xxy[j] * pc_y[j] * pb_x[j] - 2.0 * pa_xyy[j] * pc_x[j] * pb_x[j]);
+
+                t_xxyy_x[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + pa_x[j] * fl1_fx * pc_yy[j] + 2.0 * pa_xy[j] * fl1_fx * pc_y[j] + 3.0 * pc_xy[j] * fl1_fx * pa_y[j]);
+
+                t_xxyy_x[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pa_yy[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pc_x[j] + pa_x[j] * pc_xx[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_x[j]);
+
+                t_xxyy_x[j] += fl_s_0_0_2 * (+ 0.5 * pc_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pc_yy[j] * pb_x[j] + fl1_fx * pa_y[j] * pc_y[j] * pb_x[j] + 2.0 * pa_xxy[j] * pc_xy[j] + pa_xx[j] * pc_yy[j] * pb_x[j]);
+
+                t_xxyy_x[j] += fl_s_0_0_2 * (+ 2.0 * pa_xyy[j] * pc_xx[j] + 4.0 * pa_xy[j] * pc_xy[j] * pb_x[j] + pc_xx[j] * pa_yy[j] * pb_x[j]);
+
+                t_xxyy_x[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - pa_x[j] * fl1_fx * pc_yy[j] - 1.5 * pc_xyy[j] * fl1_fx - 3.0 * pc_xy[j] * fl1_fx * pa_y[j] - pa_x[j] * pc_xx[j] * fl1_fx);
+
+                t_xxyy_x[j] += fl_s_0_0_3 * (- 0.5 * pc_xxx[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_yy[j] * pb_x[j] - pa_xx[j] * pc_xyy[j] - 4.0 * pa_xy[j] * pc_xxy[j]);
+
+                t_xxyy_x[j] += fl_s_0_0_3 * (- 2.0 * pa_x[j] * pc_xyy[j] * pb_x[j] - pc_xxx[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_y[j] * pb_x[j]);
 
                 t_xxyy_x[j] += fl_s_0_0_4 * (1.5 * pc_xyy[j] * fl1_fx + 0.5 * pc_xxx[j] * fl1_fx + 2.0 * pa_x[j] * pc_xxyy[j] + 2.0 * pc_xxxy[j] * pa_y[j] + pc_xxyy[j] * pb_x[j]);
 
                 t_xxyy_x[j] += -fl_s_0_0_5 * pc_xxxyy[j];
 
-                t_xxyy_y[j] = fl_s_0_0_0 * (0.5 * fl2_fx * pa_y[j] + pa_xxy[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_xx[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_yy[j] * pb_y[j] + pa_xxyy[j] * pb_y[j]);
+                t_xxyy_y[j] = fl_s_0_0_0 * (0.5 * fl2_fx * pa_y[j] + pa_xxy[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_xx[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_yy[j] * pb_y[j]);
 
-                t_xxyy_y[j] += fl_s_0_0_1 * (-fl2_fx * pa_y[j] - 0.75 * fl2_fx * pc_y[j] - pa_xxy[j] * fl1_fx - 1.5 * pa_xx[j] * pc_y[j] * fl1_fx - 2.0 * pa_xy[j] * pc_x[j] * fl1_fx - 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_xx[j] * fl1_fx * pb_y[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pa_yy[j] * pc_y[j] - fl1_fx * pa_y[j] * pc_y[j] * pb_y[j] - 0.5 * fl1_fx * pa_yy[j] * pb_y[j] - pa_xxyy[j] * pc_y[j] - 2.0 * pa_xxy[j] * pc_y[j] * pb_y[j] - 2.0 * pa_xyy[j] * pc_x[j] * pb_y[j]);
+                t_xxyy_y[j] += fl_s_0_0_0 * pa_xxyy[j] * pb_y[j];
 
-                t_xxyy_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.5 * fl2_fx * pa_y[j] + 1.5 * pa_xx[j] * pc_y[j] * fl1_fx + 2.0 * pa_xy[j] * pc_x[j] * fl1_fx + 3.0 * pa_x[j] * pc_xy[j] * fl1_fx + pc_xx[j] * pa_y[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] + 0.5 * pc_xx[j] * fl1_fx * pb_y[j] + fl1_fx * pa_y[j] * pc_yy[j] + 0.5 * fl1_fx * pc_yy[j] * pb_y[j] + 0.5 * fl1_fx * pa_yy[j] * pc_y[j] + fl1_fx * pa_y[j] * pc_y[j] * pb_y[j] + 2.0 * pa_xxy[j] * pc_yy[j] + pa_xx[j] * pc_yy[j] * pb_y[j] + 2.0 * pa_xyy[j] * pc_xy[j] + 4.0 * pa_xy[j] * pc_xy[j] * pb_y[j] + pc_xx[j] * pa_yy[j] * pb_y[j]);
+                t_xxyy_y[j] += fl_s_0_0_1 * (-fl2_fx * pa_y[j] - 0.75 * fl2_fx * pc_y[j] - pa_xxy[j] * fl1_fx - 1.5 * pa_xx[j] * pc_y[j] * fl1_fx - 2.0 * pa_xy[j] * pc_x[j] * fl1_fx);
 
-                t_xxyy_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 3.0 * pa_x[j] * pc_xy[j] * fl1_fx - pc_xx[j] * pa_y[j] * fl1_fx - 1.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pc_yyy[j] - fl1_fx * pa_y[j] * pc_yy[j] - 0.5 * fl1_fx * pc_yy[j] * pb_y[j] - pa_xx[j] * pc_yyy[j] - 4.0 * pa_xy[j] * pc_xyy[j] - 2.0 * pa_x[j] * pc_xyy[j] * pb_y[j] - pc_xxy[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_y[j] * pb_y[j]);
+                t_xxyy_y[j] += fl_s_0_0_1 * (- 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_xx[j] * fl1_fx * pb_y[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pa_yy[j] * pc_y[j] - fl1_fx * pa_y[j] * pc_y[j] * pb_y[j]);
+
+                t_xxyy_y[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_yy[j] * pb_y[j] - pa_xxyy[j] * pc_y[j] - 2.0 * pa_xxy[j] * pc_y[j] * pb_y[j] - 2.0 * pa_xyy[j] * pc_x[j] * pb_y[j]);
+
+                t_xxyy_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.5 * fl2_fx * pa_y[j] + 1.5 * pa_xx[j] * pc_y[j] * fl1_fx + 2.0 * pa_xy[j] * pc_x[j] * fl1_fx + 3.0 * pa_x[j] * pc_xy[j] * fl1_fx);
+
+                t_xxyy_y[j] += fl_s_0_0_2 * (+ pc_xx[j] * pa_y[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] + 0.5 * pc_xx[j] * fl1_fx * pb_y[j] + fl1_fx * pa_y[j] * pc_yy[j]);
+
+                t_xxyy_y[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pc_yy[j] * pb_y[j] + 0.5 * fl1_fx * pa_yy[j] * pc_y[j] + fl1_fx * pa_y[j] * pc_y[j] * pb_y[j] + 2.0 * pa_xxy[j] * pc_yy[j] + pa_xx[j] * pc_yy[j] * pb_y[j]);
+
+                t_xxyy_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_xyy[j] * pc_xy[j] + 4.0 * pa_xy[j] * pc_xy[j] * pb_y[j] + pc_xx[j] * pa_yy[j] * pb_y[j]);
+
+                t_xxyy_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 3.0 * pa_x[j] * pc_xy[j] * fl1_fx - pc_xx[j] * pa_y[j] * fl1_fx - 1.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_y[j]);
+
+                t_xxyy_y[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_yyy[j] - fl1_fx * pa_y[j] * pc_yy[j] - 0.5 * fl1_fx * pc_yy[j] * pb_y[j] - pa_xx[j] * pc_yyy[j] - 4.0 * pa_xy[j] * pc_xyy[j]);
+
+                t_xxyy_y[j] += fl_s_0_0_3 * (- 2.0 * pa_x[j] * pc_xyy[j] * pb_y[j] - pc_xxy[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_y[j] * pb_y[j]);
 
                 t_xxyy_y[j] += fl_s_0_0_4 * (1.5 * pc_xxy[j] * fl1_fx + 0.5 * fl1_fx * pc_yyy[j] + 2.0 * pa_x[j] * pc_xyyy[j] + 2.0 * pc_xxyy[j] * pa_y[j] + pc_xxyy[j] * pb_y[j]);
 
@@ -9332,11 +10122,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxyy_z[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_z[j] + 0.5 * pa_xx[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_yy[j] * pb_z[j] + pa_xxyy[j] * pb_z[j]);
 
-                t_xxyy_z[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_xx[j] * fl1_fx * pc_z[j] - 0.5 * pa_xx[j] * fl1_fx * pb_z[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pa_yy[j] * pc_z[j] - fl1_fx * pa_y[j] * pc_y[j] * pb_z[j] - 0.5 * fl1_fx * pa_yy[j] * pb_z[j] - pa_xxyy[j] * pc_z[j] - 2.0 * pa_xxy[j] * pc_y[j] * pb_z[j] - 2.0 * pa_xyy[j] * pc_x[j] * pb_z[j]);
+                t_xxyy_z[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_xx[j] * fl1_fx * pc_z[j] - 0.5 * pa_xx[j] * fl1_fx * pb_z[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
 
-                t_xxyy_z[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_xx[j] * fl1_fx * pc_z[j] + pa_x[j] * pc_xz[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] + 0.5 * pc_xx[j] * fl1_fx * pb_z[j] + fl1_fx * pa_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pb_z[j] + 0.5 * fl1_fx * pa_yy[j] * pc_z[j] + fl1_fx * pa_y[j] * pc_y[j] * pb_z[j] + 2.0 * pa_xxy[j] * pc_yz[j] + pa_xx[j] * pc_yy[j] * pb_z[j] + 2.0 * pa_xyy[j] * pc_xz[j] + 4.0 * pa_xy[j] * pc_xy[j] * pb_z[j] + pc_xx[j] * pa_yy[j] * pb_z[j]);
+                t_xxyy_z[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_yy[j] * pc_z[j] - fl1_fx * pa_y[j] * pc_y[j] * pb_z[j] - 0.5 * fl1_fx * pa_yy[j] * pb_z[j] - pa_xxyy[j] * pc_z[j] - 2.0 * pa_xxy[j] * pc_y[j] * pb_z[j]);
 
-                t_xxyy_z[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - pa_x[j] * pc_xz[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_yyz[j] - fl1_fx * pa_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pb_z[j] - pa_xx[j] * pc_yyz[j] - 4.0 * pa_xy[j] * pc_xyz[j] - 2.0 * pa_x[j] * pc_xyy[j] * pb_z[j] - pc_xxz[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_y[j] * pb_z[j]);
+                t_xxyy_z[j] += -fl_s_0_0_1 * 2.0 * pa_xyy[j] * pc_x[j] * pb_z[j];
+
+                t_xxyy_z[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_xx[j] * fl1_fx * pc_z[j] + pa_x[j] * pc_xz[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_z[j]);
+
+                t_xxyy_z[j] += fl_s_0_0_2 * (+ 0.5 * pc_xx[j] * fl1_fx * pb_z[j] + fl1_fx * pa_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pb_z[j] + 0.5 * fl1_fx * pa_yy[j] * pc_z[j] + fl1_fx * pa_y[j] * pc_y[j] * pb_z[j]);
+
+                t_xxyy_z[j] += fl_s_0_0_2 * (+ 2.0 * pa_xxy[j] * pc_yz[j] + pa_xx[j] * pc_yy[j] * pb_z[j] + 2.0 * pa_xyy[j] * pc_xz[j] + 4.0 * pa_xy[j] * pc_xy[j] * pb_z[j] + pc_xx[j] * pa_yy[j] * pb_z[j]);
+
+                t_xxyy_z[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - pa_x[j] * pc_xz[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_yyz[j]);
+
+                t_xxyy_z[j] += fl_s_0_0_3 * (- fl1_fx * pa_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pb_z[j] - pa_xx[j] * pc_yyz[j] - 4.0 * pa_xy[j] * pc_xyz[j] - 2.0 * pa_x[j] * pc_xyy[j] * pb_z[j]);
+
+                t_xxyy_z[j] += fl_s_0_0_3 * (- pc_xxz[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_y[j] * pb_z[j]);
 
                 t_xxyy_z[j] += fl_s_0_0_4 * (0.5 * pc_xxz[j] * fl1_fx + 0.5 * fl1_fx * pc_yyz[j] + 2.0 * pa_x[j] * pc_xyyz[j] + 2.0 * pc_xxyz[j] * pa_y[j] + pc_xxyy[j] * pb_z[j]);
 
@@ -9531,11 +10333,25 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxyz_x[j] = fl_s_0_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * fl1_fx * pa_yz[j] * pb_x[j] + pa_xxyz[j] * pb_x[j]);
 
-                t_xxyz_x[j] += fl_s_0_0_1 * (-pa_xy[j] * fl1_fx * pc_z[j] - pa_xz[j] * fl1_fx * pc_y[j] - pa_xyz[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_yz[j] - 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_yz[j] * pb_x[j] - pa_xxyz[j] * pc_x[j] - pa_xxy[j] * pc_z[j] * pb_x[j] - pa_xxz[j] * pc_y[j] * pb_x[j] - 2.0 * pa_xyz[j] * pc_x[j] * pb_x[j]);
+                t_xxyz_x[j] += fl_s_0_0_1 * (-pa_xy[j] * fl1_fx * pc_z[j] - pa_xz[j] * fl1_fx * pc_y[j] - pa_xyz[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_yz[j] - 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_x[j]);
 
-                t_xxyz_x[j] += fl_s_0_0_2 * (pa_x[j] * fl1_fx * pc_yz[j] + pa_xy[j] * fl1_fx * pc_z[j] + pa_xz[j] * fl1_fx * pc_y[j] + 1.5 * pc_xz[j] * fl1_fx * pa_y[j] + 1.5 * pc_xy[j] * fl1_fx * pa_z[j] + 1.5 * pc_x[j] * fl1_fx * pa_yz[j] + 0.5 * fl1_fx * pc_yz[j] * pb_x[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_x[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_x[j] + pa_xxy[j] * pc_xz[j] + pa_xxz[j] * pc_xy[j] + pa_xx[j] * pc_yz[j] * pb_x[j] + 2.0 * pa_xyz[j] * pc_xx[j] + 2.0 * pa_xy[j] * pc_xz[j] * pb_x[j] + 2.0 * pa_xz[j] * pc_xy[j] * pb_x[j] + pc_xx[j] * pa_yz[j] * pb_x[j]);
+                t_xxyz_x[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_yz[j] * pb_x[j] - pa_xxyz[j] * pc_x[j] - pa_xxy[j] * pc_z[j] * pb_x[j] - pa_xxz[j] * pc_y[j] * pb_x[j]);
 
-                t_xxyz_x[j] += fl_s_0_0_3 * (-pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_yz[j] * pb_x[j] - pa_xx[j] * pc_xyz[j] - 2.0 * pa_xy[j] * pc_xxz[j] - 2.0 * pa_xz[j] * pc_xxy[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_x[j] - pc_xxx[j] * pa_yz[j] - pc_xxz[j] * pa_y[j] * pb_x[j] - pc_xxy[j] * pa_z[j] * pb_x[j]);
+                t_xxyz_x[j] += -fl_s_0_0_1 * 2.0 * pa_xyz[j] * pc_x[j] * pb_x[j];
+
+                t_xxyz_x[j] += fl_s_0_0_2 * (pa_x[j] * fl1_fx * pc_yz[j] + pa_xy[j] * fl1_fx * pc_z[j] + pa_xz[j] * fl1_fx * pc_y[j] + 1.5 * pc_xz[j] * fl1_fx * pa_y[j] + 1.5 * pc_xy[j] * fl1_fx * pa_z[j]);
+
+                t_xxyz_x[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pa_yz[j] + 0.5 * fl1_fx * pc_yz[j] * pb_x[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_x[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_x[j] + pa_xxy[j] * pc_xz[j]);
+
+                t_xxyz_x[j] += fl_s_0_0_2 * (+ pa_xxz[j] * pc_xy[j] + pa_xx[j] * pc_yz[j] * pb_x[j] + 2.0 * pa_xyz[j] * pc_xx[j] + 2.0 * pa_xy[j] * pc_xz[j] * pb_x[j] + 2.0 * pa_xz[j] * pc_xy[j] * pb_x[j]);
+
+                t_xxyz_x[j] += fl_s_0_0_2 * pc_xx[j] * pa_yz[j] * pb_x[j];
+
+                t_xxyz_x[j] += fl_s_0_0_3 * (-pa_x[j] * fl1_fx * pc_yz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pa_y[j] - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_yz[j] * pb_x[j]);
+
+                t_xxyz_x[j] += fl_s_0_0_3 * (- pa_xx[j] * pc_xyz[j] - 2.0 * pa_xy[j] * pc_xxz[j] - 2.0 * pa_xz[j] * pc_xxy[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_x[j] - pc_xxx[j] * pa_yz[j]);
+
+                t_xxyz_x[j] += fl_s_0_0_3 * (- pc_xxz[j] * pa_y[j] * pb_x[j] - pc_xxy[j] * pa_z[j] * pb_x[j]);
 
                 t_xxyz_x[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + 2.0 * pa_x[j] * pc_xxyz[j] + pc_xxxz[j] * pa_y[j] + pc_xxxy[j] * pa_z[j] + pc_xxyz[j] * pb_x[j]);
 
@@ -9543,25 +10359,57 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxyz_y[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pa_z[j] + 0.5 * pa_xxz[j] * fl1_fx + 0.5 * fl1_fx * pa_yz[j] * pb_y[j] + pa_xxyz[j] * pb_y[j]);
 
-                t_xxyz_y[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pa_z[j] - 0.5 * pa_xx[j] * fl1_fx * pc_z[j] - 0.5 * pa_xxz[j] * fl1_fx - pa_xz[j] * pc_x[j] * fl1_fx - 0.5 * fl1_fx * pa_yz[j] * pc_y[j] - 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_yz[j] * pb_y[j] - pa_xxyz[j] * pc_y[j] - pa_xxy[j] * pc_z[j] * pb_y[j] - pa_xxz[j] * pc_y[j] * pb_y[j] - 2.0 * pa_xyz[j] * pc_x[j] * pb_y[j]);
+                t_xxyz_y[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pa_z[j] - 0.5 * pa_xx[j] * fl1_fx * pc_z[j] - 0.5 * pa_xxz[j] * fl1_fx - pa_xz[j] * pc_x[j] * fl1_fx);
 
-                t_xxyz_y[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pa_z[j] + 0.5 * pa_xx[j] * fl1_fx * pc_z[j] + pa_x[j] * pc_xz[j] * fl1_fx + pa_xz[j] * pc_x[j] * fl1_fx + 0.5 * pc_xx[j] * fl1_fx * pa_z[j] + 0.5 * fl1_fx * pa_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pa_z[j] + 0.5 * fl1_fx * pc_yz[j] * pb_y[j] + 0.5 * fl1_fx * pa_yz[j] * pc_y[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_y[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_y[j] + pa_xxy[j] * pc_yz[j] + pa_xxz[j] * pc_yy[j] + pa_xx[j] * pc_yz[j] * pb_y[j] + 2.0 * pa_xyz[j] * pc_xy[j] + 2.0 * pa_xy[j] * pc_xz[j] * pb_y[j] + 2.0 * pa_xz[j] * pc_xy[j] * pb_y[j] + pc_xx[j] * pa_yz[j] * pb_y[j]);
+                t_xxyz_y[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_yz[j] * pc_y[j] - 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_yz[j] * pb_y[j] - pa_xxyz[j] * pc_y[j]);
 
-                t_xxyz_y[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - pa_x[j] * pc_xz[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_yyz[j] - 0.5 * fl1_fx * pa_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pa_z[j] - 0.5 * fl1_fx * pc_yz[j] * pb_y[j] - pa_xx[j] * pc_yyz[j] - 2.0 * pa_xy[j] * pc_xyz[j] - 2.0 * pa_xz[j] * pc_xyy[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_y[j] - pc_xxy[j] * pa_yz[j] - pc_xxz[j] * pa_y[j] * pb_y[j] - pc_xxy[j] * pa_z[j] * pb_y[j]);
+                t_xxyz_y[j] += fl_s_0_0_1 * (- pa_xxy[j] * pc_z[j] * pb_y[j] - pa_xxz[j] * pc_y[j] * pb_y[j] - 2.0 * pa_xyz[j] * pc_x[j] * pb_y[j]);
 
-                t_xxyz_y[j] += fl_s_0_0_4 * (0.5 * pc_xxz[j] * fl1_fx + 0.5 * fl1_fx * pc_yyz[j] + 2.0 * pa_x[j] * pc_xyyz[j] + pc_xxyz[j] * pa_y[j] + pc_xxyy[j] * pa_z[j] + pc_xxyz[j] * pb_y[j]);
+                t_xxyz_y[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pa_z[j] + 0.5 * pa_xx[j] * fl1_fx * pc_z[j] + pa_x[j] * pc_xz[j] * fl1_fx + pa_xz[j] * pc_x[j] * fl1_fx);
+
+                t_xxyz_y[j] += fl_s_0_0_2 * (+ 0.5 * pc_xx[j] * fl1_fx * pa_z[j] + 0.5 * fl1_fx * pa_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pa_z[j] + 0.5 * fl1_fx * pc_yz[j] * pb_y[j] + 0.5 * fl1_fx * pa_yz[j] * pc_y[j]);
+
+                t_xxyz_y[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_y[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_y[j] + pa_xxy[j] * pc_yz[j] + pa_xxz[j] * pc_yy[j] + pa_xx[j] * pc_yz[j] * pb_y[j]);
+
+                t_xxyz_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_xyz[j] * pc_xy[j] + 2.0 * pa_xy[j] * pc_xz[j] * pb_y[j] + 2.0 * pa_xz[j] * pc_xy[j] * pb_y[j] + pc_xx[j] * pa_yz[j] * pb_y[j]);
+
+                t_xxyz_y[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - pa_x[j] * pc_xz[j] * fl1_fx - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pa_z[j] - 0.5 * fl1_fx * pc_yyz[j]);
+
+                t_xxyz_y[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pa_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pa_z[j] - 0.5 * fl1_fx * pc_yz[j] * pb_y[j] - pa_xx[j] * pc_yyz[j] - 2.0 * pa_xy[j] * pc_xyz[j]);
+
+                t_xxyz_y[j] += fl_s_0_0_3 * (- 2.0 * pa_xz[j] * pc_xyy[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_y[j] - pc_xxy[j] * pa_yz[j] - pc_xxz[j] * pa_y[j] * pb_y[j] - pc_xxy[j] * pa_z[j] * pb_y[j]);
+
+                t_xxyz_y[j] += fl_s_0_0_4 * (0.5 * pc_xxz[j] * fl1_fx + 0.5 * fl1_fx * pc_yyz[j] + 2.0 * pa_x[j] * pc_xyyz[j] + pc_xxyz[j] * pa_y[j] + pc_xxyy[j] * pa_z[j]);
+
+                t_xxyz_y[j] += fl_s_0_0_4 * pc_xxyz[j] * pb_y[j];
 
                 t_xxyz_y[j] += -fl_s_0_0_5 * pc_xxyyz[j];
 
                 t_xxyz_z[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pa_y[j] + 0.5 * pa_xxy[j] * fl1_fx + 0.5 * fl1_fx * pa_yz[j] * pb_z[j] + pa_xxyz[j] * pb_z[j]);
 
-                t_xxyz_z[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pa_y[j] - 0.25 * fl2_fx * pc_y[j] - 0.5 * pa_xxy[j] * fl1_fx - 0.5 * pa_xx[j] * pc_y[j] * fl1_fx - pa_xy[j] * pc_x[j] * fl1_fx - 0.5 * fl1_fx * pa_yz[j] * pc_z[j] - 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_z[j] - 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_z[j] - 0.5 * fl1_fx * pa_yz[j] * pb_z[j] - pa_xxyz[j] * pc_z[j] - pa_xxy[j] * pc_z[j] * pb_z[j] - pa_xxz[j] * pc_y[j] * pb_z[j] - 2.0 * pa_xyz[j] * pc_x[j] * pb_z[j]);
+                t_xxyz_z[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pa_y[j] - 0.25 * fl2_fx * pc_y[j] - 0.5 * pa_xxy[j] * fl1_fx - 0.5 * pa_xx[j] * pc_y[j] * fl1_fx - pa_xy[j] * pc_x[j] * fl1_fx);
 
-                t_xxyz_z[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pa_y[j] + 0.5 * pa_xx[j] * pc_y[j] * fl1_fx + pa_xy[j] * pc_x[j] * fl1_fx + pa_x[j] * pc_xy[j] * fl1_fx + 0.5 * pc_xx[j] * pa_y[j] * fl1_fx + 0.5 * fl1_fx * pa_y[j] * pc_zz[j] + 0.5 * fl1_fx * pc_yz[j] * pa_z[j] + 0.5 * fl1_fx * pc_yz[j] * pb_z[j] + 0.5 * fl1_fx * pa_yz[j] * pc_z[j] + 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_z[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_z[j] + pa_xxy[j] * pc_zz[j] + pa_xxz[j] * pc_yz[j] + pa_xx[j] * pc_yz[j] * pb_z[j] + 2.0 * pa_xyz[j] * pc_xz[j] + 2.0 * pa_xy[j] * pc_xz[j] * pb_z[j] + 2.0 * pa_xz[j] * pc_xy[j] * pb_z[j] + pc_xx[j] * pa_yz[j] * pb_z[j]);
+                t_xxyz_z[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_yz[j] * pc_z[j] - 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_z[j] - 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_z[j] - 0.5 * fl1_fx * pa_yz[j] * pb_z[j] - pa_xxyz[j] * pc_z[j]);
 
-                t_xxyz_z[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - pa_x[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xx[j] * pa_y[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * fl1_fx * pc_yzz[j] - 0.5 * fl1_fx * pa_y[j] * pc_zz[j] - 0.5 * fl1_fx * pc_yz[j] * pa_z[j] - 0.5 * fl1_fx * pc_yz[j] * pb_z[j] - pa_xx[j] * pc_yzz[j] - 2.0 * pa_xy[j] * pc_xzz[j] - 2.0 * pa_xz[j] * pc_xyz[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_z[j] - pc_xxz[j] * pa_yz[j] - pc_xxz[j] * pa_y[j] * pb_z[j] - pc_xxy[j] * pa_z[j] * pb_z[j]);
+                t_xxyz_z[j] += fl_s_0_0_1 * (- pa_xxy[j] * pc_z[j] * pb_z[j] - pa_xxz[j] * pc_y[j] * pb_z[j] - 2.0 * pa_xyz[j] * pc_x[j] * pb_z[j]);
 
-                t_xxyz_z[j] += fl_s_0_0_4 * (0.5 * pc_xxy[j] * fl1_fx + 0.5 * fl1_fx * pc_yzz[j] + 2.0 * pa_x[j] * pc_xyzz[j] + pc_xxzz[j] * pa_y[j] + pc_xxyz[j] * pa_z[j] + pc_xxyz[j] * pb_z[j]);
+                t_xxyz_z[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pa_y[j] + 0.5 * pa_xx[j] * pc_y[j] * fl1_fx + pa_xy[j] * pc_x[j] * fl1_fx + pa_x[j] * pc_xy[j] * fl1_fx);
+
+                t_xxyz_z[j] += fl_s_0_0_2 * (+ 0.5 * pc_xx[j] * pa_y[j] * fl1_fx + 0.5 * fl1_fx * pa_y[j] * pc_zz[j] + 0.5 * fl1_fx * pc_yz[j] * pa_z[j] + 0.5 * fl1_fx * pc_yz[j] * pb_z[j] + 0.5 * fl1_fx * pa_yz[j] * pc_z[j]);
+
+                t_xxyz_z[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pa_y[j] * pc_z[j] * pb_z[j] + 0.5 * fl1_fx * pc_y[j] * pa_z[j] * pb_z[j] + pa_xxy[j] * pc_zz[j] + pa_xxz[j] * pc_yz[j] + pa_xx[j] * pc_yz[j] * pb_z[j]);
+
+                t_xxyz_z[j] += fl_s_0_0_2 * (+ 2.0 * pa_xyz[j] * pc_xz[j] + 2.0 * pa_xy[j] * pc_xz[j] * pb_z[j] + 2.0 * pa_xz[j] * pc_xy[j] * pb_z[j] + pc_xx[j] * pa_yz[j] * pb_z[j]);
+
+                t_xxyz_z[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - pa_x[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xx[j] * pa_y[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * fl1_fx * pc_yzz[j]);
+
+                t_xxyz_z[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pa_y[j] * pc_zz[j] - 0.5 * fl1_fx * pc_yz[j] * pa_z[j] - 0.5 * fl1_fx * pc_yz[j] * pb_z[j] - pa_xx[j] * pc_yzz[j] - 2.0 * pa_xy[j] * pc_xzz[j]);
+
+                t_xxyz_z[j] += fl_s_0_0_3 * (- 2.0 * pa_xz[j] * pc_xyz[j] - 2.0 * pa_x[j] * pc_xyz[j] * pb_z[j] - pc_xxz[j] * pa_yz[j] - pc_xxz[j] * pa_y[j] * pb_z[j] - pc_xxy[j] * pa_z[j] * pb_z[j]);
+
+                t_xxyz_z[j] += fl_s_0_0_4 * (0.5 * pc_xxy[j] * fl1_fx + 0.5 * fl1_fx * pc_yzz[j] + 2.0 * pa_x[j] * pc_xyzz[j] + pc_xxzz[j] * pa_y[j] + pc_xxyz[j] * pa_z[j]);
+
+                t_xxyz_z[j] += fl_s_0_0_4 * pc_xxyz[j] * pb_z[j];
 
                 t_xxyz_z[j] += -fl_s_0_0_5 * pc_xxyzz[j];
             }
@@ -9738,13 +10586,29 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xxzz_x[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xzz[j] * fl1_fx + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_zz[j] * pb_x[j] + pa_xxzz[j] * pb_x[j]);
+                t_xxzz_x[j] = fl_s_0_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xzz[j] * fl1_fx + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_zz[j] * pb_x[j]);
 
-                t_xxzz_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 2.0 * pa_xz[j] * fl1_fx * pc_z[j] - pa_xzz[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_zz[j] - 0.5 * fl2_fx * pb_x[j] - 0.5 * pa_xx[j] * fl1_fx * pc_x[j] - 0.5 * pa_xx[j] * fl1_fx * pb_x[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_zz[j] * pb_x[j] - pa_xxzz[j] * pc_x[j] - 2.0 * pa_xxz[j] * pc_z[j] * pb_x[j] - 2.0 * pa_xzz[j] * pc_x[j] * pb_x[j]);
+                t_xxzz_x[j] += fl_s_0_0_0 * pa_xxzz[j] * pb_x[j];
 
-                t_xxzz_x[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + pa_x[j] * fl1_fx * pc_zz[j] + 2.0 * pa_xz[j] * fl1_fx * pc_z[j] + 3.0 * pc_xz[j] * fl1_fx * pa_z[j] + 1.5 * pc_x[j] * fl1_fx * pa_zz[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pc_x[j] + pa_x[j] * pc_xx[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] + 0.5 * pc_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pc_zz[j] * pb_x[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_x[j] + 2.0 * pa_xxz[j] * pc_xz[j] + pa_xx[j] * pc_zz[j] * pb_x[j] + 2.0 * pa_xzz[j] * pc_xx[j] + 4.0 * pa_xz[j] * pc_xz[j] * pb_x[j] + pc_xx[j] * pa_zz[j] * pb_x[j]);
+                t_xxzz_x[j] += fl_s_0_0_1 * (-pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 2.0 * pa_xz[j] * fl1_fx * pc_z[j] - pa_xzz[j] * fl1_fx - 1.5 * pc_x[j] * fl1_fx * pa_zz[j]);
 
-                t_xxzz_x[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - pa_x[j] * fl1_fx * pc_zz[j] - 1.5 * pc_xzz[j] * fl1_fx - 3.0 * pc_xz[j] * fl1_fx * pa_z[j] - pa_x[j] * pc_xx[j] * fl1_fx - 0.5 * pc_xxx[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_zz[j] * pb_x[j] - pa_xx[j] * pc_xzz[j] - 4.0 * pa_xz[j] * pc_xxz[j] - 2.0 * pa_x[j] * pc_xzz[j] * pb_x[j] - pc_xxx[j] * pa_zz[j] - 2.0 * pc_xxz[j] * pa_z[j] * pb_x[j]);
+                t_xxzz_x[j] += fl_s_0_0_1 * (- 0.5 * fl2_fx * pb_x[j] - 0.5 * pa_xx[j] * fl1_fx * pc_x[j] - 0.5 * pa_xx[j] * fl1_fx * pb_x[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_x[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_x[j]);
+
+                t_xxzz_x[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_zz[j] * pb_x[j] - pa_xxzz[j] * pc_x[j] - 2.0 * pa_xxz[j] * pc_z[j] * pb_x[j] - 2.0 * pa_xzz[j] * pc_x[j] * pb_x[j]);
+
+                t_xxzz_x[j] += fl_s_0_0_2 * (0.5 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + pa_x[j] * fl1_fx * pc_zz[j] + 2.0 * pa_xz[j] * fl1_fx * pc_z[j] + 3.0 * pc_xz[j] * fl1_fx * pa_z[j]);
+
+                t_xxzz_x[j] += fl_s_0_0_2 * (+ 1.5 * pc_x[j] * fl1_fx * pa_zz[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pc_x[j] + pa_x[j] * pc_xx[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_x[j]);
+
+                t_xxzz_x[j] += fl_s_0_0_2 * (+ 0.5 * pc_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pc_zz[j] * pb_x[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_x[j] + 2.0 * pa_xxz[j] * pc_xz[j] + pa_xx[j] * pc_zz[j] * pb_x[j]);
+
+                t_xxzz_x[j] += fl_s_0_0_2 * (+ 2.0 * pa_xzz[j] * pc_xx[j] + 4.0 * pa_xz[j] * pc_xz[j] * pb_x[j] + pc_xx[j] * pa_zz[j] * pb_x[j]);
+
+                t_xxzz_x[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - pa_x[j] * fl1_fx * pc_zz[j] - 1.5 * pc_xzz[j] * fl1_fx - 3.0 * pc_xz[j] * fl1_fx * pa_z[j] - pa_x[j] * pc_xx[j] * fl1_fx);
+
+                t_xxzz_x[j] += fl_s_0_0_3 * (- 0.5 * pc_xxx[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_zz[j] * pb_x[j] - pa_xx[j] * pc_xzz[j] - 4.0 * pa_xz[j] * pc_xxz[j]);
+
+                t_xxzz_x[j] += fl_s_0_0_3 * (- 2.0 * pa_x[j] * pc_xzz[j] * pb_x[j] - pc_xxx[j] * pa_zz[j] - 2.0 * pc_xxz[j] * pa_z[j] * pb_x[j]);
 
                 t_xxzz_x[j] += fl_s_0_0_4 * (1.5 * pc_xzz[j] * fl1_fx + 0.5 * pc_xxx[j] * fl1_fx + 2.0 * pa_x[j] * pc_xxzz[j] + 2.0 * pc_xxxz[j] * pa_z[j] + pc_xxzz[j] * pb_x[j]);
 
@@ -9752,23 +10616,51 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xxzz_y[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_y[j] + 0.5 * pa_xx[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_zz[j] * pb_y[j] + pa_xxzz[j] * pb_y[j]);
 
-                t_xxzz_y[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_xx[j] * fl1_fx * pc_y[j] - 0.5 * pa_xx[j] * fl1_fx * pb_y[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pa_zz[j] * pc_y[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_zz[j] * pb_y[j] - pa_xxzz[j] * pc_y[j] - 2.0 * pa_xxz[j] * pc_z[j] * pb_y[j] - 2.0 * pa_xzz[j] * pc_x[j] * pb_y[j]);
+                t_xxzz_y[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_xx[j] * fl1_fx * pc_y[j] - 0.5 * pa_xx[j] * fl1_fx * pb_y[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_y[j]);
 
-                t_xxzz_y[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_xx[j] * fl1_fx * pc_y[j] + pa_x[j] * pc_xy[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_y[j] + 0.5 * pc_xx[j] * fl1_fx * pb_y[j] + fl1_fx * pa_z[j] * pc_yz[j] + 0.5 * fl1_fx * pc_zz[j] * pb_y[j] + 0.5 * fl1_fx * pa_zz[j] * pc_y[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_y[j] + 2.0 * pa_xxz[j] * pc_yz[j] + pa_xx[j] * pc_zz[j] * pb_y[j] + 2.0 * pa_xzz[j] * pc_xy[j] + 4.0 * pa_xz[j] * pc_xz[j] * pb_y[j] + pc_xx[j] * pa_zz[j] * pb_y[j]);
+                t_xxzz_y[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_zz[j] * pc_y[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_zz[j] * pb_y[j] - pa_xxzz[j] * pc_y[j] - 2.0 * pa_xxz[j] * pc_z[j] * pb_y[j]);
 
-                t_xxzz_y[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - pa_x[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pc_yzz[j] - fl1_fx * pa_z[j] * pc_yz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_y[j] - pa_xx[j] * pc_yzz[j] - 4.0 * pa_xz[j] * pc_xyz[j] - 2.0 * pa_x[j] * pc_xzz[j] * pb_y[j] - pc_xxy[j] * pa_zz[j] - 2.0 * pc_xxz[j] * pa_z[j] * pb_y[j]);
+                t_xxzz_y[j] += -fl_s_0_0_1 * 2.0 * pa_xzz[j] * pc_x[j] * pb_y[j];
+
+                t_xxzz_y[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_xx[j] * fl1_fx * pc_y[j] + pa_x[j] * pc_xy[j] * fl1_fx + pa_x[j] * pc_x[j] * fl1_fx * pb_y[j]);
+
+                t_xxzz_y[j] += fl_s_0_0_2 * (+ 0.5 * pc_xx[j] * fl1_fx * pb_y[j] + fl1_fx * pa_z[j] * pc_yz[j] + 0.5 * fl1_fx * pc_zz[j] * pb_y[j] + 0.5 * fl1_fx * pa_zz[j] * pc_y[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_y[j]);
+
+                t_xxzz_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_xxz[j] * pc_yz[j] + pa_xx[j] * pc_zz[j] * pb_y[j] + 2.0 * pa_xzz[j] * pc_xy[j] + 4.0 * pa_xz[j] * pc_xz[j] * pb_y[j] + pc_xx[j] * pa_zz[j] * pb_y[j]);
+
+                t_xxzz_y[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - pa_x[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pc_yzz[j]);
+
+                t_xxzz_y[j] += fl_s_0_0_3 * (- fl1_fx * pa_z[j] * pc_yz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_y[j] - pa_xx[j] * pc_yzz[j] - 4.0 * pa_xz[j] * pc_xyz[j] - 2.0 * pa_x[j] * pc_xzz[j] * pb_y[j]);
+
+                t_xxzz_y[j] += fl_s_0_0_3 * (- pc_xxy[j] * pa_zz[j] - 2.0 * pc_xxz[j] * pa_z[j] * pb_y[j]);
 
                 t_xxzz_y[j] += fl_s_0_0_4 * (0.5 * pc_xxy[j] * fl1_fx + 0.5 * fl1_fx * pc_yzz[j] + 2.0 * pa_x[j] * pc_xyzz[j] + 2.0 * pc_xxyz[j] * pa_z[j] + pc_xxzz[j] * pb_y[j]);
 
                 t_xxzz_y[j] += -fl_s_0_0_5 * pc_xxyzz[j];
 
-                t_xxzz_z[j] = fl_s_0_0_0 * (0.5 * fl2_fx * pa_z[j] + pa_xxz[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_xx[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pb_z[j] + pa_xxzz[j] * pb_z[j]);
+                t_xxzz_z[j] = fl_s_0_0_0 * (0.5 * fl2_fx * pa_z[j] + pa_xxz[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_xx[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pb_z[j]);
 
-                t_xxzz_z[j] += fl_s_0_0_1 * (-fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - pa_xxz[j] * fl1_fx - 1.5 * pa_xx[j] * pc_z[j] * fl1_fx - 2.0 * pa_xz[j] * pc_x[j] * fl1_fx - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_xx[j] * fl1_fx * pb_z[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pa_zz[j] * pc_z[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_z[j] - 0.5 * fl1_fx * pa_zz[j] * pb_z[j] - pa_xxzz[j] * pc_z[j] - 2.0 * pa_xxz[j] * pc_z[j] * pb_z[j] - 2.0 * pa_xzz[j] * pc_x[j] * pb_z[j]);
+                t_xxzz_z[j] += fl_s_0_0_0 * pa_xxzz[j] * pb_z[j];
 
-                t_xxzz_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.5 * fl2_fx * pa_z[j] + 1.5 * pa_xx[j] * pc_z[j] * fl1_fx + 2.0 * pa_xz[j] * pc_x[j] * fl1_fx + 3.0 * pa_x[j] * pc_xz[j] * fl1_fx + pc_xx[j] * pa_z[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] + 0.5 * pc_xx[j] * fl1_fx * pb_z[j] + fl1_fx * pa_z[j] * pc_zz[j] + 0.5 * fl1_fx * pc_zz[j] * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pc_z[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_z[j] + 2.0 * pa_xxz[j] * pc_zz[j] + pa_xx[j] * pc_zz[j] * pb_z[j] + 2.0 * pa_xzz[j] * pc_xz[j] + 4.0 * pa_xz[j] * pc_xz[j] * pb_z[j] + pc_xx[j] * pa_zz[j] * pb_z[j]);
+                t_xxzz_z[j] += fl_s_0_0_1 * (-fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - pa_xxz[j] * fl1_fx - 1.5 * pa_xx[j] * pc_z[j] * fl1_fx - 2.0 * pa_xz[j] * pc_x[j] * fl1_fx);
 
-                t_xxzz_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 3.0 * pa_x[j] * pc_xz[j] * fl1_fx - pc_xx[j] * pa_z[j] * fl1_fx - 1.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_zzz[j] - fl1_fx * pa_z[j] * pc_zz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_z[j] - pa_xx[j] * pc_zzz[j] - 4.0 * pa_xz[j] * pc_xzz[j] - 2.0 * pa_x[j] * pc_xzz[j] * pb_z[j] - pc_xxz[j] * pa_zz[j] - 2.0 * pc_xxz[j] * pa_z[j] * pb_z[j]);
+                t_xxzz_z[j] += fl_s_0_0_1 * (- 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_xx[j] * fl1_fx * pb_z[j] - pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pa_zz[j] * pc_z[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_z[j]);
+
+                t_xxzz_z[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_zz[j] * pb_z[j] - pa_xxzz[j] * pc_z[j] - 2.0 * pa_xxz[j] * pc_z[j] * pb_z[j] - 2.0 * pa_xzz[j] * pc_x[j] * pb_z[j]);
+
+                t_xxzz_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.5 * fl2_fx * pa_z[j] + 1.5 * pa_xx[j] * pc_z[j] * fl1_fx + 2.0 * pa_xz[j] * pc_x[j] * fl1_fx + 3.0 * pa_x[j] * pc_xz[j] * fl1_fx);
+
+                t_xxzz_z[j] += fl_s_0_0_2 * (+ pc_xx[j] * pa_z[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + pa_x[j] * pc_x[j] * fl1_fx * pb_z[j] + 0.5 * pc_xx[j] * fl1_fx * pb_z[j] + fl1_fx * pa_z[j] * pc_zz[j]);
+
+                t_xxzz_z[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pc_zz[j] * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pc_z[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_z[j] + 2.0 * pa_xxz[j] * pc_zz[j] + pa_xx[j] * pc_zz[j] * pb_z[j]);
+
+                t_xxzz_z[j] += fl_s_0_0_2 * (+ 2.0 * pa_xzz[j] * pc_xz[j] + 4.0 * pa_xz[j] * pc_xz[j] * pb_z[j] + pc_xx[j] * pa_zz[j] * pb_z[j]);
+
+                t_xxzz_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 3.0 * pa_x[j] * pc_xz[j] * fl1_fx - pc_xx[j] * pa_z[j] * fl1_fx - 1.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pb_z[j]);
+
+                t_xxzz_z[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_zzz[j] - fl1_fx * pa_z[j] * pc_zz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_z[j] - pa_xx[j] * pc_zzz[j] - 4.0 * pa_xz[j] * pc_xzz[j]);
+
+                t_xxzz_z[j] += fl_s_0_0_3 * (- 2.0 * pa_x[j] * pc_xzz[j] * pb_z[j] - pc_xxz[j] * pa_zz[j] - 2.0 * pc_xxz[j] * pa_z[j] * pb_z[j]);
 
                 t_xxzz_z[j] += fl_s_0_0_4 * (1.5 * pc_xxz[j] * fl1_fx + 0.5 * fl1_fx * pc_zzz[j] + 2.0 * pa_x[j] * pc_xzzz[j] + 2.0 * pc_xxzz[j] * pa_z[j] + pc_xxzz[j] * pb_z[j]);
 
@@ -9942,11 +10834,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyyy_x[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pa_y[j] + 0.5 * fl1_fx * pa_yyy[j] + 1.5 * pa_xy[j] * fl1_fx * pb_x[j] + pa_xyyy[j] * pb_x[j]);
 
-                t_xyyy_x[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pa_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * fl1_fx * pa_yy[j] * pc_y[j] - 0.5 * fl1_fx * pa_yyy[j] - 1.5 * pa_xy[j] * fl1_fx * pc_x[j] - 1.5 * pa_xy[j] * fl1_fx * pb_x[j] - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] - pa_xyyy[j] * pc_x[j] - 3.0 * pa_xyy[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yyy[j] * pb_x[j]);
+                t_xyyy_x[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pa_y[j] - 0.75 * fl2_fx * pc_y[j] - 1.5 * fl1_fx * pa_yy[j] * pc_y[j] - 0.5 * fl1_fx * pa_yyy[j] - 1.5 * pa_xy[j] * fl1_fx * pc_x[j]);
 
-                t_xyyy_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pa_y[j] + 1.5 * fl1_fx * pa_y[j] * pc_yy[j] + 1.5 * fl1_fx * pa_yy[j] * pc_y[j] + 1.5 * pa_xy[j] * fl1_fx * pc_x[j] + 1.5 * pa_x[j] * pc_xy[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] + 1.5 * pc_xx[j] * pa_y[j] * fl1_fx + 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] + 1.5 * pc_xy[j] * fl1_fx * pb_x[j] + 3.0 * pa_xyy[j] * pc_xy[j] + 3.0 * pa_xy[j] * pc_yy[j] * pb_x[j] + pc_xx[j] * pa_yyy[j] + 3.0 * pc_xy[j] * pa_yy[j] * pb_x[j]);
+                t_xyyy_x[j] += fl_s_0_0_1 * (- 1.5 * pa_xy[j] * fl1_fx * pb_x[j] - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] - pa_xyyy[j] * pc_x[j] - 3.0 * pa_xyy[j] * pc_y[j] * pb_x[j]);
 
-                t_xyyy_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 0.5 * fl1_fx * pc_yyy[j] - 1.5 * fl1_fx * pa_y[j] * pc_yy[j] - 1.5 * pa_x[j] * pc_xy[j] * fl1_fx - 1.5 * pc_xx[j] * pa_y[j] * fl1_fx - 1.5 * pc_xxy[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_x[j] - 3.0 * pa_xy[j] * pc_xyy[j] - pa_x[j] * pc_yyy[j] * pb_x[j] - 3.0 * pc_xxy[j] * pa_yy[j] - 3.0 * pc_xyy[j] * pa_y[j] * pb_x[j]);
+                t_xyyy_x[j] += -fl_s_0_0_1 * pc_x[j] * pa_yyy[j] * pb_x[j];
+
+                t_xyyy_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pa_y[j] + 1.5 * fl1_fx * pa_y[j] * pc_yy[j] + 1.5 * fl1_fx * pa_yy[j] * pc_y[j] + 1.5 * pa_xy[j] * fl1_fx * pc_x[j]);
+
+                t_xyyy_x[j] += fl_s_0_0_2 * (+ 1.5 * pa_x[j] * pc_xy[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] + 1.5 * pc_xx[j] * pa_y[j] * fl1_fx + 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] + 1.5 * pc_xy[j] * fl1_fx * pb_x[j]);
+
+                t_xyyy_x[j] += fl_s_0_0_2 * (+ 3.0 * pa_xyy[j] * pc_xy[j] + 3.0 * pa_xy[j] * pc_yy[j] * pb_x[j] + pc_xx[j] * pa_yyy[j] + 3.0 * pc_xy[j] * pa_yy[j] * pb_x[j]);
+
+                t_xyyy_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 0.5 * fl1_fx * pc_yyy[j] - 1.5 * fl1_fx * pa_y[j] * pc_yy[j] - 1.5 * pa_x[j] * pc_xy[j] * fl1_fx - 1.5 * pc_xx[j] * pa_y[j] * fl1_fx);
+
+                t_xyyy_x[j] += fl_s_0_0_3 * (- 1.5 * pc_xxy[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_x[j] - 3.0 * pa_xy[j] * pc_xyy[j] - pa_x[j] * pc_yyy[j] * pb_x[j] - 3.0 * pc_xxy[j] * pa_yy[j]);
+
+                t_xyyy_x[j] += -fl_s_0_0_3 * 3.0 * pc_xyy[j] * pa_y[j] * pb_x[j];
 
                 t_xyyy_x[j] += fl_s_0_0_4 * (0.5 * fl1_fx * pc_yyy[j] + 1.5 * pc_xxy[j] * fl1_fx + pa_x[j] * pc_xyyy[j] + 3.0 * pc_xxyy[j] * pa_y[j] + pc_xyyy[j] * pb_x[j]);
 
@@ -9954,11 +10858,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyyy_y[j] = fl_s_0_0_0 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pa_xyy[j] * fl1_fx + 1.5 * pa_xy[j] * fl1_fx * pb_y[j] + pa_xyyy[j] * pb_y[j]);
 
-                t_xyyy_y[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 1.5 * pa_xyy[j] * fl1_fx - 4.5 * pa_xy[j] * pc_y[j] * fl1_fx - 1.5 * pc_x[j] * pa_yy[j] * fl1_fx - 1.5 * pa_xy[j] * fl1_fx * pb_y[j] - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] - pa_xyyy[j] * pc_y[j] - 3.0 * pa_xyy[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yyy[j] * pb_y[j]);
+                t_xyyy_y[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 1.5 * pa_xyy[j] * fl1_fx - 4.5 * pa_xy[j] * pc_y[j] * fl1_fx - 1.5 * pc_x[j] * pa_yy[j] * fl1_fx);
 
-                t_xyyy_y[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 4.5 * pa_xy[j] * pc_y[j] * fl1_fx + 3.0 * pa_x[j] * pc_yy[j] * fl1_fx + 1.5 * pc_x[j] * pa_yy[j] * fl1_fx + 4.5 * pc_xy[j] * pa_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] + 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_y[j] + 3.0 * pa_xyy[j] * pc_yy[j] + 3.0 * pa_xy[j] * pc_yy[j] * pb_y[j] + pc_xy[j] * pa_yyy[j] + 3.0 * pc_xy[j] * pa_yy[j] * pb_y[j]);
+                t_xyyy_y[j] += fl_s_0_0_1 * (- 1.5 * pa_xy[j] * fl1_fx * pb_y[j] - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] - pa_xyyy[j] * pc_y[j] - 3.0 * pa_xyy[j] * pc_y[j] * pb_y[j]);
 
-                t_xyyy_y[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_yy[j] * fl1_fx - 4.5 * pc_xy[j] * pa_y[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_y[j] - 3.0 * pa_xy[j] * pc_yyy[j] - pa_x[j] * pc_yyy[j] * pb_y[j] - 3.0 * pc_xyy[j] * pa_yy[j] - 3.0 * pc_xyy[j] * pa_y[j] * pb_y[j]);
+                t_xyyy_y[j] += -fl_s_0_0_1 * pc_x[j] * pa_yyy[j] * pb_y[j];
+
+                t_xyyy_y[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 4.5 * pa_xy[j] * pc_y[j] * fl1_fx + 3.0 * pa_x[j] * pc_yy[j] * fl1_fx + 1.5 * pc_x[j] * pa_yy[j] * fl1_fx);
+
+                t_xyyy_y[j] += fl_s_0_0_2 * (+ 4.5 * pc_xy[j] * pa_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] + 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] + 1.5 * pc_xy[j] * fl1_fx * pb_y[j] + 3.0 * pa_xyy[j] * pc_yy[j]);
+
+                t_xyyy_y[j] += fl_s_0_0_2 * (+ 3.0 * pa_xy[j] * pc_yy[j] * pb_y[j] + pc_xy[j] * pa_yyy[j] + 3.0 * pc_xy[j] * pa_yy[j] * pb_y[j]);
+
+                t_xyyy_y[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_yy[j] * fl1_fx - 4.5 * pc_xy[j] * pa_y[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_y[j]);
+
+                t_xyyy_y[j] += fl_s_0_0_3 * (- 3.0 * pa_xy[j] * pc_yyy[j] - pa_x[j] * pc_yyy[j] * pb_y[j] - 3.0 * pc_xyy[j] * pa_yy[j] - 3.0 * pc_xyy[j] * pa_y[j] * pb_y[j]);
 
                 t_xyyy_y[j] += fl_s_0_0_4 * (3.0 * pc_xyy[j] * fl1_fx + pa_x[j] * pc_yyyy[j] + 3.0 * pc_xyyy[j] * pa_y[j] + pc_xyyy[j] * pb_y[j]);
 
@@ -9966,11 +10880,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyyy_z[j] = fl_s_0_0_0 * (1.5 * pa_xy[j] * fl1_fx * pb_z[j] + pa_xyyy[j] * pb_z[j]);
 
-                t_xyyy_z[j] += fl_s_0_0_1 * (-1.5 * pa_xy[j] * fl1_fx * pc_z[j] - 1.5 * pa_xy[j] * fl1_fx * pb_z[j] - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j] - pa_xyyy[j] * pc_z[j] - 3.0 * pa_xyy[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yyy[j] * pb_z[j]);
+                t_xyyy_z[j] += fl_s_0_0_1 * (-1.5 * pa_xy[j] * fl1_fx * pc_z[j] - 1.5 * pa_xy[j] * fl1_fx * pb_z[j] - 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j] - pa_xyyy[j] * pc_z[j]);
 
-                t_xyyy_z[j] += fl_s_0_0_2 * (1.5 * pa_xy[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] + 1.5 * pc_xz[j] * pa_y[j] * fl1_fx + 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j] + 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 3.0 * pa_xyy[j] * pc_yz[j] + 3.0 * pa_xy[j] * pc_yy[j] * pb_z[j] + pc_xz[j] * pa_yyy[j] + 3.0 * pc_xy[j] * pa_yy[j] * pb_z[j]);
+                t_xyyy_z[j] += fl_s_0_0_1 * (- 3.0 * pa_xyy[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yyy[j] * pb_z[j]);
 
-                t_xyyy_z[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pa_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_xy[j] * pc_yyz[j] - pa_x[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_xyz[j] * pa_yy[j] - 3.0 * pc_xyy[j] * pa_y[j] * pb_z[j]);
+                t_xyyy_z[j] += fl_s_0_0_2 * (1.5 * pa_xy[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] + 1.5 * pc_xz[j] * pa_y[j] * fl1_fx + 1.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j]);
+
+                t_xyyy_z[j] += fl_s_0_0_2 * (+ 1.5 * pc_xy[j] * fl1_fx * pb_z[j] + 3.0 * pa_xyy[j] * pc_yz[j] + 3.0 * pa_xy[j] * pc_yy[j] * pb_z[j] + pc_xz[j] * pa_yyy[j] + 3.0 * pc_xy[j] * pa_yy[j] * pb_z[j]);
+
+                t_xyyy_z[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pa_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pb_z[j] - 3.0 * pa_xy[j] * pc_yyz[j]);
+
+                t_xyyy_z[j] += fl_s_0_0_3 * (- pa_x[j] * pc_yyy[j] * pb_z[j] - 3.0 * pc_xyz[j] * pa_yy[j] - 3.0 * pc_xyy[j] * pa_y[j] * pb_z[j]);
 
                 t_xyyy_z[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_x[j] * pc_yyyz[j] + 3.0 * pc_xyyz[j] * pa_y[j] + pc_xyyy[j] * pb_z[j]);
 
@@ -10165,23 +11085,53 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyyz_x[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pa_z[j] + 0.5 * fl1_fx * pa_yyz[j] + 0.5 * pa_xz[j] * fl1_fx * pb_x[j] + pa_xyyz[j] * pb_x[j]);
 
-                t_xyyz_x[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pa_z[j] - 0.5 * fl1_fx * pa_yy[j] * pc_z[j] - fl1_fx * pa_yz[j] * pc_y[j] - 0.5 * fl1_fx * pa_yyz[j] - 0.5 * pa_xz[j] * fl1_fx * pc_x[j] - 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] - 0.5 * pa_xz[j] * fl1_fx * pb_x[j] - 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] - pa_xyyz[j] * pc_x[j] - pa_xyy[j] * pc_z[j] * pb_x[j] - 2.0 * pa_xyz[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yyz[j] * pb_x[j]);
+                t_xyyz_x[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl2_fx * pa_z[j] - 0.5 * fl1_fx * pa_yy[j] * pc_z[j] - fl1_fx * pa_yz[j] * pc_y[j] - 0.5 * fl1_fx * pa_yyz[j]);
 
-                t_xyyz_x[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pa_z[j] + fl1_fx * pa_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pa_z[j] + 0.5 * fl1_fx * pa_yy[j] * pc_z[j] + fl1_fx * pa_yz[j] * pc_y[j] + 0.5 * pa_x[j] * fl1_fx * pc_xz[j] + 0.5 * pa_xz[j] * fl1_fx * pc_x[j] + 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] + 0.5 * pc_xx[j] * fl1_fx * pa_z[j] + 0.5 * pc_xz[j] * fl1_fx * pb_x[j] + 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] + pa_xyy[j] * pc_xz[j] + 2.0 * pa_xyz[j] * pc_xy[j] + 2.0 * pa_xy[j] * pc_yz[j] * pb_x[j] + pa_xz[j] * pc_yy[j] * pb_x[j] + pc_xx[j] * pa_yyz[j] + pc_xz[j] * pa_yy[j] * pb_x[j] + 2.0 * pc_xy[j] * pa_yz[j] * pb_x[j]);
+                t_xyyz_x[j] += fl_s_0_0_1 * (- 0.5 * pa_xz[j] * fl1_fx * pc_x[j] - 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] - 0.5 * pa_xz[j] * fl1_fx * pb_x[j] - 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] - pa_xyyz[j] * pc_x[j]);
 
-                t_xyyz_x[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl1_fx * pc_yyz[j] - fl1_fx * pa_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pa_z[j] - 0.5 * pa_x[j] * fl1_fx * pc_xz[j] - 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pa_z[j] - 0.5 * pc_xz[j] * fl1_fx * pb_x[j] - 2.0 * pa_xy[j] * pc_xyz[j] - pa_xz[j] * pc_xyy[j] - pa_x[j] * pc_yyz[j] * pb_x[j] - pc_xxz[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_yz[j] - 2.0 * pc_xyz[j] * pa_y[j] * pb_x[j] - pc_xyy[j] * pa_z[j] * pb_x[j]);
+                t_xyyz_x[j] += fl_s_0_0_1 * (- pa_xyy[j] * pc_z[j] * pb_x[j] - 2.0 * pa_xyz[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yyz[j] * pb_x[j]);
 
-                t_xyyz_x[j] += fl_s_0_0_4 * (0.5 * fl1_fx * pc_yyz[j] + 0.5 * pc_xxz[j] * fl1_fx + pa_x[j] * pc_xyyz[j] + 2.0 * pc_xxyz[j] * pa_y[j] + pc_xxyy[j] * pa_z[j] + pc_xyyz[j] * pb_x[j]);
+                t_xyyz_x[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_z[j] + 0.25 * fl2_fx * pa_z[j] + fl1_fx * pa_y[j] * pc_yz[j] + 0.5 * fl1_fx * pc_yy[j] * pa_z[j] + 0.5 * fl1_fx * pa_yy[j] * pc_z[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_2 * (+ fl1_fx * pa_yz[j] * pc_y[j] + 0.5 * pa_x[j] * fl1_fx * pc_xz[j] + 0.5 * pa_xz[j] * fl1_fx * pc_x[j] + 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_x[j] + 0.5 * pc_xx[j] * fl1_fx * pa_z[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_2 * (+ 0.5 * pc_xz[j] * fl1_fx * pb_x[j] + 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_x[j] + pa_xyy[j] * pc_xz[j] + 2.0 * pa_xyz[j] * pc_xy[j] + 2.0 * pa_xy[j] * pc_yz[j] * pb_x[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_2 * (+ pa_xz[j] * pc_yy[j] * pb_x[j] + pc_xx[j] * pa_yyz[j] + pc_xz[j] * pa_yy[j] * pb_x[j] + 2.0 * pc_xy[j] * pa_yz[j] * pb_x[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_z[j] - 0.5 * fl1_fx * pc_yyz[j] - fl1_fx * pa_y[j] * pc_yz[j] - 0.5 * fl1_fx * pc_yy[j] * pa_z[j] - 0.5 * pa_x[j] * fl1_fx * pc_xz[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_3 * (- 0.5 * pc_xxz[j] * fl1_fx - 0.5 * pc_xx[j] * fl1_fx * pa_z[j] - 0.5 * pc_xz[j] * fl1_fx * pb_x[j] - 2.0 * pa_xy[j] * pc_xyz[j] - pa_xz[j] * pc_xyy[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_3 * (- pa_x[j] * pc_yyz[j] * pb_x[j] - pc_xxz[j] * pa_yy[j] - 2.0 * pc_xxy[j] * pa_yz[j] - 2.0 * pc_xyz[j] * pa_y[j] * pb_x[j] - pc_xyy[j] * pa_z[j] * pb_x[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_4 * (0.5 * fl1_fx * pc_yyz[j] + 0.5 * pc_xxz[j] * fl1_fx + pa_x[j] * pc_xyyz[j] + 2.0 * pc_xxyz[j] * pa_y[j] + pc_xxyy[j] * pa_z[j]);
+
+                t_xyyz_x[j] += fl_s_0_0_4 * pc_xyyz[j] * pb_x[j];
 
                 t_xyyz_x[j] += -fl_s_0_0_5 * pc_xxyyz[j];
 
                 t_xyyz_y[j] = fl_s_0_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * pa_xz[j] * fl1_fx * pb_y[j] + pa_xyyz[j] * pb_y[j]);
 
-                t_xyyz_y[j] += fl_s_0_0_1 * (-pa_xy[j] * fl1_fx * pc_z[j] - pa_xyz[j] * fl1_fx - 1.5 * pa_xz[j] * pc_y[j] * fl1_fx - pc_x[j] * pa_yz[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j] - 0.5 * pa_xz[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] - pa_xyyz[j] * pc_y[j] - pa_xyy[j] * pc_z[j] * pb_y[j] - 2.0 * pa_xyz[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yyz[j] * pb_y[j]);
+                t_xyyz_y[j] += fl_s_0_0_1 * (-pa_xy[j] * fl1_fx * pc_z[j] - pa_xyz[j] * fl1_fx - 1.5 * pa_xz[j] * pc_y[j] * fl1_fx - pc_x[j] * pa_yz[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j]);
 
-                t_xyyz_y[j] += fl_s_0_0_2 * (pa_xy[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_xz[j] * pc_y[j] * fl1_fx + pc_xz[j] * pa_y[j] * fl1_fx + pc_x[j] * pa_yz[j] * fl1_fx + 1.5 * pc_xy[j] * fl1_fx * pa_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j] + 0.5 * pc_xz[j] * fl1_fx * pb_y[j] + 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] + pa_xyy[j] * pc_yz[j] + 2.0 * pa_xyz[j] * pc_yy[j] + 2.0 * pa_xy[j] * pc_yz[j] * pb_y[j] + pa_xz[j] * pc_yy[j] * pb_y[j] + pc_xy[j] * pa_yyz[j] + pc_xz[j] * pa_yy[j] * pb_y[j] + 2.0 * pc_xy[j] * pa_yz[j] * pb_y[j]);
+                t_xyyz_y[j] += fl_s_0_0_1 * (- 0.5 * pa_xz[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] - pa_xyyz[j] * pc_y[j] - pa_xyy[j] * pc_z[j] * pb_y[j] - 2.0 * pa_xyz[j] * pc_y[j] * pb_y[j]);
 
-                t_xyyz_y[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - pc_xz[j] * pa_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 0.5 * pc_xz[j] * fl1_fx * pb_y[j] - 2.0 * pa_xy[j] * pc_yyz[j] - pa_xz[j] * pc_yyy[j] - pa_x[j] * pc_yyz[j] * pb_y[j] - pc_xyz[j] * pa_yy[j] - 2.0 * pc_xyy[j] * pa_yz[j] - 2.0 * pc_xyz[j] * pa_y[j] * pb_y[j] - pc_xyy[j] * pa_z[j] * pb_y[j]);
+                t_xyyz_y[j] += -fl_s_0_0_1 * pc_x[j] * pa_yyz[j] * pb_y[j];
+
+                t_xyyz_y[j] += fl_s_0_0_2 * (pa_xy[j] * fl1_fx * pc_z[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_xz[j] * pc_y[j] * fl1_fx + pc_xz[j] * pa_y[j] * fl1_fx + pc_x[j] * pa_yz[j] * fl1_fx);
+
+                t_xyyz_y[j] += fl_s_0_0_2 * (+ 1.5 * pc_xy[j] * fl1_fx * pa_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_y[j] + 0.5 * pc_xz[j] * fl1_fx * pb_y[j] + 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_y[j] + pa_xyy[j] * pc_yz[j]);
+
+                t_xyyz_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_xyz[j] * pc_yy[j] + 2.0 * pa_xy[j] * pc_yz[j] * pb_y[j] + pa_xz[j] * pc_yy[j] * pb_y[j] + pc_xy[j] * pa_yyz[j] + pc_xz[j] * pa_yy[j] * pb_y[j]);
+
+                t_xyyz_y[j] += fl_s_0_0_2 * 2.0 * pc_xy[j] * pa_yz[j] * pb_y[j];
+
+                t_xyyz_y[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - pc_xz[j] * pa_y[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 0.5 * pc_xz[j] * fl1_fx * pb_y[j]);
+
+                t_xyyz_y[j] += fl_s_0_0_3 * (- 2.0 * pa_xy[j] * pc_yyz[j] - pa_xz[j] * pc_yyy[j] - pa_x[j] * pc_yyz[j] * pb_y[j] - pc_xyz[j] * pa_yy[j] - 2.0 * pc_xyy[j] * pa_yz[j]);
+
+                t_xyyz_y[j] += fl_s_0_0_3 * (- 2.0 * pc_xyz[j] * pa_y[j] * pb_y[j] - pc_xyy[j] * pa_z[j] * pb_y[j]);
 
                 t_xyyz_y[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_x[j] * pc_yyyz[j] + 2.0 * pc_xyyz[j] * pa_y[j] + pc_xyyy[j] * pa_z[j] + pc_xyyz[j] * pb_y[j]);
 
@@ -10189,13 +11139,29 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyyz_z[j] = fl_s_0_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_xyy[j] * fl1_fx + 0.5 * pa_xz[j] * fl1_fx * pb_z[j] + pa_xyyz[j] * pb_z[j]);
 
-                t_xyyz_z[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.25 * pc_x[j] * fl2_fx - 0.5 * pa_xyy[j] * fl1_fx - pa_xy[j] * pc_y[j] * fl1_fx - 0.5 * pc_x[j] * pa_yy[j] * fl1_fx - 0.5 * pa_xz[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] - 0.5 * pa_xz[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j] - pa_xyyz[j] * pc_z[j] - pa_xyy[j] * pc_z[j] * pb_z[j] - 2.0 * pa_xyz[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yyz[j] * pb_z[j]);
+                t_xyyz_z[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.25 * pc_x[j] * fl2_fx - 0.5 * pa_xyy[j] * fl1_fx - pa_xy[j] * pc_y[j] * fl1_fx - 0.5 * pc_x[j] * pa_yy[j] * fl1_fx);
 
-                t_xyyz_z[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pc_x[j] * fl2_fx + pa_xy[j] * pc_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_yy[j] * fl1_fx + 0.5 * pc_x[j] * pa_yy[j] * fl1_fx + pc_xy[j] * pa_y[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pc_zz[j] + 0.5 * pa_xz[j] * fl1_fx * pc_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] + 0.5 * pc_xz[j] * fl1_fx * pa_z[j] + 0.5 * pc_xz[j] * fl1_fx * pb_z[j] + 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j] + pa_xyy[j] * pc_zz[j] + 2.0 * pa_xyz[j] * pc_yz[j] + 2.0 * pa_xy[j] * pc_yz[j] * pb_z[j] + pa_xz[j] * pc_yy[j] * pb_z[j] + pc_xz[j] * pa_yyz[j] + pc_xz[j] * pa_yy[j] * pb_z[j] + 2.0 * pc_xy[j] * pa_yz[j] * pb_z[j]);
+                t_xyyz_z[j] += fl_s_0_0_1 * (- 0.5 * pa_xz[j] * fl1_fx * pc_z[j] - 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] - 0.5 * pa_xz[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j] - pa_xyyz[j] * pc_z[j]);
 
-                t_xyyz_z[j] += fl_s_0_0_3 * (-0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_yy[j] * fl1_fx - pc_xy[j] * pa_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j] - 0.5 * pc_xzz[j] * fl1_fx - 0.5 * pc_xz[j] * fl1_fx * pa_z[j] - 0.5 * pc_xz[j] * fl1_fx * pb_z[j] - 2.0 * pa_xy[j] * pc_yzz[j] - pa_xz[j] * pc_yyz[j] - pa_x[j] * pc_yyz[j] * pb_z[j] - pc_xzz[j] * pa_yy[j] - 2.0 * pc_xyz[j] * pa_yz[j] - 2.0 * pc_xyz[j] * pa_y[j] * pb_z[j] - pc_xyy[j] * pa_z[j] * pb_z[j]);
+                t_xyyz_z[j] += fl_s_0_0_1 * (- pa_xyy[j] * pc_z[j] * pb_z[j] - 2.0 * pa_xyz[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yyz[j] * pb_z[j]);
 
-                t_xyyz_z[j] += fl_s_0_0_4 * (0.5 * pc_xyy[j] * fl1_fx + 0.5 * pc_xzz[j] * fl1_fx + pa_x[j] * pc_yyzz[j] + 2.0 * pc_xyzz[j] * pa_y[j] + pc_xyyz[j] * pa_z[j] + pc_xyyz[j] * pb_z[j]);
+                t_xyyz_z[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pc_x[j] * fl2_fx + pa_xy[j] * pc_y[j] * fl1_fx + 0.5 * pa_x[j] * pc_yy[j] * fl1_fx + 0.5 * pc_x[j] * pa_yy[j] * fl1_fx);
+
+                t_xyyz_z[j] += fl_s_0_0_2 * (+ pc_xy[j] * pa_y[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pc_zz[j] + 0.5 * pa_xz[j] * fl1_fx * pc_z[j] + 0.5 * pa_x[j] * fl1_fx * pc_z[j] * pb_z[j] + 0.5 * pc_xz[j] * fl1_fx * pa_z[j]);
+
+                t_xyyz_z[j] += fl_s_0_0_2 * (+ 0.5 * pc_xz[j] * fl1_fx * pb_z[j] + 0.5 * pc_x[j] * fl1_fx * pa_z[j] * pb_z[j] + pa_xyy[j] * pc_zz[j] + 2.0 * pa_xyz[j] * pc_yz[j] + 2.0 * pa_xy[j] * pc_yz[j] * pb_z[j]);
+
+                t_xyyz_z[j] += fl_s_0_0_2 * (+ pa_xz[j] * pc_yy[j] * pb_z[j] + pc_xz[j] * pa_yyz[j] + pc_xz[j] * pa_yy[j] * pb_z[j] + 2.0 * pc_xy[j] * pa_yz[j] * pb_z[j]);
+
+                t_xyyz_z[j] += fl_s_0_0_3 * (-0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * pc_yy[j] * fl1_fx - pc_xy[j] * pa_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j]);
+
+                t_xyyz_z[j] += fl_s_0_0_3 * (- 0.5 * pc_xzz[j] * fl1_fx - 0.5 * pc_xz[j] * fl1_fx * pa_z[j] - 0.5 * pc_xz[j] * fl1_fx * pb_z[j] - 2.0 * pa_xy[j] * pc_yzz[j] - pa_xz[j] * pc_yyz[j]);
+
+                t_xyyz_z[j] += fl_s_0_0_3 * (- pa_x[j] * pc_yyz[j] * pb_z[j] - pc_xzz[j] * pa_yy[j] - 2.0 * pc_xyz[j] * pa_yz[j] - 2.0 * pc_xyz[j] * pa_y[j] * pb_z[j] - pc_xyy[j] * pa_z[j] * pb_z[j]);
+
+                t_xyyz_z[j] += fl_s_0_0_4 * (0.5 * pc_xyy[j] * fl1_fx + 0.5 * pc_xzz[j] * fl1_fx + pa_x[j] * pc_yyzz[j] + 2.0 * pc_xyzz[j] * pa_y[j] + pc_xyyz[j] * pa_z[j]);
+
+                t_xyyz_z[j] += fl_s_0_0_4 * pc_xyyz[j] * pb_z[j];
 
                 t_xyyz_z[j] += -fl_s_0_0_5 * pc_xyyzz[j];
             }
@@ -10388,35 +11354,81 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xyzz_x[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pa_y[j] + 0.5 * fl1_fx * pa_yzz[j] + 0.5 * pa_xy[j] * fl1_fx * pb_x[j] + pa_xyzz[j] * pb_x[j]);
 
-                t_xyzz_x[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pa_y[j] - 0.25 * fl2_fx * pc_y[j] - fl1_fx * pa_yz[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pa_zz[j] - 0.5 * fl1_fx * pa_yzz[j] - 0.5 * pa_xy[j] * fl1_fx * pc_x[j] - 0.5 * pa_xy[j] * fl1_fx * pb_x[j] - 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] - pa_xyzz[j] * pc_x[j] - 2.0 * pa_xyz[j] * pc_z[j] * pb_x[j] - pa_xzz[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yzz[j] * pb_x[j]);
+                t_xyzz_x[j] += fl_s_0_0_1 * (-0.5 * fl2_fx * pa_y[j] - 0.25 * fl2_fx * pc_y[j] - fl1_fx * pa_yz[j] * pc_z[j] - 0.5 * fl1_fx * pc_y[j] * pa_zz[j] - 0.5 * fl1_fx * pa_yzz[j]);
 
-                t_xyzz_x[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pa_y[j] + 0.5 * fl1_fx * pa_y[j] * pc_zz[j] + fl1_fx * pc_yz[j] * pa_z[j] + fl1_fx * pa_yz[j] * pc_z[j] + 0.5 * fl1_fx * pc_y[j] * pa_zz[j] + 0.5 * pa_xy[j] * fl1_fx * pc_x[j] + 0.5 * pa_x[j] * pc_xy[j] * fl1_fx + 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] + 0.5 * pc_xx[j] * pa_y[j] * fl1_fx + 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] + 0.5 * pc_xy[j] * fl1_fx * pb_x[j] + 2.0 * pa_xyz[j] * pc_xz[j] + pa_xy[j] * pc_zz[j] * pb_x[j] + pa_xzz[j] * pc_xy[j] + 2.0 * pa_xz[j] * pc_yz[j] * pb_x[j] + pc_xx[j] * pa_yzz[j] + 2.0 * pc_xz[j] * pa_yz[j] * pb_x[j] + pc_xy[j] * pa_zz[j] * pb_x[j]);
+                t_xyzz_x[j] += fl_s_0_0_1 * (- 0.5 * pa_xy[j] * fl1_fx * pc_x[j] - 0.5 * pa_xy[j] * fl1_fx * pb_x[j] - 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] - pa_xyzz[j] * pc_x[j]);
 
-                t_xyzz_x[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * fl1_fx * pc_yzz[j] - 0.5 * fl1_fx * pa_y[j] * pc_zz[j] - fl1_fx * pc_yz[j] * pa_z[j] - 0.5 * pa_x[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xx[j] * pa_y[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_xy[j] * fl1_fx * pb_x[j] - pa_xy[j] * pc_xzz[j] - 2.0 * pa_xz[j] * pc_xyz[j] - pa_x[j] * pc_yzz[j] * pb_x[j] - 2.0 * pc_xxz[j] * pa_yz[j] - pc_xzz[j] * pa_y[j] * pb_x[j] - pc_xxy[j] * pa_zz[j] - 2.0 * pc_xyz[j] * pa_z[j] * pb_x[j]);
+                t_xyzz_x[j] += fl_s_0_0_1 * (- 2.0 * pa_xyz[j] * pc_z[j] * pb_x[j] - pa_xzz[j] * pc_y[j] * pb_x[j] - pc_x[j] * pa_yzz[j] * pb_x[j]);
 
-                t_xyzz_x[j] += fl_s_0_0_4 * (0.5 * fl1_fx * pc_yzz[j] + 0.5 * pc_xxy[j] * fl1_fx + pa_x[j] * pc_xyzz[j] + pc_xxzz[j] * pa_y[j] + 2.0 * pc_xxyz[j] * pa_z[j] + pc_xyzz[j] * pb_x[j]);
+                t_xyzz_x[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_y[j] + 0.25 * fl2_fx * pa_y[j] + 0.5 * fl1_fx * pa_y[j] * pc_zz[j] + fl1_fx * pc_yz[j] * pa_z[j] + fl1_fx * pa_yz[j] * pc_z[j]);
+
+                t_xyzz_x[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pc_y[j] * pa_zz[j] + 0.5 * pa_xy[j] * fl1_fx * pc_x[j] + 0.5 * pa_x[j] * pc_xy[j] * fl1_fx + 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_x[j] + 0.5 * pc_xx[j] * pa_y[j] * fl1_fx);
+
+                t_xyzz_x[j] += fl_s_0_0_2 * (+ 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_x[j] + 0.5 * pc_xy[j] * fl1_fx * pb_x[j] + 2.0 * pa_xyz[j] * pc_xz[j] + pa_xy[j] * pc_zz[j] * pb_x[j] + pa_xzz[j] * pc_xy[j]);
+
+                t_xyzz_x[j] += fl_s_0_0_2 * (+ 2.0 * pa_xz[j] * pc_yz[j] * pb_x[j] + pc_xx[j] * pa_yzz[j] + 2.0 * pc_xz[j] * pa_yz[j] * pb_x[j] + pc_xy[j] * pa_zz[j] * pb_x[j]);
+
+                t_xyzz_x[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_y[j] - 0.5 * fl1_fx * pc_yzz[j] - 0.5 * fl1_fx * pa_y[j] * pc_zz[j] - fl1_fx * pc_yz[j] * pa_z[j] - 0.5 * pa_x[j] * pc_xy[j] * fl1_fx);
+
+                t_xyzz_x[j] += fl_s_0_0_3 * (- 0.5 * pc_xx[j] * pa_y[j] * fl1_fx - 0.5 * pc_xxy[j] * fl1_fx - 0.5 * pc_xy[j] * fl1_fx * pb_x[j] - pa_xy[j] * pc_xzz[j] - 2.0 * pa_xz[j] * pc_xyz[j]);
+
+                t_xyzz_x[j] += fl_s_0_0_3 * (- pa_x[j] * pc_yzz[j] * pb_x[j] - 2.0 * pc_xxz[j] * pa_yz[j] - pc_xzz[j] * pa_y[j] * pb_x[j] - pc_xxy[j] * pa_zz[j] - 2.0 * pc_xyz[j] * pa_z[j] * pb_x[j]);
+
+                t_xyzz_x[j] += fl_s_0_0_4 * (0.5 * fl1_fx * pc_yzz[j] + 0.5 * pc_xxy[j] * fl1_fx + pa_x[j] * pc_xyzz[j] + pc_xxzz[j] * pa_y[j] + 2.0 * pc_xxyz[j] * pa_z[j]);
+
+                t_xyzz_x[j] += fl_s_0_0_4 * pc_xyzz[j] * pb_x[j];
 
                 t_xyzz_x[j] += -fl_s_0_0_5 * pc_xxyzz[j];
 
                 t_xyzz_y[j] = fl_s_0_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_xzz[j] * fl1_fx + 0.5 * pa_xy[j] * fl1_fx * pb_y[j] + pa_xyzz[j] * pb_y[j]);
 
-                t_xyzz_y[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.25 * pc_x[j] * fl2_fx - pa_xz[j] * fl1_fx * pc_z[j] - 0.5 * pa_xzz[j] * fl1_fx - 0.5 * pc_x[j] * fl1_fx * pa_zz[j] - 0.5 * pa_xy[j] * fl1_fx * pc_y[j] - 0.5 * pa_xy[j] * fl1_fx * pb_y[j] - 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] - pa_xyzz[j] * pc_y[j] - 2.0 * pa_xyz[j] * pc_z[j] * pb_y[j] - pa_xzz[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yzz[j] * pb_y[j]);
+                t_xyzz_y[j] += fl_s_0_0_1 * (-0.5 * pa_x[j] * fl2_fx - 0.25 * pc_x[j] * fl2_fx - pa_xz[j] * fl1_fx * pc_z[j] - 0.5 * pa_xzz[j] * fl1_fx - 0.5 * pc_x[j] * fl1_fx * pa_zz[j]);
 
-                t_xyzz_y[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pc_x[j] * fl2_fx + 0.5 * pa_x[j] * fl1_fx * pc_zz[j] + pa_xz[j] * fl1_fx * pc_z[j] + pc_xz[j] * fl1_fx * pa_z[j] + 0.5 * pc_x[j] * fl1_fx * pa_zz[j] + 0.5 * pa_xy[j] * fl1_fx * pc_y[j] + 0.5 * pa_x[j] * pc_yy[j] * fl1_fx + 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] + 0.5 * pc_xy[j] * pa_y[j] * fl1_fx + 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] + 0.5 * pc_xy[j] * fl1_fx * pb_y[j] + 2.0 * pa_xyz[j] * pc_yz[j] + pa_xy[j] * pc_zz[j] * pb_y[j] + pa_xzz[j] * pc_yy[j] + 2.0 * pa_xz[j] * pc_yz[j] * pb_y[j] + pc_xy[j] * pa_yzz[j] + 2.0 * pc_xz[j] * pa_yz[j] * pb_y[j] + pc_xy[j] * pa_zz[j] * pb_y[j]);
+                t_xyzz_y[j] += fl_s_0_0_1 * (- 0.5 * pa_xy[j] * fl1_fx * pc_y[j] - 0.5 * pa_xy[j] * fl1_fx * pb_y[j] - 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] - pa_xyzz[j] * pc_y[j]);
 
-                t_xyzz_y[j] += fl_s_0_0_3 * (-0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j] - 0.5 * pc_xzz[j] * fl1_fx - pc_xz[j] * fl1_fx * pa_z[j] - 0.5 * pa_x[j] * pc_yy[j] * fl1_fx - 0.5 * pc_xy[j] * pa_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * pc_xy[j] * fl1_fx * pb_y[j] - pa_xy[j] * pc_yzz[j] - 2.0 * pa_xz[j] * pc_yyz[j] - pa_x[j] * pc_yzz[j] * pb_y[j] - 2.0 * pc_xyz[j] * pa_yz[j] - pc_xzz[j] * pa_y[j] * pb_y[j] - pc_xyy[j] * pa_zz[j] - 2.0 * pc_xyz[j] * pa_z[j] * pb_y[j]);
+                t_xyzz_y[j] += fl_s_0_0_1 * (- 2.0 * pa_xyz[j] * pc_z[j] * pb_y[j] - pa_xzz[j] * pc_y[j] * pb_y[j] - pc_x[j] * pa_yzz[j] * pb_y[j]);
 
-                t_xyzz_y[j] += fl_s_0_0_4 * (0.5 * pc_xzz[j] * fl1_fx + 0.5 * pc_xyy[j] * fl1_fx + pa_x[j] * pc_yyzz[j] + pc_xyzz[j] * pa_y[j] + 2.0 * pc_xyyz[j] * pa_z[j] + pc_xyzz[j] * pb_y[j]);
+                t_xyzz_y[j] += fl_s_0_0_2 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pc_x[j] * fl2_fx + 0.5 * pa_x[j] * fl1_fx * pc_zz[j] + pa_xz[j] * fl1_fx * pc_z[j] + pc_xz[j] * fl1_fx * pa_z[j]);
+
+                t_xyzz_y[j] += fl_s_0_0_2 * (+ 0.5 * pc_x[j] * fl1_fx * pa_zz[j] + 0.5 * pa_xy[j] * fl1_fx * pc_y[j] + 0.5 * pa_x[j] * pc_yy[j] * fl1_fx + 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_y[j] + 0.5 * pc_xy[j] * pa_y[j] * fl1_fx);
+
+                t_xyzz_y[j] += fl_s_0_0_2 * (+ 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_y[j] + 0.5 * pc_xy[j] * fl1_fx * pb_y[j] + 2.0 * pa_xyz[j] * pc_yz[j] + pa_xy[j] * pc_zz[j] * pb_y[j] + pa_xzz[j] * pc_yy[j]);
+
+                t_xyzz_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_xz[j] * pc_yz[j] * pb_y[j] + pc_xy[j] * pa_yzz[j] + 2.0 * pc_xz[j] * pa_yz[j] * pb_y[j] + pc_xy[j] * pa_zz[j] * pb_y[j]);
+
+                t_xyzz_y[j] += fl_s_0_0_3 * (-0.25 * pc_x[j] * fl2_fx - 0.5 * pa_x[j] * fl1_fx * pc_zz[j] - 0.5 * pc_xzz[j] * fl1_fx - pc_xz[j] * fl1_fx * pa_z[j] - 0.5 * pa_x[j] * pc_yy[j] * fl1_fx);
+
+                t_xyzz_y[j] += fl_s_0_0_3 * (- 0.5 * pc_xy[j] * pa_y[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * pc_xy[j] * fl1_fx * pb_y[j] - pa_xy[j] * pc_yzz[j] - 2.0 * pa_xz[j] * pc_yyz[j]);
+
+                t_xyzz_y[j] += fl_s_0_0_3 * (- pa_x[j] * pc_yzz[j] * pb_y[j] - 2.0 * pc_xyz[j] * pa_yz[j] - pc_xzz[j] * pa_y[j] * pb_y[j] - pc_xyy[j] * pa_zz[j] - 2.0 * pc_xyz[j] * pa_z[j] * pb_y[j]);
+
+                t_xyzz_y[j] += fl_s_0_0_4 * (0.5 * pc_xzz[j] * fl1_fx + 0.5 * pc_xyy[j] * fl1_fx + pa_x[j] * pc_yyzz[j] + pc_xyzz[j] * pa_y[j] + 2.0 * pc_xyyz[j] * pa_z[j]);
+
+                t_xyzz_y[j] += fl_s_0_0_4 * pc_xyzz[j] * pb_y[j];
 
                 t_xyzz_y[j] += -fl_s_0_0_5 * pc_xyyzz[j];
 
                 t_xyzz_z[j] = fl_s_0_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * pa_xy[j] * fl1_fx * pb_z[j] + pa_xyzz[j] * pb_z[j]);
 
-                t_xyzz_z[j] += fl_s_0_0_1 * (-pa_xyz[j] * fl1_fx - 1.5 * pa_xy[j] * pc_z[j] * fl1_fx - pa_xz[j] * pc_y[j] * fl1_fx - pc_x[j] * pa_yz[j] * fl1_fx - 0.5 * pa_xy[j] * fl1_fx * pb_z[j] - 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j] - pa_xyzz[j] * pc_z[j] - 2.0 * pa_xyz[j] * pc_z[j] * pb_z[j] - pa_xzz[j] * pc_y[j] * pb_z[j] - pc_x[j] * pa_yzz[j] * pb_z[j]);
+                t_xyzz_z[j] += fl_s_0_0_1 * (-pa_xyz[j] * fl1_fx - 1.5 * pa_xy[j] * pc_z[j] * fl1_fx - pa_xz[j] * pc_y[j] * fl1_fx - pc_x[j] * pa_yz[j] * fl1_fx - 0.5 * pa_xy[j] * fl1_fx * pb_z[j]);
 
-                t_xyzz_z[j] += fl_s_0_0_2 * (1.5 * pa_xy[j] * pc_z[j] * fl1_fx + pa_xz[j] * pc_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + pc_x[j] * pa_yz[j] * fl1_fx + 1.5 * pc_xz[j] * pa_y[j] * fl1_fx + pc_xy[j] * pa_z[j] * fl1_fx + 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] + 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j] + 0.5 * pc_xy[j] * fl1_fx * pb_z[j] + 2.0 * pa_xyz[j] * pc_zz[j] + pa_xy[j] * pc_zz[j] * pb_z[j] + pa_xzz[j] * pc_yz[j] + 2.0 * pa_xz[j] * pc_yz[j] * pb_z[j] + pc_xz[j] * pa_yzz[j] + 2.0 * pc_xz[j] * pa_yz[j] * pb_z[j] + pc_xy[j] * pa_zz[j] * pb_z[j]);
+                t_xyzz_z[j] += fl_s_0_0_1 * (- 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] - 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j] - pa_xyzz[j] * pc_z[j] - 2.0 * pa_xyz[j] * pc_z[j] * pb_z[j] - pa_xzz[j] * pc_y[j] * pb_z[j]);
 
-                t_xyzz_z[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pa_y[j] * fl1_fx - pc_xy[j] * pa_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 0.5 * pc_xy[j] * fl1_fx * pb_z[j] - pa_xy[j] * pc_zzz[j] - 2.0 * pa_xz[j] * pc_yzz[j] - pa_x[j] * pc_yzz[j] * pb_z[j] - 2.0 * pc_xzz[j] * pa_yz[j] - pc_xzz[j] * pa_y[j] * pb_z[j] - pc_xyz[j] * pa_zz[j] - 2.0 * pc_xyz[j] * pa_z[j] * pb_z[j]);
+                t_xyzz_z[j] += -fl_s_0_0_1 * pc_x[j] * pa_yzz[j] * pb_z[j];
+
+                t_xyzz_z[j] += fl_s_0_0_2 * (1.5 * pa_xy[j] * pc_z[j] * fl1_fx + pa_xz[j] * pc_y[j] * fl1_fx + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + pc_x[j] * pa_yz[j] * fl1_fx + 1.5 * pc_xz[j] * pa_y[j] * fl1_fx);
+
+                t_xyzz_z[j] += fl_s_0_0_2 * (+ pc_xy[j] * pa_z[j] * fl1_fx + 0.5 * pa_x[j] * pc_y[j] * fl1_fx * pb_z[j] + 0.5 * pc_x[j] * pa_y[j] * fl1_fx * pb_z[j] + 0.5 * pc_xy[j] * fl1_fx * pb_z[j] + 2.0 * pa_xyz[j] * pc_zz[j]);
+
+                t_xyzz_z[j] += fl_s_0_0_2 * (+ pa_xy[j] * pc_zz[j] * pb_z[j] + pa_xzz[j] * pc_yz[j] + 2.0 * pa_xz[j] * pc_yz[j] * pb_z[j] + pc_xz[j] * pa_yzz[j] + 2.0 * pc_xz[j] * pa_yz[j] * pb_z[j]);
+
+                t_xyzz_z[j] += fl_s_0_0_2 * pc_xy[j] * pa_zz[j] * pb_z[j];
+
+                t_xyzz_z[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xz[j] * pa_y[j] * fl1_fx - pc_xy[j] * pa_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 0.5 * pc_xy[j] * fl1_fx * pb_z[j]);
+
+                t_xyzz_z[j] += fl_s_0_0_3 * (- pa_xy[j] * pc_zzz[j] - 2.0 * pa_xz[j] * pc_yzz[j] - pa_x[j] * pc_yzz[j] * pb_z[j] - 2.0 * pc_xzz[j] * pa_yz[j] - pc_xzz[j] * pa_y[j] * pb_z[j]);
+
+                t_xyzz_z[j] += fl_s_0_0_3 * (- pc_xyz[j] * pa_zz[j] - 2.0 * pc_xyz[j] * pa_z[j] * pb_z[j]);
 
                 t_xyzz_z[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_x[j] * pc_yzzz[j] + pc_xzzz[j] * pa_y[j] + 2.0 * pc_xyzz[j] * pa_z[j] + pc_xyzz[j] * pb_z[j]);
 
@@ -10590,11 +11602,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xzzz_x[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pa_z[j] + 0.5 * fl1_fx * pa_zzz[j] + 1.5 * pa_xz[j] * fl1_fx * pb_x[j] + pa_xzzz[j] * pb_x[j]);
 
-                t_xzzz_x[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * fl1_fx * pa_zz[j] * pc_z[j] - 0.5 * fl1_fx * pa_zzz[j] - 1.5 * pa_xz[j] * fl1_fx * pc_x[j] - 1.5 * pa_xz[j] * fl1_fx * pb_x[j] - 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_x[j] - pa_xzzz[j] * pc_x[j] - 3.0 * pa_xzz[j] * pc_z[j] * pb_x[j] - pc_x[j] * pa_zzz[j] * pb_x[j]);
+                t_xzzz_x[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * fl1_fx * pa_zz[j] * pc_z[j] - 0.5 * fl1_fx * pa_zzz[j] - 1.5 * pa_xz[j] * fl1_fx * pc_x[j]);
 
-                t_xzzz_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * fl1_fx * pa_z[j] * pc_zz[j] + 1.5 * fl1_fx * pa_zz[j] * pc_z[j] + 1.5 * pa_xz[j] * fl1_fx * pc_x[j] + 1.5 * pa_x[j] * pc_xz[j] * fl1_fx + 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_x[j] + 1.5 * pc_xx[j] * pa_z[j] * fl1_fx + 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_x[j] + 1.5 * pc_xz[j] * fl1_fx * pb_x[j] + 3.0 * pa_xzz[j] * pc_xz[j] + 3.0 * pa_xz[j] * pc_zz[j] * pb_x[j] + pc_xx[j] * pa_zzz[j] + 3.0 * pc_xz[j] * pa_zz[j] * pb_x[j]);
+                t_xzzz_x[j] += fl_s_0_0_1 * (- 1.5 * pa_xz[j] * fl1_fx * pb_x[j] - 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_x[j] - 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_x[j] - pa_xzzz[j] * pc_x[j] - 3.0 * pa_xzz[j] * pc_z[j] * pb_x[j]);
 
-                t_xzzz_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pa_z[j] * pc_zz[j] - 1.5 * pa_x[j] * pc_xz[j] * fl1_fx - 1.5 * pc_xx[j] * pa_z[j] * fl1_fx - 1.5 * pc_xxz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_x[j] - 3.0 * pa_xz[j] * pc_xzz[j] - pa_x[j] * pc_zzz[j] * pb_x[j] - 3.0 * pc_xxz[j] * pa_zz[j] - 3.0 * pc_xzz[j] * pa_z[j] * pb_x[j]);
+                t_xzzz_x[j] += -fl_s_0_0_1 * pc_x[j] * pa_zzz[j] * pb_x[j];
+
+                t_xzzz_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * fl1_fx * pa_z[j] * pc_zz[j] + 1.5 * fl1_fx * pa_zz[j] * pc_z[j] + 1.5 * pa_xz[j] * fl1_fx * pc_x[j]);
+
+                t_xzzz_x[j] += fl_s_0_0_2 * (+ 1.5 * pa_x[j] * pc_xz[j] * fl1_fx + 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_x[j] + 1.5 * pc_xx[j] * pa_z[j] * fl1_fx + 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_x[j] + 1.5 * pc_xz[j] * fl1_fx * pb_x[j]);
+
+                t_xzzz_x[j] += fl_s_0_0_2 * (+ 3.0 * pa_xzz[j] * pc_xz[j] + 3.0 * pa_xz[j] * pc_zz[j] * pb_x[j] + pc_xx[j] * pa_zzz[j] + 3.0 * pc_xz[j] * pa_zz[j] * pb_x[j]);
+
+                t_xzzz_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pa_z[j] * pc_zz[j] - 1.5 * pa_x[j] * pc_xz[j] * fl1_fx - 1.5 * pc_xx[j] * pa_z[j] * fl1_fx);
+
+                t_xzzz_x[j] += fl_s_0_0_3 * (- 1.5 * pc_xxz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_x[j] - 3.0 * pa_xz[j] * pc_xzz[j] - pa_x[j] * pc_zzz[j] * pb_x[j] - 3.0 * pc_xxz[j] * pa_zz[j]);
+
+                t_xzzz_x[j] += -fl_s_0_0_3 * 3.0 * pc_xzz[j] * pa_z[j] * pb_x[j];
 
                 t_xzzz_x[j] += fl_s_0_0_4 * (0.5 * fl1_fx * pc_zzz[j] + 1.5 * pc_xxz[j] * fl1_fx + pa_x[j] * pc_xzzz[j] + 3.0 * pc_xxzz[j] * pa_z[j] + pc_xzzz[j] * pb_x[j]);
 
@@ -10602,11 +11626,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xzzz_y[j] = fl_s_0_0_0 * (1.5 * pa_xz[j] * fl1_fx * pb_y[j] + pa_xzzz[j] * pb_y[j]);
 
-                t_xzzz_y[j] += fl_s_0_0_1 * (-1.5 * pa_xz[j] * fl1_fx * pc_y[j] - 1.5 * pa_xz[j] * fl1_fx * pb_y[j] - 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_y[j] - pa_xzzz[j] * pc_y[j] - 3.0 * pa_xzz[j] * pc_z[j] * pb_y[j] - pc_x[j] * pa_zzz[j] * pb_y[j]);
+                t_xzzz_y[j] += fl_s_0_0_1 * (-1.5 * pa_xz[j] * fl1_fx * pc_y[j] - 1.5 * pa_xz[j] * fl1_fx * pb_y[j] - 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_y[j] - 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_y[j] - pa_xzzz[j] * pc_y[j]);
 
-                t_xzzz_y[j] += fl_s_0_0_2 * (1.5 * pa_xz[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_y[j] + 1.5 * pc_xy[j] * pa_z[j] * fl1_fx + 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_y[j] + 1.5 * pc_xz[j] * fl1_fx * pb_y[j] + 3.0 * pa_xzz[j] * pc_yz[j] + 3.0 * pa_xz[j] * pc_zz[j] * pb_y[j] + pc_xy[j] * pa_zzz[j] + 3.0 * pc_xz[j] * pa_zz[j] * pb_y[j]);
+                t_xzzz_y[j] += fl_s_0_0_1 * (- 3.0 * pa_xzz[j] * pc_z[j] * pb_y[j] - pc_x[j] * pa_zzz[j] * pb_y[j]);
 
-                t_xzzz_y[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xy[j] * pa_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 3.0 * pa_xz[j] * pc_yzz[j] - pa_x[j] * pc_zzz[j] * pb_y[j] - 3.0 * pc_xyz[j] * pa_zz[j] - 3.0 * pc_xzz[j] * pa_z[j] * pb_y[j]);
+                t_xzzz_y[j] += fl_s_0_0_2 * (1.5 * pa_xz[j] * fl1_fx * pc_y[j] + 1.5 * pa_x[j] * pc_yz[j] * fl1_fx + 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_y[j] + 1.5 * pc_xy[j] * pa_z[j] * fl1_fx + 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_y[j]);
+
+                t_xzzz_y[j] += fl_s_0_0_2 * (+ 1.5 * pc_xz[j] * fl1_fx * pb_y[j] + 3.0 * pa_xzz[j] * pc_yz[j] + 3.0 * pa_xz[j] * pc_zz[j] * pb_y[j] + pc_xy[j] * pa_zzz[j] + 3.0 * pc_xz[j] * pa_zz[j] * pb_y[j]);
+
+                t_xzzz_y[j] += fl_s_0_0_3 * (-1.5 * pa_x[j] * pc_yz[j] * fl1_fx - 1.5 * pc_xy[j] * pa_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_y[j] - 3.0 * pa_xz[j] * pc_yzz[j]);
+
+                t_xzzz_y[j] += fl_s_0_0_3 * (- pa_x[j] * pc_zzz[j] * pb_y[j] - 3.0 * pc_xyz[j] * pa_zz[j] - 3.0 * pc_xzz[j] * pa_z[j] * pb_y[j]);
 
                 t_xzzz_y[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_x[j] * pc_yzzz[j] + 3.0 * pc_xyzz[j] * pa_z[j] + pc_xzzz[j] * pb_y[j]);
 
@@ -10614,11 +11644,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_xzzz_z[j] = fl_s_0_0_0 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pa_xzz[j] * fl1_fx + 1.5 * pa_xz[j] * fl1_fx * pb_z[j] + pa_xzzz[j] * pb_z[j]);
 
-                t_xzzz_z[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 1.5 * pa_xzz[j] * fl1_fx - 4.5 * pa_xz[j] * pc_z[j] * fl1_fx - 1.5 * pc_x[j] * pa_zz[j] * fl1_fx - 1.5 * pa_xz[j] * fl1_fx * pb_z[j] - 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_z[j] - pa_xzzz[j] * pc_z[j] - 3.0 * pa_xzz[j] * pc_z[j] * pb_z[j] - pc_x[j] * pa_zzz[j] * pb_z[j]);
+                t_xzzz_z[j] += fl_s_0_0_1 * (-1.5 * pa_x[j] * fl2_fx - 0.75 * pc_x[j] * fl2_fx - 1.5 * pa_xzz[j] * fl1_fx - 4.5 * pa_xz[j] * pc_z[j] * fl1_fx - 1.5 * pc_x[j] * pa_zz[j] * fl1_fx);
 
-                t_xzzz_z[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 4.5 * pa_xz[j] * pc_z[j] * fl1_fx + 3.0 * pa_x[j] * pc_zz[j] * fl1_fx + 1.5 * pc_x[j] * pa_zz[j] * fl1_fx + 4.5 * pc_xz[j] * pa_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_z[j] + 3.0 * pa_xzz[j] * pc_zz[j] + 3.0 * pa_xz[j] * pc_zz[j] * pb_z[j] + pc_xz[j] * pa_zzz[j] + 3.0 * pc_xz[j] * pa_zz[j] * pb_z[j]);
+                t_xzzz_z[j] += fl_s_0_0_1 * (- 1.5 * pa_xz[j] * fl1_fx * pb_z[j] - 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_z[j] - 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_z[j] - pa_xzzz[j] * pc_z[j] - 3.0 * pa_xzz[j] * pc_z[j] * pb_z[j]);
 
-                t_xzzz_z[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_zz[j] * fl1_fx - 4.5 * pc_xz[j] * pa_z[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_z[j] - 3.0 * pa_xz[j] * pc_zzz[j] - pa_x[j] * pc_zzz[j] * pb_z[j] - 3.0 * pc_xzz[j] * pa_zz[j] - 3.0 * pc_xzz[j] * pa_z[j] * pb_z[j]);
+                t_xzzz_z[j] += -fl_s_0_0_1 * pc_x[j] * pa_zzz[j] * pb_z[j];
+
+                t_xzzz_z[j] += fl_s_0_0_2 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pc_x[j] * fl2_fx + 4.5 * pa_xz[j] * pc_z[j] * fl1_fx + 3.0 * pa_x[j] * pc_zz[j] * fl1_fx + 1.5 * pc_x[j] * pa_zz[j] * fl1_fx);
+
+                t_xzzz_z[j] += fl_s_0_0_2 * (+ 4.5 * pc_xz[j] * pa_z[j] * fl1_fx + 1.5 * pa_x[j] * pc_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_x[j] * pa_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_xz[j] * fl1_fx * pb_z[j] + 3.0 * pa_xzz[j] * pc_zz[j]);
+
+                t_xzzz_z[j] += fl_s_0_0_2 * (+ 3.0 * pa_xz[j] * pc_zz[j] * pb_z[j] + pc_xz[j] * pa_zzz[j] + 3.0 * pc_xz[j] * pa_zz[j] * pb_z[j]);
+
+                t_xzzz_z[j] += fl_s_0_0_3 * (-0.75 * pc_x[j] * fl2_fx - 3.0 * pa_x[j] * pc_zz[j] * fl1_fx - 4.5 * pc_xz[j] * pa_z[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx - 1.5 * pc_xz[j] * fl1_fx * pb_z[j]);
+
+                t_xzzz_z[j] += fl_s_0_0_3 * (- 3.0 * pa_xz[j] * pc_zzz[j] - pa_x[j] * pc_zzz[j] * pb_z[j] - 3.0 * pc_xzz[j] * pa_zz[j] - 3.0 * pc_xzz[j] * pa_z[j] * pb_z[j]);
 
                 t_xzzz_z[j] += fl_s_0_0_4 * (3.0 * pc_xzz[j] * fl1_fx + pa_x[j] * pc_zzzz[j] + 3.0 * pc_xzzz[j] * pa_z[j] + pc_xzzz[j] * pb_z[j]);
 
@@ -10773,11 +11813,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyyy_x[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_x[j] + 3.0 * pa_yy[j] * fl1_fx * pb_x[j] + pa_yyyy[j] * pb_x[j]);
 
-                t_yyyy_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * fl2_fx * pb_x[j] - 3.0 * pa_yy[j] * fl1_fx * pc_x[j] - 3.0 * pa_yy[j] * fl1_fx * pb_x[j] - 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_x[j] - pa_yyyy[j] * pc_x[j] - 4.0 * pa_yyy[j] * pc_y[j] * pb_x[j]);
+                t_yyyy_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * fl2_fx * pb_x[j] - 3.0 * pa_yy[j] * fl1_fx * pc_x[j] - 3.0 * pa_yy[j] * fl1_fx * pb_x[j] - 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_x[j]);
 
-                t_yyyy_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 3.0 * pa_yy[j] * fl1_fx * pc_x[j] + 6.0 * pa_y[j] * pc_xy[j] * fl1_fx + 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_x[j] + 3.0 * pc_yy[j] * fl1_fx * pb_x[j] + 4.0 * pa_yyy[j] * pc_xy[j] + 6.0 * pa_yy[j] * pc_yy[j] * pb_x[j]);
+                t_yyyy_x[j] += fl_s_0_0_1 * (- pa_yyyy[j] * pc_x[j] - 4.0 * pa_yyy[j] * pc_y[j] * pb_x[j]);
 
-                t_yyyy_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 6.0 * pa_y[j] * pc_xy[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_x[j] - 6.0 * pa_yy[j] * pc_xyy[j] - 4.0 * pa_y[j] * pc_yyy[j] * pb_x[j]);
+                t_yyyy_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 3.0 * pa_yy[j] * fl1_fx * pc_x[j] + 6.0 * pa_y[j] * pc_xy[j] * fl1_fx + 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_x[j]);
+
+                t_yyyy_x[j] += fl_s_0_0_2 * (+ 3.0 * pc_yy[j] * fl1_fx * pb_x[j] + 4.0 * pa_yyy[j] * pc_xy[j] + 6.0 * pa_yy[j] * pc_yy[j] * pb_x[j]);
+
+                t_yyyy_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 6.0 * pa_y[j] * pc_xy[j] * fl1_fx - 3.0 * pc_xyy[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_x[j] - 6.0 * pa_yy[j] * pc_xyy[j]);
+
+                t_yyyy_x[j] += -fl_s_0_0_3 * 4.0 * pa_y[j] * pc_yyy[j] * pb_x[j];
 
                 t_yyyy_x[j] += fl_s_0_0_4 * (3.0 * pc_xyy[j] * fl1_fx + 4.0 * pa_y[j] * pc_xyyy[j] + pc_yyyy[j] * pb_x[j]);
 
@@ -10785,11 +11831,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyyy_y[j] = fl_s_0_0_0 * (3.0 * pa_y[j] * fl2_fx + 2.0 * pa_yyy[j] * fl1_fx + 0.75 * fl2_fx * pb_y[j] + 3.0 * pa_yy[j] * fl1_fx * pb_y[j] + pa_yyyy[j] * pb_y[j]);
 
-                t_yyyy_y[j] += fl_s_0_0_1 * (-6.0 * pa_y[j] * fl2_fx - 3.75 * pc_y[j] * fl2_fx - 2.0 * pa_yyy[j] * fl1_fx - 9.0 * pa_yy[j] * pc_y[j] * fl1_fx - 1.5 * fl2_fx * pb_y[j] - 3.0 * pa_yy[j] * fl1_fx * pb_y[j] - 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_y[j] - pa_yyyy[j] * pc_y[j] - 4.0 * pa_yyy[j] * pc_y[j] * pb_y[j]);
+                t_yyyy_y[j] += fl_s_0_0_1 * (-6.0 * pa_y[j] * fl2_fx - 3.75 * pc_y[j] * fl2_fx - 2.0 * pa_yyy[j] * fl1_fx - 9.0 * pa_yy[j] * pc_y[j] * fl1_fx - 1.5 * fl2_fx * pb_y[j]);
 
-                t_yyyy_y[j] += fl_s_0_0_2 * (3.0 * pa_y[j] * fl2_fx + 7.5 * pc_y[j] * fl2_fx + 9.0 * pa_yy[j] * pc_y[j] * fl1_fx + 12.0 * pa_y[j] * pc_yy[j] * fl1_fx + 0.75 * fl2_fx * pb_y[j] + 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_y[j] + 3.0 * pc_yy[j] * fl1_fx * pb_y[j] + 4.0 * pa_yyy[j] * pc_yy[j] + 6.0 * pa_yy[j] * pc_yy[j] * pb_y[j]);
+                t_yyyy_y[j] += fl_s_0_0_1 * (- 3.0 * pa_yy[j] * fl1_fx * pb_y[j] - 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_y[j] - pa_yyyy[j] * pc_y[j] - 4.0 * pa_yyy[j] * pc_y[j] * pb_y[j]);
 
-                t_yyyy_y[j] += fl_s_0_0_3 * (-3.75 * pc_y[j] * fl2_fx - 12.0 * pa_y[j] * pc_yy[j] * fl1_fx - 5.0 * pc_yyy[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_y[j] - 6.0 * pa_yy[j] * pc_yyy[j] - 4.0 * pa_y[j] * pc_yyy[j] * pb_y[j]);
+                t_yyyy_y[j] += fl_s_0_0_2 * (3.0 * pa_y[j] * fl2_fx + 7.5 * pc_y[j] * fl2_fx + 9.0 * pa_yy[j] * pc_y[j] * fl1_fx + 12.0 * pa_y[j] * pc_yy[j] * fl1_fx + 0.75 * fl2_fx * pb_y[j]);
+
+                t_yyyy_y[j] += fl_s_0_0_2 * (+ 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_y[j] + 3.0 * pc_yy[j] * fl1_fx * pb_y[j] + 4.0 * pa_yyy[j] * pc_yy[j] + 6.0 * pa_yy[j] * pc_yy[j] * pb_y[j]);
+
+                t_yyyy_y[j] += fl_s_0_0_3 * (-3.75 * pc_y[j] * fl2_fx - 12.0 * pa_y[j] * pc_yy[j] * fl1_fx - 5.0 * pc_yyy[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_y[j] - 6.0 * pa_yy[j] * pc_yyy[j]);
+
+                t_yyyy_y[j] += -fl_s_0_0_3 * 4.0 * pa_y[j] * pc_yyy[j] * pb_y[j];
 
                 t_yyyy_y[j] += fl_s_0_0_4 * (5.0 * pc_yyy[j] * fl1_fx + 4.0 * pa_y[j] * pc_yyyy[j] + pc_yyyy[j] * pb_y[j]);
 
@@ -10797,11 +11849,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyyy_z[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_z[j] + 3.0 * pa_yy[j] * fl1_fx * pb_z[j] + pa_yyyy[j] * pb_z[j]);
 
-                t_yyyy_z[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 3.0 * pa_yy[j] * fl1_fx * pc_z[j] - 3.0 * pa_yy[j] * fl1_fx * pb_z[j] - 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] - pa_yyyy[j] * pc_z[j] - 4.0 * pa_yyy[j] * pc_y[j] * pb_z[j]);
+                t_yyyy_z[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pb_z[j] - 3.0 * pa_yy[j] * fl1_fx * pc_z[j] - 3.0 * pa_yy[j] * fl1_fx * pb_z[j] - 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j]);
 
-                t_yyyy_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 3.0 * pa_yy[j] * fl1_fx * pc_z[j] + 6.0 * pa_y[j] * pc_yz[j] * fl1_fx + 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] + 3.0 * pc_yy[j] * fl1_fx * pb_z[j] + 4.0 * pa_yyy[j] * pc_yz[j] + 6.0 * pa_yy[j] * pc_yy[j] * pb_z[j]);
+                t_yyyy_z[j] += fl_s_0_0_1 * (- pa_yyyy[j] * pc_z[j] - 4.0 * pa_yyy[j] * pc_y[j] * pb_z[j]);
 
-                t_yyyy_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 6.0 * pa_y[j] * pc_yz[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_z[j] - 6.0 * pa_yy[j] * pc_yyz[j] - 4.0 * pa_y[j] * pc_yyy[j] * pb_z[j]);
+                t_yyyy_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pb_z[j] + 3.0 * pa_yy[j] * fl1_fx * pc_z[j] + 6.0 * pa_y[j] * pc_yz[j] * fl1_fx + 6.0 * pa_y[j] * pc_y[j] * fl1_fx * pb_z[j]);
+
+                t_yyyy_z[j] += fl_s_0_0_2 * (+ 3.0 * pc_yy[j] * fl1_fx * pb_z[j] + 4.0 * pa_yyy[j] * pc_yz[j] + 6.0 * pa_yy[j] * pc_yy[j] * pb_z[j]);
+
+                t_yyyy_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 6.0 * pa_y[j] * pc_yz[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pb_z[j] - 6.0 * pa_yy[j] * pc_yyz[j]);
+
+                t_yyyy_z[j] += -fl_s_0_0_3 * 4.0 * pa_y[j] * pc_yyy[j] * pb_z[j];
 
                 t_yyyy_z[j] += fl_s_0_0_4 * (3.0 * pc_yyz[j] * fl1_fx + 4.0 * pa_y[j] * pc_yyyz[j] + pc_yyyy[j] * pb_z[j]);
 
@@ -10975,11 +12033,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyyz_x[j] = fl_s_0_0_0 * (1.5 * pa_yz[j] * fl1_fx * pb_x[j] + pa_yyyz[j] * pb_x[j]);
 
-                t_yyyz_x[j] += fl_s_0_0_1 * (-1.5 * pa_yz[j] * fl1_fx * pc_x[j] - 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_x[j] - 1.5 * pa_yz[j] * fl1_fx * pb_x[j] - 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_x[j] - pa_yyyz[j] * pc_x[j] - pa_yyy[j] * pc_z[j] * pb_x[j] - 3.0 * pa_yyz[j] * pc_y[j] * pb_x[j]);
+                t_yyyz_x[j] += fl_s_0_0_1 * (-1.5 * pa_yz[j] * fl1_fx * pc_x[j] - 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_x[j] - 1.5 * pa_yz[j] * fl1_fx * pb_x[j] - 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_x[j] - pa_yyyz[j] * pc_x[j]);
 
-                t_yyyz_x[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * fl1_fx * pc_xz[j] + 1.5 * pa_yz[j] * fl1_fx * pc_x[j] + 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_x[j] + 1.5 * pc_xy[j] * fl1_fx * pa_z[j] + 1.5 * pc_yz[j] * fl1_fx * pb_x[j] + 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_x[j] + pa_yyy[j] * pc_xz[j] + 3.0 * pa_yyz[j] * pc_xy[j] + 3.0 * pa_yy[j] * pc_yz[j] * pb_x[j] + 3.0 * pa_yz[j] * pc_yy[j] * pb_x[j]);
+                t_yyyz_x[j] += fl_s_0_0_1 * (- pa_yyy[j] * pc_z[j] * pb_x[j] - 3.0 * pa_yyz[j] * pc_y[j] * pb_x[j]);
 
-                t_yyyz_x[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * fl1_fx * pc_xz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 1.5 * pc_yz[j] * fl1_fx * pb_x[j] - 3.0 * pa_yy[j] * pc_xyz[j] - 3.0 * pa_yz[j] * pc_xyy[j] - 3.0 * pa_y[j] * pc_yyz[j] * pb_x[j] - pc_yyy[j] * pa_z[j] * pb_x[j]);
+                t_yyyz_x[j] += fl_s_0_0_2 * (1.5 * pa_y[j] * fl1_fx * pc_xz[j] + 1.5 * pa_yz[j] * fl1_fx * pc_x[j] + 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_x[j] + 1.5 * pc_xy[j] * fl1_fx * pa_z[j] + 1.5 * pc_yz[j] * fl1_fx * pb_x[j]);
+
+                t_yyyz_x[j] += fl_s_0_0_2 * (+ 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_x[j] + pa_yyy[j] * pc_xz[j] + 3.0 * pa_yyz[j] * pc_xy[j] + 3.0 * pa_yy[j] * pc_yz[j] * pb_x[j] + 3.0 * pa_yz[j] * pc_yy[j] * pb_x[j]);
+
+                t_yyyz_x[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * fl1_fx * pc_xz[j] - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_xy[j] * fl1_fx * pa_z[j] - 1.5 * pc_yz[j] * fl1_fx * pb_x[j] - 3.0 * pa_yy[j] * pc_xyz[j]);
+
+                t_yyyz_x[j] += fl_s_0_0_3 * (- 3.0 * pa_yz[j] * pc_xyy[j] - 3.0 * pa_y[j] * pc_yyz[j] * pb_x[j] - pc_yyy[j] * pa_z[j] * pb_x[j]);
 
                 t_yyyz_x[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + 3.0 * pa_y[j] * pc_xyyz[j] + pc_xyyy[j] * pa_z[j] + pc_yyyz[j] * pb_x[j]);
 
@@ -10987,11 +12051,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyyz_y[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pa_z[j] + 1.5 * pa_yyz[j] * fl1_fx + 1.5 * pa_yz[j] * fl1_fx * pb_y[j] + pa_yyyz[j] * pb_y[j]);
 
-                t_yyyz_y[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pa_z[j] - 1.5 * pa_yy[j] * fl1_fx * pc_z[j] - 1.5 * pa_yyz[j] * fl1_fx - 4.5 * pa_yz[j] * pc_y[j] * fl1_fx - 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_y[j] - 1.5 * pa_yz[j] * fl1_fx * pb_y[j] - 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_y[j] - pa_yyyz[j] * pc_y[j] - pa_yyy[j] * pc_z[j] * pb_y[j] - 3.0 * pa_yyz[j] * pc_y[j] * pb_y[j]);
+                t_yyyz_y[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_z[j] - 1.5 * fl2_fx * pa_z[j] - 1.5 * pa_yy[j] * fl1_fx * pc_z[j] - 1.5 * pa_yyz[j] * fl1_fx - 4.5 * pa_yz[j] * pc_y[j] * fl1_fx);
 
-                t_yyyz_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * pa_yy[j] * fl1_fx * pc_z[j] + 4.5 * pa_y[j] * pc_yz[j] * fl1_fx + 4.5 * pa_yz[j] * pc_y[j] * fl1_fx + 3.0 * pc_yy[j] * fl1_fx * pa_z[j] + 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_y[j] + 1.5 * pc_yz[j] * fl1_fx * pb_y[j] + 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_y[j] + pa_yyy[j] * pc_yz[j] + 3.0 * pa_yyz[j] * pc_yy[j] + 3.0 * pa_yy[j] * pc_yz[j] * pb_y[j] + 3.0 * pa_yz[j] * pc_yy[j] * pb_y[j]);
+                t_yyyz_y[j] += fl_s_0_0_1 * (- 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_y[j] - 1.5 * pa_yz[j] * fl1_fx * pb_y[j] - 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_y[j] - pa_yyyz[j] * pc_y[j] - pa_yyy[j] * pc_z[j] * pb_y[j]);
 
-                t_yyyz_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 4.5 * pa_y[j] * pc_yz[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pa_z[j] - 1.5 * pc_yz[j] * fl1_fx * pb_y[j] - 3.0 * pa_yy[j] * pc_yyz[j] - 3.0 * pa_yz[j] * pc_yyy[j] - 3.0 * pa_y[j] * pc_yyz[j] * pb_y[j] - pc_yyy[j] * pa_z[j] * pb_y[j]);
+                t_yyyz_y[j] += -fl_s_0_0_1 * 3.0 * pa_yyz[j] * pc_y[j] * pb_y[j];
+
+                t_yyyz_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * pa_yy[j] * fl1_fx * pc_z[j] + 4.5 * pa_y[j] * pc_yz[j] * fl1_fx + 4.5 * pa_yz[j] * pc_y[j] * fl1_fx);
+
+                t_yyyz_y[j] += fl_s_0_0_2 * (+ 3.0 * pc_yy[j] * fl1_fx * pa_z[j] + 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_y[j] + 1.5 * pc_yz[j] * fl1_fx * pb_y[j] + 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_y[j] + pa_yyy[j] * pc_yz[j]);
+
+                t_yyyz_y[j] += fl_s_0_0_2 * (+ 3.0 * pa_yyz[j] * pc_yy[j] + 3.0 * pa_yy[j] * pc_yz[j] * pb_y[j] + 3.0 * pa_yz[j] * pc_yy[j] * pb_y[j]);
+
+                t_yyyz_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 4.5 * pa_y[j] * pc_yz[j] * fl1_fx - 3.0 * pc_yyz[j] * fl1_fx - 3.0 * pc_yy[j] * fl1_fx * pa_z[j] - 1.5 * pc_yz[j] * fl1_fx * pb_y[j]);
+
+                t_yyyz_y[j] += fl_s_0_0_3 * (- 3.0 * pa_yy[j] * pc_yyz[j] - 3.0 * pa_yz[j] * pc_yyy[j] - 3.0 * pa_y[j] * pc_yyz[j] * pb_y[j] - pc_yyy[j] * pa_z[j] * pb_y[j]);
 
                 t_yyyz_y[j] += fl_s_0_0_4 * (3.0 * pc_yyz[j] * fl1_fx + 3.0 * pa_y[j] * pc_yyyz[j] + pc_yyyy[j] * pa_z[j] + pc_yyyz[j] * pb_y[j]);
 
@@ -10999,11 +12073,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyyz_z[j] = fl_s_0_0_0 * (0.75 * pa_y[j] * fl2_fx + 0.5 * pa_yyy[j] * fl1_fx + 1.5 * pa_yz[j] * fl1_fx * pb_z[j] + pa_yyyz[j] * pb_z[j]);
 
-                t_yyyz_z[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 0.5 * pa_yyy[j] * fl1_fx - 1.5 * pa_yy[j] * pc_y[j] * fl1_fx - 1.5 * pa_yz[j] * fl1_fx * pc_z[j] - 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_z[j] - 1.5 * pa_yz[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_z[j] - pa_yyyz[j] * pc_z[j] - pa_yyy[j] * pc_z[j] * pb_z[j] - 3.0 * pa_yyz[j] * pc_y[j] * pb_z[j]);
+                t_yyyz_z[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 0.5 * pa_yyy[j] * fl1_fx - 1.5 * pa_yy[j] * pc_y[j] * fl1_fx - 1.5 * pa_yz[j] * fl1_fx * pc_z[j]);
 
-                t_yyyz_z[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 1.5 * pa_yy[j] * pc_y[j] * fl1_fx + 1.5 * pa_y[j] * pc_yy[j] * fl1_fx + 1.5 * pa_y[j] * fl1_fx * pc_zz[j] + 1.5 * pa_yz[j] * fl1_fx * pc_z[j] + 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_z[j] + 1.5 * pc_yz[j] * fl1_fx * pa_z[j] + 1.5 * pc_yz[j] * fl1_fx * pb_z[j] + 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_z[j] + pa_yyy[j] * pc_zz[j] + 3.0 * pa_yyz[j] * pc_yz[j] + 3.0 * pa_yy[j] * pc_yz[j] * pb_z[j] + 3.0 * pa_yz[j] * pc_yy[j] * pb_z[j]);
+                t_yyyz_z[j] += fl_s_0_0_1 * (- 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_z[j] - 1.5 * pa_yz[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_z[j] - pa_yyyz[j] * pc_z[j] - pa_yyy[j] * pc_z[j] * pb_z[j]);
 
-                t_yyyz_z[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 1.5 * pa_y[j] * pc_yy[j] * fl1_fx - 0.5 * pc_yyy[j] * fl1_fx - 1.5 * pa_y[j] * fl1_fx * pc_zz[j] - 1.5 * pc_yzz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pa_z[j] - 1.5 * pc_yz[j] * fl1_fx * pb_z[j] - 3.0 * pa_yy[j] * pc_yzz[j] - 3.0 * pa_yz[j] * pc_yyz[j] - 3.0 * pa_y[j] * pc_yyz[j] * pb_z[j] - pc_yyy[j] * pa_z[j] * pb_z[j]);
+                t_yyyz_z[j] += -fl_s_0_0_1 * 3.0 * pa_yyz[j] * pc_y[j] * pb_z[j];
+
+                t_yyyz_z[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 1.5 * pa_yy[j] * pc_y[j] * fl1_fx + 1.5 * pa_y[j] * pc_yy[j] * fl1_fx + 1.5 * pa_y[j] * fl1_fx * pc_zz[j]);
+
+                t_yyyz_z[j] += fl_s_0_0_2 * (+ 1.5 * pa_yz[j] * fl1_fx * pc_z[j] + 1.5 * pa_y[j] * fl1_fx * pc_z[j] * pb_z[j] + 1.5 * pc_yz[j] * fl1_fx * pa_z[j] + 1.5 * pc_yz[j] * fl1_fx * pb_z[j] + 1.5 * pc_y[j] * fl1_fx * pa_z[j] * pb_z[j]);
+
+                t_yyyz_z[j] += fl_s_0_0_2 * (+ pa_yyy[j] * pc_zz[j] + 3.0 * pa_yyz[j] * pc_yz[j] + 3.0 * pa_yy[j] * pc_yz[j] * pb_z[j] + 3.0 * pa_yz[j] * pc_yy[j] * pb_z[j]);
+
+                t_yyyz_z[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 1.5 * pa_y[j] * pc_yy[j] * fl1_fx - 0.5 * pc_yyy[j] * fl1_fx - 1.5 * pa_y[j] * fl1_fx * pc_zz[j] - 1.5 * pc_yzz[j] * fl1_fx);
+
+                t_yyyz_z[j] += fl_s_0_0_3 * (- 1.5 * pc_yz[j] * fl1_fx * pa_z[j] - 1.5 * pc_yz[j] * fl1_fx * pb_z[j] - 3.0 * pa_yy[j] * pc_yzz[j] - 3.0 * pa_yz[j] * pc_yyz[j] - 3.0 * pa_y[j] * pc_yyz[j] * pb_z[j]);
+
+                t_yyyz_z[j] += -fl_s_0_0_3 * pc_yyy[j] * pa_z[j] * pb_z[j];
 
                 t_yyyz_z[j] += fl_s_0_0_4 * (0.5 * pc_yyy[j] * fl1_fx + 1.5 * pc_yzz[j] * fl1_fx + 3.0 * pa_y[j] * pc_yyzz[j] + pc_yyyz[j] * pa_z[j] + pc_yyyz[j] * pb_z[j]);
 
@@ -11184,35 +12270,79 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yyzz_x[j] = fl_s_0_0_0 * (0.25 * fl2_fx * pb_x[j] + 0.5 * pa_yy[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_zz[j] * pb_x[j] + pa_yyzz[j] * pb_x[j]);
 
-                t_yyzz_x[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_x[j] - 0.5 * fl2_fx * pb_x[j] - 0.5 * pa_yy[j] * fl1_fx * pc_x[j] - 0.5 * pa_yy[j] * fl1_fx * pb_x[j] - pa_y[j] * pc_y[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pa_zz[j] * pc_x[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_zz[j] * pb_x[j] - pa_yyzz[j] * pc_x[j] - 2.0 * pa_yyz[j] * pc_z[j] * pb_x[j] - 2.0 * pa_yzz[j] * pc_y[j] * pb_x[j]);
+                t_yyzz_x[j] += fl_s_0_0_1 * (-0.25 * fl2_fx * pc_x[j] - 0.5 * fl2_fx * pb_x[j] - 0.5 * pa_yy[j] * fl1_fx * pc_x[j] - 0.5 * pa_yy[j] * fl1_fx * pb_x[j] - pa_y[j] * pc_y[j] * fl1_fx * pb_x[j]);
 
-                t_yyzz_x[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_x[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_yy[j] * fl1_fx * pc_x[j] + pa_y[j] * pc_xy[j] * fl1_fx + pa_y[j] * pc_y[j] * fl1_fx * pb_x[j] + 0.5 * pc_yy[j] * fl1_fx * pb_x[j] + fl1_fx * pa_z[j] * pc_xz[j] + 0.5 * fl1_fx * pc_zz[j] * pb_x[j] + 0.5 * fl1_fx * pa_zz[j] * pc_x[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_x[j] + 2.0 * pa_yyz[j] * pc_xz[j] + pa_yy[j] * pc_zz[j] * pb_x[j] + 2.0 * pa_yzz[j] * pc_xy[j] + 4.0 * pa_yz[j] * pc_yz[j] * pb_x[j] + pc_yy[j] * pa_zz[j] * pb_x[j]);
+                t_yyzz_x[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_zz[j] * pc_x[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_x[j] - 0.5 * fl1_fx * pa_zz[j] * pb_x[j] - pa_yyzz[j] * pc_x[j] - 2.0 * pa_yyz[j] * pc_z[j] * pb_x[j]);
 
-                t_yyzz_x[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_x[j] - pa_y[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * pc_yy[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_xzz[j] - fl1_fx * pa_z[j] * pc_xz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_x[j] - pa_yy[j] * pc_xzz[j] - 4.0 * pa_yz[j] * pc_xyz[j] - 2.0 * pa_y[j] * pc_yzz[j] * pb_x[j] - pc_xyy[j] * pa_zz[j] - 2.0 * pc_yyz[j] * pa_z[j] * pb_x[j]);
+                t_yyzz_x[j] += -fl_s_0_0_1 * 2.0 * pa_yzz[j] * pc_y[j] * pb_x[j];
+
+                t_yyzz_x[j] += fl_s_0_0_2 * (0.5 * fl2_fx * pc_x[j] + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_yy[j] * fl1_fx * pc_x[j] + pa_y[j] * pc_xy[j] * fl1_fx + pa_y[j] * pc_y[j] * fl1_fx * pb_x[j]);
+
+                t_yyzz_x[j] += fl_s_0_0_2 * (+ 0.5 * pc_yy[j] * fl1_fx * pb_x[j] + fl1_fx * pa_z[j] * pc_xz[j] + 0.5 * fl1_fx * pc_zz[j] * pb_x[j] + 0.5 * fl1_fx * pa_zz[j] * pc_x[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_x[j]);
+
+                t_yyzz_x[j] += fl_s_0_0_2 * (+ 2.0 * pa_yyz[j] * pc_xz[j] + pa_yy[j] * pc_zz[j] * pb_x[j] + 2.0 * pa_yzz[j] * pc_xy[j] + 4.0 * pa_yz[j] * pc_yz[j] * pb_x[j] + pc_yy[j] * pa_zz[j] * pb_x[j]);
+
+                t_yyzz_x[j] += fl_s_0_0_3 * (-0.25 * fl2_fx * pc_x[j] - pa_y[j] * pc_xy[j] * fl1_fx - 0.5 * pc_xyy[j] * fl1_fx - 0.5 * pc_yy[j] * fl1_fx * pb_x[j] - 0.5 * fl1_fx * pc_xzz[j]);
+
+                t_yyzz_x[j] += fl_s_0_0_3 * (- fl1_fx * pa_z[j] * pc_xz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_x[j] - pa_yy[j] * pc_xzz[j] - 4.0 * pa_yz[j] * pc_xyz[j] - 2.0 * pa_y[j] * pc_yzz[j] * pb_x[j]);
+
+                t_yyzz_x[j] += fl_s_0_0_3 * (- pc_xyy[j] * pa_zz[j] - 2.0 * pc_yyz[j] * pa_z[j] * pb_x[j]);
 
                 t_yyzz_x[j] += fl_s_0_0_4 * (0.5 * pc_xyy[j] * fl1_fx + 0.5 * fl1_fx * pc_xzz[j] + 2.0 * pa_y[j] * pc_xyzz[j] + 2.0 * pc_xyyz[j] * pa_z[j] + pc_yyzz[j] * pb_x[j]);
 
                 t_yyzz_x[j] += -fl_s_0_0_5 * pc_xyyzz[j];
 
-                t_yyzz_y[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * fl2_fx + pa_yzz[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_yy[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_zz[j] * pb_y[j] + pa_yyzz[j] * pb_y[j]);
+                t_yyzz_y[j] = fl_s_0_0_0 * (0.5 * pa_y[j] * fl2_fx + pa_yzz[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_yy[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_zz[j] * pb_y[j]);
 
-                t_yyzz_y[j] += fl_s_0_0_1 * (-pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 2.0 * pa_yz[j] * fl1_fx * pc_z[j] - pa_yzz[j] * fl1_fx - 1.5 * pc_y[j] * fl1_fx * pa_zz[j] - 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_yy[j] * fl1_fx * pc_y[j] - 0.5 * pa_yy[j] * fl1_fx * pb_y[j] - pa_y[j] * pc_y[j] * fl1_fx * pb_y[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_y[j] - 0.5 * fl1_fx * pa_zz[j] * pb_y[j] - pa_yyzz[j] * pc_y[j] - 2.0 * pa_yyz[j] * pc_z[j] * pb_y[j] - 2.0 * pa_yzz[j] * pc_y[j] * pb_y[j]);
+                t_yyzz_y[j] += fl_s_0_0_0 * pa_yyzz[j] * pb_y[j];
 
-                t_yyzz_y[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + pa_y[j] * fl1_fx * pc_zz[j] + 2.0 * pa_yz[j] * fl1_fx * pc_z[j] + 3.0 * pc_yz[j] * fl1_fx * pa_z[j] + 1.5 * pc_y[j] * fl1_fx * pa_zz[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_yy[j] * fl1_fx * pc_y[j] + pa_y[j] * pc_yy[j] * fl1_fx + pa_y[j] * pc_y[j] * fl1_fx * pb_y[j] + 0.5 * pc_yy[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pc_zz[j] * pb_y[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_y[j] + 2.0 * pa_yyz[j] * pc_yz[j] + pa_yy[j] * pc_zz[j] * pb_y[j] + 2.0 * pa_yzz[j] * pc_yy[j] + 4.0 * pa_yz[j] * pc_yz[j] * pb_y[j] + pc_yy[j] * pa_zz[j] * pb_y[j]);
+                t_yyzz_y[j] += fl_s_0_0_1 * (-pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 2.0 * pa_yz[j] * fl1_fx * pc_z[j] - pa_yzz[j] * fl1_fx - 1.5 * pc_y[j] * fl1_fx * pa_zz[j]);
 
-                t_yyzz_y[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - pa_y[j] * fl1_fx * pc_zz[j] - 1.5 * pc_yzz[j] * fl1_fx - 3.0 * pc_yz[j] * fl1_fx * pa_z[j] - pa_y[j] * pc_yy[j] * fl1_fx - 0.5 * pc_yyy[j] * fl1_fx - 0.5 * pc_yy[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pc_zz[j] * pb_y[j] - pa_yy[j] * pc_yzz[j] - 4.0 * pa_yz[j] * pc_yyz[j] - 2.0 * pa_y[j] * pc_yzz[j] * pb_y[j] - pc_yyy[j] * pa_zz[j] - 2.0 * pc_yyz[j] * pa_z[j] * pb_y[j]);
+                t_yyzz_y[j] += fl_s_0_0_1 * (- 0.5 * fl2_fx * pb_y[j] - 0.5 * pa_yy[j] * fl1_fx * pc_y[j] - 0.5 * pa_yy[j] * fl1_fx * pb_y[j] - pa_y[j] * pc_y[j] * fl1_fx * pb_y[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_y[j]);
+
+                t_yyzz_y[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_zz[j] * pb_y[j] - pa_yyzz[j] * pc_y[j] - 2.0 * pa_yyz[j] * pc_z[j] * pb_y[j] - 2.0 * pa_yzz[j] * pc_y[j] * pb_y[j]);
+
+                t_yyzz_y[j] += fl_s_0_0_2 * (0.5 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + pa_y[j] * fl1_fx * pc_zz[j] + 2.0 * pa_yz[j] * fl1_fx * pc_z[j] + 3.0 * pc_yz[j] * fl1_fx * pa_z[j]);
+
+                t_yyzz_y[j] += fl_s_0_0_2 * (+ 1.5 * pc_y[j] * fl1_fx * pa_zz[j] + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_yy[j] * fl1_fx * pc_y[j] + pa_y[j] * pc_yy[j] * fl1_fx + pa_y[j] * pc_y[j] * fl1_fx * pb_y[j]);
+
+                t_yyzz_y[j] += fl_s_0_0_2 * (+ 0.5 * pc_yy[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pc_zz[j] * pb_y[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_y[j] + 2.0 * pa_yyz[j] * pc_yz[j] + pa_yy[j] * pc_zz[j] * pb_y[j]);
+
+                t_yyzz_y[j] += fl_s_0_0_2 * (+ 2.0 * pa_yzz[j] * pc_yy[j] + 4.0 * pa_yz[j] * pc_yz[j] * pb_y[j] + pc_yy[j] * pa_zz[j] * pb_y[j]);
+
+                t_yyzz_y[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - pa_y[j] * fl1_fx * pc_zz[j] - 1.5 * pc_yzz[j] * fl1_fx - 3.0 * pc_yz[j] * fl1_fx * pa_z[j] - pa_y[j] * pc_yy[j] * fl1_fx);
+
+                t_yyzz_y[j] += fl_s_0_0_3 * (- 0.5 * pc_yyy[j] * fl1_fx - 0.5 * pc_yy[j] * fl1_fx * pb_y[j] - 0.5 * fl1_fx * pc_zz[j] * pb_y[j] - pa_yy[j] * pc_yzz[j] - 4.0 * pa_yz[j] * pc_yyz[j]);
+
+                t_yyzz_y[j] += fl_s_0_0_3 * (- 2.0 * pa_y[j] * pc_yzz[j] * pb_y[j] - pc_yyy[j] * pa_zz[j] - 2.0 * pc_yyz[j] * pa_z[j] * pb_y[j]);
 
                 t_yyzz_y[j] += fl_s_0_0_4 * (1.5 * pc_yzz[j] * fl1_fx + 0.5 * pc_yyy[j] * fl1_fx + 2.0 * pa_y[j] * pc_yyzz[j] + 2.0 * pc_yyyz[j] * pa_z[j] + pc_yyzz[j] * pb_y[j]);
 
                 t_yyzz_y[j] += -fl_s_0_0_5 * pc_yyyzz[j];
 
-                t_yyzz_z[j] = fl_s_0_0_0 * (0.5 * fl2_fx * pa_z[j] + pa_yyz[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_yy[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pb_z[j] + pa_yyzz[j] * pb_z[j]);
+                t_yyzz_z[j] = fl_s_0_0_0 * (0.5 * fl2_fx * pa_z[j] + pa_yyz[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_yy[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pb_z[j]);
 
-                t_yyzz_z[j] += fl_s_0_0_1 * (-fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - pa_yyz[j] * fl1_fx - 1.5 * pa_yy[j] * pc_z[j] * fl1_fx - 2.0 * pa_yz[j] * pc_y[j] * fl1_fx - 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_yy[j] * fl1_fx * pb_z[j] - pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pa_zz[j] * pc_z[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_z[j] - 0.5 * fl1_fx * pa_zz[j] * pb_z[j] - pa_yyzz[j] * pc_z[j] - 2.0 * pa_yyz[j] * pc_z[j] * pb_z[j] - 2.0 * pa_yzz[j] * pc_y[j] * pb_z[j]);
+                t_yyzz_z[j] += fl_s_0_0_0 * pa_yyzz[j] * pb_z[j];
 
-                t_yyzz_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.5 * fl2_fx * pa_z[j] + 1.5 * pa_yy[j] * pc_z[j] * fl1_fx + 2.0 * pa_yz[j] * pc_y[j] * fl1_fx + 3.0 * pa_y[j] * pc_yz[j] * fl1_fx + pc_yy[j] * pa_z[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] + 0.5 * pc_yy[j] * fl1_fx * pb_z[j] + fl1_fx * pa_z[j] * pc_zz[j] + 0.5 * fl1_fx * pc_zz[j] * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pc_z[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_z[j] + 2.0 * pa_yyz[j] * pc_zz[j] + pa_yy[j] * pc_zz[j] * pb_z[j] + 2.0 * pa_yzz[j] * pc_yz[j] + 4.0 * pa_yz[j] * pc_yz[j] * pb_z[j] + pc_yy[j] * pa_zz[j] * pb_z[j]);
+                t_yyzz_z[j] += fl_s_0_0_1 * (-fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - pa_yyz[j] * fl1_fx - 1.5 * pa_yy[j] * pc_z[j] * fl1_fx - 2.0 * pa_yz[j] * pc_y[j] * fl1_fx);
 
-                t_yyzz_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 3.0 * pa_y[j] * pc_yz[j] * fl1_fx - pc_yy[j] * pa_z[j] * fl1_fx - 1.5 * pc_yyz[j] * fl1_fx - 0.5 * pc_yy[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pc_zzz[j] - fl1_fx * pa_z[j] * pc_zz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_z[j] - pa_yy[j] * pc_zzz[j] - 4.0 * pa_yz[j] * pc_yzz[j] - 2.0 * pa_y[j] * pc_yzz[j] * pb_z[j] - pc_yyz[j] * pa_zz[j] - 2.0 * pc_yyz[j] * pa_z[j] * pb_z[j]);
+                t_yyzz_z[j] += fl_s_0_0_1 * (- 0.5 * fl2_fx * pb_z[j] - 0.5 * pa_yy[j] * fl1_fx * pb_z[j] - pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] - 0.5 * fl1_fx * pa_zz[j] * pc_z[j] - fl1_fx * pa_z[j] * pc_z[j] * pb_z[j]);
+
+                t_yyzz_z[j] += fl_s_0_0_1 * (- 0.5 * fl1_fx * pa_zz[j] * pb_z[j] - pa_yyzz[j] * pc_z[j] - 2.0 * pa_yyz[j] * pc_z[j] * pb_z[j] - 2.0 * pa_yzz[j] * pc_y[j] * pb_z[j]);
+
+                t_yyzz_z[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.5 * fl2_fx * pa_z[j] + 1.5 * pa_yy[j] * pc_z[j] * fl1_fx + 2.0 * pa_yz[j] * pc_y[j] * fl1_fx + 3.0 * pa_y[j] * pc_yz[j] * fl1_fx);
+
+                t_yyzz_z[j] += fl_s_0_0_2 * (+ pc_yy[j] * pa_z[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + pa_y[j] * pc_y[j] * fl1_fx * pb_z[j] + 0.5 * pc_yy[j] * fl1_fx * pb_z[j] + fl1_fx * pa_z[j] * pc_zz[j]);
+
+                t_yyzz_z[j] += fl_s_0_0_2 * (+ 0.5 * fl1_fx * pc_zz[j] * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pc_z[j] + fl1_fx * pa_z[j] * pc_z[j] * pb_z[j] + 2.0 * pa_yyz[j] * pc_zz[j] + pa_yy[j] * pc_zz[j] * pb_z[j]);
+
+                t_yyzz_z[j] += fl_s_0_0_2 * (+ 2.0 * pa_yzz[j] * pc_yz[j] + 4.0 * pa_yz[j] * pc_yz[j] * pb_z[j] + pc_yy[j] * pa_zz[j] * pb_z[j]);
+
+                t_yyzz_z[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 3.0 * pa_y[j] * pc_yz[j] * fl1_fx - pc_yy[j] * pa_z[j] * fl1_fx - 1.5 * pc_yyz[j] * fl1_fx - 0.5 * pc_yy[j] * fl1_fx * pb_z[j]);
+
+                t_yyzz_z[j] += fl_s_0_0_3 * (- 0.5 * fl1_fx * pc_zzz[j] - fl1_fx * pa_z[j] * pc_zz[j] - 0.5 * fl1_fx * pc_zz[j] * pb_z[j] - pa_yy[j] * pc_zzz[j] - 4.0 * pa_yz[j] * pc_yzz[j]);
+
+                t_yyzz_z[j] += fl_s_0_0_3 * (- 2.0 * pa_y[j] * pc_yzz[j] * pb_z[j] - pc_yyz[j] * pa_zz[j] - 2.0 * pc_yyz[j] * pa_z[j] * pb_z[j]);
 
                 t_yyzz_z[j] += fl_s_0_0_4 * (1.5 * pc_yyz[j] * fl1_fx + 0.5 * fl1_fx * pc_zzz[j] + 2.0 * pa_y[j] * pc_yzzz[j] + 2.0 * pc_yyzz[j] * pa_z[j] + pc_yyzz[j] * pb_z[j]);
 
@@ -11386,11 +12516,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yzzz_x[j] = fl_s_0_0_0 * (1.5 * pa_yz[j] * fl1_fx * pb_x[j] + pa_yzzz[j] * pb_x[j]);
 
-                t_yzzz_x[j] += fl_s_0_0_1 * (-1.5 * pa_yz[j] * fl1_fx * pc_x[j] - 1.5 * pa_yz[j] * fl1_fx * pb_x[j] - 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_x[j] - 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_x[j] - pa_yzzz[j] * pc_x[j] - 3.0 * pa_yzz[j] * pc_z[j] * pb_x[j] - pc_y[j] * pa_zzz[j] * pb_x[j]);
+                t_yzzz_x[j] += fl_s_0_0_1 * (-1.5 * pa_yz[j] * fl1_fx * pc_x[j] - 1.5 * pa_yz[j] * fl1_fx * pb_x[j] - 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_x[j] - 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_x[j] - pa_yzzz[j] * pc_x[j]);
 
-                t_yzzz_x[j] += fl_s_0_0_2 * (1.5 * pa_yz[j] * fl1_fx * pc_x[j] + 1.5 * pa_y[j] * pc_xz[j] * fl1_fx + 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_x[j] + 1.5 * pc_xy[j] * pa_z[j] * fl1_fx + 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_x[j] + 1.5 * pc_yz[j] * fl1_fx * pb_x[j] + 3.0 * pa_yzz[j] * pc_xz[j] + 3.0 * pa_yz[j] * pc_zz[j] * pb_x[j] + pc_xy[j] * pa_zzz[j] + 3.0 * pc_yz[j] * pa_zz[j] * pb_x[j]);
+                t_yzzz_x[j] += fl_s_0_0_1 * (- 3.0 * pa_yzz[j] * pc_z[j] * pb_x[j] - pc_y[j] * pa_zzz[j] * pb_x[j]);
 
-                t_yzzz_x[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_xy[j] * pa_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_x[j] - 3.0 * pa_yz[j] * pc_xzz[j] - pa_y[j] * pc_zzz[j] * pb_x[j] - 3.0 * pc_xyz[j] * pa_zz[j] - 3.0 * pc_yzz[j] * pa_z[j] * pb_x[j]);
+                t_yzzz_x[j] += fl_s_0_0_2 * (1.5 * pa_yz[j] * fl1_fx * pc_x[j] + 1.5 * pa_y[j] * pc_xz[j] * fl1_fx + 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_x[j] + 1.5 * pc_xy[j] * pa_z[j] * fl1_fx + 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_x[j]);
+
+                t_yzzz_x[j] += fl_s_0_0_2 * (+ 1.5 * pc_yz[j] * fl1_fx * pb_x[j] + 3.0 * pa_yzz[j] * pc_xz[j] + 3.0 * pa_yz[j] * pc_zz[j] * pb_x[j] + pc_xy[j] * pa_zzz[j] + 3.0 * pc_yz[j] * pa_zz[j] * pb_x[j]);
+
+                t_yzzz_x[j] += fl_s_0_0_3 * (-1.5 * pa_y[j] * pc_xz[j] * fl1_fx - 1.5 * pc_xy[j] * pa_z[j] * fl1_fx - 1.5 * pc_xyz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_x[j] - 3.0 * pa_yz[j] * pc_xzz[j]);
+
+                t_yzzz_x[j] += fl_s_0_0_3 * (- pa_y[j] * pc_zzz[j] * pb_x[j] - 3.0 * pc_xyz[j] * pa_zz[j] - 3.0 * pc_yzz[j] * pa_z[j] * pb_x[j]);
 
                 t_yzzz_x[j] += fl_s_0_0_4 * (1.5 * pc_xyz[j] * fl1_fx + pa_y[j] * pc_xzzz[j] + 3.0 * pc_xyzz[j] * pa_z[j] + pc_yzzz[j] * pb_x[j]);
 
@@ -11398,11 +12534,23 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yzzz_y[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pa_z[j] + 0.5 * fl1_fx * pa_zzz[j] + 1.5 * pa_yz[j] * fl1_fx * pb_y[j] + pa_yzzz[j] * pb_y[j]);
 
-                t_yzzz_y[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * fl1_fx * pa_zz[j] * pc_z[j] - 0.5 * fl1_fx * pa_zzz[j] - 1.5 * pa_yz[j] * fl1_fx * pc_y[j] - 1.5 * pa_yz[j] * fl1_fx * pb_y[j] - 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_y[j] - 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_y[j] - pa_yzzz[j] * pc_y[j] - 3.0 * pa_yzz[j] * pc_z[j] * pb_y[j] - pc_y[j] * pa_zzz[j] * pb_y[j]);
+                t_yzzz_y[j] += fl_s_0_0_1 * (-1.5 * fl2_fx * pa_z[j] - 0.75 * fl2_fx * pc_z[j] - 1.5 * fl1_fx * pa_zz[j] * pc_z[j] - 0.5 * fl1_fx * pa_zzz[j] - 1.5 * pa_yz[j] * fl1_fx * pc_y[j]);
 
-                t_yzzz_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * fl1_fx * pa_z[j] * pc_zz[j] + 1.5 * fl1_fx * pa_zz[j] * pc_z[j] + 1.5 * pa_yz[j] * fl1_fx * pc_y[j] + 1.5 * pa_y[j] * pc_yz[j] * fl1_fx + 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_y[j] + 1.5 * pc_yy[j] * pa_z[j] * fl1_fx + 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_y[j] + 1.5 * pc_yz[j] * fl1_fx * pb_y[j] + 3.0 * pa_yzz[j] * pc_yz[j] + 3.0 * pa_yz[j] * pc_zz[j] * pb_y[j] + pc_yy[j] * pa_zzz[j] + 3.0 * pc_yz[j] * pa_zz[j] * pb_y[j]);
+                t_yzzz_y[j] += fl_s_0_0_1 * (- 1.5 * pa_yz[j] * fl1_fx * pb_y[j] - 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_y[j] - 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_y[j] - pa_yzzz[j] * pc_y[j] - 3.0 * pa_yzz[j] * pc_z[j] * pb_y[j]);
 
-                t_yzzz_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pa_z[j] * pc_zz[j] - 1.5 * pa_y[j] * pc_yz[j] * fl1_fx - 1.5 * pc_yy[j] * pa_z[j] * fl1_fx - 1.5 * pc_yyz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_y[j] - 3.0 * pa_yz[j] * pc_yzz[j] - pa_y[j] * pc_zzz[j] * pb_y[j] - 3.0 * pc_yyz[j] * pa_zz[j] - 3.0 * pc_yzz[j] * pa_z[j] * pb_y[j]);
+                t_yzzz_y[j] += -fl_s_0_0_1 * pc_y[j] * pa_zzz[j] * pb_y[j];
+
+                t_yzzz_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_z[j] + 0.75 * fl2_fx * pa_z[j] + 1.5 * fl1_fx * pa_z[j] * pc_zz[j] + 1.5 * fl1_fx * pa_zz[j] * pc_z[j] + 1.5 * pa_yz[j] * fl1_fx * pc_y[j]);
+
+                t_yzzz_y[j] += fl_s_0_0_2 * (+ 1.5 * pa_y[j] * pc_yz[j] * fl1_fx + 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_y[j] + 1.5 * pc_yy[j] * pa_z[j] * fl1_fx + 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_y[j] + 1.5 * pc_yz[j] * fl1_fx * pb_y[j]);
+
+                t_yzzz_y[j] += fl_s_0_0_2 * (+ 3.0 * pa_yzz[j] * pc_yz[j] + 3.0 * pa_yz[j] * pc_zz[j] * pb_y[j] + pc_yy[j] * pa_zzz[j] + 3.0 * pc_yz[j] * pa_zz[j] * pb_y[j]);
+
+                t_yzzz_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_z[j] - 0.5 * fl1_fx * pc_zzz[j] - 1.5 * fl1_fx * pa_z[j] * pc_zz[j] - 1.5 * pa_y[j] * pc_yz[j] * fl1_fx - 1.5 * pc_yy[j] * pa_z[j] * fl1_fx);
+
+                t_yzzz_y[j] += fl_s_0_0_3 * (- 1.5 * pc_yyz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_y[j] - 3.0 * pa_yz[j] * pc_yzz[j] - pa_y[j] * pc_zzz[j] * pb_y[j] - 3.0 * pc_yyz[j] * pa_zz[j]);
+
+                t_yzzz_y[j] += -fl_s_0_0_3 * 3.0 * pc_yzz[j] * pa_z[j] * pb_y[j];
 
                 t_yzzz_y[j] += fl_s_0_0_4 * (0.5 * fl1_fx * pc_zzz[j] + 1.5 * pc_yyz[j] * fl1_fx + pa_y[j] * pc_yzzz[j] + 3.0 * pc_yyzz[j] * pa_z[j] + pc_yzzz[j] * pb_y[j]);
 
@@ -11410,11 +12558,21 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_yzzz_z[j] = fl_s_0_0_0 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pa_yzz[j] * fl1_fx + 1.5 * pa_yz[j] * fl1_fx * pb_z[j] + pa_yzzz[j] * pb_z[j]);
 
-                t_yzzz_z[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 1.5 * pa_yzz[j] * fl1_fx - 4.5 * pa_yz[j] * pc_z[j] * fl1_fx - 1.5 * pc_y[j] * pa_zz[j] * fl1_fx - 1.5 * pa_yz[j] * fl1_fx * pb_z[j] - 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_z[j] - pa_yzzz[j] * pc_z[j] - 3.0 * pa_yzz[j] * pc_z[j] * pb_z[j] - pc_y[j] * pa_zzz[j] * pb_z[j]);
+                t_yzzz_z[j] += fl_s_0_0_1 * (-1.5 * pa_y[j] * fl2_fx - 0.75 * pc_y[j] * fl2_fx - 1.5 * pa_yzz[j] * fl1_fx - 4.5 * pa_yz[j] * pc_z[j] * fl1_fx - 1.5 * pc_y[j] * pa_zz[j] * fl1_fx);
 
-                t_yzzz_z[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 4.5 * pa_yz[j] * pc_z[j] * fl1_fx + 3.0 * pa_y[j] * pc_zz[j] * fl1_fx + 1.5 * pc_y[j] * pa_zz[j] * fl1_fx + 4.5 * pc_yz[j] * pa_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_yz[j] * fl1_fx * pb_z[j] + 3.0 * pa_yzz[j] * pc_zz[j] + 3.0 * pa_yz[j] * pc_zz[j] * pb_z[j] + pc_yz[j] * pa_zzz[j] + 3.0 * pc_yz[j] * pa_zz[j] * pb_z[j]);
+                t_yzzz_z[j] += fl_s_0_0_1 * (- 1.5 * pa_yz[j] * fl1_fx * pb_z[j] - 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_z[j] - 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_z[j] - pa_yzzz[j] * pc_z[j] - 3.0 * pa_yzz[j] * pc_z[j] * pb_z[j]);
 
-                t_yzzz_z[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_zz[j] * fl1_fx - 4.5 * pc_yz[j] * pa_z[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_z[j] - 3.0 * pa_yz[j] * pc_zzz[j] - pa_y[j] * pc_zzz[j] * pb_z[j] - 3.0 * pc_yzz[j] * pa_zz[j] - 3.0 * pc_yzz[j] * pa_z[j] * pb_z[j]);
+                t_yzzz_z[j] += -fl_s_0_0_1 * pc_y[j] * pa_zzz[j] * pb_z[j];
+
+                t_yzzz_z[j] += fl_s_0_0_2 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pc_y[j] * fl2_fx + 4.5 * pa_yz[j] * pc_z[j] * fl1_fx + 3.0 * pa_y[j] * pc_zz[j] * fl1_fx + 1.5 * pc_y[j] * pa_zz[j] * fl1_fx);
+
+                t_yzzz_z[j] += fl_s_0_0_2 * (+ 4.5 * pc_yz[j] * pa_z[j] * fl1_fx + 1.5 * pa_y[j] * pc_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_y[j] * pa_z[j] * fl1_fx * pb_z[j] + 1.5 * pc_yz[j] * fl1_fx * pb_z[j] + 3.0 * pa_yzz[j] * pc_zz[j]);
+
+                t_yzzz_z[j] += fl_s_0_0_2 * (+ 3.0 * pa_yz[j] * pc_zz[j] * pb_z[j] + pc_yz[j] * pa_zzz[j] + 3.0 * pc_yz[j] * pa_zz[j] * pb_z[j]);
+
+                t_yzzz_z[j] += fl_s_0_0_3 * (-0.75 * pc_y[j] * fl2_fx - 3.0 * pa_y[j] * pc_zz[j] * fl1_fx - 4.5 * pc_yz[j] * pa_z[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx - 1.5 * pc_yz[j] * fl1_fx * pb_z[j]);
+
+                t_yzzz_z[j] += fl_s_0_0_3 * (- 3.0 * pa_yz[j] * pc_zzz[j] - pa_y[j] * pc_zzz[j] * pb_z[j] - 3.0 * pc_yzz[j] * pa_zz[j] - 3.0 * pc_yzz[j] * pa_z[j] * pb_z[j]);
 
                 t_yzzz_z[j] += fl_s_0_0_4 * (3.0 * pc_yzz[j] * fl1_fx + pa_y[j] * pc_zzzz[j] + 3.0 * pc_yzzz[j] * pa_z[j] + pc_yzzz[j] * pb_z[j]);
 
@@ -11569,11 +12727,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_zzzz_x[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_x[j] + 3.0 * pa_zz[j] * fl1_fx * pb_x[j] + pa_zzzz[j] * pb_x[j]);
 
-                t_zzzz_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * fl2_fx * pb_x[j] - 3.0 * pa_zz[j] * fl1_fx * pc_x[j] - 3.0 * pa_zz[j] * fl1_fx * pb_x[j] - 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_x[j] - pa_zzzz[j] * pc_x[j] - 4.0 * pa_zzz[j] * pc_z[j] * pb_x[j]);
+                t_zzzz_x[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_x[j] - 1.5 * fl2_fx * pb_x[j] - 3.0 * pa_zz[j] * fl1_fx * pc_x[j] - 3.0 * pa_zz[j] * fl1_fx * pb_x[j] - 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_x[j]);
 
-                t_zzzz_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 3.0 * pa_zz[j] * fl1_fx * pc_x[j] + 6.0 * pa_z[j] * pc_xz[j] * fl1_fx + 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_x[j] + 3.0 * pc_zz[j] * fl1_fx * pb_x[j] + 4.0 * pa_zzz[j] * pc_xz[j] + 6.0 * pa_zz[j] * pc_zz[j] * pb_x[j]);
+                t_zzzz_x[j] += fl_s_0_0_1 * (- pa_zzzz[j] * pc_x[j] - 4.0 * pa_zzz[j] * pc_z[j] * pb_x[j]);
 
-                t_zzzz_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 6.0 * pa_z[j] * pc_xz[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx - 3.0 * pc_zz[j] * fl1_fx * pb_x[j] - 6.0 * pa_zz[j] * pc_xzz[j] - 4.0 * pa_z[j] * pc_zzz[j] * pb_x[j]);
+                t_zzzz_x[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_x[j] + 0.75 * fl2_fx * pb_x[j] + 3.0 * pa_zz[j] * fl1_fx * pc_x[j] + 6.0 * pa_z[j] * pc_xz[j] * fl1_fx + 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_x[j]);
+
+                t_zzzz_x[j] += fl_s_0_0_2 * (+ 3.0 * pc_zz[j] * fl1_fx * pb_x[j] + 4.0 * pa_zzz[j] * pc_xz[j] + 6.0 * pa_zz[j] * pc_zz[j] * pb_x[j]);
+
+                t_zzzz_x[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_x[j] - 6.0 * pa_z[j] * pc_xz[j] * fl1_fx - 3.0 * pc_xzz[j] * fl1_fx - 3.0 * pc_zz[j] * fl1_fx * pb_x[j] - 6.0 * pa_zz[j] * pc_xzz[j]);
+
+                t_zzzz_x[j] += -fl_s_0_0_3 * 4.0 * pa_z[j] * pc_zzz[j] * pb_x[j];
 
                 t_zzzz_x[j] += fl_s_0_0_4 * (3.0 * pc_xzz[j] * fl1_fx + 4.0 * pa_z[j] * pc_xzzz[j] + pc_zzzz[j] * pb_x[j]);
 
@@ -11581,11 +12745,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_zzzz_y[j] = fl_s_0_0_0 * (0.75 * fl2_fx * pb_y[j] + 3.0 * pa_zz[j] * fl1_fx * pb_y[j] + pa_zzzz[j] * pb_y[j]);
 
-                t_zzzz_y[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pb_y[j] - 3.0 * pa_zz[j] * fl1_fx * pc_y[j] - 3.0 * pa_zz[j] * fl1_fx * pb_y[j] - 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_y[j] - pa_zzzz[j] * pc_y[j] - 4.0 * pa_zzz[j] * pc_z[j] * pb_y[j]);
+                t_zzzz_y[j] += fl_s_0_0_1 * (-0.75 * fl2_fx * pc_y[j] - 1.5 * fl2_fx * pb_y[j] - 3.0 * pa_zz[j] * fl1_fx * pc_y[j] - 3.0 * pa_zz[j] * fl1_fx * pb_y[j] - 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_y[j]);
 
-                t_zzzz_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 3.0 * pa_zz[j] * fl1_fx * pc_y[j] + 6.0 * pa_z[j] * pc_yz[j] * fl1_fx + 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_y[j] + 3.0 * pc_zz[j] * fl1_fx * pb_y[j] + 4.0 * pa_zzz[j] * pc_yz[j] + 6.0 * pa_zz[j] * pc_zz[j] * pb_y[j]);
+                t_zzzz_y[j] += fl_s_0_0_1 * (- pa_zzzz[j] * pc_y[j] - 4.0 * pa_zzz[j] * pc_z[j] * pb_y[j]);
 
-                t_zzzz_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 6.0 * pa_z[j] * pc_yz[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx - 3.0 * pc_zz[j] * fl1_fx * pb_y[j] - 6.0 * pa_zz[j] * pc_yzz[j] - 4.0 * pa_z[j] * pc_zzz[j] * pb_y[j]);
+                t_zzzz_y[j] += fl_s_0_0_2 * (1.5 * fl2_fx * pc_y[j] + 0.75 * fl2_fx * pb_y[j] + 3.0 * pa_zz[j] * fl1_fx * pc_y[j] + 6.0 * pa_z[j] * pc_yz[j] * fl1_fx + 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_y[j]);
+
+                t_zzzz_y[j] += fl_s_0_0_2 * (+ 3.0 * pc_zz[j] * fl1_fx * pb_y[j] + 4.0 * pa_zzz[j] * pc_yz[j] + 6.0 * pa_zz[j] * pc_zz[j] * pb_y[j]);
+
+                t_zzzz_y[j] += fl_s_0_0_3 * (-0.75 * fl2_fx * pc_y[j] - 6.0 * pa_z[j] * pc_yz[j] * fl1_fx - 3.0 * pc_yzz[j] * fl1_fx - 3.0 * pc_zz[j] * fl1_fx * pb_y[j] - 6.0 * pa_zz[j] * pc_yzz[j]);
+
+                t_zzzz_y[j] += -fl_s_0_0_3 * 4.0 * pa_z[j] * pc_zzz[j] * pb_y[j];
 
                 t_zzzz_y[j] += fl_s_0_0_4 * (3.0 * pc_yzz[j] * fl1_fx + 4.0 * pa_z[j] * pc_yzzz[j] + pc_zzzz[j] * pb_y[j]);
 
@@ -11593,11 +12763,17 @@ namespace npotrecfunc { // npotrecfunc namespace
 
                 t_zzzz_z[j] = fl_s_0_0_0 * (3.0 * pa_z[j] * fl2_fx + 2.0 * pa_zzz[j] * fl1_fx + 0.75 * fl2_fx * pb_z[j] + 3.0 * pa_zz[j] * fl1_fx * pb_z[j] + pa_zzzz[j] * pb_z[j]);
 
-                t_zzzz_z[j] += fl_s_0_0_1 * (-6.0 * pa_z[j] * fl2_fx - 3.75 * pc_z[j] * fl2_fx - 2.0 * pa_zzz[j] * fl1_fx - 9.0 * pa_zz[j] * pc_z[j] * fl1_fx - 1.5 * fl2_fx * pb_z[j] - 3.0 * pa_zz[j] * fl1_fx * pb_z[j] - 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_z[j] - pa_zzzz[j] * pc_z[j] - 4.0 * pa_zzz[j] * pc_z[j] * pb_z[j]);
+                t_zzzz_z[j] += fl_s_0_0_1 * (-6.0 * pa_z[j] * fl2_fx - 3.75 * pc_z[j] * fl2_fx - 2.0 * pa_zzz[j] * fl1_fx - 9.0 * pa_zz[j] * pc_z[j] * fl1_fx - 1.5 * fl2_fx * pb_z[j]);
 
-                t_zzzz_z[j] += fl_s_0_0_2 * (3.0 * pa_z[j] * fl2_fx + 7.5 * pc_z[j] * fl2_fx + 9.0 * pa_zz[j] * pc_z[j] * fl1_fx + 12.0 * pa_z[j] * pc_zz[j] * fl1_fx + 0.75 * fl2_fx * pb_z[j] + 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_z[j] + 3.0 * pc_zz[j] * fl1_fx * pb_z[j] + 4.0 * pa_zzz[j] * pc_zz[j] + 6.0 * pa_zz[j] * pc_zz[j] * pb_z[j]);
+                t_zzzz_z[j] += fl_s_0_0_1 * (- 3.0 * pa_zz[j] * fl1_fx * pb_z[j] - 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_z[j] - pa_zzzz[j] * pc_z[j] - 4.0 * pa_zzz[j] * pc_z[j] * pb_z[j]);
 
-                t_zzzz_z[j] += fl_s_0_0_3 * (-3.75 * pc_z[j] * fl2_fx - 12.0 * pa_z[j] * pc_zz[j] * fl1_fx - 5.0 * pc_zzz[j] * fl1_fx - 3.0 * pc_zz[j] * fl1_fx * pb_z[j] - 6.0 * pa_zz[j] * pc_zzz[j] - 4.0 * pa_z[j] * pc_zzz[j] * pb_z[j]);
+                t_zzzz_z[j] += fl_s_0_0_2 * (3.0 * pa_z[j] * fl2_fx + 7.5 * pc_z[j] * fl2_fx + 9.0 * pa_zz[j] * pc_z[j] * fl1_fx + 12.0 * pa_z[j] * pc_zz[j] * fl1_fx + 0.75 * fl2_fx * pb_z[j]);
+
+                t_zzzz_z[j] += fl_s_0_0_2 * (+ 6.0 * pa_z[j] * pc_z[j] * fl1_fx * pb_z[j] + 3.0 * pc_zz[j] * fl1_fx * pb_z[j] + 4.0 * pa_zzz[j] * pc_zz[j] + 6.0 * pa_zz[j] * pc_zz[j] * pb_z[j]);
+
+                t_zzzz_z[j] += fl_s_0_0_3 * (-3.75 * pc_z[j] * fl2_fx - 12.0 * pa_z[j] * pc_zz[j] * fl1_fx - 5.0 * pc_zzz[j] * fl1_fx - 3.0 * pc_zz[j] * fl1_fx * pb_z[j] - 6.0 * pa_zz[j] * pc_zzz[j]);
+
+                t_zzzz_z[j] += -fl_s_0_0_3 * 4.0 * pa_z[j] * pc_zzz[j] * pb_z[j];
 
                 t_zzzz_z[j] += fl_s_0_0_4 * (5.0 * pc_zzz[j] * fl1_fx + 4.0 * pa_z[j] * pc_zzzz[j] + pc_zzzz[j] * pb_z[j]);
 
