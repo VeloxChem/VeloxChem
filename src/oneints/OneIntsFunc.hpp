@@ -355,6 +355,17 @@ namespace intsfunc { // intsfunc namespace
      */
     int32_t getNumberOfComponentsInDistancesTensor(const int32_t tensorOrder);
     
+    /**
+     Computes tensor product of two tensors.
+
+     @param aTensor the tensor A = B * C.
+     @param bTensor the tensor B.
+     @param cTensor the tensor C.
+     */
+    void compTensorsProduct(      CMemBlock2D<double>& aTensor,
+                            const CMemBlock2D<double>& bTensor,
+                            const CMemBlock2D<double>& cTensor);
+    
 } // intsfunc namespace
 
 #endif /* OneIntsFunc_hpp */

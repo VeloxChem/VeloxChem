@@ -1245,4 +1245,43 @@ namespace intsfunc { // intsfunc namespace
         return ncomps;
     }
     
+    void
+    compTensorsProduct(      CMemBlock2D<double>& aTensor,
+                       const CMemBlock2D<double>& bTensor,
+                       const CMemBlock2D<double>& cTensor)
+    {
+        // set up dimensions of tensors
+        
+        auto adim = aTensor.blocks();
+        
+        auto bdim = bTensor.blocks();
+        
+        auto cdim = cTensor.blocks();
+        
+        // compute product of tensors
+        
+        if (adim == bdim * cdim)
+        {
+            auto ndim = aTensor.size(0);
+            
+            for (int32_t i = 0; i < bdim; i++)
+            {
+                auto bvals = bTensor.data(i);
+                
+                for (int32_t j = 0; j < cdim; j++)
+                {
+                    auto cvals = cTensor.data(j);
+                    
+                    auto avals = aTensor.data(i * cdim + j);
+                    
+                    #pragma omp simd aligned(avals, bvals, cvals: VLX_ALIGN)
+                    for (int32_t k = 0; k < ndim; k++)
+                    {
+                        avals[k] = bvals[k] * cvals[k];
+                    }
+                }
+            }
+        }
+    }
+    
 } // intsfunc namespace

@@ -258,9 +258,13 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
     
     auto ktcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
     
+    bool userpa2b = btcomps * ktcomps > 0;
+    
     auto rpa = (btcomps > 0) ? CMemBlock2D<double>(pdim, btcomps * pmax) : CMemBlock2D<double>();
     
     auto rpb = (ktcomps > 0) ? CMemBlock2D<double>(pdim, ktcomps * pmax) : CMemBlock2D<double>();
+    
+    auto rpa2b = (userpa2b) ? CMemBlock2D<double>(pdim, btcomps * ktcomps * pmax) : CMemBlock2D<double>();
 
     // allocate primitives and auxilary integrals buffer
     
@@ -304,9 +308,13 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
         
         intsfunc::compTensorsPB(rpb, rab, rfacts, 2, bragtos, ketgtos, i);
         
+        // compute tensor products: R(PA) x P(PB)
+        
+        intsfunc::compTensorsProduct(rpa2b, rpa, rpb);
+        
         // compite primitive overlap integrals
         
-        _compPrimOverlapInts(primbuffer, auxbuffer, rfacts, rab, rpa, rpb,
+        _compPrimOverlapInts(primbuffer, auxbuffer, rfacts, rab, rpa, rpb, rpa2b, 
                              bragtos, ketgtos, i);
         
         // contract primitive overlap integrals
@@ -330,6 +338,7 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                               const CMemBlock2D<double>&  abDistances,
                                               const CMemBlock2D<double>&  paDistances,
                                               const CMemBlock2D<double>&  pbDistances,
+                                              const CMemBlock2D<double>&  pa2bDistances,
                                               const CGtoBlock&            braGtoBlock,
                                               const CGtoBlock&            ketGtoBlock,
                                               const int32_t               iContrGto) const
