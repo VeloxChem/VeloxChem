@@ -102,9 +102,9 @@ class LinearResponseSolver:
         self.comp_1e_ints()
 
         self.eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        self.screening = self.eri_drv.compute(
-            get_qq_scheme(self.qq_type), self.eri_thresh, self.molecule,
-            self.basis)
+        self.screening = self.eri_drv.compute(get_qq_scheme(self.qq_type),
+                                              self.eri_thresh, self.molecule,
+                                              self.basis)
 
         # TODO: make use of Fock matrices from scf
         self.comp_fock()
@@ -460,8 +460,8 @@ class LinearResponseSolver:
                 fat = fak + kfa
                 fbt = fbk + kfb
 
-                gao = S @ (da @ fat.T + db @ fbt.T) - (
-                    fat.T @ da + fbt.T @ db) @ S
+                gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da +
+                                                       fbt.T @ db) @ S
                 gmo = mo.T @ gao @ mo
 
                 gv[:, col] = -self.mat2vec(gmo)

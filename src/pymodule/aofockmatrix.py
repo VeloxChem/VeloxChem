@@ -67,9 +67,8 @@ def _read_hdf5(fname):
     hf.close()
 
     for ftype in set(types):
-        assert_msg_critical(
-            ftype in list(focktype.values()),
-            "AOFockMatrix.read_hdf5: invalid Fock types!")
+        assert_msg_critical(ftype in list(focktype.values()),
+                            "AOFockMatrix.read_hdf5: invalid Fock types!")
 
     return AOFockMatrix(focks, types, factors, indices)
 

@@ -138,8 +138,8 @@ class TDAExciDriver:
 
         eri_drv = ElectronRepulsionIntegralsDriver(comm)
 
-        qq_data = eri_drv.compute(
-            get_qq_scheme(self.qq_type), self.eri_thresh, molecule, ao_basis)
+        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
+                                  molecule, ao_basis)
 
         # set up trial excitation vectors on master node
 
@@ -321,8 +321,8 @@ class TDAExciDriver:
 
             trial_mat = trial_vecs[0].zvector_to_numpy()
             for i in range(1, nvecs):
-                trial_mat = np.hstack((trial_mat,
-                                       trial_vecs[i].zvector_to_numpy()))
+                trial_mat = np.hstack(
+                    (trial_mat, trial_vecs[i].zvector_to_numpy()))
 
             return trial_mat
 

@@ -217,8 +217,9 @@ class ScfRestrictedDriver(ScfDriver):
 
                 acc_diis = CTwoDiis()
 
-                acc_diis.compute_error_vectors(
-                    self.fock_matrices, self.den_matrices, ovl_mat, oao_mat)
+                acc_diis.compute_error_vectors(self.fock_matrices,
+                                               self.den_matrices, ovl_mat,
+                                               oao_mat)
 
                 weights = acc_diis.compute_weights()
 

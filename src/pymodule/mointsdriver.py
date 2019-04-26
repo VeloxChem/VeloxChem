@@ -62,8 +62,8 @@ class MOIntegralsDriver:
         # set up screening data
         eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
 
-        qq_data = eri_drv.compute(
-            get_qq_scheme(self.qq_type), self.eri_thresh, molecule, ao_basis)
+        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
+                                  molecule, ao_basis)
 
         # initialize MO integrals batch
         moints_batch = MOIntsBatch()

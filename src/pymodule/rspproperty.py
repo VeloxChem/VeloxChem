@@ -33,8 +33,9 @@ class ResponseProperty:
             The MPI task.
         """
 
-        self.rsp_property = self.rsp_driver.compute(
-            mol_orbs, task.molecule, task.ao_basis, task.mpi_comm, task.ostream)
+        self.rsp_property = self.rsp_driver.compute(mol_orbs, task.molecule,
+                                                    task.ao_basis,
+                                                    task.mpi_comm, task.ostream)
 
     def compute(self,
                 mol_orbs,

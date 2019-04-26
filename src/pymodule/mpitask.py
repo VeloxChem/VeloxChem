@@ -103,8 +103,8 @@ class MpiTask:
 
         # broadcast input dictionary
 
-        self.input_dict = self.mpi_comm.bcast(
-            self.input_dict, root=mpi_master())
+        self.input_dict = self.mpi_comm.bcast(self.input_dict,
+                                              root=mpi_master())
 
         # broadcast molecule and basis set
 
