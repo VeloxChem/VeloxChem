@@ -9,8 +9,8 @@ class TestScfDriver(unittest.TestCase):
 
     def test_h2se_scf(self):
 
-        scf_drv = ScfRestrictedDriver()
         task = MpiTask(["inputs/h2se.inp", "inputs/h2se.out"], MPI.COMM_WORLD)
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute_task(task)
         task.finish()

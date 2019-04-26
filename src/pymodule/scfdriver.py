@@ -3,7 +3,6 @@ from os.path import isfile
 import numpy as np
 import time as tm
 import math
-import sys
 
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
@@ -11,7 +10,6 @@ from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .denguess import DensityGuess
@@ -86,7 +84,7 @@ class ScfDriver:
         The flag for restarting from checkpoint file
     """
 
-    def __init__(self, scf_dict):
+    def __init__(self, comm, ostream):
         """Initializes SCF driver.
 
         Initializes SCF driver to default setup (convergence threshold, initial
@@ -136,26 +134,31 @@ class ScfDriver:
         self.nuc_energy = 0.0
 
         # mpi information
-        self.rank = 0
-        self.nodes = 1
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # output stream
+        self.ostream = ostream
 
         # restart information
         self.restart = True
 
-        if scf_dict:
-            if 'acc_type' in scf_dict:
-                self.acc_type = scf_dict['acc_type'].upper()
-            if 'max_iter' in scf_dict:
-                self.max_iter = int(scf_dict['max_iter'])
-            if 'conv_thresh' in scf_dict:
-                self.conv_thresh = float(scf_dict['conv_thresh'])
-            if 'qq_type' in scf_dict:
-                self.qq_type = scf_dict['qq_type'].upper()
-            if 'eri_thresh' in scf_dict:
-                self.eri_thresh = float(scf_dict['eri_thresh'])
-            if 'restart' in scf_dict:
-                key = scf_dict['restart'].lower()
-                self.restart = True if key == 'yes' else False
+    def update_settings(self, scf_dict):
+
+        if 'acc_type' in scf_dict:
+            self.acc_type = scf_dict['acc_type'].upper()
+        if 'max_iter' in scf_dict:
+            self.max_iter = int(scf_dict['max_iter'])
+        if 'conv_thresh' in scf_dict:
+            self.conv_thresh = float(scf_dict['conv_thresh'])
+        if 'qq_type' in scf_dict:
+            self.qq_type = scf_dict['qq_type'].upper()
+        if 'eri_thresh' in scf_dict:
+            self.eri_thresh = float(scf_dict['eri_thresh'])
+        if 'restart' in scf_dict:
+            key = scf_dict['restart'].lower()
+            self.restart = True if key == 'yes' else False
 
     def compute_task(self, task):
         """Performs SCF calculation.
@@ -171,19 +174,12 @@ class ScfDriver:
         checkpoint_file = task.input_dict["checkpoint_file"]
 
         self.compute(task.molecule, task.ao_basis, task.min_basis,
-                     task.mpi_comm, task.ostream, checkpoint_file)
+                     checkpoint_file)
 
-    def compute(self,
-                molecule,
-                ao_basis,
-                min_basis,
-                comm,
-                ostream=OutputStream(sys.stdout),
-                checkpoint_file=None):
+    def compute(self, molecule, ao_basis, min_basis, checkpoint_file=None):
         """Performs SCF calculation.
 
-        Performs SCF calculation using molecular data, MPI communicator and
-        output stream.
+        Performs SCF calculation using molecular data
 
         Parameters
         ----------
@@ -193,15 +189,7 @@ class ScfDriver:
             The AO basis set.
         min_basis
             The minimal AO basis set.
-        comm
-            The MPI communicator.
-        ostream
-            The output stream.
         """
-
-        # MPI rank and size
-        self.rank = comm.Get_rank()
-        self.nodes = comm.Get_size()
 
         # checkpoint file
         self.checkpoint_file = checkpoint_file
@@ -210,7 +198,7 @@ class ScfDriver:
         if self.restart:
             self.den_guess = DensityGuess("RESTART", checkpoint_file)
             self.restart = self.den_guess.validate_checkpoint(
-                molecule, ao_basis, comm, self.ovl_thresh)
+                molecule, ao_basis, self.comm, self.ovl_thresh)
 
         if self.restart:
             self.acc_type = "DIIS"
@@ -221,11 +209,11 @@ class ScfDriver:
         self.nuc_energy = molecule.nuclear_repulsion_energy()
 
         if self.rank == mpi_master():
-            self.print_header(ostream)
+            self.print_header()
 
         # C2-DIIS method
         if self.acc_type == "DIIS":
-            self.comp_diis(molecule, ao_basis, min_basis, comm, ostream)
+            self.comp_diis(molecule, ao_basis, min_basis)
 
         # two level C2-DIIS method
         if self.acc_type == "L2_DIIS":
@@ -241,7 +229,7 @@ class ScfDriver:
 
             val_basis = ao_basis.get_valence_basis()
 
-            self.comp_diis(molecule, val_basis, min_basis, comm, ostream)
+            self.comp_diis(molecule, val_basis, min_basis)
 
             # second step
             self.first_step = False
@@ -252,22 +240,23 @@ class ScfDriver:
 
             self.den_guess.guess_type = "PRCMO"
 
-            self.comp_diis(molecule, ao_basis, val_basis, comm, ostream)
+            self.comp_diis(molecule, ao_basis, val_basis)
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
         if self.rank == mpi_master():
-            self.print_scf_energy(ostream)
-            self.print_ground_state(molecule, ostream)
-            self.mol_orbs.print_orbitals(molecule, ao_basis, False, ostream)
+            self.print_scf_energy()
+            self.print_ground_state(molecule)
+            self.mol_orbs.print_orbitals(molecule, ao_basis, False,
+                                         self.ostream)
 
             if (checkpoint_file and isinstance(checkpoint_file, str) and
                     isfile(checkpoint_file)):
                 checkpoint_text = "Checkpoint written to file: "
                 checkpoint_text += checkpoint_file
-                ostream.print_info(checkpoint_text)
-                ostream.print_blank()
+                self.ostream.print_info(checkpoint_text)
+                self.ostream.print_blank()
 
     def write_checkpoint(self, checkpoint_file):
         """Writes molecular orbitals to checkpoint file"""
@@ -276,11 +265,10 @@ class ScfDriver:
             if checkpoint_file and isinstance(checkpoint_file, str):
                 self.mol_orbs.write_hdf5(checkpoint_file)
 
-    def comp_diis(self, molecule, ao_basis, min_basis, comm, ostream):
+    def comp_diis(self, molecule, ao_basis, min_basis):
         """Performs SCF calculation with C2-DIIS acceleration.
 
-        Performs SCF calculation using molecular data, MPI communicator and
-        output stream.
+        Performs SCF calculation using molecular data
 
         Parameters
         ----------
@@ -290,10 +278,6 @@ class ScfDriver:
             The AO basis set.
         min_basis
             The minimal AO basis set.
-        comm
-            The MPI communicator.
-        ostream
-            The output stream.
         """
 
         start_time = tm.time()
@@ -301,8 +285,7 @@ class ScfDriver:
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
-        ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis,
-                                                        comm, ostream)
+        ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis)
 
         linear_dependency = False
 
@@ -311,9 +294,9 @@ class ScfDriver:
 
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
 
-            ostream.print_info("Orthogonalization matrix computed in" +
-                               " {:.2f} sec.".format(tm.time() - t0))
-            ostream.print_blank()
+            self.ostream.print_info("Orthogonalization matrix computed in" +
+                                    " {:.2f} sec.".format(tm.time() - t0))
+            self.ostream.print_blank()
 
             nrow = oao_mat.number_of_rows()
             ncol = oao_mat.number_of_columns()
@@ -321,34 +304,35 @@ class ScfDriver:
 
             if linear_dependency:
                 ndim = nrow - ncol
-                ostream.print_info(
+                self.ostream.print_info(
                     "Removed " + str(ndim) + " linearly dependent" +
                     " vector{:s}.".format('' if ndim == 1 else 's'))
-                ostream.print_blank()
-            ostream.flush()
+                self.ostream.print_blank()
+            self.ostream.flush()
 
         else:
             oao_mat = None
 
-        linear_dependency = comm.bcast(linear_dependency, root=mpi_master())
+        linear_dependency = self.comm.bcast(linear_dependency,
+                                            root=mpi_master())
 
         if (linear_dependency and self.eri_thresh > self.eri_thresh_tight):
             self.eri_thresh = self.eri_thresh_tight
 
             if self.rank == mpi_master():
-                ostream.print_info("ERI screening threshold tightened to" +
-                                   " {:.1e}.".format(self.eri_thresh))
-                ostream.print_blank()
+                self.ostream.print_info("ERI screening threshold tightened to" +
+                                        " {:.1e}.".format(self.eri_thresh))
+                self.ostream.print_blank()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(comm)
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
 
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
 
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
-                                          ovl_mat, comm, ostream)
+                                          ovl_mat)
 
-        den_mat.broadcast(self.rank, comm)
+        den_mat.broadcast(self.rank, self.comm)
 
         self.density = AODensityMatrix(den_mat)
 
@@ -359,28 +343,27 @@ class ScfDriver:
         dden_fock = False
 
         if self.rank == mpi_master():
-            self.print_scf_title(ostream)
+            self.print_scf_title()
 
         for i in self.get_scf_range():
 
             self.comp_2e_fock(eri_drv, fock_mat, ref_fock_mat, den_mat,
-                              dden_fock, molecule, ao_basis, qq_data, comm)
+                              dden_fock, molecule, ao_basis, qq_data)
 
             ref_fock_mat = self.store_fock_mat(fock_mat)
 
-            fock_mat.reduce_sum(self.rank, self.nodes, comm)
+            fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
-                                                 den_mat, comm)
+                                                 den_mat)
 
             self.comp_full_fock(fock_mat, kin_mat, npot_mat)
 
-            e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, oao_mat,
-                                        comm)
+            e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, oao_mat)
 
             self.set_skip_iter_flag(i, e_grad)
 
-            diff_den = self.comp_density_change(den_mat, self.density, comm)
+            diff_den = self.comp_density_change(den_mat, self.density)
 
             dden_fock = self.use_diff_density_fock(diff_den)
 
@@ -388,14 +371,13 @@ class ScfDriver:
 
             self.check_convergence()
 
-            self.print_iter_data(i, ostream)
+            self.print_iter_data(i)
 
             self.store_diis_data(i, fock_mat, den_mat)
 
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
-            self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat,
-                                                        ostream)
+            self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat)
 
             self.write_checkpoint(self.checkpoint_file)
 
@@ -405,9 +387,9 @@ class ScfDriver:
 
             if dden_fock:
                 diff_den_mat = AODensityMatrix(den_mat)
-                diff_den_mat.broadcast(self.rank, comm)
+                diff_den_mat.broadcast(self.rank, self.comm)
             else:
-                den_mat.broadcast(self.rank, comm)
+                den_mat.broadcast(self.rank, self.comm)
 
             if self.qq_dyn:
                 qq_data.set_threshold(self.get_dyn_threshold(e_grad))
@@ -416,13 +398,13 @@ class ScfDriver:
                 break
 
         if self.rank == mpi_master():
-            self.print_scf_finish(start_time, ostream)
+            self.print_scf_finish(start_time)
 
-    def comp_one_ints(self, molecule, basis, comm, ostream):
+    def comp_one_ints(self, molecule, basis):
         """Computes one-electron integrals required for SCF calculation.
 
         Computes one-electron integrals (overlap, kinetic energy and nuclear
-        potential) using molecular data, MPI communicator and output stream.
+        potential) using molecular data.
 
         Parameters
         ----------
@@ -430,49 +412,44 @@ class ScfDriver:
             The molecule.
         ao_basis
             The AO basis set.
-        comm
-            The MPI communicator.
-        ostream
-            The output stream.
         """
 
         t0 = tm.time()
 
-        ovl_drv = OverlapIntegralsDriver(comm)
+        ovl_drv = OverlapIntegralsDriver(self.comm)
         ovl_mat = ovl_drv.compute(molecule, basis)
 
         t1 = tm.time()
 
-        kin_drv = KineticEnergyIntegralsDriver(comm)
+        kin_drv = KineticEnergyIntegralsDriver(self.comm)
         kin_mat = kin_drv.compute(molecule, basis)
 
         t2 = tm.time()
 
-        npot_drv = NuclearPotentialIntegralsDriver(comm)
+        npot_drv = NuclearPotentialIntegralsDriver(self.comm)
         npot_mat = npot_drv.compute(molecule, basis)
 
         t3 = tm.time()
 
         if self.rank == mpi_master():
 
-            ostream.print_info("Overlap matrix computed in" +
-                               " {:.2f} sec.".format(t1 - t0))
-            ostream.print_blank()
+            self.ostream.print_info("Overlap matrix computed in" +
+                                    " {:.2f} sec.".format(t1 - t0))
+            self.ostream.print_blank()
 
-            ostream.print_info("Kinetic energy matrix computed in" +
-                               " {:.2f} sec.".format(t2 - t1))
-            ostream.print_blank()
+            self.ostream.print_info("Kinetic energy matrix computed in" +
+                                    " {:.2f} sec.".format(t2 - t1))
+            self.ostream.print_blank()
 
-            ostream.print_info("Nuclear potential matrix computed in" +
-                               " {:.2f} sec.".format(t3 - t2))
-            ostream.print_blank()
+            self.ostream.print_info("Nuclear potential matrix computed in" +
+                                    " {:.2f} sec.".format(t3 - t2))
+            self.ostream.print_blank()
 
-            ostream.flush()
+            self.ostream.flush()
 
         return (ovl_mat, kin_mat, npot_mat)
 
-    def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat, comm,
-                           ostream):
+    def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
         """Computes initial density guess for SCF calculation.
 
         Computes initial density guess for SCF using superposition of atomic
@@ -488,22 +465,19 @@ class ScfDriver:
             The minimal AO basis set.
         ovl_mat
             The overlap matrix between minimal and full AO basis.
-        comm
-            The MPI communicator.
-        ostream
-            The output stream.
         """
 
         # guess: read from checkpoint file
         if self.den_guess.guess_type == "RESTART":
 
-            return self.den_guess.restart_density(molecule, comm, ostream)
+            return self.den_guess.restart_density(molecule, self.comm,
+                                                  self.ostream)
 
         # guess: superposition of atomic densities
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, comm, ostream)
+                                              ovl_mat, self.comm, self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
         if self.den_guess.guess_type == "PRCMO":
@@ -542,7 +516,7 @@ class ScfDriver:
             else:
                 self.skip_iter = True
 
-    def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat, comm):
+    def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         """Computes SCF energy components.
 
             Computes SCF energy components: electronic energy, kinetic energy,
@@ -558,8 +532,6 @@ class ScfDriver:
             The nuclear potential matrix.
         den_mat
             The density matrix.
-        comm
-            The MPI communicator.
         Returns
         -------
             The tuple (electronic energy, kinetic energy, nuclear potential
@@ -569,10 +541,10 @@ class ScfDriver:
         return (0.0, 0.0, 0.0)
 
     def comp_2e_fock(self, eri_drv, fock_mat, ref_fock_mat, den_mat, dden_fock,
-                     molecule, ao_basis, qq_data, comm):
+                     molecule, ao_basis, qq_data):
         """Computes 2e part of Fock/Kohn-Sham matrix.
 
-        Computes 2e part of Fock/Kohn-Sham matrix in parallel on given MPI
+        Computes 2e part of Fock/Kohn-Sham matrix in parallel on MPI
         communicator.
 
         Parameters
@@ -594,8 +566,6 @@ class ScfDriver:
             The AO basis.
         qq_data
             The electron repulsion integrals screener.
-        comm
-            The MPI communicator.
         """
 
         if dden_fock:
@@ -624,7 +594,7 @@ class ScfDriver:
 
         return
 
-    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat, comm):
+    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """Computes electronic gradient.
 
         Computes electronic gradient using Fock/Kohn-Sham matrix.
@@ -639,8 +609,6 @@ class ScfDriver:
             The density matrix.
         oao_mat
             The orthogonalization matrix.
-        comm
-            The MPI communicator.
         Returns
         -------
             The electronic gradient.
@@ -648,7 +616,7 @@ class ScfDriver:
 
         return 0.0
 
-    def comp_density_change(self, den_mat, old_den_mat, comm):
+    def comp_density_change(self, den_mat, old_den_mat):
         """Computes norm of density change.
 
         Computes norm of density change between two density matrices.
@@ -659,8 +627,6 @@ class ScfDriver:
             The current density matrix.
         old_den_mat
             The previous density matrix.
-        comm
-            The MPI communicator.
         Returns
         -------
         The norm of change between two density matrices.
@@ -723,7 +689,7 @@ class ScfDriver:
 
         return None
 
-    def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
+    def gen_molecular_orbitals(self, fock_mat, oao_mat):
         """Generates molecular orbitals.
 
         Generates molecular orbital by diagonalizing Fock/Kohn-Sham matrix.
@@ -734,8 +700,6 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix.
         oao_mat
             The orthogonalization matrix.
-        ostream
-            The output stream.
         Returns
         -------
             The molecular orbitals.
@@ -843,7 +807,7 @@ class ScfDriver:
 
         return range(self.max_iter + 1)
 
-    def print_scf_energy(self, ostream):
+    def print_scf_energy(self):
         """Prints SCF energy information to output stream.
 
         Prints SCF energy information to output stream.
@@ -852,77 +816,65 @@ class ScfDriver:
         ----------
         molecule
             The molecule.
-        ostream
-            The output stream.
         """
 
         return
 
-    def print_header(self, ostream):
+    def print_header(self):
         """Prints SCF setup header to output stream.
 
         Prints SCF calculation setup details to output stream,
-
-        Parameters
-        ----------
-        ostream
-            The output stream.
         """
 
-        ostream.print_blank()
-        ostream.print_header("Self Consistent Field Driver Setup")
-        ostream.print_header(36 * "=")
-        ostream.print_blank()
+        self.ostream.print_blank()
+        self.ostream.print_header("Self Consistent Field Driver Setup")
+        self.ostream.print_header(36 * "=")
+        self.ostream.print_blank()
 
         str_width = 80
         cur_str = "Wave Function Model          : " + self.get_scf_type()
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Initial Guess Model          : " + self.get_guess_type()
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = "Convergence Accelerator      : " + self.get_acc_type()
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Max. Number Of Error Vectors : " + str(self.max_err_vecs)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold        : " + \
             "{:.1e}".format(self.conv_thresh)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = "ERI screening scheme         : " + get_qq_type(self.qq_type)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI screening mode           : " + self.get_qq_dyn()
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI Screening Threshold      : " + \
             "{:.1e}".format(self.eri_thresh)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Linear Dependence Threshold  : " + \
             "{:.1e}".format(self.ovl_thresh)
-        ostream.print_header(cur_str.ljust(str_width))
-        ostream.print_blank()
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
 
-    def print_scf_title(self, ostream):
+    def print_scf_title(self):
         """Prints SCF cycles header to output stream.
 
         Prints SCF cycles header to output stream,
-
-        Parameters
-        ----------
-        ostream
-            The output stream.
         """
 
         if self.first_step:
-            ostream.print_info("Starting Reduced Basis SCF calculation...")
+            self.ostream.print_info("Starting Reduced Basis SCF calculation...")
         else:
-            ostream.print_blank()
-            ostream.print_header("Iter. |   Hartree-Fock Energy, au   | "
-                                 "Energy Change, au |  Gradient Norm  | "
-                                 "Density Change |")
-            ostream.print_header(92 * "-")
+            self.ostream.print_blank()
+            self.ostream.print_header("Iter. |   Hartree-Fock Energy, au   | "
+                                      "Energy Change, au |  Gradient Norm  | "
+                                      "Density Change |")
+            self.ostream.print_header(92 * "-")
 
-    def print_scf_finish(self, start_time, ostream):
+    def print_scf_finish(self, start_time):
         """Prints SCF calculation finish message to output stream.
 
         Prints SCF calculation finish message to output stream,
@@ -931,8 +883,6 @@ class ScfDriver:
         ----------
         start_time
             The start time of SCF calculation.
-        ostream
-            The output stream.
         """
 
         if self.first_step:
@@ -940,8 +890,8 @@ class ScfDriver:
             valstr += "{:.12f}".format(self.old_energy)
             valstr += " au. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
-            ostream.print_info(valstr)
-            ostream.print_blank()
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
 
         else:
             valstr = "*** SCF "
@@ -952,13 +902,13 @@ class ScfDriver:
             valstr += str(self.num_iter)
             valstr += " iterations. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
-            ostream.print_blank()
-            ostream.print_header(valstr.ljust(92))
-            ostream.print_blank()
+            self.ostream.print_blank()
+            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_blank()
 
-        ostream.flush()
+        self.ostream.flush()
 
-    def print_iter_data(self, i, ostream):
+    def print_iter_data(self, i):
         """Prints SCF iteration data to output stream.
 
         Prints SCF iteration data to output stream,
@@ -967,8 +917,6 @@ class ScfDriver:
         ----------
         i
             The current SCF iteration.
-        ostream
-            The output stream.
         """
 
         if self.rank == mpi_master():
@@ -992,8 +940,8 @@ class ScfDriver:
                 exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
                 exec_str += ("{:5.8f}".format(diff_den)).center(15) + " "
 
-                ostream.print_header(exec_str)
-                ostream.flush()
+                self.ostream.print_header(exec_str)
+                self.ostream.flush()
 
     def get_scf_energy(self):
         """Gets SCF energy from previous SCF iteration.
@@ -1140,7 +1088,7 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
-    def print_ground_state(self, molecule, ostream):
+    def print_ground_state(self, molecule):
         """Prints ground state information to output stream.
 
         Prints ground state information to output stream.
@@ -1149,40 +1097,31 @@ class ScfDriver:
         ----------
         molecule
             The molecule.
-        ostream
-            The output stream.
         """
 
-        ostream.print_blank()
+        self.ostream.print_blank()
 
-        ostream.print_header("Ground State Information".ljust(92))
-        ostream.print_header("------------------------".ljust(92))
+        self.ostream.print_header("Ground State Information".ljust(92))
+        self.ostream.print_header("------------------------".ljust(92))
 
         chg = molecule.get_charge()
         valstr = "Charge of Molecule            :{:5.1f}".format(chg)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
         valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         sz = 0.5 * (mult - 1.0)
         valstr = "Magnetic Quantum Number (S_z) :{:5.1f}".format(sz)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
-        ostream.print_blank()
+        self.ostream.print_blank()
 
-    def print_energy_components(self, ostream):
+    def print_energy_components(self):
         """Prints SCF energy components to output stream.
 
         Prints SCF energy components to output stream.
-
-        Parameters
-        ----------
-        molecule
-            The molecule.
-        ostream
-            The output stream.
         """
 
         enuc = self.nuc_energy
@@ -1192,16 +1131,17 @@ class ScfDriver:
         e_el = etot - enuc
 
         valstr = "Total Energy                       :{:20.10f} au".format(etot)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         valstr = "Electronic Energy                  :{:20.10f} au".format(e_el)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         valstr = "Nuclear Repulsion Energy           :{:20.10f} au".format(enuc)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
-        ostream.print_header("------------------------------------".ljust(92))
+        self.ostream.print_header(
+            "------------------------------------".ljust(92))
 
         grad = self.iter_data[-1][2]
         valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))

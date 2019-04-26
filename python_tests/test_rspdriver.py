@@ -15,7 +15,7 @@ class TestRspDriver(unittest.TestCase):
 
         # scf
         task = MpiTask(["inputs/h2se.inp", None], MPI.COMM_WORLD)
-        scf_drv = ScfRestrictedDriver()
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute_task(task)
         mol_orbs = scf_drv.mol_orbs

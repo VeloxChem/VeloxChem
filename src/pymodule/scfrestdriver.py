@@ -15,7 +15,7 @@ class ScfRestrictedDriver(ScfDriver):
         two-level C2-DIIS convergence accelerators.
     """
 
-    def __init__(self, scf_dict=None):
+    def __init__(self, comm, ostream):
         """Initializes spin restricted closed shell SCF driver.
 
         Initializes spin restricted closed shell SCF driver to default setup
@@ -23,9 +23,9 @@ class ScfRestrictedDriver(ScfDriver):
         constructor.
         """
 
-        super().__init__(scf_dict)
+        super().__init__(comm, ostream)
 
-    def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat, comm):
+    def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         """Computes spin restricted closed shell SCF energy components.
 
         Computes spin restricted closed shell SCF energy components: electronic
@@ -42,8 +42,6 @@ class ScfRestrictedDriver(ScfDriver):
             The nuclear potential matrix.
         den_mat
             The density matrix.
-        comm
-            The MPI communicator.
         Returns
         -------
             The tuple (electronic energy, kinetic energy, nuclear potential
@@ -60,9 +58,9 @@ class ScfRestrictedDriver(ScfDriver):
             e_kin = 0.0
             e_en = 0.0
 
-        e_ee = comm.bcast(e_ee, mpi_master())
-        e_kin = comm.bcast(e_kin, mpi_master())
-        e_en = comm.bcast(e_en, mpi_master())
+        e_ee = self.comm.bcast(e_ee, root=mpi_master())
+        e_kin = self.comm.bcast(e_kin, root=mpi_master())
+        e_en = self.comm.bcast(e_en, root=mpi_master())
 
         return (e_ee, e_kin, e_en)
 
@@ -86,7 +84,7 @@ class ScfRestrictedDriver(ScfDriver):
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
-    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat, comm):
+    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """Computes spin restricted closed shell electronic gradient.
 
         Computes spin restricted closed shell electronic gradient using
@@ -102,8 +100,6 @@ class ScfRestrictedDriver(ScfDriver):
             The density matrix.
         oao_mat
             The orthogonalization matrix.
-        comm
-            The MPI communicator.
         Returns
         -------
             The electronic gradient.
@@ -125,11 +121,11 @@ class ScfRestrictedDriver(ScfDriver):
         else:
             e_grad = 0.0
 
-        e_grad = comm.bcast(e_grad, mpi_master())
+        e_grad = self.comm.bcast(e_grad, root=mpi_master())
 
         return e_grad
 
-    def comp_density_change(self, den_mat, old_den_mat, comm):
+    def comp_density_change(self, den_mat, old_den_mat):
         """Computes norm of spin restricted closed shell density change.
 
         Computes norm of spin restricted closed shell density change between
@@ -141,8 +137,6 @@ class ScfRestrictedDriver(ScfDriver):
             The current density matrix.
         old_den_mat
             The previous density matrix.
-        comm
-            The MPI communicator.
         Returns
         -------
             The norm of change between two density matrices.
@@ -156,7 +150,7 @@ class ScfRestrictedDriver(ScfDriver):
         else:
             diff_den = 0.0
 
-        diff_den = comm.bcast(diff_den, mpi_master())
+        diff_den = self.comm.bcast(diff_den, root=mpi_master())
 
         return diff_den
 
@@ -252,7 +246,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return effmat
 
-    def gen_molecular_orbitals(self, fock_mat, oao_mat, ostream):
+    def gen_molecular_orbitals(self, fock_mat, oao_mat):
         """Generates spin restricted molecular orbitals.
 
         Generates spin restricted molecular orbital by diagonalizing
@@ -265,8 +259,6 @@ class ScfRestrictedDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         oao_mat
             The orthogonalization matrix.
-        ostream
-            The output stream.
         Returns
         -------
             The molecular orbitals.
@@ -309,7 +301,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return AODensityMatrix()
 
-    def print_scf_energy(self, ostream):
+    def print_scf_energy(self):
         """Prints SCF energy information to output stream.
 
         Prints SCF energy information to output stream.
@@ -318,13 +310,11 @@ class ScfRestrictedDriver(ScfDriver):
         ----------
         molecule
             The molecule.
-        ostream
-            The output stream.
         """
 
-        ostream.print_header("Spin-Restricted Hatree-Fock:".ljust(92))
-        ostream.print_header("----------------------------".ljust(92))
-        self.print_energy_components(ostream)
+        self.ostream.print_header("Spin-Restricted Hatree-Fock:".ljust(92))
+        self.ostream.print_header("----------------------------".ljust(92))
+        self.print_energy_components()
 
         return
 
