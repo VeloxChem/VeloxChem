@@ -1,7 +1,4 @@
-import sys
-
 from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
 from .tdaexcidriver import TDAExciDriver
 from .lrsolver import LinearResponseSolver
 from .qqscheme import get_qq_type
@@ -19,10 +16,19 @@ class ResponseDriver:
         The number of MPI processes.
     """
 
-    def __init__(self, rsp_input):
+    def __init__(self, rsp_input, comm, ostream):
         """Initializes Response driver.
 
         Initializes Response driver to default setup.
+
+        Parameters
+        ----------
+        rsp_input
+            The input dictionary that defines the response property.
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
         """
 
         # calculation type
@@ -53,35 +59,17 @@ class ResponseDriver:
                 self.prop_type = 'SINGEX_TDA'
 
         # mpi information
-        self.rank = 0
-        self.nodes = 1
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
-    def compute_task(self, mol_orbs, task):
-        """Performs molecular property calculation using response theory.
+        # output stream
+        self.ostream = ostream
 
-        Performs molecular property calculation using data from MPI task.
-
-        Parameters
-        ----------
-        mol_orbs
-            The molecular orbitals.
-        task
-            The response input data as MPI task.
-        """
-
-        self.compute(mol_orbs, task.molecule, task.ao_basis, task.mpi_comm,
-                     task.ostream)
-
-    def compute(self,
-                mol_orbs,
-                molecule,
-                ao_basis,
-                comm,
-                ostream=OutputStream(sys.stdout)):
+    def compute(self, mol_orbs, molecule, ao_basis):
         """Performs molecular property calculation.
 
-        Performs molecular property calculation using molecular data, MPI
-        communicator and output stream.
+        Performs molecular property calculation using molecular data
 
         Parameters
         ----------
@@ -91,85 +79,82 @@ class ResponseDriver:
             The molecule.
         ao_basis
             The AO basis set.
-        min_basis
-            The minimal AO basis set.
-        comm
-            The MPI communicator.
-        ostream
-            The output stream.
         """
 
-        self.rank = comm.Get_rank()
-        self.nodes = comm.Get_size()
-
         if self.rank == mpi_master():
-            self.print_header(ostream)
+            self.print_header()
 
         # TDA singlet/triplet excited states
 
         if self.prop_type.upper() in ["SINGEX_TDA", "TRIPEX_TDA"]:
-            tda_exci = TDAExciDriver(self.nstates, self.prop_type.upper()[0])
+            tda_exci = TDAExciDriver(self.comm, self.ostream)
 
-            tda_exci.set_eri(self.eri_thresh, self.qq_type)
-            tda_exci.set_solver(self.conv_thresh, self.max_iter)
+            tda_exci.update_settings({
+                'nstates': self.nstates,
+                'spin': self.prop_type[0].upper(),
+                'eri_thresh': self.eri_thresh,
+                'qq_type': self.qq_type,
+                'conv_thresh': self.conv_thresh,
+                'max_iter': self.max_iter
+            })
 
-            return tda_exci.compute(mol_orbs, molecule, ao_basis, comm, ostream)
+            return tda_exci.compute(mol_orbs, molecule, ao_basis)
 
         # Linear response solver
 
         if self.prop_type.upper() in ["POLARIZABILITY"]:
-            lr_solver = LinearResponseSolver(self.a_ops, self.b_ops,
-                                             self.frequencies)
+            lr_solver = LinearResponseSolver(self.comm, self.ostream)
 
-            lr_solver.set_eri(self.eri_thresh, self.qq_type)
-            lr_solver.set_solver(self.conv_thresh, self.max_iter)
+            lr_solver.update_settings({
+                'a_ops': self.a_ops,
+                'b_ops': self.b_ops,
+                'frequencies': self.frequencies,
+                'eri_thresh': self.eri_thresh,
+                'qq_type': self.qq_type,
+                'conv_thresh': self.conv_thresh,
+                'max_iter': self.max_iter
+            })
 
-            return lr_solver.compute(mol_orbs, molecule, ao_basis, comm,
-                                     ostream)
+            return lr_solver.compute(mol_orbs, molecule, ao_basis)
 
-    def print_header(self, ostream):
+    def print_header(self):
         """Prints response driver setup header to output stream.
 
         Prints molecular property calculation setup details to output stream.
-
-        Parameters
-        ----------
-        ostream
-            The output stream.
         """
 
-        ostream.print_blank()
-        ostream.print_header("Response Driver Setup")
-        ostream.print_header(23 * "=")
-        ostream.print_blank()
+        self.ostream.print_blank()
+        self.ostream.print_header("Response Driver Setup")
+        self.ostream.print_header(23 * "=")
+        self.ostream.print_blank()
 
         str_width = 60
 
         cur_str = "Molecular Property Type   : " + self.prop_str()
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
             cur_str = "Number Of Excited States  : " + str(self.nstates)
-            ostream.print_header(cur_str.ljust(str_width))
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.prop_type in ['SINGEX_TDA', 'TRIPEX_TDA']:
             cur_str = "Response Equations Type   : Tamm-Dancoff"
-            ostream.print_header(cur_str.ljust(str_width))
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = "Max. Number Of Iterations : " + str(self.max_iter)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold     : " + \
             "{:.1e}".format(self.conv_thresh)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = "ERI screening scheme      : " + get_qq_type(self.qq_type)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI Screening Threshold   : " + \
             "{:.1e}".format(self.eri_thresh)
-        ostream.print_header(cur_str.ljust(str_width))
-        ostream.print_blank()
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
 
-        ostream.flush()
+        self.ostream.flush()
 
     def prop_str(self):
         """Gets string with type of molecular property calculation.

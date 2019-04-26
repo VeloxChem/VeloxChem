@@ -20,7 +20,6 @@ class TestSolvers(unittest.TestCase):
 
         comm = task.mpi_comm
         rank = task.mpi_rank
-        size = task.mpi_size
 
         # compute overlap
 

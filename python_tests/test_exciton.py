@@ -22,7 +22,6 @@ class TestExciton(unittest.TestCase):
 
         comm = task.mpi_comm
         rank = task.mpi_rank
-        size = task.mpi_size
 
         # build sub molecules
 
@@ -38,7 +37,7 @@ class TestExciton(unittest.TestCase):
         S12 = ovldrv.compute(mol_1, mol_2, basis)
         S21 = ovldrv.compute(mol_2, mol_1, basis)
 
-        if (rank == mpi_master()):
+        if rank == mpi_master():
 
             S_exmod = assemble_overlap_matrices(mol_1, mol_2, basis, basis, S11,
                                                 S22, S12, S21)
@@ -54,10 +53,11 @@ class TestExciton(unittest.TestCase):
         T12 = kindrv.compute(mol_1, mol_2, basis)
         T21 = kindrv.compute(mol_2, mol_1, basis)
 
-        if (rank == mpi_master()):
+        if rank == mpi_master():
 
-            T_exmod = assemble_kinetic_energy_matrices(
-                mol_1, mol_2, basis, basis, T11, T22, T12, T21)
+            T_exmod = assemble_kinetic_energy_matrices(mol_1, mol_2, basis,
+                                                       basis, T11, T22, T12,
+                                                       T21)
 
             self.assertEqual(T, T_exmod)
 
@@ -70,7 +70,7 @@ class TestExciton(unittest.TestCase):
         V12 = npotdrv.compute(mol_1, mol_2, basis, molecule)
         V21 = npotdrv.compute(mol_2, mol_1, basis, molecule)
 
-        if (rank == mpi_master()):
+        if rank == mpi_master():
 
             V_exmod = assemble_nuclear_potential_matrices(
                 mol_1, mol_2, basis, basis, V11, V22, V12, V21)

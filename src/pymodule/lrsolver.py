@@ -2,7 +2,6 @@ import numpy as np
 import time as tm
 import itertools
 import math
-import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -16,7 +15,6 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
-from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
 
@@ -24,24 +22,23 @@ from .errorhandler import assert_msg_critical
 class LinearResponseSolver:
     """Implements linear response solver"""
 
-    def __init__(self, a_ops=None, b_ops=None, frequencies=None):
-        """Initializes linear response solver"""
+    def __init__(self, comm, ostream):
+        """Initializes linear response solver.
+
+        Initializes linear response solver to default setup.
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
 
         # operators and frequencies
-        if a_ops:
-            self.a_ops = a_ops
-        else:
-            self.a_ops = 'xyz'
-
-        if b_ops:
-            self.b_ops = b_ops
-        else:
-            self.b_ops = 'xyz'
-
-        if frequencies:
-            self.frequencies = frequencies
-        else:
-            self.frequencies = (0,)
+        self.a_ops = 'xyz'
+        self.b_ops = 'xyz'
+        self.frequencies = (0,)
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -53,6 +50,42 @@ class LinearResponseSolver:
         self.cur_iter = 0
         self.small_thresh = 1.0e-10
         self.is_converged = False
+
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # output stream
+        self.ostream = ostream
+
+    def update_settings(self, settings):
+        """Updates settings in LR solver.
+
+        Updates settings in linear response solver.
+
+        Parameters
+        ----------
+        settings
+            The settings for the driver.
+        """
+
+        if 'a_ops' in settings:
+            self.a_ops = settings['a_ops']
+        if 'b_ops' in settings:
+            self.b_ops = settings['b_ops']
+        if 'frequencies' in settings:
+            self.frequencies = settings['frequencies']
+
+        if 'eri_thresh' in settings:
+            self.eri_thresh = settings['eri_thresh']
+        if 'qq_type' in settings:
+            self.qq_type = settings['qq_type']
+
+        if 'conv_thresh' in settings:
+            self.conv_thresh = settings['conv_thresh']
+        if 'max_iter' in settings:
+            self.max_iter = settings['max_iter']
 
     def set_eri(self, eri_thresh, qq_type):
         """Sets screening in computation of electron repulsion integrals"""
@@ -66,20 +99,8 @@ class LinearResponseSolver:
         self.conv_thresh = conv_thresh
         self.max_iter = max_iter
 
-    def compute(self,
-                mol_orbs,
-                molecule,
-                basis,
-                comm,
-                ostream=OutputStream(sys.stdout)):
+    def compute(self, mol_orbs, molecule, basis):
         """Performs linear response calculation"""
-
-        self.comm = comm.Clone()
-        self.rank = comm.Get_rank()
-        self.nodes = comm.Get_size()
-
-        if self.rank == mpi_master():
-            self.ostream = ostream
 
         self.molecule = molecule
         self.basis = basis
@@ -114,8 +135,6 @@ class LinearResponseSolver:
         self.start_time = tm.time()
 
         op_freq_keys, solutions = self.lr_solve(self.b_ops, self.frequencies)
-
-        self.comm.Free()
 
         if self.rank == mpi_master():
             v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}

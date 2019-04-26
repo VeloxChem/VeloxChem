@@ -3,7 +3,6 @@ import numpy as np
 import unittest
 
 from veloxchem.veloxchemlib import mpi_master
-from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.lrsolver import LinearResponseSolver
@@ -22,13 +21,18 @@ class TestRspDriver(unittest.TestCase):
         mol_orbs = scf_drv.mol_orbs
 
         # TDA
-        tda_exci = TDAExciDriver(3, 'Singlet')
+        tda_exci = TDAExciDriver(task.mpi_comm, task.ostream)
 
-        tda_exci.set_eri(1.0e-12, 'QQ_DEN')
-        tda_exci.set_solver(1.0e-4, 50)
+        tda_exci.update_settings({
+            'nstates': 3,
+            'spin': 'singlet',
+            'eri_thresh': 1.0e-12,
+            'qq_type': 'QQ_DEN',
+            'conv_thresh': 1.0e-4,
+            'max_iter': 50,
+        })
 
-        tda_exci.compute(mol_orbs, task.molecule, task.ao_basis, task.mpi_comm,
-                         OutputStream())
+        tda_exci.compute(mol_orbs, task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
 
@@ -39,13 +43,19 @@ class TestRspDriver(unittest.TestCase):
             self.assertTrue(np.max(np.abs(reigs - ref_eigs)) < 1.0e-6)
 
         # polarizability
-        lr_solver = LinearResponseSolver()
+        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
 
-        lr_solver.set_eri(1.0e-12, 'QQ_DEN')
-        lr_solver.set_solver(1.0e-5, 50)
+        lr_solver.update_settings({
+            'a_ops': 'xyz',
+            'b_ops': 'xyz',
+            'frequencies': (0,),
+            'eri_thresh': 1.0e-12,
+            'qq_type': 'QQ_DEN',
+            'conv_thresh': 1.0e-5,
+            'max_iter': 50,
+        })
 
-        lr_prop = lr_solver.compute(mol_orbs, task.molecule, task.ao_basis,
-                                    task.mpi_comm, OutputStream())
+        lr_prop = lr_solver.compute(mol_orbs, task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
 

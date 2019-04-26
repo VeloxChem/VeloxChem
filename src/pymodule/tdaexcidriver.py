@@ -1,13 +1,11 @@
 import numpy as np
 import time as tm
-import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
-from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
 from .blockdavidson import BlockDavidsonSolver
 
@@ -42,15 +40,22 @@ class TDAExciDriver:
         The number of MPI processes.
     """
 
-    def __init__(self, nstates=3, spin='S'):
+    def __init__(self, comm, ostream):
         """Initializes TDA excited states computation driver.
 
         Initializes TDA excited states computation drived to default setup.
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
         """
 
         # excited states information
-        self.nstates = nstates
-        self.triplet = True if spin[0].upper() == 'T' else False
+        self.nstates = 3
+        self.triplet = False
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -64,52 +69,43 @@ class TDAExciDriver:
         self.is_converged = None
 
         # mpi information
-        self.rank = 0
-        self.nodes = 1
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
-    def set_eri(self, eri_thresh, qq_type):
-        """Sets screening in computation of electron repulsion integrals.
+        # output stream
+        self.ostream = ostream
 
-        Sets screening in computation of electron repulsion integrals.
+    def update_settings(self, settings):
+        """Updates settings in TDA driver.
 
-        Parameters
-        ----------
-        eri_thresh
-            The threshold for computation of electron repulsion integrals.
-        qq_type
-            The screening type for computation of electron repulsion integrals.
-        """
-
-        self.eri_thresh = eri_thresh
-        self.qq_type = qq_type
-
-    def set_solver(self, conv_thresh, max_iter):
-        """Sets convergence threshold and maximum number of iterations.
-
-        Sets convergence threshold and maximum number of iterations in excited
-        states solver.
+        Updates settings in TDA excited states computation driver.
 
         Parameters
         ----------
-        conv_thresh
-            The convergence threshold of excited states.
-        max_iter
-            The maximum number of iterations.
+        settings
+            The settings for the driver.
         """
 
-        self.conv_thresh = conv_thresh
-        self.max_iter = max_iter
+        if 'nstates' in settings:
+            self.nstates = settings['nstates']
+        if 'spin' in settings:
+            self.triplet = (settings['spin'][0].upper() == 'T')
 
-    def compute(self,
-                mol_orbs,
-                molecule,
-                ao_basis,
-                comm,
-                ostream=OutputStream(sys.stdout)):
+        if 'eri_thresh' in settings:
+            self.eri_thresh = settings['eri_thresh']
+        if 'qq_type' in settings:
+            self.qq_type = settings['qq_type']
+
+        if 'conv_thresh' in settings:
+            self.conv_thresh = settings['conv_thresh']
+        if 'max_iter' in settings:
+            self.max_iter = settings['max_iter']
+
+    def compute(self, mol_orbs, molecule, ao_basis):
         """Performs TDA excited states calculation.
 
-        Performs TDA excited states calculation using molecular data, MPI
-        communicator and output stream.
+        Performs TDA excited states calculation using molecular data.
 
         Parameters
         ----------
@@ -119,24 +115,13 @@ class TDAExciDriver:
             The molecule.
         ao_basis
             The AO basis set.
-        min_basis
-            The minimal AO basis set.
-        comm
-            The MPI communicator.
-        ostream
-            The output stream.
         """
-
-        # MPI rank and size
-
-        self.rank = comm.Get_rank()
-        self.nodes = comm.Get_size()
 
         # set start time
 
         start_time = tm.time()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(comm)
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
 
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
@@ -147,7 +132,7 @@ class TDAExciDriver:
 
         # initalize sigma vectors driver
 
-        a2x_drv = TDASigmaVectorDriver(comm)
+        a2x_drv = TDASigmaVectorDriver(self.comm)
 
         # block Davidson algorithm setup
 
@@ -171,13 +156,13 @@ class TDAExciDriver:
 
                 zvecs = self.solver.compute(diag_mat)
 
-                self.print_iter_data(i, ostream)
+                self.print_iter_data(i)
 
                 self.update_trial_vectors(trial_vecs, zvecs)
 
             # check convergence
 
-            self.check_convergence(i, comm)
+            self.check_convergence(i)
 
             if self.is_converged:
                 break
@@ -185,7 +170,7 @@ class TDAExciDriver:
         # print converged excited states
 
         if self.rank == mpi_master():
-            self.print_excited_states(trial_vecs, start_time, ostream)
+            self.print_excited_states(trial_vecs, start_time)
 
             reigs, rnorms = self.solver.get_eigenvalues()
             return reigs
@@ -248,7 +233,7 @@ class TDAExciDriver:
             for j in range(zvecs.shape[0]):
                 trial_vecs[i].set_zcoefficient(zvecs[j, i], j)
 
-    def check_convergence(self, iter, comm):
+    def check_convergence(self, iter):
         """Checks convergence of excitation energies and set convergence flag.
 
         Checks convergence of excitation energies and set convergence flag on
@@ -258,8 +243,6 @@ class TDAExciDriver:
         ----------
         iter
             The current excited states solver iteration.
-        comm
-            The MPI communicator.
         """
 
         self.cur_iter = iter
@@ -269,7 +252,8 @@ class TDAExciDriver:
         else:
             self.is_converged = False
 
-        self.is_converged = comm.bcast(self.is_converged, root=mpi_master())
+        self.is_converged = self.comm.bcast(self.is_converged,
+                                            root=mpi_master())
 
     def convert_to_sigma_matrix(self, sig_vecs):
         """Converts set of sigma vectors from C++ data format to numpy data
@@ -328,7 +312,7 @@ class TDAExciDriver:
 
         return None
 
-    def print_iter_data(self, iter, ostream):
+    def print_iter_data(self, iter):
         """Prints excited states solver iteration data to output stream.
 
         Prints excited states solver iteration data to output stream.
@@ -337,8 +321,6 @@ class TDAExciDriver:
         ----------
         iter
             The current excited states solver iteration.
-        ostream
-            The output stream.
         """
 
         # iteration header
@@ -349,8 +331,8 @@ class TDAExciDriver:
         rmax, rmin = self.solver.max_min_residual_norms()
         exec_str += " * Residues (Max,Min): {:.2e} and {:.2e}".format(
             rmax, rmin)
-        ostream.print_header(exec_str)
-        ostream.print_blank()
+        self.ostream.print_header(exec_str)
+        self.ostream.print_blank()
 
         # excited states information
 
@@ -358,13 +340,13 @@ class TDAExciDriver:
         for i in range(reigs.shape[0]):
             exec_str = "State {:2d}: {:5.8f} ".format(i + 1, reigs[i])
             exec_str += "au Residual Norm: {:3.8f}".format(rnorms[i])
-            ostream.print_header(exec_str.ljust(84))
+            self.ostream.print_header(exec_str.ljust(84))
 
         # flush output stream
-        ostream.print_blank()
-        ostream.flush()
+        self.ostream.print_blank()
+        self.ostream.flush()
 
-    def print_excited_states(self, trial_vecs, start_time, ostream):
+    def print_excited_states(self, trial_vecs, start_time):
         """Prints excited states information to output stream.
 
         Prints excited states information to output stream.
@@ -373,11 +355,9 @@ class TDAExciDriver:
         ----------
         start_time
             The start time of SCF calculation.
-        ostream
-            The output stream.
         """
 
-        ostream.print_blank()
+        self.ostream.print_blank()
 
         valstr = "*** {:d} excited states ".format(self.nstates)
         if self.is_converged:
@@ -386,34 +366,33 @@ class TDAExciDriver:
             valstr += "not converged"
         valstr += " in {:d} iterations. ".format(self.cur_iter + 1)
         valstr += "Time: {:.2f}".format(tm.time() - start_time) + " sec."
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         reigs, rnorms = self.solver.get_eigenvalues()
 
         for i in range(reigs.shape[0]):
-            self.print_state_information(i, reigs[i], trial_vecs[i], rnorms[i],
-                                         ostream)
+            self.print_state_information(i, reigs[i], trial_vecs[i], rnorms[i])
 
-    def print_state_information(self, iter, eval, evec, rnorm, ostream):
+    def print_state_information(self, iter, eval, evec, rnorm):
 
-        ostream.print_blank()
+        self.ostream.print_blank()
 
         valstr = "Excited State No.{:3d}:".format(iter + 1)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
         valstr = 21 * "-"
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         valstr = "Excitation Type   : "
         if self.triplet:
             valstr += "Triplet"
         else:
             valstr += "Singlet"
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         valstr = "Excitation Energy : {:5.8f} au".format(eval)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
         valstr = "Residual Norm     : {:3.8f} au".format(rnorm)
-        ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(valstr.ljust(92))
 
-        ostream.print_blank()
+        self.ostream.print_blank()

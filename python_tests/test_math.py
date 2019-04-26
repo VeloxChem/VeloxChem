@@ -43,11 +43,11 @@ class TestMath(unittest.TestCase):
 
         matrix = DenseMatrix([[1., 2., 3.], [4., 5., 6.]])
 
-        self.assertEqual(
-            matrix.slice(0, 0, 2, 2), DenseMatrix([[1., 2.], [4., 5.]]))
+        self.assertEqual(matrix.slice(0, 0, 2, 2),
+                         DenseMatrix([[1., 2.], [4., 5.]]))
 
-        self.assertEqual(
-            matrix.slice(0, 1, 2, 2), DenseMatrix([[2., 3.], [5., 6.]]))
+        self.assertEqual(matrix.slice(0, 1, 2, 2),
+                         DenseMatrix([[2., 3.], [5., 6.]]))
 
 
 if __name__ == "__main__":

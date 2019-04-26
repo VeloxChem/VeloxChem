@@ -56,7 +56,6 @@ class TestOneInts(unittest.TestCase):
 
         comm = task.mpi_comm
         rank = task.mpi_rank
-        size = task.mpi_size
 
         # compute 1e integrals
 
@@ -94,7 +93,6 @@ class TestOneInts(unittest.TestCase):
 
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
-        size = comm.Get_size()
 
         ovldrv = OverlapIntegralsDriver(comm)
         kindrv = KineticEnergyIntegralsDriver(comm)
