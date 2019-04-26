@@ -1,5 +1,4 @@
 import time as tm
-import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
@@ -7,7 +6,6 @@ from .veloxchemlib import fockmat
 from .veloxchemlib import moints
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import TwoIndexes
-from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .subcommunicators import SubCommunicators
@@ -17,7 +15,7 @@ from .qqscheme import get_qq_scheme
 
 class MOIntegralsDriver:
 
-    def __init__(self):
+    def __init__(self, comm, ostream):
 
         # screening scheme
         self.qq_type = "QQ_DEN"
@@ -27,30 +25,25 @@ class MOIntegralsDriver:
         self.num_matrices = 0
         self.batch_size = 3000
 
-    def compute_task(self, task, mol_orbs, mints_type, grps):
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
-        return self.compute(task.molecule, task.ao_basis, mol_orbs, mints_type,
-                            grps, task.mpi_comm, task.ostream)
+        # output stream
+        self.ostream = ostream
 
-    def compute(self,
-                molecule,
-                ao_basis,
-                mol_orbs,
-                mints_type,
-                grps,
-                global_comm,
-                ostream=OutputStream(sys.stdout)):
+    def compute(self, molecule, ao_basis, mol_orbs, mints_type, grps):
 
         # start timer
         start_time = tm.time()
 
         # split communicators
-        subcomm = SubCommunicators(global_comm, grps)
+        subcomm = SubCommunicators(self.comm, grps)
         local_comm = subcomm.local_comm
         cross_comm = subcomm.cross_comm
 
-        global_rank = global_comm.Get_rank()
-        global_master = (global_rank == mpi_master())
+        global_master = (self.rank == mpi_master())
 
         local_rank = local_comm.Get_rank()
         local_nodes = local_comm.Get_size()
@@ -105,7 +98,7 @@ class MOIntegralsDriver:
 
         # print title
         if global_master:
-            self.print_header(ostream)
+            self.print_header()
 
         # loop over batches
         for cur_bra_ids, cur_ket_ids in zip(loc_bra_ids, loc_ket_ids):
@@ -133,17 +126,17 @@ class MOIntegralsDriver:
                                     cur_ket_ids)
 
         if global_master:
-            self.print_finish(start_time, ostream)
+            self.print_finish(start_time)
 
         return moints_batch
 
-    def collect_moints_batches(self, moints_batch, grps, global_comm):
+    def collect_moints_batches(self, moints_batch, grps):
 
-        subcomm = SubCommunicators(global_comm, grps)
+        subcomm = SubCommunicators(self.comm, grps)
         local_comm = subcomm.local_comm
         cross_comm = subcomm.cross_comm
 
-        global_master = (global_comm.Get_rank() == mpi_master())
+        global_master = (self.rank == mpi_master())
         local_master = (local_comm.Get_rank() == mpi_master())
 
         cross_rank = cross_comm.Get_rank()
@@ -157,33 +150,34 @@ class MOIntegralsDriver:
 
         return moints_batch
 
-    def print_header(self, ostream):
+    def print_header(self):
 
-        ostream.print_blank()
-        ostream.print_header("Integrals Transformation (AO->MO) Driver Setup")
-        ostream.print_header(46 * "=")
-        ostream.print_blank()
+        self.ostream.print_blank()
+        self.ostream.print_header(
+            "Integrals Transformation (AO->MO) Driver Setup")
+        self.ostream.print_header(46 * "=")
+        self.ostream.print_blank()
 
         str_width = 80
         cur_str = "Number of Fock matrices      : " + str(self.num_matrices)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Size of Fock matrices batch  : " + str(self.batch_size)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI screening scheme         : " + get_qq_type(self.qq_type)
-        ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI Screening Threshold      : " + \
             "{:.1e}".format(self.eri_thresh)
-        ostream.print_header(cur_str.ljust(str_width))
-        ostream.print_blank()
-        ostream.flush()
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+        self.ostream.flush()
 
-    def print_finish(self, start_time, ostream):
+    def print_finish(self, start_time):
 
         valstr = "*** Integrals transformation (AO->MO) done in "
         valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
-        ostream.print_blank()
-        ostream.print_header(valstr.ljust(92))
-        ostream.print_blank()
+        self.ostream.print_blank()
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
 
     def get_batch_dimensions(self, vec_ids):
 

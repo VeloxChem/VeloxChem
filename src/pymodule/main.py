@@ -77,8 +77,8 @@ def main():
 
     if task_type == 'mp2':
 
-        mp2_drv = Mp2Driver()
-        mp2_drv.compute_task(task, mol_orbs)
+        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
     # Cube
 

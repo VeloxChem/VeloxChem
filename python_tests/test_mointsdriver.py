@@ -8,13 +8,14 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mointsdriver import MOIntegralsDriver
 from veloxchem.mp2driver import Mp2Driver
 from veloxchem.mpitask import MpiTask
+from veloxchem.outputstream import OutputStream
 
 
 class TestMOIntegralsDriver(unittest.TestCase):
 
     def test_moints_type(self):
 
-        moints_drv = MOIntegralsDriver()
+        moints_drv = MOIntegralsDriver(MPI.COMM_WORLD, OutputStream())
 
         self.assertEqual(moints_drv.get_moints_type("OOOO"), moints.oooo)
         self.assertEqual(moints_drv.get_moints_type("OOOV"), moints.ooov)
@@ -33,8 +34,8 @@ class TestMOIntegralsDriver(unittest.TestCase):
         mol_orbs = scf_drv.mol_orbs
 
         # mp2
-        mp2_drv = Mp2Driver()
-        mp2_drv.compute_task(task, mol_orbs)
+        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
         if task.mpi_rank == mpi_master():
             e_mp2 = mp2_drv.e_mp2
@@ -42,10 +43,11 @@ class TestMOIntegralsDriver(unittest.TestCase):
             self.assertAlmostEqual(e_ref, e_mp2, 8)
 
         # extra test: collect moints batches to master node
-        moints_drv = MOIntegralsDriver()
+        moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
         grps = [p for p in range(task.mpi_size)]
-        oovv = moints_drv.compute_task(task, mol_orbs, "OOVV", grps)
-        moints_drv.collect_moints_batches(oovv, grps, task.mpi_comm)
+        oovv = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
+                                  "OOVV", grps)
+        moints_drv.collect_moints_batches(oovv, grps)
 
         if task.mpi_rank == mpi_master():
             orb_ene = mol_orbs.ea_to_numpy()
