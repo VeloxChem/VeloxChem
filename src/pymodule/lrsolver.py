@@ -4,17 +4,10 @@ import itertools
 import math
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import KineticEnergyIntegralsDriver
-from .veloxchemlib import OverlapIntegralsDriver
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
+from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
 
@@ -90,131 +83,82 @@ class LinearResponseSolver:
     def compute(self, mol_orbs, molecule, basis):
         """Performs linear response calculation"""
 
-        self.molecule = molecule
-        self.basis = basis
+        basis = basis
 
-        nalpha = self.molecule.number_of_alpha_electrons()
-        nbeta = self.molecule.number_of_beta_electrons()
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
             'LinearResponseSolver: not yet implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            self.nocc = nalpha
-            self.norb = mol_orbs.number_mos()
-            self.mo = mol_orbs.alpha_to_numpy()
-            self.ea = mol_orbs.ea_to_numpy()
-            dens = mol_orbs.get_density(self.molecule)
-            self.dens = (dens.alpha_to_numpy(0), dens.beta_to_numpy(0))
+            nocc = nalpha
+            norb = mol_orbs.number_mos()
+            mo = mol_orbs.alpha_to_numpy()
+            ea = mol_orbs.ea_to_numpy()
+            density = mol_orbs.get_density(molecule)
+            dens = (density.alpha_to_numpy(0), density.beta_to_numpy(0))
+
+            xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+            excitations = list(
+                itertools.product(xv.bra_unique_indexes(),
+                                  xv.ket_unique_indexes()))
+
+            z = [2.0 * (ea[j] - ea[i]) for i, j in excitations]
+            self.orb_diag = np.array(z + z)
+
+            lz = len(excitations)
+            self.ovl_diag = 2.0 * np.ones(2 * lz)
+            self.ovl_diag[lz:] = -2.0
+
+        else:
+            nocc = None
+            norb = None
+            dens = None
+            mo = None
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
+
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
         # TODO: make use of 1e integrals from scf
-        self.comp_1e_ints()
-
-        self.eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        self.screening = self.eri_drv.compute(get_qq_scheme(self.qq_type),
-                                              self.eri_thresh, self.molecule,
-                                              self.basis)
+        overlap, hcore, dipoles = e2x_drv.comp_1e_ints(molecule, basis)
 
         # TODO: make use of Fock matrices from scf
-        self.comp_fock()
+        focks = e2x_drv.comp_fock(hcore, dens, screening, molecule, basis)
+
+        tensors = {'C': mo, 'S': overlap, 'D': dens, 'F': focks, 'Mu': dipoles}
+        shapes = {'nocc': nocc, 'norb': norb}
 
         # start linear response calculation
 
         self.start_time = tm.time()
 
-        op_freq_keys, solutions = self.lr_solve(self.b_ops, self.frequencies)
+        ops = self.b_ops
+        freqs = self.frequencies
 
         if self.rank == mpi_master():
-            v1 = {op: v for op, v in zip(self.a_ops, self.get_rhs(self.a_ops))}
-
-            lrs = {}
-            for aop in self.a_ops:
-                for col, (bop, w) in enumerate(op_freq_keys):
-                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[:, col])
-            return lrs
-        else:
-            return None
-
-    def comp_1e_ints(self):
-        """Computes 1e integrals"""
-
-        overlap_drv = OverlapIntegralsDriver(self.comm)
-        kinetic_drv = KineticEnergyIntegralsDriver(self.comm)
-        potential_drv = NuclearPotentialIntegralsDriver(self.comm)
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-
-        S = overlap_drv.compute(self.molecule, self.basis)
-        T = kinetic_drv.compute(self.molecule, self.basis)
-        V = potential_drv.compute(self.molecule, self.basis)
-        Dpl = dipole_drv.compute(self.molecule, self.basis)
-
-        if self.rank == mpi_master():
-            self.overlap = S.to_numpy()
-            self.hcore = T.to_numpy() - V.to_numpy()
-            self.dipoles = (Dpl.x_to_numpy(), Dpl.y_to_numpy(),
-                            Dpl.z_to_numpy())
-
-    def comp_fock(self):
-        """Computes Fock matrices"""
-
-        if self.rank == mpi_master():
-            dabs = (self.dens,)
-        else:
-            dabs = None
-
-        fabs = self.get_two_el_fock(dabs)
-
-        if self.rank == mpi_master():
-            fa, fb = fabs[0]
-            fa += self.hcore
-            fb += self.hcore
-            self.focks = (fa, fb)
-
-    def get_rhs(self, ops):
-        """Create right-hand sides of linear response equations"""
-
-        if 'x' in ops or 'y' in ops or 'z' in ops:
-            props = {k: v for k, v in zip('xyz', self.dipoles)}
-
-        D = self.dens[0] + self.dens[1]
-        S = self.overlap
-        mo = self.mo
-
-        matrices = tuple(
-            mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
-
-        gradients = tuple(self.mat2vec(m) for m in matrices)
-        return gradients
-
-    def mat2vec(self, mat):
-
-        excitations = list(self.get_excitations())
-
-        z = [mat[i, j] for i, j in excitations]
-        y = [mat[j, i] for i, j in excitations]
-
-        return np.array(z + y)
-
-    def lr_solve(self, ops, freqs):
-
-        if self.rank == mpi_master():
-            V1 = {op: v for op, v in zip(ops, self.get_rhs(ops))}
-            igs = self.initial_guess(ops, freqs)
+            V1 = {
+                op: v for op, v in zip(ops, self.get_rhs(ops, tensors, shapes))
+            }
+            igs = self.initial_guess(freqs, V1)
             b = self.setup_trials(igs)
 
             assert_msg_critical(
                 np.any(b),
-                'LinearResponseSolver.lr_solve: trial vector is empty')
+                'LinearResponseSolver.compute: trial vector is empty')
         else:
             b = None
 
-        e2b = self.e2n(b)
+        e2b = e2x_drv.e2n(b, tensors, screening, molecule, basis)
 
         if self.rank == mpi_master():
-            s2b = self.s2n(b)
+            s2b = e2x_drv.s2n(b, tensors, shapes)
 
-            od = self.get_orbital_diagonal()
-            sd = self.get_overlap_diagonal()
+            od = self.orb_diag
+            sd = self.ovl_diag
             td = {w: od - w * sd for w in freqs}
 
             op_freq_keys = list(igs.keys())
@@ -239,7 +183,7 @@ class LinearResponseSolver:
                     solutions[:, col] = np.matmul(b, reduced_solution)
                     e2nn[:, col] = np.matmul(e2b, reduced_solution)
 
-                s2nn = self.s2n(solutions)
+                s2nn = e2x_drv.s2n(solutions, tensors, shapes)
                 nvs = []
 
                 # next residual
@@ -274,12 +218,8 @@ class LinearResponseSolver:
                 if max_residual < self.conv_thresh:
                     self.is_converged = True
 
-                conv_info = {'is_converged': self.is_converged}
-            else:
-                conv_info = None
-
-            conv_info = self.comm.bcast(conv_info, root=mpi_master())
-            self.is_converged = conv_info['is_converged']
+            self.is_converged = self.comm.bcast(self.is_converged,
+                                                root=mpi_master())
             if self.is_converged:
                 break
 
@@ -289,10 +229,11 @@ class LinearResponseSolver:
             else:
                 new_trials = None
 
-            new_e2b = self.e2n(new_trials)
+            new_e2b = e2x_drv.e2n(new_trials, tensors, screening, molecule,
+                                  basis)
 
             if self.rank == mpi_master():
-                new_s2b = self.s2n(new_trials)
+                new_s2b = e2x_drv.s2n(new_trials, tensors, shapes)
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
 
@@ -312,18 +253,58 @@ class LinearResponseSolver:
                 self.is_converged,
                 'LinearResponseSolver.compute: failed to converge')
 
-            return op_freq_keys, solutions
+        if self.rank == mpi_master():
+            v1 = {
+                op: v for op, v in zip(
+                    self.a_ops, self.get_rhs(self.a_ops, tensors, shapes))
+            }
+
+            lrs = {}
+            for aop in self.a_ops:
+                for col, (bop, w) in enumerate(op_freq_keys):
+                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[:, col])
+            return lrs
         else:
-            return None, None
+            return None
 
-    def initial_guess(self, ops, freqs):
+    def get_rhs(self, ops, tensors, shapes):
+        """Create right-hand sides of linear response equations"""
 
-        od = self.get_orbital_diagonal()
-        sd = self.get_overlap_diagonal()
+        mo = tensors['C']
+        S = tensors['S']
+        D = tensors['D'][0] + tensors['D'][1]
+        dipoles = tensors['Mu']
+
+        nocc = shapes['nocc']
+        norb = shapes['norb']
+
+        if 'x' in ops or 'y' in ops or 'z' in ops:
+            props = {k: v for k, v in zip('xyz', dipoles)}
+
+        matrices = tuple(
+            mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
+
+        gradients = tuple(self.mat2vec(m, nocc, norb) for m in matrices)
+        return gradients
+
+    def mat2vec(self, mat, nocc, norb):
+
+        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+        excitations = list(
+            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+        z = [mat[i, j] for i, j in excitations]
+        y = [mat[j, i] for i, j in excitations]
+        return np.array(z + y)
+
+    def initial_guess(self, freqs, V1):
+
+        od = self.orb_diag
+        sd = self.ovl_diag
         dim = od.shape[0]
 
         ig = {}
-        for op, grad in zip(ops, self.get_rhs(ops)):
+        for op, grad in V1.items():
             gn = np.linalg.norm(grad)
             for w in freqs:
                 if gn < self.small_thresh:
@@ -332,30 +313,6 @@ class LinearResponseSolver:
                     td = od - w * sd
                     ig[(op, w)] = grad / td
         return ig
-
-    def get_orbital_diagonal(self):
-
-        orben = self.ea
-        z = [2 * (orben[j] - orben[i]) for i, j in self.get_excitations()]
-        e2c = np.array(z + z)
-        return e2c
-
-    def get_overlap_diagonal(self):
-
-        lz = len(list(self.get_excitations()))
-        s2d = 2.0 * np.ones(2 * lz)
-        s2d[lz:] = -2.0
-        return s2d
-
-    def get_excitations(self):
-
-        nocc = self.nocc
-        norb = self.norb
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        cre = xv.bra_unique_indexes()
-        ann = xv.ket_unique_indexes()
-        excitations = itertools.product(cre, ann)
-        return excitations
 
     def setup_trials(self, vectors, td=None, b=None, renormalize=True):
 
@@ -421,162 +378,3 @@ class LinearResponseSolver:
             yx[half_rows:, :] = xy[:half_rows, :]
 
         return yx
-
-    def e2n(self, vecs):
-
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                len(vecs.shape) == 2,
-                'LinearResponseSolver.e2n: invalid shape of vecs')
-
-            da, db = self.dens
-            S = self.overlap
-            mo = self.mo
-
-            dks = []
-            kns = []
-
-            for col in range(vecs.shape[1]):
-                vec = vecs[:, col]
-
-                kN = self.vec2mat(vec).T
-                kn = mo @ kN @ mo.T
-
-                dak = kn.T @ S @ da - da @ S @ kn.T
-                dbk = kn.T @ S @ db - db @ S @ kn.T
-
-                dks.append((dak, dbk))
-                kns.append(kn)
-
-            dks = tuple(dks)
-        else:
-            dks = None
-
-        fks = self.get_two_el_fock(dks)
-
-        if self.rank == mpi_master():
-            gv = np.zeros(vecs.shape)
-
-            fa, fb = self.focks
-
-            for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
-
-                kfa = S @ kn @ fa - fa @ kn @ S
-                kfb = S @ kn @ fb - fb @ kn @ S
-
-                fat = fak + kfa
-                fbt = fbk + kfb
-
-                gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da +
-                                                       fbt.T @ db) @ S
-                gmo = mo.T @ gao @ mo
-
-                gv[:, col] = -self.mat2vec(gmo)
-            return gv
-        else:
-            return None
-
-    def get_two_el_fock(self, dabs):
-
-        # TODO: make this routine more general (for both rest and unrest)
-
-        if self.rank == mpi_master():
-            dts = []
-            for dab in dabs:
-                da, db = dab
-                dt = da + db
-                dts.append(dt)
-
-                # Note: skip spin density for restricted case
-                # ds = da - db
-                # dts.append(ds)
-
-            dens = AODensityMatrix(dts, denmat.rest)
-        else:
-            dens = AODensityMatrix()
-        dens.broadcast(self.rank, self.comm)
-
-        fock = AOFockMatrix(dens)
-
-        # for i in range(0, 2 * len(dabs), 2):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
-        #    fock.set_fock_type(fockmat.rgenk, i + 1)
-
-        # Note: skip spin density for restricted case
-        # for i in range(len(dabs)):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
-        for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fockmat.rgenjk, i)
-
-        self.eri_drv.compute(fock, dens, self.molecule, self.basis,
-                             self.screening)
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-        fabs = []
-        if self.rank == mpi_master():
-
-            # for i in range(0, 2 * len(dabs), 2):
-            #    ft = fock.to_numpy(i).T
-            #    fs = -fock.to_numpy(i + 1).T
-            #    fa = (ft + fs) / 2
-            #    fb = (ft - fs) / 2
-            #    fabs.append((fa, fb))
-
-            # Note: skip spin density for restricted case
-            for i in range(len(dabs)):
-                ft = fock.to_numpy(i).T
-                fa = ft * 0.5
-                fb = ft * 0.5
-                fabs.append((fa, fb))
-
-            return tuple(fabs)
-        else:
-            return None
-
-    def np2vlx(self, vec):
-
-        nocc = self.nocc
-        norb = self.norb
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        zlen = len(vec) // 2
-        z, y = vec[:zlen], vec[zlen:]
-        xv.set_yzcoefficients(z, y)
-        return xv
-
-    def vec2mat(self, vec):
-
-        xv = self.np2vlx(vec)
-        kz = xv.get_zmatrix()
-        ky = xv.get_ymatrix()
-
-        rows = kz.number_of_rows() + ky.number_of_rows()
-        cols = kz.number_of_columns() + ky.number_of_columns()
-
-        kzy = np.zeros((rows, cols))
-        kzy[:kz.number_of_rows(), ky.number_of_columns():] = kz.to_numpy()
-        kzy[kz.number_of_rows():, :ky.number_of_columns()] = ky.to_numpy()
-
-        return kzy
-
-    def s2n(self, vecs):
-
-        assert_msg_critical(
-            len(vecs.shape) == 2,
-            'LinearResponseSolver.s2n: invalid shape of vecs')
-
-        D = self.dens[0] + self.dens[1]
-        S = self.overlap
-        mo = self.mo
-
-        s2n_vecs = np.ndarray(vecs.shape)
-        rows, columns = vecs.shape
-
-        for c in range(columns):
-            kappa = self.vec2mat(vecs[:, c]).T
-            kappa_ao = mo @ kappa @ mo.T
-
-            s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
-            s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-            s2n_vecs[:, c] = -self.mat2vec(s2n_mo)
-
-        return s2n_vecs

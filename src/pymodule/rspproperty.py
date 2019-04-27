@@ -20,7 +20,8 @@ class ResponseProperty:
 
     def init_driver(self, comm, ostream):
 
-        self.rsp_driver = ResponseDriver(self.rsp_input, comm, ostream)
+        self.rsp_driver = ResponseDriver(comm, ostream)
+        self.rsp_driver.update_settings(self.rsp_input)
 
     def compute(self, mol_orbs, molecule, basis):
         """Performs response property/spectroscopy calculation.
