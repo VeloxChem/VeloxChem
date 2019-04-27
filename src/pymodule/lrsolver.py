@@ -53,7 +53,7 @@ class LinearResponseSolver:
         self.ostream = ostream
 
     def update_settings(self, settings):
-        """Updates settings in LR solver.
+        """Updates settings in linear response solver.
 
         Updates settings in linear response solver.
 
@@ -81,35 +81,36 @@ class LinearResponseSolver:
             self.max_iter = settings['max_iter']
 
     def compute(self, molecule, basis, scf_tensors):
-        """Performs linear response calculation"""
+        """Performs linear response calculation.
 
-        basis = basis
+        Performs linear response calculation for a molecule and a basis set.
 
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        basis
+            The basis set.
+        scf_tensors
+            The tensors from converged SCF wavefunction.
+        """
+
+        self.start_time = tm.time()
+
+        # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'LinearResponseSolver: not yet implemented for unrestricted case')
+            'LinearResponseSolver: not implemented for unrestricted case')
 
-        mo = scf_tensors['C']
-        ea = scf_tensors['E']
-
+        # make preparations
         if self.rank == mpi_master():
+            mo = scf_tensors['C']
+            ea = scf_tensors['E']
             nocc = nalpha
             norb = mo.shape[1]
-
-            xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-            excitations = list(
-                itertools.product(xv.bra_unique_indexes(),
-                                  xv.ket_unique_indexes()))
-
-            z = [2.0 * (ea[j] - ea[i]) for i, j in excitations]
-            self.orb_diag = np.array(z + z)
-
-            lz = len(excitations)
-            self.ovl_diag = 2.0 * np.ones(2 * lz)
-            self.ovl_diag[lz:] = -2.0
-
+            od, sd = self.get_diagonals(ea, nocc, norb)
         else:
             nocc = None
             norb = None
@@ -121,18 +122,12 @@ class LinearResponseSolver:
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
         # start linear response calculation
-
-        self.start_time = tm.time()
-
-        ops = self.b_ops
-        freqs = self.frequencies
-
         if self.rank == mpi_master():
             V1 = {
-                op: v
-                for op, v in zip(ops, self.get_rhs(ops, scf_tensors, nocc))
+                op: v for op, v in zip(
+                    self.b_ops, self.get_rhs(self.b_ops, scf_tensors, nocc))
             }
-            igs = self.initial_guess(freqs, V1)
+            igs = self.initial_guess(self.frequencies, V1, od, sd)
             b = self.setup_trials(igs)
 
             assert_msg_critical(
@@ -145,17 +140,16 @@ class LinearResponseSolver:
 
         if self.rank == mpi_master():
             s2b = e2x_drv.s2n(b, scf_tensors, nocc)
-
-            od = self.orb_diag
-            sd = self.ovl_diag
-            td = {w: od - w * sd for w in freqs}
+            td = {w: od - w * sd for w in self.frequencies}
 
             op_freq_keys = list(igs.keys())
             solutions = np.zeros((b.shape[0], len(igs)))
             e2nn = np.zeros((e2b.shape[0], len(igs)))
             residuals = {}
-            relative_residual_norm = {}
 
+        relative_residual_norm = {}
+
+        # start iterations
         for i in range(self.max_iter):
 
             if self.rank == mpi_master():
@@ -163,12 +157,9 @@ class LinearResponseSolver:
 
                 # next solution
                 for col, (op, freq) in enumerate(op_freq_keys):
-                    v = V1[op]
-
-                    # reduced_solution = (b.T*v)/(b.T*(e2b-freq*s2b))
                     reduced_solution = np.linalg.solve(
-                        np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
-
+                        np.matmul(b.T, e2b - freq * s2b),
+                        np.matmul(b.T, V1[op]))
                     solutions[:, col] = np.matmul(b, reduced_solution)
                     e2nn[:, col] = np.matmul(e2b, reduced_solution)
 
@@ -177,41 +168,25 @@ class LinearResponseSolver:
 
                 # next residual
                 for col, (op, freq) in enumerate(op_freq_keys):
-                    v = V1[op]
                     n = solutions[:, col]
-                    r = e2nn[:, col] - freq * s2nn[:, col] - v
+                    r = e2nn[:, col] - freq * s2nn[:, col] - V1[op]
                     residuals[(op, freq)] = r
-                    nvs.append(np.dot(n, v))
+                    nvs.append(np.dot(n, V1[op]))
                     rn = np.linalg.norm(r)
                     nn = np.linalg.norm(n)
                     relative_residual_norm[(op, freq)] = rn / nn
 
                 # write to output
-                output_header = '*** Iteration:   {} '.format(i + 1)
-                output_header += '* Residuals (Max,Min): '
-                output_header += '{:.2e} and {:.2e}'.format(
-                    max(relative_residual_norm.values()),
-                    min(relative_residual_norm.values()))
-                self.ostream.print_header(output_header.ljust(68))
-                self.ostream.print_blank()
-                for (op, freq), nv in zip(op_freq_keys, nvs):
-                    ops_label = '<<{};{}>>_{}'.format(op, op, freq)
-                    rel_res = relative_residual_norm[(op, freq)]
-                    output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
-                    output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-                    self.ostream.print_header(output_iter.ljust(68))
-                self.ostream.print_blank()
-                self.ostream.flush()
+                self.print_iteration(i, relative_residual_norm, op_freq_keys,
+                                     nvs)
 
-                max_residual = max(relative_residual_norm.values())
-                if max_residual < self.conv_thresh:
-                    self.is_converged = True
+            # check convergence
+            self.check_convergence(relative_residual_norm)
 
-            self.is_converged = self.comm.bcast(self.is_converged,
-                                                root=mpi_master())
             if self.is_converged:
                 break
 
+            # update trial vectors
             if self.rank == mpi_master():
                 new_trials = self.setup_trials(residuals, td=td, b=b)
                 b = np.append(b, new_trials, axis=1)
@@ -226,22 +201,15 @@ class LinearResponseSolver:
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
 
+        # converged?
         if self.rank == mpi_master():
-            output_conv = '*** '
-            if self.is_converged:
-                output_conv += 'Linear response converged'
-            else:
-                output_conv += 'Linear response NOT converged'
-            output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
-            output_conv += 'Time: {:.2f} sec'.format(tm.time() -
-                                                     self.start_time)
-            self.ostream.print_header(output_conv.ljust(68))
-            self.ostream.print_blank()
+            self.print_convergence()
 
             assert_msg_critical(
                 self.is_converged,
                 'LinearResponseSolver.compute: failed to converge')
 
+        # calculate properties
         if self.rank == mpi_master():
             v1 = {
                 op: v for op, v in zip(
@@ -255,6 +223,65 @@ class LinearResponseSolver:
             return lrs
         else:
             return None
+
+    def get_diagonals(self, ea, nocc, norb):
+        """Gets orbital and overlap diagonals"""
+
+        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+        excitations = list(
+            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+        z = [2.0 * (ea[j] - ea[i]) for i, j in excitations]
+        orb_diag = np.array(z + z)
+
+        lz = len(excitations)
+        ovl_diag = 2.0 * np.ones(2 * lz)
+        ovl_diag[lz:] = -2.0
+
+        return orb_diag, ovl_diag
+
+    def print_iteration(self, i, relative_residual_norm, op_freq_keys, nvs):
+        """Prints information of the iteration"""
+
+        output_header = '*** Iteration:   {} '.format(i + 1)
+        output_header += '* Residuals (Max,Min): '
+        output_header += '{:.2e} and {:.2e}'.format(
+            max(relative_residual_norm.values()),
+            min(relative_residual_norm.values()))
+        self.ostream.print_header(output_header.ljust(68))
+        self.ostream.print_blank()
+        for (op, freq), nv in zip(op_freq_keys, nvs):
+            ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+            rel_res = relative_residual_norm[(op, freq)]
+            output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
+            output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
+            self.ostream.print_header(output_iter.ljust(68))
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_convergence(self):
+        """Prints information after convergence"""
+
+        output_conv = '*** '
+        if self.is_converged:
+            output_conv += 'Linear response converged'
+        else:
+            output_conv += 'Linear response NOT converged'
+        output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
+        output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
+        self.ostream.print_header(output_conv.ljust(68))
+        self.ostream.print_blank()
+
+    def check_convergence(self, relative_residual_norm):
+        """Checks convergence"""
+
+        if self.rank == mpi_master():
+            max_residual = max(relative_residual_norm.values())
+            if max_residual < self.conv_thresh:
+                self.is_converged = True
+
+        self.is_converged = self.comm.bcast(self.is_converged,
+                                            root=mpi_master())
 
     def get_rhs(self, ops, scf_tensors, nocc):
         """Create right-hand sides of linear response equations"""
@@ -285,10 +312,8 @@ class LinearResponseSolver:
         y = [mat[j, i] for i, j in excitations]
         return np.array(z + y)
 
-    def initial_guess(self, freqs, V1):
+    def initial_guess(self, freqs, V1, od, sd):
 
-        od = self.orb_diag
-        sd = self.ovl_diag
         dim = od.shape[0]
 
         ig = {}
