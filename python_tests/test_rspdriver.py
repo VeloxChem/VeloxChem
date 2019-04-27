@@ -18,7 +18,7 @@ class TestRspDriver(unittest.TestCase):
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-        mol_orbs = scf_drv.mol_orbs
+        scf_tensors = scf_drv.scf_tensors
 
         # TDA
         tda_exci = TDAExciDriver(task.mpi_comm, task.ostream)
@@ -32,7 +32,7 @@ class TestRspDriver(unittest.TestCase):
             'max_iter': 50,
         })
 
-        tda_exci.compute(mol_orbs, task.molecule, task.ao_basis)
+        tda_exci.compute(task.molecule, task.ao_basis, scf_tensors)
 
         if task.mpi_rank == mpi_master():
 
@@ -55,7 +55,7 @@ class TestRspDriver(unittest.TestCase):
             'max_iter': 50,
         })
 
-        lr_prop = lr_solver.compute(mol_orbs, task.molecule, task.ao_basis)
+        lr_prop = lr_solver.compute(task.molecule, task.ao_basis, scf_tensors)
 
         if task.mpi_rank == mpi_master():
 

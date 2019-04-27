@@ -76,19 +76,19 @@ class ResponseDriver:
         elif rsp_input['property'].lower() == 'absorption':
             self.prop_type = 'SINGEX_TDA'
 
-    def compute(self, mol_orbs, molecule, ao_basis):
+    def compute(self, molecule, ao_basis, scf_tensors):
         """Performs molecular property calculation.
 
         Performs molecular property calculation using molecular data
 
         Parameters
         ----------
-        mol_orbs
-            The molecular orbitals.
         molecule
             The molecule.
         ao_basis
             The AO basis set.
+        scf_tensors
+            The tensors from converged SCF wavefunction.
         """
 
         if self.rank == mpi_master():
@@ -108,7 +108,7 @@ class ResponseDriver:
                 'max_iter': self.max_iter
             })
 
-            return tda_exci.compute(mol_orbs, molecule, ao_basis)
+            return tda_exci.compute(molecule, ao_basis, scf_tensors)
 
         # Linear response solver
 
@@ -125,7 +125,7 @@ class ResponseDriver:
                 'max_iter': self.max_iter
             })
 
-            return lr_solver.compute(mol_orbs, molecule, ao_basis)
+            return lr_solver.compute(molecule, ao_basis, scf_tensors)
 
     def print_header(self):
         """Prints response driver setup header to output stream.

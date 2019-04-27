@@ -80,7 +80,7 @@ class LinearResponseSolver:
         if 'max_iter' in settings:
             self.max_iter = settings['max_iter']
 
-    def compute(self, mol_orbs, molecule, basis):
+    def compute(self, molecule, basis, scf_tensors):
         """Performs linear response calculation"""
 
         basis = basis
@@ -91,13 +91,12 @@ class LinearResponseSolver:
             nalpha == nbeta,
             'LinearResponseSolver: not yet implemented for unrestricted case')
 
+        mo = scf_tensors['C']
+        ea = scf_tensors['E']
+
         if self.rank == mpi_master():
             nocc = nalpha
-            norb = mol_orbs.number_mos()
-            mo = mol_orbs.alpha_to_numpy()
-            ea = mol_orbs.ea_to_numpy()
-            density = mol_orbs.get_density(molecule)
-            dens = (density.alpha_to_numpy(0), density.beta_to_numpy(0))
+            norb = mo.shape[1]
 
             xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
             excitations = list(
@@ -114,23 +113,12 @@ class LinearResponseSolver:
         else:
             nocc = None
             norb = None
-            dens = None
-            mo = None
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
 
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
-
-        # TODO: make use of 1e integrals from scf
-        overlap, hcore, dipoles = e2x_drv.comp_1e_ints(molecule, basis)
-
-        # TODO: make use of Fock matrices from scf
-        focks = e2x_drv.comp_fock(hcore, dens, screening, molecule, basis)
-
-        tensors = {'C': mo, 'S': overlap, 'D': dens, 'F': focks, 'Mu': dipoles}
-        shapes = {'nocc': nocc, 'norb': norb}
 
         # start linear response calculation
 
@@ -141,7 +129,8 @@ class LinearResponseSolver:
 
         if self.rank == mpi_master():
             V1 = {
-                op: v for op, v in zip(ops, self.get_rhs(ops, tensors, shapes))
+                op: v
+                for op, v in zip(ops, self.get_rhs(ops, scf_tensors, nocc))
             }
             igs = self.initial_guess(freqs, V1)
             b = self.setup_trials(igs)
@@ -152,10 +141,10 @@ class LinearResponseSolver:
         else:
             b = None
 
-        e2b = e2x_drv.e2n(b, tensors, screening, molecule, basis)
+        e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
 
         if self.rank == mpi_master():
-            s2b = e2x_drv.s2n(b, tensors, shapes)
+            s2b = e2x_drv.s2n(b, scf_tensors, nocc)
 
             od = self.orb_diag
             sd = self.ovl_diag
@@ -183,7 +172,7 @@ class LinearResponseSolver:
                     solutions[:, col] = np.matmul(b, reduced_solution)
                     e2nn[:, col] = np.matmul(e2b, reduced_solution)
 
-                s2nn = e2x_drv.s2n(solutions, tensors, shapes)
+                s2nn = e2x_drv.s2n(solutions, scf_tensors, nocc)
                 nvs = []
 
                 # next residual
@@ -229,11 +218,11 @@ class LinearResponseSolver:
             else:
                 new_trials = None
 
-            new_e2b = e2x_drv.e2n(new_trials, tensors, screening, molecule,
+            new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
                                   basis)
 
             if self.rank == mpi_master():
-                new_s2b = e2x_drv.s2n(new_trials, tensors, shapes)
+                new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
 
@@ -256,7 +245,7 @@ class LinearResponseSolver:
         if self.rank == mpi_master():
             v1 = {
                 op: v for op, v in zip(
-                    self.a_ops, self.get_rhs(self.a_ops, tensors, shapes))
+                    self.a_ops, self.get_rhs(self.a_ops, scf_tensors, nocc))
             }
 
             lrs = {}
@@ -267,16 +256,15 @@ class LinearResponseSolver:
         else:
             return None
 
-    def get_rhs(self, ops, tensors, shapes):
+    def get_rhs(self, ops, scf_tensors, nocc):
         """Create right-hand sides of linear response equations"""
 
-        mo = tensors['C']
-        S = tensors['S']
-        D = tensors['D'][0] + tensors['D'][1]
-        dipoles = tensors['Mu']
+        mo = scf_tensors['C']
+        S = scf_tensors['S']
+        D = scf_tensors['D'][0] + scf_tensors['D'][1]
+        dipoles = scf_tensors['Mu']
 
-        nocc = shapes['nocc']
-        norb = shapes['norb']
+        norb = mo.shape[1]
 
         if 'x' in ops or 'y' in ops or 'z' in ops:
             props = {k: v for k, v in zip('xyz', dipoles)}

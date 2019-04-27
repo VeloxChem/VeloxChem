@@ -8,10 +8,11 @@ from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import MolecularOrbitals
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
+from .molecularorbitals import MolecularOrbitals
 from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
@@ -263,7 +264,8 @@ class ScfDriver:
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
-        ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis)
+        ovl_mat, kin_mat, npot_mat, dipole_mats = self.comp_one_ints(
+            molecule, ao_basis)
 
         linear_dependency = False
 
@@ -363,6 +365,27 @@ class ScfDriver:
                 break
 
         if self.rank == mpi_master():
+            self.scf_tensors = {
+                'C': self.mol_orbs.alpha_to_numpy(),
+                'E': self.mol_orbs.ea_to_numpy(),
+                'S': ovl_mat.to_numpy(),
+                'Mu': (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                       dipole_mats.z_to_numpy()),
+                'D': (self.density.alpha_to_numpy(0),
+                      self.density.beta_to_numpy(0)),
+                'F': (fock_mat.to_numpy(0), fock_mat.to_numpy(0)),
+            }
+        else:
+            self.scf_tensors = {
+                'C': None,
+                'E': None,
+                'S': None,
+                'Mu': None,
+                'D': None,
+                'F': None
+            }
+
+        if self.rank == mpi_master():
             self.print_scf_finish(start_time)
 
     def comp_one_ints(self, molecule, basis):
@@ -396,6 +419,9 @@ class ScfDriver:
 
         t3 = tm.time()
 
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_mats = dipole_drv.compute(molecule, basis)
+
         if self.rank == mpi_master():
 
             self.ostream.print_info("Overlap matrix computed in" +
@@ -412,7 +438,7 @@ class ScfDriver:
 
             self.ostream.flush()
 
-        return (ovl_mat, kin_mat, npot_mat)
+        return (ovl_mat, kin_mat, npot_mat, dipole_mats)
 
     def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
         """Computes initial density guess for SCF calculation.

@@ -10,7 +10,6 @@ from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver
-from .molecularorbitals import MolecularOrbitals
 from .errorhandler import assert_msg_critical
 
 
@@ -41,10 +40,9 @@ def main():
 
         # molecular orbitals
 
-        if task.mpi_rank == mpi_master():
-            mol_orbs = scf_drv.mol_orbs
-        else:
-            mol_orbs = MolecularOrbitals()
+        mol_orbs = scf_drv.mol_orbs
+        density = scf_drv.density
+        scf_tensors = scf_drv.scf_tensors
 
     # Response
 
@@ -57,14 +55,14 @@ def main():
             if rsp_dict['property'].lower() == 'polarizability':
                 polar = Polarizability(rsp_dict)
                 polar.init_driver(task.mpi_comm, task.ostream)
-                polar.compute(mol_orbs, task.molecule, task.ao_basis)
+                polar.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():
                     polar.print_property(task.ostream)
 
             elif rsp_dict['property'].lower() == 'absorption':
                 abs_spec = Absorption(rsp_dict)
                 abs_spec.init_driver(task.mpi_comm, task.ostream)
-                abs_spec.compute(mol_orbs, task.molecule, task.ao_basis)
+                abs_spec.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():
                     abs_spec.print_property(task.ostream)
 
@@ -75,7 +73,7 @@ def main():
         else:
             rsp_drv = ResponseDriver(task.mpi_comm, task.ostream)
             rsp_drv.update_settings({'property': 'absorption'})
-            rsp_drv.compute(mol_orbs, task.molecule, task.ao_basis)
+            rsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # MP2 perturbation theory
 
@@ -92,9 +90,6 @@ def main():
 
         if task.mpi_rank == mpi_master():
             vis_drv = VisualizationDriver()
-
-            mol_orbs = scf_drv.mol_orbs
-            density = scf_drv.density
 
             nelec = task.molecule.number_of_electrons()
             homo = nelec // 2 - 1

@@ -2,10 +2,6 @@ import numpy as np
 import itertools
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import KineticEnergyIntegralsDriver
-from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ExcitationVector
@@ -34,45 +30,6 @@ class LinearResponseMatrixVectorDriver:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-
-    def comp_1e_ints(self, molecule, basis):
-        """Computes 1e integrals"""
-
-        overlap_drv = OverlapIntegralsDriver(self.comm)
-        kinetic_drv = KineticEnergyIntegralsDriver(self.comm)
-        potential_drv = NuclearPotentialIntegralsDriver(self.comm)
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-
-        S = overlap_drv.compute(molecule, basis)
-        T = kinetic_drv.compute(molecule, basis)
-        V = potential_drv.compute(molecule, basis)
-        Dpl = dipole_drv.compute(molecule, basis)
-
-        if self.rank == mpi_master():
-            overlap = S.to_numpy()
-            hcore = T.to_numpy() - V.to_numpy()
-            dipoles = (Dpl.x_to_numpy(), Dpl.y_to_numpy(), Dpl.z_to_numpy())
-            return overlap, hcore, dipoles
-        else:
-            return None, None, None
-
-    def comp_fock(self, hcore, dens, screening, molecule, basis):
-        """Computes Fock matrices"""
-
-        if self.rank == mpi_master():
-            dabs = (dens,)
-        else:
-            dabs = None
-
-        fabs = self.get_two_el_fock(dabs, screening, molecule, basis)
-
-        if self.rank == mpi_master():
-            fa, fb = fabs[0]
-            fa += hcore
-            fb += hcore
-            return fa, fb
-        else:
-            return None, None
 
     def e2n(self, vecs, tensors, screening, molecule, basis):
 
@@ -187,7 +144,7 @@ class LinearResponseMatrixVectorDriver:
         else:
             return None
 
-    def s2n(self, vecs, tensors, shapes):
+    def s2n(self, vecs, tensors, nocc):
 
         assert_msg_critical(
             len(vecs.shape) == 2,
@@ -197,8 +154,7 @@ class LinearResponseMatrixVectorDriver:
         S = tensors['S']
         D = tensors['D'][0] + tensors['D'][1]
 
-        nocc = shapes['nocc']
-        norb = shapes['norb']
+        norb = mo.shape[1]
 
         s2n_vecs = np.ndarray(vecs.shape)
         rows, columns = vecs.shape

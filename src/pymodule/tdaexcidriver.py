@@ -6,8 +6,10 @@ from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
+from .veloxchemlib import molorb
 from .qqscheme import get_qq_scheme
 from .blockdavidson import BlockDavidsonSolver
+from .molecularorbitals import MolecularOrbitals
 
 
 class TDAExciDriver:
@@ -102,20 +104,26 @@ class TDAExciDriver:
         if 'max_iter' in settings:
             self.max_iter = settings['max_iter']
 
-    def compute(self, mol_orbs, molecule, ao_basis):
+    def compute(self, molecule, ao_basis, scf_tensors):
         """Performs TDA excited states calculation.
 
         Performs TDA excited states calculation using molecular data.
 
         Parameters
         ----------
-        mol_orbs
-            The molecular orbitals.
         molecule
             The molecule.
         ao_basis
             The AO basis set.
+        scf_tensors
+            The tensors from converged SCF wavefunction.
         """
+
+        if self.rank == mpi_master():
+            mol_orbs = MolecularOrbitals([scf_tensors['C']], [scf_tensors['E']],
+                                         molorb.rest)
+        else:
+            mol_orbs = MolecularOrbitals()
 
         # set start time
 
