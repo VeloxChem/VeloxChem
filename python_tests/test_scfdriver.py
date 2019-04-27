@@ -12,7 +12,7 @@ class TestScfDriver(unittest.TestCase):
         task = MpiTask(["inputs/h2se.inp", "inputs/h2se.out"], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute_task(task)
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
         task.finish()
 
         e_scf = scf_drv.get_scf_energy()

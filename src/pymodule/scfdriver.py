@@ -143,6 +143,7 @@ class ScfDriver:
 
         # restart information
         self.restart = True
+        self.checkpoint_file = None
 
     def update_settings(self, scf_dict):
 
@@ -159,24 +160,10 @@ class ScfDriver:
         if 'restart' in scf_dict:
             key = scf_dict['restart'].lower()
             self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in scf_dict:
+            self.checkpoint_file = scf_dict['checkpoint_file']
 
-    def compute_task(self, task):
-        """Performs SCF calculation.
-
-        Performs SCF calculation using data from MPI task.
-
-        Parameters
-        ----------
-        task
-            The SCF input data as MPI task.
-        """
-
-        checkpoint_file = task.input_dict["checkpoint_file"]
-
-        self.compute(task.molecule, task.ao_basis, task.min_basis,
-                     checkpoint_file)
-
-    def compute(self, molecule, ao_basis, min_basis, checkpoint_file=None):
+    def compute(self, molecule, ao_basis, min_basis):
         """Performs SCF calculation.
 
         Performs SCF calculation using molecular data
@@ -191,12 +178,9 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
-        # checkpoint file
-        self.checkpoint_file = checkpoint_file
-
         # initial guess
         if self.restart:
-            self.den_guess = DensityGuess("RESTART", checkpoint_file)
+            self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
             self.restart = self.den_guess.validate_checkpoint(
                 molecule, ao_basis, self.comm, self.ovl_thresh)
 
@@ -251,19 +235,20 @@ class ScfDriver:
             self.mol_orbs.print_orbitals(molecule, ao_basis, False,
                                          self.ostream)
 
-            if (checkpoint_file and isinstance(checkpoint_file, str) and
-                    isfile(checkpoint_file)):
+            if (self.checkpoint_file and
+                    isinstance(self.checkpoint_file, str) and
+                    isfile(self.checkpoint_file)):
                 checkpoint_text = "Checkpoint written to file: "
-                checkpoint_text += checkpoint_file
+                checkpoint_text += self.checkpoint_file
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()
 
-    def write_checkpoint(self, checkpoint_file):
+    def write_checkpoint(self):
         """Writes molecular orbitals to checkpoint file"""
 
         if self.rank == mpi_master() and not self.first_step:
-            if checkpoint_file and isinstance(checkpoint_file, str):
-                self.mol_orbs.write_hdf5(checkpoint_file)
+            if self.checkpoint_file and isinstance(self.checkpoint_file, str):
+                self.mol_orbs.write_hdf5(self.checkpoint_file)
 
     def comp_diis(self, molecule, ao_basis, min_basis):
         """Performs SCF calculation with C2-DIIS acceleration.
@@ -379,7 +364,7 @@ class ScfDriver:
 
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat)
 
-            self.write_checkpoint(self.checkpoint_file)
+            self.write_checkpoint()
 
             self.density = AODensityMatrix(den_mat)
 

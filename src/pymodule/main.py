@@ -37,7 +37,7 @@ def main():
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(scf_dict)
-        scf_drv.compute_task(task)
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         # molecular orbitals
 

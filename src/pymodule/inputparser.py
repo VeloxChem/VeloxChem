@@ -178,4 +178,6 @@ class InputParser:
             else:
                 fchkp = self.filename + ".scf.h5"
             self.input_dict["input_file"] = self.filename
-            self.input_dict["checkpoint_file"] = fchkp
+            if "scf" not in self.input_dict:
+                self.input_dict["scf"] = {}
+            self.input_dict["scf"]["checkpoint_file"] = fchkp
