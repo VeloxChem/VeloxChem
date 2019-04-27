@@ -1,7 +1,6 @@
 import numpy as np
 import time as tm
 import itertools
-import math
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
@@ -111,6 +110,7 @@ class LinearResponseSolver:
             nocc = nalpha
             norb = mo.shape[1]
             od, sd = self.get_diagonals(ea, nocc, norb)
+            td = {w: od - w * sd for w in self.frequencies}
         else:
             nocc = None
             norb = None
@@ -127,7 +127,7 @@ class LinearResponseSolver:
                 op: v for op, v in zip(
                     self.b_ops, self.get_rhs(self.b_ops, scf_tensors, nocc))
             }
-            igs = self.initial_guess(self.frequencies, V1, od, sd)
+            igs = self.initial_guess(self.frequencies, V1, od, sd, td)
             b = self.setup_trials(igs)
 
             assert_msg_critical(
@@ -137,16 +137,11 @@ class LinearResponseSolver:
             b = None
 
         e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
-
         if self.rank == mpi_master():
             s2b = e2x_drv.s2n(b, scf_tensors, nocc)
-            td = {w: od - w * sd for w in self.frequencies}
 
-            op_freq_keys = list(igs.keys())
-            solutions = np.zeros((b.shape[0], len(igs)))
-            e2nn = np.zeros((e2b.shape[0], len(igs)))
-            residuals = {}
-
+        solutions = {}
+        residuals = {}
         relative_residual_norm = {}
 
         # start iterations
@@ -154,31 +149,29 @@ class LinearResponseSolver:
 
             if self.rank == mpi_master():
                 self.cur_iter = i
-
-                # next solution
-                for col, (op, freq) in enumerate(op_freq_keys):
-                    reduced_solution = np.linalg.solve(
-                        np.matmul(b.T, e2b - freq * s2b),
-                        np.matmul(b.T, V1[op]))
-                    solutions[:, col] = np.matmul(b, reduced_solution)
-                    e2nn[:, col] = np.matmul(e2b, reduced_solution)
-
-                s2nn = e2x_drv.s2n(solutions, scf_tensors, nocc)
                 nvs = []
 
-                # next residual
-                for col, (op, freq) in enumerate(op_freq_keys):
-                    n = solutions[:, col]
-                    r = e2nn[:, col] - freq * s2nn[:, col] - V1[op]
-                    residuals[(op, freq)] = r
-                    nvs.append(np.dot(n, V1[op]))
+                # next solution
+                for op, freq in igs:
+                    v = V1[op]
+                    reduced_solution = np.linalg.solve(
+                        np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
+                    solutions[(op, freq)] = np.matmul(b, reduced_solution)
+                    residuals[(op, freq)] = np.matmul(e2b - freq * s2b,
+                                                      reduced_solution) - v
+
+                    r = residuals[(op, freq)]
+                    n = solutions[(op, freq)]
+
+                    nv = np.dot(n, v)
+                    nvs.append((op, freq, nv))
+
                     rn = np.linalg.norm(r)
                     nn = np.linalg.norm(n)
                     relative_residual_norm[(op, freq)] = rn / nn
 
                 # write to output
-                self.print_iteration(i, relative_residual_norm, op_freq_keys,
-                                     nvs)
+                self.print_iteration(relative_residual_norm, nvs)
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -195,7 +188,6 @@ class LinearResponseSolver:
 
             new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
                                   basis)
-
             if self.rank == mpi_master():
                 new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
                 e2b = np.append(e2b, new_e2b, axis=1)
@@ -218,8 +210,8 @@ class LinearResponseSolver:
 
             lrs = {}
             for aop in self.a_ops:
-                for col, (bop, w) in enumerate(op_freq_keys):
-                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[:, col])
+                for bop, w in solutions:
+                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[(bop, w)])
             return lrs
         else:
             return None
@@ -240,17 +232,17 @@ class LinearResponseSolver:
 
         return orb_diag, ovl_diag
 
-    def print_iteration(self, i, relative_residual_norm, op_freq_keys, nvs):
+    def print_iteration(self, relative_residual_norm, nvs):
         """Prints information of the iteration"""
 
-        output_header = '*** Iteration:   {} '.format(i + 1)
+        output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm.values()),
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(68))
         self.ostream.print_blank()
-        for (op, freq), nv in zip(op_freq_keys, nvs):
+        for op, freq, nv in nvs:
             ops_label = '<<{};{}>>_{}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
@@ -312,7 +304,7 @@ class LinearResponseSolver:
         y = [mat[j, i] for i, j in excitations]
         return np.array(z + y)
 
-    def initial_guess(self, freqs, V1, od, sd):
+    def initial_guess(self, freqs, V1, od, sd, td):
 
         dim = od.shape[0]
 
@@ -323,8 +315,7 @@ class LinearResponseSolver:
                 if gn < self.small_thresh:
                     ig[(op, w)] = np.zeros(dim)
                 else:
-                    td = od - w * sd
-                    ig[(op, w)] = grad / td
+                    ig[(op, w)] = grad / td[w]
         return ig
 
     def setup_trials(self, vectors, td=None, b=None, renormalize=True):
@@ -332,7 +323,7 @@ class LinearResponseSolver:
         trials = []
 
         for (op, freq) in vectors:
-            vec = np.array(vectors[(op, freq)])
+            vec = vectors[(op, freq)]
 
             if td is not None:
                 v = vec / td[freq]
@@ -344,32 +335,33 @@ class LinearResponseSolver:
                 if freq > self.small_thresh:
                     trials.append(self.swap(v))
 
-        new_trials = np.array(trials).transpose()
+        new_trials = np.array(trials).T
 
         if b is not None:
             new_trials = new_trials - np.matmul(b, np.matmul(b.T, new_trials))
 
         if trials and renormalize:
-            t = self.get_transform(new_trials)
-            truncated = np.matmul(new_trials, t)
-
-            # S12 = (truncated.T*truncated).invsqrt()
-            tt = np.matmul(truncated.T, truncated)
-            evals, evecs = np.linalg.eigh(tt)
-            evals_invsqrt = [1.0 / math.sqrt(x) for x in evals]
-            S12 = np.matmul(evecs, np.matmul(np.diag(evals_invsqrt), evecs.T))
-
-            new_trials = np.matmul(truncated, S12)
+            truncated = self.truncate(new_trials)
+            new_trials = self.lowdin_normalize(truncated)
 
         return new_trials
 
-    def get_transform(self, basis):
+    def truncate(self, basis):
 
         Sb = np.matmul(basis.T, basis)
         l, T = np.linalg.eigh(Sb)
         b_norm = np.sqrt(Sb.diagonal())
         mask = l > b_norm * self.small_thresh
-        return T[:, mask]
+        return np.matmul(basis, T[:, mask])
+
+    @staticmethod
+    def lowdin_normalize(basis):
+
+        Sb = np.matmul(basis.T, basis)
+        l, T = np.linalg.eig(Sb)
+        linvsqrt = np.diag(np.sqrt(1.0 / l))
+        S12 = np.matmul(T, np.matmul(linvsqrt, T.T))
+        return np.matmul(basis, S12)
 
     @staticmethod
     def swap(xy):
