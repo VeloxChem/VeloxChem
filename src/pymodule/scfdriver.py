@@ -40,9 +40,6 @@ class ScfDriver:
     qq_dyn
         The flag for enabling dynamic thresholds in electron repulsion
         integrals screening scheme.
-    qq_dden
-        The flag for use of density difference scheme in Fock/Kohn-Sham
-        matrices construction.
     conv_thresh
         The SCF convergence threshold.
     eri_thresh
@@ -51,8 +48,6 @@ class ScfDriver:
         The atomic orbitals linear dependency threshold.
     diis_thresh
         The C2-DIIS switch on threshold.
-    dden_thresh
-        The switch on threshold for difference of densities scheme.
     use_level_shift
         The flag for usage of level shifting in SCF iterations.
     iter_data
@@ -100,13 +95,11 @@ class ScfDriver:
         # screening scheme
         self.qq_type = "QQ_DEN"
         self.qq_dyn = True
-        self.qq_dden = False
 
         # thresholds
         self.conv_thresh = 1.0e-6
         self.ovl_thresh = 1.0e-6
         self.diis_thresh = 1000.0
-        self.dden_thresh = 1.0e-3
         self.eri_thresh = 1.0e-12
         self.eri_thresh_tight = 1.0e-15
 
@@ -323,19 +316,12 @@ class ScfDriver:
 
         fock_mat = AOFockMatrix(den_mat)
 
-        ref_fock_mat = AOFockMatrix()
-
-        dden_fock = False
-
         if self.rank == mpi_master():
             self.print_scf_title()
 
         for i in self.get_scf_range():
 
-            self.comp_2e_fock(eri_drv, fock_mat, ref_fock_mat, den_mat,
-                              dden_fock, molecule, ao_basis, qq_data)
-
-            ref_fock_mat = self.store_fock_mat(fock_mat)
+            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data)
 
             fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
@@ -349,8 +335,6 @@ class ScfDriver:
             self.set_skip_iter_flag(i, e_grad)
 
             diff_den = self.comp_density_change(den_mat, self.density)
-
-            dden_fock = self.use_diff_density_fock(diff_den)
 
             self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
 
@@ -370,11 +354,7 @@ class ScfDriver:
 
             den_mat = self.gen_new_density(molecule)
 
-            if dden_fock:
-                diff_den_mat = AODensityMatrix(den_mat)
-                diff_den_mat.broadcast(self.rank, self.comm)
-            else:
-                den_mat.broadcast(self.rank, self.comm)
+            den_mat.broadcast(self.rank, self.comm)
 
             if self.qq_dyn:
                 qq_data.set_threshold(self.get_dyn_threshold(e_grad))
@@ -525,41 +505,6 @@ class ScfDriver:
 
         return (0.0, 0.0, 0.0)
 
-    def comp_2e_fock(self, eri_drv, fock_mat, ref_fock_mat, den_mat, dden_fock,
-                     molecule, ao_basis, qq_data):
-        """Computes 2e part of Fock/Kohn-Sham matrix.
-
-        Computes 2e part of Fock/Kohn-Sham matrix in parallel on MPI
-        communicator.
-
-        Parameters
-        ----------
-        eri_drv
-            The electron repulsion integrals driver.
-        fock_mat
-            The Fock/Kohn-Sham matrix (2e-part).
-        ref_fock_mat
-            The reference Fock/Kohn-Sham matrix (2e-part).
-        den_mat
-            The density matrix.
-        dden_fock
-            The flag for using density difference method in construction of
-            Fock/Kohn-Sham matrix (2e-part).
-        molecule
-            The moelcule.
-        ao_basis
-            The AO basis.
-        qq_data
-            The electron repulsion integrals screener.
-        """
-
-        if dden_fock:
-            dden_mat = den_mat.sub(self.density)
-            eri_drv.compute(fock_mat, dden_mat, molecule, ao_basis, qq_data)
-            fock_mat.add(ref_fock_mat)
-        else:
-            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data)
-
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
         """Computes full Fock/Kohn-Sham matrix.
 
@@ -618,26 +563,6 @@ class ScfDriver:
         """
 
         return 0.0
-
-    def store_fock_mat(self, fock_mat):
-        """Stores Fock/Kohn-Sham matrix.
-
-        Stores Fock/Kohn-Sham matrix needed for density difference construction
-        of Fock/Kohn-Sham matrix.
-
-        Parameters
-        ----------
-        fock_mat
-            The Fock/Kohn-Sham matrix.
-        Returns
-        -------
-            The Fock/Kohn-Sham matrix.
-        """
-
-        if self.qq_dden and (not self.skip_iter):
-            return AOFockMatrix(fock_mat)
-
-        return AOFockMatrix()
 
     def store_diis_data(self, i, fock_mat, den_mat):
         """Stores Fock/Kohn-Sham and density matrices for current iteration.
@@ -1020,27 +945,6 @@ class ScfDriver:
             return True
 
         if self.den_guess.guess_type == "SAD":
-            return True
-
-        return False
-
-    def use_diff_density_fock(self, diff_den):
-        """Determines if density difference method will be used in construction
-        of Fock/Kohn-Sham matrix.
-
-        Determines if density difference method will be used in construction
-        of Fock/Kohn-Sham matrix.
-
-        Returns
-        -------
-        The flag for usage of density difference method in construction of
-        Fock/Kohn-Sham matrix.
-        """
-
-        if self.skip_iter:
-            return False
-
-        if self.qq_dden and (diff_den < self.dden_thresh):
             return True
 
         return False
