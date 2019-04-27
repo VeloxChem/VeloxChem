@@ -1,7 +1,4 @@
-import sys
-
 from .rspdriver import ResponseDriver
-from .outputstream import OutputStream
 
 
 class ResponseProperty:
@@ -21,27 +18,11 @@ class ResponseProperty:
 
         self.rsp_input = rsp_input
 
-    def compute_task(self, mol_orbs, task):
-        """Performs response property/spectroscopy calculation.
+    def init_driver(self, comm, ostream):
 
-        Parameters
-        ----------
-        mol_orbs
-            The molecular orbitals.
-        task
-            The MPI task.
-        """
+        self.rsp_driver = ResponseDriver(self.rsp_input, comm, ostream)
 
-        rsp_driver = ResponseDriver(self.rsp_input, task.mpi_comm, task.ostream)
-        self.rsp_property = rsp_driver.compute(mol_orbs, task.molecule,
-                                               task.ao_basis)
-
-    def compute(self,
-                mol_orbs,
-                molecule,
-                basis,
-                comm,
-                ostream=OutputStream(sys.stdout)):
+    def compute(self, mol_orbs, molecule, basis):
         """Performs response property/spectroscopy calculation.
 
         Parameters
@@ -52,14 +33,9 @@ class ResponseProperty:
             The molecule.
         basis
             The AO basis set.
-        comm
-            The MPI communicator.
-        ostream
-            The output stream.
         """
 
-        rsp_driver = ResponseDriver(self.rsp_input, comm, ostream)
-        self.rsp_property = rsp_driver.compute(mol_orbs, molecule, basis)
+        self.rsp_property = self.rsp_driver.compute(mol_orbs, molecule, basis)
 
     def get_property(self, req_list):
         """Gets response property/spectroscopy.

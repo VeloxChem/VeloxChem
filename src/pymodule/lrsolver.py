@@ -87,18 +87,6 @@ class LinearResponseSolver:
         if 'max_iter' in settings:
             self.max_iter = settings['max_iter']
 
-    def set_eri(self, eri_thresh, qq_type):
-        """Sets screening in computation of electron repulsion integrals"""
-
-        self.eri_thresh = eri_thresh
-        self.qq_type = qq_type
-
-    def set_solver(self, conv_thresh, max_iter):
-        """Sets convergence threshold and maximum number of iterations"""
-
-        self.conv_thresh = conv_thresh
-        self.max_iter = max_iter
-
     def compute(self, mol_orbs, molecule, basis):
         """Performs linear response calculation"""
 

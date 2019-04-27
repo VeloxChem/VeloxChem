@@ -16,15 +16,13 @@ class ResponseDriver:
         The number of MPI processes.
     """
 
-    def __init__(self, rsp_input, comm, ostream):
+    def __init__(self, comm, ostream):
         """Initializes Response driver.
 
         Initializes Response driver to default setup.
 
         Parameters
         ----------
-        rsp_input
-            The input dictionary that defines the response property.
         comm
             The MPI communicator.
         ostream
@@ -33,30 +31,15 @@ class ResponseDriver:
 
         # calculation type
         self.prop_type = 'SINGEX_TDA'
-        self.nstates = int(rsp_input['nstates']) \
-            if 'nstates' in rsp_input else 3
+        self.nstates = 3
 
         # solver settings
-        self.conv_thresh = float(rsp_input['conv_thresh']) \
-            if 'conv_thresh' in rsp_input else 1.0e-4
-        self.max_iter = int(rsp_input['max_iter']) \
-            if 'max_iter' in rsp_input else 50
+        self.conv_thresh = 1.0e-4
+        self.max_iter = 50
 
         # ERI settings
-        self.eri_thresh = float(rsp_input['eri_thresh']) \
-            if 'eri_thresh' in rsp_input else 1.0e-15
-        self.qq_type = rsp_input['qq_type'].upper() \
-            if 'qq_type' in rsp_input else 'QQ_DEN'
-
-        if rsp_input:
-
-            if rsp_input['property'].lower() == 'polarizability':
-                self.prop_type = 'POLARIZABILITY'
-                self.a_ops, self.b_ops = rsp_input['operators']
-                self.frequencies = rsp_input['frequencies']
-
-            elif rsp_input['property'].lower() == 'absorption':
-                self.prop_type = 'SINGEX_TDA'
+        self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
 
         # mpi information
         self.comm = comm
@@ -65,6 +48,33 @@ class ResponseDriver:
 
         # output stream
         self.ostream = ostream
+
+    def update_settings(self, rsp_input):
+
+        # calculation type
+        if 'nstates' in rsp_input:
+            self.nstates = int(rsp_input['nstates'])
+
+        # solver settings
+        if 'conv_thresh' in rsp_input:
+            self.conv_thresh = float(rsp_input['conv_thresh'])
+        if 'max_iter' in rsp_input:
+            self.max_iter = int(rsp_input['max_iter'])
+
+        # ERI settings
+        if 'eri_thresh' in rsp_input:
+            self.eri_thresh = float(rsp_input['eri_thresh'])
+        if 'qq_type' in rsp_input:
+            self.qq_type = rsp_input['qq_type'].upper()
+
+        # properties
+        if rsp_input['property'].lower() == 'polarizability':
+            self.prop_type = 'POLARIZABILITY'
+            self.a_ops, self.b_ops = rsp_input['operators']
+            self.frequencies = rsp_input['frequencies']
+
+        elif rsp_input['property'].lower() == 'absorption':
+            self.prop_type = 'SINGEX_TDA'
 
     def compute(self, mol_orbs, molecule, ao_basis):
         """Performs molecular property calculation.

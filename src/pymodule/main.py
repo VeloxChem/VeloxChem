@@ -56,13 +56,15 @@ def main():
 
             if rsp_dict['property'].lower() == 'polarizability':
                 polar = Polarizability(rsp_dict)
-                polar.compute_task(mol_orbs, task)
+                polar.init_driver(task.mpi_comm, task.ostream)
+                polar.compute(mol_orbs, task.molecule, task.ao_basis)
                 if task.mpi_rank == mpi_master():
                     polar.print_property(task.ostream)
 
             elif rsp_dict['property'].lower() == 'absorption':
                 abs_spec = Absorption(rsp_dict)
-                abs_spec.compute_task(mol_orbs, task)
+                abs_spec.init_driver(task.mpi_comm, task.ostream)
+                abs_spec.compute(mol_orbs, task.molecule, task.ao_basis)
                 if task.mpi_rank == mpi_master():
                     abs_spec.print_property(task.ostream)
 
@@ -71,8 +73,9 @@ def main():
                     assert_msg_critical(False, 'response: invalid property')
 
         else:
-            rsp_drv = ResponseDriver({'property': 'absorption'})
-            rsp_drv.compute_task(mol_orbs, task)
+            rsp_drv = ResponseDriver(task.mpi_comm, task.ostream)
+            rsp_drv.update_settings({'property': 'absorption'})
+            rsp_drv.compute(mol_orbs, task.molecule, task.ao_basis)
 
     # MP2 perturbation theory
 
