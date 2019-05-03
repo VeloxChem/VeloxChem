@@ -64,7 +64,7 @@ class TDAExciDriver:
         self.qq_type = 'QQ_DEN'
 
         # solver setup
-        self.conv_thesh = 1.0e-4
+        self.conv_thresh = 1.0e-4
         self.max_iter = 50
         self.cur_iter = 0
         self.solver = None
