@@ -609,7 +609,7 @@ TEST_F(COneIntsFuncTest, CompTensorsProduct)
     
     CMemBlock2D<double> tena(4, 6);
     
-    intsfunc::compTensorsProduct(tena, tenb, tenc);
+    intsfunc::compTensorsProduct(tena, tenb, tenc, 3, 2, 1);
     
     CMemBlock2D<double> refa({ 1.0,   4.0,  6.0,  3.0,
                                3.0,  -6.0,  2.0,  9.0,
@@ -620,14 +620,4 @@ TEST_F(COneIntsFuncTest, CompTensorsProduct)
                               4, 6);
     
     ASSERT_EQ(tena, refa);
-    
-    CMemBlock2D<double> tenx({1.0, 1.0, 1.0, 1.0,
-                              2.0, 2.0, 3.0, 3.0},
-                             4, 2);
-    
-    CMemBlock2D<double> refx(tenx);
-    
-    intsfunc::compTensorsProduct(tenx, tenb, tenc);
-    
-    ASSERT_EQ(tenx, refx);
 }

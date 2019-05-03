@@ -361,10 +361,16 @@ namespace intsfunc { // intsfunc namespace
      @param aTensor the tensor A = B * C.
      @param bTensor the tensor B.
      @param cTensor the tensor C.
+     @param bDimensions the tensorial dimensions of tensor B.
+     @param cDimensions the tensorial dimensions of tensor C.
+     @param nBlocks the number of tensorial blocks.
      */
     void compTensorsProduct(      CMemBlock2D<double>& aTensor,
                             const CMemBlock2D<double>& bTensor,
-                            const CMemBlock2D<double>& cTensor);
+                            const CMemBlock2D<double>& cTensor,
+                            const int32_t              bDimensions,
+                            const int32_t              cDimensions,
+                            const int32_t              nBlocks);
     
 } // intsfunc namespace
 

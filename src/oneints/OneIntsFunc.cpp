@@ -1248,36 +1248,35 @@ namespace intsfunc { // intsfunc namespace
     void
     compTensorsProduct(      CMemBlock2D<double>& aTensor,
                        const CMemBlock2D<double>& bTensor,
-                       const CMemBlock2D<double>& cTensor)
+                       const CMemBlock2D<double>& cTensor,
+                       const int32_t              bDimensions,
+                       const int32_t              cDimensions,
+                       const int32_t              nBlocks)
     {
         // set up dimensions of tensors
         
-        auto adim = aTensor.blocks();
-        
-        auto bdim = bTensor.blocks();
-        
-        auto cdim = cTensor.blocks();
+        auto adim = bDimensions * cDimensions;
         
         // compute product of tensors
+      
+        auto ndim = aTensor.size(0);
         
-        if (adim == bdim * cdim)
+        for (int32_t i = 0; i < nBlocks; i++)
         {
-            auto ndim = aTensor.size(0);
-            
-            for (int32_t i = 0; i < bdim; i++)
+            for (int32_t j = 0; j < bDimensions; j++)
             {
-                auto bvals = bTensor.data(i);
+                auto bvals = bTensor.data(bDimensions * i + j);
                 
-                for (int32_t j = 0; j < cdim; j++)
+                for (int32_t k = 0; k < cDimensions; k++)
                 {
-                    auto cvals = cTensor.data(j);
+                    auto cvals = cTensor.data(cDimensions * i + k);
                     
-                    auto avals = aTensor.data(i * cdim + j);
+                    auto avals = aTensor.data(adim * i + j * cDimensions + k);
                     
                     #pragma omp simd aligned(avals, bvals, cvals: VLX_ALIGN)
-                    for (int32_t k = 0; k < ndim; k++)
+                    for (int32_t l = 0; l < ndim; l++)
                     {
-                        avals[k] = bvals[k] * cvals[k];
+                        avals[l] = bvals[l] * cvals[l];
                     }
                 }
             }

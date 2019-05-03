@@ -289,6 +289,12 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
     // determine bra and ket sides symmetry
     
     bool symbk = (bragtos == ketgtos);
+    
+    // set up primitive GTOs positions
+    
+    auto spos = braGtoBlock.getStartPositions();
+    
+    auto epos = braGtoBlock.getEndPositions();
 
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -310,7 +316,7 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
         
         // compute tensor products: R(PA) x P(PB)
         
-        intsfunc::compTensorsProduct(rpa2b, rpa, rpb);
+        intsfunc::compTensorsProduct(rpa2b, rpa, rpb, btcomps, ktcomps, epos[i] - spos[i]);
         
         // compite primitive overlap integrals
         
@@ -338,7 +344,7 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
                                               const CMemBlock2D<double>&  abDistances,
                                               const CMemBlock2D<double>&  paDistances,
                                               const CMemBlock2D<double>&  pbDistances,
-                                              const CMemBlock2D<double>&  pa2bDistances,
+                                              const CMemBlock2D<double>&  pa2pbDistances,
                                               const CGtoBlock&            braGtoBlock,
                                               const CGtoBlock&            ketGtoBlock,
                                               const int32_t               iContrGto) const
@@ -445,8 +451,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 1) && (kang == 1))
     {
         ovlrecfunc::compOverlapForPP(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     pa2pbDistances, braGtoBlock, ketGtoBlock,
+                                     iContrGto);
         
         return;
     }
@@ -456,8 +462,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 1) && (kang == 2))
     {
         ovlrecfunc::compOverlapForPD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -467,8 +473,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 2) && (kang == 1))
     {
         ovlrecfunc::compOverlapForDP(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -478,8 +484,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 1) && (kang == 3))
     {
         ovlrecfunc::compOverlapForPF(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -489,7 +495,7 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 3) && (kang == 1))
     {
         ovlrecfunc::compOverlapForFP(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
+                                     paDistances, pa2pbDistances, braGtoBlock,
                                      ketGtoBlock, iContrGto);
         
         return;
@@ -500,8 +506,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 1) && (kang == 4))
     {
         ovlrecfunc::compOverlapForPG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -511,8 +517,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 4) && (kang == 1))
     {
         ovlrecfunc::compOverlapForGP(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -522,8 +528,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 2) && (kang == 2))
     {
         ovlrecfunc::compOverlapForDD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -533,8 +539,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 2) && (kang == 3))
     {
         ovlrecfunc::compOverlapForDF(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -544,8 +550,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 3) && (kang == 2))
     {
         ovlrecfunc::compOverlapForFD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -555,8 +561,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 2) && (kang == 4))
     {
         ovlrecfunc::compOverlapForDG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -566,8 +572,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 4) && (kang == 2))
     {
         ovlrecfunc::compOverlapForGD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -577,8 +583,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 3) && (kang == 3))
     {
         ovlrecfunc::compOverlapForFF(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -588,8 +594,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 3) && (kang == 4))
     {
         ovlrecfunc::compOverlapForFG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -599,8 +605,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 4) && (kang == 3))
     {
         ovlrecfunc::compOverlapForGF(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
@@ -610,8 +616,8 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     if ((bang == 4) && (kang == 4))
     {
         ovlrecfunc::compOverlapForGG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
+                                     paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
