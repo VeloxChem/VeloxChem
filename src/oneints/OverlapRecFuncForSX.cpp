@@ -79,7 +79,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
                 
                         * std::exp(-fz[j] * (abx[j] * abx[j] + aby[j] * aby[j] +
                                      
-                                   abz[j] * abz[j]));
+                                     abz[j] * abz[j]));
             }
             
             idx++;
@@ -112,7 +112,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
         for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
         {
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
@@ -176,7 +176,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
         for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
         {
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(3 * idx);
 
@@ -245,9 +245,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto fx = osFactors.data(2 * idx);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
-
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_xx = pbDistances.data(9 * idx + 3);
 
@@ -337,9 +335,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto fx = osFactors.data(2 * idx);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            // set up pointers to 2-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_xx = paDistances.data(9 * idx + 3);
 
@@ -429,17 +425,13 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto fx = osFactors.data(2 * idx);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(19 * idx);
 
             auto pb_y = pbDistances.data(19 * idx + 1);
 
             auto pb_z = pbDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
-
-            // set up pointers to 3-th order tensor of distance R(PB)
 
             auto pb_xxx = pbDistances.data(19 * idx + 9);
 
@@ -500,9 +492,9 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_0_xxx[j] = fl_s_0_0 * (1.5 * pb_x[j] * fl1_fx + pb_xxx[j]);
 
-                t_0_xxy[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_y[j] + pb_xxy[j]);
+                t_0_xxy[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pb_xxy[j]);
 
-                t_0_xxz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pb_xxz[j]);
+                t_0_xxz[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pb_xxz[j]);
 
                 t_0_xyy[j] = fl_s_0_0 * (0.5 * pb_x[j] * fl1_fx + pb_xyy[j]);
 
@@ -512,7 +504,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_0_yyy[j] = fl_s_0_0 * (1.5 * pb_y[j] * fl1_fx + pb_yyy[j]);
 
-                t_0_yyz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pb_yyz[j]);
+                t_0_yyz[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pb_yyz[j]);
 
                 t_0_yzz[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pb_yzz[j]);
 
@@ -554,17 +546,13 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto fx = osFactors.data(2 * idx);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(19 * idx);
 
             auto pa_y = paDistances.data(19 * idx + 1);
 
             auto pa_z = paDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            // set up pointers to 3-th order tensor of distance R(PA)
 
             auto pa_xxx = paDistances.data(19 * idx + 9);
 
@@ -625,9 +613,9 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_xxx_0[j] = fl_s_0_0 * (1.5 * pa_x[j] * fl1_fx + pa_xxx[j]);
 
-                t_xxy_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_y[j] + pa_xxy[j]);
+                t_xxy_0[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa_xxy[j]);
 
-                t_xxz_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] + pa_xxz[j]);
+                t_xxz_0[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa_xxz[j]);
 
                 t_xyy_0[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa_xyy[j]);
 
@@ -637,7 +625,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_yyy_0[j] = fl_s_0_0 * (1.5 * pa_y[j] * fl1_fx + pa_yyy[j]);
 
-                t_yyz_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] + pa_yyz[j]);
+                t_yyz_0[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa_yyz[j]);
 
                 t_yzz_0[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa_yzz[j]);
 
@@ -679,9 +667,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto fx = osFactors.data(2 * idx);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
-
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_xx = pbDistances.data(34 * idx + 3);
 
@@ -694,10 +680,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto pb_yz = pbDistances.data(34 * idx + 7);
 
             auto pb_zz = pbDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PB)
-
-            // set up pointers to 4-th order tensor of distance R(PB)
 
             auto pb_xxxx = pbDistances.data(34 * idx + 19);
 
@@ -786,11 +768,11 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_0_xxxz[j] = fl_s_0_0 * (1.5 * pb_xz[j] * fl1_fx + pb_xxxz[j]);
 
-                t_0_xxyy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * fl1_fx * pb_yy[j] + pb_xxyy[j]);
+                t_0_xxyy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * pb_yy[j] * fl1_fx + pb_xxyy[j]);
 
-                t_0_xxyz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_yz[j] + pb_xxyz[j]);
+                t_0_xxyz[j] = fl_s_0_0 * (0.5 * pb_yz[j] * fl1_fx + pb_xxyz[j]);
 
-                t_0_xxzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pb_xxzz[j]);
+                t_0_xxzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * pb_zz[j] * fl1_fx + pb_xxzz[j]);
 
                 t_0_xyyy[j] = fl_s_0_0 * (1.5 * pb_xy[j] * fl1_fx + pb_xyyy[j]);
 
@@ -804,7 +786,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_0_yyyz[j] = fl_s_0_0 * (1.5 * pb_yz[j] * fl1_fx + pb_yyyz[j]);
 
-                t_0_yyzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_yy[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pb_yyzz[j]);
+                t_0_yyzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_yy[j] * fl1_fx + 0.5 * pb_zz[j] * fl1_fx + pb_yyzz[j]);
 
                 t_0_yzzz[j] = fl_s_0_0 * (1.5 * pb_yz[j] * fl1_fx + pb_yzzz[j]);
 
@@ -846,9 +828,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
             auto fx = osFactors.data(2 * idx);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            // set up pointers to 2-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_xx = paDistances.data(34 * idx + 3);
 
@@ -861,10 +841,6 @@ namespace ovlrecfunc { // ovlrecfunc namespace
             auto pa_yz = paDistances.data(34 * idx + 7);
 
             auto pa_zz = paDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PA)
-
-            // set up pointers to 4-th order tensor of distance R(PA)
 
             auto pa_xxxx = paDistances.data(34 * idx + 19);
 
@@ -953,11 +929,11 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_xxxz_0[j] = fl_s_0_0 * (1.5 * pa_xz[j] * fl1_fx + pa_xxxz[j]);
 
-                t_xxyy_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_yy[j] + pa_xxyy[j]);
+                t_xxyy_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * pa_yy[j] * fl1_fx + pa_xxyy[j]);
 
-                t_xxyz_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_yz[j] + pa_xxyz[j]);
+                t_xxyz_0[j] = fl_s_0_0 * (0.5 * pa_yz[j] * fl1_fx + pa_xxyz[j]);
 
-                t_xxzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_zz[j] + pa_xxzz[j]);
+                t_xxzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * pa_zz[j] * fl1_fx + pa_xxzz[j]);
 
                 t_xyyy_0[j] = fl_s_0_0 * (1.5 * pa_xy[j] * fl1_fx + pa_xyyy[j]);
 
@@ -971,7 +947,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
 
                 t_yyyz_0[j] = fl_s_0_0 * (1.5 * pa_yz[j] * fl1_fx + pa_yyyz[j]);
 
-                t_yyzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pa_zz[j] + pa_yyzz[j]);
+                t_yyzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * pa_zz[j] * fl1_fx + pa_yyzz[j]);
 
                 t_yzzz_0[j] = fl_s_0_0 * (1.5 * pa_yz[j] * fl1_fx + pa_yzzz[j]);
 
