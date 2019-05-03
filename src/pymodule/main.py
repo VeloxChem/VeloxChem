@@ -9,6 +9,7 @@ from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mp2driver import Mp2Driver
+from .adconedriver import AdcOneDriver
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 
@@ -25,14 +26,14 @@ def main():
 
     # Hartree-Fock
 
-    if task_type in ['hf', 'mp2', 'cube', 'response']:
+    if task_type in ['hf', 'mp2', 'cube', 'response', 'adc1']:
 
         # initialize scf driver and run scf
 
         if 'scf' in task.input_dict:
             scf_dict = task.input_dict['scf']
         else:
-            scf_dict = None
+            scf_dict = {}
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(scf_dict)
@@ -74,6 +75,19 @@ def main():
             rsp_drv = ResponseDriver(task.mpi_comm, task.ostream)
             rsp_drv.update_settings({'property': 'absorption'})
             rsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+
+    # ADC(1)
+
+    if task_type == 'adc1':
+
+        if 'adc' in task.input_dict:
+            adc_dict = task.input_dict['adc']
+        else:
+            adc_dict = {}
+
+        adc1_drv = AdcOneDriver(task.mpi_comm, task.ostream)
+        adc1_drv.update_settings(adc_dict)
+        adc1_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # MP2 perturbation theory
 
