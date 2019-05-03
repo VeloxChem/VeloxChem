@@ -197,7 +197,6 @@ class AdcOneDriver:
                     # 2e contribution
                     prefactor = -1.0 if self.triplet else 1.0
                     mat = prefactor * fock.to_numpy(fockind)
-                    mat = fock.to_numpy(fockind)
                     mat = np.matmul(Cocc.T, np.matmul(mat, Cvir))
                     # 1e contribution
                     cjb = trial_mat[:, fockind].reshape(nocc, nvir)
