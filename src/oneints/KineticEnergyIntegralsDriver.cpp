@@ -257,9 +257,13 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
     
     auto ktcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
     
+    bool userpa2b = btcomps * ktcomps > 0;
+    
     auto rpa = (btcomps > 0) ? CMemBlock2D<double>(pdim, btcomps * pmax) : CMemBlock2D<double>();
     
     auto rpb = (ktcomps > 0) ? CMemBlock2D<double>(pdim, ktcomps * pmax) : CMemBlock2D<double>();
+    
+    auto rpa2b = (userpa2b) ? CMemBlock2D<double>(pdim, btcomps * ktcomps * pmax) : CMemBlock2D<double>();
     
     // allocate primitives and auxilary integrals buffer
     
@@ -285,6 +289,12 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
     
     bool symbk = (bragtos == ketgtos);
     
+    // set up primitive GTOs positions
+    
+    auto spos = braGtoBlock.getStartPositions();
+    
+    auto epos = braGtoBlock.getEndPositions();
+    
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
         // compute distances: R(AB) = A - B
@@ -303,10 +313,14 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
         
         intsfunc::compTensorsPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
         
+        // compute tensor products: R(PA) x P(PB)
+        
+        intsfunc::compTensorsProduct(rpa2b, rpa, rpb, btcomps, ktcomps, epos[i] - spos[i]);
+        
         // compite primitive kinetic energy integrals
         
-        _compPrimKineticEnergyInts(primbuffer, auxbuffer, rfacts, rab, rpa,
-                                   rpb, bragtos, ketgtos, i);
+        _compPrimKineticEnergyInts(primbuffer, auxbuffer, rfacts, rab, rpa, rpb, rpa2b,
+                                   bragtos, ketgtos, i);
         
         // contract primitive kinetic energy integrals
         
@@ -329,6 +343,7 @@ CKineticEnergyIntegralsDriver::_compPrimKineticEnergyInts(      CMemBlock2D<doub
                                                           const CMemBlock2D<double>&  abDistances,
                                                           const CMemBlock2D<double>&  paDistances,
                                                           const CMemBlock2D<double>&  pbDistances,
+                                                          const CMemBlock2D<double>&  pa2pbDistances,
                                                           const CGtoBlock&            braGtoBlock,
                                                           const CGtoBlock&            ketGtoBlock,
                                                           const int32_t               iContrGto) const
@@ -339,272 +354,247 @@ CKineticEnergyIntegralsDriver::_compPrimKineticEnergyInts(      CMemBlock2D<doub
     
     auto kang = ketGtoBlock.getAngularMomentum();
     
-    // compute (s|T|s) auxilary integrals
+    // compute (S|T|S) primitive integrals
     
-    kinrecfunc::compKineticEnergyForSS(primBuffer, auxBuffer, osFactors,
-                                       abDistances, braGtoBlock, ketGtoBlock,
-                                       iContrGto);
+    kinrecfunc::compKineticEnergyForSS(primBuffer, auxBuffer, osFactors, abDistances, 
+                                       braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (s|T|p) auxilary integrals
+    // compute (S|T|P) primitive integrals
     
     if ((bang == 0) && (kang == 1))
     {
-       kinrecfunc::compKineticEnergyForSP(primBuffer, auxBuffer, osFactors,
-                                          pbDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
+        kinrecfunc::compKineticEnergyForSP(primBuffer, auxBuffer, osFactors, pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (s|T|d) auxilary integrals
+    // compute (S|T|D) primitive integrals
     
     if ((bang == 0) && (kang == 2))
     {
-       kinrecfunc::compKineticEnergyForSD(primBuffer, auxBuffer, osFactors,
-                                          pbDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
+        kinrecfunc::compKineticEnergyForSD(primBuffer, auxBuffer, osFactors, pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (s|T|f) auxilary integrals
+    // compute (S|T|F) primitive integrals
     
     if ((bang == 0) && (kang == 3))
     {
-       kinrecfunc::compKineticEnergyForSF(primBuffer, auxBuffer, osFactors,
-                                          pbDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
+        kinrecfunc::compKineticEnergyForSF(primBuffer, auxBuffer, osFactors, pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (s|T|g) auxilary integrals
+    // compute (S|T|G) primitive integrals
     
     if ((bang == 0) && (kang == 4))
     {
-       kinrecfunc::compKineticEnergyForSG(primBuffer, auxBuffer, osFactors,
-                                          pbDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
+        kinrecfunc::compKineticEnergyForSG(primBuffer, auxBuffer, osFactors, pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (p|T|s) auxilary integrals
+    // compute (P|T|S) primitive integrals
     
     if ((bang == 1) && (kang == 0))
     {
-       kinrecfunc::compKineticEnergyForPS(primBuffer, auxBuffer, osFactors,
-                                          paDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
+        kinrecfunc::compKineticEnergyForPS(primBuffer, auxBuffer, osFactors, paDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (d|T|s) auxilary integrals
-    
-    if ((bang == 2) && (kang == 0))
-    {
-       kinrecfunc::compKineticEnergyForDS(primBuffer, auxBuffer, osFactors,
-                                          paDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
-        
-        return;
-    }
-    
-    // compute (f|T|s) auxilary integrals
-    
-    if ((bang == 3) && (kang == 0))
-    {
-       kinrecfunc::compKineticEnergyForFS(primBuffer, auxBuffer, osFactors,
-                                          paDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
-        
-        return;
-    }
-    
-    // compute (g|T|s) auxilary integrals
-    
-    if ((bang == 4) && (kang == 0))
-    {
-       kinrecfunc::compKineticEnergyForGS(primBuffer, auxBuffer, osFactors,
-                                          paDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
-        
-        return;
-    }
-    
-    // compute (p|T|p) auxilary integrals
+    // compute (P|T|P) primitive integrals
     
     if ((bang == 1) && (kang == 1))
     {
-        kinrecfunc::compKineticEnergyForPP(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForPP(primBuffer, auxBuffer, osFactors, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (p|T|d) auxilary integrals
+    // compute (P|T|D) primitive integrals
     
     if ((bang == 1) && (kang == 2))
     {
-        kinrecfunc::compKineticEnergyForPD(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForPD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (d|T|p) auxilary integrals
-    
-    if ((bang == 2) && (kang == 1))
-    {
-        kinrecfunc::compKineticEnergyForDP(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (p|T|f) auxilary integrals
+    // compute (P|T|F) primitive integrals
     
     if ((bang == 1) && (kang == 3))
     {
-        kinrecfunc::compKineticEnergyForPF(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForPF(primBuffer, auxBuffer, osFactors, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f|T|p) auxilary integrals
-    
-    if ((bang == 3) && (kang == 1))
-    {
-        kinrecfunc::compKineticEnergyForFP(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (p|T|g) auxilary integrals
+    // compute (P|T|G) primitive integrals
     
     if ((bang == 1) && (kang == 4))
     {
-        kinrecfunc::compKineticEnergyForPG(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForPG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g|T|p) auxilary integrals
+    // compute (D|T|S) primitive integrals
     
-    if ((bang == 4) && (kang == 1))
+    if ((bang == 2) && (kang == 0))
     {
-        kinrecfunc::compKineticEnergyForGP(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForDS(primBuffer, auxBuffer, osFactors, paDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (d|T|d) auxilary integrals
+    // compute (D|T|P) primitive integrals
+    
+    if ((bang == 2) && (kang == 1))
+    {
+        kinrecfunc::compKineticEnergyForDP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (D|T|D) primitive integrals
     
     if ((bang == 2) && (kang == 2))
     {
-        kinrecfunc::compKineticEnergyForDD(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForDD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (d|T|f) auxilary integrals
+    // compute (D|T|F) primitive integrals
     
     if ((bang == 2) && (kang == 3))
     {
-        kinrecfunc::compKineticEnergyForDF(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForDF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f|T|d) auxilary integrals
-    
-    if ((bang == 3) && (kang == 2))
-    {
-        kinrecfunc::compKineticEnergyForFD(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (d|T|g) auxilary integrals
+    // compute (D|T|G) primitive integrals
     
     if ((bang == 2) && (kang == 4))
     {
-        kinrecfunc::compKineticEnergyForDG(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForDG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g|T|d) auxilary integrals
+    // compute (F|T|S) primitive integrals
     
-    if ((bang == 4) && (kang == 2))
+    if ((bang == 3) && (kang == 0))
     {
-        kinrecfunc::compKineticEnergyForGD(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForFS(primBuffer, auxBuffer, osFactors, paDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f|T|f) auxilary integrals
+    // compute (F|T|P) primitive integrals
+    
+    if ((bang == 3) && (kang == 1))
+    {
+        kinrecfunc::compKineticEnergyForFP(primBuffer, auxBuffer, osFactors, paDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (F|T|D) primitive integrals
+    
+    if ((bang == 3) && (kang == 2))
+    {
+        kinrecfunc::compKineticEnergyForFD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (F|T|F) primitive integrals
     
     if ((bang == 3) && (kang == 3))
     {
-        kinrecfunc::compKineticEnergyForFF(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForFF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f|T|g) auxilary integrals
+    // compute (F|T|G) primitive integrals
     
     if ((bang == 3) && (kang == 4))
     {
-        kinrecfunc::compKineticEnergyForFG(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForFG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g|T|f) auxilary integrals
+    // compute (G|T|S) primitive integrals
+    
+    if ((bang == 4) && (kang == 0))
+    {
+        kinrecfunc::compKineticEnergyForGS(primBuffer, auxBuffer, osFactors, paDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (G|T|P) primitive integrals
+    
+    if ((bang == 4) && (kang == 1))
+    {
+        kinrecfunc::compKineticEnergyForGP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (G|T|D) primitive integrals
+    
+    if ((bang == 4) && (kang == 2))
+    {
+        kinrecfunc::compKineticEnergyForGD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (G|T|F) primitive integrals
     
     if ((bang == 4) && (kang == 3))
     {
-        kinrecfunc::compKineticEnergyForGF(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForGF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g|T|g) auxilary integrals
+    // compute (G|T|G) primitive integrals
     
     if ((bang == 4) && (kang == 4))
     {
-        kinrecfunc::compKineticEnergyForGG(primBuffer, auxBuffer, osFactors,
-                                           paDistances, pbDistances, braGtoBlock,
-                                           ketGtoBlock, iContrGto);
+        kinrecfunc::compKineticEnergyForGG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                           braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }

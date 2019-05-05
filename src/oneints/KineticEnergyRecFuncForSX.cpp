@@ -81,7 +81,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                 
                 s_0_0[j] = fb * knorm[j] * std::pow(fpi * fx[j], 1.5)
                 
-                         * std::exp(-fz[j] * r2ab);
+                * std::exp(-fz[j] * r2ab);
                 
                 t_0_0[j] = fz[j] * (3.0 - 2.0 * fz[j] * r2ab) * s_0_0[j];
             }
@@ -121,7 +121,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fz = osFactors.data(4 * idx + 1);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
@@ -156,15 +156,15 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_0_x[j] = fl_s_0_0 * pb_x[j];
 
-                t_0_x[j] += fl_r_0_0 * 2.0 * fl1_fz * pb_x[j];
+                t_0_x[j] += fl_r_0_0 * 2.0 * pb_x[j] * fl1_fz;
 
                 t_0_y[j] = fl_s_0_0 * pb_y[j];
 
-                t_0_y[j] += fl_r_0_0 * 2.0 * fl1_fz * pb_y[j];
+                t_0_y[j] += fl_r_0_0 * 2.0 * pb_y[j] * fl1_fz;
 
                 t_0_z[j] = fl_s_0_0 * pb_z[j];
 
-                t_0_z[j] += fl_r_0_0 * 2.0 * fl1_fz * pb_z[j];
+                t_0_z[j] += fl_r_0_0 * 2.0 * pb_z[j] * fl1_fz;
             }
 
             idx++;
@@ -202,7 +202,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fz = osFactors.data(4 * idx + 1);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(3 * idx);
 
@@ -237,15 +237,15 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_x_0[j] = fl_s_0_0 * pa_x[j];
 
-                t_x_0[j] += fl_r_0_0 * 2.0 * fl1_fz * pa_x[j];
+                t_x_0[j] += fl_r_0_0 * 2.0 * pa_x[j] * fl1_fz;
 
                 t_y_0[j] = fl_s_0_0 * pa_y[j];
 
-                t_y_0[j] += fl_r_0_0 * 2.0 * fl1_fz * pa_y[j];
+                t_y_0[j] += fl_r_0_0 * 2.0 * pa_y[j] * fl1_fz;
 
                 t_z_0[j] = fl_s_0_0 * pa_z[j];
 
-                t_z_0[j] += fl_r_0_0 * 2.0 * fl1_fz * pa_z[j];
+                t_z_0[j] += fl_r_0_0 * 2.0 * pa_z[j] * fl1_fz;
             }
 
             idx++;
@@ -287,9 +287,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
-
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_xx = pbDistances.data(9 * idx + 3);
 
@@ -403,9 +401,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            // set up pointers to 2-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_xx = paDistances.data(9 * idx + 3);
 
@@ -519,17 +515,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(19 * idx);
 
             auto pb_y = pbDistances.data(19 * idx + 1);
 
             auto pb_z = pbDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
-
-            // set up pointers to 3-th order tensor of distance R(PB)
 
             auto pb_xxx = pbDistances.data(19 * idx + 9);
 
@@ -600,13 +592,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_0_xxx[j] += fl_r_0_0 * (-3.0 * pb_x[j] * fl1_fz * fl1_fgb + 6.0 * pb_x[j] * fl1_fz * fl1_fx + 6.0 * pb_xxx[j] * fl1_fz);
 
-                t_0_xxy[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_y[j] + pb_xxy[j]);
+                t_0_xxy[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pb_xxy[j]);
 
-                t_0_xxy[j] += fl_r_0_0 * (-fl1_fz * fl1_fgb * pb_y[j] + 2.0 * fl1_fx * fl1_fz * pb_y[j] + 6.0 * pb_xxy[j] * fl1_fz);
+                t_0_xxy[j] += fl_r_0_0 * (-pb_y[j] * fl1_fz * fl1_fgb + 2.0 * pb_y[j] * fl1_fx * fl1_fz + 6.0 * pb_xxy[j] * fl1_fz);
 
-                t_0_xxz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pb_xxz[j]);
+                t_0_xxz[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pb_xxz[j]);
 
-                t_0_xxz[j] += fl_r_0_0 * (-fl1_fz * fl1_fgb * pb_z[j] + 2.0 * fl1_fx * fl1_fz * pb_z[j] + 6.0 * pb_xxz[j] * fl1_fz);
+                t_0_xxz[j] += fl_r_0_0 * (-pb_z[j] * fl1_fz * fl1_fgb + 2.0 * pb_z[j] * fl1_fx * fl1_fz + 6.0 * pb_xxz[j] * fl1_fz);
 
                 t_0_xyy[j] = fl_s_0_0 * (0.5 * pb_x[j] * fl1_fx + pb_xyy[j]);
 
@@ -624,9 +616,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_0_yyy[j] += fl_r_0_0 * (-3.0 * pb_y[j] * fl1_fz * fl1_fgb + 6.0 * pb_y[j] * fl1_fz * fl1_fx + 6.0 * pb_yyy[j] * fl1_fz);
 
-                t_0_yyz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pb_yyz[j]);
+                t_0_yyz[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pb_yyz[j]);
 
-                t_0_yyz[j] += fl_r_0_0 * (-fl1_fz * fl1_fgb * pb_z[j] + 2.0 * fl1_fx * fl1_fz * pb_z[j] + 6.0 * pb_yyz[j] * fl1_fz);
+                t_0_yyz[j] += fl_r_0_0 * (-pb_z[j] * fl1_fz * fl1_fgb + 2.0 * pb_z[j] * fl1_fx * fl1_fz + 6.0 * pb_yyz[j] * fl1_fz);
 
                 t_0_yzz[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pb_yzz[j]);
 
@@ -676,17 +668,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(19 * idx);
 
             auto pa_y = paDistances.data(19 * idx + 1);
 
             auto pa_z = paDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            // set up pointers to 3-th order tensor of distance R(PA)
 
             auto pa_xxx = paDistances.data(19 * idx + 9);
 
@@ -757,13 +745,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_xxx_0[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fz * fl1_fga + 6.0 * pa_x[j] * fl1_fz * fl1_fx + 6.0 * pa_xxx[j] * fl1_fz);
 
-                t_xxy_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_y[j] + pa_xxy[j]);
+                t_xxy_0[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa_xxy[j]);
 
-                t_xxy_0[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_y[j] + 2.0 * fl1_fx * fl1_fz * pa_y[j] + 6.0 * pa_xxy[j] * fl1_fz);
+                t_xxy_0[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fga + 2.0 * pa_y[j] * fl1_fx * fl1_fz + 6.0 * pa_xxy[j] * fl1_fz);
 
-                t_xxz_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] + pa_xxz[j]);
+                t_xxz_0[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa_xxz[j]);
 
-                t_xxz_0[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_z[j] + 2.0 * fl1_fx * fl1_fz * pa_z[j] + 6.0 * pa_xxz[j] * fl1_fz);
+                t_xxz_0[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fga + 2.0 * pa_z[j] * fl1_fx * fl1_fz + 6.0 * pa_xxz[j] * fl1_fz);
 
                 t_xyy_0[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa_xyy[j]);
 
@@ -781,9 +769,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_yyy_0[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fz * fl1_fga + 6.0 * pa_y[j] * fl1_fz * fl1_fx + 6.0 * pa_yyy[j] * fl1_fz);
 
-                t_yyz_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] + pa_yyz[j]);
+                t_yyz_0[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa_yyz[j]);
 
-                t_yyz_0[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_z[j] + 2.0 * fl1_fx * fl1_fz * pa_z[j] + 6.0 * pa_yyz[j] * fl1_fz);
+                t_yyz_0[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fga + 2.0 * pa_z[j] * fl1_fx * fl1_fz + 6.0 * pa_yyz[j] * fl1_fz);
 
                 t_yzz_0[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa_yzz[j]);
 
@@ -833,9 +821,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
-
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_xx = pbDistances.data(34 * idx + 3);
 
@@ -848,10 +834,6 @@ namespace kinrecfunc { // kinrecfunc namespace
             auto pb_yz = pbDistances.data(34 * idx + 7);
 
             auto pb_zz = pbDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PB)
-
-            // set up pointers to 4-th order tensor of distance R(PB)
 
             auto pb_xxxx = pbDistances.data(34 * idx + 19);
 
@@ -954,17 +936,17 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_0_xxxz[j] += fl_r_0_0 * (-3.0 * pb_xz[j] * fl1_fz * fl1_fgb + 9.0 * pb_xz[j] * fl1_fx * fl1_fz + 8.0 * pb_xxxz[j] * fl1_fz);
 
-                t_0_xxyy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * fl1_fx * pb_yy[j] + pb_xxyy[j]);
+                t_0_xxyy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * pb_yy[j] * fl1_fx + pb_xxyy[j]);
 
-                t_0_xxyy[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fgb - pb_xx[j] * fl1_fz * fl1_fgb + fl2_fx * fl1_fz - fl1_fz * fl1_fgb * pb_yy[j] + 3.0 * pb_xx[j] * fl1_fz * fl1_fx + 3.0 * fl1_fx * pb_yy[j] * fl1_fz + 8.0 * pb_xxyy[j] * fl1_fz);
+                t_0_xxyy[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fgb - pb_xx[j] * fl1_fz * fl1_fgb + fl2_fx * fl1_fz - pb_yy[j] * fl1_fz * fl1_fgb + 3.0 * pb_xx[j] * fl1_fz * fl1_fx + 3.0 * pb_yy[j] * fl1_fx * fl1_fz + 8.0 * pb_xxyy[j] * fl1_fz);
 
-                t_0_xxyz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_yz[j] + pb_xxyz[j]);
+                t_0_xxyz[j] = fl_s_0_0 * (0.5 * pb_yz[j] * fl1_fx + pb_xxyz[j]);
 
-                t_0_xxyz[j] += fl_r_0_0 * (-fl1_fz * fl1_fgb * pb_yz[j] + 3.0 * fl1_fx * pb_yz[j] * fl1_fz + 8.0 * pb_xxyz[j] * fl1_fz);
+                t_0_xxyz[j] += fl_r_0_0 * (-pb_yz[j] * fl1_fz * fl1_fgb + 3.0 * pb_yz[j] * fl1_fx * fl1_fz + 8.0 * pb_xxyz[j] * fl1_fz);
 
-                t_0_xxzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pb_xxzz[j]);
+                t_0_xxzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_xx[j] * fl1_fx + 0.5 * pb_zz[j] * fl1_fx + pb_xxzz[j]);
 
-                t_0_xxzz[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fgb - pb_xx[j] * fl1_fz * fl1_fgb + fl2_fx * fl1_fz - fl1_fz * fl1_fgb * pb_zz[j] + 3.0 * pb_xx[j] * fl1_fz * fl1_fx + 3.0 * fl1_fx * pb_zz[j] * fl1_fz + 8.0 * pb_xxzz[j] * fl1_fz);
+                t_0_xxzz[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fgb - pb_xx[j] * fl1_fz * fl1_fgb + fl2_fx * fl1_fz - pb_zz[j] * fl1_fz * fl1_fgb + 3.0 * pb_xx[j] * fl1_fz * fl1_fx + 3.0 * pb_zz[j] * fl1_fx * fl1_fz + 8.0 * pb_xxzz[j] * fl1_fz);
 
                 t_0_xyyy[j] = fl_s_0_0 * (1.5 * pb_xy[j] * fl1_fx + pb_xyyy[j]);
 
@@ -990,9 +972,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_0_yyyz[j] += fl_r_0_0 * (-3.0 * pb_yz[j] * fl1_fz * fl1_fgb + 9.0 * pb_yz[j] * fl1_fx * fl1_fz + 8.0 * pb_yyyz[j] * fl1_fz);
 
-                t_0_yyzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_yy[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pb_yyzz[j]);
+                t_0_yyzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pb_yy[j] * fl1_fx + 0.5 * pb_zz[j] * fl1_fx + pb_yyzz[j]);
 
-                t_0_yyzz[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fgb - pb_yy[j] * fl1_fz * fl1_fgb + fl2_fx * fl1_fz - fl1_fz * fl1_fgb * pb_zz[j] + 3.0 * pb_yy[j] * fl1_fz * fl1_fx + 3.0 * fl1_fx * pb_zz[j] * fl1_fz + 8.0 * pb_yyzz[j] * fl1_fz);
+                t_0_yyzz[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fgb - pb_yy[j] * fl1_fz * fl1_fgb + fl2_fx * fl1_fz - pb_zz[j] * fl1_fz * fl1_fgb + 3.0 * pb_yy[j] * fl1_fz * fl1_fx + 3.0 * pb_zz[j] * fl1_fx * fl1_fz + 8.0 * pb_yyzz[j] * fl1_fz);
 
                 t_0_yzzz[j] = fl_s_0_0 * (1.5 * pb_yz[j] * fl1_fx + pb_yzzz[j]);
 
@@ -1042,9 +1024,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            // set up pointers to 2-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_xx = paDistances.data(34 * idx + 3);
 
@@ -1057,10 +1037,6 @@ namespace kinrecfunc { // kinrecfunc namespace
             auto pa_yz = paDistances.data(34 * idx + 7);
 
             auto pa_zz = paDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PA)
-
-            // set up pointers to 4-th order tensor of distance R(PA)
 
             auto pa_xxxx = paDistances.data(34 * idx + 19);
 
@@ -1163,17 +1139,17 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_xxxz_0[j] += fl_r_0_0 * (-3.0 * pa_xz[j] * fl1_fz * fl1_fga + 9.0 * pa_xz[j] * fl1_fx * fl1_fz + 8.0 * pa_xxxz[j] * fl1_fz);
 
-                t_xxyy_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_yy[j] + pa_xxyy[j]);
+                t_xxyy_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * pa_yy[j] * fl1_fx + pa_xxyy[j]);
 
-                t_xxyy_0[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga - pa_xx[j] * fl1_fz * fl1_fga + fl2_fx * fl1_fz - fl1_fz * fl1_fga * pa_yy[j] + 3.0 * pa_xx[j] * fl1_fz * fl1_fx + 3.0 * fl1_fx * pa_yy[j] * fl1_fz + 8.0 * pa_xxyy[j] * fl1_fz);
+                t_xxyy_0[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga - pa_xx[j] * fl1_fz * fl1_fga + fl2_fx * fl1_fz - pa_yy[j] * fl1_fz * fl1_fga + 3.0 * pa_xx[j] * fl1_fz * fl1_fx + 3.0 * pa_yy[j] * fl1_fx * fl1_fz + 8.0 * pa_xxyy[j] * fl1_fz);
 
-                t_xxyz_0[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_yz[j] + pa_xxyz[j]);
+                t_xxyz_0[j] = fl_s_0_0 * (0.5 * pa_yz[j] * fl1_fx + pa_xxyz[j]);
 
-                t_xxyz_0[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_yz[j] + 3.0 * fl1_fx * pa_yz[j] * fl1_fz + 8.0 * pa_xxyz[j] * fl1_fz);
+                t_xxyz_0[j] += fl_r_0_0 * (-pa_yz[j] * fl1_fz * fl1_fga + 3.0 * pa_yz[j] * fl1_fx * fl1_fz + 8.0 * pa_xxyz[j] * fl1_fz);
 
-                t_xxzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_zz[j] + pa_xxzz[j]);
+                t_xxzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * pa_zz[j] * fl1_fx + pa_xxzz[j]);
 
-                t_xxzz_0[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga - pa_xx[j] * fl1_fz * fl1_fga + fl2_fx * fl1_fz - fl1_fz * fl1_fga * pa_zz[j] + 3.0 * pa_xx[j] * fl1_fz * fl1_fx + 3.0 * fl1_fx * pa_zz[j] * fl1_fz + 8.0 * pa_xxzz[j] * fl1_fz);
+                t_xxzz_0[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga - pa_xx[j] * fl1_fz * fl1_fga + fl2_fx * fl1_fz - pa_zz[j] * fl1_fz * fl1_fga + 3.0 * pa_xx[j] * fl1_fz * fl1_fx + 3.0 * pa_zz[j] * fl1_fx * fl1_fz + 8.0 * pa_xxzz[j] * fl1_fz);
 
                 t_xyyy_0[j] = fl_s_0_0 * (1.5 * pa_xy[j] * fl1_fx + pa_xyyy[j]);
 
@@ -1199,9 +1175,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 t_yyyz_0[j] += fl_r_0_0 * (-3.0 * pa_yz[j] * fl1_fz * fl1_fga + 9.0 * pa_yz[j] * fl1_fx * fl1_fz + 8.0 * pa_yyyz[j] * fl1_fz);
 
-                t_yyzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pa_zz[j] + pa_yyzz[j]);
+                t_yyzz_0[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * pa_zz[j] * fl1_fx + pa_yyzz[j]);
 
-                t_yyzz_0[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga - pa_yy[j] * fl1_fz * fl1_fga + fl2_fx * fl1_fz - fl1_fz * fl1_fga * pa_zz[j] + 3.0 * pa_yy[j] * fl1_fz * fl1_fx + 3.0 * fl1_fx * pa_zz[j] * fl1_fz + 8.0 * pa_yyzz[j] * fl1_fz);
+                t_yyzz_0[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga - pa_yy[j] * fl1_fz * fl1_fga + fl2_fx * fl1_fz - pa_zz[j] * fl1_fz * fl1_fga + 3.0 * pa_yy[j] * fl1_fz * fl1_fx + 3.0 * pa_zz[j] * fl1_fx * fl1_fz + 8.0 * pa_yyzz[j] * fl1_fz);
 
                 t_yzzz_0[j] = fl_s_0_0 * (1.5 * pa_yz[j] * fl1_fx + pa_yzzz[j]);
 

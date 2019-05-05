@@ -14,8 +14,7 @@ namespace kinrecfunc { // kinrecfunc namespace
     compKineticEnergyForPP(      CMemBlock2D<double>& primBuffer,
                            const CMemBlock2D<double>& auxBuffer,
                            const CMemBlock2D<double>& osFactors,
-                           const CMemBlock2D<double>& paDistances,
-                           const CMemBlock2D<double>& pbDistances,
+                           const CMemBlock2D<double>& pa2pbDistances,
                            const CGtoBlock&           braGtoBlock,
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
@@ -44,21 +43,25 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fz = osFactors.data(4 * idx + 1);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pa_x = paDistances.data(3 * idx);
+            auto pa2pb_x_x = pa2pbDistances.data(9 * idx);
 
-            auto pa_y = paDistances.data(3 * idx + 1);
+            auto pa2pb_x_y = pa2pbDistances.data(9 * idx + 1);
 
-            auto pa_z = paDistances.data(3 * idx + 2);
+            auto pa2pb_x_z = pa2pbDistances.data(9 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            auto pa2pb_y_x = pa2pbDistances.data(9 * idx + 3);
 
-            auto pb_x = pbDistances.data(3 * idx);
+            auto pa2pb_y_y = pa2pbDistances.data(9 * idx + 4);
 
-            auto pb_y = pbDistances.data(3 * idx + 1);
+            auto pa2pb_y_z = pa2pbDistances.data(9 * idx + 5);
 
-            auto pb_z = pbDistances.data(3 * idx + 2);
+            auto pa2pb_z_x = pa2pbDistances.data(9 * idx + 6);
+
+            auto pa2pb_z_y = pa2pbDistances.data(9 * idx + 7);
+
+            auto pa2pb_z_z = pa2pbDistances.data(9 * idx + 8);
 
             // set up pointers to auxilary integrals
 
@@ -88,8 +91,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (0,9)
 
-            #pragma omp simd aligned(fx, fz, pa_x, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_x_x, t_x_y, t_x_z, t_y_x, \
-                                     t_y_y, t_y_z, t_z_x, t_z_y, t_z_z: VLX_ALIGN)
+            #pragma omp simd aligned(fx, fz, pa2pb_x_x, pa2pb_x_y, pa2pb_x_z, pa2pb_y_x, pa2pb_y_y, pa2pb_y_z, \
+                                     pa2pb_z_x, pa2pb_z_y, pa2pb_z_z, r_0_0, s_0_0, t_x_x, t_x_y, t_x_z, t_y_x, t_y_y, t_y_z, \
+                                     t_z_x, t_z_y, t_z_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -100,41 +104,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl1_fz = fz[j];
 
-                t_x_x[j] = fl_s_0_0 * (0.5 * fl1_fx + pa_x[j] * pb_x[j]);
+                t_x_x[j] = fl_s_0_0 * (0.5 * fl1_fx + pa2pb_x_x[j]);
 
-                t_x_x[j] += fl_r_0_0 * (fl1_fz * fl1_fx + 4.0 * fl1_fz * pa_x[j] * pb_x[j]);
+                t_x_x[j] += fl_r_0_0 * (fl1_fz * fl1_fx + 4.0 * pa2pb_x_x[j] * fl1_fz);
 
-                t_x_y[j] = fl_s_0_0 * pa_x[j] * pb_y[j];
+                t_x_y[j] = fl_s_0_0 * pa2pb_x_y[j];
 
-                t_x_y[j] += fl_r_0_0 * 4.0 * fl1_fz * pa_x[j] * pb_y[j];
+                t_x_y[j] += fl_r_0_0 * 4.0 * pa2pb_x_y[j] * fl1_fz;
 
-                t_x_z[j] = fl_s_0_0 * pa_x[j] * pb_z[j];
+                t_x_z[j] = fl_s_0_0 * pa2pb_x_z[j];
 
-                t_x_z[j] += fl_r_0_0 * 4.0 * fl1_fz * pa_x[j] * pb_z[j];
+                t_x_z[j] += fl_r_0_0 * 4.0 * pa2pb_x_z[j] * fl1_fz;
 
-                t_y_x[j] = fl_s_0_0 * pa_y[j] * pb_x[j];
+                t_y_x[j] = fl_s_0_0 * pa2pb_y_x[j];
 
-                t_y_x[j] += fl_r_0_0 * 4.0 * fl1_fz * pa_y[j] * pb_x[j];
+                t_y_x[j] += fl_r_0_0 * 4.0 * pa2pb_y_x[j] * fl1_fz;
 
-                t_y_y[j] = fl_s_0_0 * (0.5 * fl1_fx + pa_y[j] * pb_y[j]);
+                t_y_y[j] = fl_s_0_0 * (0.5 * fl1_fx + pa2pb_y_y[j]);
 
-                t_y_y[j] += fl_r_0_0 * (fl1_fz * fl1_fx + 4.0 * fl1_fz * pa_y[j] * pb_y[j]);
+                t_y_y[j] += fl_r_0_0 * (fl1_fz * fl1_fx + 4.0 * pa2pb_y_y[j] * fl1_fz);
 
-                t_y_z[j] = fl_s_0_0 * pa_y[j] * pb_z[j];
+                t_y_z[j] = fl_s_0_0 * pa2pb_y_z[j];
 
-                t_y_z[j] += fl_r_0_0 * 4.0 * fl1_fz * pa_y[j] * pb_z[j];
+                t_y_z[j] += fl_r_0_0 * 4.0 * pa2pb_y_z[j] * fl1_fz;
 
-                t_z_x[j] = fl_s_0_0 * pa_z[j] * pb_x[j];
+                t_z_x[j] = fl_s_0_0 * pa2pb_z_x[j];
 
-                t_z_x[j] += fl_r_0_0 * 4.0 * fl1_fz * pa_z[j] * pb_x[j];
+                t_z_x[j] += fl_r_0_0 * 4.0 * pa2pb_z_x[j] * fl1_fz;
 
-                t_z_y[j] = fl_s_0_0 * pa_z[j] * pb_y[j];
+                t_z_y[j] = fl_s_0_0 * pa2pb_z_y[j];
 
-                t_z_y[j] += fl_r_0_0 * 4.0 * fl1_fz * pa_z[j] * pb_y[j];
+                t_z_y[j] += fl_r_0_0 * 4.0 * pa2pb_z_y[j] * fl1_fz;
 
-                t_z_z[j] = fl_s_0_0 * (0.5 * fl1_fx + pa_z[j] * pb_z[j]);
+                t_z_z[j] = fl_s_0_0 * (0.5 * fl1_fx + pa2pb_z_z[j]);
 
-                t_z_z[j] += fl_r_0_0 * (fl1_fz * fl1_fx + 4.0 * fl1_fz * pa_z[j] * pb_z[j]);
+                t_z_z[j] += fl_r_0_0 * (fl1_fz * fl1_fx + 4.0 * pa2pb_z_z[j] * fl1_fz);
             }
 
             idx++;
@@ -147,14 +151,15 @@ namespace kinrecfunc { // kinrecfunc namespace
                            const CMemBlock2D<double>& osFactors,
                            const CMemBlock2D<double>& paDistances,
                            const CMemBlock2D<double>& pbDistances,
+                           const CMemBlock2D<double>& pa2pbDistances,
                            const CGtoBlock&           braGtoBlock,
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
-        kinrecfunc::compKineticEnergyForPD_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPD_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForPD_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPD_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                 braGtoBlock, ketGtoBlock, iContrGto); 
     }
 
@@ -164,6 +169,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                const CMemBlock2D<double>& osFactors,
                                const CMemBlock2D<double>& paDistances,
                                const CMemBlock2D<double>& pbDistances,
+                               const CMemBlock2D<double>& pa2pbDistances,
                                const CGtoBlock&           braGtoBlock,
                                const CGtoBlock&           ketGtoBlock,
                                const int32_t              iContrGto)
@@ -194,13 +200,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(3 * idx);
 
             auto pa_y = paDistances.data(3 * idx + 1);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(9 * idx);
 
@@ -208,19 +214,25 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_z = pbDistances.data(9 * idx + 2);
 
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xx = pbDistances.data(9 * idx + 3);
+            auto pa2pb_x_xx = pa2pbDistances.data(27 * idx + 3);
 
-            auto pb_xy = pbDistances.data(9 * idx + 4);
+            auto pa2pb_x_xy = pa2pbDistances.data(27 * idx + 4);
 
-            auto pb_xz = pbDistances.data(9 * idx + 5);
+            auto pa2pb_x_xz = pa2pbDistances.data(27 * idx + 5);
 
-            auto pb_yy = pbDistances.data(9 * idx + 6);
+            auto pa2pb_x_yy = pa2pbDistances.data(27 * idx + 6);
 
-            auto pb_yz = pbDistances.data(9 * idx + 7);
+            auto pa2pb_x_yz = pa2pbDistances.data(27 * idx + 7);
 
-            auto pb_zz = pbDistances.data(9 * idx + 8);
+            auto pa2pb_x_zz = pa2pbDistances.data(27 * idx + 8);
+
+            auto pa2pb_y_xx = pa2pbDistances.data(27 * idx + 12);
+
+            auto pa2pb_y_xy = pa2pbDistances.data(27 * idx + 13);
+
+            auto pa2pb_y_xz = pa2pbDistances.data(27 * idx + 14);
 
             // set up pointers to auxilary integrals
 
@@ -250,8 +262,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (0,9)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_x, pa_y, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_yz, pb_z, pb_zz, \
-                                     r_0_0, s_0_0, t_x_xx, t_x_xy, t_x_xz, t_x_yy, t_x_yz, t_x_zz, t_y_xx, t_y_xy, t_y_xz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_x_xx, pa2pb_x_xy, pa2pb_x_xz, pa2pb_x_yy, pa2pb_x_yz, \
+                                     pa2pb_x_zz, pa2pb_y_xx, pa2pb_y_xy, pa2pb_y_xz, pa_x, pa_y, pb_x, pb_y, pb_z, r_0_0, s_0_0, \
+                                     t_x_xx, t_x_xy, t_x_xz, t_x_yy, t_x_yz, t_x_zz, t_y_xx, t_y_xy, t_y_xz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -264,41 +277,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl1_fz = fz[j];
 
-                t_x_xx[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + fl1_fx * pb_x[j] + pa_x[j] * pb_xx[j]);
+                t_x_xx[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pb_x[j] * fl1_fx + pa2pb_x_xx[j]);
 
-                t_x_xx[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_x[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_x[j] + 6.0 * fl1_fz * pa_x[j] * pb_xx[j]);
+                t_x_xx[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb + 2.0 * pa_x[j] * fl1_fz * fl1_fx + 4.0 * pb_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_x_xx[j] * fl1_fz);
 
-                t_x_xy[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_y[j] + pa_x[j] * pb_xy[j]);
+                t_x_xy[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pa2pb_x_xy[j]);
 
-                t_x_xy[j] += fl_r_0_0 * (2.0 * fl1_fz * fl1_fx * pb_y[j] + 6.0 * fl1_fz * pa_x[j] * pb_xy[j]);
+                t_x_xy[j] += fl_r_0_0 * (2.0 * pb_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_x_xy[j] * fl1_fz);
 
-                t_x_xz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pa_x[j] * pb_xz[j]);
+                t_x_xz[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pa2pb_x_xz[j]);
 
-                t_x_xz[j] += fl_r_0_0 * (2.0 * fl1_fz * fl1_fx * pb_z[j] + 6.0 * fl1_fz * pa_x[j] * pb_xz[j]);
+                t_x_xz[j] += fl_r_0_0 * (2.0 * pb_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_x_xz[j] * fl1_fz);
 
-                t_x_yy[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa_x[j] * pb_yy[j]);
+                t_x_yy[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa2pb_x_yy[j]);
 
-                t_x_yy[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_x[j] * fl1_fx + 6.0 * fl1_fz * pa_x[j] * pb_yy[j]);
+                t_x_yy[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb + 2.0 * pa_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_x_yy[j] * fl1_fz);
 
-                t_x_yz[j] = fl_s_0_0 * pa_x[j] * pb_yz[j];
+                t_x_yz[j] = fl_s_0_0 * pa2pb_x_yz[j];
 
-                t_x_yz[j] += fl_r_0_0 * 6.0 * fl1_fz * pa_x[j] * pb_yz[j];
+                t_x_yz[j] += fl_r_0_0 * 6.0 * pa2pb_x_yz[j] * fl1_fz;
 
-                t_x_zz[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa_x[j] * pb_zz[j]);
+                t_x_zz[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa2pb_x_zz[j]);
 
-                t_x_zz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_x[j] * fl1_fx + 6.0 * fl1_fz * pa_x[j] * pb_zz[j]);
+                t_x_zz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb + 2.0 * pa_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_x_zz[j] * fl1_fz);
 
-                t_y_xx[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa_y[j] * pb_xx[j]);
+                t_y_xx[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa2pb_y_xx[j]);
 
-                t_y_xx[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_y[j] * fl1_fx + 6.0 * fl1_fz * pa_y[j] * pb_xx[j]);
+                t_y_xx[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb + 2.0 * pa_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_y_xx[j] * fl1_fz);
 
-                t_y_xy[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_x[j] + pa_y[j] * pb_xy[j]);
+                t_y_xy[j] = fl_s_0_0 * (0.5 * pb_x[j] * fl1_fx + pa2pb_y_xy[j]);
 
-                t_y_xy[j] += fl_r_0_0 * (2.0 * fl1_fz * fl1_fx * pb_x[j] + 6.0 * fl1_fz * pa_y[j] * pb_xy[j]);
+                t_y_xy[j] += fl_r_0_0 * (2.0 * pb_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_y_xy[j] * fl1_fz);
 
-                t_y_xz[j] = fl_s_0_0 * pa_y[j] * pb_xz[j];
+                t_y_xz[j] = fl_s_0_0 * pa2pb_y_xz[j];
 
-                t_y_xz[j] += fl_r_0_0 * 6.0 * fl1_fz * pa_y[j] * pb_xz[j];
+                t_y_xz[j] += fl_r_0_0 * 6.0 * pa2pb_y_xz[j] * fl1_fz;
             }
 
             idx++;
@@ -311,6 +324,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto)
@@ -341,13 +355,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_y = paDistances.data(3 * idx + 1);
 
             auto pa_z = paDistances.data(3 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(9 * idx);
 
@@ -355,19 +369,25 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_z = pbDistances.data(9 * idx + 2);
 
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xx = pbDistances.data(9 * idx + 3);
+            auto pa2pb_y_yy = pa2pbDistances.data(27 * idx + 15);
 
-            auto pb_xy = pbDistances.data(9 * idx + 4);
+            auto pa2pb_y_yz = pa2pbDistances.data(27 * idx + 16);
 
-            auto pb_xz = pbDistances.data(9 * idx + 5);
+            auto pa2pb_y_zz = pa2pbDistances.data(27 * idx + 17);
 
-            auto pb_yy = pbDistances.data(9 * idx + 6);
+            auto pa2pb_z_xx = pa2pbDistances.data(27 * idx + 21);
 
-            auto pb_yz = pbDistances.data(9 * idx + 7);
+            auto pa2pb_z_xy = pa2pbDistances.data(27 * idx + 22);
 
-            auto pb_zz = pbDistances.data(9 * idx + 8);
+            auto pa2pb_z_xz = pa2pbDistances.data(27 * idx + 23);
+
+            auto pa2pb_z_yy = pa2pbDistances.data(27 * idx + 24);
+
+            auto pa2pb_z_yz = pa2pbDistances.data(27 * idx + 25);
+
+            auto pa2pb_z_zz = pa2pbDistances.data(27 * idx + 26);
 
             // set up pointers to auxilary integrals
 
@@ -397,8 +417,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (9,18)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_y, pa_z, pb_x, pb_xx, pb_xy, pb_xz, pb_y, pb_yy, pb_yz, pb_z, pb_zz, \
-                                     r_0_0, s_0_0, t_y_yy, t_y_yz, t_y_zz, t_z_xx, t_z_xy, t_z_xz, t_z_yy, t_z_yz, t_z_zz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_y_yy, pa2pb_y_yz, pa2pb_y_zz, pa2pb_z_xx, pa2pb_z_xy, \
+                                     pa2pb_z_xz, pa2pb_z_yy, pa2pb_z_yz, pa2pb_z_zz, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, \
+                                     t_y_yy, t_y_yz, t_y_zz, t_z_xx, t_z_xy, t_z_xz, t_z_yy, t_z_yz, t_z_zz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -411,41 +432,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl1_fz = fz[j];
 
-                t_y_yy[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + fl1_fx * pb_y[j] + pa_y[j] * pb_yy[j]);
+                t_y_yy[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pb_y[j] * fl1_fx + pa2pb_y_yy[j]);
 
-                t_y_yy[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_y[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_y[j] + 6.0 * fl1_fz * pa_y[j] * pb_yy[j]);
+                t_y_yy[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb + 2.0 * pa_y[j] * fl1_fz * fl1_fx + 4.0 * pb_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_y_yy[j] * fl1_fz);
 
-                t_y_yz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pa_y[j] * pb_yz[j]);
+                t_y_yz[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pa2pb_y_yz[j]);
 
-                t_y_yz[j] += fl_r_0_0 * (2.0 * fl1_fz * fl1_fx * pb_z[j] + 6.0 * fl1_fz * pa_y[j] * pb_yz[j]);
+                t_y_yz[j] += fl_r_0_0 * (2.0 * pb_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_y_yz[j] * fl1_fz);
 
-                t_y_zz[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa_y[j] * pb_zz[j]);
+                t_y_zz[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa2pb_y_zz[j]);
 
-                t_y_zz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_y[j] * fl1_fx + 6.0 * fl1_fz * pa_y[j] * pb_zz[j]);
+                t_y_zz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb + 2.0 * pa_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_y_zz[j] * fl1_fz);
 
-                t_z_xx[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa_z[j] * pb_xx[j]);
+                t_z_xx[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa2pb_z_xx[j]);
 
-                t_z_xx[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_z[j] * fl1_fx + 6.0 * fl1_fz * pa_z[j] * pb_xx[j]);
+                t_z_xx[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fgb + 2.0 * pa_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_z_xx[j] * fl1_fz);
 
-                t_z_xy[j] = fl_s_0_0 * pa_z[j] * pb_xy[j];
+                t_z_xy[j] = fl_s_0_0 * pa2pb_z_xy[j];
 
-                t_z_xy[j] += fl_r_0_0 * 6.0 * fl1_fz * pa_z[j] * pb_xy[j];
+                t_z_xy[j] += fl_r_0_0 * 6.0 * pa2pb_z_xy[j] * fl1_fz;
 
-                t_z_xz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_x[j] + pa_z[j] * pb_xz[j]);
+                t_z_xz[j] = fl_s_0_0 * (0.5 * pb_x[j] * fl1_fx + pa2pb_z_xz[j]);
 
-                t_z_xz[j] += fl_r_0_0 * (2.0 * fl1_fz * fl1_fx * pb_x[j] + 6.0 * fl1_fz * pa_z[j] * pb_xz[j]);
+                t_z_xz[j] += fl_r_0_0 * (2.0 * pb_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_z_xz[j] * fl1_fz);
 
-                t_z_yy[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa_z[j] * pb_yy[j]);
+                t_z_yy[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa2pb_z_yy[j]);
 
-                t_z_yy[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_z[j] * fl1_fx + 6.0 * fl1_fz * pa_z[j] * pb_yy[j]);
+                t_z_yy[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fgb + 2.0 * pa_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_z_yy[j] * fl1_fz);
 
-                t_z_yz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_y[j] + pa_z[j] * pb_yz[j]);
+                t_z_yz[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pa2pb_z_yz[j]);
 
-                t_z_yz[j] += fl_r_0_0 * (2.0 * fl1_fz * fl1_fx * pb_y[j] + 6.0 * fl1_fz * pa_z[j] * pb_yz[j]);
+                t_z_yz[j] += fl_r_0_0 * (2.0 * pb_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_z_yz[j] * fl1_fz);
 
-                t_z_zz[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + fl1_fx * pb_z[j] + pa_z[j] * pb_zz[j]);
+                t_z_zz[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pb_z[j] * fl1_fx + pa2pb_z_zz[j]);
 
-                t_z_zz[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fgb + 2.0 * fl1_fz * pa_z[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_z[j] + 6.0 * fl1_fz * pa_z[j] * pb_zz[j]);
+                t_z_zz[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fgb + 2.0 * pa_z[j] * fl1_fz * fl1_fx + 4.0 * pb_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_z_zz[j] * fl1_fz);
             }
 
             idx++;
@@ -458,14 +479,15 @@ namespace kinrecfunc { // kinrecfunc namespace
                            const CMemBlock2D<double>& osFactors,
                            const CMemBlock2D<double>& paDistances,
                            const CMemBlock2D<double>& pbDistances,
+                           const CMemBlock2D<double>& pa2pbDistances,
                            const CGtoBlock&           braGtoBlock,
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
-        kinrecfunc::compKineticEnergyForDP_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForDP_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForDP_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForDP_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                 braGtoBlock, ketGtoBlock, iContrGto); 
     }
 
@@ -475,6 +497,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                const CMemBlock2D<double>& osFactors,
                                const CMemBlock2D<double>& paDistances,
                                const CMemBlock2D<double>& pbDistances,
+                               const CMemBlock2D<double>& pa2pbDistances,
                                const CGtoBlock&           braGtoBlock,
                                const CGtoBlock&           ketGtoBlock,
                                const int32_t              iContrGto)
@@ -505,7 +528,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(9 * idx);
 
@@ -513,21 +536,33 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_z = paDistances.data(9 * idx + 2);
 
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            auto pa_xx = paDistances.data(9 * idx + 3);
-
-            auto pa_xy = paDistances.data(9 * idx + 4);
-
-            auto pa_xz = paDistances.data(9 * idx + 5);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
+
+            // set up pointers to tensors product of distances R(PA)xR(PB)
+
+            auto pa2pb_xx_x = pa2pbDistances.data(27 * idx + 9);
+
+            auto pa2pb_xx_y = pa2pbDistances.data(27 * idx + 10);
+
+            auto pa2pb_xx_z = pa2pbDistances.data(27 * idx + 11);
+
+            auto pa2pb_xy_x = pa2pbDistances.data(27 * idx + 12);
+
+            auto pa2pb_xy_y = pa2pbDistances.data(27 * idx + 13);
+
+            auto pa2pb_xy_z = pa2pbDistances.data(27 * idx + 14);
+
+            auto pa2pb_xz_x = pa2pbDistances.data(27 * idx + 15);
+
+            auto pa2pb_xz_y = pa2pbDistances.data(27 * idx + 16);
+
+            auto pa2pb_xz_z = pa2pbDistances.data(27 * idx + 17);
 
             // set up pointers to auxilary integrals
 
@@ -557,8 +592,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (0,9)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_x, pa_xx, pa_xy, pa_xz, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, \
-                                     t_xx_x, t_xx_y, t_xx_z, t_xy_x, t_xy_y, t_xy_z, t_xz_x, t_xz_y, t_xz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_xx_x, pa2pb_xx_y, pa2pb_xx_z, pa2pb_xy_x, pa2pb_xy_y, \
+                                     pa2pb_xy_z, pa2pb_xz_x, pa2pb_xz_y, pa2pb_xz_z, pa_x, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, \
+                                     s_0_0, t_xx_x, t_xx_y, t_xx_z, t_xy_x, t_xy_y, t_xy_z, t_xz_x, t_xz_y, t_xz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -571,41 +607,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl1_fz = fz[j];
 
-                t_xx_x[j] = fl_s_0_0 * (pa_x[j] * fl1_fx + 0.5 * fl1_fx * pb_x[j] + pa_xx[j] * pb_x[j]);
+                t_xx_x[j] = fl_s_0_0 * (pa_x[j] * fl1_fx + 0.5 * pb_x[j] * fl1_fx + pa2pb_xx_x[j]);
 
-                t_xx_x[j] += fl_r_0_0 * (4.0 * pa_x[j] * fl1_fz * fl1_fx - fl1_fz * fl1_fga * pb_x[j] + 2.0 * fl1_fz * fl1_fx * pb_x[j] + 6.0 * pa_xx[j] * fl1_fz * pb_x[j]);
+                t_xx_x[j] += fl_r_0_0 * (4.0 * pa_x[j] * fl1_fz * fl1_fx - pb_x[j] * fl1_fz * fl1_fga + 2.0 * pb_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_xx_x[j] * fl1_fz);
 
-                t_xx_y[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_y[j] + pa_xx[j] * pb_y[j]);
+                t_xx_y[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pa2pb_xx_y[j]);
 
-                t_xx_y[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pb_y[j] + 2.0 * fl1_fz * fl1_fx * pb_y[j] + 6.0 * pa_xx[j] * fl1_fz * pb_y[j]);
+                t_xx_y[j] += fl_r_0_0 * (-pb_y[j] * fl1_fz * fl1_fga + 2.0 * pb_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_xx_y[j] * fl1_fz);
 
-                t_xx_z[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pa_xx[j] * pb_z[j]);
+                t_xx_z[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pa2pb_xx_z[j]);
 
-                t_xx_z[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pb_z[j] + 2.0 * fl1_fz * fl1_fx * pb_z[j] + 6.0 * pa_xx[j] * fl1_fz * pb_z[j]);
+                t_xx_z[j] += fl_r_0_0 * (-pb_z[j] * fl1_fz * fl1_fga + 2.0 * pb_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_xx_z[j] * fl1_fz);
 
-                t_xy_x[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_y[j] + pa_xy[j] * pb_x[j]);
+                t_xy_x[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa2pb_xy_x[j]);
 
-                t_xy_x[j] += fl_r_0_0 * (2.0 * fl1_fx * fl1_fz * pa_y[j] + 6.0 * pa_xy[j] * fl1_fz * pb_x[j]);
+                t_xy_x[j] += fl_r_0_0 * (2.0 * pa_y[j] * fl1_fx * fl1_fz + 6.0 * pa2pb_xy_x[j] * fl1_fz);
 
-                t_xy_y[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa_xy[j] * pb_y[j]);
+                t_xy_y[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa2pb_xy_y[j]);
 
-                t_xy_y[j] += fl_r_0_0 * (2.0 * pa_x[j] * fl1_fz * fl1_fx + 6.0 * pa_xy[j] * fl1_fz * pb_y[j]);
+                t_xy_y[j] += fl_r_0_0 * (2.0 * pa_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_xy_y[j] * fl1_fz);
 
-                t_xy_z[j] = fl_s_0_0 * pa_xy[j] * pb_z[j];
+                t_xy_z[j] = fl_s_0_0 * pa2pb_xy_z[j];
 
-                t_xy_z[j] += fl_r_0_0 * 6.0 * pa_xy[j] * fl1_fz * pb_z[j];
+                t_xy_z[j] += fl_r_0_0 * 6.0 * pa2pb_xy_z[j] * fl1_fz;
 
-                t_xz_x[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] + pa_xz[j] * pb_x[j]);
+                t_xz_x[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa2pb_xz_x[j]);
 
-                t_xz_x[j] += fl_r_0_0 * (2.0 * fl1_fx * fl1_fz * pa_z[j] + 6.0 * pa_xz[j] * fl1_fz * pb_x[j]);
+                t_xz_x[j] += fl_r_0_0 * (2.0 * pa_z[j] * fl1_fx * fl1_fz + 6.0 * pa2pb_xz_x[j] * fl1_fz);
 
-                t_xz_y[j] = fl_s_0_0 * pa_xz[j] * pb_y[j];
+                t_xz_y[j] = fl_s_0_0 * pa2pb_xz_y[j];
 
-                t_xz_y[j] += fl_r_0_0 * 6.0 * pa_xz[j] * fl1_fz * pb_y[j];
+                t_xz_y[j] += fl_r_0_0 * 6.0 * pa2pb_xz_y[j] * fl1_fz;
 
-                t_xz_z[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa_xz[j] * pb_z[j]);
+                t_xz_z[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx + pa2pb_xz_z[j]);
 
-                t_xz_z[j] += fl_r_0_0 * (2.0 * pa_x[j] * fl1_fz * fl1_fx + 6.0 * pa_xz[j] * fl1_fz * pb_z[j]);
+                t_xz_z[j] += fl_r_0_0 * (2.0 * pa_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_xz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -618,6 +654,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto)
@@ -648,27 +685,39 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_y = paDistances.data(9 * idx + 1);
 
             auto pa_z = paDistances.data(9 * idx + 2);
 
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            auto pa_yy = paDistances.data(9 * idx + 6);
-
-            auto pa_yz = paDistances.data(9 * idx + 7);
-
-            auto pa_zz = paDistances.data(9 * idx + 8);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
+
+            // set up pointers to tensors product of distances R(PA)xR(PB)
+
+            auto pa2pb_yy_x = pa2pbDistances.data(27 * idx + 18);
+
+            auto pa2pb_yy_y = pa2pbDistances.data(27 * idx + 19);
+
+            auto pa2pb_yy_z = pa2pbDistances.data(27 * idx + 20);
+
+            auto pa2pb_yz_x = pa2pbDistances.data(27 * idx + 21);
+
+            auto pa2pb_yz_y = pa2pbDistances.data(27 * idx + 22);
+
+            auto pa2pb_yz_z = pa2pbDistances.data(27 * idx + 23);
+
+            auto pa2pb_zz_x = pa2pbDistances.data(27 * idx + 24);
+
+            auto pa2pb_zz_y = pa2pbDistances.data(27 * idx + 25);
+
+            auto pa2pb_zz_z = pa2pbDistances.data(27 * idx + 26);
 
             // set up pointers to auxilary integrals
 
@@ -698,8 +747,9 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (9,18)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_y, pa_yy, pa_yz, pa_z, pa_zz, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_yy_x, \
-                                     t_yy_y, t_yy_z, t_yz_x, t_yz_y, t_yz_z, t_zz_x, t_zz_y, t_zz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_yy_x, pa2pb_yy_y, pa2pb_yy_z, pa2pb_yz_x, pa2pb_yz_y, \
+                                     pa2pb_yz_z, pa2pb_zz_x, pa2pb_zz_y, pa2pb_zz_z, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, \
+                                     t_yy_x, t_yy_y, t_yy_z, t_yz_x, t_yz_y, t_yz_z, t_zz_x, t_zz_y, t_zz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -712,41 +762,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl1_fz = fz[j];
 
-                t_yy_x[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_x[j] + pa_yy[j] * pb_x[j]);
+                t_yy_x[j] = fl_s_0_0 * (0.5 * pb_x[j] * fl1_fx + pa2pb_yy_x[j]);
 
-                t_yy_x[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pb_x[j] + 2.0 * fl1_fz * fl1_fx * pb_x[j] + 6.0 * pa_yy[j] * fl1_fz * pb_x[j]);
+                t_yy_x[j] += fl_r_0_0 * (-pb_x[j] * fl1_fz * fl1_fga + 2.0 * pb_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_yy_x[j] * fl1_fz);
 
-                t_yy_y[j] = fl_s_0_0 * (pa_y[j] * fl1_fx + 0.5 * fl1_fx * pb_y[j] + pa_yy[j] * pb_y[j]);
+                t_yy_y[j] = fl_s_0_0 * (pa_y[j] * fl1_fx + 0.5 * pb_y[j] * fl1_fx + pa2pb_yy_y[j]);
 
-                t_yy_y[j] += fl_r_0_0 * (4.0 * pa_y[j] * fl1_fz * fl1_fx - fl1_fz * fl1_fga * pb_y[j] + 2.0 * fl1_fz * fl1_fx * pb_y[j] + 6.0 * pa_yy[j] * fl1_fz * pb_y[j]);
+                t_yy_y[j] += fl_r_0_0 * (4.0 * pa_y[j] * fl1_fz * fl1_fx - pb_y[j] * fl1_fz * fl1_fga + 2.0 * pb_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_yy_y[j] * fl1_fz);
 
-                t_yy_z[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_z[j] + pa_yy[j] * pb_z[j]);
+                t_yy_z[j] = fl_s_0_0 * (0.5 * pb_z[j] * fl1_fx + pa2pb_yy_z[j]);
 
-                t_yy_z[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pb_z[j] + 2.0 * fl1_fz * fl1_fx * pb_z[j] + 6.0 * pa_yy[j] * fl1_fz * pb_z[j]);
+                t_yy_z[j] += fl_r_0_0 * (-pb_z[j] * fl1_fz * fl1_fga + 2.0 * pb_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_yy_z[j] * fl1_fz);
 
-                t_yz_x[j] = fl_s_0_0 * pa_yz[j] * pb_x[j];
+                t_yz_x[j] = fl_s_0_0 * pa2pb_yz_x[j];
 
-                t_yz_x[j] += fl_r_0_0 * 6.0 * pa_yz[j] * fl1_fz * pb_x[j];
+                t_yz_x[j] += fl_r_0_0 * 6.0 * pa2pb_yz_x[j] * fl1_fz;
 
-                t_yz_y[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] + pa_yz[j] * pb_y[j]);
+                t_yz_y[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx + pa2pb_yz_y[j]);
 
-                t_yz_y[j] += fl_r_0_0 * (2.0 * fl1_fx * fl1_fz * pa_z[j] + 6.0 * pa_yz[j] * fl1_fz * pb_y[j]);
+                t_yz_y[j] += fl_r_0_0 * (2.0 * pa_z[j] * fl1_fx * fl1_fz + 6.0 * pa2pb_yz_y[j] * fl1_fz);
 
-                t_yz_z[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa_yz[j] * pb_z[j]);
+                t_yz_z[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx + pa2pb_yz_z[j]);
 
-                t_yz_z[j] += fl_r_0_0 * (2.0 * pa_y[j] * fl1_fz * fl1_fx + 6.0 * pa_yz[j] * fl1_fz * pb_z[j]);
+                t_yz_z[j] += fl_r_0_0 * (2.0 * pa_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_yz_z[j] * fl1_fz);
 
-                t_zz_x[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_x[j] + pa_zz[j] * pb_x[j]);
+                t_zz_x[j] = fl_s_0_0 * (0.5 * pb_x[j] * fl1_fx + pa2pb_zz_x[j]);
 
-                t_zz_x[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pb_x[j] + 2.0 * fl1_fz * fl1_fx * pb_x[j] + 6.0 * pa_zz[j] * fl1_fz * pb_x[j]);
+                t_zz_x[j] += fl_r_0_0 * (-pb_x[j] * fl1_fz * fl1_fga + 2.0 * pb_x[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_zz_x[j] * fl1_fz);
 
-                t_zz_y[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_y[j] + pa_zz[j] * pb_y[j]);
+                t_zz_y[j] = fl_s_0_0 * (0.5 * pb_y[j] * fl1_fx + pa2pb_zz_y[j]);
 
-                t_zz_y[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pb_y[j] + 2.0 * fl1_fz * fl1_fx * pb_y[j] + 6.0 * pa_zz[j] * fl1_fz * pb_y[j]);
+                t_zz_y[j] += fl_r_0_0 * (-pb_y[j] * fl1_fz * fl1_fga + 2.0 * pb_y[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_zz_y[j] * fl1_fz);
 
-                t_zz_z[j] = fl_s_0_0 * (pa_z[j] * fl1_fx + 0.5 * fl1_fx * pb_z[j] + pa_zz[j] * pb_z[j]);
+                t_zz_z[j] = fl_s_0_0 * (pa_z[j] * fl1_fx + 0.5 * pb_z[j] * fl1_fx + pa2pb_zz_z[j]);
 
-                t_zz_z[j] += fl_r_0_0 * (4.0 * pa_z[j] * fl1_fz * fl1_fx - fl1_fz * fl1_fga * pb_z[j] + 2.0 * fl1_fz * fl1_fx * pb_z[j] + 6.0 * pa_zz[j] * fl1_fz * pb_z[j]);
+                t_zz_z[j] += fl_r_0_0 * (4.0 * pa_z[j] * fl1_fz * fl1_fx - pb_z[j] * fl1_fz * fl1_fga + 2.0 * pb_z[j] * fl1_fz * fl1_fx + 6.0 * pa2pb_zz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -757,16 +807,16 @@ namespace kinrecfunc { // kinrecfunc namespace
     compKineticEnergyForPF(      CMemBlock2D<double>& primBuffer,
                            const CMemBlock2D<double>& auxBuffer,
                            const CMemBlock2D<double>& osFactors,
-                           const CMemBlock2D<double>& paDistances,
                            const CMemBlock2D<double>& pbDistances,
+                           const CMemBlock2D<double>& pa2pbDistances,
                            const CGtoBlock&           braGtoBlock,
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
-        kinrecfunc::compKineticEnergyForPF_0_15(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPF_0_15(primBuffer, auxBuffer, osFactors, pbDistances, pa2pbDistances, 
                                                 braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForPF_15_30(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPF_15_30(primBuffer, auxBuffer, osFactors, pbDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
     }
 
@@ -774,8 +824,8 @@ namespace kinrecfunc { // kinrecfunc namespace
     compKineticEnergyForPF_0_15(      CMemBlock2D<double>& primBuffer,
                                 const CMemBlock2D<double>& auxBuffer,
                                 const CMemBlock2D<double>& osFactors,
-                                const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto)
@@ -806,21 +856,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            auto pa_x = paDistances.data(3 * idx);
-
-            auto pa_y = paDistances.data(3 * idx + 1);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
-
-            auto pb_x = pbDistances.data(19 * idx);
-
-            auto pb_y = pbDistances.data(19 * idx + 1);
-
-            auto pb_z = pbDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_xx = pbDistances.data(19 * idx + 3);
 
@@ -834,27 +870,49 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_zz = pbDistances.data(19 * idx + 8);
 
-            // set up pointers to 3-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xxx = pbDistances.data(19 * idx + 9);
+            auto pa2pb_x_x = pa2pbDistances.data(57 * idx);
 
-            auto pb_xxy = pbDistances.data(19 * idx + 10);
+            auto pa2pb_x_y = pa2pbDistances.data(57 * idx + 1);
 
-            auto pb_xxz = pbDistances.data(19 * idx + 11);
+            auto pa2pb_x_z = pa2pbDistances.data(57 * idx + 2);
 
-            auto pb_xyy = pbDistances.data(19 * idx + 12);
+            auto pa2pb_x_xxx = pa2pbDistances.data(57 * idx + 9);
 
-            auto pb_xyz = pbDistances.data(19 * idx + 13);
+            auto pa2pb_x_xxy = pa2pbDistances.data(57 * idx + 10);
 
-            auto pb_xzz = pbDistances.data(19 * idx + 14);
+            auto pa2pb_x_xxz = pa2pbDistances.data(57 * idx + 11);
 
-            auto pb_yyy = pbDistances.data(19 * idx + 15);
+            auto pa2pb_x_xyy = pa2pbDistances.data(57 * idx + 12);
 
-            auto pb_yyz = pbDistances.data(19 * idx + 16);
+            auto pa2pb_x_xyz = pa2pbDistances.data(57 * idx + 13);
 
-            auto pb_yzz = pbDistances.data(19 * idx + 17);
+            auto pa2pb_x_xzz = pa2pbDistances.data(57 * idx + 14);
 
-            auto pb_zzz = pbDistances.data(19 * idx + 18);
+            auto pa2pb_x_yyy = pa2pbDistances.data(57 * idx + 15);
+
+            auto pa2pb_x_yyz = pa2pbDistances.data(57 * idx + 16);
+
+            auto pa2pb_x_yzz = pa2pbDistances.data(57 * idx + 17);
+
+            auto pa2pb_x_zzz = pa2pbDistances.data(57 * idx + 18);
+
+            auto pa2pb_y_x = pa2pbDistances.data(57 * idx + 19);
+
+            auto pa2pb_y_y = pa2pbDistances.data(57 * idx + 20);
+
+            auto pa2pb_y_z = pa2pbDistances.data(57 * idx + 21);
+
+            auto pa2pb_y_xxx = pa2pbDistances.data(57 * idx + 28);
+
+            auto pa2pb_y_xxy = pa2pbDistances.data(57 * idx + 29);
+
+            auto pa2pb_y_xxz = pa2pbDistances.data(57 * idx + 30);
+
+            auto pa2pb_y_xyy = pa2pbDistances.data(57 * idx + 31);
+
+            auto pa2pb_y_xyz = pa2pbDistances.data(57 * idx + 32);
 
             // set up pointers to auxilary integrals
 
@@ -896,10 +954,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (0,15)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_x, pa_y, pb_x, pb_xx, pb_xxx, pb_xxy, pb_xxz, pb_xy, pb_xyy, pb_xyz, \
-                                     pb_xz, pb_xzz, pb_y, pb_yy, pb_yyy, pb_yyz, pb_yz, pb_yzz, pb_z, pb_zz, pb_zzz, r_0_0, \
-                                     s_0_0, t_x_xxx, t_x_xxy, t_x_xxz, t_x_xyy, t_x_xyz, t_x_xzz, t_x_yyy, t_x_yyz, \
-                                     t_x_yzz, t_x_zzz, t_y_xxx, t_y_xxy, t_y_xxz, t_y_xyy, t_y_xyz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_x_x, pa2pb_x_xxx, pa2pb_x_xxy, pa2pb_x_xxz, pa2pb_x_xyy, \
+                                     pa2pb_x_xyz, pa2pb_x_xzz, pa2pb_x_y, pa2pb_x_yyy, pa2pb_x_yyz, pa2pb_x_yzz, \
+                                     pa2pb_x_z, pa2pb_x_zzz, pa2pb_y_x, pa2pb_y_xxx, pa2pb_y_xxy, pa2pb_y_xxz, \
+                                     pa2pb_y_xyy, pa2pb_y_xyz, pa2pb_y_y, pa2pb_y_z, pb_xx, pb_xy, pb_xz, pb_yy, pb_yz, pb_zz, \
+                                     r_0_0, s_0_0, t_x_xxx, t_x_xxy, t_x_xxz, t_x_xyy, t_x_xyz, t_x_xzz, t_x_yyy, \
+                                     t_x_yyz, t_x_yzz, t_x_zzz, t_y_xxx, t_y_xxy, t_y_xxz, t_y_xyy, t_y_xyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -914,65 +974,65 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_x_xxx[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_x[j] * pb_x[j] * fl1_fx + 1.5 * fl1_fx * pb_xx[j] + pa_x[j] * pb_xxx[j]);
+                t_x_xxx[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa2pb_x_x[j] * fl1_fx + 1.5 * pb_xx[j] * fl1_fx + pa2pb_x_xxx[j]);
 
-                t_x_xxx[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb + 3.0 * fl1_fz * fl2_fx - 3.0 * pa_x[j] * pb_x[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_x[j] * pb_x[j] * fl1_fx + 9.0 * fl1_fz * fl1_fx * pb_xx[j] + 8.0 * fl1_fz * pa_x[j] * pb_xxx[j]);
+                t_x_xxx[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb + 3.0 * fl1_fz * fl2_fx - 3.0 * pa2pb_x_x[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_x_x[j] * fl1_fz * fl1_fx + 9.0 * pb_xx[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_xxx[j] * fl1_fz);
 
-                t_x_xxy[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_y[j] + fl1_fx * pb_xy[j] + pa_x[j] * pb_xxy[j]);
+                t_x_xxy[j] = fl_s_0_0 * (0.5 * pa2pb_x_y[j] * fl1_fx + pb_xy[j] * fl1_fx + pa2pb_x_xxy[j]);
 
-                t_x_xxy[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb * pb_y[j] + 3.0 * fl1_fz * pa_x[j] * fl1_fx * pb_y[j] + 6.0 * fl1_fz * fl1_fx * pb_xy[j] + 8.0 * fl1_fz * pa_x[j] * pb_xxy[j]);
+                t_x_xxy[j] += fl_r_0_0 * (-pa2pb_x_y[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_x_y[j] * fl1_fz * fl1_fx + 6.0 * pb_xy[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_xxy[j] * fl1_fz);
 
-                t_x_xxz[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_z[j] + fl1_fx * pb_xz[j] + pa_x[j] * pb_xxz[j]);
+                t_x_xxz[j] = fl_s_0_0 * (0.5 * pa2pb_x_z[j] * fl1_fx + pb_xz[j] * fl1_fx + pa2pb_x_xxz[j]);
 
-                t_x_xxz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb * pb_z[j] + 3.0 * fl1_fz * pa_x[j] * fl1_fx * pb_z[j] + 6.0 * fl1_fz * fl1_fx * pb_xz[j] + 8.0 * fl1_fz * pa_x[j] * pb_xxz[j]);
+                t_x_xxz[j] += fl_r_0_0 * (-pa2pb_x_z[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_x_z[j] * fl1_fz * fl1_fx + 6.0 * pb_xz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_xxz[j] * fl1_fz);
 
-                t_x_xyy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pb_x[j] * fl1_fx + 0.5 * fl1_fx * pb_yy[j] + pa_x[j] * pb_xyy[j]);
+                t_x_xyy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa2pb_x_x[j] * fl1_fx + 0.5 * pb_yy[j] * fl1_fx + pa2pb_x_xyy[j]);
 
-                t_x_xyy[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa_x[j] * pb_x[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_x[j] * pb_x[j] * fl1_fx + 3.0 * fl1_fz * fl1_fx * pb_yy[j] + 8.0 * fl1_fz * pa_x[j] * pb_xyy[j]);
+                t_x_xyy[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa2pb_x_x[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_x_x[j] * fl1_fz * fl1_fx + 3.0 * pb_yy[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_xyy[j] * fl1_fz);
 
-                t_x_xyz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_yz[j] + pa_x[j] * pb_xyz[j]);
+                t_x_xyz[j] = fl_s_0_0 * (0.5 * pb_yz[j] * fl1_fx + pa2pb_x_xyz[j]);
 
-                t_x_xyz[j] += fl_r_0_0 * (3.0 * fl1_fz * fl1_fx * pb_yz[j] + 8.0 * fl1_fz * pa_x[j] * pb_xyz[j]);
+                t_x_xyz[j] += fl_r_0_0 * (3.0 * pb_yz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_xyz[j] * fl1_fz);
 
-                t_x_xzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_x[j] * pb_x[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pa_x[j] * pb_xzz[j]);
+                t_x_xzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa2pb_x_x[j] * fl1_fx + 0.5 * pb_zz[j] * fl1_fx + pa2pb_x_xzz[j]);
 
-                t_x_xzz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa_x[j] * pb_x[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_x[j] * pb_x[j] * fl1_fx + 3.0 * fl1_fz * fl1_fx * pb_zz[j] + 8.0 * fl1_fz * pa_x[j] * pb_xzz[j]);
+                t_x_xzz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa2pb_x_x[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_x_x[j] * fl1_fz * fl1_fx + 3.0 * pb_zz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_xzz[j] * fl1_fz);
 
-                t_x_yyy[j] = fl_s_0_0 * (1.5 * pa_x[j] * pb_y[j] * fl1_fx + pa_x[j] * pb_yyy[j]);
+                t_x_yyy[j] = fl_s_0_0 * (1.5 * pa2pb_x_y[j] * fl1_fx + pa2pb_x_yyy[j]);
 
-                t_x_yyy[j] += fl_r_0_0 * (-3.0 * pa_x[j] * pb_y[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_x[j] * pb_y[j] * fl1_fx + 8.0 * fl1_fz * pa_x[j] * pb_yyy[j]);
+                t_x_yyy[j] += fl_r_0_0 * (-3.0 * pa2pb_x_y[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_x_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_yyy[j] * fl1_fz);
 
-                t_x_yyz[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_x[j] * pb_yyz[j]);
+                t_x_yyz[j] = fl_s_0_0 * (0.5 * pa2pb_x_z[j] * fl1_fx + pa2pb_x_yyz[j]);
 
-                t_x_yyz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb * pb_z[j] + 3.0 * fl1_fz * pa_x[j] * fl1_fx * pb_z[j] + 8.0 * fl1_fz * pa_x[j] * pb_yyz[j]);
+                t_x_yyz[j] += fl_r_0_0 * (-pa2pb_x_z[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_x_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_yyz[j] * fl1_fz);
 
-                t_x_yzz[j] = fl_s_0_0 * (0.5 * pa_x[j] * pb_y[j] * fl1_fx + pa_x[j] * pb_yzz[j]);
+                t_x_yzz[j] = fl_s_0_0 * (0.5 * pa2pb_x_y[j] * fl1_fx + pa2pb_x_yzz[j]);
 
-                t_x_yzz[j] += fl_r_0_0 * (-pa_x[j] * pb_y[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_x[j] * pb_y[j] * fl1_fx + 8.0 * fl1_fz * pa_x[j] * pb_yzz[j]);
+                t_x_yzz[j] += fl_r_0_0 * (-pa2pb_x_y[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_x_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_yzz[j] * fl1_fz);
 
-                t_x_zzz[j] = fl_s_0_0 * (1.5 * pa_x[j] * pb_z[j] * fl1_fx + pa_x[j] * pb_zzz[j]);
+                t_x_zzz[j] = fl_s_0_0 * (1.5 * pa2pb_x_z[j] * fl1_fx + pa2pb_x_zzz[j]);
 
-                t_x_zzz[j] += fl_r_0_0 * (-3.0 * pa_x[j] * pb_z[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_x[j] * pb_z[j] * fl1_fx + 8.0 * fl1_fz * pa_x[j] * pb_zzz[j]);
+                t_x_zzz[j] += fl_r_0_0 * (-3.0 * pa2pb_x_z[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_x_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_x_zzz[j] * fl1_fz);
 
-                t_y_xxx[j] = fl_s_0_0 * (1.5 * pa_y[j] * pb_x[j] * fl1_fx + pa_y[j] * pb_xxx[j]);
+                t_y_xxx[j] = fl_s_0_0 * (1.5 * pa2pb_y_x[j] * fl1_fx + pa2pb_y_xxx[j]);
 
-                t_y_xxx[j] += fl_r_0_0 * (-3.0 * pa_y[j] * pb_x[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_y[j] * pb_x[j] * fl1_fx + 8.0 * fl1_fz * pa_y[j] * pb_xxx[j]);
+                t_y_xxx[j] += fl_r_0_0 * (-3.0 * pa2pb_y_x[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_y_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_xxx[j] * fl1_fz);
 
-                t_y_xxy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_y[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pb_xx[j] + pa_y[j] * pb_xxy[j]);
+                t_y_xxy[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa2pb_y_y[j] * fl1_fx + 0.5 * pb_xx[j] * fl1_fx + pa2pb_y_xxy[j]);
 
-                t_y_xxy[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa_y[j] * fl1_fz * fl1_fgb * pb_y[j] + 3.0 * fl1_fz * pa_y[j] * fl1_fx * pb_y[j] + 3.0 * fl1_fz * fl1_fx * pb_xx[j] + 8.0 * fl1_fz * pa_y[j] * pb_xxy[j]);
+                t_y_xxy[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa2pb_y_y[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_y_y[j] * fl1_fz * fl1_fx + 3.0 * pb_xx[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_xxy[j] * fl1_fz);
 
-                t_y_xxz[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx * pb_z[j] + pa_y[j] * pb_xxz[j]);
+                t_y_xxz[j] = fl_s_0_0 * (0.5 * pa2pb_y_z[j] * fl1_fx + pa2pb_y_xxz[j]);
 
-                t_y_xxz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb * pb_z[j] + 3.0 * fl1_fz * pa_y[j] * fl1_fx * pb_z[j] + 8.0 * fl1_fz * pa_y[j] * pb_xxz[j]);
+                t_y_xxz[j] += fl_r_0_0 * (-pa2pb_y_z[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_y_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_xxz[j] * fl1_fz);
 
-                t_y_xyy[j] = fl_s_0_0 * (0.5 * pa_y[j] * pb_x[j] * fl1_fx + fl1_fx * pb_xy[j] + pa_y[j] * pb_xyy[j]);
+                t_y_xyy[j] = fl_s_0_0 * (0.5 * pa2pb_y_x[j] * fl1_fx + pb_xy[j] * fl1_fx + pa2pb_y_xyy[j]);
 
-                t_y_xyy[j] += fl_r_0_0 * (-pa_y[j] * pb_x[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_y[j] * pb_x[j] * fl1_fx + 6.0 * fl1_fz * fl1_fx * pb_xy[j] + 8.0 * fl1_fz * pa_y[j] * pb_xyy[j]);
+                t_y_xyy[j] += fl_r_0_0 * (-pa2pb_y_x[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_y_x[j] * fl1_fz * fl1_fx + 6.0 * pb_xy[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_xyy[j] * fl1_fz);
 
-                t_y_xyz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_xz[j] + pa_y[j] * pb_xyz[j]);
+                t_y_xyz[j] = fl_s_0_0 * (0.5 * pb_xz[j] * fl1_fx + pa2pb_y_xyz[j]);
 
-                t_y_xyz[j] += fl_r_0_0 * (3.0 * fl1_fz * fl1_fx * pb_xz[j] + 8.0 * fl1_fz * pa_y[j] * pb_xyz[j]);
+                t_y_xyz[j] += fl_r_0_0 * (3.0 * pb_xz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_xyz[j] * fl1_fz);
             }
 
             idx++;
@@ -983,8 +1043,8 @@ namespace kinrecfunc { // kinrecfunc namespace
     compKineticEnergyForPF_15_30(      CMemBlock2D<double>& primBuffer,
                                  const CMemBlock2D<double>& auxBuffer,
                                  const CMemBlock2D<double>& osFactors,
-                                 const CMemBlock2D<double>& paDistances,
                                  const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -1015,21 +1075,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            auto pa_y = paDistances.data(3 * idx + 1);
-
-            auto pa_z = paDistances.data(3 * idx + 2);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
-
-            auto pb_x = pbDistances.data(19 * idx);
-
-            auto pb_y = pbDistances.data(19 * idx + 1);
-
-            auto pb_z = pbDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_xx = pbDistances.data(19 * idx + 3);
 
@@ -1043,27 +1089,49 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_zz = pbDistances.data(19 * idx + 8);
 
-            // set up pointers to 3-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xxx = pbDistances.data(19 * idx + 9);
+            auto pa2pb_y_x = pa2pbDistances.data(57 * idx + 19);
 
-            auto pb_xxy = pbDistances.data(19 * idx + 10);
+            auto pa2pb_y_y = pa2pbDistances.data(57 * idx + 20);
 
-            auto pb_xxz = pbDistances.data(19 * idx + 11);
+            auto pa2pb_y_z = pa2pbDistances.data(57 * idx + 21);
 
-            auto pb_xyy = pbDistances.data(19 * idx + 12);
+            auto pa2pb_y_xzz = pa2pbDistances.data(57 * idx + 33);
 
-            auto pb_xyz = pbDistances.data(19 * idx + 13);
+            auto pa2pb_y_yyy = pa2pbDistances.data(57 * idx + 34);
 
-            auto pb_xzz = pbDistances.data(19 * idx + 14);
+            auto pa2pb_y_yyz = pa2pbDistances.data(57 * idx + 35);
 
-            auto pb_yyy = pbDistances.data(19 * idx + 15);
+            auto pa2pb_y_yzz = pa2pbDistances.data(57 * idx + 36);
 
-            auto pb_yyz = pbDistances.data(19 * idx + 16);
+            auto pa2pb_y_zzz = pa2pbDistances.data(57 * idx + 37);
 
-            auto pb_yzz = pbDistances.data(19 * idx + 17);
+            auto pa2pb_z_x = pa2pbDistances.data(57 * idx + 38);
 
-            auto pb_zzz = pbDistances.data(19 * idx + 18);
+            auto pa2pb_z_y = pa2pbDistances.data(57 * idx + 39);
+
+            auto pa2pb_z_z = pa2pbDistances.data(57 * idx + 40);
+
+            auto pa2pb_z_xxx = pa2pbDistances.data(57 * idx + 47);
+
+            auto pa2pb_z_xxy = pa2pbDistances.data(57 * idx + 48);
+
+            auto pa2pb_z_xxz = pa2pbDistances.data(57 * idx + 49);
+
+            auto pa2pb_z_xyy = pa2pbDistances.data(57 * idx + 50);
+
+            auto pa2pb_z_xyz = pa2pbDistances.data(57 * idx + 51);
+
+            auto pa2pb_z_xzz = pa2pbDistances.data(57 * idx + 52);
+
+            auto pa2pb_z_yyy = pa2pbDistances.data(57 * idx + 53);
+
+            auto pa2pb_z_yyz = pa2pbDistances.data(57 * idx + 54);
+
+            auto pa2pb_z_yzz = pa2pbDistances.data(57 * idx + 55);
+
+            auto pa2pb_z_zzz = pa2pbDistances.data(57 * idx + 56);
 
             // set up pointers to auxilary integrals
 
@@ -1105,10 +1173,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (15,30)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_y, pa_z, pb_x, pb_xx, pb_xxx, pb_xxy, pb_xxz, pb_xy, pb_xyy, pb_xyz, \
-                                     pb_xz, pb_xzz, pb_y, pb_yy, pb_yyy, pb_yyz, pb_yz, pb_yzz, pb_z, pb_zz, pb_zzz, r_0_0, \
-                                     s_0_0, t_y_xzz, t_y_yyy, t_y_yyz, t_y_yzz, t_y_zzz, t_z_xxx, t_z_xxy, t_z_xxz, \
-                                     t_z_xyy, t_z_xyz, t_z_xzz, t_z_yyy, t_z_yyz, t_z_yzz, t_z_zzz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_y_x, pa2pb_y_xzz, pa2pb_y_y, pa2pb_y_yyy, pa2pb_y_yyz, \
+                                     pa2pb_y_yzz, pa2pb_y_z, pa2pb_y_zzz, pa2pb_z_x, pa2pb_z_xxx, pa2pb_z_xxy, \
+                                     pa2pb_z_xxz, pa2pb_z_xyy, pa2pb_z_xyz, pa2pb_z_xzz, pa2pb_z_y, pa2pb_z_yyy, \
+                                     pa2pb_z_yyz, pa2pb_z_yzz, pa2pb_z_z, pa2pb_z_zzz, pb_xx, pb_xy, pb_xz, pb_yy, pb_yz, \
+                                     pb_zz, r_0_0, s_0_0, t_y_xzz, t_y_yyy, t_y_yyz, t_y_yzz, t_y_zzz, t_z_xxx, t_z_xxy, \
+                                     t_z_xxz, t_z_xyy, t_z_xyz, t_z_xzz, t_z_yyy, t_z_yyz, t_z_yzz, t_z_zzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -1123,65 +1193,65 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_y_xzz[j] = fl_s_0_0 * (0.5 * pa_y[j] * pb_x[j] * fl1_fx + pa_y[j] * pb_xzz[j]);
+                t_y_xzz[j] = fl_s_0_0 * (0.5 * pa2pb_y_x[j] * fl1_fx + pa2pb_y_xzz[j]);
 
-                t_y_xzz[j] += fl_r_0_0 * (-pa_y[j] * pb_x[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_y[j] * pb_x[j] * fl1_fx + 8.0 * fl1_fz * pa_y[j] * pb_xzz[j]);
+                t_y_xzz[j] += fl_r_0_0 * (-pa2pb_y_x[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_y_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_xzz[j] * fl1_fz);
 
-                t_y_yyy[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_y[j] * pb_y[j] * fl1_fx + 1.5 * fl1_fx * pb_yy[j] + pa_y[j] * pb_yyy[j]);
+                t_y_yyy[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa2pb_y_y[j] * fl1_fx + 1.5 * pb_yy[j] * fl1_fx + pa2pb_y_yyy[j]);
 
-                t_y_yyy[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb + 3.0 * fl1_fz * fl2_fx - 3.0 * pa_y[j] * pb_y[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_y[j] * pb_y[j] * fl1_fx + 9.0 * fl1_fz * fl1_fx * pb_yy[j] + 8.0 * fl1_fz * pa_y[j] * pb_yyy[j]);
+                t_y_yyy[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb + 3.0 * fl1_fz * fl2_fx - 3.0 * pa2pb_y_y[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_y_y[j] * fl1_fz * fl1_fx + 9.0 * pb_yy[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_yyy[j] * fl1_fz);
 
-                t_y_yyz[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx * pb_z[j] + fl1_fx * pb_yz[j] + pa_y[j] * pb_yyz[j]);
+                t_y_yyz[j] = fl_s_0_0 * (0.5 * pa2pb_y_z[j] * fl1_fx + pb_yz[j] * fl1_fx + pa2pb_y_yyz[j]);
 
-                t_y_yyz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fgb * pb_z[j] + 3.0 * fl1_fz * pa_y[j] * fl1_fx * pb_z[j] + 6.0 * fl1_fz * fl1_fx * pb_yz[j] + 8.0 * fl1_fz * pa_y[j] * pb_yyz[j]);
+                t_y_yyz[j] += fl_r_0_0 * (-pa2pb_y_z[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_y_z[j] * fl1_fz * fl1_fx + 6.0 * pb_yz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_yyz[j] * fl1_fz);
 
-                t_y_yzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_y[j] * pb_y[j] * fl1_fx + 0.5 * fl1_fx * pb_zz[j] + pa_y[j] * pb_yzz[j]);
+                t_y_yzz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa2pb_y_y[j] * fl1_fx + 0.5 * pb_zz[j] * fl1_fx + pa2pb_y_yzz[j]);
 
-                t_y_yzz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa_y[j] * pb_y[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_y[j] * pb_y[j] * fl1_fx + 3.0 * fl1_fz * fl1_fx * pb_zz[j] + 8.0 * fl1_fz * pa_y[j] * pb_yzz[j]);
+                t_y_yzz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa2pb_y_y[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_y_y[j] * fl1_fz * fl1_fx + 3.0 * pb_zz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_yzz[j] * fl1_fz);
 
-                t_y_zzz[j] = fl_s_0_0 * (1.5 * pa_y[j] * pb_z[j] * fl1_fx + pa_y[j] * pb_zzz[j]);
+                t_y_zzz[j] = fl_s_0_0 * (1.5 * pa2pb_y_z[j] * fl1_fx + pa2pb_y_zzz[j]);
 
-                t_y_zzz[j] += fl_r_0_0 * (-3.0 * pa_y[j] * pb_z[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_y[j] * pb_z[j] * fl1_fx + 8.0 * fl1_fz * pa_y[j] * pb_zzz[j]);
+                t_y_zzz[j] += fl_r_0_0 * (-3.0 * pa2pb_y_z[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_y_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_y_zzz[j] * fl1_fz);
 
-                t_z_xxx[j] = fl_s_0_0 * (1.5 * pa_z[j] * pb_x[j] * fl1_fx + pa_z[j] * pb_xxx[j]);
+                t_z_xxx[j] = fl_s_0_0 * (1.5 * pa2pb_z_x[j] * fl1_fx + pa2pb_z_xxx[j]);
 
-                t_z_xxx[j] += fl_r_0_0 * (-3.0 * pa_z[j] * pb_x[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_z[j] * pb_x[j] * fl1_fx + 8.0 * fl1_fz * pa_z[j] * pb_xxx[j]);
+                t_z_xxx[j] += fl_r_0_0 * (-3.0 * pa2pb_z_x[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_z_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_xxx[j] * fl1_fz);
 
-                t_z_xxy[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl1_fx * pb_y[j] + pa_z[j] * pb_xxy[j]);
+                t_z_xxy[j] = fl_s_0_0 * (0.5 * pa2pb_z_y[j] * fl1_fx + pa2pb_z_xxy[j]);
 
-                t_z_xxy[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fgb * pb_y[j] + 3.0 * fl1_fz * pa_z[j] * fl1_fx * pb_y[j] + 8.0 * fl1_fz * pa_z[j] * pb_xxy[j]);
+                t_z_xxy[j] += fl_r_0_0 * (-pa2pb_z_y[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_z_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_xxy[j] * fl1_fz);
 
-                t_z_xxz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_xx[j] + pa_z[j] * pb_xxz[j]);
+                t_z_xxz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa2pb_z_z[j] * fl1_fx + 0.5 * pb_xx[j] * fl1_fx + pa2pb_z_xxz[j]);
 
-                t_z_xxz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa_z[j] * fl1_fz * fl1_fgb * pb_z[j] + 3.0 * fl1_fz * pa_z[j] * fl1_fx * pb_z[j] + 3.0 * fl1_fz * fl1_fx * pb_xx[j] + 8.0 * fl1_fz * pa_z[j] * pb_xxz[j]);
+                t_z_xxz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa2pb_z_z[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_z_z[j] * fl1_fz * fl1_fx + 3.0 * pb_xx[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_xxz[j] * fl1_fz);
 
-                t_z_xyy[j] = fl_s_0_0 * (0.5 * pa_z[j] * pb_x[j] * fl1_fx + pa_z[j] * pb_xyy[j]);
+                t_z_xyy[j] = fl_s_0_0 * (0.5 * pa2pb_z_x[j] * fl1_fx + pa2pb_z_xyy[j]);
 
-                t_z_xyy[j] += fl_r_0_0 * (-pa_z[j] * pb_x[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_z[j] * pb_x[j] * fl1_fx + 8.0 * fl1_fz * pa_z[j] * pb_xyy[j]);
+                t_z_xyy[j] += fl_r_0_0 * (-pa2pb_z_x[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_z_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_xyy[j] * fl1_fz);
 
-                t_z_xyz[j] = fl_s_0_0 * (0.5 * fl1_fx * pb_xy[j] + pa_z[j] * pb_xyz[j]);
+                t_z_xyz[j] = fl_s_0_0 * (0.5 * pb_xy[j] * fl1_fx + pa2pb_z_xyz[j]);
 
-                t_z_xyz[j] += fl_r_0_0 * (3.0 * fl1_fz * fl1_fx * pb_xy[j] + 8.0 * fl1_fz * pa_z[j] * pb_xyz[j]);
+                t_z_xyz[j] += fl_r_0_0 * (3.0 * pb_xy[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_xyz[j] * fl1_fz);
 
-                t_z_xzz[j] = fl_s_0_0 * (0.5 * pa_z[j] * pb_x[j] * fl1_fx + fl1_fx * pb_xz[j] + pa_z[j] * pb_xzz[j]);
+                t_z_xzz[j] = fl_s_0_0 * (0.5 * pa2pb_z_x[j] * fl1_fx + pb_xz[j] * fl1_fx + pa2pb_z_xzz[j]);
 
-                t_z_xzz[j] += fl_r_0_0 * (-pa_z[j] * pb_x[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_z[j] * pb_x[j] * fl1_fx + 6.0 * fl1_fz * fl1_fx * pb_xz[j] + 8.0 * fl1_fz * pa_z[j] * pb_xzz[j]);
+                t_z_xzz[j] += fl_r_0_0 * (-pa2pb_z_x[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_z_x[j] * fl1_fz * fl1_fx + 6.0 * pb_xz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_xzz[j] * fl1_fz);
 
-                t_z_yyy[j] = fl_s_0_0 * (1.5 * pa_z[j] * pb_y[j] * fl1_fx + pa_z[j] * pb_yyy[j]);
+                t_z_yyy[j] = fl_s_0_0 * (1.5 * pa2pb_z_y[j] * fl1_fx + pa2pb_z_yyy[j]);
 
-                t_z_yyy[j] += fl_r_0_0 * (-3.0 * pa_z[j] * pb_y[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_z[j] * pb_y[j] * fl1_fx + 8.0 * fl1_fz * pa_z[j] * pb_yyy[j]);
+                t_z_yyy[j] += fl_r_0_0 * (-3.0 * pa2pb_z_y[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_z_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_yyy[j] * fl1_fz);
 
-                t_z_yyz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_z[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pb_yy[j] + pa_z[j] * pb_yyz[j]);
+                t_z_yyz[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa2pb_z_z[j] * fl1_fx + 0.5 * pb_yy[j] * fl1_fx + pa2pb_z_yyz[j]);
 
-                t_z_yyz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa_z[j] * fl1_fz * fl1_fgb * pb_z[j] + 3.0 * fl1_fz * pa_z[j] * fl1_fx * pb_z[j] + 3.0 * fl1_fz * fl1_fx * pb_yy[j] + 8.0 * fl1_fz * pa_z[j] * pb_yyz[j]);
+                t_z_yyz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb + fl1_fz * fl2_fx - pa2pb_z_z[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_z_z[j] * fl1_fz * fl1_fx + 3.0 * pb_yy[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_yyz[j] * fl1_fz);
 
-                t_z_yzz[j] = fl_s_0_0 * (0.5 * pa_z[j] * pb_y[j] * fl1_fx + fl1_fx * pb_yz[j] + pa_z[j] * pb_yzz[j]);
+                t_z_yzz[j] = fl_s_0_0 * (0.5 * pa2pb_z_y[j] * fl1_fx + pb_yz[j] * fl1_fx + pa2pb_z_yzz[j]);
 
-                t_z_yzz[j] += fl_r_0_0 * (-pa_z[j] * pb_y[j] * fl1_fz * fl1_fgb + 3.0 * fl1_fz * pa_z[j] * pb_y[j] * fl1_fx + 6.0 * fl1_fz * fl1_fx * pb_yz[j] + 8.0 * fl1_fz * pa_z[j] * pb_yzz[j]);
+                t_z_yzz[j] += fl_r_0_0 * (-pa2pb_z_y[j] * fl1_fz * fl1_fgb + 3.0 * pa2pb_z_y[j] * fl1_fz * fl1_fx + 6.0 * pb_yz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_yzz[j] * fl1_fz);
 
-                t_z_zzz[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_z[j] * pb_z[j] * fl1_fx + 1.5 * fl1_fx * pb_zz[j] + pa_z[j] * pb_zzz[j]);
+                t_z_zzz[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa2pb_z_z[j] * fl1_fx + 1.5 * pb_zz[j] * fl1_fx + pa2pb_z_zzz[j]);
 
-                t_z_zzz[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb + 3.0 * fl1_fz * fl2_fx - 3.0 * pa_z[j] * pb_z[j] * fl1_fz * fl1_fgb + 9.0 * fl1_fz * pa_z[j] * pb_z[j] * fl1_fx + 9.0 * fl1_fz * fl1_fx * pb_zz[j] + 8.0 * fl1_fz * pa_z[j] * pb_zzz[j]);
+                t_z_zzz[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb + 3.0 * fl1_fz * fl2_fx - 3.0 * pa2pb_z_z[j] * fl1_fz * fl1_fgb + 9.0 * pa2pb_z_z[j] * fl1_fz * fl1_fx + 9.0 * pb_zz[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_z_zzz[j] * fl1_fz);
             }
 
             idx++;
@@ -1193,15 +1263,15 @@ namespace kinrecfunc { // kinrecfunc namespace
                            const CMemBlock2D<double>& auxBuffer,
                            const CMemBlock2D<double>& osFactors,
                            const CMemBlock2D<double>& paDistances,
-                           const CMemBlock2D<double>& pbDistances,
+                           const CMemBlock2D<double>& pa2pbDistances,
                            const CGtoBlock&           braGtoBlock,
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
-        kinrecfunc::compKineticEnergyForFP_0_15(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForFP_0_15(primBuffer, auxBuffer, osFactors, paDistances, pa2pbDistances, 
                                                 braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForFP_15_30(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForFP_15_30(primBuffer, auxBuffer, osFactors, paDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
     }
 
@@ -1210,7 +1280,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& auxBuffer,
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
-                                const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto)
@@ -1241,15 +1311,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            auto pa_x = paDistances.data(19 * idx);
-
-            auto pa_y = paDistances.data(19 * idx + 1);
-
-            auto pa_z = paDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_xx = paDistances.data(19 * idx + 3);
 
@@ -1261,25 +1323,55 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_yz = paDistances.data(19 * idx + 7);
 
-            // set up pointers to 3-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pa_xxx = paDistances.data(19 * idx + 9);
+            auto pa2pb_x_x = pa2pbDistances.data(57 * idx);
 
-            auto pa_xxy = paDistances.data(19 * idx + 10);
+            auto pa2pb_x_y = pa2pbDistances.data(57 * idx + 1);
 
-            auto pa_xxz = paDistances.data(19 * idx + 11);
+            auto pa2pb_x_z = pa2pbDistances.data(57 * idx + 2);
 
-            auto pa_xyy = paDistances.data(19 * idx + 12);
+            auto pa2pb_y_x = pa2pbDistances.data(57 * idx + 3);
 
-            auto pa_xyz = paDistances.data(19 * idx + 13);
+            auto pa2pb_y_y = pa2pbDistances.data(57 * idx + 4);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            auto pa2pb_y_z = pa2pbDistances.data(57 * idx + 5);
 
-            auto pb_x = pbDistances.data(3 * idx);
+            auto pa2pb_z_x = pa2pbDistances.data(57 * idx + 6);
 
-            auto pb_y = pbDistances.data(3 * idx + 1);
+            auto pa2pb_z_y = pa2pbDistances.data(57 * idx + 7);
 
-            auto pb_z = pbDistances.data(3 * idx + 2);
+            auto pa2pb_z_z = pa2pbDistances.data(57 * idx + 8);
+
+            auto pa2pb_xxx_x = pa2pbDistances.data(57 * idx + 27);
+
+            auto pa2pb_xxx_y = pa2pbDistances.data(57 * idx + 28);
+
+            auto pa2pb_xxx_z = pa2pbDistances.data(57 * idx + 29);
+
+            auto pa2pb_xxy_x = pa2pbDistances.data(57 * idx + 30);
+
+            auto pa2pb_xxy_y = pa2pbDistances.data(57 * idx + 31);
+
+            auto pa2pb_xxy_z = pa2pbDistances.data(57 * idx + 32);
+
+            auto pa2pb_xxz_x = pa2pbDistances.data(57 * idx + 33);
+
+            auto pa2pb_xxz_y = pa2pbDistances.data(57 * idx + 34);
+
+            auto pa2pb_xxz_z = pa2pbDistances.data(57 * idx + 35);
+
+            auto pa2pb_xyy_x = pa2pbDistances.data(57 * idx + 36);
+
+            auto pa2pb_xyy_y = pa2pbDistances.data(57 * idx + 37);
+
+            auto pa2pb_xyy_z = pa2pbDistances.data(57 * idx + 38);
+
+            auto pa2pb_xyz_x = pa2pbDistances.data(57 * idx + 39);
+
+            auto pa2pb_xyz_y = pa2pbDistances.data(57 * idx + 40);
+
+            auto pa2pb_xyz_z = pa2pbDistances.data(57 * idx + 41);
 
             // set up pointers to auxilary integrals
 
@@ -1321,10 +1413,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (0,15)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_x, pa_xx, pa_xxx, pa_xxy, pa_xxz, pa_xy, pa_xyy, pa_xyz, pa_xz, pa_y, \
-                                     pa_yy, pa_yz, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_xxx_x, t_xxx_y, t_xxx_z, t_xxy_x, \
-                                     t_xxy_y, t_xxy_z, t_xxz_x, t_xxz_y, t_xxz_z, t_xyy_x, t_xyy_y, t_xyy_z, t_xyz_x, \
-                                     t_xyz_y, t_xyz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_x_x, pa2pb_x_y, pa2pb_x_z, pa2pb_xxx_x, pa2pb_xxx_y, \
+                                     pa2pb_xxx_z, pa2pb_xxy_x, pa2pb_xxy_y, pa2pb_xxy_z, pa2pb_xxz_x, pa2pb_xxz_y, \
+                                     pa2pb_xxz_z, pa2pb_xyy_x, pa2pb_xyy_y, pa2pb_xyy_z, pa2pb_xyz_x, pa2pb_xyz_y, \
+                                     pa2pb_xyz_z, pa2pb_y_x, pa2pb_y_y, pa2pb_y_z, pa2pb_z_x, pa2pb_z_y, pa2pb_z_z, pa_xx, \
+                                     pa_xy, pa_xz, pa_yy, pa_yz, r_0_0, s_0_0, t_xxx_x, t_xxx_y, t_xxx_z, t_xxy_x, t_xxy_y, \
+                                     t_xxy_z, t_xxz_x, t_xxz_y, t_xxz_z, t_xyy_x, t_xyy_y, t_xyy_z, t_xyz_x, t_xyz_y, \
+                                     t_xyz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -1339,65 +1434,65 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xxx_x[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_xx[j] * fl1_fx + 1.5 * pa_x[j] * fl1_fx * pb_x[j] + pa_xxx[j] * pb_x[j]);
+                t_xxx_x[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_xx[j] * fl1_fx + 1.5 * pa2pb_x_x[j] * fl1_fx + pa2pb_xxx_x[j]);
 
-                t_xxx_x[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga + 3.0 * fl2_fx * fl1_fz + 9.0 * pa_xx[j] * fl1_fz * fl1_fx - 3.0 * pa_x[j] * fl1_fz * fl1_fga * pb_x[j] + 9.0 * pa_x[j] * fl1_fz * fl1_fx * pb_x[j] + 8.0 * pa_xxx[j] * fl1_fz * pb_x[j]);
+                t_xxx_x[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga + 3.0 * fl2_fx * fl1_fz + 9.0 * pa_xx[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_x_x[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_x_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xxx_x[j] * fl1_fz);
 
-                t_xxx_y[j] = fl_s_0_0 * (1.5 * pa_x[j] * fl1_fx * pb_y[j] + pa_xxx[j] * pb_y[j]);
+                t_xxx_y[j] = fl_s_0_0 * (1.5 * pa2pb_x_y[j] * fl1_fx + pa2pb_xxx_y[j]);
 
-                t_xxx_y[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fz * fl1_fga * pb_y[j] + 9.0 * pa_x[j] * fl1_fz * fl1_fx * pb_y[j] + 8.0 * pa_xxx[j] * fl1_fz * pb_y[j]);
+                t_xxx_y[j] += fl_r_0_0 * (-3.0 * pa2pb_x_y[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_x_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xxx_y[j] * fl1_fz);
 
-                t_xxx_z[j] = fl_s_0_0 * (1.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_xxx[j] * pb_z[j]);
+                t_xxx_z[j] = fl_s_0_0 * (1.5 * pa2pb_x_z[j] * fl1_fx + pa2pb_xxx_z[j]);
 
-                t_xxx_z[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fz * fl1_fga * pb_z[j] + 9.0 * pa_x[j] * fl1_fz * fl1_fx * pb_z[j] + 8.0 * pa_xxx[j] * fl1_fz * pb_z[j]);
+                t_xxx_z[j] += fl_r_0_0 * (-3.0 * pa2pb_x_z[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_x_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xxx_z[j] * fl1_fz);
 
-                t_xxy_x[j] = fl_s_0_0 * (pa_xy[j] * fl1_fx + 0.5 * fl1_fx * pa_y[j] * pb_x[j] + pa_xxy[j] * pb_x[j]);
+                t_xxy_x[j] = fl_s_0_0 * (pa_xy[j] * fl1_fx + 0.5 * pa2pb_y_x[j] * fl1_fx + pa2pb_xxy_x[j]);
 
-                t_xxy_x[j] += fl_r_0_0 * (6.0 * pa_xy[j] * fl1_fx * fl1_fz - fl1_fz * fl1_fga * pa_y[j] * pb_x[j] + 3.0 * fl1_fx * fl1_fz * pa_y[j] * pb_x[j] + 8.0 * pa_xxy[j] * fl1_fz * pb_x[j]);
+                t_xxy_x[j] += fl_r_0_0 * (6.0 * pa_xy[j] * fl1_fx * fl1_fz - pa2pb_y_x[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_y_x[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xxy_x[j] * fl1_fz);
 
-                t_xxy_y[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_y[j] * pb_y[j] + pa_xxy[j] * pb_y[j]);
+                t_xxy_y[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * pa2pb_y_y[j] * fl1_fx + pa2pb_xxy_y[j]);
 
-                t_xxy_y[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * fl1_fx + fl2_fx * fl1_fz + 3.0 * pa_xx[j] * fl1_fz * fl1_fx - fl1_fz * fl1_fga * pa_y[j] * pb_y[j] + 3.0 * fl1_fx * fl1_fz * pa_y[j] * pb_y[j] + 8.0 * pa_xxy[j] * fl1_fz * pb_y[j]);
+                t_xxy_y[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * fl1_fx + fl2_fx * fl1_fz + 3.0 * pa_xx[j] * fl1_fz * fl1_fx - pa2pb_y_y[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_y_y[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xxy_y[j] * fl1_fz);
 
-                t_xxy_z[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_y[j] * pb_z[j] + pa_xxy[j] * pb_z[j]);
+                t_xxy_z[j] = fl_s_0_0 * (0.5 * pa2pb_y_z[j] * fl1_fx + pa2pb_xxy_z[j]);
 
-                t_xxy_z[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_y[j] * pb_z[j] + 3.0 * fl1_fx * fl1_fz * pa_y[j] * pb_z[j] + 8.0 * pa_xxy[j] * fl1_fz * pb_z[j]);
+                t_xxy_z[j] += fl_r_0_0 * (-pa2pb_y_z[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_y_z[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xxy_z[j] * fl1_fz);
 
-                t_xxz_x[j] = fl_s_0_0 * (pa_xz[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_x[j] + pa_xxz[j] * pb_x[j]);
+                t_xxz_x[j] = fl_s_0_0 * (pa_xz[j] * fl1_fx + 0.5 * pa2pb_z_x[j] * fl1_fx + pa2pb_xxz_x[j]);
 
-                t_xxz_x[j] += fl_r_0_0 * (6.0 * pa_xz[j] * fl1_fx * fl1_fz - fl1_fz * fl1_fga * pa_z[j] * pb_x[j] + 3.0 * fl1_fx * fl1_fz * pa_z[j] * pb_x[j] + 8.0 * pa_xxz[j] * fl1_fz * pb_x[j]);
+                t_xxz_x[j] += fl_r_0_0 * (6.0 * pa_xz[j] * fl1_fx * fl1_fz - pa2pb_z_x[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_z_x[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xxz_x[j] * fl1_fz);
 
-                t_xxz_y[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] * pb_y[j] + pa_xxz[j] * pb_y[j]);
+                t_xxz_y[j] = fl_s_0_0 * (0.5 * pa2pb_z_y[j] * fl1_fx + pa2pb_xxz_y[j]);
 
-                t_xxz_y[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_z[j] * pb_y[j] + 3.0 * fl1_fx * fl1_fz * pa_z[j] * pb_y[j] + 8.0 * pa_xxz[j] * fl1_fz * pb_y[j]);
+                t_xxz_y[j] += fl_r_0_0 * (-pa2pb_z_y[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_z_y[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xxz_y[j] * fl1_fz);
 
-                t_xxz_z[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_z[j] + pa_xxz[j] * pb_z[j]);
+                t_xxz_z[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_xx[j] * fl1_fx + 0.5 * pa2pb_z_z[j] * fl1_fx + pa2pb_xxz_z[j]);
 
-                t_xxz_z[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * fl1_fx + fl2_fx * fl1_fz + 3.0 * pa_xx[j] * fl1_fz * fl1_fx - fl1_fz * fl1_fga * pa_z[j] * pb_z[j] + 3.0 * fl1_fx * fl1_fz * pa_z[j] * pb_z[j] + 8.0 * pa_xxz[j] * fl1_fz * pb_z[j]);
+                t_xxz_z[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * fl1_fx + fl2_fx * fl1_fz + 3.0 * pa_xx[j] * fl1_fz * fl1_fx - pa2pb_z_z[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_z_z[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xxz_z[j] * fl1_fz);
 
-                t_xyy_x[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * fl1_fx * pa_yy[j] + 0.5 * pa_x[j] * fl1_fx * pb_x[j] + pa_xyy[j] * pb_x[j]);
+                t_xyy_x[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * pa2pb_x_x[j] * fl1_fx + pa2pb_xyy_x[j]);
 
-                t_xyy_x[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fga + fl2_fx * fl1_fz + 3.0 * fl1_fx * pa_yy[j] * fl1_fz - pa_x[j] * fl1_fz * fl1_fga * pb_x[j] + 3.0 * pa_x[j] * fl1_fz * fl1_fx * pb_x[j] + 8.0 * pa_xyy[j] * fl1_fz * pb_x[j]);
+                t_xyy_x[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fga + fl2_fx * fl1_fz + 3.0 * pa_yy[j] * fl1_fx * fl1_fz - pa2pb_x_x[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_x_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xyy_x[j] * fl1_fz);
 
-                t_xyy_y[j] = fl_s_0_0 * (pa_xy[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_y[j] + pa_xyy[j] * pb_y[j]);
+                t_xyy_y[j] = fl_s_0_0 * (pa_xy[j] * fl1_fx + 0.5 * pa2pb_x_y[j] * fl1_fx + pa2pb_xyy_y[j]);
 
-                t_xyy_y[j] += fl_r_0_0 * (6.0 * pa_xy[j] * fl1_fz * fl1_fx - pa_x[j] * fl1_fz * fl1_fga * pb_y[j] + 3.0 * pa_x[j] * fl1_fz * fl1_fx * pb_y[j] + 8.0 * pa_xyy[j] * fl1_fz * pb_y[j]);
+                t_xyy_y[j] += fl_r_0_0 * (6.0 * pa_xy[j] * fl1_fz * fl1_fx - pa2pb_x_y[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_x_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xyy_y[j] * fl1_fz);
 
-                t_xyy_z[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_xyy[j] * pb_z[j]);
+                t_xyy_z[j] = fl_s_0_0 * (0.5 * pa2pb_x_z[j] * fl1_fx + pa2pb_xyy_z[j]);
 
-                t_xyy_z[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fga * pb_z[j] + 3.0 * pa_x[j] * fl1_fz * fl1_fx * pb_z[j] + 8.0 * pa_xyy[j] * fl1_fz * pb_z[j]);
+                t_xyy_z[j] += fl_r_0_0 * (-pa2pb_x_z[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_x_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xyy_z[j] * fl1_fz);
 
-                t_xyz_x[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_yz[j] + pa_xyz[j] * pb_x[j]);
+                t_xyz_x[j] = fl_s_0_0 * (0.5 * pa_yz[j] * fl1_fx + pa2pb_xyz_x[j]);
 
-                t_xyz_x[j] += fl_r_0_0 * (3.0 * fl1_fx * pa_yz[j] * fl1_fz + 8.0 * pa_xyz[j] * fl1_fz * pb_x[j]);
+                t_xyz_x[j] += fl_r_0_0 * (3.0 * pa_yz[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xyz_x[j] * fl1_fz);
 
-                t_xyz_y[j] = fl_s_0_0 * (0.5 * pa_xz[j] * fl1_fx + pa_xyz[j] * pb_y[j]);
+                t_xyz_y[j] = fl_s_0_0 * (0.5 * pa_xz[j] * fl1_fx + pa2pb_xyz_y[j]);
 
-                t_xyz_y[j] += fl_r_0_0 * (3.0 * pa_xz[j] * fl1_fx * fl1_fz + 8.0 * pa_xyz[j] * fl1_fz * pb_y[j]);
+                t_xyz_y[j] += fl_r_0_0 * (3.0 * pa_xz[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_xyz_y[j] * fl1_fz);
 
-                t_xyz_z[j] = fl_s_0_0 * (0.5 * pa_xy[j] * fl1_fx + pa_xyz[j] * pb_z[j]);
+                t_xyz_z[j] = fl_s_0_0 * (0.5 * pa_xy[j] * fl1_fx + pa2pb_xyz_z[j]);
 
-                t_xyz_z[j] += fl_r_0_0 * (3.0 * pa_xy[j] * fl1_fz * fl1_fx + 8.0 * pa_xyz[j] * fl1_fz * pb_z[j]);
+                t_xyz_z[j] += fl_r_0_0 * (3.0 * pa_xy[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xyz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -1409,7 +1504,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                  const CMemBlock2D<double>& auxBuffer,
                                  const CMemBlock2D<double>& osFactors,
                                  const CMemBlock2D<double>& paDistances,
-                                 const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -1440,15 +1535,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
-
-            auto pa_x = paDistances.data(19 * idx);
-
-            auto pa_y = paDistances.data(19 * idx + 1);
-
-            auto pa_z = paDistances.data(19 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_xz = paDistances.data(19 * idx + 5);
 
@@ -1458,25 +1545,55 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_zz = paDistances.data(19 * idx + 8);
 
-            // set up pointers to 3-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pa_xzz = paDistances.data(19 * idx + 14);
+            auto pa2pb_x_x = pa2pbDistances.data(57 * idx);
 
-            auto pa_yyy = paDistances.data(19 * idx + 15);
+            auto pa2pb_x_y = pa2pbDistances.data(57 * idx + 1);
 
-            auto pa_yyz = paDistances.data(19 * idx + 16);
+            auto pa2pb_x_z = pa2pbDistances.data(57 * idx + 2);
 
-            auto pa_yzz = paDistances.data(19 * idx + 17);
+            auto pa2pb_y_x = pa2pbDistances.data(57 * idx + 3);
 
-            auto pa_zzz = paDistances.data(19 * idx + 18);
+            auto pa2pb_y_y = pa2pbDistances.data(57 * idx + 4);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            auto pa2pb_y_z = pa2pbDistances.data(57 * idx + 5);
 
-            auto pb_x = pbDistances.data(3 * idx);
+            auto pa2pb_z_x = pa2pbDistances.data(57 * idx + 6);
 
-            auto pb_y = pbDistances.data(3 * idx + 1);
+            auto pa2pb_z_y = pa2pbDistances.data(57 * idx + 7);
 
-            auto pb_z = pbDistances.data(3 * idx + 2);
+            auto pa2pb_z_z = pa2pbDistances.data(57 * idx + 8);
+
+            auto pa2pb_xzz_x = pa2pbDistances.data(57 * idx + 42);
+
+            auto pa2pb_xzz_y = pa2pbDistances.data(57 * idx + 43);
+
+            auto pa2pb_xzz_z = pa2pbDistances.data(57 * idx + 44);
+
+            auto pa2pb_yyy_x = pa2pbDistances.data(57 * idx + 45);
+
+            auto pa2pb_yyy_y = pa2pbDistances.data(57 * idx + 46);
+
+            auto pa2pb_yyy_z = pa2pbDistances.data(57 * idx + 47);
+
+            auto pa2pb_yyz_x = pa2pbDistances.data(57 * idx + 48);
+
+            auto pa2pb_yyz_y = pa2pbDistances.data(57 * idx + 49);
+
+            auto pa2pb_yyz_z = pa2pbDistances.data(57 * idx + 50);
+
+            auto pa2pb_yzz_x = pa2pbDistances.data(57 * idx + 51);
+
+            auto pa2pb_yzz_y = pa2pbDistances.data(57 * idx + 52);
+
+            auto pa2pb_yzz_z = pa2pbDistances.data(57 * idx + 53);
+
+            auto pa2pb_zzz_x = pa2pbDistances.data(57 * idx + 54);
+
+            auto pa2pb_zzz_y = pa2pbDistances.data(57 * idx + 55);
+
+            auto pa2pb_zzz_z = pa2pbDistances.data(57 * idx + 56);
 
             // set up pointers to auxilary integrals
 
@@ -1518,10 +1635,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (15,30)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_x, pa_xz, pa_xzz, pa_y, pa_yy, pa_yyy, pa_yyz, pa_yz, pa_yzz, pa_z, \
-                                     pa_zz, pa_zzz, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_xzz_x, t_xzz_y, t_xzz_z, t_yyy_x, \
-                                     t_yyy_y, t_yyy_z, t_yyz_x, t_yyz_y, t_yyz_z, t_yzz_x, t_yzz_y, t_yzz_z, t_zzz_x, \
-                                     t_zzz_y, t_zzz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_x_x, pa2pb_x_y, pa2pb_x_z, pa2pb_xzz_x, pa2pb_xzz_y, \
+                                     pa2pb_xzz_z, pa2pb_y_x, pa2pb_y_y, pa2pb_y_z, pa2pb_yyy_x, pa2pb_yyy_y, pa2pb_yyy_z, \
+                                     pa2pb_yyz_x, pa2pb_yyz_y, pa2pb_yyz_z, pa2pb_yzz_x, pa2pb_yzz_y, pa2pb_yzz_z, \
+                                     pa2pb_z_x, pa2pb_z_y, pa2pb_z_z, pa2pb_zzz_x, pa2pb_zzz_y, pa2pb_zzz_z, pa_xz, \
+                                     pa_yy, pa_yz, pa_zz, r_0_0, s_0_0, t_xzz_x, t_xzz_y, t_xzz_z, t_yyy_x, t_yyy_y, \
+                                     t_yyy_z, t_yyz_x, t_yyz_y, t_yyz_z, t_yzz_x, t_yzz_y, t_yzz_z, t_zzz_x, t_zzz_y, \
+                                     t_zzz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -1536,65 +1656,65 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xzz_x[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * fl1_fx * pa_zz[j] + 0.5 * pa_x[j] * fl1_fx * pb_x[j] + pa_xzz[j] * pb_x[j]);
+                t_xzz_x[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_zz[j] * fl1_fx + 0.5 * pa2pb_x_x[j] * fl1_fx + pa2pb_xzz_x[j]);
 
-                t_xzz_x[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fga + fl2_fx * fl1_fz + 3.0 * fl1_fx * pa_zz[j] * fl1_fz - pa_x[j] * fl1_fz * fl1_fga * pb_x[j] + 3.0 * pa_x[j] * fl1_fz * fl1_fx * pb_x[j] + 8.0 * pa_xzz[j] * fl1_fz * pb_x[j]);
+                t_xzz_x[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fga + fl2_fx * fl1_fz + 3.0 * pa_zz[j] * fl1_fx * fl1_fz - pa2pb_x_x[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_x_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xzz_x[j] * fl1_fz);
 
-                t_xzz_y[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_y[j] + pa_xzz[j] * pb_y[j]);
+                t_xzz_y[j] = fl_s_0_0 * (0.5 * pa2pb_x_y[j] * fl1_fx + pa2pb_xzz_y[j]);
 
-                t_xzz_y[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fga * pb_y[j] + 3.0 * pa_x[j] * fl1_fz * fl1_fx * pb_y[j] + 8.0 * pa_xzz[j] * fl1_fz * pb_y[j]);
+                t_xzz_y[j] += fl_r_0_0 * (-pa2pb_x_y[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_x_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xzz_y[j] * fl1_fz);
 
-                t_xzz_z[j] = fl_s_0_0 * (pa_xz[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_z[j] + pa_xzz[j] * pb_z[j]);
+                t_xzz_z[j] = fl_s_0_0 * (pa_xz[j] * fl1_fx + 0.5 * pa2pb_x_z[j] * fl1_fx + pa2pb_xzz_z[j]);
 
-                t_xzz_z[j] += fl_r_0_0 * (6.0 * pa_xz[j] * fl1_fz * fl1_fx - pa_x[j] * fl1_fz * fl1_fga * pb_z[j] + 3.0 * pa_x[j] * fl1_fz * fl1_fx * pb_z[j] + 8.0 * pa_xzz[j] * fl1_fz * pb_z[j]);
+                t_xzz_z[j] += fl_r_0_0 * (6.0 * pa_xz[j] * fl1_fz * fl1_fx - pa2pb_x_z[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_x_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_xzz_z[j] * fl1_fz);
 
-                t_yyy_x[j] = fl_s_0_0 * (1.5 * pa_y[j] * fl1_fx * pb_x[j] + pa_yyy[j] * pb_x[j]);
+                t_yyy_x[j] = fl_s_0_0 * (1.5 * pa2pb_y_x[j] * fl1_fx + pa2pb_yyy_x[j]);
 
-                t_yyy_x[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fz * fl1_fga * pb_x[j] + 9.0 * pa_y[j] * fl1_fz * fl1_fx * pb_x[j] + 8.0 * pa_yyy[j] * fl1_fz * pb_x[j]);
+                t_yyy_x[j] += fl_r_0_0 * (-3.0 * pa2pb_y_x[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_y_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_yyy_x[j] * fl1_fz);
 
-                t_yyy_y[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_yy[j] * fl1_fx + 1.5 * pa_y[j] * fl1_fx * pb_y[j] + pa_yyy[j] * pb_y[j]);
+                t_yyy_y[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_yy[j] * fl1_fx + 1.5 * pa2pb_y_y[j] * fl1_fx + pa2pb_yyy_y[j]);
 
-                t_yyy_y[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga + 3.0 * fl2_fx * fl1_fz + 9.0 * pa_yy[j] * fl1_fz * fl1_fx - 3.0 * pa_y[j] * fl1_fz * fl1_fga * pb_y[j] + 9.0 * pa_y[j] * fl1_fz * fl1_fx * pb_y[j] + 8.0 * pa_yyy[j] * fl1_fz * pb_y[j]);
+                t_yyy_y[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga + 3.0 * fl2_fx * fl1_fz + 9.0 * pa_yy[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_y_y[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_y_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_yyy_y[j] * fl1_fz);
 
-                t_yyy_z[j] = fl_s_0_0 * (1.5 * pa_y[j] * fl1_fx * pb_z[j] + pa_yyy[j] * pb_z[j]);
+                t_yyy_z[j] = fl_s_0_0 * (1.5 * pa2pb_y_z[j] * fl1_fx + pa2pb_yyy_z[j]);
 
-                t_yyy_z[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fz * fl1_fga * pb_z[j] + 9.0 * pa_y[j] * fl1_fz * fl1_fx * pb_z[j] + 8.0 * pa_yyy[j] * fl1_fz * pb_z[j]);
+                t_yyy_z[j] += fl_r_0_0 * (-3.0 * pa2pb_y_z[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_y_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_yyy_z[j] * fl1_fz);
 
-                t_yyz_x[j] = fl_s_0_0 * (0.5 * fl1_fx * pa_z[j] * pb_x[j] + pa_yyz[j] * pb_x[j]);
+                t_yyz_x[j] = fl_s_0_0 * (0.5 * pa2pb_z_x[j] * fl1_fx + pa2pb_yyz_x[j]);
 
-                t_yyz_x[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_z[j] * pb_x[j] + 3.0 * fl1_fx * fl1_fz * pa_z[j] * pb_x[j] + 8.0 * pa_yyz[j] * fl1_fz * pb_x[j]);
+                t_yyz_x[j] += fl_r_0_0 * (-pa2pb_z_x[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_z_x[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_yyz_x[j] * fl1_fz);
 
-                t_yyz_y[j] = fl_s_0_0 * (pa_yz[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_y[j] + pa_yyz[j] * pb_y[j]);
+                t_yyz_y[j] = fl_s_0_0 * (pa_yz[j] * fl1_fx + 0.5 * pa2pb_z_y[j] * fl1_fx + pa2pb_yyz_y[j]);
 
-                t_yyz_y[j] += fl_r_0_0 * (6.0 * pa_yz[j] * fl1_fx * fl1_fz - fl1_fz * fl1_fga * pa_z[j] * pb_y[j] + 3.0 * fl1_fx * fl1_fz * pa_z[j] * pb_y[j] + 8.0 * pa_yyz[j] * fl1_fz * pb_y[j]);
+                t_yyz_y[j] += fl_r_0_0 * (6.0 * pa_yz[j] * fl1_fx * fl1_fz - pa2pb_z_y[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_z_y[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_yyz_y[j] * fl1_fz);
 
-                t_yyz_z[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * fl1_fx * pa_z[j] * pb_z[j] + pa_yyz[j] * pb_z[j]);
+                t_yyz_z[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_yy[j] * fl1_fx + 0.5 * pa2pb_z_z[j] * fl1_fx + pa2pb_yyz_z[j]);
 
-                t_yyz_z[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * fl1_fx + fl2_fx * fl1_fz + 3.0 * pa_yy[j] * fl1_fz * fl1_fx - fl1_fz * fl1_fga * pa_z[j] * pb_z[j] + 3.0 * fl1_fx * fl1_fz * pa_z[j] * pb_z[j] + 8.0 * pa_yyz[j] * fl1_fz * pb_z[j]);
+                t_yyz_z[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * fl1_fx + fl2_fx * fl1_fz + 3.0 * pa_yy[j] * fl1_fz * fl1_fx - pa2pb_z_z[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_z_z[j] * fl1_fx * fl1_fz + 8.0 * pa2pb_yyz_z[j] * fl1_fz);
 
-                t_yzz_x[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl1_fx * pb_x[j] + pa_yzz[j] * pb_x[j]);
+                t_yzz_x[j] = fl_s_0_0 * (0.5 * pa2pb_y_x[j] * fl1_fx + pa2pb_yzz_x[j]);
 
-                t_yzz_x[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fga * pb_x[j] + 3.0 * pa_y[j] * fl1_fz * fl1_fx * pb_x[j] + 8.0 * pa_yzz[j] * fl1_fz * pb_x[j]);
+                t_yzz_x[j] += fl_r_0_0 * (-pa2pb_y_x[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_y_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_yzz_x[j] * fl1_fz);
 
-                t_yzz_y[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * fl1_fx * pa_zz[j] + 0.5 * pa_y[j] * fl1_fx * pb_y[j] + pa_yzz[j] * pb_y[j]);
+                t_yzz_y[j] = fl_s_0_0 * (0.25 * fl2_fx + 0.5 * pa_zz[j] * fl1_fx + 0.5 * pa2pb_y_y[j] * fl1_fx + pa2pb_yzz_y[j]);
 
-                t_yzz_y[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fga + fl2_fx * fl1_fz + 3.0 * fl1_fx * pa_zz[j] * fl1_fz - pa_y[j] * fl1_fz * fl1_fga * pb_y[j] + 3.0 * pa_y[j] * fl1_fz * fl1_fx * pb_y[j] + 8.0 * pa_yzz[j] * fl1_fz * pb_y[j]);
+                t_yzz_y[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fga + fl2_fx * fl1_fz + 3.0 * pa_zz[j] * fl1_fx * fl1_fz - pa2pb_y_y[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_y_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_yzz_y[j] * fl1_fz);
 
-                t_yzz_z[j] = fl_s_0_0 * (pa_yz[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_z[j] + pa_yzz[j] * pb_z[j]);
+                t_yzz_z[j] = fl_s_0_0 * (pa_yz[j] * fl1_fx + 0.5 * pa2pb_y_z[j] * fl1_fx + pa2pb_yzz_z[j]);
 
-                t_yzz_z[j] += fl_r_0_0 * (6.0 * pa_yz[j] * fl1_fz * fl1_fx - pa_y[j] * fl1_fz * fl1_fga * pb_z[j] + 3.0 * pa_y[j] * fl1_fz * fl1_fx * pb_z[j] + 8.0 * pa_yzz[j] * fl1_fz * pb_z[j]);
+                t_yzz_z[j] += fl_r_0_0 * (6.0 * pa_yz[j] * fl1_fz * fl1_fx - pa2pb_y_z[j] * fl1_fz * fl1_fga + 3.0 * pa2pb_y_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_yzz_z[j] * fl1_fz);
 
-                t_zzz_x[j] = fl_s_0_0 * (1.5 * pa_z[j] * fl1_fx * pb_x[j] + pa_zzz[j] * pb_x[j]);
+                t_zzz_x[j] = fl_s_0_0 * (1.5 * pa2pb_z_x[j] * fl1_fx + pa2pb_zzz_x[j]);
 
-                t_zzz_x[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fz * fl1_fga * pb_x[j] + 9.0 * pa_z[j] * fl1_fz * fl1_fx * pb_x[j] + 8.0 * pa_zzz[j] * fl1_fz * pb_x[j]);
+                t_zzz_x[j] += fl_r_0_0 * (-3.0 * pa2pb_z_x[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_z_x[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_zzz_x[j] * fl1_fz);
 
-                t_zzz_y[j] = fl_s_0_0 * (1.5 * pa_z[j] * fl1_fx * pb_y[j] + pa_zzz[j] * pb_y[j]);
+                t_zzz_y[j] = fl_s_0_0 * (1.5 * pa2pb_z_y[j] * fl1_fx + pa2pb_zzz_y[j]);
 
-                t_zzz_y[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fz * fl1_fga * pb_y[j] + 9.0 * pa_z[j] * fl1_fz * fl1_fx * pb_y[j] + 8.0 * pa_zzz[j] * fl1_fz * pb_y[j]);
+                t_zzz_y[j] += fl_r_0_0 * (-3.0 * pa2pb_z_y[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_z_y[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_zzz_y[j] * fl1_fz);
 
-                t_zzz_z[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_zz[j] * fl1_fx + 1.5 * pa_z[j] * fl1_fx * pb_z[j] + pa_zzz[j] * pb_z[j]);
+                t_zzz_z[j] = fl_s_0_0 * (0.75 * fl2_fx + 1.5 * pa_zz[j] * fl1_fx + 1.5 * pa2pb_z_z[j] * fl1_fx + pa2pb_zzz_z[j]);
 
-                t_zzz_z[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga + 3.0 * fl2_fx * fl1_fz + 9.0 * pa_zz[j] * fl1_fz * fl1_fx - 3.0 * pa_z[j] * fl1_fz * fl1_fga * pb_z[j] + 9.0 * pa_z[j] * fl1_fz * fl1_fx * pb_z[j] + 8.0 * pa_zzz[j] * fl1_fz * pb_z[j]);
+                t_zzz_z[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga + 3.0 * fl2_fx * fl1_fz + 9.0 * pa_zz[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_z_z[j] * fl1_fz * fl1_fga + 9.0 * pa2pb_z_z[j] * fl1_fz * fl1_fx + 8.0 * pa2pb_zzz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -1607,23 +1727,24 @@ namespace kinrecfunc { // kinrecfunc namespace
                            const CMemBlock2D<double>& osFactors,
                            const CMemBlock2D<double>& paDistances,
                            const CMemBlock2D<double>& pbDistances,
+                           const CMemBlock2D<double>& pa2pbDistances,
                            const CGtoBlock&           braGtoBlock,
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
-        kinrecfunc::compKineticEnergyForPG_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPG_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForPG_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPG_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                 braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForPG_18_27(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPG_18_27(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForPG_27_36(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPG_27_36(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForPG_36_45(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForPG_36_45(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
     }
 
@@ -1633,6 +1754,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                const CMemBlock2D<double>& osFactors,
                                const CMemBlock2D<double>& paDistances,
                                const CMemBlock2D<double>& pbDistances,
+                               const CMemBlock2D<double>& pa2pbDistances,
                                const CGtoBlock&           braGtoBlock,
                                const CGtoBlock&           ketGtoBlock,
                                const int32_t              iContrGto)
@@ -1663,33 +1785,17 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(3 * idx);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(34 * idx);
 
             auto pb_y = pbDistances.data(34 * idx + 1);
 
             auto pb_z = pbDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
-
-            auto pb_xx = pbDistances.data(34 * idx + 3);
-
-            auto pb_xy = pbDistances.data(34 * idx + 4);
-
-            auto pb_xz = pbDistances.data(34 * idx + 5);
-
-            auto pb_yy = pbDistances.data(34 * idx + 6);
-
-            auto pb_yz = pbDistances.data(34 * idx + 7);
-
-            auto pb_zz = pbDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PB)
 
             auto pb_xxx = pbDistances.data(34 * idx + 9);
 
@@ -1709,25 +1815,37 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_yzz = pbDistances.data(34 * idx + 17);
 
-            // set up pointers to 4-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xxxx = pbDistances.data(34 * idx + 19);
+            auto pa2pb_x_xx = pa2pbDistances.data(102 * idx + 3);
 
-            auto pb_xxxy = pbDistances.data(34 * idx + 20);
+            auto pa2pb_x_xy = pa2pbDistances.data(102 * idx + 4);
 
-            auto pb_xxxz = pbDistances.data(34 * idx + 21);
+            auto pa2pb_x_xz = pa2pbDistances.data(102 * idx + 5);
 
-            auto pb_xxyy = pbDistances.data(34 * idx + 22);
+            auto pa2pb_x_yy = pa2pbDistances.data(102 * idx + 6);
 
-            auto pb_xxyz = pbDistances.data(34 * idx + 23);
+            auto pa2pb_x_yz = pa2pbDistances.data(102 * idx + 7);
 
-            auto pb_xxzz = pbDistances.data(34 * idx + 24);
+            auto pa2pb_x_zz = pa2pbDistances.data(102 * idx + 8);
 
-            auto pb_xyyy = pbDistances.data(34 * idx + 25);
+            auto pa2pb_x_xxxx = pa2pbDistances.data(102 * idx + 19);
 
-            auto pb_xyyz = pbDistances.data(34 * idx + 26);
+            auto pa2pb_x_xxxy = pa2pbDistances.data(102 * idx + 20);
 
-            auto pb_xyzz = pbDistances.data(34 * idx + 27);
+            auto pa2pb_x_xxxz = pa2pbDistances.data(102 * idx + 21);
+
+            auto pa2pb_x_xxyy = pa2pbDistances.data(102 * idx + 22);
+
+            auto pa2pb_x_xxyz = pa2pbDistances.data(102 * idx + 23);
+
+            auto pa2pb_x_xxzz = pa2pbDistances.data(102 * idx + 24);
+
+            auto pa2pb_x_xyyy = pa2pbDistances.data(102 * idx + 25);
+
+            auto pa2pb_x_xyyz = pa2pbDistances.data(102 * idx + 26);
+
+            auto pa2pb_x_xyzz = pa2pbDistances.data(102 * idx + 27);
 
             // set up pointers to auxilary integrals
 
@@ -1757,10 +1875,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (0,9)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_x, pb_x, pb_xx, pb_xxx, pb_xxxx, pb_xxxy, pb_xxxz, pb_xxy, pb_xxyy, \
-                                     pb_xxyz, pb_xxz, pb_xxzz, pb_xy, pb_xyy, pb_xyyy, pb_xyyz, pb_xyz, pb_xyzz, pb_xz, \
-                                     pb_xzz, pb_y, pb_yy, pb_yyy, pb_yyz, pb_yz, pb_yzz, pb_z, pb_zz, r_0_0, s_0_0, t_x_xxxx, \
-                                     t_x_xxxy, t_x_xxxz, t_x_xxyy, t_x_xxyz, t_x_xxzz, t_x_xyyy, t_x_xyyz, t_x_xyzz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_x_xx, pa2pb_x_xxxx, pa2pb_x_xxxy, pa2pb_x_xxxz, \
+                                     pa2pb_x_xxyy, pa2pb_x_xxyz, pa2pb_x_xxzz, pa2pb_x_xy, pa2pb_x_xyyy, pa2pb_x_xyyz, \
+                                     pa2pb_x_xyzz, pa2pb_x_xz, pa2pb_x_yy, pa2pb_x_yz, pa2pb_x_zz, pa_x, pb_x, pb_xxx, pb_xxy, \
+                                     pb_xxz, pb_xyy, pb_xyz, pb_xzz, pb_y, pb_yyy, pb_yyz, pb_yzz, pb_z, r_0_0, s_0_0, \
+                                     t_x_xxxx, t_x_xxxy, t_x_xxxz, t_x_xxyy, t_x_xxyz, t_x_xxzz, t_x_xyyy, t_x_xyyz, \
+                                     t_x_xyzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -1775,41 +1895,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_x_xxxx[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * fl2_fx * pb_x[j] + 3.0 * pa_x[j] * pb_xx[j] * fl1_fx + 2.0 * fl1_fx * pb_xxx[j] + pa_x[j] * pb_xxxx[j]);
+                t_x_xxxx[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * pb_x[j] * fl2_fx + 3.0 * pa2pb_x_xx[j] * fl1_fx + 2.0 * pb_xxx[j] * fl1_fx + pa2pb_x_xxxx[j]);
 
-                t_x_xxxx[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fgb - 6.0 * fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_x[j] * fl2_fx + 18.0 * fl1_fz * fl2_fx * pb_x[j] - 6.0 * pa_x[j] * pb_xx[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_x[j] * pb_xx[j] * fl1_fx + 16.0 * fl1_fz * fl1_fx * pb_xxx[j] + 10.0 * fl1_fz * pa_x[j] * pb_xxxx[j]);
+                t_x_xxxx[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fgb - 6.0 * pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_x[j] * fl1_fz * fl2_fx + 18.0 * pb_x[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_x_xx[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_x_xx[j] * fl1_fz * fl1_fx + 16.0 * pb_xxx[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xxxx[j] * fl1_fz);
 
-                t_x_xxxy[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_xy[j] * fl1_fx + 1.5 * fl1_fx * pb_xxy[j] + pa_x[j] * pb_xxxy[j]);
+                t_x_xxxy[j] = fl_s_0_0 * (0.75 * pb_y[j] * fl2_fx + 1.5 * pa2pb_x_xy[j] * fl1_fx + 1.5 * pb_xxy[j] * fl1_fx + pa2pb_x_xxxy[j]);
 
-                t_x_xxxy[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb * pb_y[j] + 4.5 * fl1_fz * fl2_fx * pb_y[j] - 3.0 * pa_x[j] * pb_xy[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_x[j] * pb_xy[j] * fl1_fx + 12.0 * fl1_fz * fl1_fx * pb_xxy[j] + 10.0 * fl1_fz * pa_x[j] * pb_xxxy[j]);
+                t_x_xxxy[j] += fl_r_0_0 * (-1.5 * pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_y[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_x_xy[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_x_xy[j] * fl1_fz * fl1_fx + 12.0 * pb_xxy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xxxy[j] * fl1_fz);
 
-                t_x_xxxz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_xz[j] * fl1_fx + 1.5 * fl1_fx * pb_xxz[j] + pa_x[j] * pb_xxxz[j]);
+                t_x_xxxz[j] = fl_s_0_0 * (0.75 * pb_z[j] * fl2_fx + 1.5 * pa2pb_x_xz[j] * fl1_fx + 1.5 * pb_xxz[j] * fl1_fx + pa2pb_x_xxxz[j]);
 
-                t_x_xxxz[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb * pb_z[j] + 4.5 * fl1_fz * fl2_fx * pb_z[j] - 3.0 * pa_x[j] * pb_xz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_x[j] * pb_xz[j] * fl1_fx + 12.0 * fl1_fz * fl1_fx * pb_xxz[j] + 10.0 * fl1_fz * pa_x[j] * pb_xxxz[j]);
+                t_x_xxxz[j] += fl_r_0_0 * (-1.5 * pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_z[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_x_xz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_x_xz[j] * fl1_fz * fl1_fx + 12.0 * pb_xxz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xxxz[j] * fl1_fz);
 
-                t_x_xxyy[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + 0.5 * pa_x[j] * pb_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_xyy[j] + pa_x[j] * pb_xxyy[j]);
+                t_x_xxyy[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pb_x[j] * fl2_fx + 0.5 * pa2pb_x_xx[j] * fl1_fx + 0.5 * pa2pb_x_yy[j] * fl1_fx + pb_xyy[j] * fl1_fx + pa2pb_x_xxyy[j]);
 
-                t_x_xxyy[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fgb - fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 1.5 * fl1_fz * pa_x[j] * fl2_fx + 3.0 * fl1_fz * fl2_fx * pb_x[j] - pa_x[j] * pb_xx[j] * fl1_fz * fl1_fgb - pa_x[j] * fl1_fz * fl1_fgb * pb_yy[j] + 4.0 * fl1_fz * pa_x[j] * pb_xx[j] * fl1_fx + 4.0 * fl1_fz * pa_x[j] * fl1_fx * pb_yy[j] + 8.0 * fl1_fz * fl1_fx * pb_xyy[j] + 10.0 * fl1_fz * pa_x[j] * pb_xxyy[j]);
+                t_x_xxyy[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fgb - pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_x[j] * fl1_fz * fl2_fx + 3.0 * pb_x[j] * fl1_fz * fl2_fx - pa2pb_x_xx[j] * fl1_fz * fl1_fgb - pa2pb_x_yy[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_x_xx[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_x_yy[j] * fl1_fz * fl1_fx + 8.0 * pb_xyy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xxyy[j] * fl1_fz);
 
-                t_x_xxyz[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl1_fx * pb_yz[j] + fl1_fx * pb_xyz[j] + pa_x[j] * pb_xxyz[j]);
+                t_x_xxyz[j] = fl_s_0_0 * (0.5 * pa2pb_x_yz[j] * fl1_fx + pb_xyz[j] * fl1_fx + pa2pb_x_xxyz[j]);
 
-                t_x_xxyz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fz * fl1_fgb * pb_yz[j] + 4.0 * fl1_fz * pa_x[j] * fl1_fx * pb_yz[j] + 8.0 * fl1_fz * fl1_fx * pb_xyz[j] + 10.0 * fl1_fz * pa_x[j] * pb_xxyz[j]);
+                t_x_xxyz[j] += fl_r_0_0 * (-pa2pb_x_yz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_x_yz[j] * fl1_fz * fl1_fx + 8.0 * pb_xyz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xxyz[j] * fl1_fz);
 
-                t_x_xxzz[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * fl2_fx * pb_x[j] + 0.5 * pa_x[j] * pb_xx[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_xzz[j] + pa_x[j] * pb_xxzz[j]);
+                t_x_xxzz[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pb_x[j] * fl2_fx + 0.5 * pa2pb_x_xx[j] * fl1_fx + 0.5 * pa2pb_x_zz[j] * fl1_fx + pb_xzz[j] * fl1_fx + pa2pb_x_xxzz[j]);
 
-                t_x_xxzz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fgb - fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 1.5 * fl1_fz * pa_x[j] * fl2_fx + 3.0 * fl1_fz * fl2_fx * pb_x[j] - pa_x[j] * pb_xx[j] * fl1_fz * fl1_fgb - pa_x[j] * fl1_fz * fl1_fgb * pb_zz[j] + 4.0 * fl1_fz * pa_x[j] * pb_xx[j] * fl1_fx + 4.0 * fl1_fz * pa_x[j] * fl1_fx * pb_zz[j] + 8.0 * fl1_fz * fl1_fx * pb_xzz[j] + 10.0 * fl1_fz * pa_x[j] * pb_xxzz[j]);
+                t_x_xxzz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fgb - pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_x[j] * fl1_fz * fl2_fx + 3.0 * pb_x[j] * fl1_fz * fl2_fx - pa2pb_x_xx[j] * fl1_fz * fl1_fgb - pa2pb_x_zz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_x_xx[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_x_zz[j] * fl1_fz * fl1_fx + 8.0 * pb_xzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xxzz[j] * fl1_fz);
 
-                t_x_xyyy[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_x[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_yyy[j] + pa_x[j] * pb_xyyy[j]);
+                t_x_xyyy[j] = fl_s_0_0 * (0.75 * pb_y[j] * fl2_fx + 1.5 * pa2pb_x_xy[j] * fl1_fx + 0.5 * pb_yyy[j] * fl1_fx + pa2pb_x_xyyy[j]);
 
-                t_x_xyyy[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_y[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_y[j] - 3.0 * pa_x[j] * pb_xy[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_x[j] * pb_xy[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_yyy[j] + 10.0 * fl1_fz * pa_x[j] * pb_xyyy[j]);
+                t_x_xyyy[j] += fl_r_0_0 * (-1.5 * pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_y[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_x_xy[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_x_xy[j] * fl1_fz * fl1_fx + 4.0 * pb_yyy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xyyy[j] * fl1_fz);
 
-                t_x_xyyz[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_z[j] + 0.5 * pa_x[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_yyz[j] + pa_x[j] * pb_xyyz[j]);
+                t_x_xyyz[j] = fl_s_0_0 * (0.25 * pb_z[j] * fl2_fx + 0.5 * pa2pb_x_xz[j] * fl1_fx + 0.5 * pb_yyz[j] * fl1_fx + pa2pb_x_xyyz[j]);
 
-                t_x_xyyz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb * pb_z[j] + 1.5 * fl1_fz * fl2_fx * pb_z[j] - pa_x[j] * pb_xz[j] * fl1_fz * fl1_fgb + 4.0 * fl1_fz * pa_x[j] * pb_xz[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_yyz[j] + 10.0 * fl1_fz * pa_x[j] * pb_xyyz[j]);
+                t_x_xyyz[j] += fl_r_0_0 * (-0.5 * pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pb_z[j] * fl1_fz * fl2_fx - pa2pb_x_xz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_x_xz[j] * fl1_fz * fl1_fx + 4.0 * pb_yyz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xyyz[j] * fl1_fz);
 
-                t_x_xyzz[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_y[j] + 0.5 * pa_x[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_yzz[j] + pa_x[j] * pb_xyzz[j]);
+                t_x_xyzz[j] = fl_s_0_0 * (0.25 * pb_y[j] * fl2_fx + 0.5 * pa2pb_x_xy[j] * fl1_fx + 0.5 * pb_yzz[j] * fl1_fx + pa2pb_x_xyzz[j]);
 
-                t_x_xyzz[j] += fl_r_0_0 * (-0.5 * fl1_fx * pb_y[j] * fl1_fz * fl1_fgb + 1.5 * fl1_fz * fl2_fx * pb_y[j] - pa_x[j] * pb_xy[j] * fl1_fz * fl1_fgb + 4.0 * fl1_fz * pa_x[j] * pb_xy[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_yzz[j] + 10.0 * fl1_fz * pa_x[j] * pb_xyzz[j]);
+                t_x_xyzz[j] += fl_r_0_0 * (-0.5 * pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pb_y[j] * fl1_fz * fl2_fx - pa2pb_x_xy[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_x_xy[j] * fl1_fz * fl1_fx + 4.0 * pb_yzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xyzz[j] * fl1_fz);
             }
 
             idx++;
@@ -1822,6 +1942,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto)
@@ -1852,57 +1973,55 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(3 * idx);
 
             auto pa_y = paDistances.data(3 * idx + 1);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(34 * idx);
 
             auto pb_z = pbDistances.data(34 * idx + 2);
 
-            // set up pointers to 2-th order tensor of distance R(PB)
-
-            auto pb_xx = pbDistances.data(34 * idx + 3);
-
-            auto pb_xy = pbDistances.data(34 * idx + 4);
-
-            auto pb_xz = pbDistances.data(34 * idx + 5);
-
-            auto pb_yy = pbDistances.data(34 * idx + 6);
-
-            auto pb_yz = pbDistances.data(34 * idx + 7);
-
-            auto pb_zz = pbDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PB)
-
             auto pb_xxx = pbDistances.data(34 * idx + 9);
 
             auto pb_zzz = pbDistances.data(34 * idx + 18);
 
-            // set up pointers to 4-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xxxx = pbDistances.data(34 * idx + 19);
+            auto pa2pb_x_xz = pa2pbDistances.data(102 * idx + 5);
 
-            auto pb_xxxy = pbDistances.data(34 * idx + 20);
+            auto pa2pb_x_yy = pa2pbDistances.data(102 * idx + 6);
 
-            auto pb_xxxz = pbDistances.data(34 * idx + 21);
+            auto pa2pb_x_yz = pa2pbDistances.data(102 * idx + 7);
 
-            auto pb_xzzz = pbDistances.data(34 * idx + 28);
+            auto pa2pb_x_zz = pa2pbDistances.data(102 * idx + 8);
 
-            auto pb_yyyy = pbDistances.data(34 * idx + 29);
+            auto pa2pb_x_xzzz = pa2pbDistances.data(102 * idx + 28);
 
-            auto pb_yyyz = pbDistances.data(34 * idx + 30);
+            auto pa2pb_x_yyyy = pa2pbDistances.data(102 * idx + 29);
 
-            auto pb_yyzz = pbDistances.data(34 * idx + 31);
+            auto pa2pb_x_yyyz = pa2pbDistances.data(102 * idx + 30);
 
-            auto pb_yzzz = pbDistances.data(34 * idx + 32);
+            auto pa2pb_x_yyzz = pa2pbDistances.data(102 * idx + 31);
 
-            auto pb_zzzz = pbDistances.data(34 * idx + 33);
+            auto pa2pb_x_yzzz = pa2pbDistances.data(102 * idx + 32);
+
+            auto pa2pb_x_zzzz = pa2pbDistances.data(102 * idx + 33);
+
+            auto pa2pb_y_xx = pa2pbDistances.data(102 * idx + 37);
+
+            auto pa2pb_y_xy = pa2pbDistances.data(102 * idx + 38);
+
+            auto pa2pb_y_xz = pa2pbDistances.data(102 * idx + 39);
+
+            auto pa2pb_y_xxxx = pa2pbDistances.data(102 * idx + 53);
+
+            auto pa2pb_y_xxxy = pa2pbDistances.data(102 * idx + 54);
+
+            auto pa2pb_y_xxxz = pa2pbDistances.data(102 * idx + 55);
 
             // set up pointers to auxilary integrals
 
@@ -1932,10 +2051,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (9,18)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_x, pa_y, pb_x, pb_xx, pb_xxx, pb_xxxx, pb_xxxy, pb_xxxz, pb_xy, \
-                                     pb_xz, pb_xzzz, pb_yy, pb_yyyy, pb_yyyz, pb_yyzz, pb_yz, pb_yzzz, pb_z, pb_zz, pb_zzz, \
-                                     pb_zzzz, r_0_0, s_0_0, t_x_xzzz, t_x_yyyy, t_x_yyyz, t_x_yyzz, t_x_yzzz, t_x_zzzz, \
-                                     t_y_xxxx, t_y_xxxy, t_y_xxxz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_x_xz, pa2pb_x_xzzz, pa2pb_x_yy, pa2pb_x_yyyy, \
+                                     pa2pb_x_yyyz, pa2pb_x_yyzz, pa2pb_x_yz, pa2pb_x_yzzz, pa2pb_x_zz, pa2pb_x_zzzz, \
+                                     pa2pb_y_xx, pa2pb_y_xxxx, pa2pb_y_xxxy, pa2pb_y_xxxz, pa2pb_y_xy, pa2pb_y_xz, pa_x, \
+                                     pa_y, pb_x, pb_xxx, pb_z, pb_zzz, r_0_0, s_0_0, t_x_xzzz, t_x_yyyy, t_x_yyyz, \
+                                     t_x_yyzz, t_x_yzzz, t_x_zzzz, t_y_xxxx, t_y_xxxy, t_y_xxxz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -1950,41 +2070,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_x_xzzz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_x[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_zzz[j] + pa_x[j] * pb_xzzz[j]);
+                t_x_xzzz[j] = fl_s_0_0 * (0.75 * pb_z[j] * fl2_fx + 1.5 * pa2pb_x_xz[j] * fl1_fx + 0.5 * pb_zzz[j] * fl1_fx + pa2pb_x_xzzz[j]);
 
-                t_x_xzzz[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_z[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_z[j] - 3.0 * pa_x[j] * pb_xz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_x[j] * pb_xz[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_zzz[j] + 10.0 * fl1_fz * pa_x[j] * pb_xzzz[j]);
+                t_x_xzzz[j] += fl_r_0_0 * (-1.5 * pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_z[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_x_xz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_x_xz[j] * fl1_fz * fl1_fx + 4.0 * pb_zzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_xzzz[j] * fl1_fz);
 
-                t_x_yyyy[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * pa_x[j] * pb_yy[j] * fl1_fx + pa_x[j] * pb_yyyy[j]);
+                t_x_yyyy[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * pa2pb_x_yy[j] * fl1_fx + pa2pb_x_yyyy[j]);
 
-                t_x_yyyy[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_x[j] * fl2_fx - 6.0 * pa_x[j] * pb_yy[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_x[j] * pb_yy[j] * fl1_fx + 10.0 * fl1_fz * pa_x[j] * pb_yyyy[j]);
+                t_x_yyyy[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_x[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_x_yy[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_x_yy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_yyyy[j] * fl1_fz);
 
-                t_x_yyyz[j] = fl_s_0_0 * (1.5 * pa_x[j] * pb_yz[j] * fl1_fx + pa_x[j] * pb_yyyz[j]);
+                t_x_yyyz[j] = fl_s_0_0 * (1.5 * pa2pb_x_yz[j] * fl1_fx + pa2pb_x_yyyz[j]);
 
-                t_x_yyyz[j] += fl_r_0_0 * (-3.0 * pa_x[j] * pb_yz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_x[j] * pb_yz[j] * fl1_fx + 10.0 * fl1_fz * pa_x[j] * pb_yyyz[j]);
+                t_x_yyyz[j] += fl_r_0_0 * (-3.0 * pa2pb_x_yz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_x_yz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_yyyz[j] * fl1_fz);
 
-                t_x_yyzz[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_x[j] * pb_yy[j] * fl1_fx + 0.5 * pa_x[j] * fl1_fx * pb_zz[j] + pa_x[j] * pb_yyzz[j]);
+                t_x_yyzz[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa2pb_x_yy[j] * fl1_fx + 0.5 * pa2pb_x_zz[j] * fl1_fx + pa2pb_x_yyzz[j]);
 
-                t_x_yyzz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * fl1_fz * pa_x[j] * fl2_fx - pa_x[j] * pb_yy[j] * fl1_fz * fl1_fgb - pa_x[j] * fl1_fz * fl1_fgb * pb_zz[j] + 4.0 * fl1_fz * pa_x[j] * pb_yy[j] * fl1_fx + 4.0 * fl1_fz * pa_x[j] * fl1_fx * pb_zz[j] + 10.0 * fl1_fz * pa_x[j] * pb_yyzz[j]);
+                t_x_yyzz[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_x[j] * fl1_fz * fl2_fx - pa2pb_x_yy[j] * fl1_fz * fl1_fgb - pa2pb_x_zz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_x_yy[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_x_zz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_yyzz[j] * fl1_fz);
 
-                t_x_yzzz[j] = fl_s_0_0 * (1.5 * pa_x[j] * pb_yz[j] * fl1_fx + pa_x[j] * pb_yzzz[j]);
+                t_x_yzzz[j] = fl_s_0_0 * (1.5 * pa2pb_x_yz[j] * fl1_fx + pa2pb_x_yzzz[j]);
 
-                t_x_yzzz[j] += fl_r_0_0 * (-3.0 * pa_x[j] * pb_yz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_x[j] * pb_yz[j] * fl1_fx + 10.0 * fl1_fz * pa_x[j] * pb_yzzz[j]);
+                t_x_yzzz[j] += fl_r_0_0 * (-3.0 * pa2pb_x_yz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_x_yz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_yzzz[j] * fl1_fz);
 
-                t_x_zzzz[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * pa_x[j] * pb_zz[j] * fl1_fx + pa_x[j] * pb_zzzz[j]);
+                t_x_zzzz[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 3.0 * pa2pb_x_zz[j] * fl1_fx + pa2pb_x_zzzz[j]);
 
-                t_x_zzzz[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_x[j] * fl2_fx - 6.0 * pa_x[j] * pb_zz[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_x[j] * pb_zz[j] * fl1_fx + 10.0 * fl1_fz * pa_x[j] * pb_zzzz[j]);
+                t_x_zzzz[j] += fl_r_0_0 * (-3.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_x[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_x_zz[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_x_zz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_x_zzzz[j] * fl1_fz);
 
-                t_y_xxxx[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * pa_y[j] * pb_xx[j] * fl1_fx + pa_y[j] * pb_xxxx[j]);
+                t_y_xxxx[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * pa2pb_y_xx[j] * fl1_fx + pa2pb_y_xxxx[j]);
 
-                t_y_xxxx[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_y[j] * fl2_fx - 6.0 * pa_y[j] * pb_xx[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_y[j] * pb_xx[j] * fl1_fx + 10.0 * fl1_fz * pa_y[j] * pb_xxxx[j]);
+                t_y_xxxx[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_y[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_y_xx[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_y_xx[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xxxx[j] * fl1_fz);
 
-                t_y_xxxy[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_xxx[j] + pa_y[j] * pb_xxxy[j]);
+                t_y_xxxy[j] = fl_s_0_0 * (0.75 * pb_x[j] * fl2_fx + 1.5 * pa2pb_y_xy[j] * fl1_fx + 0.5 * pb_xxx[j] * fl1_fx + pa2pb_y_xxxy[j]);
 
-                t_y_xxxy[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_x[j] - 3.0 * pa_y[j] * pb_xy[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_y[j] * pb_xy[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_xxx[j] + 10.0 * fl1_fz * pa_y[j] * pb_xxxy[j]);
+                t_y_xxxy[j] += fl_r_0_0 * (-1.5 * pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_x[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_y_xy[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_y_xy[j] * fl1_fz * fl1_fx + 4.0 * pb_xxx[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xxxy[j] * fl1_fz);
 
-                t_y_xxxz[j] = fl_s_0_0 * (1.5 * pa_y[j] * pb_xz[j] * fl1_fx + pa_y[j] * pb_xxxz[j]);
+                t_y_xxxz[j] = fl_s_0_0 * (1.5 * pa2pb_y_xz[j] * fl1_fx + pa2pb_y_xxxz[j]);
 
-                t_y_xxxz[j] += fl_r_0_0 * (-3.0 * pa_y[j] * pb_xz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_y[j] * pb_xz[j] * fl1_fx + 10.0 * fl1_fz * pa_y[j] * pb_xxxz[j]);
+                t_y_xxxz[j] += fl_r_0_0 * (-3.0 * pa2pb_y_xz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_y_xz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xxxz[j] * fl1_fz);
             }
 
             idx++;
@@ -1997,6 +2117,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                  const CMemBlock2D<double>& osFactors,
                                  const CMemBlock2D<double>& paDistances,
                                  const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -2027,33 +2148,17 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_y = paDistances.data(3 * idx + 1);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(34 * idx);
 
             auto pb_y = pbDistances.data(34 * idx + 1);
 
             auto pb_z = pbDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
-
-            auto pb_xx = pbDistances.data(34 * idx + 3);
-
-            auto pb_xy = pbDistances.data(34 * idx + 4);
-
-            auto pb_xz = pbDistances.data(34 * idx + 5);
-
-            auto pb_yy = pbDistances.data(34 * idx + 6);
-
-            auto pb_yz = pbDistances.data(34 * idx + 7);
-
-            auto pb_zz = pbDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PB)
 
             auto pb_xxy = pbDistances.data(34 * idx + 10);
 
@@ -2069,25 +2174,37 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_yyz = pbDistances.data(34 * idx + 16);
 
-            // set up pointers to 4-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xxyy = pbDistances.data(34 * idx + 22);
+            auto pa2pb_y_xx = pa2pbDistances.data(102 * idx + 37);
 
-            auto pb_xxyz = pbDistances.data(34 * idx + 23);
+            auto pa2pb_y_xy = pa2pbDistances.data(102 * idx + 38);
 
-            auto pb_xxzz = pbDistances.data(34 * idx + 24);
+            auto pa2pb_y_xz = pa2pbDistances.data(102 * idx + 39);
 
-            auto pb_xyyy = pbDistances.data(34 * idx + 25);
+            auto pa2pb_y_yy = pa2pbDistances.data(102 * idx + 40);
 
-            auto pb_xyyz = pbDistances.data(34 * idx + 26);
+            auto pa2pb_y_yz = pa2pbDistances.data(102 * idx + 41);
 
-            auto pb_xyzz = pbDistances.data(34 * idx + 27);
+            auto pa2pb_y_zz = pa2pbDistances.data(102 * idx + 42);
 
-            auto pb_xzzz = pbDistances.data(34 * idx + 28);
+            auto pa2pb_y_xxyy = pa2pbDistances.data(102 * idx + 56);
 
-            auto pb_yyyy = pbDistances.data(34 * idx + 29);
+            auto pa2pb_y_xxyz = pa2pbDistances.data(102 * idx + 57);
 
-            auto pb_yyyz = pbDistances.data(34 * idx + 30);
+            auto pa2pb_y_xxzz = pa2pbDistances.data(102 * idx + 58);
+
+            auto pa2pb_y_xyyy = pa2pbDistances.data(102 * idx + 59);
+
+            auto pa2pb_y_xyyz = pa2pbDistances.data(102 * idx + 60);
+
+            auto pa2pb_y_xyzz = pa2pbDistances.data(102 * idx + 61);
+
+            auto pa2pb_y_xzzz = pa2pbDistances.data(102 * idx + 62);
+
+            auto pa2pb_y_yyyy = pa2pbDistances.data(102 * idx + 63);
+
+            auto pa2pb_y_yyyz = pa2pbDistances.data(102 * idx + 64);
 
             // set up pointers to auxilary integrals
 
@@ -2117,10 +2234,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (18,27)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_y, pb_x, pb_xx, pb_xxy, pb_xxyy, pb_xxyz, pb_xxz, pb_xxzz, pb_xy, \
-                                     pb_xyy, pb_xyyy, pb_xyyz, pb_xyz, pb_xyzz, pb_xz, pb_xzz, pb_xzzz, pb_y, pb_yy, pb_yyy, \
-                                     pb_yyyy, pb_yyyz, pb_yyz, pb_yz, pb_z, pb_zz, r_0_0, s_0_0, t_y_xxyy, t_y_xxyz, \
-                                     t_y_xxzz, t_y_xyyy, t_y_xyyz, t_y_xyzz, t_y_xzzz, t_y_yyyy, t_y_yyyz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_y_xx, pa2pb_y_xxyy, pa2pb_y_xxyz, pa2pb_y_xxzz, \
+                                     pa2pb_y_xy, pa2pb_y_xyyy, pa2pb_y_xyyz, pa2pb_y_xyzz, pa2pb_y_xz, pa2pb_y_xzzz, \
+                                     pa2pb_y_yy, pa2pb_y_yyyy, pa2pb_y_yyyz, pa2pb_y_yz, pa2pb_y_zz, pa_y, pb_x, pb_xxy, \
+                                     pb_xxz, pb_xyy, pb_xyz, pb_xzz, pb_y, pb_yyy, pb_yyz, pb_z, r_0_0, s_0_0, t_y_xxyy, \
+                                     t_y_xxyz, t_y_xxzz, t_y_xyyy, t_y_xyyz, t_y_xyzz, t_y_xzzz, t_y_yyyy, t_y_yyyz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -2135,41 +2253,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_y_xxyy[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + 0.5 * pa_y[j] * pb_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_yy[j] + fl1_fx * pb_xxy[j] + pa_y[j] * pb_xxyy[j]);
+                t_y_xxyy[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pb_y[j] * fl2_fx + 0.5 * pa2pb_y_xx[j] * fl1_fx + 0.5 * pa2pb_y_yy[j] * fl1_fx + pb_xxy[j] * fl1_fx + pa2pb_y_xxyy[j]);
 
-                t_y_xxyy[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fgb - fl1_fx * fl1_fz * fl1_fgb * pb_y[j] + 1.5 * fl1_fz * pa_y[j] * fl2_fx + 3.0 * fl1_fz * fl2_fx * pb_y[j] - pa_y[j] * pb_xx[j] * fl1_fz * fl1_fgb - pa_y[j] * fl1_fz * fl1_fgb * pb_yy[j] + 4.0 * fl1_fz * pa_y[j] * pb_xx[j] * fl1_fx + 4.0 * fl1_fz * pa_y[j] * fl1_fx * pb_yy[j] + 8.0 * fl1_fz * fl1_fx * pb_xxy[j] + 10.0 * fl1_fz * pa_y[j] * pb_xxyy[j]);
+                t_y_xxyy[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fgb - pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_y[j] * fl1_fz * fl2_fx + 3.0 * pb_y[j] * fl1_fz * fl2_fx - pa2pb_y_xx[j] * fl1_fz * fl1_fgb - pa2pb_y_yy[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_y_xx[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_y_yy[j] * fl1_fz * fl1_fx + 8.0 * pb_xxy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xxyy[j] * fl1_fz);
 
-                t_y_xxyz[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_z[j] + 0.5 * pa_y[j] * fl1_fx * pb_yz[j] + 0.5 * fl1_fx * pb_xxz[j] + pa_y[j] * pb_xxyz[j]);
+                t_y_xxyz[j] = fl_s_0_0 * (0.25 * pb_z[j] * fl2_fx + 0.5 * pa2pb_y_yz[j] * fl1_fx + 0.5 * pb_xxz[j] * fl1_fx + pa2pb_y_xxyz[j]);
 
-                t_y_xxyz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb * pb_z[j] + 1.5 * fl1_fz * fl2_fx * pb_z[j] - pa_y[j] * fl1_fz * fl1_fgb * pb_yz[j] + 4.0 * fl1_fz * pa_y[j] * fl1_fx * pb_yz[j] + 4.0 * fl1_fz * fl1_fx * pb_xxz[j] + 10.0 * fl1_fz * pa_y[j] * pb_xxyz[j]);
+                t_y_xxyz[j] += fl_r_0_0 * (-0.5 * pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pb_z[j] * fl1_fz * fl2_fx - pa2pb_y_yz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_y_yz[j] * fl1_fz * fl1_fx + 4.0 * pb_xxz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xxyz[j] * fl1_fz);
 
-                t_y_xxzz[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pa_y[j] * pb_xx[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_zz[j] + pa_y[j] * pb_xxzz[j]);
+                t_y_xxzz[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pa2pb_y_xx[j] * fl1_fx + 0.5 * pa2pb_y_zz[j] * fl1_fx + pa2pb_y_xxzz[j]);
 
-                t_y_xxzz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * fl1_fz * pa_y[j] * fl2_fx - pa_y[j] * pb_xx[j] * fl1_fz * fl1_fgb - pa_y[j] * fl1_fz * fl1_fgb * pb_zz[j] + 4.0 * fl1_fz * pa_y[j] * pb_xx[j] * fl1_fx + 4.0 * fl1_fz * pa_y[j] * fl1_fx * pb_zz[j] + 10.0 * fl1_fz * pa_y[j] * pb_xxzz[j]);
+                t_y_xxzz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_y[j] * fl1_fz * fl2_fx - pa2pb_y_xx[j] * fl1_fz * fl1_fgb - pa2pb_y_zz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_y_xx[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_y_zz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xxzz[j] * fl1_fz);
 
-                t_y_xyyy[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_y[j] * pb_xy[j] * fl1_fx + 1.5 * fl1_fx * pb_xyy[j] + pa_y[j] * pb_xyyy[j]);
+                t_y_xyyy[j] = fl_s_0_0 * (0.75 * pb_x[j] * fl2_fx + 1.5 * pa2pb_y_xy[j] * fl1_fx + 1.5 * pb_xyy[j] * fl1_fx + pa2pb_y_xyyy[j]);
 
-                t_y_xyyy[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_x[j] - 3.0 * pa_y[j] * pb_xy[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_y[j] * pb_xy[j] * fl1_fx + 12.0 * fl1_fz * fl1_fx * pb_xyy[j] + 10.0 * fl1_fz * pa_y[j] * pb_xyyy[j]);
+                t_y_xyyy[j] += fl_r_0_0 * (-1.5 * pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_x[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_y_xy[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_y_xy[j] * fl1_fz * fl1_fx + 12.0 * pb_xyy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xyyy[j] * fl1_fz);
 
-                t_y_xyyz[j] = fl_s_0_0 * (0.5 * pa_y[j] * pb_xz[j] * fl1_fx + fl1_fx * pb_xyz[j] + pa_y[j] * pb_xyyz[j]);
+                t_y_xyyz[j] = fl_s_0_0 * (0.5 * pa2pb_y_xz[j] * fl1_fx + pb_xyz[j] * fl1_fx + pa2pb_y_xyyz[j]);
 
-                t_y_xyyz[j] += fl_r_0_0 * (-pa_y[j] * pb_xz[j] * fl1_fz * fl1_fgb + 4.0 * fl1_fz * pa_y[j] * pb_xz[j] * fl1_fx + 8.0 * fl1_fz * fl1_fx * pb_xyz[j] + 10.0 * fl1_fz * pa_y[j] * pb_xyyz[j]);
+                t_y_xyyz[j] += fl_r_0_0 * (-pa2pb_y_xz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_y_xz[j] * fl1_fz * fl1_fx + 8.0 * pb_xyz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xyyz[j] * fl1_fz);
 
-                t_y_xyzz[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_x[j] + 0.5 * pa_y[j] * pb_xy[j] * fl1_fx + 0.5 * fl1_fx * pb_xzz[j] + pa_y[j] * pb_xyzz[j]);
+                t_y_xyzz[j] = fl_s_0_0 * (0.25 * pb_x[j] * fl2_fx + 0.5 * pa2pb_y_xy[j] * fl1_fx + 0.5 * pb_xzz[j] * fl1_fx + pa2pb_y_xyzz[j]);
 
-                t_y_xyzz[j] += fl_r_0_0 * (-0.5 * fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 1.5 * fl1_fz * fl2_fx * pb_x[j] - pa_y[j] * pb_xy[j] * fl1_fz * fl1_fgb + 4.0 * fl1_fz * pa_y[j] * pb_xy[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_xzz[j] + 10.0 * fl1_fz * pa_y[j] * pb_xyzz[j]);
+                t_y_xyzz[j] += fl_r_0_0 * (-0.5 * pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pb_x[j] * fl1_fz * fl2_fx - pa2pb_y_xy[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_y_xy[j] * fl1_fz * fl1_fx + 4.0 * pb_xzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xyzz[j] * fl1_fz);
 
-                t_y_xzzz[j] = fl_s_0_0 * (1.5 * pa_y[j] * pb_xz[j] * fl1_fx + pa_y[j] * pb_xzzz[j]);
+                t_y_xzzz[j] = fl_s_0_0 * (1.5 * pa2pb_y_xz[j] * fl1_fx + pa2pb_y_xzzz[j]);
 
-                t_y_xzzz[j] += fl_r_0_0 * (-3.0 * pa_y[j] * pb_xz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_y[j] * pb_xz[j] * fl1_fx + 10.0 * fl1_fz * pa_y[j] * pb_xzzz[j]);
+                t_y_xzzz[j] += fl_r_0_0 * (-3.0 * pa2pb_y_xz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_y_xz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_xzzz[j] * fl1_fz);
 
-                t_y_yyyy[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * fl2_fx * pb_y[j] + 3.0 * pa_y[j] * pb_yy[j] * fl1_fx + 2.0 * fl1_fx * pb_yyy[j] + pa_y[j] * pb_yyyy[j]);
+                t_y_yyyy[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * pb_y[j] * fl2_fx + 3.0 * pa2pb_y_yy[j] * fl1_fx + 2.0 * pb_yyy[j] * fl1_fx + pa2pb_y_yyyy[j]);
 
-                t_y_yyyy[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fgb - 6.0 * fl1_fx * pb_y[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_y[j] * fl2_fx + 18.0 * fl1_fz * fl2_fx * pb_y[j] - 6.0 * pa_y[j] * pb_yy[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_y[j] * pb_yy[j] * fl1_fx + 16.0 * fl1_fz * fl1_fx * pb_yyy[j] + 10.0 * fl1_fz * pa_y[j] * pb_yyyy[j]);
+                t_y_yyyy[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fgb - 6.0 * pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_y[j] * fl1_fz * fl2_fx + 18.0 * pb_y[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_y_yy[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_y_yy[j] * fl1_fz * fl1_fx + 16.0 * pb_yyy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_yyyy[j] * fl1_fz);
 
-                t_y_yyyz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_yz[j] * fl1_fx + 1.5 * fl1_fx * pb_yyz[j] + pa_y[j] * pb_yyyz[j]);
+                t_y_yyyz[j] = fl_s_0_0 * (0.75 * pb_z[j] * fl2_fx + 1.5 * pa2pb_y_yz[j] * fl1_fx + 1.5 * pb_yyz[j] * fl1_fx + pa2pb_y_yyyz[j]);
 
-                t_y_yyyz[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fgb * pb_z[j] + 4.5 * fl1_fz * fl2_fx * pb_z[j] - 3.0 * pa_y[j] * pb_yz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_y[j] * pb_yz[j] * fl1_fx + 12.0 * fl1_fz * fl1_fx * pb_yyz[j] + 10.0 * fl1_fz * pa_y[j] * pb_yyyz[j]);
+                t_y_yyyz[j] += fl_r_0_0 * (-1.5 * pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_z[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_y_yz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_y_yz[j] * fl1_fz * fl1_fx + 12.0 * pb_yyz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_yyyz[j] * fl1_fz);
             }
 
             idx++;
@@ -2182,6 +2300,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                  const CMemBlock2D<double>& osFactors,
                                  const CMemBlock2D<double>& paDistances,
                                  const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -2212,35 +2331,19 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_y = paDistances.data(3 * idx + 1);
 
             auto pa_z = paDistances.data(3 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(34 * idx);
 
             auto pb_y = pbDistances.data(34 * idx + 1);
 
             auto pb_z = pbDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
-
-            auto pb_xx = pbDistances.data(34 * idx + 3);
-
-            auto pb_xy = pbDistances.data(34 * idx + 4);
-
-            auto pb_xz = pbDistances.data(34 * idx + 5);
-
-            auto pb_yy = pbDistances.data(34 * idx + 6);
-
-            auto pb_yz = pbDistances.data(34 * idx + 7);
-
-            auto pb_zz = pbDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PB)
 
             auto pb_xxx = pbDistances.data(34 * idx + 9);
 
@@ -2252,25 +2355,43 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_zzz = pbDistances.data(34 * idx + 18);
 
-            // set up pointers to 4-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xxxx = pbDistances.data(34 * idx + 19);
+            auto pa2pb_y_yy = pa2pbDistances.data(102 * idx + 40);
 
-            auto pb_xxxy = pbDistances.data(34 * idx + 20);
+            auto pa2pb_y_yz = pa2pbDistances.data(102 * idx + 41);
 
-            auto pb_xxxz = pbDistances.data(34 * idx + 21);
+            auto pa2pb_y_zz = pa2pbDistances.data(102 * idx + 42);
 
-            auto pb_xxyy = pbDistances.data(34 * idx + 22);
+            auto pa2pb_y_yyzz = pa2pbDistances.data(102 * idx + 65);
 
-            auto pb_xxyz = pbDistances.data(34 * idx + 23);
+            auto pa2pb_y_yzzz = pa2pbDistances.data(102 * idx + 66);
 
-            auto pb_xxzz = pbDistances.data(34 * idx + 24);
+            auto pa2pb_y_zzzz = pa2pbDistances.data(102 * idx + 67);
 
-            auto pb_yyzz = pbDistances.data(34 * idx + 31);
+            auto pa2pb_z_xx = pa2pbDistances.data(102 * idx + 71);
 
-            auto pb_yzzz = pbDistances.data(34 * idx + 32);
+            auto pa2pb_z_xy = pa2pbDistances.data(102 * idx + 72);
 
-            auto pb_zzzz = pbDistances.data(34 * idx + 33);
+            auto pa2pb_z_xz = pa2pbDistances.data(102 * idx + 73);
+
+            auto pa2pb_z_yy = pa2pbDistances.data(102 * idx + 74);
+
+            auto pa2pb_z_yz = pa2pbDistances.data(102 * idx + 75);
+
+            auto pa2pb_z_zz = pa2pbDistances.data(102 * idx + 76);
+
+            auto pa2pb_z_xxxx = pa2pbDistances.data(102 * idx + 87);
+
+            auto pa2pb_z_xxxy = pa2pbDistances.data(102 * idx + 88);
+
+            auto pa2pb_z_xxxz = pa2pbDistances.data(102 * idx + 89);
+
+            auto pa2pb_z_xxyy = pa2pbDistances.data(102 * idx + 90);
+
+            auto pa2pb_z_xxyz = pa2pbDistances.data(102 * idx + 91);
+
+            auto pa2pb_z_xxzz = pa2pbDistances.data(102 * idx + 92);
 
             // set up pointers to auxilary integrals
 
@@ -2300,10 +2421,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (27,36)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_y, pa_z, pb_x, pb_xx, pb_xxx, pb_xxxx, pb_xxxy, pb_xxxz, pb_xxy, \
-                                     pb_xxyy, pb_xxyz, pb_xxz, pb_xxzz, pb_xy, pb_xz, pb_y, pb_yy, pb_yyzz, pb_yz, pb_yzz, \
-                                     pb_yzzz, pb_z, pb_zz, pb_zzz, pb_zzzz, r_0_0, s_0_0, t_y_yyzz, t_y_yzzz, t_y_zzzz, \
-                                     t_z_xxxx, t_z_xxxy, t_z_xxxz, t_z_xxyy, t_z_xxyz, t_z_xxzz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_y_yy, pa2pb_y_yyzz, pa2pb_y_yz, pa2pb_y_yzzz, \
+                                     pa2pb_y_zz, pa2pb_y_zzzz, pa2pb_z_xx, pa2pb_z_xxxx, pa2pb_z_xxxy, pa2pb_z_xxxz, \
+                                     pa2pb_z_xxyy, pa2pb_z_xxyz, pa2pb_z_xxzz, pa2pb_z_xy, pa2pb_z_xz, pa2pb_z_yy, \
+                                     pa2pb_z_yz, pa2pb_z_zz, pa_y, pa_z, pb_x, pb_xxx, pb_xxy, pb_xxz, pb_y, pb_yzz, pb_z, pb_zzz, \
+                                     r_0_0, s_0_0, t_y_yyzz, t_y_yzzz, t_y_zzzz, t_z_xxxx, t_z_xxxy, t_z_xxxz, \
+                                     t_z_xxyy, t_z_xxyz, t_z_xxzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -2318,41 +2441,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_y_yyzz[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * fl2_fx * pb_y[j] + 0.5 * pa_y[j] * pb_yy[j] * fl1_fx + 0.5 * pa_y[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_yzz[j] + pa_y[j] * pb_yyzz[j]);
+                t_y_yyzz[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pb_y[j] * fl2_fx + 0.5 * pa2pb_y_yy[j] * fl1_fx + 0.5 * pa2pb_y_zz[j] * fl1_fx + pb_yzz[j] * fl1_fx + pa2pb_y_yyzz[j]);
 
-                t_y_yyzz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fgb - fl1_fx * pb_y[j] * fl1_fz * fl1_fgb + 1.5 * fl1_fz * pa_y[j] * fl2_fx + 3.0 * fl1_fz * fl2_fx * pb_y[j] - pa_y[j] * pb_yy[j] * fl1_fz * fl1_fgb - pa_y[j] * fl1_fz * fl1_fgb * pb_zz[j] + 4.0 * fl1_fz * pa_y[j] * pb_yy[j] * fl1_fx + 4.0 * fl1_fz * pa_y[j] * fl1_fx * pb_zz[j] + 8.0 * fl1_fz * fl1_fx * pb_yzz[j] + 10.0 * fl1_fz * pa_y[j] * pb_yyzz[j]);
+                t_y_yyzz[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fgb - pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_y[j] * fl1_fz * fl2_fx + 3.0 * pb_y[j] * fl1_fz * fl2_fx - pa2pb_y_yy[j] * fl1_fz * fl1_fgb - pa2pb_y_zz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_y_yy[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_y_zz[j] * fl1_fz * fl1_fx + 8.0 * pb_yzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_yyzz[j] * fl1_fz);
 
-                t_y_yzzz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_z[j] + 1.5 * pa_y[j] * pb_yz[j] * fl1_fx + 0.5 * fl1_fx * pb_zzz[j] + pa_y[j] * pb_yzzz[j]);
+                t_y_yzzz[j] = fl_s_0_0 * (0.75 * pb_z[j] * fl2_fx + 1.5 * pa2pb_y_yz[j] * fl1_fx + 0.5 * pb_zzz[j] * fl1_fx + pa2pb_y_yzzz[j]);
 
-                t_y_yzzz[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_z[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_z[j] - 3.0 * pa_y[j] * pb_yz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_y[j] * pb_yz[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_zzz[j] + 10.0 * fl1_fz * pa_y[j] * pb_yzzz[j]);
+                t_y_yzzz[j] += fl_r_0_0 * (-1.5 * pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_z[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_y_yz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_y_yz[j] * fl1_fz * fl1_fx + 4.0 * pb_zzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_yzzz[j] * fl1_fz);
 
-                t_y_zzzz[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * pa_y[j] * pb_zz[j] * fl1_fx + pa_y[j] * pb_zzzz[j]);
+                t_y_zzzz[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 3.0 * pa2pb_y_zz[j] * fl1_fx + pa2pb_y_zzzz[j]);
 
-                t_y_zzzz[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_y[j] * fl2_fx - 6.0 * pa_y[j] * pb_zz[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_y[j] * pb_zz[j] * fl1_fx + 10.0 * fl1_fz * pa_y[j] * pb_zzzz[j]);
+                t_y_zzzz[j] += fl_r_0_0 * (-3.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_y[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_y_zz[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_y_zz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_y_zzzz[j] * fl1_fz);
 
-                t_z_xxxx[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * pa_z[j] * pb_xx[j] * fl1_fx + pa_z[j] * pb_xxxx[j]);
+                t_z_xxxx[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * pa2pb_z_xx[j] * fl1_fx + pa2pb_z_xxxx[j]);
 
-                t_z_xxxx[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_z[j] * fl2_fx - 6.0 * pa_z[j] * pb_xx[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_z[j] * pb_xx[j] * fl1_fx + 10.0 * fl1_fz * pa_z[j] * pb_xxxx[j]);
+                t_z_xxxx[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_z[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_z_xx[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_z_xx[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xxxx[j] * fl1_fz);
 
-                t_z_xxxy[j] = fl_s_0_0 * (1.5 * pa_z[j] * pb_xy[j] * fl1_fx + pa_z[j] * pb_xxxy[j]);
+                t_z_xxxy[j] = fl_s_0_0 * (1.5 * pa2pb_z_xy[j] * fl1_fx + pa2pb_z_xxxy[j]);
 
-                t_z_xxxy[j] += fl_r_0_0 * (-3.0 * pa_z[j] * pb_xy[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_z[j] * pb_xy[j] * fl1_fx + 10.0 * fl1_fz * pa_z[j] * pb_xxxy[j]);
+                t_z_xxxy[j] += fl_r_0_0 * (-3.0 * pa2pb_z_xy[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_z_xy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xxxy[j] * fl1_fz);
 
-                t_z_xxxz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_xxx[j] + pa_z[j] * pb_xxxz[j]);
+                t_z_xxxz[j] = fl_s_0_0 * (0.75 * pb_x[j] * fl2_fx + 1.5 * pa2pb_z_xz[j] * fl1_fx + 0.5 * pb_xxx[j] * fl1_fx + pa2pb_z_xxxz[j]);
 
-                t_z_xxxz[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_x[j] - 3.0 * pa_z[j] * pb_xz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_z[j] * pb_xz[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_xxx[j] + 10.0 * fl1_fz * pa_z[j] * pb_xxxz[j]);
+                t_z_xxxz[j] += fl_r_0_0 * (-1.5 * pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_x[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_z_xz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_z_xz[j] * fl1_fz * fl1_fx + 4.0 * pb_xxx[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xxxz[j] * fl1_fz);
 
-                t_z_xxyy[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pa_z[j] * pb_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_yy[j] + pa_z[j] * pb_xxyy[j]);
+                t_z_xxyy[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pa2pb_z_xx[j] * fl1_fx + 0.5 * pa2pb_z_yy[j] * fl1_fx + pa2pb_z_xxyy[j]);
 
-                t_z_xxyy[j] += fl_r_0_0 * (-pa_z[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * fl1_fz * pa_z[j] * fl2_fx - pa_z[j] * pb_xx[j] * fl1_fz * fl1_fgb - pa_z[j] * fl1_fz * fl1_fgb * pb_yy[j] + 4.0 * fl1_fz * pa_z[j] * pb_xx[j] * fl1_fx + 4.0 * fl1_fz * pa_z[j] * fl1_fx * pb_yy[j] + 10.0 * fl1_fz * pa_z[j] * pb_xxyy[j]);
+                t_z_xxyy[j] += fl_r_0_0 * (-pa_z[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_z[j] * fl1_fz * fl2_fx - pa2pb_z_xx[j] * fl1_fz * fl1_fgb - pa2pb_z_yy[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_z_xx[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_z_yy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xxyy[j] * fl1_fz);
 
-                t_z_xxyz[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_y[j] + 0.5 * pa_z[j] * fl1_fx * pb_yz[j] + 0.5 * fl1_fx * pb_xxy[j] + pa_z[j] * pb_xxyz[j]);
+                t_z_xxyz[j] = fl_s_0_0 * (0.25 * pb_y[j] * fl2_fx + 0.5 * pa2pb_z_yz[j] * fl1_fx + 0.5 * pb_xxy[j] * fl1_fx + pa2pb_z_xxyz[j]);
 
-                t_z_xxyz[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fgb * pb_y[j] + 1.5 * fl1_fz * fl2_fx * pb_y[j] - pa_z[j] * fl1_fz * fl1_fgb * pb_yz[j] + 4.0 * fl1_fz * pa_z[j] * fl1_fx * pb_yz[j] + 4.0 * fl1_fz * fl1_fx * pb_xxy[j] + 10.0 * fl1_fz * pa_z[j] * pb_xxyz[j]);
+                t_z_xxyz[j] += fl_r_0_0 * (-0.5 * pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pb_y[j] * fl1_fz * fl2_fx - pa2pb_z_yz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_z_yz[j] * fl1_fz * fl1_fx + 4.0 * pb_xxy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xxyz[j] * fl1_fz);
 
-                t_z_xxzz[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + 0.5 * pa_z[j] * pb_xx[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_xxz[j] + pa_z[j] * pb_xxzz[j]);
+                t_z_xxzz[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pb_z[j] * fl2_fx + 0.5 * pa2pb_z_xx[j] * fl1_fx + 0.5 * pa2pb_z_zz[j] * fl1_fx + pb_xxz[j] * fl1_fx + pa2pb_z_xxzz[j]);
 
-                t_z_xxzz[j] += fl_r_0_0 * (-pa_z[j] * fl1_fx * fl1_fz * fl1_fgb - fl1_fx * fl1_fz * fl1_fgb * pb_z[j] + 1.5 * fl1_fz * pa_z[j] * fl2_fx + 3.0 * fl1_fz * fl2_fx * pb_z[j] - pa_z[j] * pb_xx[j] * fl1_fz * fl1_fgb - pa_z[j] * fl1_fz * fl1_fgb * pb_zz[j] + 4.0 * fl1_fz * pa_z[j] * pb_xx[j] * fl1_fx + 4.0 * fl1_fz * pa_z[j] * fl1_fx * pb_zz[j] + 8.0 * fl1_fz * fl1_fx * pb_xxz[j] + 10.0 * fl1_fz * pa_z[j] * pb_xxzz[j]);
+                t_z_xxzz[j] += fl_r_0_0 * (-pa_z[j] * fl1_fx * fl1_fz * fl1_fgb - pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_z[j] * fl1_fz * fl2_fx + 3.0 * pb_z[j] * fl1_fz * fl2_fx - pa2pb_z_xx[j] * fl1_fz * fl1_fgb - pa2pb_z_zz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_z_xx[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_z_zz[j] * fl1_fz * fl1_fx + 8.0 * pb_xxz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xxzz[j] * fl1_fz);
             }
 
             idx++;
@@ -2365,6 +2488,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                  const CMemBlock2D<double>& osFactors,
                                  const CMemBlock2D<double>& paDistances,
                                  const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -2395,31 +2519,17 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fgb = osFactors.data(4 * idx + 3);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_z = paDistances.data(3 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(34 * idx);
 
             auto pb_y = pbDistances.data(34 * idx + 1);
 
             auto pb_z = pbDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PB)
-
-            auto pb_xy = pbDistances.data(34 * idx + 4);
-
-            auto pb_xz = pbDistances.data(34 * idx + 5);
-
-            auto pb_yy = pbDistances.data(34 * idx + 6);
-
-            auto pb_yz = pbDistances.data(34 * idx + 7);
-
-            auto pb_zz = pbDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PB)
 
             auto pb_xyy = pbDistances.data(34 * idx + 12);
 
@@ -2435,25 +2545,35 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pb_zzz = pbDistances.data(34 * idx + 18);
 
-            // set up pointers to 4-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pb_xyyy = pbDistances.data(34 * idx + 25);
+            auto pa2pb_z_xy = pa2pbDistances.data(102 * idx + 72);
 
-            auto pb_xyyz = pbDistances.data(34 * idx + 26);
+            auto pa2pb_z_xz = pa2pbDistances.data(102 * idx + 73);
 
-            auto pb_xyzz = pbDistances.data(34 * idx + 27);
+            auto pa2pb_z_yy = pa2pbDistances.data(102 * idx + 74);
 
-            auto pb_xzzz = pbDistances.data(34 * idx + 28);
+            auto pa2pb_z_yz = pa2pbDistances.data(102 * idx + 75);
 
-            auto pb_yyyy = pbDistances.data(34 * idx + 29);
+            auto pa2pb_z_zz = pa2pbDistances.data(102 * idx + 76);
 
-            auto pb_yyyz = pbDistances.data(34 * idx + 30);
+            auto pa2pb_z_xyyy = pa2pbDistances.data(102 * idx + 93);
 
-            auto pb_yyzz = pbDistances.data(34 * idx + 31);
+            auto pa2pb_z_xyyz = pa2pbDistances.data(102 * idx + 94);
 
-            auto pb_yzzz = pbDistances.data(34 * idx + 32);
+            auto pa2pb_z_xyzz = pa2pbDistances.data(102 * idx + 95);
 
-            auto pb_zzzz = pbDistances.data(34 * idx + 33);
+            auto pa2pb_z_xzzz = pa2pbDistances.data(102 * idx + 96);
+
+            auto pa2pb_z_yyyy = pa2pbDistances.data(102 * idx + 97);
+
+            auto pa2pb_z_yyyz = pa2pbDistances.data(102 * idx + 98);
+
+            auto pa2pb_z_yyzz = pa2pbDistances.data(102 * idx + 99);
+
+            auto pa2pb_z_yzzz = pa2pbDistances.data(102 * idx + 100);
+
+            auto pa2pb_z_zzzz = pa2pbDistances.data(102 * idx + 101);
 
             // set up pointers to auxilary integrals
 
@@ -2483,10 +2603,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (36,45)
 
-            #pragma omp simd aligned(fgb, fx, fz, pa_z, pb_x, pb_xy, pb_xyy, pb_xyyy, pb_xyyz, pb_xyz, pb_xyzz, pb_xz, \
-                                     pb_xzz, pb_xzzz, pb_y, pb_yy, pb_yyy, pb_yyyy, pb_yyyz, pb_yyz, pb_yyzz, pb_yz, pb_yzz, \
-                                     pb_yzzz, pb_z, pb_zz, pb_zzz, pb_zzzz, r_0_0, s_0_0, t_z_xyyy, t_z_xyyz, t_z_xyzz, \
-                                     t_z_xzzz, t_z_yyyy, t_z_yyyz, t_z_yyzz, t_z_yzzz, t_z_zzzz: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, fz, pa2pb_z_xy, pa2pb_z_xyyy, pa2pb_z_xyyz, pa2pb_z_xyzz, \
+                                     pa2pb_z_xz, pa2pb_z_xzzz, pa2pb_z_yy, pa2pb_z_yyyy, pa2pb_z_yyyz, pa2pb_z_yyzz, \
+                                     pa2pb_z_yz, pa2pb_z_yzzz, pa2pb_z_zz, pa2pb_z_zzzz, pa_z, pb_x, pb_xyy, pb_xyz, pb_xzz, \
+                                     pb_y, pb_yyy, pb_yyz, pb_yzz, pb_z, pb_zzz, r_0_0, s_0_0, t_z_xyyy, t_z_xyyz, \
+                                     t_z_xyzz, t_z_xzzz, t_z_yyyy, t_z_yyyz, t_z_yyzz, t_z_yzzz, t_z_zzzz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -2501,41 +2622,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_z_xyyy[j] = fl_s_0_0 * (1.5 * pa_z[j] * pb_xy[j] * fl1_fx + pa_z[j] * pb_xyyy[j]);
+                t_z_xyyy[j] = fl_s_0_0 * (1.5 * pa2pb_z_xy[j] * fl1_fx + pa2pb_z_xyyy[j]);
 
-                t_z_xyyy[j] += fl_r_0_0 * (-3.0 * pa_z[j] * pb_xy[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_z[j] * pb_xy[j] * fl1_fx + 10.0 * fl1_fz * pa_z[j] * pb_xyyy[j]);
+                t_z_xyyy[j] += fl_r_0_0 * (-3.0 * pa2pb_z_xy[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_z_xy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xyyy[j] * fl1_fz);
 
-                t_z_xyyz[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_x[j] + 0.5 * pa_z[j] * pb_xz[j] * fl1_fx + 0.5 * fl1_fx * pb_xyy[j] + pa_z[j] * pb_xyyz[j]);
+                t_z_xyyz[j] = fl_s_0_0 * (0.25 * pb_x[j] * fl2_fx + 0.5 * pa2pb_z_xz[j] * fl1_fx + 0.5 * pb_xyy[j] * fl1_fx + pa2pb_z_xyyz[j]);
 
-                t_z_xyyz[j] += fl_r_0_0 * (-0.5 * fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 1.5 * fl1_fz * fl2_fx * pb_x[j] - pa_z[j] * pb_xz[j] * fl1_fz * fl1_fgb + 4.0 * fl1_fz * pa_z[j] * pb_xz[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_xyy[j] + 10.0 * fl1_fz * pa_z[j] * pb_xyyz[j]);
+                t_z_xyyz[j] += fl_r_0_0 * (-0.5 * pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pb_x[j] * fl1_fz * fl2_fx - pa2pb_z_xz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_z_xz[j] * fl1_fz * fl1_fx + 4.0 * pb_xyy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xyyz[j] * fl1_fz);
 
-                t_z_xyzz[j] = fl_s_0_0 * (0.5 * pa_z[j] * pb_xy[j] * fl1_fx + fl1_fx * pb_xyz[j] + pa_z[j] * pb_xyzz[j]);
+                t_z_xyzz[j] = fl_s_0_0 * (0.5 * pa2pb_z_xy[j] * fl1_fx + pb_xyz[j] * fl1_fx + pa2pb_z_xyzz[j]);
 
-                t_z_xyzz[j] += fl_r_0_0 * (-pa_z[j] * pb_xy[j] * fl1_fz * fl1_fgb + 4.0 * fl1_fz * pa_z[j] * pb_xy[j] * fl1_fx + 8.0 * fl1_fz * fl1_fx * pb_xyz[j] + 10.0 * fl1_fz * pa_z[j] * pb_xyzz[j]);
+                t_z_xyzz[j] += fl_r_0_0 * (-pa2pb_z_xy[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_z_xy[j] * fl1_fz * fl1_fx + 8.0 * pb_xyz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xyzz[j] * fl1_fz);
 
-                t_z_xzzz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_x[j] + 1.5 * pa_z[j] * pb_xz[j] * fl1_fx + 1.5 * fl1_fx * pb_xzz[j] + pa_z[j] * pb_xzzz[j]);
+                t_z_xzzz[j] = fl_s_0_0 * (0.75 * pb_x[j] * fl2_fx + 1.5 * pa2pb_z_xz[j] * fl1_fx + 1.5 * pb_xzz[j] * fl1_fx + pa2pb_z_xzzz[j]);
 
-                t_z_xzzz[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_x[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_x[j] - 3.0 * pa_z[j] * pb_xz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_z[j] * pb_xz[j] * fl1_fx + 12.0 * fl1_fz * fl1_fx * pb_xzz[j] + 10.0 * fl1_fz * pa_z[j] * pb_xzzz[j]);
+                t_z_xzzz[j] += fl_r_0_0 * (-1.5 * pb_x[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_x[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_z_xz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_z_xz[j] * fl1_fz * fl1_fx + 12.0 * pb_xzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_xzzz[j] * fl1_fz);
 
-                t_z_yyyy[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * pa_z[j] * pb_yy[j] * fl1_fx + pa_z[j] * pb_yyyy[j]);
+                t_z_yyyy[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * pa2pb_z_yy[j] * fl1_fx + pa2pb_z_yyyy[j]);
 
-                t_z_yyyy[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_z[j] * fl2_fx - 6.0 * pa_z[j] * pb_yy[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_z[j] * pb_yy[j] * fl1_fx + 10.0 * fl1_fz * pa_z[j] * pb_yyyy[j]);
+                t_z_yyyy[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_z[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_z_yy[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_z_yy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_yyyy[j] * fl1_fz);
 
-                t_z_yyyz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_yz[j] * fl1_fx + 0.5 * fl1_fx * pb_yyy[j] + pa_z[j] * pb_yyyz[j]);
+                t_z_yyyz[j] = fl_s_0_0 * (0.75 * pb_y[j] * fl2_fx + 1.5 * pa2pb_z_yz[j] * fl1_fx + 0.5 * pb_yyy[j] * fl1_fx + pa2pb_z_yyyz[j]);
 
-                t_z_yyyz[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_y[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_y[j] - 3.0 * pa_z[j] * pb_yz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_z[j] * pb_yz[j] * fl1_fx + 4.0 * fl1_fz * fl1_fx * pb_yyy[j] + 10.0 * fl1_fz * pa_z[j] * pb_yyyz[j]);
+                t_z_yyyz[j] += fl_r_0_0 * (-1.5 * pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_y[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_z_yz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_z_yz[j] * fl1_fz * fl1_fx + 4.0 * pb_yyy[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_yyyz[j] * fl1_fz);
 
-                t_z_yyzz[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * fl2_fx * pb_z[j] + 0.5 * pa_z[j] * pb_yy[j] * fl1_fx + 0.5 * pa_z[j] * fl1_fx * pb_zz[j] + fl1_fx * pb_yyz[j] + pa_z[j] * pb_yyzz[j]);
+                t_z_yyzz[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pb_z[j] * fl2_fx + 0.5 * pa2pb_z_yy[j] * fl1_fx + 0.5 * pa2pb_z_zz[j] * fl1_fx + pb_yyz[j] * fl1_fx + pa2pb_z_yyzz[j]);
 
-                t_z_yyzz[j] += fl_r_0_0 * (-pa_z[j] * fl1_fx * fl1_fz * fl1_fgb - fl1_fx * fl1_fz * fl1_fgb * pb_z[j] + 1.5 * fl1_fz * pa_z[j] * fl2_fx + 3.0 * fl1_fz * fl2_fx * pb_z[j] - pa_z[j] * pb_yy[j] * fl1_fz * fl1_fgb - pa_z[j] * fl1_fz * fl1_fgb * pb_zz[j] + 4.0 * fl1_fz * pa_z[j] * pb_yy[j] * fl1_fx + 4.0 * fl1_fz * pa_z[j] * fl1_fx * pb_zz[j] + 8.0 * fl1_fz * fl1_fx * pb_yyz[j] + 10.0 * fl1_fz * pa_z[j] * pb_yyzz[j]);
+                t_z_yyzz[j] += fl_r_0_0 * (-pa_z[j] * fl1_fx * fl1_fz * fl1_fgb - pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 1.5 * pa_z[j] * fl1_fz * fl2_fx + 3.0 * pb_z[j] * fl1_fz * fl2_fx - pa2pb_z_yy[j] * fl1_fz * fl1_fgb - pa2pb_z_zz[j] * fl1_fz * fl1_fgb + 4.0 * pa2pb_z_yy[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_z_zz[j] * fl1_fz * fl1_fx + 8.0 * pb_yyz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_yyzz[j] * fl1_fz);
 
-                t_z_yzzz[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_y[j] + 1.5 * pa_z[j] * pb_yz[j] * fl1_fx + 1.5 * fl1_fx * pb_yzz[j] + pa_z[j] * pb_yzzz[j]);
+                t_z_yzzz[j] = fl_s_0_0 * (0.75 * pb_y[j] * fl2_fx + 1.5 * pa2pb_z_yz[j] * fl1_fx + 1.5 * pb_yzz[j] * fl1_fx + pa2pb_z_yzzz[j]);
 
-                t_z_yzzz[j] += fl_r_0_0 * (-1.5 * fl1_fx * pb_y[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * fl2_fx * pb_y[j] - 3.0 * pa_z[j] * pb_yz[j] * fl1_fz * fl1_fgb + 12.0 * fl1_fz * pa_z[j] * pb_yz[j] * fl1_fx + 12.0 * fl1_fz * fl1_fx * pb_yzz[j] + 10.0 * fl1_fz * pa_z[j] * pb_yzzz[j]);
+                t_z_yzzz[j] += fl_r_0_0 * (-1.5 * pb_y[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pb_y[j] * fl1_fz * fl2_fx - 3.0 * pa2pb_z_yz[j] * fl1_fz * fl1_fgb + 12.0 * pa2pb_z_yz[j] * fl1_fz * fl1_fx + 12.0 * pb_yzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_yzzz[j] * fl1_fz);
 
-                t_z_zzzz[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * fl2_fx * pb_z[j] + 3.0 * pa_z[j] * pb_zz[j] * fl1_fx + 2.0 * fl1_fx * pb_zzz[j] + pa_z[j] * pb_zzzz[j]);
+                t_z_zzzz[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 3.0 * pb_z[j] * fl2_fx + 3.0 * pa2pb_z_zz[j] * fl1_fx + 2.0 * pb_zzz[j] * fl1_fx + pa2pb_z_zzzz[j]);
 
-                t_z_zzzz[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fgb - 6.0 * fl1_fx * pb_z[j] * fl1_fz * fl1_fgb + 4.5 * fl1_fz * pa_z[j] * fl2_fx + 18.0 * fl1_fz * fl2_fx * pb_z[j] - 6.0 * pa_z[j] * pb_zz[j] * fl1_fz * fl1_fgb + 24.0 * fl1_fz * pa_z[j] * pb_zz[j] * fl1_fx + 16.0 * fl1_fz * fl1_fx * pb_zzz[j] + 10.0 * fl1_fz * pa_z[j] * pb_zzzz[j]);
+                t_z_zzzz[j] += fl_r_0_0 * (-3.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fgb - 6.0 * pb_z[j] * fl1_fx * fl1_fz * fl1_fgb + 4.5 * pa_z[j] * fl1_fz * fl2_fx + 18.0 * pb_z[j] * fl1_fz * fl2_fx - 6.0 * pa2pb_z_zz[j] * fl1_fz * fl1_fgb + 24.0 * pa2pb_z_zz[j] * fl1_fz * fl1_fx + 16.0 * pb_zzz[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_z_zzzz[j] * fl1_fz);
             }
 
             idx++;
@@ -2548,23 +2669,24 @@ namespace kinrecfunc { // kinrecfunc namespace
                            const CMemBlock2D<double>& osFactors,
                            const CMemBlock2D<double>& paDistances,
                            const CMemBlock2D<double>& pbDistances,
+                           const CMemBlock2D<double>& pa2pbDistances,
                            const CGtoBlock&           braGtoBlock,
                            const CGtoBlock&           ketGtoBlock,
                            const int32_t              iContrGto)
     {
-        kinrecfunc::compKineticEnergyForGP_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForGP_0_9(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForGP_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForGP_9_18(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                 braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForGP_18_27(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForGP_18_27(primBuffer, auxBuffer, osFactors, paDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForGP_27_36(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForGP_27_36(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
 
-        kinrecfunc::compKineticEnergyForGP_36_45(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, 
+        kinrecfunc::compKineticEnergyForGP_36_45(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances, 
                                                  braGtoBlock, ketGtoBlock, iContrGto); 
     }
 
@@ -2574,6 +2696,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                const CMemBlock2D<double>& osFactors,
                                const CMemBlock2D<double>& paDistances,
                                const CMemBlock2D<double>& pbDistances,
+                               const CMemBlock2D<double>& pa2pbDistances,
                                const CGtoBlock&           braGtoBlock,
                                const CGtoBlock&           ketGtoBlock,
                                const int32_t              iContrGto)
@@ -2604,7 +2727,7 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(34 * idx);
 
@@ -2612,37 +2735,57 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_z = paDistances.data(34 * idx + 2);
 
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            auto pa_xx = paDistances.data(34 * idx + 3);
-
-            auto pa_xy = paDistances.data(34 * idx + 4);
-
-            auto pa_xz = paDistances.data(34 * idx + 5);
-
-            // set up pointers to 3-th order tensor of distance R(PA)
-
             auto pa_xxx = paDistances.data(34 * idx + 9);
 
             auto pa_xxy = paDistances.data(34 * idx + 10);
 
             auto pa_xxz = paDistances.data(34 * idx + 11);
 
-            // set up pointers to 4-th order tensor of distance R(PA)
-
-            auto pa_xxxx = paDistances.data(34 * idx + 19);
-
-            auto pa_xxxy = paDistances.data(34 * idx + 20);
-
-            auto pa_xxxz = paDistances.data(34 * idx + 21);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
+
+            // set up pointers to tensors product of distances R(PA)xR(PB)
+
+            auto pa2pb_xx_x = pa2pbDistances.data(102 * idx + 9);
+
+            auto pa2pb_xx_y = pa2pbDistances.data(102 * idx + 10);
+
+            auto pa2pb_xx_z = pa2pbDistances.data(102 * idx + 11);
+
+            auto pa2pb_xy_x = pa2pbDistances.data(102 * idx + 12);
+
+            auto pa2pb_xy_y = pa2pbDistances.data(102 * idx + 13);
+
+            auto pa2pb_xy_z = pa2pbDistances.data(102 * idx + 14);
+
+            auto pa2pb_xz_x = pa2pbDistances.data(102 * idx + 15);
+
+            auto pa2pb_xz_y = pa2pbDistances.data(102 * idx + 16);
+
+            auto pa2pb_xz_z = pa2pbDistances.data(102 * idx + 17);
+
+            auto pa2pb_xxxx_x = pa2pbDistances.data(102 * idx + 57);
+
+            auto pa2pb_xxxx_y = pa2pbDistances.data(102 * idx + 58);
+
+            auto pa2pb_xxxx_z = pa2pbDistances.data(102 * idx + 59);
+
+            auto pa2pb_xxxy_x = pa2pbDistances.data(102 * idx + 60);
+
+            auto pa2pb_xxxy_y = pa2pbDistances.data(102 * idx + 61);
+
+            auto pa2pb_xxxy_z = pa2pbDistances.data(102 * idx + 62);
+
+            auto pa2pb_xxxz_x = pa2pbDistances.data(102 * idx + 63);
+
+            auto pa2pb_xxxz_y = pa2pbDistances.data(102 * idx + 64);
+
+            auto pa2pb_xxxz_z = pa2pbDistances.data(102 * idx + 65);
 
             // set up pointers to auxilary integrals
 
@@ -2672,9 +2815,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (0,9)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_x, pa_xx, pa_xxx, pa_xxxx, pa_xxxy, pa_xxxz, pa_xxy, pa_xxz, pa_xy, \
-                                     pa_xz, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_xxxx_x, t_xxxx_y, t_xxxx_z, \
-                                     t_xxxy_x, t_xxxy_y, t_xxxy_z, t_xxxz_x, t_xxxz_y, t_xxxz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_xx_x, pa2pb_xx_y, pa2pb_xx_z, pa2pb_xxxx_x, \
+                                     pa2pb_xxxx_y, pa2pb_xxxx_z, pa2pb_xxxy_x, pa2pb_xxxy_y, pa2pb_xxxy_z, pa2pb_xxxz_x, \
+                                     pa2pb_xxxz_y, pa2pb_xxxz_z, pa2pb_xy_x, pa2pb_xy_y, pa2pb_xy_z, pa2pb_xz_x, \
+                                     pa2pb_xz_y, pa2pb_xz_z, pa_x, pa_xxx, pa_xxy, pa_xxz, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, \
+                                     s_0_0, t_xxxx_x, t_xxxx_y, t_xxxx_z, t_xxxy_x, t_xxxy_y, t_xxxy_z, t_xxxz_x, \
+                                     t_xxxz_y, t_xxxz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -2689,41 +2835,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xxxx_x[j] = fl_s_0_0 * (3.0 * pa_x[j] * fl2_fx + 2.0 * pa_xxx[j] * fl1_fx + 0.75 * fl2_fx * pb_x[j] + 3.0 * pa_xx[j] * fl1_fx * pb_x[j] + pa_xxxx[j] * pb_x[j]);
+                t_xxxx_x[j] = fl_s_0_0 * (3.0 * pa_x[j] * fl2_fx + 2.0 * pa_xxx[j] * fl1_fx + 0.75 * pb_x[j] * fl2_fx + 3.0 * pa2pb_xx_x[j] * fl1_fx + pa2pb_xxxx_x[j]);
 
-                t_xxxx_x[j] += fl_r_0_0 * (-6.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 18.0 * pa_x[j] * fl2_fx * fl1_fz + 16.0 * pa_xxx[j] * fl1_fz * fl1_fx - 3.0 * fl1_fx * fl1_fz * fl1_fga * pb_x[j] - 6.0 * pa_xx[j] * fl1_fz * fl1_fga * pb_x[j] + 4.5 * fl2_fx * fl1_fz * pb_x[j] + 24.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_x[j] + 10.0 * pa_xxxx[j] * fl1_fz * pb_x[j]);
+                t_xxxx_x[j] += fl_r_0_0 * (-6.0 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 18.0 * pa_x[j] * fl2_fx * fl1_fz + 16.0 * pa_xxx[j] * fl1_fz * fl1_fx - 3.0 * pb_x[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_xx_x[j] * fl1_fz * fl1_fga + 4.5 * pb_x[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_xx_x[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xxxx_x[j] * fl1_fz);
 
-                t_xxxx_y[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_y[j] + 3.0 * pa_xx[j] * fl1_fx * pb_y[j] + pa_xxxx[j] * pb_y[j]);
+                t_xxxx_y[j] = fl_s_0_0 * (0.75 * pb_y[j] * fl2_fx + 3.0 * pa2pb_xx_y[j] * fl1_fx + pa2pb_xxxx_y[j]);
 
-                t_xxxx_y[j] += fl_r_0_0 * (-3.0 * fl1_fx * fl1_fz * fl1_fga * pb_y[j] - 6.0 * pa_xx[j] * fl1_fz * fl1_fga * pb_y[j] + 4.5 * fl2_fx * fl1_fz * pb_y[j] + 24.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_y[j] + 10.0 * pa_xxxx[j] * fl1_fz * pb_y[j]);
+                t_xxxx_y[j] += fl_r_0_0 * (-3.0 * pb_y[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_xx_y[j] * fl1_fz * fl1_fga + 4.5 * pb_y[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_xx_y[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xxxx_y[j] * fl1_fz);
 
-                t_xxxx_z[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_z[j] + 3.0 * pa_xx[j] * fl1_fx * pb_z[j] + pa_xxxx[j] * pb_z[j]);
+                t_xxxx_z[j] = fl_s_0_0 * (0.75 * pb_z[j] * fl2_fx + 3.0 * pa2pb_xx_z[j] * fl1_fx + pa2pb_xxxx_z[j]);
 
-                t_xxxx_z[j] += fl_r_0_0 * (-3.0 * fl1_fx * fl1_fz * fl1_fga * pb_z[j] - 6.0 * pa_xx[j] * fl1_fz * fl1_fga * pb_z[j] + 4.5 * fl2_fx * fl1_fz * pb_z[j] + 24.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_z[j] + 10.0 * pa_xxxx[j] * fl1_fz * pb_z[j]);
+                t_xxxx_z[j] += fl_r_0_0 * (-3.0 * pb_z[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_xx_z[j] * fl1_fz * fl1_fga + 4.5 * pb_z[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_xx_z[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xxxx_z[j] * fl1_fz);
 
-                t_xxxy_x[j] = fl_s_0_0 * (0.75 * fl2_fx * pa_y[j] + 1.5 * pa_xxy[j] * fl1_fx + 1.5 * pa_xy[j] * fl1_fx * pb_x[j] + pa_xxxy[j] * pb_x[j]);
+                t_xxxy_x[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pa_xxy[j] * fl1_fx + 1.5 * pa2pb_xy_x[j] * fl1_fx + pa2pb_xxxy_x[j]);
 
-                t_xxxy_x[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga * pa_y[j] + 4.5 * fl2_fx * fl1_fz * pa_y[j] + 12.0 * pa_xxy[j] * fl1_fx * fl1_fz - 3.0 * pa_xy[j] * fl1_fz * fl1_fga * pb_x[j] + 12.0 * pa_xy[j] * fl1_fx * fl1_fz * pb_x[j] + 10.0 * pa_xxxy[j] * fl1_fz * pb_x[j]);
+                t_xxxy_x[j] += fl_r_0_0 * (-1.5 * pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_y[j] * fl2_fx * fl1_fz + 12.0 * pa_xxy[j] * fl1_fx * fl1_fz - 3.0 * pa2pb_xy_x[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xy_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxxy_x[j] * fl1_fz);
 
-                t_xxxy_y[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 0.5 * pa_xxx[j] * fl1_fx + 1.5 * pa_xy[j] * fl1_fx * pb_y[j] + pa_xxxy[j] * pb_y[j]);
+                t_xxxy_y[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 0.5 * pa_xxx[j] * fl1_fx + 1.5 * pa2pb_xy_y[j] * fl1_fx + pa2pb_xxxy_y[j]);
 
-                t_xxxy_y[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fz * fl1_fga * fl1_fx + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xxx[j] * fl1_fz * fl1_fx - 3.0 * pa_xy[j] * fl1_fz * fl1_fga * pb_y[j] + 12.0 * pa_xy[j] * fl1_fx * fl1_fz * pb_y[j] + 10.0 * pa_xxxy[j] * fl1_fz * pb_y[j]);
+                t_xxxy_y[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fz * fl1_fga * fl1_fx + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xxx[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_xy_y[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xy_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxxy_y[j] * fl1_fz);
 
-                t_xxxy_z[j] = fl_s_0_0 * (1.5 * pa_xy[j] * fl1_fx * pb_z[j] + pa_xxxy[j] * pb_z[j]);
+                t_xxxy_z[j] = fl_s_0_0 * (1.5 * pa2pb_xy_z[j] * fl1_fx + pa2pb_xxxy_z[j]);
 
-                t_xxxy_z[j] += fl_r_0_0 * (-3.0 * pa_xy[j] * fl1_fz * fl1_fga * pb_z[j] + 12.0 * pa_xy[j] * fl1_fx * fl1_fz * pb_z[j] + 10.0 * pa_xxxy[j] * fl1_fz * pb_z[j]);
+                t_xxxy_z[j] += fl_r_0_0 * (-3.0 * pa2pb_xy_z[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xy_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxxy_z[j] * fl1_fz);
 
-                t_xxxz_x[j] = fl_s_0_0 * (0.75 * fl2_fx * pa_z[j] + 1.5 * pa_xxz[j] * fl1_fx + 1.5 * pa_xz[j] * fl1_fx * pb_x[j] + pa_xxxz[j] * pb_x[j]);
+                t_xxxz_x[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 1.5 * pa_xxz[j] * fl1_fx + 1.5 * pa2pb_xz_x[j] * fl1_fx + pa2pb_xxxz_x[j]);
 
-                t_xxxz_x[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga * pa_z[j] + 4.5 * fl2_fx * fl1_fz * pa_z[j] + 12.0 * pa_xxz[j] * fl1_fx * fl1_fz - 3.0 * pa_xz[j] * fl1_fz * fl1_fga * pb_x[j] + 12.0 * pa_xz[j] * fl1_fx * fl1_fz * pb_x[j] + 10.0 * pa_xxxz[j] * fl1_fz * pb_x[j]);
+                t_xxxz_x[j] += fl_r_0_0 * (-1.5 * pa_z[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_z[j] * fl2_fx * fl1_fz + 12.0 * pa_xxz[j] * fl1_fx * fl1_fz - 3.0 * pa2pb_xz_x[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xz_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxxz_x[j] * fl1_fz);
 
-                t_xxxz_y[j] = fl_s_0_0 * (1.5 * pa_xz[j] * fl1_fx * pb_y[j] + pa_xxxz[j] * pb_y[j]);
+                t_xxxz_y[j] = fl_s_0_0 * (1.5 * pa2pb_xz_y[j] * fl1_fx + pa2pb_xxxz_y[j]);
 
-                t_xxxz_y[j] += fl_r_0_0 * (-3.0 * pa_xz[j] * fl1_fz * fl1_fga * pb_y[j] + 12.0 * pa_xz[j] * fl1_fx * fl1_fz * pb_y[j] + 10.0 * pa_xxxz[j] * fl1_fz * pb_y[j]);
+                t_xxxz_y[j] += fl_r_0_0 * (-3.0 * pa2pb_xz_y[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xz_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxxz_y[j] * fl1_fz);
 
-                t_xxxz_z[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 0.5 * pa_xxx[j] * fl1_fx + 1.5 * pa_xz[j] * fl1_fx * pb_z[j] + pa_xxxz[j] * pb_z[j]);
+                t_xxxz_z[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 0.5 * pa_xxx[j] * fl1_fx + 1.5 * pa2pb_xz_z[j] * fl1_fx + pa2pb_xxxz_z[j]);
 
-                t_xxxz_z[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fz * fl1_fga * fl1_fx + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xxx[j] * fl1_fz * fl1_fx - 3.0 * pa_xz[j] * fl1_fz * fl1_fga * pb_z[j] + 12.0 * pa_xz[j] * fl1_fx * fl1_fz * pb_z[j] + 10.0 * pa_xxxz[j] * fl1_fz * pb_z[j]);
+                t_xxxz_z[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fz * fl1_fga * fl1_fx + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xxx[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_xz_z[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xz_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxxz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -2736,6 +2882,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto)
@@ -2766,25 +2913,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(34 * idx);
 
             auto pa_y = paDistances.data(34 * idx + 1);
 
             auto pa_z = paDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            auto pa_xx = paDistances.data(34 * idx + 3);
-
-            auto pa_yy = paDistances.data(34 * idx + 6);
-
-            auto pa_yz = paDistances.data(34 * idx + 7);
-
-            auto pa_zz = paDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PA)
 
             auto pa_xxy = paDistances.data(34 * idx + 10);
 
@@ -2796,21 +2931,57 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_xzz = paDistances.data(34 * idx + 14);
 
-            // set up pointers to 4-th order tensor of distance R(PA)
-
-            auto pa_xxyy = paDistances.data(34 * idx + 22);
-
-            auto pa_xxyz = paDistances.data(34 * idx + 23);
-
-            auto pa_xxzz = paDistances.data(34 * idx + 24);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
+
+            // set up pointers to tensors product of distances R(PA)xR(PB)
+
+            auto pa2pb_xx_x = pa2pbDistances.data(102 * idx + 9);
+
+            auto pa2pb_xx_y = pa2pbDistances.data(102 * idx + 10);
+
+            auto pa2pb_xx_z = pa2pbDistances.data(102 * idx + 11);
+
+            auto pa2pb_yy_x = pa2pbDistances.data(102 * idx + 18);
+
+            auto pa2pb_yy_y = pa2pbDistances.data(102 * idx + 19);
+
+            auto pa2pb_yy_z = pa2pbDistances.data(102 * idx + 20);
+
+            auto pa2pb_yz_x = pa2pbDistances.data(102 * idx + 21);
+
+            auto pa2pb_yz_y = pa2pbDistances.data(102 * idx + 22);
+
+            auto pa2pb_yz_z = pa2pbDistances.data(102 * idx + 23);
+
+            auto pa2pb_zz_x = pa2pbDistances.data(102 * idx + 24);
+
+            auto pa2pb_zz_y = pa2pbDistances.data(102 * idx + 25);
+
+            auto pa2pb_zz_z = pa2pbDistances.data(102 * idx + 26);
+
+            auto pa2pb_xxyy_x = pa2pbDistances.data(102 * idx + 66);
+
+            auto pa2pb_xxyy_y = pa2pbDistances.data(102 * idx + 67);
+
+            auto pa2pb_xxyy_z = pa2pbDistances.data(102 * idx + 68);
+
+            auto pa2pb_xxyz_x = pa2pbDistances.data(102 * idx + 69);
+
+            auto pa2pb_xxyz_y = pa2pbDistances.data(102 * idx + 70);
+
+            auto pa2pb_xxyz_z = pa2pbDistances.data(102 * idx + 71);
+
+            auto pa2pb_xxzz_x = pa2pbDistances.data(102 * idx + 72);
+
+            auto pa2pb_xxzz_y = pa2pbDistances.data(102 * idx + 73);
+
+            auto pa2pb_xxzz_z = pa2pbDistances.data(102 * idx + 74);
 
             // set up pointers to auxilary integrals
 
@@ -2840,9 +3011,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (9,18)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_x, pa_xx, pa_xxy, pa_xxyy, pa_xxyz, pa_xxz, pa_xxzz, pa_xyy, \
-                                     pa_xyz, pa_xzz, pa_y, pa_yy, pa_yz, pa_z, pa_zz, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_xxyy_x, \
-                                     t_xxyy_y, t_xxyy_z, t_xxyz_x, t_xxyz_y, t_xxyz_z, t_xxzz_x, t_xxzz_y, t_xxzz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_xx_x, pa2pb_xx_y, pa2pb_xx_z, pa2pb_xxyy_x, \
+                                     pa2pb_xxyy_y, pa2pb_xxyy_z, pa2pb_xxyz_x, pa2pb_xxyz_y, pa2pb_xxyz_z, pa2pb_xxzz_x, \
+                                     pa2pb_xxzz_y, pa2pb_xxzz_z, pa2pb_yy_x, pa2pb_yy_y, pa2pb_yy_z, pa2pb_yz_x, \
+                                     pa2pb_yz_y, pa2pb_yz_z, pa2pb_zz_x, pa2pb_zz_y, pa2pb_zz_z, pa_x, pa_xxy, pa_xxz, \
+                                     pa_xyy, pa_xyz, pa_xzz, pa_y, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_xxyy_x, t_xxyy_y, \
+                                     t_xxyy_z, t_xxyz_x, t_xxyz_y, t_xxyz_z, t_xxzz_x, t_xxzz_y, t_xxzz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -2857,41 +3031,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xxyy_x[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xyy[j] * fl1_fx + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_yy[j] * pb_x[j] + pa_xxyy[j] * pb_x[j]);
+                t_xxyy_x[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xyy[j] * fl1_fx + 0.25 * pb_x[j] * fl2_fx + 0.5 * pa2pb_xx_x[j] * fl1_fx + 0.5 * pa2pb_yy_x[j] * fl1_fx + pa2pb_xxyy_x[j]);
 
-                t_xxyy_x[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 3.0 * pa_x[j] * fl2_fx * fl1_fz + 8.0 * pa_xyy[j] * fl1_fx * fl1_fz - fl1_fx * fl1_fz * fl1_fga * pb_x[j] - pa_xx[j] * fl1_fz * fl1_fga * pb_x[j] + 1.5 * fl2_fx * fl1_fz * pb_x[j] - fl1_fz * fl1_fga * pa_yy[j] * pb_x[j] + 4.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_x[j] + 4.0 * fl1_fx * pa_yy[j] * fl1_fz * pb_x[j] + 10.0 * pa_xxyy[j] * fl1_fz * pb_x[j]);
+                t_xxyy_x[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 3.0 * pa_x[j] * fl2_fx * fl1_fz + 8.0 * pa_xyy[j] * fl1_fx * fl1_fz - pb_x[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_xx_x[j] * fl1_fz * fl1_fga + 1.5 * pb_x[j] * fl2_fx * fl1_fz - pa2pb_yy_x[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xx_x[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_yy_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxyy_x[j] * fl1_fz);
 
-                t_xxyy_y[j] = fl_s_0_0 * (0.5 * fl2_fx * pa_y[j] + pa_xxy[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_xx[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_yy[j] * pb_y[j] + pa_xxyy[j] * pb_y[j]);
+                t_xxyy_y[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl2_fx + pa_xxy[j] * fl1_fx + 0.25 * pb_y[j] * fl2_fx + 0.5 * pa2pb_xx_y[j] * fl1_fx + 0.5 * pa2pb_yy_y[j] * fl1_fx + pa2pb_xxyy_y[j]);
 
-                t_xxyy_y[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_y[j] * fl1_fx + 3.0 * fl2_fx * pa_y[j] * fl1_fz + 8.0 * pa_xxy[j] * fl1_fz * fl1_fx - fl1_fx * fl1_fz * fl1_fga * pb_y[j] - pa_xx[j] * fl1_fz * fl1_fga * pb_y[j] + 1.5 * fl2_fx * fl1_fz * pb_y[j] - fl1_fz * fl1_fga * pa_yy[j] * pb_y[j] + 4.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_y[j] + 4.0 * fl1_fx * pa_yy[j] * fl1_fz * pb_y[j] + 10.0 * pa_xxyy[j] * fl1_fz * pb_y[j]);
+                t_xxyy_y[j] += fl_r_0_0 * (-pa_y[j] * fl1_fz * fl1_fga * fl1_fx + 3.0 * pa_y[j] * fl2_fx * fl1_fz + 8.0 * pa_xxy[j] * fl1_fz * fl1_fx - pb_y[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_xx_y[j] * fl1_fz * fl1_fga + 1.5 * pb_y[j] * fl2_fx * fl1_fz - pa2pb_yy_y[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xx_y[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_yy_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxyy_y[j] * fl1_fz);
 
-                t_xxyy_z[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_z[j] + 0.5 * pa_xx[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_yy[j] * pb_z[j] + pa_xxyy[j] * pb_z[j]);
+                t_xxyy_z[j] = fl_s_0_0 * (0.25 * pb_z[j] * fl2_fx + 0.5 * pa2pb_xx_z[j] * fl1_fx + 0.5 * pa2pb_yy_z[j] * fl1_fx + pa2pb_xxyy_z[j]);
 
-                t_xxyy_z[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga * pb_z[j] - pa_xx[j] * fl1_fz * fl1_fga * pb_z[j] + 1.5 * fl2_fx * fl1_fz * pb_z[j] - fl1_fz * fl1_fga * pa_yy[j] * pb_z[j] + 4.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_z[j] + 4.0 * fl1_fx * pa_yy[j] * fl1_fz * pb_z[j] + 10.0 * pa_xxyy[j] * fl1_fz * pb_z[j]);
+                t_xxyy_z[j] += fl_r_0_0 * (-pb_z[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_xx_z[j] * fl1_fz * fl1_fga + 1.5 * pb_z[j] * fl2_fx * fl1_fz - pa2pb_yy_z[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xx_z[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_yy_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxyy_z[j] * fl1_fz);
 
-                t_xxyz_x[j] = fl_s_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * fl1_fx * pa_yz[j] * pb_x[j] + pa_xxyz[j] * pb_x[j]);
+                t_xxyz_x[j] = fl_s_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * pa2pb_yz_x[j] * fl1_fx + pa2pb_xxyz_x[j]);
 
-                t_xxyz_x[j] += fl_r_0_0 * (8.0 * pa_xyz[j] * fl1_fx * fl1_fz - fl1_fz * fl1_fga * pa_yz[j] * pb_x[j] + 4.0 * fl1_fx * pa_yz[j] * fl1_fz * pb_x[j] + 10.0 * pa_xxyz[j] * fl1_fz * pb_x[j]);
+                t_xxyz_x[j] += fl_r_0_0 * (8.0 * pa_xyz[j] * fl1_fx * fl1_fz - pa2pb_yz_x[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_yz_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxyz_x[j] * fl1_fz);
 
-                t_xxyz_y[j] = fl_s_0_0 * (0.25 * fl2_fx * pa_z[j] + 0.5 * pa_xxz[j] * fl1_fx + 0.5 * fl1_fx * pa_yz[j] * pb_y[j] + pa_xxyz[j] * pb_y[j]);
+                t_xxyz_y[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pa_xxz[j] * fl1_fx + 0.5 * pa2pb_yz_y[j] * fl1_fx + pa2pb_xxyz_y[j]);
 
-                t_xxyz_y[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * fl1_fx * pa_z[j] + 1.5 * fl2_fx * fl1_fz * pa_z[j] + 4.0 * pa_xxz[j] * fl1_fx * fl1_fz - fl1_fz * fl1_fga * pa_yz[j] * pb_y[j] + 4.0 * fl1_fx * pa_yz[j] * fl1_fz * pb_y[j] + 10.0 * pa_xxyz[j] * fl1_fz * pb_y[j]);
+                t_xxyz_y[j] += fl_r_0_0 * (-0.5 * pa_z[j] * fl1_fz * fl1_fga * fl1_fx + 1.5 * pa_z[j] * fl2_fx * fl1_fz + 4.0 * pa_xxz[j] * fl1_fx * fl1_fz - pa2pb_yz_y[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_yz_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxyz_y[j] * fl1_fz);
 
-                t_xxyz_z[j] = fl_s_0_0 * (0.25 * fl2_fx * pa_y[j] + 0.5 * pa_xxy[j] * fl1_fx + 0.5 * fl1_fx * pa_yz[j] * pb_z[j] + pa_xxyz[j] * pb_z[j]);
+                t_xxyz_z[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pa_xxy[j] * fl1_fx + 0.5 * pa2pb_yz_z[j] * fl1_fx + pa2pb_xxyz_z[j]);
 
-                t_xxyz_z[j] += fl_r_0_0 * (-0.5 * fl1_fz * fl1_fga * pa_y[j] * fl1_fx + 1.5 * fl2_fx * pa_y[j] * fl1_fz + 4.0 * pa_xxy[j] * fl1_fz * fl1_fx - fl1_fz * fl1_fga * pa_yz[j] * pb_z[j] + 4.0 * fl1_fx * pa_yz[j] * fl1_fz * pb_z[j] + 10.0 * pa_xxyz[j] * fl1_fz * pb_z[j]);
+                t_xxyz_z[j] += fl_r_0_0 * (-0.5 * pa_y[j] * fl1_fz * fl1_fga * fl1_fx + 1.5 * pa_y[j] * fl2_fx * fl1_fz + 4.0 * pa_xxy[j] * fl1_fz * fl1_fx - pa2pb_yz_z[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_yz_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxyz_z[j] * fl1_fz);
 
-                t_xxzz_x[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xzz[j] * fl1_fx + 0.25 * fl2_fx * pb_x[j] + 0.5 * pa_xx[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_zz[j] * pb_x[j] + pa_xxzz[j] * pb_x[j]);
+                t_xxzz_x[j] = fl_s_0_0 * (0.5 * pa_x[j] * fl2_fx + pa_xzz[j] * fl1_fx + 0.25 * pb_x[j] * fl2_fx + 0.5 * pa2pb_xx_x[j] * fl1_fx + 0.5 * pa2pb_zz_x[j] * fl1_fx + pa2pb_xxzz_x[j]);
 
-                t_xxzz_x[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 3.0 * pa_x[j] * fl2_fx * fl1_fz + 8.0 * pa_xzz[j] * fl1_fx * fl1_fz - fl1_fx * fl1_fz * fl1_fga * pb_x[j] - pa_xx[j] * fl1_fz * fl1_fga * pb_x[j] + 1.5 * fl2_fx * fl1_fz * pb_x[j] - fl1_fz * fl1_fga * pa_zz[j] * pb_x[j] + 4.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_x[j] + 4.0 * fl1_fx * pa_zz[j] * fl1_fz * pb_x[j] + 10.0 * pa_xxzz[j] * fl1_fz * pb_x[j]);
+                t_xxzz_x[j] += fl_r_0_0 * (-pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 3.0 * pa_x[j] * fl2_fx * fl1_fz + 8.0 * pa_xzz[j] * fl1_fx * fl1_fz - pb_x[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_xx_x[j] * fl1_fz * fl1_fga + 1.5 * pb_x[j] * fl2_fx * fl1_fz - pa2pb_zz_x[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xx_x[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_zz_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxzz_x[j] * fl1_fz);
 
-                t_xxzz_y[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_y[j] + 0.5 * pa_xx[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_zz[j] * pb_y[j] + pa_xxzz[j] * pb_y[j]);
+                t_xxzz_y[j] = fl_s_0_0 * (0.25 * pb_y[j] * fl2_fx + 0.5 * pa2pb_xx_y[j] * fl1_fx + 0.5 * pa2pb_zz_y[j] * fl1_fx + pa2pb_xxzz_y[j]);
 
-                t_xxzz_y[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga * pb_y[j] - pa_xx[j] * fl1_fz * fl1_fga * pb_y[j] + 1.5 * fl2_fx * fl1_fz * pb_y[j] - fl1_fz * fl1_fga * pa_zz[j] * pb_y[j] + 4.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_y[j] + 4.0 * fl1_fx * pa_zz[j] * fl1_fz * pb_y[j] + 10.0 * pa_xxzz[j] * fl1_fz * pb_y[j]);
+                t_xxzz_y[j] += fl_r_0_0 * (-pb_y[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_xx_y[j] * fl1_fz * fl1_fga + 1.5 * pb_y[j] * fl2_fx * fl1_fz - pa2pb_zz_y[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xx_y[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_zz_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxzz_y[j] * fl1_fz);
 
-                t_xxzz_z[j] = fl_s_0_0 * (0.5 * fl2_fx * pa_z[j] + pa_xxz[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_xx[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pb_z[j] + pa_xxzz[j] * pb_z[j]);
+                t_xxzz_z[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl2_fx + pa_xxz[j] * fl1_fx + 0.25 * pb_z[j] * fl2_fx + 0.5 * pa2pb_xx_z[j] * fl1_fx + 0.5 * pa2pb_zz_z[j] * fl1_fx + pa2pb_xxzz_z[j]);
 
-                t_xxzz_z[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_z[j] * fl1_fx + 3.0 * fl2_fx * pa_z[j] * fl1_fz + 8.0 * pa_xxz[j] * fl1_fz * fl1_fx - fl1_fx * fl1_fz * fl1_fga * pb_z[j] - pa_xx[j] * fl1_fz * fl1_fga * pb_z[j] + 1.5 * fl2_fx * fl1_fz * pb_z[j] - fl1_fz * fl1_fga * pa_zz[j] * pb_z[j] + 4.0 * pa_xx[j] * fl1_fz * fl1_fx * pb_z[j] + 4.0 * fl1_fx * pa_zz[j] * fl1_fz * pb_z[j] + 10.0 * pa_xxzz[j] * fl1_fz * pb_z[j]);
+                t_xxzz_z[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fga * fl1_fx + 3.0 * pa_z[j] * fl2_fx * fl1_fz + 8.0 * pa_xxz[j] * fl1_fz * fl1_fx - pb_z[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_xx_z[j] * fl1_fz * fl1_fga + 1.5 * pb_z[j] * fl2_fx * fl1_fz - pa2pb_zz_z[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xx_z[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_zz_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xxzz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -2903,7 +3077,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                  const CMemBlock2D<double>& auxBuffer,
                                  const CMemBlock2D<double>& osFactors,
                                  const CMemBlock2D<double>& paDistances,
-                                 const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -2934,21 +3108,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(34 * idx);
 
             auto pa_y = paDistances.data(34 * idx + 1);
 
             auto pa_z = paDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            auto pa_xy = paDistances.data(34 * idx + 4);
-
-            auto pa_xz = paDistances.data(34 * idx + 5);
-
-            // set up pointers to 3-th order tensor of distance R(PA)
 
             auto pa_xyy = paDistances.data(34 * idx + 12);
 
@@ -2962,21 +3128,37 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_yzz = paDistances.data(34 * idx + 17);
 
-            // set up pointers to 4-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA)xR(PB)
 
-            auto pa_xyyy = paDistances.data(34 * idx + 25);
+            auto pa2pb_xy_x = pa2pbDistances.data(102 * idx + 12);
 
-            auto pa_xyyz = paDistances.data(34 * idx + 26);
+            auto pa2pb_xy_y = pa2pbDistances.data(102 * idx + 13);
 
-            auto pa_xyzz = paDistances.data(34 * idx + 27);
+            auto pa2pb_xy_z = pa2pbDistances.data(102 * idx + 14);
 
-            // set up pointers to 1-th order tensor of distance R(PB)
+            auto pa2pb_xz_x = pa2pbDistances.data(102 * idx + 15);
 
-            auto pb_x = pbDistances.data(3 * idx);
+            auto pa2pb_xz_y = pa2pbDistances.data(102 * idx + 16);
 
-            auto pb_y = pbDistances.data(3 * idx + 1);
+            auto pa2pb_xz_z = pa2pbDistances.data(102 * idx + 17);
 
-            auto pb_z = pbDistances.data(3 * idx + 2);
+            auto pa2pb_xyyy_x = pa2pbDistances.data(102 * idx + 75);
+
+            auto pa2pb_xyyy_y = pa2pbDistances.data(102 * idx + 76);
+
+            auto pa2pb_xyyy_z = pa2pbDistances.data(102 * idx + 77);
+
+            auto pa2pb_xyyz_x = pa2pbDistances.data(102 * idx + 78);
+
+            auto pa2pb_xyyz_y = pa2pbDistances.data(102 * idx + 79);
+
+            auto pa2pb_xyyz_z = pa2pbDistances.data(102 * idx + 80);
+
+            auto pa2pb_xyzz_x = pa2pbDistances.data(102 * idx + 81);
+
+            auto pa2pb_xyzz_y = pa2pbDistances.data(102 * idx + 82);
+
+            auto pa2pb_xyzz_z = pa2pbDistances.data(102 * idx + 83);
 
             // set up pointers to auxilary integrals
 
@@ -3006,9 +3188,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (18,27)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_x, pa_xy, pa_xyy, pa_xyyy, pa_xyyz, pa_xyz, pa_xyzz, pa_xz, pa_xzz, \
-                                     pa_y, pa_yyy, pa_yyz, pa_yzz, pa_z, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_xyyy_x, t_xyyy_y, \
-                                     t_xyyy_z, t_xyyz_x, t_xyyz_y, t_xyyz_z, t_xyzz_x, t_xyzz_y, t_xyzz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_xy_x, pa2pb_xy_y, pa2pb_xy_z, pa2pb_xyyy_x, \
+                                     pa2pb_xyyy_y, pa2pb_xyyy_z, pa2pb_xyyz_x, pa2pb_xyyz_y, pa2pb_xyyz_z, pa2pb_xyzz_x, \
+                                     pa2pb_xyzz_y, pa2pb_xyzz_z, pa2pb_xz_x, pa2pb_xz_y, pa2pb_xz_z, pa_x, pa_xyy, pa_xyz, \
+                                     pa_xzz, pa_y, pa_yyy, pa_yyz, pa_yzz, pa_z, r_0_0, s_0_0, t_xyyy_x, t_xyyy_y, t_xyyy_z, \
+                                     t_xyyz_x, t_xyyz_y, t_xyyz_z, t_xyzz_x, t_xyzz_y, t_xyzz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -3023,41 +3207,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xyyy_x[j] = fl_s_0_0 * (0.75 * fl2_fx * pa_y[j] + 0.5 * fl1_fx * pa_yyy[j] + 1.5 * pa_xy[j] * fl1_fx * pb_x[j] + pa_xyyy[j] * pb_x[j]);
+                t_xyyy_x[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 0.5 * pa_yyy[j] * fl1_fx + 1.5 * pa2pb_xy_x[j] * fl1_fx + pa2pb_xyyy_x[j]);
 
-                t_xyyy_x[j] += fl_r_0_0 * (-1.5 * fl1_fx * pa_y[j] * fl1_fz * fl1_fga + 4.5 * fl2_fx * pa_y[j] * fl1_fz + 4.0 * fl1_fx * pa_yyy[j] * fl1_fz - 3.0 * pa_xy[j] * fl1_fz * fl1_fga * pb_x[j] + 12.0 * pa_xy[j] * fl1_fz * fl1_fx * pb_x[j] + 10.0 * pa_xyyy[j] * fl1_fz * pb_x[j]);
+                t_xyyy_x[j] += fl_r_0_0 * (-1.5 * pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_y[j] * fl2_fx * fl1_fz + 4.0 * pa_yyy[j] * fl1_fx * fl1_fz - 3.0 * pa2pb_xy_x[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xy_x[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xyyy_x[j] * fl1_fz);
 
-                t_xyyy_y[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pa_xyy[j] * fl1_fx + 1.5 * pa_xy[j] * fl1_fx * pb_y[j] + pa_xyyy[j] * pb_y[j]);
+                t_xyyy_y[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pa_xyy[j] * fl1_fx + 1.5 * pa2pb_xy_y[j] * fl1_fx + pa2pb_xyyy_y[j]);
 
-                t_xyyy_y[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 12.0 * pa_xyy[j] * fl1_fz * fl1_fx - 3.0 * pa_xy[j] * fl1_fz * fl1_fga * pb_y[j] + 12.0 * pa_xy[j] * fl1_fz * fl1_fx * pb_y[j] + 10.0 * pa_xyyy[j] * fl1_fz * pb_y[j]);
+                t_xyyy_y[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 12.0 * pa_xyy[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_xy_y[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xy_y[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xyyy_y[j] * fl1_fz);
 
-                t_xyyy_z[j] = fl_s_0_0 * (1.5 * pa_xy[j] * fl1_fx * pb_z[j] + pa_xyyy[j] * pb_z[j]);
+                t_xyyy_z[j] = fl_s_0_0 * (1.5 * pa2pb_xy_z[j] * fl1_fx + pa2pb_xyyy_z[j]);
 
-                t_xyyy_z[j] += fl_r_0_0 * (-3.0 * pa_xy[j] * fl1_fz * fl1_fga * pb_z[j] + 12.0 * pa_xy[j] * fl1_fz * fl1_fx * pb_z[j] + 10.0 * pa_xyyy[j] * fl1_fz * pb_z[j]);
+                t_xyyy_z[j] += fl_r_0_0 * (-3.0 * pa2pb_xy_z[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xy_z[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xyyy_z[j] * fl1_fz);
 
-                t_xyyz_x[j] = fl_s_0_0 * (0.25 * fl2_fx * pa_z[j] + 0.5 * fl1_fx * pa_yyz[j] + 0.5 * pa_xz[j] * fl1_fx * pb_x[j] + pa_xyyz[j] * pb_x[j]);
+                t_xyyz_x[j] = fl_s_0_0 * (0.25 * pa_z[j] * fl2_fx + 0.5 * pa_yyz[j] * fl1_fx + 0.5 * pa2pb_xz_x[j] * fl1_fx + pa2pb_xyyz_x[j]);
 
-                t_xyyz_x[j] += fl_r_0_0 * (-0.5 * fl1_fx * fl1_fz * fl1_fga * pa_z[j] + 1.5 * fl2_fx * fl1_fz * pa_z[j] + 4.0 * fl1_fx * pa_yyz[j] * fl1_fz - pa_xz[j] * fl1_fz * fl1_fga * pb_x[j] + 4.0 * pa_xz[j] * fl1_fx * fl1_fz * pb_x[j] + 10.0 * pa_xyyz[j] * fl1_fz * pb_x[j]);
+                t_xyyz_x[j] += fl_r_0_0 * (-0.5 * pa_z[j] * fl1_fx * fl1_fz * fl1_fga + 1.5 * pa_z[j] * fl2_fx * fl1_fz + 4.0 * pa_yyz[j] * fl1_fx * fl1_fz - pa2pb_xz_x[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xz_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xyyz_x[j] * fl1_fz);
 
-                t_xyyz_y[j] = fl_s_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * pa_xz[j] * fl1_fx * pb_y[j] + pa_xyyz[j] * pb_y[j]);
+                t_xyyz_y[j] = fl_s_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * pa2pb_xz_y[j] * fl1_fx + pa2pb_xyyz_y[j]);
 
-                t_xyyz_y[j] += fl_r_0_0 * (8.0 * pa_xyz[j] * fl1_fx * fl1_fz - pa_xz[j] * fl1_fz * fl1_fga * pb_y[j] + 4.0 * pa_xz[j] * fl1_fx * fl1_fz * pb_y[j] + 10.0 * pa_xyyz[j] * fl1_fz * pb_y[j]);
+                t_xyyz_y[j] += fl_r_0_0 * (8.0 * pa_xyz[j] * fl1_fx * fl1_fz - pa2pb_xz_y[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xz_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xyyz_y[j] * fl1_fz);
 
-                t_xyyz_z[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_xyy[j] * fl1_fx + 0.5 * pa_xz[j] * fl1_fx * pb_z[j] + pa_xyyz[j] * pb_z[j]);
+                t_xyyz_z[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_xyy[j] * fl1_fx + 0.5 * pa2pb_xz_z[j] * fl1_fx + pa2pb_xyyz_z[j]);
 
-                t_xyyz_z[j] += fl_r_0_0 * (-0.5 * pa_x[j] * fl1_fz * fl1_fga * fl1_fx + 1.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xyy[j] * fl1_fz * fl1_fx - pa_xz[j] * fl1_fz * fl1_fga * pb_z[j] + 4.0 * pa_xz[j] * fl1_fx * fl1_fz * pb_z[j] + 10.0 * pa_xyyz[j] * fl1_fz * pb_z[j]);
+                t_xyyz_z[j] += fl_r_0_0 * (-0.5 * pa_x[j] * fl1_fz * fl1_fga * fl1_fx + 1.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xyy[j] * fl1_fz * fl1_fx - pa2pb_xz_z[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xz_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_xyyz_z[j] * fl1_fz);
 
-                t_xyzz_x[j] = fl_s_0_0 * (0.25 * fl2_fx * pa_y[j] + 0.5 * fl1_fx * pa_yzz[j] + 0.5 * pa_xy[j] * fl1_fx * pb_x[j] + pa_xyzz[j] * pb_x[j]);
+                t_xyzz_x[j] = fl_s_0_0 * (0.25 * pa_y[j] * fl2_fx + 0.5 * pa_yzz[j] * fl1_fx + 0.5 * pa2pb_xy_x[j] * fl1_fx + pa2pb_xyzz_x[j]);
 
-                t_xyzz_x[j] += fl_r_0_0 * (-0.5 * fl1_fx * pa_y[j] * fl1_fz * fl1_fga + 1.5 * fl2_fx * pa_y[j] * fl1_fz + 4.0 * fl1_fx * pa_yzz[j] * fl1_fz - pa_xy[j] * fl1_fz * fl1_fga * pb_x[j] + 4.0 * pa_xy[j] * fl1_fz * fl1_fx * pb_x[j] + 10.0 * pa_xyzz[j] * fl1_fz * pb_x[j]);
+                t_xyzz_x[j] += fl_r_0_0 * (-0.5 * pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 1.5 * pa_y[j] * fl2_fx * fl1_fz + 4.0 * pa_yzz[j] * fl1_fx * fl1_fz - pa2pb_xy_x[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xy_x[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xyzz_x[j] * fl1_fz);
 
-                t_xyzz_y[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_xzz[j] * fl1_fx + 0.5 * pa_xy[j] * fl1_fx * pb_y[j] + pa_xyzz[j] * pb_y[j]);
+                t_xyzz_y[j] = fl_s_0_0 * (0.25 * pa_x[j] * fl2_fx + 0.5 * pa_xzz[j] * fl1_fx + 0.5 * pa2pb_xy_y[j] * fl1_fx + pa2pb_xyzz_y[j]);
 
-                t_xyzz_y[j] += fl_r_0_0 * (-0.5 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 1.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xzz[j] * fl1_fx * fl1_fz - pa_xy[j] * fl1_fz * fl1_fga * pb_y[j] + 4.0 * pa_xy[j] * fl1_fz * fl1_fx * pb_y[j] + 10.0 * pa_xyzz[j] * fl1_fz * pb_y[j]);
+                t_xyzz_y[j] += fl_r_0_0 * (-0.5 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 1.5 * pa_x[j] * fl2_fx * fl1_fz + 4.0 * pa_xzz[j] * fl1_fx * fl1_fz - pa2pb_xy_y[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xy_y[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xyzz_y[j] * fl1_fz);
 
-                t_xyzz_z[j] = fl_s_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * pa_xy[j] * fl1_fx * pb_z[j] + pa_xyzz[j] * pb_z[j]);
+                t_xyzz_z[j] = fl_s_0_0 * (pa_xyz[j] * fl1_fx + 0.5 * pa2pb_xy_z[j] * fl1_fx + pa2pb_xyzz_z[j]);
 
-                t_xyzz_z[j] += fl_r_0_0 * (8.0 * pa_xyz[j] * fl1_fz * fl1_fx - pa_xy[j] * fl1_fz * fl1_fga * pb_z[j] + 4.0 * pa_xy[j] * fl1_fz * fl1_fx * pb_z[j] + 10.0 * pa_xyzz[j] * fl1_fz * pb_z[j]);
+                t_xyzz_z[j] += fl_r_0_0 * (8.0 * pa_xyz[j] * fl1_fz * fl1_fx - pa2pb_xy_z[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_xy_z[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xyzz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -3070,6 +3254,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                  const CMemBlock2D<double>& osFactors,
                                  const CMemBlock2D<double>& paDistances,
                                  const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -3100,23 +3285,13 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_x = paDistances.data(34 * idx);
 
             auto pa_y = paDistances.data(34 * idx + 1);
 
             auto pa_z = paDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            auto pa_xz = paDistances.data(34 * idx + 5);
-
-            auto pa_yy = paDistances.data(34 * idx + 6);
-
-            auto pa_yz = paDistances.data(34 * idx + 7);
-
-            // set up pointers to 3-th order tensor of distance R(PA)
 
             auto pa_xzz = paDistances.data(34 * idx + 14);
 
@@ -3126,21 +3301,51 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_zzz = paDistances.data(34 * idx + 18);
 
-            // set up pointers to 4-th order tensor of distance R(PA)
-
-            auto pa_xzzz = paDistances.data(34 * idx + 28);
-
-            auto pa_yyyy = paDistances.data(34 * idx + 29);
-
-            auto pa_yyyz = paDistances.data(34 * idx + 30);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
+
+            // set up pointers to tensors product of distances R(PA)xR(PB)
+
+            auto pa2pb_xz_x = pa2pbDistances.data(102 * idx + 15);
+
+            auto pa2pb_xz_y = pa2pbDistances.data(102 * idx + 16);
+
+            auto pa2pb_xz_z = pa2pbDistances.data(102 * idx + 17);
+
+            auto pa2pb_yy_x = pa2pbDistances.data(102 * idx + 18);
+
+            auto pa2pb_yy_y = pa2pbDistances.data(102 * idx + 19);
+
+            auto pa2pb_yy_z = pa2pbDistances.data(102 * idx + 20);
+
+            auto pa2pb_yz_x = pa2pbDistances.data(102 * idx + 21);
+
+            auto pa2pb_yz_y = pa2pbDistances.data(102 * idx + 22);
+
+            auto pa2pb_yz_z = pa2pbDistances.data(102 * idx + 23);
+
+            auto pa2pb_xzzz_x = pa2pbDistances.data(102 * idx + 84);
+
+            auto pa2pb_xzzz_y = pa2pbDistances.data(102 * idx + 85);
+
+            auto pa2pb_xzzz_z = pa2pbDistances.data(102 * idx + 86);
+
+            auto pa2pb_yyyy_x = pa2pbDistances.data(102 * idx + 87);
+
+            auto pa2pb_yyyy_y = pa2pbDistances.data(102 * idx + 88);
+
+            auto pa2pb_yyyy_z = pa2pbDistances.data(102 * idx + 89);
+
+            auto pa2pb_yyyz_x = pa2pbDistances.data(102 * idx + 90);
+
+            auto pa2pb_yyyz_y = pa2pbDistances.data(102 * idx + 91);
+
+            auto pa2pb_yyyz_z = pa2pbDistances.data(102 * idx + 92);
 
             // set up pointers to auxilary integrals
 
@@ -3170,9 +3375,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (27,36)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_x, pa_xz, pa_xzz, pa_xzzz, pa_y, pa_yy, pa_yyy, pa_yyyy, pa_yyyz, \
-                                     pa_yyz, pa_yz, pa_z, pa_zzz, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_xzzz_x, t_xzzz_y, \
-                                     t_xzzz_z, t_yyyy_x, t_yyyy_y, t_yyyy_z, t_yyyz_x, t_yyyz_y, t_yyyz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_xz_x, pa2pb_xz_y, pa2pb_xz_z, pa2pb_xzzz_x, \
+                                     pa2pb_xzzz_y, pa2pb_xzzz_z, pa2pb_yy_x, pa2pb_yy_y, pa2pb_yy_z, pa2pb_yyyy_x, \
+                                     pa2pb_yyyy_y, pa2pb_yyyy_z, pa2pb_yyyz_x, pa2pb_yyyz_y, pa2pb_yyyz_z, pa2pb_yz_x, \
+                                     pa2pb_yz_y, pa2pb_yz_z, pa_x, pa_xzz, pa_y, pa_yyy, pa_yyz, pa_z, pa_zzz, pb_x, pb_y, pb_z, \
+                                     r_0_0, s_0_0, t_xzzz_x, t_xzzz_y, t_xzzz_z, t_yyyy_x, t_yyyy_y, t_yyyy_z, \
+                                     t_yyyz_x, t_yyyz_y, t_yyyz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -3187,41 +3395,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_xzzz_x[j] = fl_s_0_0 * (0.75 * fl2_fx * pa_z[j] + 0.5 * fl1_fx * pa_zzz[j] + 1.5 * pa_xz[j] * fl1_fx * pb_x[j] + pa_xzzz[j] * pb_x[j]);
+                t_xzzz_x[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 0.5 * pa_zzz[j] * fl1_fx + 1.5 * pa2pb_xz_x[j] * fl1_fx + pa2pb_xzzz_x[j]);
 
-                t_xzzz_x[j] += fl_r_0_0 * (-1.5 * fl1_fx * pa_z[j] * fl1_fz * fl1_fga + 4.5 * fl2_fx * pa_z[j] * fl1_fz + 4.0 * fl1_fx * pa_zzz[j] * fl1_fz - 3.0 * pa_xz[j] * fl1_fz * fl1_fga * pb_x[j] + 12.0 * pa_xz[j] * fl1_fz * fl1_fx * pb_x[j] + 10.0 * pa_xzzz[j] * fl1_fz * pb_x[j]);
+                t_xzzz_x[j] += fl_r_0_0 * (-1.5 * pa_z[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_z[j] * fl2_fx * fl1_fz + 4.0 * pa_zzz[j] * fl1_fx * fl1_fz - 3.0 * pa2pb_xz_x[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xz_x[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xzzz_x[j] * fl1_fz);
 
-                t_xzzz_y[j] = fl_s_0_0 * (1.5 * pa_xz[j] * fl1_fx * pb_y[j] + pa_xzzz[j] * pb_y[j]);
+                t_xzzz_y[j] = fl_s_0_0 * (1.5 * pa2pb_xz_y[j] * fl1_fx + pa2pb_xzzz_y[j]);
 
-                t_xzzz_y[j] += fl_r_0_0 * (-3.0 * pa_xz[j] * fl1_fz * fl1_fga * pb_y[j] + 12.0 * pa_xz[j] * fl1_fz * fl1_fx * pb_y[j] + 10.0 * pa_xzzz[j] * fl1_fz * pb_y[j]);
+                t_xzzz_y[j] += fl_r_0_0 * (-3.0 * pa2pb_xz_y[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xz_y[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xzzz_y[j] * fl1_fz);
 
-                t_xzzz_z[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pa_xzz[j] * fl1_fx + 1.5 * pa_xz[j] * fl1_fx * pb_z[j] + pa_xzzz[j] * pb_z[j]);
+                t_xzzz_z[j] = fl_s_0_0 * (0.75 * pa_x[j] * fl2_fx + 1.5 * pa_xzz[j] * fl1_fx + 1.5 * pa2pb_xz_z[j] * fl1_fx + pa2pb_xzzz_z[j]);
 
-                t_xzzz_z[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 12.0 * pa_xzz[j] * fl1_fz * fl1_fx - 3.0 * pa_xz[j] * fl1_fz * fl1_fga * pb_z[j] + 12.0 * pa_xz[j] * fl1_fz * fl1_fx * pb_z[j] + 10.0 * pa_xzzz[j] * fl1_fz * pb_z[j]);
+                t_xzzz_z[j] += fl_r_0_0 * (-1.5 * pa_x[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_x[j] * fl2_fx * fl1_fz + 12.0 * pa_xzz[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_xz_z[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_xz_z[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_xzzz_z[j] * fl1_fz);
 
-                t_yyyy_x[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_x[j] + 3.0 * pa_yy[j] * fl1_fx * pb_x[j] + pa_yyyy[j] * pb_x[j]);
+                t_yyyy_x[j] = fl_s_0_0 * (0.75 * pb_x[j] * fl2_fx + 3.0 * pa2pb_yy_x[j] * fl1_fx + pa2pb_yyyy_x[j]);
 
-                t_yyyy_x[j] += fl_r_0_0 * (-3.0 * fl1_fx * fl1_fz * fl1_fga * pb_x[j] - 6.0 * pa_yy[j] * fl1_fz * fl1_fga * pb_x[j] + 4.5 * fl2_fx * fl1_fz * pb_x[j] + 24.0 * pa_yy[j] * fl1_fz * fl1_fx * pb_x[j] + 10.0 * pa_yyyy[j] * fl1_fz * pb_x[j]);
+                t_yyyy_x[j] += fl_r_0_0 * (-3.0 * pb_x[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_yy_x[j] * fl1_fz * fl1_fga + 4.5 * pb_x[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_yy_x[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_yyyy_x[j] * fl1_fz);
 
-                t_yyyy_y[j] = fl_s_0_0 * (3.0 * pa_y[j] * fl2_fx + 2.0 * pa_yyy[j] * fl1_fx + 0.75 * fl2_fx * pb_y[j] + 3.0 * pa_yy[j] * fl1_fx * pb_y[j] + pa_yyyy[j] * pb_y[j]);
+                t_yyyy_y[j] = fl_s_0_0 * (3.0 * pa_y[j] * fl2_fx + 2.0 * pa_yyy[j] * fl1_fx + 0.75 * pb_y[j] * fl2_fx + 3.0 * pa2pb_yy_y[j] * fl1_fx + pa2pb_yyyy_y[j]);
 
-                t_yyyy_y[j] += fl_r_0_0 * (-6.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 18.0 * pa_y[j] * fl2_fx * fl1_fz + 16.0 * pa_yyy[j] * fl1_fz * fl1_fx - 3.0 * fl1_fx * fl1_fz * fl1_fga * pb_y[j] - 6.0 * pa_yy[j] * fl1_fz * fl1_fga * pb_y[j] + 4.5 * fl2_fx * fl1_fz * pb_y[j] + 24.0 * pa_yy[j] * fl1_fz * fl1_fx * pb_y[j] + 10.0 * pa_yyyy[j] * fl1_fz * pb_y[j]);
+                t_yyyy_y[j] += fl_r_0_0 * (-6.0 * pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 18.0 * pa_y[j] * fl2_fx * fl1_fz + 16.0 * pa_yyy[j] * fl1_fz * fl1_fx - 3.0 * pb_y[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_yy_y[j] * fl1_fz * fl1_fga + 4.5 * pb_y[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_yy_y[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_yyyy_y[j] * fl1_fz);
 
-                t_yyyy_z[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_z[j] + 3.0 * pa_yy[j] * fl1_fx * pb_z[j] + pa_yyyy[j] * pb_z[j]);
+                t_yyyy_z[j] = fl_s_0_0 * (0.75 * pb_z[j] * fl2_fx + 3.0 * pa2pb_yy_z[j] * fl1_fx + pa2pb_yyyy_z[j]);
 
-                t_yyyy_z[j] += fl_r_0_0 * (-3.0 * fl1_fx * fl1_fz * fl1_fga * pb_z[j] - 6.0 * pa_yy[j] * fl1_fz * fl1_fga * pb_z[j] + 4.5 * fl2_fx * fl1_fz * pb_z[j] + 24.0 * pa_yy[j] * fl1_fz * fl1_fx * pb_z[j] + 10.0 * pa_yyyy[j] * fl1_fz * pb_z[j]);
+                t_yyyy_z[j] += fl_r_0_0 * (-3.0 * pb_z[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_yy_z[j] * fl1_fz * fl1_fga + 4.5 * pb_z[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_yy_z[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_yyyy_z[j] * fl1_fz);
 
-                t_yyyz_x[j] = fl_s_0_0 * (1.5 * pa_yz[j] * fl1_fx * pb_x[j] + pa_yyyz[j] * pb_x[j]);
+                t_yyyz_x[j] = fl_s_0_0 * (1.5 * pa2pb_yz_x[j] * fl1_fx + pa2pb_yyyz_x[j]);
 
-                t_yyyz_x[j] += fl_r_0_0 * (-3.0 * pa_yz[j] * fl1_fz * fl1_fga * pb_x[j] + 12.0 * pa_yz[j] * fl1_fx * fl1_fz * pb_x[j] + 10.0 * pa_yyyz[j] * fl1_fz * pb_x[j]);
+                t_yyyz_x[j] += fl_r_0_0 * (-3.0 * pa2pb_yz_x[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_yz_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_yyyz_x[j] * fl1_fz);
 
-                t_yyyz_y[j] = fl_s_0_0 * (0.75 * fl2_fx * pa_z[j] + 1.5 * pa_yyz[j] * fl1_fx + 1.5 * pa_yz[j] * fl1_fx * pb_y[j] + pa_yyyz[j] * pb_y[j]);
+                t_yyyz_y[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 1.5 * pa_yyz[j] * fl1_fx + 1.5 * pa2pb_yz_y[j] * fl1_fx + pa2pb_yyyz_y[j]);
 
-                t_yyyz_y[j] += fl_r_0_0 * (-1.5 * fl1_fx * fl1_fz * fl1_fga * pa_z[j] + 4.5 * fl2_fx * fl1_fz * pa_z[j] + 12.0 * pa_yyz[j] * fl1_fx * fl1_fz - 3.0 * pa_yz[j] * fl1_fz * fl1_fga * pb_y[j] + 12.0 * pa_yz[j] * fl1_fx * fl1_fz * pb_y[j] + 10.0 * pa_yyyz[j] * fl1_fz * pb_y[j]);
+                t_yyyz_y[j] += fl_r_0_0 * (-1.5 * pa_z[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_z[j] * fl2_fx * fl1_fz + 12.0 * pa_yyz[j] * fl1_fx * fl1_fz - 3.0 * pa2pb_yz_y[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_yz_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_yyyz_y[j] * fl1_fz);
 
-                t_yyyz_z[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 0.5 * pa_yyy[j] * fl1_fx + 1.5 * pa_yz[j] * fl1_fx * pb_z[j] + pa_yyyz[j] * pb_z[j]);
+                t_yyyz_z[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 0.5 * pa_yyy[j] * fl1_fx + 1.5 * pa2pb_yz_z[j] * fl1_fx + pa2pb_yyyz_z[j]);
 
-                t_yyyz_z[j] += fl_r_0_0 * (-1.5 * pa_y[j] * fl1_fz * fl1_fga * fl1_fx + 4.5 * pa_y[j] * fl2_fx * fl1_fz + 4.0 * pa_yyy[j] * fl1_fz * fl1_fx - 3.0 * pa_yz[j] * fl1_fz * fl1_fga * pb_z[j] + 12.0 * pa_yz[j] * fl1_fx * fl1_fz * pb_z[j] + 10.0 * pa_yyyz[j] * fl1_fz * pb_z[j]);
+                t_yyyz_z[j] += fl_r_0_0 * (-1.5 * pa_y[j] * fl1_fz * fl1_fga * fl1_fx + 4.5 * pa_y[j] * fl2_fx * fl1_fz + 4.0 * pa_yyy[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_yz_z[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_yz_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_yyyz_z[j] * fl1_fz);
             }
 
             idx++;
@@ -3234,6 +3442,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                  const CMemBlock2D<double>& osFactors,
                                  const CMemBlock2D<double>& paDistances,
                                  const CMemBlock2D<double>& pbDistances,
+                                 const CMemBlock2D<double>& pa2pbDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
                                  const int32_t              iContrGto)
@@ -3264,21 +3473,11 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto fga = osFactors.data(4 * idx + 2);
 
-            // set up pointers to 1-th order tensor of distance R(PA)
+            // set up pointers to tensors product of distances R(PA) = P - A
 
             auto pa_y = paDistances.data(34 * idx + 1);
 
             auto pa_z = paDistances.data(34 * idx + 2);
-
-            // set up pointers to 2-th order tensor of distance R(PA)
-
-            auto pa_yy = paDistances.data(34 * idx + 6);
-
-            auto pa_yz = paDistances.data(34 * idx + 7);
-
-            auto pa_zz = paDistances.data(34 * idx + 8);
-
-            // set up pointers to 3-th order tensor of distance R(PA)
 
             auto pa_yyz = paDistances.data(34 * idx + 16);
 
@@ -3286,21 +3485,51 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             auto pa_zzz = paDistances.data(34 * idx + 18);
 
-            // set up pointers to 4-th order tensor of distance R(PA)
-
-            auto pa_yyzz = paDistances.data(34 * idx + 31);
-
-            auto pa_yzzz = paDistances.data(34 * idx + 32);
-
-            auto pa_zzzz = paDistances.data(34 * idx + 33);
-
-            // set up pointers to 1-th order tensor of distance R(PB)
+            // set up pointers to tensors product of distances R(PB) = P - B
 
             auto pb_x = pbDistances.data(3 * idx);
 
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
+
+            // set up pointers to tensors product of distances R(PA)xR(PB)
+
+            auto pa2pb_yy_x = pa2pbDistances.data(102 * idx + 18);
+
+            auto pa2pb_yy_y = pa2pbDistances.data(102 * idx + 19);
+
+            auto pa2pb_yy_z = pa2pbDistances.data(102 * idx + 20);
+
+            auto pa2pb_yz_x = pa2pbDistances.data(102 * idx + 21);
+
+            auto pa2pb_yz_y = pa2pbDistances.data(102 * idx + 22);
+
+            auto pa2pb_yz_z = pa2pbDistances.data(102 * idx + 23);
+
+            auto pa2pb_zz_x = pa2pbDistances.data(102 * idx + 24);
+
+            auto pa2pb_zz_y = pa2pbDistances.data(102 * idx + 25);
+
+            auto pa2pb_zz_z = pa2pbDistances.data(102 * idx + 26);
+
+            auto pa2pb_yyzz_x = pa2pbDistances.data(102 * idx + 93);
+
+            auto pa2pb_yyzz_y = pa2pbDistances.data(102 * idx + 94);
+
+            auto pa2pb_yyzz_z = pa2pbDistances.data(102 * idx + 95);
+
+            auto pa2pb_yzzz_x = pa2pbDistances.data(102 * idx + 96);
+
+            auto pa2pb_yzzz_y = pa2pbDistances.data(102 * idx + 97);
+
+            auto pa2pb_yzzz_z = pa2pbDistances.data(102 * idx + 98);
+
+            auto pa2pb_zzzz_x = pa2pbDistances.data(102 * idx + 99);
+
+            auto pa2pb_zzzz_y = pa2pbDistances.data(102 * idx + 100);
+
+            auto pa2pb_zzzz_z = pa2pbDistances.data(102 * idx + 101);
 
             // set up pointers to auxilary integrals
 
@@ -3330,9 +3559,12 @@ namespace kinrecfunc { // kinrecfunc namespace
 
             // Batch of Integrals (36,45)
 
-            #pragma omp simd aligned(fga, fx, fz, pa_y, pa_yy, pa_yyz, pa_yyzz, pa_yz, pa_yzz, pa_yzzz, pa_z, pa_zz, \
-                                     pa_zzz, pa_zzzz, pb_x, pb_y, pb_z, r_0_0, s_0_0, t_yyzz_x, t_yyzz_y, t_yyzz_z, \
-                                     t_yzzz_x, t_yzzz_y, t_yzzz_z, t_zzzz_x, t_zzzz_y, t_zzzz_z: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, fz, pa2pb_yy_x, pa2pb_yy_y, pa2pb_yy_z, pa2pb_yyzz_x, \
+                                     pa2pb_yyzz_y, pa2pb_yyzz_z, pa2pb_yz_x, pa2pb_yz_y, pa2pb_yz_z, pa2pb_yzzz_x, \
+                                     pa2pb_yzzz_y, pa2pb_yzzz_z, pa2pb_zz_x, pa2pb_zz_y, pa2pb_zz_z, pa2pb_zzzz_x, \
+                                     pa2pb_zzzz_y, pa2pb_zzzz_z, pa_y, pa_yyz, pa_yzz, pa_z, pa_zzz, pb_x, pb_y, pb_z, r_0_0, s_0_0, \
+                                     t_yyzz_x, t_yyzz_y, t_yyzz_z, t_yzzz_x, t_yzzz_y, t_yzzz_z, t_zzzz_x, t_zzzz_y, \
+                                     t_zzzz_z: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl_r_0_0 = r_0_0[j];
@@ -3347,41 +3579,41 @@ namespace kinrecfunc { // kinrecfunc namespace
 
                 double fl2_fx = fx[j] * fx[j];
 
-                t_yyzz_x[j] = fl_s_0_0 * (0.25 * fl2_fx * pb_x[j] + 0.5 * pa_yy[j] * fl1_fx * pb_x[j] + 0.5 * fl1_fx * pa_zz[j] * pb_x[j] + pa_yyzz[j] * pb_x[j]);
+                t_yyzz_x[j] = fl_s_0_0 * (0.25 * pb_x[j] * fl2_fx + 0.5 * pa2pb_yy_x[j] * fl1_fx + 0.5 * pa2pb_zz_x[j] * fl1_fx + pa2pb_yyzz_x[j]);
 
-                t_yyzz_x[j] += fl_r_0_0 * (-fl1_fx * fl1_fz * fl1_fga * pb_x[j] - pa_yy[j] * fl1_fz * fl1_fga * pb_x[j] + 1.5 * fl2_fx * fl1_fz * pb_x[j] - fl1_fz * fl1_fga * pa_zz[j] * pb_x[j] + 4.0 * pa_yy[j] * fl1_fz * fl1_fx * pb_x[j] + 4.0 * fl1_fx * pa_zz[j] * fl1_fz * pb_x[j] + 10.0 * pa_yyzz[j] * fl1_fz * pb_x[j]);
+                t_yyzz_x[j] += fl_r_0_0 * (-pb_x[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_yy_x[j] * fl1_fz * fl1_fga + 1.5 * pb_x[j] * fl2_fx * fl1_fz - pa2pb_zz_x[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_yy_x[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_zz_x[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_yyzz_x[j] * fl1_fz);
 
-                t_yyzz_y[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl2_fx + pa_yzz[j] * fl1_fx + 0.25 * fl2_fx * pb_y[j] + 0.5 * pa_yy[j] * fl1_fx * pb_y[j] + 0.5 * fl1_fx * pa_zz[j] * pb_y[j] + pa_yyzz[j] * pb_y[j]);
+                t_yyzz_y[j] = fl_s_0_0 * (0.5 * pa_y[j] * fl2_fx + pa_yzz[j] * fl1_fx + 0.25 * pb_y[j] * fl2_fx + 0.5 * pa2pb_yy_y[j] * fl1_fx + 0.5 * pa2pb_zz_y[j] * fl1_fx + pa2pb_yyzz_y[j]);
 
-                t_yyzz_y[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 3.0 * pa_y[j] * fl2_fx * fl1_fz + 8.0 * pa_yzz[j] * fl1_fx * fl1_fz - fl1_fx * fl1_fz * fl1_fga * pb_y[j] - pa_yy[j] * fl1_fz * fl1_fga * pb_y[j] + 1.5 * fl2_fx * fl1_fz * pb_y[j] - fl1_fz * fl1_fga * pa_zz[j] * pb_y[j] + 4.0 * pa_yy[j] * fl1_fz * fl1_fx * pb_y[j] + 4.0 * fl1_fx * pa_zz[j] * fl1_fz * pb_y[j] + 10.0 * pa_yyzz[j] * fl1_fz * pb_y[j]);
+                t_yyzz_y[j] += fl_r_0_0 * (-pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 3.0 * pa_y[j] * fl2_fx * fl1_fz + 8.0 * pa_yzz[j] * fl1_fx * fl1_fz - pb_y[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_yy_y[j] * fl1_fz * fl1_fga + 1.5 * pb_y[j] * fl2_fx * fl1_fz - pa2pb_zz_y[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_yy_y[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_zz_y[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_yyzz_y[j] * fl1_fz);
 
-                t_yyzz_z[j] = fl_s_0_0 * (0.5 * fl2_fx * pa_z[j] + pa_yyz[j] * fl1_fx + 0.25 * fl2_fx * pb_z[j] + 0.5 * pa_yy[j] * fl1_fx * pb_z[j] + 0.5 * fl1_fx * pa_zz[j] * pb_z[j] + pa_yyzz[j] * pb_z[j]);
+                t_yyzz_z[j] = fl_s_0_0 * (0.5 * pa_z[j] * fl2_fx + pa_yyz[j] * fl1_fx + 0.25 * pb_z[j] * fl2_fx + 0.5 * pa2pb_yy_z[j] * fl1_fx + 0.5 * pa2pb_zz_z[j] * fl1_fx + pa2pb_yyzz_z[j]);
 
-                t_yyzz_z[j] += fl_r_0_0 * (-fl1_fz * fl1_fga * pa_z[j] * fl1_fx + 3.0 * fl2_fx * pa_z[j] * fl1_fz + 8.0 * pa_yyz[j] * fl1_fz * fl1_fx - fl1_fx * fl1_fz * fl1_fga * pb_z[j] - pa_yy[j] * fl1_fz * fl1_fga * pb_z[j] + 1.5 * fl2_fx * fl1_fz * pb_z[j] - fl1_fz * fl1_fga * pa_zz[j] * pb_z[j] + 4.0 * pa_yy[j] * fl1_fz * fl1_fx * pb_z[j] + 4.0 * fl1_fx * pa_zz[j] * fl1_fz * pb_z[j] + 10.0 * pa_yyzz[j] * fl1_fz * pb_z[j]);
+                t_yyzz_z[j] += fl_r_0_0 * (-pa_z[j] * fl1_fz * fl1_fga * fl1_fx + 3.0 * pa_z[j] * fl2_fx * fl1_fz + 8.0 * pa_yyz[j] * fl1_fz * fl1_fx - pb_z[j] * fl1_fx * fl1_fz * fl1_fga - pa2pb_yy_z[j] * fl1_fz * fl1_fga + 1.5 * pb_z[j] * fl2_fx * fl1_fz - pa2pb_zz_z[j] * fl1_fz * fl1_fga + 4.0 * pa2pb_yy_z[j] * fl1_fz * fl1_fx + 4.0 * pa2pb_zz_z[j] * fl1_fx * fl1_fz + 10.0 * pa2pb_yyzz_z[j] * fl1_fz);
 
-                t_yzzz_x[j] = fl_s_0_0 * (1.5 * pa_yz[j] * fl1_fx * pb_x[j] + pa_yzzz[j] * pb_x[j]);
+                t_yzzz_x[j] = fl_s_0_0 * (1.5 * pa2pb_yz_x[j] * fl1_fx + pa2pb_yzzz_x[j]);
 
-                t_yzzz_x[j] += fl_r_0_0 * (-3.0 * pa_yz[j] * fl1_fz * fl1_fga * pb_x[j] + 12.0 * pa_yz[j] * fl1_fz * fl1_fx * pb_x[j] + 10.0 * pa_yzzz[j] * fl1_fz * pb_x[j]);
+                t_yzzz_x[j] += fl_r_0_0 * (-3.0 * pa2pb_yz_x[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_yz_x[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_yzzz_x[j] * fl1_fz);
 
-                t_yzzz_y[j] = fl_s_0_0 * (0.75 * fl2_fx * pa_z[j] + 0.5 * fl1_fx * pa_zzz[j] + 1.5 * pa_yz[j] * fl1_fx * pb_y[j] + pa_yzzz[j] * pb_y[j]);
+                t_yzzz_y[j] = fl_s_0_0 * (0.75 * pa_z[j] * fl2_fx + 0.5 * pa_zzz[j] * fl1_fx + 1.5 * pa2pb_yz_y[j] * fl1_fx + pa2pb_yzzz_y[j]);
 
-                t_yzzz_y[j] += fl_r_0_0 * (-1.5 * fl1_fx * pa_z[j] * fl1_fz * fl1_fga + 4.5 * fl2_fx * pa_z[j] * fl1_fz + 4.0 * fl1_fx * pa_zzz[j] * fl1_fz - 3.0 * pa_yz[j] * fl1_fz * fl1_fga * pb_y[j] + 12.0 * pa_yz[j] * fl1_fz * fl1_fx * pb_y[j] + 10.0 * pa_yzzz[j] * fl1_fz * pb_y[j]);
+                t_yzzz_y[j] += fl_r_0_0 * (-1.5 * pa_z[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_z[j] * fl2_fx * fl1_fz + 4.0 * pa_zzz[j] * fl1_fx * fl1_fz - 3.0 * pa2pb_yz_y[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_yz_y[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_yzzz_y[j] * fl1_fz);
 
-                t_yzzz_z[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pa_yzz[j] * fl1_fx + 1.5 * pa_yz[j] * fl1_fx * pb_z[j] + pa_yzzz[j] * pb_z[j]);
+                t_yzzz_z[j] = fl_s_0_0 * (0.75 * pa_y[j] * fl2_fx + 1.5 * pa_yzz[j] * fl1_fx + 1.5 * pa2pb_yz_z[j] * fl1_fx + pa2pb_yzzz_z[j]);
 
-                t_yzzz_z[j] += fl_r_0_0 * (-1.5 * pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_y[j] * fl2_fx * fl1_fz + 12.0 * pa_yzz[j] * fl1_fz * fl1_fx - 3.0 * pa_yz[j] * fl1_fz * fl1_fga * pb_z[j] + 12.0 * pa_yz[j] * fl1_fz * fl1_fx * pb_z[j] + 10.0 * pa_yzzz[j] * fl1_fz * pb_z[j]);
+                t_yzzz_z[j] += fl_r_0_0 * (-1.5 * pa_y[j] * fl1_fx * fl1_fz * fl1_fga + 4.5 * pa_y[j] * fl2_fx * fl1_fz + 12.0 * pa_yzz[j] * fl1_fz * fl1_fx - 3.0 * pa2pb_yz_z[j] * fl1_fz * fl1_fga + 12.0 * pa2pb_yz_z[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_yzzz_z[j] * fl1_fz);
 
-                t_zzzz_x[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_x[j] + 3.0 * pa_zz[j] * fl1_fx * pb_x[j] + pa_zzzz[j] * pb_x[j]);
+                t_zzzz_x[j] = fl_s_0_0 * (0.75 * pb_x[j] * fl2_fx + 3.0 * pa2pb_zz_x[j] * fl1_fx + pa2pb_zzzz_x[j]);
 
-                t_zzzz_x[j] += fl_r_0_0 * (-3.0 * fl1_fx * fl1_fz * fl1_fga * pb_x[j] - 6.0 * pa_zz[j] * fl1_fz * fl1_fga * pb_x[j] + 4.5 * fl2_fx * fl1_fz * pb_x[j] + 24.0 * pa_zz[j] * fl1_fz * fl1_fx * pb_x[j] + 10.0 * pa_zzzz[j] * fl1_fz * pb_x[j]);
+                t_zzzz_x[j] += fl_r_0_0 * (-3.0 * pb_x[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_zz_x[j] * fl1_fz * fl1_fga + 4.5 * pb_x[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_zz_x[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_zzzz_x[j] * fl1_fz);
 
-                t_zzzz_y[j] = fl_s_0_0 * (0.75 * fl2_fx * pb_y[j] + 3.0 * pa_zz[j] * fl1_fx * pb_y[j] + pa_zzzz[j] * pb_y[j]);
+                t_zzzz_y[j] = fl_s_0_0 * (0.75 * pb_y[j] * fl2_fx + 3.0 * pa2pb_zz_y[j] * fl1_fx + pa2pb_zzzz_y[j]);
 
-                t_zzzz_y[j] += fl_r_0_0 * (-3.0 * fl1_fx * fl1_fz * fl1_fga * pb_y[j] - 6.0 * pa_zz[j] * fl1_fz * fl1_fga * pb_y[j] + 4.5 * fl2_fx * fl1_fz * pb_y[j] + 24.0 * pa_zz[j] * fl1_fz * fl1_fx * pb_y[j] + 10.0 * pa_zzzz[j] * fl1_fz * pb_y[j]);
+                t_zzzz_y[j] += fl_r_0_0 * (-3.0 * pb_y[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_zz_y[j] * fl1_fz * fl1_fga + 4.5 * pb_y[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_zz_y[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_zzzz_y[j] * fl1_fz);
 
-                t_zzzz_z[j] = fl_s_0_0 * (3.0 * pa_z[j] * fl2_fx + 2.0 * pa_zzz[j] * fl1_fx + 0.75 * fl2_fx * pb_z[j] + 3.0 * pa_zz[j] * fl1_fx * pb_z[j] + pa_zzzz[j] * pb_z[j]);
+                t_zzzz_z[j] = fl_s_0_0 * (3.0 * pa_z[j] * fl2_fx + 2.0 * pa_zzz[j] * fl1_fx + 0.75 * pb_z[j] * fl2_fx + 3.0 * pa2pb_zz_z[j] * fl1_fx + pa2pb_zzzz_z[j]);
 
-                t_zzzz_z[j] += fl_r_0_0 * (-6.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fga + 18.0 * pa_z[j] * fl2_fx * fl1_fz + 16.0 * pa_zzz[j] * fl1_fz * fl1_fx - 3.0 * fl1_fx * fl1_fz * fl1_fga * pb_z[j] - 6.0 * pa_zz[j] * fl1_fz * fl1_fga * pb_z[j] + 4.5 * fl2_fx * fl1_fz * pb_z[j] + 24.0 * pa_zz[j] * fl1_fz * fl1_fx * pb_z[j] + 10.0 * pa_zzzz[j] * fl1_fz * pb_z[j]);
+                t_zzzz_z[j] += fl_r_0_0 * (-6.0 * pa_z[j] * fl1_fx * fl1_fz * fl1_fga + 18.0 * pa_z[j] * fl2_fx * fl1_fz + 16.0 * pa_zzz[j] * fl1_fz * fl1_fx - 3.0 * pb_z[j] * fl1_fx * fl1_fz * fl1_fga - 6.0 * pa2pb_zz_z[j] * fl1_fz * fl1_fga + 4.5 * pb_z[j] * fl2_fx * fl1_fz + 24.0 * pa2pb_zz_z[j] * fl1_fz * fl1_fx + 10.0 * pa2pb_zzzz_z[j] * fl1_fz);
             }
 
             idx++;

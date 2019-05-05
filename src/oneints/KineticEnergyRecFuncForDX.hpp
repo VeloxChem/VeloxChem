@@ -20,8 +20,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -31,6 +32,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
@@ -42,8 +44,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -53,6 +56,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      const CMemBlock2D<double>& osFactors,
                                      const CMemBlock2D<double>& paDistances,
                                      const CMemBlock2D<double>& pbDistances,
+                                     const CMemBlock2D<double>& pa2pbDistances,
                                      const CGtoBlock&           braGtoBlock,
                                      const CGtoBlock&           ketGtoBlock,
                                      const int32_t              iContrGto);
@@ -64,8 +68,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -75,6 +80,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -86,8 +92,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -97,6 +104,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -108,8 +116,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -119,6 +128,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
@@ -130,8 +140,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -141,6 +152,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      const CMemBlock2D<double>& osFactors,
                                      const CMemBlock2D<double>& paDistances,
                                      const CMemBlock2D<double>& pbDistances,
+                                     const CMemBlock2D<double>& pa2pbDistances,
                                      const CGtoBlock&           braGtoBlock,
                                      const CGtoBlock&           ketGtoBlock,
                                      const int32_t              iContrGto);
@@ -152,8 +164,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -163,6 +176,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -174,8 +188,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -185,6 +200,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -196,8 +212,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -207,6 +224,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -218,8 +236,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -229,6 +248,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -240,8 +260,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -251,6 +272,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -262,8 +284,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -273,6 +296,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
@@ -284,8 +308,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -295,6 +320,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      const CMemBlock2D<double>& osFactors,
                                      const CMemBlock2D<double>& paDistances,
                                      const CMemBlock2D<double>& pbDistances,
+                                     const CMemBlock2D<double>& pa2pbDistances,
                                      const CGtoBlock&           braGtoBlock,
                                      const CGtoBlock&           ketGtoBlock,
                                      const int32_t              iContrGto);
@@ -306,8 +332,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -317,6 +344,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -328,8 +356,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -339,6 +368,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -350,8 +380,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -361,6 +392,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -372,8 +404,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -383,6 +416,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -394,8 +428,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -405,6 +440,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -416,8 +452,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -427,6 +464,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
@@ -438,8 +476,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -449,6 +488,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      const CMemBlock2D<double>& osFactors,
                                      const CMemBlock2D<double>& paDistances,
                                      const CMemBlock2D<double>& pbDistances,
+                                     const CMemBlock2D<double>& pa2pbDistances,
                                      const CGtoBlock&           braGtoBlock,
                                      const CGtoBlock&           ketGtoBlock,
                                      const int32_t              iContrGto);
@@ -460,8 +500,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -471,6 +512,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -482,8 +524,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -493,6 +536,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -504,8 +548,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -515,6 +560,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -526,8 +572,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -537,6 +584,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -548,8 +596,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -559,6 +608,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -570,8 +620,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -581,6 +632,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -592,8 +644,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -603,6 +656,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -614,8 +668,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -625,6 +680,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -636,8 +692,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -647,6 +704,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                 const CMemBlock2D<double>& osFactors,
                                 const CMemBlock2D<double>& paDistances,
                                 const CMemBlock2D<double>& pbDistances,
+                                const CMemBlock2D<double>& pa2pbDistances,
                                 const CGtoBlock&           braGtoBlock,
                                 const CGtoBlock&           ketGtoBlock,
                                 const int32_t              iContrGto);
@@ -658,8 +716,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -669,6 +728,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                      const CMemBlock2D<double>& osFactors,
                                      const CMemBlock2D<double>& paDistances,
                                      const CMemBlock2D<double>& pbDistances,
+                                     const CMemBlock2D<double>& pa2pbDistances,
                                      const CGtoBlock&           braGtoBlock,
                                      const CGtoBlock&           ketGtoBlock,
                                      const int32_t              iContrGto);
@@ -680,8 +740,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -691,6 +752,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -702,8 +764,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -713,6 +776,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -724,8 +788,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -735,6 +800,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -746,8 +812,8 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -756,7 +822,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& auxBuffer,
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
-                                      const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -768,8 +834,8 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -778,7 +844,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& auxBuffer,
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
-                                      const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -790,8 +856,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -801,6 +868,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -812,8 +880,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -823,6 +892,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
@@ -834,8 +904,9 @@ namespace kinrecfunc { // kinrecfunc namespace
     @param primBuffer the primitives buffer.
     @param auxBuffer the auxilaries buffer.
     @param osFactors the Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param pbDistances the vector of distances R(PB) = P - B.
+    @param paDistances the set of distance tensors R(R(PA) = P - A.
+    @param pbDistances the set of distance tensors R(R(PB) = P - B.
+    @param pa2pbDistances the set of products of distance tensors R(PA)xR(PB).
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -845,6 +916,7 @@ namespace kinrecfunc { // kinrecfunc namespace
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pa2pbDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
