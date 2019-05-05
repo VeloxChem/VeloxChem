@@ -78,7 +78,7 @@ class COverlapIntegralsDriver
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
-     @param pa2bDistances the vector of distances products R(PA) x R(PB).
+     @param pa2pbDistances the vector of distances products R(PA) x R(PB).
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
@@ -89,7 +89,7 @@ class COverlapIntegralsDriver
                               const CMemBlock2D<double>&  abDistances,
                               const CMemBlock2D<double>&  paDistances,
                               const CMemBlock2D<double>&  pbDistances,
-                              const CMemBlock2D<double>&  pa2bDistances,
+                              const CMemBlock2D<double>&  pa2pbDistances,
                               const CGtoBlock&            braGtoBlock,
                               const CGtoBlock&            ketGtoBlock,
                               const int32_t               iContrGto) const;

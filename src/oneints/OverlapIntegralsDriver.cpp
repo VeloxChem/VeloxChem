@@ -355,12 +355,12 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
     
     auto kang = ketGtoBlock.getAngularMomentum();
     
-    // compute (s||s) auxilary integrals
+    // compute (S||S) primitive integrals
     
     ovlrecfunc::compOverlapForSS(primBuffer, auxBuffer, osFactors, abDistances,
                                  braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (s||p) auxilary integrals
+    // compute (S||P) primitive integrals
     
     if ((bang == 0) && (kang == 1))
     {
@@ -370,40 +370,37 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
         return;
     }
     
-    // compute (s||d) auxilary integrals
+    // compute (S||D) primitive integrals
     
     if ((bang == 0) && (kang == 2))
     {
-        ovlrecfunc::compOverlapForSD(primBuffer, auxBuffer, osFactors,
-                                     pbDistances, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
+        ovlrecfunc::compOverlapForSD(primBuffer, auxBuffer, osFactors, pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (s||f) auxilary integrals
+    // compute (S||F) primitive integrals
     
     if ((bang == 0) && (kang == 3))
     {
-        ovlrecfunc::compOverlapForSF(primBuffer, auxBuffer, osFactors,
-                                     pbDistances, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
+        ovlrecfunc::compOverlapForSF(primBuffer, auxBuffer, osFactors, pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (s||g) auxilary integrals
+    // compute (S||G) primitive integrals
     
     if ((bang == 0) && (kang == 4))
     {
-        ovlrecfunc::compOverlapForSG(primBuffer, auxBuffer, osFactors,
-                                     pbDistances, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
+        ovlrecfunc::compOverlapForSG(primBuffer, auxBuffer, osFactors, pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (p||s) auxilary integrals
+    // compute (P||S) primitive integrals
     
     if ((bang == 1) && (kang == 0))
     {
@@ -413,210 +410,191 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBu
         return;
     }
     
-    // compute (d||s) auxilary integrals
-    
-    if ((bang == 2) && (kang == 0))
-    {
-        ovlrecfunc::compOverlapForDS(primBuffer, auxBuffer, osFactors,
-                                     paDistances, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
-        
-        return;
-    }
-    
-    // compute (f||s) auxilary integrals
-    
-    if ((bang == 3) && (kang == 0))
-    {
-        ovlrecfunc::compOverlapForFS(primBuffer, auxBuffer, osFactors,
-                                     paDistances, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
-        
-        return;
-    }
-    
-    // compute (g||s) auxilary integrals
-    
-    if ((bang == 4) && (kang == 0))
-    {
-        ovlrecfunc::compOverlapForGS(primBuffer, auxBuffer, osFactors,
-                                     paDistances, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
-        
-        return;
-    }
-    
-    // compute (p||p) auxilary integrals
+    // compute (P||P) primitive integrals
     
     if ((bang == 1) && (kang == 1))
     {
-        ovlrecfunc::compOverlapForPP(primBuffer, auxBuffer, osFactors,
-                                     pa2pbDistances, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
+        ovlrecfunc::compOverlapForPP(primBuffer, auxBuffer, osFactors, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (p||d) auxilary integrals
+    // compute (P||D) primitive integrals
     
     if ((bang == 1) && (kang == 2))
     {
-        ovlrecfunc::compOverlapForPD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForPD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (d||p) auxilary integrals
-    
-    if ((bang == 2) && (kang == 1))
-    {
-        ovlrecfunc::compOverlapForDP(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (p||f) auxilary integrals
+    // compute (P||F) primitive integrals
     
     if ((bang == 1) && (kang == 3))
     {
-        ovlrecfunc::compOverlapForPF(primBuffer, auxBuffer, osFactors,
-                                     pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForPF(primBuffer, auxBuffer, osFactors, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f||p) auxilary integrals
-    
-    if ((bang == 3) && (kang == 1))
-    {
-        ovlrecfunc::compOverlapForFP(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pa2pbDistances, braGtoBlock,
-                                     ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (p||g) auxilary integrals
+    // compute (P||G) primitive integrals
     
     if ((bang == 1) && (kang == 4))
     {
-        ovlrecfunc::compOverlapForPG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForPG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g||p) auxilary integrals
+    // compute (D||S) primitive integrals
     
-    if ((bang == 4) && (kang == 1))
+    if ((bang == 2) && (kang == 0))
     {
-        ovlrecfunc::compOverlapForGP(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForDS(primBuffer, auxBuffer, osFactors, paDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (d||d) auxilary integrals
+    // compute (D||P) primitive integrals
+    
+    if ((bang == 2) && (kang == 1))
+    {
+        ovlrecfunc::compOverlapForDP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (D||D) primitive integrals
     
     if ((bang == 2) && (kang == 2))
     {
-        ovlrecfunc::compOverlapForDD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForDD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (d||f) auxilary integrals
+    // compute (D||F) primitive integrals
     
     if ((bang == 2) && (kang == 3))
     {
-        ovlrecfunc::compOverlapForDF(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForDF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f||d) auxilary integrals
-    
-    if ((bang == 3) && (kang == 2))
-    {
-        ovlrecfunc::compOverlapForFD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (d||g) auxilary integrals
+    // compute (D||G) primitive integrals
     
     if ((bang == 2) && (kang == 4))
     {
-        ovlrecfunc::compOverlapForDG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForDG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g||d) auxilary integrals
+    // compute (F||S) primitive integrals
     
-    if ((bang == 4) && (kang == 2))
+    if ((bang == 3) && (kang == 0))
     {
-        ovlrecfunc::compOverlapForGD(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForFS(primBuffer, auxBuffer, osFactors, paDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f||f) auxilary integrals
+    // compute (F||P) primitive integrals
+    
+    if ((bang == 3) && (kang == 1))
+    {
+        ovlrecfunc::compOverlapForFP(primBuffer, auxBuffer, osFactors, paDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (F||D) primitive integrals
+    
+    if ((bang == 3) && (kang == 2))
+    {
+        ovlrecfunc::compOverlapForFD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (F||F) primitive integrals
     
     if ((bang == 3) && (kang == 3))
     {
-        ovlrecfunc::compOverlapForFF(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForFF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (f||g) auxilary integrals
+    // compute (F||G) primitive integrals
     
     if ((bang == 3) && (kang == 4))
     {
-        ovlrecfunc::compOverlapForFG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForFG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g||f) auxilary integrals
+    // compute (G||S) primitive integrals
+    
+    if ((bang == 4) && (kang == 0))
+    {
+        ovlrecfunc::compOverlapForGS(primBuffer, auxBuffer, osFactors, paDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (G||P) primitive integrals
+    
+    if ((bang == 4) && (kang == 1))
+    {
+        ovlrecfunc::compOverlapForGP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (G||D) primitive integrals
+    
+    if ((bang == 4) && (kang == 2))
+    {
+        ovlrecfunc::compOverlapForGD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
+                                     braGtoBlock, ketGtoBlock, iContrGto);
+        
+        return;
+    }
+    
+    // compute (G||F) primitive integrals
     
     if ((bang == 4) && (kang == 3))
     {
-        ovlrecfunc::compOverlapForGF(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForGF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
     }
     
-    // compute (g||g) auxilary integrals
+    // compute (G||G) primitive integrals
     
     if ((bang == 4) && (kang == 4))
     {
-        ovlrecfunc::compOverlapForGG(primBuffer, auxBuffer, osFactors,
-                                     paDistances, pbDistances, pa2pbDistances,
+        ovlrecfunc::compOverlapForGG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
                                      braGtoBlock, ketGtoBlock, iContrGto);
         
         return;
