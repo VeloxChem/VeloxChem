@@ -13,6 +13,7 @@ from .adconedriver import AdcOneDriver
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 
+from .crsp import ComplexResponse
 
 def main():
 
@@ -26,7 +27,7 @@ def main():
 
     # Hartree-Fock
 
-    if task_type in ['hf', 'mp2', 'cube', 'response', 'adc1']:
+    if task_type in ['hf', 'mp2', 'cube', 'response', 'cpp', 'adc1']:
 
         # initialize scf driver and run scf
 
@@ -75,6 +76,14 @@ def main():
             rsp_drv = ResponseDriver(task.mpi_comm, task.ostream)
             rsp_drv.update_settings({'property': 'absorption'})
             rsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+
+    # Complex Response
+
+    if task_type == 'cpp':
+
+        crsp_drv = ComplexResponse()
+        crsp_drv.clr(mol_orbs, task)
+
 
     # ADC(1)
 
