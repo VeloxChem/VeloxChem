@@ -17,22 +17,30 @@ from .lrmatvecdriver import lrmat2vec
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .qqscheme import get_qq_scheme
+from .qqscheme import get_qq_type
 
 
 class ComplexResponse:
     """ Provides functionality to solve complex linear
     response equations. """
 
-    def __init__(self, comm):
+    def __init__(self, comm, ostream):
 
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-12
 
+        self.max_iter = 150
+        self.conv_thresh = 1.0e-6
+
+        self.cur_iter = 0
         self.is_converged = False
+        self.small_thresh = 1.0e-10
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.size = self.comm.Get_size()
+
+        self.ostream = ostream
 
     def paired(self, v_xy):
         """Returns paired trial vector.
@@ -71,7 +79,7 @@ class ComplexResponse:
         return np.array(realger).T, np.array(realung).T, np.array(
             imagung).T, np.array(imagger).T
 
-    def assemble_subsp(self, realvec, imagvec, threshold=1.0e-10):
+    def assemble_subsp(self, realvec, imagvec):
         """Assembles subspace out of real and imaginary parts of trials,
         if their norm exceeds a certain threshold (zero vectors shouldn't
         be added).
@@ -80,15 +88,15 @@ class ComplexResponse:
         space = []
         if len(realvec.shape) != 1:
             for vec in range(len(realvec[0, :])):
-                if np.linalg.norm(realvec[:, vec]) > threshold:
+                if np.linalg.norm(realvec[:, vec]) > self.small_thresh:
                     space.append(realvec[:, vec])
-                if np.linalg.norm(imagvec[:, vec]) > threshold:
+                if np.linalg.norm(imagvec[:, vec]) > self.small_thresh:
                     space.append(imagvec[:, vec])
 
         else:
-            if np.linalg.norm(realvec) > threshold:
+            if np.linalg.norm(realvec) > self.small_thresh:
                 space.append(realvec)
-            if np.linalg.norm(imagvec) > threshold:
+            if np.linalg.norm(imagvec) > self.small_thresh:
                 space.append(imagvec)
 
         return np.array(space).T
@@ -240,8 +248,10 @@ class ComplexResponse:
             precond[de + size, de - 2 * size] = pd_mat[de, de]
             precond[de - 2 * size, de + size] = pd_mat[de, de]
 
-        print('Precondition matrix created in',
-              '{:.2f}'.format(tm.time() - start_time), 'sec.')
+        self.ostream.print_info(
+            'Precondition matrix created in {:.2f} sec.'.format(tm.time() -
+                                                                start_time))
+        self.ostream.print_blank()
 
         return precond
 
@@ -281,7 +291,7 @@ class ComplexResponse:
                  -gradger.imag]).flatten()
             gn = np.linalg.norm(grad)
             for w in freqs:
-                if gn < 1e-10:
+                if gn < self.small_thresh:
                     ig[(op, w)] = np.zeros(grad.shape[0])
                 else:
                     ig[(op, w)] = np.matmul(precond[w], grad)
@@ -293,7 +303,6 @@ class ComplexResponse:
                      td=None,
                      bger=np.array([]),
                      bung=np.array([]),
-                     threshold=1e-10,
                      normalize=True):
         """Returns orthonormalized trial vectors. Takes set of vectors,
         preconditioner matrix, gerade and ungerade subspaces as input
@@ -310,7 +319,7 @@ class ComplexResponse:
                 v = np.matmul(td[w], vec)
             else:
                 v = vec
-            if np.linalg.norm(v) > threshold:
+            if np.linalg.norm(v) > self.small_thresh:
                 trials.append(v)
 
         new_trials = np.array(trials).T
@@ -370,9 +379,7 @@ class ComplexResponse:
                     0.15,
                     0.2,
                 ),
-                d=0.004556335294880438,
-                maxit=150,
-                threshold=1.0e-6):
+                d=0.004556335294880438,):
         """Solves for the approximate response vector iteratively
         while checking the residuals for convergence.
 
@@ -380,6 +387,11 @@ class ComplexResponse:
         frequencies, damping parameter, maximim number of iterations and
         convergence threshold.
         """
+
+        if self.rank == mpi_master():
+            self.print_header()
+
+        self.start_time = tm.time()
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
@@ -443,9 +455,11 @@ class ComplexResponse:
         residuals = {}
         relative_residual_norm = {}
 
-        for i in range(maxit):
+        for iteration in range(self.max_iter):
+            self.cur_iter = iteration
 
             if self.rank == mpi_master():
+                nvs =  []
 
                 for op, w in igs:
                     grad = v1[op]
@@ -482,8 +496,6 @@ class ComplexResponse:
 
                     # creating gradient and matrix for linear equation
 
-                    print(ntrials_ger, 'gerade trial vectors')
-                    print(ntrials_ung, 'ungerade trial vectors')
                     size = 2 * (ntrials_ger + ntrials_ung)
 
                     # gradient
@@ -632,23 +644,28 @@ class ComplexResponse:
                     # calculating relative residual norm for convergence check
 
                     nv = np.matmul(n, grad)
+                    nvs.append((op, w, nv))
+
                     rn = np.linalg.norm(r)
                     nn = np.linalg.norm(n)
                     if nn != 0:
                         relative_residual_norm[(op, w)] = rn / nn
                     else:
                         relative_residual_norm[(op, w)] = 0
-                    print(f"{i+1} <<{op};{op}>>({w})={-nv:.10f} rn={rn:.5e}")
 
-                print()
+                self.ostream.print_info(
+                    '{:d} gerade trial vectors'.format(ntrials_ger))
+                self.ostream.print_info(
+                    '{:d} ungerade trial vectors'.format(ntrials_ung))
+                self.ostream.print_blank()
+                self.print_iteration(relative_residual_norm, nvs)
 
                 # checking for convergence
 
                 max_residual = max(relative_residual_norm.values())
 
-                if max_residual < threshold:
+                if max_residual < self.conv_thresh:
                     self.is_converged = True
-                    print('Converged')
 
             self.is_converged = self.comm.bcast(self.is_converged,
                                                 root=mpi_master())
@@ -705,4 +722,69 @@ class ComplexResponse:
                     e2bung = np.append(e2bung, new_e2bung, axis=1)
                     s2bger = np.append(s2bger, new_s2bger, axis=1)
 
+        # converged?
+        if self.rank == mpi_master():
+            self.print_convergence()
+
         return solutions
+
+    def print_iteration(self, relative_residual_norm, nvs):
+        """Prints information of the iteration"""
+
+        output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
+        output_header += '* Residuals (Max,Min): '
+        output_header += '{:.2e} and {:.2e}'.format(
+            max(relative_residual_norm.values()),
+            min(relative_residual_norm.values()))
+        self.ostream.print_header(output_header.ljust(82))
+        self.ostream.print_blank()
+        for op, freq, nv in nvs:
+            ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+            rel_res = relative_residual_norm[(op, freq)]
+            output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
+                ops_label, -nv.real, -nv.imag)
+            output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
+            self.ostream.print_header(output_iter.ljust(82))
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_header(self):
+        """Prints response driver setup header to output stream.
+
+        Prints molecular property calculation setup details to output stream.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header("Complex Response Driver Setup")
+        self.ostream.print_header(31 * "=")
+        self.ostream.print_blank()
+
+        str_width = 60
+
+        cur_str = "Max. Number Of Iterations : " + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "Convergence Threshold     : " + \
+            "{:.1e}".format(self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "ERI screening scheme      : " + get_qq_type(self.qq_type)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "ERI Screening Threshold   : " + \
+            "{:.1e}".format(self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
+        self.ostream.flush()
+
+    def print_convergence(self):
+        """Prints information after convergence"""
+
+        output_conv = '*** '
+        if self.is_converged:
+            output_conv += 'Complex response converged'
+        else:
+            output_conv += 'Complex response NOT converged'
+        output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
+        output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
+        self.ostream.print_header(output_conv.ljust(82))
+        self.ostream.print_blank()
