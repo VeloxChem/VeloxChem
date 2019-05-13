@@ -62,6 +62,16 @@ class CRecursionTerm
      */
     int32_t _orderOfIntegral;
     
+    /**
+     Cheks if angular momentum is valid for given number of centers.
+
+     @param angularMomentum the angular momentum.
+     @param nCenters the number of centers.
+     @return true if angular momentum is valids, false otherwise.
+     */
+    bool _isValidAngularMomentum(const CFourIndexes& angularMomentum,
+                                 const int32_t       nCenters) const;
+    
 public:
     
     /**
@@ -139,6 +149,13 @@ public:
      @return true if recursion term objects are not equal, false otherwise.
      */
     bool operator!=(const CRecursionTerm& other) const;
+    
+    /**
+     Checks if recursion term object is valid recursion term.
+
+     @return true if recursion term object is valid recursion term, false otherwise.
+     */
+    bool isValid() const;
     
     /**
      Converts recursion term object to text output and insert it into output

@@ -182,6 +182,81 @@ CRecursionTerm::operator!=(const CRecursionTerm& other) const
     return !(*this == other);
 }
 
+bool
+CRecursionTerm::isValid() const
+{
+    if (_labelOfOperator.empty()) return false;
+    
+    if (_orderOfOperator < 0) return false;
+    
+    if (_braCenters < 1) return false;
+    
+    if (_ketCenters < 1) return false;
+    
+    if (_orderOfIntegral < 0) return false;
+    
+    if (!_isValidAngularMomentum(_braAngularMomentum, _braCenters)) return false;
+    
+    if (!_isValidAngularMomentum(_ketAngularMomentum, _ketCenters)) return false;
+    
+    return true;
+}
+
+bool
+CRecursionTerm::_isValidAngularMomentum(const CFourIndexes& angularMomentum,
+                                        const int32_t       nCenters) const
+{
+    // one-center expansion
+    
+    if (nCenters == 1)
+    {
+        if (angularMomentum.first() < 0) return false;
+        
+        return true;
+    }
+    
+    // two-center expansion
+    
+    if (nCenters == 2)
+    {
+        if (angularMomentum.first() < 0) return false;
+        
+        if (angularMomentum.second() < 0) return false;
+        
+        return true;
+    }
+    
+    // three-center expansion
+    
+    if (nCenters == 3)
+    {
+        if (angularMomentum.first() < 0) return false;
+        
+        if (angularMomentum.second() < 0) return false;
+        
+        if (angularMomentum.third() < 0) return false;
+        
+        return true;
+    }
+    
+    // four-center expansion
+    
+    if (nCenters == 4)
+    {
+        if (angularMomentum.first() < 0) return false;
+        
+        if (angularMomentum.second() < 0) return false;
+        
+        if (angularMomentum.third() < 0) return false;
+        
+        if (angularMomentum.fourth() < 0) return false;
+        
+        return true;
+    }
+    
+    return false;
+}
+
 std::ostream&
 operator<<(      std::ostream&   output,
            const CRecursionTerm& source)
