@@ -150,8 +150,8 @@ class TDAExciDriver:
 
             # perform linear transformation of trial vectors
 
-            sig_vecs = a2x_drv.compute(trial_vecs, qq_data, mol_orbs, molecule,
-                                       ao_basis)
+            sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
+                                       mol_orbs, molecule, ao_basis)
 
             # solve eigenvalues problem on master node
 

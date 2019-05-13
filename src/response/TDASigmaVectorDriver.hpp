@@ -70,6 +70,8 @@ class CTDASigmaVectorDriver
 
      @param sigmaVectors the set of sigma vectors.
      @param zVectors the set of Z vectors.
+     @param isTripletStates the flag indicating A matrix construction for
+            triplet excited states, instead of default singlet excited states.
      @param screeningContainer the electron repulsion integrals screeners
             container.
      @param molecularOrbitals the molecular orbitals.
@@ -78,6 +80,7 @@ class CTDASigmaVectorDriver
      */
     void _addFirstOrderFockContribution(      std::vector<CDenseMatrix>&      sigmaVectors,
                                         const std::vector<CExcitationVector>& zVectors,
+                                        const bool                            isTripletStates,
                                         const CScreeningContainer&            screeningContainer,
                                         const CMolecularOrbitals&             molecularOrbitals,
                                         const CMolecule&                      molecule,
@@ -115,23 +118,6 @@ public:
                                       const CMolecularOrbitals&             molecularOrbitals,
                                       const CMolecule&                      molecule,
                                       const CMolecularBasis&                basis) const;
-    
-    /**
-     Computes sigma = A * Z vectors.
-
-     @param zVectors the vector of excitation vectors.
-     @param screeningContainer the electron repulsion integrals screeners
-            container.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @return the vector of sigma vectors.
-     */
-    std::vector<CDenseMatrix> compute(const std::vector<CExcitationVector>& zVectors,
-                                      const CScreeningContainer&            screeningContainer,
-                                      const CMolecularOrbitals&             molecularOrbitals,
-                                      const CMolecule&                      molecule,
-                                      const CMolecularBasis&                basis) const;
-    
     
 };
 

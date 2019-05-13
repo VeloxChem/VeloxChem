@@ -75,6 +75,8 @@ class ResponseDriver:
 
         elif rsp_input['property'].lower() == 'absorption':
             self.prop_type = 'SINGEX_TDA'
+            if 'spin' in rsp_input and rsp_input['spin'][0].upper() == 'T':
+                self.prop_type = 'TRIPEX_TDA'
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """Performs molecular property calculation.
@@ -177,10 +179,13 @@ class ResponseDriver:
         The string with type of molecular property calculation.
         """
 
+        if self.prop_type == "POLARIZABILITY":
+            return "Polarizability"
+
         if self.prop_type == "SINGEX_TDA":
             return "Singlet Excited States"
 
-        if self.prop_type == "POLARIZABILITY":
-            return "Polarizability"
+        if self.prop_type == "TRIPEX_TDA":
+            return "Triplet Excited States"
 
         return "Undefined"

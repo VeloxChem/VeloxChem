@@ -28,6 +28,7 @@ CTDASigmaVectorDriver::~CTDASigmaVectorDriver()
 
 std::vector<CDenseMatrix>
 CTDASigmaVectorDriver::compute(const std::vector<CExcitationVector>& zVectors,
+                               const bool                            isTripletStates,
                                const CScreeningContainer&            screeningContainer,
                                const CMolecularOrbitals&             molecularOrbitals,
                                const CMolecule&                      molecule,
@@ -37,7 +38,7 @@ CTDASigmaVectorDriver::compute(const std::vector<CExcitationVector>& zVectors,
  
     _addCanonicalFockContribution(sig_vecs, zVectors, molecularOrbitals);
     
-    _addFirstOrderFockContribution(sig_vecs, zVectors, screeningContainer,
+    _addFirstOrderFockContribution(sig_vecs, zVectors, isTripletStates, screeningContainer,
                                    molecularOrbitals, molecule, basis);
     
     return sig_vecs;
@@ -108,6 +109,7 @@ CTDASigmaVectorDriver::_addCanonicalFockContribution(      std::vector<CDenseMat
 void
 CTDASigmaVectorDriver::_addFirstOrderFockContribution(      std::vector<CDenseMatrix>&      sigmaVectors,
                                                       const std::vector<CExcitationVector>& zVectors,
+                                                      const bool                            isTripletStates,
                                                       const CScreeningContainer&            screeningContainer,
                                                       const CMolecularOrbitals&             molecularOrbitals,
                                                       const CMolecule&                      molecule,
@@ -131,6 +133,18 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(      std::vector<CDenseMa
     // compute AO Fock matrices
     
     CAOFockMatrix faomat(dmat);
+
+    double fock_prefactor = 1.0;
+
+    if (isTripletStates)
+    {
+        fock_prefactor = -1.0;
+
+        for (int32_t i = 0; i < nvecs; i++)
+        {
+            faomat.setFockType(fockmat::rgenk, i);
+        }
+    }
     
     CElectronRepulsionIntegralsDriver eri_drv(_locComm);
     
@@ -169,7 +183,7 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(      std::vector<CDenseMa
             
             for (int32_t j = 0; j < ndim; j++)
             {
-                sigdat[j] += fdat[bidx[j] * ncol + kidx[j]];
+                sigdat[j] += fdat[bidx[j] * ncol + kidx[j]] * fock_prefactor;
             }
         }
     }

@@ -15,10 +15,10 @@ class Absorption(ResponseProperty):
         rsp_input['residue'] = 'single'
         # rsp_input['operators'] = ('xyz',)
 
-        # if 'spin' in rsp_dict:
-        #    rsp_input['spin'] = rsp_dict['spin']
-        # else:
-        #    rsp_input['spin'] = 'singlet'
+        if 'spin' in rsp_dict:
+            rsp_input['spin'] = rsp_dict['spin']
+        else:
+            rsp_input['spin'] = 'singlet'
 
         super().__init__(rsp_input)
 
@@ -33,8 +33,9 @@ class Absorption(ResponseProperty):
         ostream.print_blank()
         ostream.print_header('One-Photon Absorption'.ljust(92))
         ostream.print_header('---------------------'.ljust(92))
+        spin_str = 'T' if self.rsp_input['spin'][0].upper() == 'T' else 'S'
         for s, e in enumerate(self.rsp_property):
-            output_abs = 'Excited State {:5d}: '.format(s + 1)
+            output_abs = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
             output_abs += '{:15.8f} a.u. '.format(e)
             output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
             ostream.print_header(output_abs.ljust(92))
