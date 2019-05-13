@@ -52,7 +52,7 @@ class LinearResponseMatrixVectorDriver:
             for col in range(vecs.shape[1]):
                 vec = vecs[:, col]
 
-                kN = self.vec2mat(vec, nocc, norb).T
+                kN = lrvec2mat(vec, nocc, norb).T
                 kn = mo @ kN @ mo.T
 
                 dak = kn.T @ S @ da - da @ S @ kn.T
@@ -82,7 +82,7 @@ class LinearResponseMatrixVectorDriver:
                                                        fbt.T @ db) @ S
                 gmo = mo.T @ gao @ mo
 
-                gv[:, col] = -self.mat2vec(gmo, nocc, norb)
+                gv[:, col] = -lrmat2vec(gmo, nocc, norb)
             return gv
         else:
             return None
@@ -160,41 +160,43 @@ class LinearResponseMatrixVectorDriver:
         rows, columns = vecs.shape
 
         for c in range(columns):
-            kappa = self.vec2mat(vecs[:, c], nocc, norb).T
+            kappa = lrvec2mat(vecs[:, c], nocc, norb).T
             kappa_ao = mo @ kappa @ mo.T
 
             s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
             s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-            s2n_vecs[:, c] = -self.mat2vec(s2n_mo, nocc, norb)
+            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)
 
         return s2n_vecs
 
-    def vec2mat(self, vec, nocc, norb):
 
-        zlen = len(vec) // 2
-        z, y = vec[:zlen], vec[zlen:]
+def lrvec2mat(vec, nocc, norb):
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        xv.set_yzcoefficients(z, y)
+    zlen = len(vec) // 2
+    z, y = vec[:zlen], vec[zlen:]
 
-        kz = xv.get_zmatrix()
-        ky = xv.get_ymatrix()
+    xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+    xv.set_yzcoefficients(z, y)
 
-        rows = kz.number_of_rows() + ky.number_of_rows()
-        cols = kz.number_of_columns() + ky.number_of_columns()
+    kz = xv.get_zmatrix()
+    ky = xv.get_ymatrix()
 
-        kzy = np.zeros((rows, cols))
-        kzy[:kz.number_of_rows(), ky.number_of_columns():] = kz.to_numpy()
-        kzy[kz.number_of_rows():, :ky.number_of_columns()] = ky.to_numpy()
+    rows = kz.number_of_rows() + ky.number_of_rows()
+    cols = kz.number_of_columns() + ky.number_of_columns()
 
-        return kzy
+    kzy = np.zeros((rows, cols))
+    kzy[:kz.number_of_rows(), ky.number_of_columns():] = kz.to_numpy()
+    kzy[kz.number_of_rows():, :ky.number_of_columns()] = ky.to_numpy()
 
-    def mat2vec(self, mat, nocc, norb):
+    return kzy
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
 
-        z = [mat[i, j] for i, j in excitations]
-        y = [mat[j, i] for i, j in excitations]
-        return np.array(z + y)
+def lrmat2vec(mat, nocc, norb):
+
+    xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+    excitations = list(
+        itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+    z = [mat[i, j] for i, j in excitations]
+    y = [mat[j, i] for i, j in excitations]
+    return np.array(z + y)

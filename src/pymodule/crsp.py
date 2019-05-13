@@ -12,6 +12,7 @@ from .veloxchemlib import szblock
 from .veloxchemlib import denmat, fockmat
 from .veloxchemlib import ericut
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
+from .lrmatvecdriver import lrmat2vec
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .qqscheme import get_qq_scheme
@@ -45,17 +46,6 @@ class ComplexResponse:
         ann = xv.ket_indexes()
 
         return nocc, norb, xv, cre, ann
-
-    def mat2vec(self, mat, mol_orbs, task):
-        """Converts matrix into excitation vector according to creation
-        and annihilation indices.
-        """
-
-        nocc, norb, xv, cre, ann = self.get_orbital_numbers(mol_orbs, task)
-        vec_exc = [mat[k, l] for k, l in zip(cre, ann)]
-        vec_dex = [mat[l, k] for k, l in zip(cre, ann)]
-
-        return np.append(vec_exc, vec_dex)
 
     def paired(self, v_xy):
         """Returns paired trial vector.
@@ -288,6 +278,9 @@ class ComplexResponse:
         d = scf_tensors['D'][0] + scf_tensors['D'][1]
         dipoles = scf_tensors['Mu']
 
+        nocc = task.molecule.number_of_alpha_electrons()
+        norb = mo.shape[1]
+
         if 'x' in ops or 'y' in ops or 'z' in ops:
             prop = {k: v for k, v in zip('xyz', dipoles)}
 
@@ -295,7 +288,7 @@ class ComplexResponse:
 
         matrices = tuple(
             [mo.T @ (s @ d @ prop[p] - prop[p] @ d @ s) @ mo for p in ops])
-        gradients = tuple([self.mat2vec(m, mol_orbs, task) for m in matrices])
+        gradients = tuple([lrmat2vec(m, nocc, norb) for m in matrices])
 
         return gradients
 

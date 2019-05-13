@@ -7,6 +7,7 @@ from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
+from .lrmatvecdriver import lrmat2vec
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
 
@@ -291,18 +292,8 @@ class LinearResponseSolver:
         matrices = tuple(
             mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
 
-        gradients = tuple(self.mat2vec(m, nocc, norb) for m in matrices)
+        gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
         return gradients
-
-    def mat2vec(self, mat, nocc, norb):
-
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
-        z = [mat[i, j] for i, j in excitations]
-        y = [mat[j, i] for i, j in excitations]
-        return np.array(z + y)
 
     def initial_guess(self, freqs, V1, od, sd, td):
 
