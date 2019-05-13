@@ -81,9 +81,8 @@ def main():
 
     if task_type == 'cpp':
 
-        crsp_drv = ComplexResponse()
-        crsp_drv.clr(mol_orbs, task)
-
+        crsp_drv = ComplexResponse(task.mpi_comm)
+        crsp_drv.compute(mol_orbs, task, scf_tensors)
 
     # ADC(1)
 

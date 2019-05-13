@@ -1,3 +1,6 @@
+import numpy as np
+import time as tm
+
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -8,26 +11,26 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import denmat, fockmat
 from .veloxchemlib import ericut
-
+from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
-from .outputstream import OutputStream
-
-from mpi4py import MPI
-
-import numpy as np
-import time as tm
+from .qqscheme import get_qq_scheme
 
 
 class ComplexResponse:
     """ Provides functionality to solve complex linear
     response equations. """
 
-    def __init__(self):
-        self.comm = MPI.COMM_WORLD
+    def __init__(self, comm):
+
+        self.qq_type = 'QQ_DEN'
+        self.eri_thresh = 1.0e-12
+
+        self.is_converged = False
+
+        self.comm = comm
         self.rank = self.comm.Get_rank()
         self.size = self.comm.Get_size()
-        self._fock = None
 
     def get_orbital_numbers(self, mol_orbs, task):
         """Requests information about orbitals like the total number,
@@ -181,31 +184,6 @@ class ComplexResponse:
 
         return vecs
 
-    def get_dipole(self, task):
-        """Fetches the length component of dipoles from respective driver.
-        """
-
-        dipole_driver = ElectricDipoleIntegralsDriver(self.comm)
-        #        master_node = (self.rank == mpi_master())
-        #        if master_node:
-        #            mol = Molecule.read_xyz(self.xyz)
-        #            bas = MolecularBasis.read(mol, self.basis)
-        #        else:
-        #            mol = Molecule()
-        #            bas = MolecularBasis()
-        dipoles = dipole_driver.compute(task.molecule, task.ao_basis)
-
-        return dipoles.x_to_numpy(), dipoles.y_to_numpy(), dipoles.z_to_numpy()
-
-    def get_overlap(self, task):
-        """Fetches the overlap matrix.
-        """
-
-        overlap = OverlapIntegralsDriver(self.comm)
-        s = overlap.compute(task.molecule, task.ao_basis)
-
-        return s.to_numpy()
-
     def construct_ed(self, mol_orbs, task):
         """Returns the E0 matrix and its diagonal elements as an array.
         """
@@ -300,20 +278,18 @@ class ComplexResponse:
 
         return precond
 
-    def get_rhs(self, mol_orbs, task, ops):
+    def get_rhs(self, mol_orbs, task, scf_tensors, ops):
         """Creates right-hand sides of complex linear response equations
         enabled gradients: dipole length
         """
 
-        if 'x' in ops or 'y' in ops or 'z' in ops:
-            prop = {k: v for k, v in zip('xyz', self.get_dipole(task))}
+        mo = scf_tensors['C']
+        s = scf_tensors['S']
+        d = scf_tensors['D'][0] + scf_tensors['D'][1]
+        dipoles = scf_tensors['Mu']
 
-        den = mol_orbs.get_density(task.molecule)
-        da = den.alpha_to_numpy(0)
-        db = den.beta_to_numpy(0)
-        d = da + db
-        s = self.get_overlap(task)
-        mo = mol_orbs.alpha_to_numpy()
+        if 'x' in ops or 'y' in ops or 'z' in ops:
+            prop = {k: v for k, v in zip('xyz', dipoles)}
 
         # creating mo gradient matrices and converting them into vectors
 
@@ -323,12 +299,12 @@ class ComplexResponse:
 
         return gradients
 
-    def initial_guess(self, mol_orbs, task, d, ops, freqs, precond):
+    def initial_guess(self, mol_orbs, task, scf_tensors, d, ops, freqs, precond):
         """Creating initial guess (un-orthonormalized trials) out of gradients.
         """
 
         ig = {}
-        for op, grad in zip(ops, self.get_rhs(mol_orbs, task, ops)):
+        for op, grad in zip(ops, self.get_rhs(mol_orbs, task, scf_tensors, ops)):
             gradger, gradung = self.decomp_sym(grad)
             grad = np.array(
                 [gradger.real, gradung.real, -gradung.imag,
@@ -412,20 +388,21 @@ class ComplexResponse:
 
         return new_ger, new_ung
 
-    def clr_solve(self,
-                  mol_orbs,
-                  task,
-                  ops='z',
-                  freqs=(
-                      0.0,
-                      0.05,
-                      0.1,
-                      0.15,
-                      0.2,
-                  ),
-                  d=0.004556335294880438,
-                  maxit=150,
-                  threshold=1.0e-6):
+    def compute(self,
+                mol_orbs,
+                task,
+                scf_tensors,
+                ops='z',
+                freqs=(
+                    0.0,
+                    0.05,
+                    0.1,
+                    0.15,
+                    0.2,
+                ),
+                d=0.004556335294880438,
+                maxit=150,
+                threshold=1.0e-6):
         """Solves for the approximate response vector iteratively
         while checking the residuals for convergence.
 
@@ -434,473 +411,327 @@ class ComplexResponse:
         convergence threshold.
         """
 
-        # calling the gradients
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, task.molecule, task.ao_basis)
 
-        v1 = {op: v for op, v in zip(ops, self.get_rhs(mol_orbs, task, ops))}
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
-        # creating the preconditioner matrix
+        if self.rank == mpi_master():
+            nocc = task.molecule.number_of_alpha_electrons()
+        else:
+            nocc = None
 
-        precond = {w: self.get_precond(mol_orbs, task, w, d) for w in freqs}
+        trials_info = {'bger': False, 'bung': False}
 
-        # spawning initial trial vectors
+        if self.rank == mpi_master():
 
-        igs = self.initial_guess(mol_orbs, task, d, ops, freqs, precond)
-        bger, bung = self.setup_trials(igs)
+            # calling the gradients
 
-        # creating sigma and rho linear transformations
+            v1 = {op: v for op, v in zip(ops, self.get_rhs(mol_orbs, task, scf_tensors, ops))}
 
-        if bger.any():
-            bger = self.orthogonalize_gram_schmidt(bger)
-            bger = self.normalize(bger)
+            # creating the preconditioner matrix
 
-            e2bger = self.e2n(bger, mol_orbs, task)
-            s2bung = self.s2n(bger, mol_orbs, task)
+            precond = {w: self.get_precond(mol_orbs, task, w, d) for w in freqs}
 
-        if bung.any():
-            bung = self.orthogonalize_gram_schmidt(bung)
-            bung = self.normalize(bung)
+            # spawning initial trial vectors
 
-            e2bung = self.e2n(bung, mol_orbs, task)
-            s2bger = self.s2n(bung, mol_orbs, task)
+            igs = self.initial_guess(mol_orbs, task, scf_tensors, d, ops, freqs, precond)
+            bger, bung = self.setup_trials(igs)
+
+            # creating sigma and rho linear transformations
+
+            if bger.any():
+                trials_info['bger'] = True
+                bger = self.orthogonalize_gram_schmidt(bger)
+                bger = self.normalize(bger)
+
+            if bung.any():
+                trials_info['bung'] = True
+                bung = self.orthogonalize_gram_schmidt(bung)
+                bung = self.normalize(bung)
+
+        else:
+            bger = None
+            bung = None
+
+        trials_info = self.comm.bcast(trials_info, root=mpi_master())
+
+        if trials_info['bger']:
+            e2bger = e2x_drv.e2n(bger, scf_tensors, screening, task.molecule, task.ao_basis)
+            if self.rank == mpi_master():
+                s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
+
+        if trials_info['bung']:
+            e2bung = e2x_drv.e2n(bung, scf_tensors, screening, task.molecule, task.ao_basis)
+            if self.rank == mpi_master():
+                s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
 
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
 
         for i in range(maxit):
-            for op, w in igs:
-                grad = v1[op]
 
-                gradger, gradung = self.decomp_sym(grad)
-                full_size = gradger.shape[0]
+            if self.rank == mpi_master():
 
-                # projections onto gerade and ungerade subspaces:
+                for op, w in igs:
+                    grad = v1[op]
 
-                if bger.any():
-                    g_realger = np.matmul(bger.T, gradger.real)
-                    g_imagger = np.matmul(bger.T, gradger.imag)
+                    gradger, gradung = self.decomp_sym(grad)
+                    full_size = gradger.shape[0]
 
-                    e2gg = np.matmul(bger.T, e2bger)
-
-                    ntrials_ger = bger.shape[1]
-
-                else:
-                    ntrials_ger = 0
-
-                if bung.any():
-                    g_realung = np.matmul(bung.T, gradung.real)
-                    g_imagung = np.matmul(bung.T, gradung.imag)
-
-                    e2uu = np.matmul(bung.T, e2bung)
+                    # projections onto gerade and ungerade subspaces:
 
                     if bger.any():
-                        s2ug = np.matmul(bung.T, s2bung)
+                        g_realger = np.matmul(bger.T, gradger.real)
+                        g_imagger = np.matmul(bger.T, gradger.imag)
 
-                    ntrials_ung = bung.shape[1]
+                        e2gg = np.matmul(bger.T, e2bger)
 
-                else:
-                    ntrials_ung = 0
+                        ntrials_ger = bger.shape[1]
 
-                # creating gradient and matrix for linear equation
+                    else:
+                        ntrials_ger = 0
 
-                print(ntrials_ger, 'gerade trial vectors')
-                print(ntrials_ung, 'ungerade trial vectors')
-                size = 2 * (ntrials_ger + ntrials_ung)
+                    if bung.any():
+                        g_realung = np.matmul(bung.T, gradung.real)
+                        g_imagung = np.matmul(bung.T, gradung.imag)
 
-                # gradient
+                        e2uu = np.matmul(bung.T, e2bung)
 
-                g = np.zeros(size)
+                        if bger.any():
+                            s2ug = np.matmul(bung.T, s2bung)
 
-                for pos in range(ntrials_ger):
-                    g[pos] = g_realger[pos]
-                    g[-pos - 1] = -g_imagger[-pos - 1]
+                        ntrials_ung = bung.shape[1]
 
-                for pos in range(ntrials_ung):
-                    g[pos + ntrials_ger] = g_realung[pos]
-                    g[-(pos + ntrials_ger) - 1] = -g_imagung[-pos - 1]
+                    else:
+                        ntrials_ung = 0
 
-                # matrix
+                    # creating gradient and matrix for linear equation
 
-                mat = np.zeros((size, size))
+                    print(ntrials_ger, 'gerade trial vectors')
+                    print(ntrials_ung, 'ungerade trial vectors')
+                    size = 2 * (ntrials_ger + ntrials_ung)
 
-                # filling E2gg
+                    # gradient
 
-                for row in range(ntrials_ger):
-                    for col in range(ntrials_ger):
-                        mat[row, col] = e2gg[row, col]
-                        mat[-row - 1, -col - 1] = -e2gg[-row - 1, -col - 1]
+                    g = np.zeros(size)
 
-                # filling E2uu
+                    for pos in range(ntrials_ger):
+                        g[pos] = g_realger[pos]
+                        g[-pos - 1] = -g_imagger[-pos - 1]
 
-                for row in range(ntrials_ung):
-                    for col in range(ntrials_ung):
-                        mat[(row + ntrials_ger),
-                            (col + ntrials_ger)] = e2uu[row, col]
-                        mat[-(row + ntrials_ger) - 1, -(col + ntrials_ger) -
-                            1] = -e2uu[-row - 1, -col - 1]
+                    for pos in range(ntrials_ung):
+                        g[pos + ntrials_ger] = g_realung[pos]
+                        g[-(pos + ntrials_ger) - 1] = -g_imagung[-pos - 1]
 
-                for row in range(ntrials_ung):
-                    for col in range(ntrials_ger):
+                    # matrix
 
-                        # filling S2ug
+                    mat = np.zeros((size, size))
 
-                        mat[(row + ntrials_ger), col] = -w * s2ug[row, col]
-                        mat[-(row + ntrials_ger) -
-                            1, col] = d * s2ug[-row - 1, col]
-                        mat[(row + ntrials_ger), -col -
-                            1] = d * s2ug[row, -col - 1]
-                        mat[-(row + ntrials_ger) - 1, -col -
-                            1] = w * s2ug[-row - 1, -col - 1]
+                    # filling E2gg
 
-                        # filling S2ug.T (interchanging of row and col)
+                    for row in range(ntrials_ger):
+                        for col in range(ntrials_ger):
+                            mat[row, col] = e2gg[row, col]
+                            mat[-row - 1, -col - 1] = -e2gg[-row - 1, -col - 1]
 
-                        mat[col, (row + ntrials_ger)] = -w * s2ug[row, col]
-                        mat[col, -(row + ntrials_ger) -
-                            1] = d * s2ug[-row - 1, col]
-                        mat[-col - 1,
-                            (row + ntrials_ger)] = d * s2ug[row, -col - 1]
-                        mat[-col - 1, -(row + ntrials_ger) -
-                            1] = w * s2ug[-row - 1, -col - 1]
+                    # filling E2uu
 
-                # solving matrix equation
+                    for row in range(ntrials_ung):
+                        for col in range(ntrials_ung):
+                            mat[(row + ntrials_ger),
+                                (col + ntrials_ger)] = e2uu[row, col]
+                            mat[-(row + ntrials_ger) - 1, -(col + ntrials_ger) -
+                                1] = -e2uu[-row - 1, -col - 1]
 
-                c = np.linalg.solve(mat, g)
+                    for row in range(ntrials_ung):
+                        for col in range(ntrials_ger):
 
-                # extracting the 4 components of c...
+                            # filling S2ug
 
-                c_realger, c_imagger = np.zeros(ntrials_ger), np.zeros(
-                    ntrials_ger)
-                c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
-                    ntrials_ung)
+                            mat[(row + ntrials_ger), col] = -w * s2ug[row, col]
+                            mat[-(row + ntrials_ger) -
+                                1, col] = d * s2ug[-row - 1, col]
+                            mat[(row + ntrials_ger), -col -
+                                1] = d * s2ug[row, -col - 1]
+                            mat[-(row + ntrials_ger) - 1, -col -
+                                1] = w * s2ug[-row - 1, -col - 1]
 
-                for pos in range(ntrials_ger):
-                    c_realger[pos] = c[pos]
-                    c_imagger[-pos - 1] = c[-pos - 1]
+                            # filling S2ug.T (interchanging of row and col)
 
-                for pos in range(ntrials_ung):
-                    c_realung[pos] = c[pos + ntrials_ger]
-                    c_imagung[-pos - 1] = c[-(pos + ntrials_ger) - 1]
+                            mat[col, (row + ntrials_ger)] = -w * s2ug[row, col]
+                            mat[col, -(row + ntrials_ger) -
+                                1] = d * s2ug[-row - 1, col]
+                            mat[-col - 1,
+                                (row + ntrials_ger)] = d * s2ug[row, -col - 1]
+                            mat[-col - 1, -(row + ntrials_ger) -
+                                1] = w * s2ug[-row - 1, -col - 1]
 
-                # ...and projecting them onto respective subspace
+                    # solving matrix equation
 
-                x_realger = np.matmul(bger, c_realger)
-                x_imagger = np.matmul(bger, c_imagger)
-                x_realung = np.matmul(bung, c_realung)
-                x_imagung = np.matmul(bung, c_imagung)
+                    c = np.linalg.solve(mat, g)
 
-                # composing response vector
+                    # extracting the 4 components of c...
 
-                x_real = x_realger + x_realung
-                x_imag = x_imagung + x_imagger
-                x = np.zeros(len(x_real), dtype=complex)
+                    c_realger, c_imagger = np.zeros(ntrials_ger), np.zeros(
+                        ntrials_ger)
+                    c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
+                        ntrials_ung)
 
-                for pos in range(len(x_real)):
-                    x[pos] = complex(x_real[pos], x_imag[pos])
+                    for pos in range(ntrials_ger):
+                        c_realger[pos] = c[pos]
+                        c_imagger[-pos - 1] = c[-pos - 1]
 
-                solutions[(op, w)] = x
+                    for pos in range(ntrials_ung):
+                        c_realung[pos] = c[pos + ntrials_ger]
+                        c_imagung[-pos - 1] = c[-(pos + ntrials_ger) - 1]
 
-                # composing E2 and S2 matrices projected onto solution subspace
+                    # ...and projecting them onto respective subspace
 
-                if bger.any():
-                    e2realger = np.matmul(e2bger, c_realger)
-                    e2imagger = np.matmul(e2bger, c_imagger)
-                    s2realger = np.matmul(s2bung, c_realger)
-                    s2imagger = np.matmul(s2bung, c_imagger)
+                    x_realger = np.matmul(bger, c_realger)
+                    x_imagger = np.matmul(bger, c_imagger)
+                    x_realung = np.matmul(bung, c_realung)
+                    x_imagung = np.matmul(bung, c_imagung)
 
-                else:
-                    e2realger = np.zeros(full_size)
-                    e2imagger = np.zeros(full_size)
-                    s2realger = np.zeros(full_size)
-                    s2imagger = np.zeros(full_size)
+                    # composing response vector
 
-                if bung.any():
-                    e2realung = np.matmul(e2bung, c_realung)
-                    e2imagung = np.matmul(e2bung, c_imagung)
-                    s2realung = np.matmul(s2bger, c_realung)
-                    s2imagung = np.matmul(s2bger, c_imagung)
+                    x_real = x_realger + x_realung
+                    x_imag = x_imagung + x_imagger
+                    x = np.zeros(len(x_real), dtype=complex)
 
-                else:
-                    e2realung = np.zeros(full_size)
-                    e2imagung = np.zeros(full_size)
-                    s2realung = np.zeros(full_size)
-                    s2imagung = np.zroes(full_size)
+                    for pos in range(len(x_real)):
+                        x[pos] = complex(x_real[pos], x_imag[pos])
 
-                # calculating the residual components
+                    solutions[(op, w)] = x
 
-                r_realger = (e2realger - w * s2realung + d * s2imagung -
-                             gradger.real)
-                r_realung = (e2realung - w * s2realger + d * s2imagger -
-                             gradung.real)
-                r_imagung = (-e2imagung + w * s2imagger + d * s2realger +
-                             gradung.imag)
-                r_imagger = (-e2imagger + w * s2imagung + d * s2realung +
-                             gradger.imag)
+                    # composing E2 and S2 matrices projected onto solution subspace
 
-                # composing total residual
+                    if bger.any():
+                        e2realger = np.matmul(e2bger, c_realger)
+                        e2imagger = np.matmul(e2bger, c_imagger)
+                        s2realger = np.matmul(s2bung, c_realger)
+                        s2imagger = np.matmul(s2bung, c_imagger)
 
-                r_real = r_realger + r_realung
-                r_imag = r_imagung + r_imagger
-                r = np.zeros(len(r_real), dtype=complex)
+                    else:
+                        e2realger = np.zeros(full_size)
+                        e2imagger = np.zeros(full_size)
+                        s2realger = np.zeros(full_size)
+                        s2imagger = np.zeros(full_size)
 
-                for pos in range(len(r_real)):
-                    r[pos] = complex(r_real[pos], r_imag[pos])
+                    if bung.any():
+                        e2realung = np.matmul(e2bung, c_realung)
+                        e2imagung = np.matmul(e2bung, c_imagung)
+                        s2realung = np.matmul(s2bger, c_realung)
+                        s2imagung = np.matmul(s2bger, c_imagung)
 
-                residuals[(op, w)] = np.array(
-                    [r_realger, r_realung, r_imagung, r_imagger]).flatten()
+                    else:
+                        e2realung = np.zeros(full_size)
+                        e2imagung = np.zeros(full_size)
+                        s2realung = np.zeros(full_size)
+                        s2imagung = np.zroes(full_size)
 
-                n = solutions[(op, w)]
+                    # calculating the residual components
 
-                # calculating relative residual norm for convergence check
+                    r_realger = (e2realger - w * s2realung + d * s2imagung -
+                                 gradger.real)
+                    r_realung = (e2realung - w * s2realger + d * s2imagger -
+                                 gradung.real)
+                    r_imagung = (-e2imagung + w * s2imagger + d * s2realger +
+                                 gradung.imag)
+                    r_imagger = (-e2imagger + w * s2imagung + d * s2realung +
+                                 gradger.imag)
 
-                nv = np.matmul(n, grad)
-                rn = np.linalg.norm(r)
-                nn = np.linalg.norm(n)
-                if nn != 0:
-                    relative_residual_norm[(op, w)] = rn / nn
-                else:
-                    relative_residual_norm[(op, w)] = 0
-                print(
-                    f"{i+1} <<{op};{op}>>({w})={-nv:.10f} rn={rn:.5e}"
-                )
-            print()
+                    # composing total residual
 
-            # checking for convergence
+                    r_real = r_realger + r_realung
+                    r_imag = r_imagung + r_imagger
+                    r = np.zeros(len(r_real), dtype=complex)
 
-            max_residual = max(relative_residual_norm.values())
+                    for pos in range(len(r_real)):
+                        r[pos] = complex(r_real[pos], r_imag[pos])
 
-            if max_residual < threshold:
-                print('Converged')
+                    residuals[(op, w)] = np.array(
+                        [r_realger, r_realung, r_imagung, r_imagger]).flatten()
+
+                    n = solutions[(op, w)]
+
+                    # calculating relative residual norm for convergence check
+
+                    nv = np.matmul(n, grad)
+                    rn = np.linalg.norm(r)
+                    nn = np.linalg.norm(n)
+                    if nn != 0:
+                        relative_residual_norm[(op, w)] = rn / nn
+                    else:
+                        relative_residual_norm[(op, w)] = 0
+                    print(f"{i+1} <<{op};{op}>>({w})={-nv:.10f} rn={rn:.5e}")
+
+                print()
+
+                # checking for convergence
+
+                max_residual = max(relative_residual_norm.values())
+
+                if max_residual < threshold:
+                    self.is_converged = True
+                    #print('Converged')
+                    #break
+
+            self.is_converged = self.comm.bcast(self.is_converged,
+                                                root=mpi_master())
+
+            if self.is_converged:
                 break
+
+            trials_info = {'new_trials_ger': False, 'new_trials_ung': False}
 
             # spawning new trial vectors from residuals
 
-            new_trials_ger, new_trials_ung = self.setup_trials(residuals,
-                                                               td=precond,
-                                                               bger=bger,
-                                                               bung=bung)
+            if self.rank == mpi_master():
 
-            # creating new sigma and rho linear transformations
+                new_trials_ger, new_trials_ung = self.setup_trials(residuals,
+                                                                   td=precond,
+                                                                   bger=bger,
+                                                                   bung=bung)
 
-            if new_trials_ger.any():
-                bger = np.append(bger, new_trials_ger, axis=1)
+                # creating new sigma and rho linear transformations
 
-                bger = self.orthogonalize_gram_schmidt(bger)
-                bger = self.normalize(bger)
+                if new_trials_ger.any():
+                    trials_info['new_trials_ger'] = True
 
-                new_e2bger = self.e2n(new_trials_ger, mol_orbs, task)
-                new_s2bung = self.s2n(new_trials_ger, mol_orbs, task)
+                    bger = np.append(bger, new_trials_ger, axis=1)
 
-                e2bger = np.append(e2bger, new_e2bger, axis=1)
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
+                    bger = self.orthogonalize_gram_schmidt(bger)
+                    bger = self.normalize(bger)
 
-            if new_trials_ung.any():
-                bung = np.append(bung, new_trials_ung, axis=1)
+                if new_trials_ung.any():
+                    trials_info['new_trials_ung'] = True
 
-                bung = self.orthogonalize_gram_schmidt(bung)
-                bung = self.normalize(bung)
+                    bung = np.append(bung, new_trials_ung, axis=1)
 
-                new_e2bung = self.e2n(new_trials_ung, mol_orbs, task)
-                new_s2bger = self.s2n(new_trials_ung, mol_orbs, task)
+                    bung = self.orthogonalize_gram_schmidt(bung)
+                    bung = self.normalize(bung)
 
-                e2bung = np.append(e2bung, new_e2bung, axis=1)
-                s2bger = np.append(s2bger, new_s2bger, axis=1)
+            else:
+                new_trials_ger = None
+                new_trials_ung = None
+
+            trials_info = self.comm.bcast(trials_info, root=mpi_master())
+
+            if trials_info['new_trials_ger']:
+                new_e2bger = e2x_drv.e2n(new_trials_ger, scf_tensors, screening, task.molecule, task.ao_basis)
+                if self.rank == mpi_master():
+                    new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
+                    e2bger = np.append(e2bger, new_e2bger, axis=1)
+                    s2bung = np.append(s2bung, new_s2bung, axis=1)
+
+            if trials_info['new_trials_ung']:
+                new_e2bung = e2x_drv.e2n(new_trials_ung, scf_tensors, screening, task.molecule, task.ao_basis)
+                if self.rank == mpi_master():
+                    new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
+                    e2bung = np.append(e2bung, new_e2bung, axis=1)
+                    s2bger = np.append(s2bger, new_s2bger, axis=1)
 
         return solutions
-
-    def clr(self, mol_orbs, task):
-        """Calls solving routine. This function should be called
-        when using the complex response driver.
-        """
-
-        solutions = self.clr_solve(mol_orbs, task)
-
-
-###############################################################################
-######################## COPIED PARTS FROM REAL SOLVER ########################
-########################### and slightly adjusted #############################
-###############################################################################
-
-    def get_two_el_fock(self, task, *dabs):
-
-        mol = task.molecule
-        bas = task.ao_basis
-
-        dts = []
-        for dab in dabs:
-            da, db = dab
-            dt = da + db
-            ds = da - db
-            dts.append(dt)
-            dts.append(ds)
-        dens = AODensityMatrix(dts, denmat.rest)
-        fock = AOFockMatrix(dens)
-        for i in range(0, 2 * len(dabs), 2):
-            fock.set_fock_type(fockmat.rgenjk, i)
-            fock.set_fock_type(fockmat.rgenk, i + 1)
-
-        eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_driver.compute(ericut.qqden, 1.0e-12, mol, bas)
-        eri_driver.compute(ericut.qqden, 1.0e-12, mol, bas)
-        eri_driver.compute(fock, dens, mol, bas, screening)
-        fock.reduce_sum(self.rank, self.size, self.comm)
-
-        fabs = []
-        for i in range(0, 2 * len(dabs), 2):
-            ft = fock.to_numpy(i).T
-            fs = -fock.to_numpy(i + 1).T
-
-            fa = (ft + fs) / 2
-            fb = (ft - fs) / 2
-
-            fabs.append((fa, fb))
-
-        return tuple(fabs)
-
-    def get_one_el_hamiltonian(self, task):
-        kinetic_driver = KineticEnergyIntegralsDriver(self.comm)
-        potential_driver = NuclearPotentialIntegralsDriver(self.comm)
-
-        mol = task.molecule
-        bas = task.ao_basis
-
-        T = kinetic_driver.compute(mol, bas).to_numpy()
-        V = potential_driver.compute(mol, bas).to_numpy()
-
-        return T - V
-
-    def get_fock(self, mol_orbs, task):
-        if self._fock is None:
-            D = mol_orbs.get_density(task.molecule)
-            da = D.alpha_to_numpy(0)
-            db = D.beta_to_numpy(0)
-            (fa, fb), = self.get_two_el_fock(
-                task,
-                (da, db),
-            )
-            h = self.get_one_el_hamiltonian(task)
-            fa += h
-            fb += h
-            self._fock = (fa, fb)
-        return self._fock
-
-    def np2vlx(self, vec, mol_orbs, task):
-        nocc, norb, xv, cre, ann = self.get_orbital_numbers(mol_orbs, task)
-        zlen = len(vec) // 2
-        z, y = vec[:zlen], vec[zlen:]
-        xv.set_yzcoefficients(z, y)
-        return xv
-
-    def vec2mat(self, vec, mol_orbs, task):
-        xv = self.np2vlx(vec, mol_orbs, task)
-        kz = xv.get_zmatrix()
-        ky = xv.get_ymatrix()
-
-        rows = kz.number_of_rows() + ky.number_of_rows()
-        cols = kz.number_of_columns() + ky.number_of_columns()
-
-        kzy = np.zeros((rows, cols))
-        kzy[:kz.number_of_rows(), ky.number_of_columns():] = kz.to_numpy()
-        kzy[kz.number_of_rows():, :ky.number_of_columns()] = ky.to_numpy()
-
-        return kzy
-
-    def e2n(self, vecs, mol_orbs, task):
-        vecs = np.array(vecs)
-
-        S = self.get_overlap(task)
-        D = mol_orbs.get_density(task.molecule)
-        da = D.alpha_to_numpy(0)
-        db = D.beta_to_numpy(0)
-        fa, fb = self.get_fock(mol_orbs, task)
-        mo = mol_orbs.alpha_to_numpy()
-
-        if len(vecs.shape) == 1:
-
-            kN = self.vec2mat(vecs, mol_orbs, task).T
-            kn = mo @ kN @ mo.T
-
-            dak = kn.T @ S @ da - da @ S @ kn.T
-            dbk = kn.T @ S @ db - db @ S @ kn.T
-
-            (fak, fbk), = self.get_two_el_fock(
-                task,
-                (dak, dbk),
-            )
-
-            kfa = S @ kn @ fa - fa @ kn @ S
-            kfb = S @ kn @ fa - fa @ kn @ S
-
-            fat = fak + kfa
-            fbt = fbk + kfb
-
-            gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da + fbt.T @ db) @ S
-            gmo = mo.T @ gao @ mo
-
-            gv = -self.mat2vec(gmo, mol_orbs, task)
-        else:
-            gv = np.zeros(vecs.shape)
-
-            dks = []
-            kns = []
-
-            for col in range(vecs.shape[1]):
-                vec = vecs[:, col]
-
-                kN = self.vec2mat(vec, mol_orbs, task).T
-                kn = mo @ kN @ mo.T
-
-                dak = kn.T @ S @ da - da @ S @ kn.T
-                dbk = kn.T @ S @ db - db @ S @ kn.T
-
-                dks.append((dak, dbk))
-                kns.append(kn)
-
-            dks = tuple(dks)
-            fks = self.get_two_el_fock(task, *dks)
-
-            for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
-
-                kfa = S @ kn @ fa - fa @ kn @ S
-                kfb = S @ kn @ fb - fb @ kn @ S
-
-                fat = fak + kfa
-                fbt = fbk + kfb
-
-                gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da +
-                                                       fbt.T @ db) @ S
-                gmo = mo.T @ gao @ mo
-
-                gv[:, col] = -self.mat2vec(gmo, mol_orbs, task)
-
-        return gv
-
-    def s2n(self, vecs, mol_orbs, task):
-
-        b = np.array(vecs)
-
-        S = self.get_overlap(task)
-        D = mol_orbs.get_density(task.molecule)
-        da = D.alpha_to_numpy(0)
-        db = D.beta_to_numpy(0)
-        D = da + db
-        mo = mol_orbs.alpha_to_numpy()
-
-        if len(b.shape) == 1:
-            kappa = self.vec2mat(vecs, mol_orbs, task).T
-            kappa_ao = mo @ kappa @ mo.T
-
-            s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
-            s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-            s2n_vecs = -self.mat2vec(s2n_mo, mol_orbs, task)
-
-        elif len(b.shape) == 2:
-            s2n_vecs = np.ndarray(b.shape)
-            rows, columns = b.shape
-            for c in range(columns):
-                kappa = self.vec2mat(b[:, c], mol_orbs, task).T
-                kappa_ao = mo @ kappa @ mo.T
-
-                s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
-                s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-                s2n_vecs[:, c] = -self.mat2vec(s2n_mo, mol_orbs, task)
-        return s2n_vecs
