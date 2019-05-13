@@ -81,7 +81,13 @@ def main():
 
     if task_type == 'cpp':
 
+        if 'cpp' in task.input_dict:
+            cpp_dict = task.input_dict['cpp']
+        else:
+            cpp_dict = {}
+
         crsp_drv = ComplexResponse(task.mpi_comm, task.ostream)
+        crsp_drv.update_settings(cpp_dict)
         crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # ADC(1)

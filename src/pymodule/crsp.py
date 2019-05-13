@@ -26,11 +26,15 @@ class ComplexResponse:
 
     def __init__(self, comm, ostream):
 
+        self.operators = 'xyz'
+        self.frequencies = (0,0.05,0.1)
+        self.damping = 0.004556335294880438
+
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-12
 
         self.max_iter = 150
-        self.conv_thresh = 1.0e-6
+        self.conv_thresh = 1.0e-5
 
         self.cur_iter = 0
         self.is_converged = False
@@ -41,6 +45,27 @@ class ComplexResponse:
         self.size = self.comm.Get_size()
 
         self.ostream = ostream
+
+    def update_settings(self, settings):
+        """Updates settings in complex response solver.
+        """
+
+        if 'operators' in settings:
+            self.operators = settings['operators'].replace(' ', '')
+            self.operators = self.operators.lower()
+        if 'frequencies' in settings:
+            self.frequencies = settings['frequencies'].replace(' ', '')
+            self.frequencies = [float(w) for w in self.frequencies.split(',')]
+
+        if 'conv_thresh' in settings:
+            self.conv_thresh = float(settings['conv_thresh'])
+        if 'max_iter' in settings:
+            self.max_iter = int(settings['max_iter'])
+
+        if 'eri_thresh' in settings:
+            self.eri_thresh = float(settings['eri_thresh'])
+        if 'qq_type' in settings:
+            self.qq_type = settings['qq_type'].upper()
 
     def paired(self, v_xy):
         """Returns paired trial vector.
@@ -367,19 +392,7 @@ class ComplexResponse:
 
         return new_ger, new_ung
 
-    def compute(self,
-                molecule,
-                basis,
-                scf_tensors,
-                ops='z',
-                freqs=(
-                    0.0,
-                    0.05,
-                    0.1,
-                    0.15,
-                    0.2,
-                ),
-                d=0.004556335294880438,):
+    def compute(self, molecule, basis, scf_tensors):
         """Solves for the approximate response vector iteratively
         while checking the residuals for convergence.
 
@@ -392,6 +405,10 @@ class ComplexResponse:
             self.print_header()
 
         self.start_time = tm.time()
+
+        d = self.damping
+        ops = self.operators
+        freqs = self.frequencies
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
