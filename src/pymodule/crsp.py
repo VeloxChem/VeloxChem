@@ -3,19 +3,11 @@ import time as tm
 import itertools
 
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import OverlapIntegralsDriver
-from .veloxchemlib import KineticEnergyIntegralsDriver
-from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
-from .veloxchemlib import denmat, fockmat
-from .veloxchemlib import ericut
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import lrmat2vec
-from .aofockmatrix import AOFockMatrix
-from .aodensitymatrix import AODensityMatrix
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 
@@ -27,7 +19,7 @@ class ComplexResponse:
     def __init__(self, comm, ostream):
 
         self.operators = 'xyz'
-        self.frequencies = (0,0.05,0.1)
+        self.frequencies = (0.1,)
         self.damping = 0.004556335294880438
 
         self.qq_type = 'QQ_DEN'
@@ -56,6 +48,8 @@ class ComplexResponse:
         if 'frequencies' in settings:
             self.frequencies = settings['frequencies'].replace(' ', '')
             self.frequencies = [float(w) for w in self.frequencies.split(',')]
+        if 'damping' in settings:
+            self.damping = float(settings['damping'])
 
         if 'conv_thresh' in settings:
             self.conv_thresh = float(settings['conv_thresh'])
@@ -277,6 +271,7 @@ class ComplexResponse:
             'Precondition matrix created in {:.2f} sec.'.format(tm.time() -
                                                                 start_time))
         self.ostream.print_blank()
+        self.ostream.flush()
 
         return precond
 
@@ -429,15 +424,21 @@ class ComplexResponse:
 
             # calling the gradients
 
-            v1 = {op: v for op, v in zip(ops, self.get_rhs(molecule, scf_tensors, ops))}
+            v1 = {
+                op: v
+                for op, v in zip(ops, self.get_rhs(molecule, scf_tensors, ops))
+            }
 
             # creating the preconditioner matrix
 
-            precond = {w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs}
+            precond = {
+                w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
+            }
 
             # spawning initial trial vectors
 
-            igs = self.initial_guess(molecule, scf_tensors, d, ops, freqs, precond)
+            igs = self.initial_guess(molecule, scf_tensors, d, ops, freqs,
+                                     precond)
             bger, bung = self.setup_trials(igs)
 
             # creating sigma and rho linear transformations
@@ -476,7 +477,7 @@ class ComplexResponse:
             self.cur_iter = iteration
 
             if self.rank == mpi_master():
-                nvs =  []
+                nvs = []
 
                 for op, w in igs:
                     grad = v1[op]
@@ -607,7 +608,8 @@ class ComplexResponse:
 
                     solutions[(op, w)] = x
 
-                    # composing E2 and S2 matrices projected onto solution subspace
+                    # composing E2 and S2 matrices projected onto solution
+                    # subspace
 
                     if bger.any():
                         e2realger = np.matmul(e2bger, c_realger)
@@ -726,14 +728,16 @@ class ComplexResponse:
             trials_info = self.comm.bcast(trials_info, root=mpi_master())
 
             if trials_info['new_trials_ger']:
-                new_e2bger = e2x_drv.e2n(new_trials_ger, scf_tensors, screening, molecule, basis)
+                new_e2bger = e2x_drv.e2n(new_trials_ger, scf_tensors, screening,
+                                         molecule, basis)
                 if self.rank == mpi_master():
                     new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
                     e2bger = np.append(e2bger, new_e2bger, axis=1)
                     s2bung = np.append(s2bung, new_s2bung, axis=1)
 
             if trials_info['new_trials_ung']:
-                new_e2bung = e2x_drv.e2n(new_trials_ung, scf_tensors, screening, molecule, basis)
+                new_e2bung = e2x_drv.e2n(new_trials_ung, scf_tensors, screening,
+                                         molecule, basis)
                 if self.rank == mpi_master():
                     new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
                     e2bung = np.append(e2bung, new_e2bung, axis=1)
