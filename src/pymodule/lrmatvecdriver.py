@@ -200,3 +200,17 @@ def lrmat2vec(mat, nocc, norb):
     z = [mat[i, j] for i, j in excitations]
     y = [mat[j, i] for i, j in excitations]
     return np.array(z + y)
+
+
+def truncate_and_normalize(basis, small_threshold):
+
+    Sb = np.matmul(basis.T, basis)
+    l, T = np.linalg.eigh(Sb)
+    b_norm = np.sqrt(Sb.diagonal())
+    mask = l > b_norm * small_threshold
+    truncated = np.matmul(basis, T[:, mask])
+
+    Sb = np.matmul(truncated.T, truncated)
+    l, T = np.linalg.eigh(Sb)
+    inverse_sqrt = np.matmul(T * np.sqrt(1.0 / l), T.T)
+    return np.matmul(truncated, inverse_sqrt)

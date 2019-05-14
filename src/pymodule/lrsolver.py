@@ -7,6 +7,7 @@ from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
+from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import lrmat2vec
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -332,27 +333,9 @@ class LinearResponseSolver:
             new_trials = new_trials - np.matmul(b, np.matmul(b.T, new_trials))
 
         if trials and renormalize:
-            truncated = self.truncate(new_trials)
-            new_trials = self.lowdin_normalize(truncated)
+            new_trials = truncate_and_normalize(new_trials, self.small_thresh)
 
         return new_trials
-
-    def truncate(self, basis):
-
-        Sb = np.matmul(basis.T, basis)
-        l, T = np.linalg.eigh(Sb)
-        b_norm = np.sqrt(Sb.diagonal())
-        mask = l > b_norm * self.small_thresh
-        return np.matmul(basis, T[:, mask])
-
-    @staticmethod
-    def lowdin_normalize(basis):
-
-        Sb = np.matmul(basis.T, basis)
-        l, T = np.linalg.eig(Sb)
-        linvsqrt = np.diag(np.sqrt(1.0 / l))
-        S12 = np.matmul(T, np.matmul(linvsqrt, T.T))
-        return np.matmul(basis, S12)
 
     @staticmethod
     def swap(xy):

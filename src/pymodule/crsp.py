@@ -7,6 +7,7 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
+from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import lrmat2vec
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
@@ -138,16 +139,6 @@ class ComplexResponse:
             ung = .5 * (vecs - vecp)
 
         return np.array(ger).T, np.array(ung).T
-
-    def rm_lin_depend(self, basis, threshold=1e-15):
-        """Removes linear dependencies from input basis vectors.
-        """
-
-        sb = np.matmul(basis.T, basis)
-        l, T = np.linalg.eigh(sb)
-        mask = l > threshold
-
-        return T[:, mask]
 
     def orthogonalize_gram_schmidt(self, tvecs):
         """Applies modified Gram Schmidt orthogonalization to trial vectors.
@@ -366,25 +357,17 @@ class ComplexResponse:
 
         if new_ger.any() and normalize:
 
-            # removing linear dependencies in gerade trials:
+            # removing linear dependencies in gerade trials
+            # and normalizing gerade trials
 
-            t_ger = self.rm_lin_depend(new_ger)
-            new_ger = np.matmul(new_ger, t_ger)
-
-            # normalizing gerade trials
-
-            new_ger = self.normalize(new_ger)
+            new_ger = truncate_and_normalize(new_ger, self.small_thresh)
 
         if new_ung.any() and normalize:
 
             # removing linear dependencies in ungerade trials:
+            # and normalizing ungerade trials
 
-            t_ung = self.rm_lin_depend(new_ung)
-            new_ung = np.matmul(new_ung, t_ung)
-
-            # normalizing ungerade trials
-
-            new_ung = self.normalize(new_ung)
+            new_ung = truncate_and_normalize(new_ung, self.small_thresh)
 
         return new_ger, new_ung
 
