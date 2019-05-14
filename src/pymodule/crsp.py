@@ -8,6 +8,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import lrmat2vec
+from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 
@@ -401,6 +402,13 @@ class ComplexResponse:
 
         self.start_time = tm.time()
 
+        # sanity check
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+        assert_msg_critical(
+            nalpha == nbeta,
+            'ComplexResponseSolver: not implemented for unrestricted case')
+
         d = self.damping
         ops = self.operators
         freqs = self.frequencies
@@ -418,9 +426,9 @@ class ComplexResponse:
         else:
             nocc = None
 
-        trials_info = {'bger': False, 'bung': False}
-
         if self.rank == mpi_master():
+
+            trials_info = {'bger': False, 'bung': False}
 
             # calling the gradients
 
@@ -441,6 +449,10 @@ class ComplexResponse:
                                      precond)
             bger, bung = self.setup_trials(igs)
 
+            assert_msg_critical(
+                bger.any() or bung.any(),
+                'ComplexResponseSolver: trial vectors are empty')
+
             # creating sigma and rho linear transformations
 
             if bger.any():
@@ -454,6 +466,7 @@ class ComplexResponse:
                 bung = self.normalize(bung)
 
         else:
+            trials_info = {}
             bger = None
             bung = None
 
@@ -672,6 +685,8 @@ class ComplexResponse:
                     else:
                         relative_residual_norm[(op, w)] = 0
 
+                # write to output
+
                 self.ostream.print_info(
                     '{:d} gerade trial vectors'.format(ntrials_ger))
                 self.ostream.print_info(
@@ -679,29 +694,27 @@ class ComplexResponse:
                 self.ostream.print_blank()
                 self.print_iteration(relative_residual_norm, nvs)
 
-                # checking for convergence
+            # check convergence
 
-                max_residual = max(relative_residual_norm.values())
-
-                if max_residual < self.conv_thresh:
-                    self.is_converged = True
-
-            self.is_converged = self.comm.bcast(self.is_converged,
-                                                root=mpi_master())
+            self.check_convergence(relative_residual_norm)
 
             if self.is_converged:
                 break
-
-            trials_info = {'new_trials_ger': False, 'new_trials_ung': False}
 
             # spawning new trial vectors from residuals
 
             if self.rank == mpi_master():
 
+                trials_info = {'new_trials_ger': False, 'new_trials_ung': False}
+
                 new_trials_ger, new_trials_ung = self.setup_trials(residuals,
                                                                    td=precond,
                                                                    bger=bger,
                                                                    bung=bung)
+
+                assert_msg_critical(
+                    new_trials_ger.any() or new_trials_ung.any(),
+                    'ComplexResponseSolver: unable to add new trial vectors')
 
                 # creating new sigma and rho linear transformations
 
@@ -722,6 +735,7 @@ class ComplexResponse:
                     bung = self.normalize(bung)
 
             else:
+                trials_info = {}
                 new_trials_ger = None
                 new_trials_ung = None
 
@@ -747,7 +761,21 @@ class ComplexResponse:
         if self.rank == mpi_master():
             self.print_convergence()
 
+            assert_msg_critical(self.is_converged,
+                                'ComplexResponseSolver: failed to converge')
+
         return solutions
+
+    def check_convergence(self, relative_residual_norm):
+        """Checks convergence"""
+
+        if self.rank == mpi_master():
+            max_residual = max(relative_residual_norm.values())
+            if max_residual < self.conv_thresh:
+                self.is_converged = True
+
+        self.is_converged = self.comm.bcast(self.is_converged,
+                                            root=mpi_master())
 
     def print_iteration(self, relative_residual_norm, nvs):
         """Prints information of the iteration"""

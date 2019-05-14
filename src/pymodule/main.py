@@ -8,12 +8,12 @@ from .scfrestdriver import ScfRestrictedDriver
 from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
+from .crsp import ComplexResponse
 from .mp2driver import Mp2Driver
 from .adconedriver import AdcOneDriver
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 
-from .crsp import ComplexResponse
 
 def main():
 
