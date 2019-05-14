@@ -1,13 +1,11 @@
 import numpy as np
 import time as tm
-import itertools
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
-from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
+from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrmat2vec
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -111,7 +109,7 @@ class LinearResponseSolver:
             ea = scf_tensors['E']
             nocc = nalpha
             norb = mo.shape[1]
-            od, sd = self.get_diagonals(ea, nocc, norb)
+            od, sd = construct_ed_sd(ea, nocc, norb)
             td = {w: od - w * sd for w in self.frequencies}
         else:
             nocc = None
@@ -217,22 +215,6 @@ class LinearResponseSolver:
             return lrs
         else:
             return None
-
-    def get_diagonals(self, ea, nocc, norb):
-        """Gets orbital and overlap diagonals"""
-
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
-        z = [2.0 * (ea[j] - ea[i]) for i, j in excitations]
-        orb_diag = np.array(z + z)
-
-        lz = len(excitations)
-        ovl_diag = 2.0 * np.ones(2 * lz)
-        ovl_diag[lz:] = -2.0
-
-        return orb_diag, ovl_diag
 
     def print_iteration(self, relative_residual_norm, nvs):
         """Prints information of the iteration"""

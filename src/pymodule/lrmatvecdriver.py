@@ -214,3 +214,21 @@ def truncate_and_normalize(basis, small_threshold):
     l, T = np.linalg.eigh(Sb)
     inverse_sqrt = np.matmul(T * np.sqrt(1.0 / l), T.T)
     return np.matmul(truncated, inverse_sqrt)
+
+
+def construct_ed_sd(orb_ene, nocc, norb):
+    """Returns the E0 and S0 diagonal elements as arrays.
+    """
+
+    xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+    excitations = list(
+        itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+    z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
+    ediag = np.array(z + z)
+
+    lz = len(excitations)
+    sdiag = 2.0 * np.ones(2 * lz)
+    sdiag[lz:] = -2.0
+
+    return ediag, sdiag

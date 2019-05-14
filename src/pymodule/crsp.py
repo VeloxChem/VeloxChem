@@ -1,13 +1,11 @@
 import numpy as np
 import time as tm
-import itertools
 
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
-from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
+from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrmat2vec
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
@@ -180,23 +178,6 @@ class ComplexResponse:
 
         return vecs
 
-    def construct_ed_sd(self, orb_ene, nocc, norb):
-        """Returns the E0 matrix and its diagonal elements as an array.
-        """
-
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
-        z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
-        ediag = np.array(z + z)
-
-        lz = len(excitations)
-        sdiag = 2.0 * np.ones(2 * lz)
-        sdiag[lz:] = -2.0
-
-        return ediag, sdiag
-
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """Constructs the preconditioner matrix.
         """
@@ -205,7 +186,7 @@ class ComplexResponse:
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ed_sd(orb_ene, nocc, norb)
+        ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         sdiag_fp = sdiag**4
