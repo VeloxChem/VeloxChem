@@ -22,10 +22,10 @@ class Absorption(ResponseProperty):
 
         super().__init__(rsp_input)
 
-    def get_property(self, state):
-        """Gets absorption component"""
+    def get_property(self, key):
+        """Gets excitation energies, CI vectors, or oscillator stengths"""
 
-        return self.rsp_property['eigenvalues'][state]
+        return self.rsp_property[key]
 
     def print_property(self, ostream):
         """Prints absorption to output stream"""
