@@ -23,6 +23,7 @@
 #include "DensityMatrixType.hpp"
 #include "MolecularOrbitals.hpp"
 #include "MolecularOrbitalsType.hpp"
+#include "AOIndices.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportOrbData.hpp"
@@ -319,6 +320,10 @@ void export_orbdata(py::module& m)
         .def("broadcast", &CMolecularOrbitals_broadcast)
         .def(py::self == py::self)
     ;
+
+    // exposing functions
+
+    m.def("get_dimer_ao_indices", &aoindices::getDimerAOIndices);
 }
 
 } // vlx_orbdata namespace
