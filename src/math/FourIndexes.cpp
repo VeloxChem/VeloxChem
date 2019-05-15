@@ -163,6 +163,20 @@ CFourIndexes::isValidQuadruple() const
     return true;
 }
 
+ int32_t
+CFourIndexes::value(const int32_t iComponent) const
+{
+    if (iComponent == 0) return _iIndex;
+    
+    if (iComponent == 1) return _jIndex;
+    
+    if (iComponent == 2) return _kIndex;
+    
+    if (iComponent == 3) return _lIndex;
+    
+    return -1;
+}
+
 std::ostream&
 operator<<(      std::ostream&  output,
            const CFourIndexes& source)

@@ -72,6 +72,28 @@ class CRecursionTerm
     bool _isValidAngularMomentum(const CFourIndexes& angularMomentum,
                                  const int32_t       nCenters) const;
     
+    /**
+     Getts number of Cartesian components for angular momentum with specified
+     number of centers.
+     
+     @param angularMomentum the angular momentum.
+     @param nCenters the number of centers.
+     @return the number of Cartesian components.
+     */
+    int32_t _numberOfCartesianComponents(const CFourIndexes& angularMomentum,
+                                         const int32_t       nCenters) const;
+    
+    /**
+     Getts number of spherical components for angular momentum with specified
+     number of centers.
+     
+     @param angularMomentum the angular momentum.
+     @param nCenters the number of centers.
+     @return the number of spherical components.
+     */
+    int32_t _numberOfSphericalComponents(const CFourIndexes& angularMomentum,
+                                         const int32_t       nCenters) const;
+    
 public:
     
     /**
@@ -156,6 +178,41 @@ public:
      @return true if recursion term object is valid recursion term, false otherwise.
      */
     bool isValid() const;
+    
+    /**
+     Gets number of tensorial components of integrand operator.
+
+     @return the number of tensorial components.
+     */
+    int32_t getNumberOfOperatorComponents() const;
+    
+    /**
+     Gets number of Cartesian components on bra side.
+
+     @return the number of Cartesian components.
+     */
+    int32_t braCartesianComponents() const;
+    
+    /**
+     Gets number of Cartesian components on ket side.
+     
+     @return the number of Cartesian components.
+     */
+    int32_t ketCartesianComponents() const;
+    
+    /**
+     Gets number of spherical components on bra side.
+     
+     @return the number of Cartesian components.
+     */
+    int32_t braSphericalComponents() const;
+    
+    /**
+     Gets number of spherical components on ket side.
+     
+     @return the number of Cartesian components.
+     */
+    int32_t ketSphericalComponents() const;
     
     /**
      Converts recursion term object to text output and insert it into output

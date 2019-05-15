@@ -126,3 +126,20 @@ TEST_F(CFourIndexesTest, IsValidQuadruple)
     
     ASSERT_TRUE(idf.isValidQuadruple());
 }
+
+TEST_F(CFourIndexesTest, I)
+{
+    CFourIndexes ida(2, 7, 0, 3);
+    
+    ASSERT_EQ(2, ida.value(0));
+    
+    ASSERT_EQ(7, ida.value(1));
+    
+    ASSERT_EQ(0, ida.value(2));
+    
+    ASSERT_EQ(3, ida.value(3));
+    
+    ASSERT_EQ(-1, ida.value(-2));
+    
+    ASSERT_EQ(-1, ida.value(4)); 
+}

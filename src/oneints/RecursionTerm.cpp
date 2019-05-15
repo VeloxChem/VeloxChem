@@ -10,6 +10,9 @@
 
 #include <utility>
 
+#include "MathFunc.hpp"
+#include "AngularMomentum.hpp"
+
 CRecursionTerm::CRecursionTerm()
 
     : _labelOfOperator(std::string())
@@ -202,59 +205,98 @@ CRecursionTerm::isValid() const
     return true;
 }
 
+int32_t
+CRecursionTerm::getNumberOfOperatorComponents() const
+{
+    if (_orderOfOperator > -1)
+    {
+        if (_isReducedOperator)
+        {
+            return angmom::to_CartesianComponents(_orderOfOperator);
+        }
+        else
+        {
+            return mathfunc::maxTensorComponents(_orderOfOperator);
+        }
+    }
+    
+    return 0;
+}
+
+int32_t
+CRecursionTerm::braCartesianComponents() const
+{
+    return _numberOfCartesianComponents(_braAngularMomentum, _braCenters);
+}
+
+int32_t
+CRecursionTerm::ketCartesianComponents() const
+{
+    return _numberOfCartesianComponents(_ketAngularMomentum, _ketCenters);
+}
+
+int32_t
+CRecursionTerm::braSphericalComponents() const
+{
+    return _numberOfSphericalComponents(_braAngularMomentum, _braCenters);
+}
+
+int32_t
+CRecursionTerm::ketSphericalComponents() const
+{
+    return _numberOfSphericalComponents(_ketAngularMomentum, _ketCenters); 
+}
+
 bool
 CRecursionTerm::_isValidAngularMomentum(const CFourIndexes& angularMomentum,
                                         const int32_t       nCenters) const
 {
-    // one-center expansion
+    if (nCenters == 0)  return false;
     
-    if (nCenters == 1)
+    if (nCenters > 4) return false;
+    
+    for (int32_t i = 0; i < nCenters; i++)
     {
-        if (angularMomentum.first() < 0) return false;
-        
-        return true;
+        if (angularMomentum.value(i) < 0) return false;
     }
     
-    // two-center expansion
+    return true;
+}
+
+int32_t
+CRecursionTerm::_numberOfCartesianComponents(const CFourIndexes& angularMomentum,
+                                             const int32_t       nCenters) const
+{
+    if (nCenters == 0) return 0;
     
-    if (nCenters == 2)
+    if (nCenters > 4) return 0;
+    
+    int32_t ncomps = 1;
+    
+    for (int32_t i = 0; i < nCenters; i++)
     {
-        if (angularMomentum.first() < 0) return false;
-        
-        if (angularMomentum.second() < 0) return false;
-        
-        return true;
+        ncomps *= angmom::to_CartesianComponents(angularMomentum.value(i));
     }
     
-    // three-center expansion
+    return ncomps;
+}
+
+int32_t
+CRecursionTerm::_numberOfSphericalComponents(const CFourIndexes& angularMomentum,
+                                             const int32_t       nCenters) const
+{
+    if (nCenters == 0) return 0;
     
-    if (nCenters == 3)
+    if (nCenters > 4) return 0;
+    
+    int32_t ncomps = 1;
+    
+    for (int32_t i = 0; i < nCenters; i++)
     {
-        if (angularMomentum.first() < 0) return false;
-        
-        if (angularMomentum.second() < 0) return false;
-        
-        if (angularMomentum.third() < 0) return false;
-        
-        return true;
+        ncomps *= angmom::to_SphericalComponents(angularMomentum.value(i));
     }
     
-    // four-center expansion
-    
-    if (nCenters == 4)
-    {
-        if (angularMomentum.first() < 0) return false;
-        
-        if (angularMomentum.second() < 0) return false;
-        
-        if (angularMomentum.third() < 0) return false;
-        
-        if (angularMomentum.fourth() < 0) return false;
-        
-        return true;
-    }
-    
-    return false;
+    return ncomps;
 }
 
 std::ostream&

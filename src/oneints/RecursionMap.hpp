@@ -98,6 +98,13 @@ public:
     bool operator!=(const CRecursionMap& other) const;
     
     /**
+     Adds valid recursion term to recursion map object.
+
+     @param recursionTerm the recursion term.
+     */
+    void add(const CRecursionTerm& recursionTerm);
+    
+    /**
      Converts recursion map object to text output and insert it into output
      text stream.
      
