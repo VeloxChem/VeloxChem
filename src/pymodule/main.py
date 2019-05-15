@@ -10,6 +10,7 @@ from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mp2driver import Mp2Driver
 from .adconedriver import AdcOneDriver
+from .excitondriver import ExcitonModelDriver
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 
@@ -23,6 +24,19 @@ def main():
     task = MpiTask(sys.argv[1:], MPI.COMM_WORLD)
 
     task_type = task.input_dict['jobs']['task'].lower()
+
+    # Exciton model
+
+    if task_type == 'exciton':
+
+        if 'exciton' in task.input_dict:
+            exciton_dict = task.input_dict['exciton']
+        else:
+            exciton_dict = {}
+
+        exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis,
+                            exciton_dict['fragments'])
 
     # Hartree-Fock
 
