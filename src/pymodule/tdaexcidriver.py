@@ -180,6 +180,10 @@ class TDAExciDriver:
             if self.is_converged:
                 break
 
+        # compute 1e dipole integrals
+
+        dipole_ints = self.comp_dipole_ints(molecule, basis)
+
         # print converged excited states
 
         if self.rank == mpi_master():
@@ -189,7 +193,7 @@ class TDAExciDriver:
             eigvecs = self.solver.ritz_vectors
 
             oscillator_strengths = self.comp_oscillator_strengths(
-                molecule, basis, eigvals, eigvecs, mo_occ, mo_vir)
+                dipole_ints, eigvals, eigvecs, mo_occ, mo_vir)
 
             return {
                 'eigenvalues': eigvals,
@@ -334,16 +338,22 @@ class TDAExciDriver:
 
         return None
 
-    def comp_oscillator_strengths(self, molecule, basis, eigvals, eigvecs,
-                                  mo_occ, mo_vir):
+    def comp_dipole_ints(self, molecule, basis):
 
         xc, yc, zc = molecule.center_of_nuclear_charge()
 
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_drv.set_origin(xc, yc, zc)
         dipole_mats = dipole_drv.compute(molecule, basis)
-        dipoles = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                   dipole_mats.z_to_numpy())
+
+        if self.rank == mpi_master():
+            return (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                    dipole_mats.z_to_numpy())
+        else:
+            return ()
+
+    def comp_oscillator_strengths(self, dipole_ints, eigvals, eigvecs, mo_occ,
+                                  mo_vir):
 
         oscillator_strengths = np.zeros((self.nstates,))
 
@@ -354,7 +364,7 @@ class TDAExciDriver:
             trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
             trans_dens *= math.sqrt(2.0)
             trans_dipole = np.array(
-                [np.sum(trans_dens * dipoles[d]) for d in range(3)])
+                [np.sum(trans_dens * dipole_ints[d]) for d in range(3)])
 
             dipole_strength = np.sum(trans_dipole**2)
             oscillator_strengths[s] = 2.0 / 3.0 * dipole_strength * exc_ene
