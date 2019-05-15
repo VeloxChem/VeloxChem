@@ -1,7 +1,9 @@
 import numpy as np
 import time as tm
+import math
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import mpi_master
@@ -104,7 +106,7 @@ class TDAExciDriver:
         if 'max_iter' in settings:
             self.max_iter = settings['max_iter']
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, basis, scf_tensors):
         """Performs TDA excited states calculation.
 
         Performs TDA excited states calculation using molecular data.
@@ -113,7 +115,7 @@ class TDAExciDriver:
         ----------
         molecule
             The molecule.
-        ao_basis
+        basis
             The AO basis set.
         scf_tensors
             The tensors from converged SCF wavefunction.
@@ -122,6 +124,9 @@ class TDAExciDriver:
         if self.rank == mpi_master():
             mol_orbs = MolecularOrbitals([scf_tensors['C']], [scf_tensors['E']],
                                          molorb.rest)
+            nocc = molecule.number_of_alpha_electrons()
+            mo_occ = scf_tensors['C'][:, :nocc]
+            mo_vir = scf_tensors['C'][:, nocc:]
         else:
             mol_orbs = MolecularOrbitals()
 
@@ -132,7 +137,7 @@ class TDAExciDriver:
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
 
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
-                                  molecule, ao_basis)
+                                  molecule, basis)
 
         # set up trial excitation vectors on master node
 
@@ -151,7 +156,7 @@ class TDAExciDriver:
             # perform linear transformation of trial vectors
 
             sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
-                                       mol_orbs, molecule, ao_basis)
+                                       mol_orbs, molecule, basis)
 
             # solve eigenvalues problem on master node
 
@@ -180,10 +185,19 @@ class TDAExciDriver:
         if self.rank == mpi_master():
             self.print_excited_states(trial_vecs, start_time)
 
-            reigs, rnorms = self.solver.get_eigenvalues()
-            return reigs
+            eigvals, rnorms = self.solver.get_eigenvalues()
+            eigvecs = self.solver.ritz_vectors
+
+            oscillator_strengths = self.comp_oscillator_strengths(
+                molecule, basis, eigvals, eigvecs, mo_occ, mo_vir)
+
+            return {
+                'eigenvalues': eigvals,
+                'eigenvectors': eigvecs,
+                'oscillator_strengths': oscillator_strengths
+            }
         else:
-            return None
+            return {}
 
     def gen_trial_vectors(self, mol_orbs, molecule):
         """Generates set of TDA trial vectors.
@@ -319,6 +333,33 @@ class TDAExciDriver:
             return trial_mat
 
         return None
+
+    def comp_oscillator_strengths(self, molecule, basis, eigvals, eigvecs,
+                                  mo_occ, mo_vir):
+
+        xc, yc, zc = molecule.center_of_nuclear_charge()
+
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_drv.set_origin(xc, yc, zc)
+        dipole_mats = dipole_drv.compute(molecule, basis)
+        dipoles = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                   dipole_mats.z_to_numpy())
+
+        oscillator_strengths = np.zeros((self.nstates,))
+
+        for s in range(self.nstates):
+            exc_ene = eigvals[s]
+            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+
+            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
+            trans_dens *= math.sqrt(2.0)
+            trans_dipole = np.array(
+                [np.sum(trans_dens * dipoles[d]) for d in range(3)])
+
+            dipole_strength = np.sum(trans_dipole**2)
+            oscillator_strengths[s] = 2.0 / 3.0 * dipole_strength * exc_ene
+
+        return oscillator_strengths
 
     def print_iter_data(self, iter):
         """Prints excited states solver iteration data to output stream.

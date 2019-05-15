@@ -25,7 +25,7 @@ class Absorption(ResponseProperty):
     def get_property(self, state):
         """Gets absorption component"""
 
-        return self.rsp_property[state]
+        return self.rsp_property['eigenvalues'][state]
 
     def print_property(self, ostream):
         """Prints absorption to output stream"""
@@ -34,9 +34,11 @@ class Absorption(ResponseProperty):
         ostream.print_header('One-Photon Absorption'.ljust(92))
         ostream.print_header('---------------------'.ljust(92))
         spin_str = 'T' if self.rsp_input['spin'][0].upper() == 'T' else 'S'
-        for s, e in enumerate(self.rsp_property):
+        for s, e in enumerate(self.rsp_property['eigenvalues']):
             output_abs = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
             output_abs += '{:15.8f} a.u. '.format(e)
             output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
+            f = self.rsp_property['oscillator_strengths'][s]
+            output_abs += '    osc.str.{:12.5f}'.format(f)
             ostream.print_header(output_abs.ljust(92))
         ostream.print_blank()
