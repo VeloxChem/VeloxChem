@@ -113,3 +113,87 @@ TEST_F(CRecursionTermTest, IsValid)
     ASSERT_FALSE(rtm.isValid());
 }
 
+TEST_F(CRecursionTermTest, GetNumberOfOperatorComponents)
+{
+    CRecursionTerm rta({"Overlap"}, 2, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(6, rta.getNumberOfOperatorComponents());
+    
+    CRecursionTerm rtb({"Overlap"}, 2, false, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 2, 5);
+    
+    ASSERT_EQ(9, rtb.getNumberOfOperatorComponents());
+}
+
+TEST_F(CRecursionTermTest, braCartesianComponents)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(6, rta.braCartesianComponents());
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 2, 5);
+    
+    ASSERT_EQ(60, rtb.braCartesianComponents());
+    
+    CRecursionTerm rtc({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       3, 2, 5);
+    
+    ASSERT_EQ(900, rtc.braCartesianComponents());
+}
+
+TEST_F(CRecursionTermTest, ketCartesianComponents)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 1, 5);
+    
+    ASSERT_EQ(3, rta.ketCartesianComponents());
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 2, 5);
+    
+    ASSERT_EQ(30, rtb.ketCartesianComponents());
+    
+    CRecursionTerm rtc({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 3, 5);
+    
+    ASSERT_EQ(180, rtc.ketCartesianComponents());
+}
+
+TEST_F(CRecursionTermTest, braSphericalComponents)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(5, rta.braSphericalComponents());
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 2, 5);
+    
+    ASSERT_EQ(35, rtb.braSphericalComponents());
+    
+    CRecursionTerm rtc({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       3, 2, 5);
+    
+    ASSERT_EQ(315, rtc.braSphericalComponents());
+}
+
+TEST_F(CRecursionTermTest, ketSphericalComponents)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 1, 5);
+    
+    ASSERT_EQ(3, rta.ketSphericalComponents());
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 2, 5);
+    
+    ASSERT_EQ(21, rtb.ketSphericalComponents());
+    
+    CRecursionTerm rtc({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 3, 5);
+    
+    ASSERT_EQ(105, rtc.ketSphericalComponents());
+}

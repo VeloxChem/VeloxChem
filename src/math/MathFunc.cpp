@@ -257,6 +257,26 @@ namespace mathfunc { // mathfunc namespace
         }
     }
     
+    int32_t
+    maxTensorComponents(const int32_t order)
+    {
+        int32_t ncomps = 0;
+        
+        if (order == 0) ncomps = 1;
+        
+        if (order > 0)
+        {
+            ncomps = 3;
+            
+            for (int32_t i = 1; i < order; i++)
+            {
+                ncomps *= 3;
+            }
+        }
+        
+        return ncomps; 
+    }
+    
 } // mathfunc namespace
 
 

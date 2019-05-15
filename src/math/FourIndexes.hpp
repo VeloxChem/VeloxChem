@@ -147,6 +147,14 @@ public:
     bool isValidQuadruple() const;
     
     /**
+     Gets specific four index component.
+
+     @param iComponent the index of four indexes object.
+     @return the values of requested index.
+     */
+    int32_t value(const int32_t iComponent) const;
+    
+    /**
      Converts four indexes object to text output and insert it into output text
      stream.
      

@@ -96,6 +96,17 @@ CRecursionMap::operator!=(const CRecursionMap& other) const
     return !(*this == other);
 }
 
+void
+CRecursionMap::add(const CRecursionTerm& recursionTerm)
+{
+    if (recursionTerm.isValid())
+    {
+        _recursionTerms.push_back(recursionTerm);
+        
+        // FIX ME: add indexes
+    }
+}
+
 std::ostream&
 operator<<(      std::ostream&  output,
            const CRecursionMap& source)
