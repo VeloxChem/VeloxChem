@@ -6,6 +6,7 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import mpi_master
+from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import get_dimer_ao_indices
 from .molecule import Molecule
 from .aodensitymatrix import AODensityMatrix
@@ -19,6 +20,8 @@ from .qqscheme import get_qq_scheme
 class ExcitonModelDriver:
 
     def __init__(self, comm, ostream):
+
+        self.H = None
 
         # exciton monomers
         self.monomers = None
@@ -51,17 +54,27 @@ class ExcitonModelDriver:
             sum(natoms) == molecule.number_of_atoms(),
             'ExcitonModelDriver: Inconsistent number of atoms')
 
+        if self.rank == mpi_master():
+            self.print_title(natoms)
+
         nfragments = len(natoms)
         start_indices = [sum(natoms[:i]) for i in range(nfragments)]
+
+        self.H = np.zeros(
+            (nfragments * self.nstates, nfragments * self.nstates))
 
         self.monomers = [{} for i in range(nfragments)]
 
         for ind in range(nfragments):
 
+            monomer_name = 'Monomer {}'.format(ind + 1)
+            self.print_banner(monomer_name)
+
             # monomer molecule
             monomer = molecule.get_sub_molecule(start_indices[ind], natoms[ind])
             if self.rank == mpi_master():
                 self.ostream.print_block(monomer.get_string())
+                self.ostream.flush()
 
             # SCF calculation
             scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
@@ -90,10 +103,16 @@ class ExcitonModelDriver:
 
             if self.rank == mpi_master():
                 abs_spec.print_property(self.ostream)
+                self.ostream.flush()
+
                 self.monomers[ind]['exc_energies'] = abs_spec.get_property(
                     'eigenvalues')
                 self.monomers[ind]['exc_vectors'] = abs_spec.get_property(
                     'eigenvectors')
+
+                for s in range(self.nstates):
+                    h = s + ind * self.nstates
+                    self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
         for ind_A in range(nfragments):
             monomer_a = molecule.get_sub_molecule(start_indices[ind_A],
@@ -103,10 +122,14 @@ class ExcitonModelDriver:
                 monomer_b = molecule.get_sub_molecule(start_indices[ind_B],
                                                       natoms[ind_B])
 
+                dimer_name = 'Dimer {} {}'.format(ind_A + 1, ind_B + 1)
+                self.print_banner(dimer_name)
+
                 # dimer molecule
                 dimer = Molecule(monomer_a, monomer_b)
                 if self.rank == mpi_master():
                     self.ostream.print_block(dimer.get_string())
+                    self.ostream.flush()
 
                 # 1e integrals
                 kin_drv = KineticEnergyIntegralsDriver(self.comm)
@@ -196,6 +219,7 @@ class ExcitonModelDriver:
                     valstr = 'Dimer Energy:{:20.10f} au'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(92))
                     self.ostream.print_blank()
+                    self.ostream.flush()
 
                     # assemble TDA CI vectors
 
@@ -263,6 +287,11 @@ class ExcitonModelDriver:
                         for sB in range(self.nstates):
                             coupling = np.sum(sigma_vec_A * CI_vectors_B[sB])
 
+                            hA = sA + ind_A * self.nstates
+                            hB = sB + ind_B * self.nstates
+                            self.H[hA, hB] = coupling
+                            self.H[hB, hA] = coupling
+
                             valstr = 'LE-LE coupling:'
                             valstr += '  {}e({}){}g  {}g{}e({})'.format(
                                 ind_A + 1, sA + 1, ind_B + 1, ind_A + 1,
@@ -270,3 +299,45 @@ class ExcitonModelDriver:
                             valstr += '  {:20.12f}'.format(coupling)
                             self.ostream.print_header(valstr.ljust(92))
                         self.ostream.print_blank()
+                        self.ostream.flush()
+
+        if self.rank == mpi_master():
+            self.print_banner('Summary')
+
+            eigvals, eigvecs = np.linalg.eigh(self.H)
+
+            valstr = 'Eigenvalues:'
+            self.ostream.print_header(valstr.ljust(92))
+            for i, e in enumerate(eigvals):
+                valstr = 'E[{}]= {:12.6f} a.u. {:12.5f} eV'.format(
+                    i + 1, e, e * hartree_in_ev())
+                self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+    def print_banner(self, title):
+
+        valstr = '|' + ' ' * 10 + title + ' ' * 10 + '|'
+        line = '+' + '-' * (len(valstr) - 2) + '+'
+        self.ostream.print_header(line)
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(line)
+        self.ostream.print_blank()
+
+    def print_title(self, natoms):
+
+        self.print_banner('Exciton Model')
+
+        valstr = 'Total number of atoms:        {}'.format(sum(natoms))
+        self.ostream.print_header(valstr.ljust(72))
+        valstr = 'Total number of monomers:     {}'.format(len(natoms))
+        self.ostream.print_header(valstr.ljust(72))
+        valstr = 'Total number of LE states:    {}'.format(
+            len(natoms) * self.nstates)
+        self.ostream.print_header(valstr.ljust(72))
+        self.ostream.print_blank()
+
+        for i, n in enumerate(natoms):
+            valstr = 'Monomer  {}  has  {}  atoms'.format(i + 1, n)
+            self.ostream.print_header(valstr.ljust(72))
+        self.ostream.print_blank()
