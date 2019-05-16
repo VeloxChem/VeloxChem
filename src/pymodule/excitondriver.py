@@ -213,48 +213,56 @@ class ExcitonModelDriver:
                     # occ.B |         |         |    occ.B |  CT(BA) |         |
                     #       +---------+---------+          +---------+---------+
 
-                    vecs_A = self.monomers[ind_A]['exc_vectors']
-                    vecs_B = self.monomers[ind_B]['exc_vectors']
+                    vectors_A = self.monomers[ind_A]['exc_vectors']
+                    vectors_B = self.monomers[ind_B]['exc_vectors']
 
-                for sA in range(self.nstates):
+                    CI_vectors_A = []
+                    CI_vectors_B = []
 
-                    if self.rank == mpi_master():
-                        vec_A = vecs_A[:, sA].reshape(nocc_A, nvir_A)
-
+                    for sA in range(self.nstates):
+                        vec_A = vectors_A[:, sA].reshape(nocc_A, nvir_A)
                         CI_vec_A = np.zeros((nocc, nvir))
                         CI_vec_A[:nocc_A, :nvir_A] = vec_A[:, :]
+                        CI_vectors_A.append(CI_vec_A)
 
-                        tdens = np.matmul(mo_occ, np.matmul(CI_vec_A, mo_vir.T))
+                    for sB in range(self.nstates):
+                        vec_B = vectors_B[:, sB].reshape(nocc_B, nvir_B)
+                        CI_vec_B = np.zeros((nocc, nvir))
+                        CI_vec_B[nocc_A:, nvir_A:] = vec_B[:, :]
+                        CI_vectors_B.append(CI_vec_B)
 
-                        tdens_mat = AODensityMatrix([tdens], denmat.rest)
-                    else:
-                        tdens_mat = AODensityMatrix()
+                # compute LE-LE couplings
+                if self.rank == mpi_master():
+                    tdens_A = []
+                    for sA in range(self.nstates):
+                        tdens_A.append(
+                            np.matmul(mo_occ,
+                                      np.matmul(CI_vectors_A[sA], mo_vir.T)))
+                    tdens_mat = AODensityMatrix(tdens_A, denmat.rest)
+                else:
+                    tdens_mat = AODensityMatrix()
 
-                    tdens_mat.broadcast(self.rank, self.comm)
+                tdens_mat.broadcast(self.rank, self.comm)
 
-                    tfock_mat = AOFockMatrix(tdens_mat)
-                    tfock_mat.set_fock_type(fockmat.rgenjk, 0)
+                tfock_mat = AOFockMatrix(tdens_mat)
+                for sA in range(self.nstates):
+                    tfock_mat.set_fock_type(fockmat.rgenjk, sA)
 
-                    eri_drv.compute(tfock_mat, tdens_mat, dimer, basis,
-                                    screening)
-                    tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+                eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
+                tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
-                    if self.rank == mpi_master():
-                        tfock = tfock_mat.to_numpy(0)
-
+                if self.rank == mpi_master():
+                    for sA in range(self.nstates):
+                        tfock = tfock_mat.to_numpy(sA)
                         sigma_vec_A = np.matmul(mo_occ.T,
                                                 np.matmul(tfock, mo_vir))
 
-                        sigma_vec_A -= np.matmul(fock_occ, CI_vec_A)
-                        sigma_vec_A += np.matmul(CI_vec_A, fock_vir)
+                        sigma_vec_A -= np.matmul(fock_occ, CI_vectors_A[sA])
+                        sigma_vec_A += np.matmul(CI_vectors_A[sA], fock_vir)
 
                         for sB in range(self.nstates):
-                            vec_B = vecs_B[:, sB].reshape(nocc_B, nvir_B)
+                            coupling = np.sum(sigma_vec_A * CI_vectors_B[sB])
 
-                            CI_vec_B = np.zeros((nocc, nvir))
-                            CI_vec_B[nocc_A:, nvir_A:] = vec_B[:, :]
-
-                            coupling = np.sum(sigma_vec_A * CI_vec_B)
                             valstr = 'LE-LE coupling:'
                             valstr += '  {}e({}){}g  {}g{}e({})'.format(
                                 ind_A + 1, sA + 1, ind_B + 1, ind_A + 1,
