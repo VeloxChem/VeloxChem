@@ -48,6 +48,7 @@ from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
+from .crsp import ComplexResponse
 
 # Python functions
 from .errorhandler import assert_msg_critical

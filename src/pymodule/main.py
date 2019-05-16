@@ -8,6 +8,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
+from .crsp import ComplexResponse
 from .mp2driver import Mp2Driver
 from .adconedriver import AdcOneDriver
 from .excitondriver import ExcitonModelDriver
@@ -40,7 +41,7 @@ def main():
 
     # Hartree-Fock
 
-    if task_type in ['hf', 'mp2', 'cube', 'response', 'adc1']:
+    if task_type in ['hf', 'mp2', 'cube', 'response', 'cpp', 'adc1']:
 
         # initialize scf driver and run scf
 
@@ -89,6 +90,19 @@ def main():
             rsp_drv = ResponseDriver(task.mpi_comm, task.ostream)
             rsp_drv.update_settings({'property': 'absorption'})
             rsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+
+    # Complex Response
+
+    if task_type == 'cpp':
+
+        if 'cpp' in task.input_dict:
+            cpp_dict = task.input_dict['cpp']
+        else:
+            cpp_dict = {}
+
+        crsp_drv = ComplexResponse(task.mpi_comm, task.ostream)
+        crsp_drv.update_settings(cpp_dict)
+        crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # ADC(1)
 

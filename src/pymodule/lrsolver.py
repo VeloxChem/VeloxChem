@@ -1,12 +1,12 @@
 import numpy as np
 import time as tm
-import itertools
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
-from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
+from .lrmatvecdriver import truncate_and_normalize
+from .lrmatvecdriver import construct_ed_sd
+from .lrmatvecdriver import lrmat2vec
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
 
@@ -109,7 +109,7 @@ class LinearResponseSolver:
             ea = scf_tensors['E']
             nocc = nalpha
             norb = mo.shape[1]
-            od, sd = self.get_diagonals(ea, nocc, norb)
+            od, sd = construct_ed_sd(ea, nocc, norb)
             td = {w: od - w * sd for w in self.frequencies}
         else:
             nocc = None
@@ -216,22 +216,6 @@ class LinearResponseSolver:
         else:
             return None
 
-    def get_diagonals(self, ea, nocc, norb):
-        """Gets orbital and overlap diagonals"""
-
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
-        z = [2.0 * (ea[j] - ea[i]) for i, j in excitations]
-        orb_diag = np.array(z + z)
-
-        lz = len(excitations)
-        ovl_diag = 2.0 * np.ones(2 * lz)
-        ovl_diag[lz:] = -2.0
-
-        return orb_diag, ovl_diag
-
     def print_iteration(self, relative_residual_norm, nvs):
         """Prints information of the iteration"""
 
@@ -291,18 +275,8 @@ class LinearResponseSolver:
         matrices = tuple(
             mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
 
-        gradients = tuple(self.mat2vec(m, nocc, norb) for m in matrices)
+        gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
         return gradients
-
-    def mat2vec(self, mat, nocc, norb):
-
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
-        z = [mat[i, j] for i, j in excitations]
-        y = [mat[j, i] for i, j in excitations]
-        return np.array(z + y)
 
     def initial_guess(self, freqs, V1, od, sd, td):
 
@@ -341,27 +315,9 @@ class LinearResponseSolver:
             new_trials = new_trials - np.matmul(b, np.matmul(b.T, new_trials))
 
         if trials and renormalize:
-            truncated = self.truncate(new_trials)
-            new_trials = self.lowdin_normalize(truncated)
+            new_trials = truncate_and_normalize(new_trials, self.small_thresh)
 
         return new_trials
-
-    def truncate(self, basis):
-
-        Sb = np.matmul(basis.T, basis)
-        l, T = np.linalg.eigh(Sb)
-        b_norm = np.sqrt(Sb.diagonal())
-        mask = l > b_norm * self.small_thresh
-        return np.matmul(basis, T[:, mask])
-
-    @staticmethod
-    def lowdin_normalize(basis):
-
-        Sb = np.matmul(basis.T, basis)
-        l, T = np.linalg.eig(Sb)
-        linvsqrt = np.diag(np.sqrt(1.0 / l))
-        S12 = np.matmul(T, np.matmul(linvsqrt, T.T))
-        return np.matmul(basis, S12)
 
     @staticmethod
     def swap(xy):
