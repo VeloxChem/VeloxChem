@@ -247,6 +247,34 @@ CRecursionTerm::ketSphericalComponents() const
     return _numberOfSphericalComponents(_ketAngularMomentum, _ketCenters); 
 }
 
+int32_t
+CRecursionTerm::getNumberOfComponents(const recblock angularForm) const
+{
+    auto ncomps = getNumberOfOperatorComponents();
+    
+    if (angularForm == recblock::cc)
+    {
+        return ncomps * braCartesianComponents() * ketCartesianComponents();
+    }
+    
+    if (angularForm == recblock::cs)
+    {
+        return ncomps * braCartesianComponents() * ketSphericalComponents();
+    }
+    
+    if (angularForm == recblock::sc)
+    {
+        return ncomps * braSphericalComponents() * ketCartesianComponents();
+    }
+    
+    if (angularForm == recblock::ss)
+    {
+        return ncomps * braSphericalComponents() * ketSphericalComponents(); 
+    }
+    
+    return 0;
+}
+
 bool
 CRecursionTerm::_isValidAngularMomentum(const CFourIndexes& angularMomentum,
                                         const int32_t       nCenters) const

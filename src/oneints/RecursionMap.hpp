@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "RecursionTerm.hpp"
+#include "RecursionBlock.hpp"
 
 /**
  Class CRecursionMap stores recursion map for primitiveintegral
@@ -23,7 +24,7 @@
 class CRecursionMap
 {
     /**
-     The vector of recursion term objects.
+     The vector of unique recursion term objects.
      */
     std::vector<CRecursionTerm> _recursionTerms;
     
@@ -31,6 +32,11 @@ class CRecursionMap
      The vector of recursion indexes.
      */
     std::vector<int32_t> _recursionIndexes;
+    
+    /**
+     The angular form of recursion term objects.
+     */
+    recblock _angularForm;
     
 public:
     
@@ -40,13 +46,23 @@ public:
     CRecursionMap();
     
     /**
+     Creates an empty recursion map object with defined angular form of
+     recursion term objects.
+     
+     @param angularForm the angular form of recursion term objects.
+     */
+    CRecursionMap(const recblock angularForm);
+    
+    /**
      Creates a recursion map object from vector of recursion term objects.
      
      @param recursionTerms the vector of recursion term objects.
      @param recursionIndexes the vector of recursion indexes.
+     @param angularForm the angular form of recursion term objects. 
      */
     CRecursionMap(const std::vector<CRecursionTerm>& recursionTerms,
-                  const std::vector<int32_t>&        recursionIndexes);
+                  const std::vector<int32_t>&        recursionIndexes,
+                  const recblock                     angularForm);
     
     /**
      Creates a recursion map object by copying other recursion map object.
@@ -98,11 +114,36 @@ public:
     bool operator!=(const CRecursionMap& other) const;
     
     /**
-     Adds valid recursion term to recursion map object.
+     Adds valid unique recursion term to recursion map object.
 
      @param recursionTerm the recursion term.
      */
     void add(const CRecursionTerm& recursionTerm);
+    
+    /**
+     Appends valid unique recursion objects from recursion map object to other
+     recursion map object.
+     
+     @param source the recursion map object.
+     */
+    void append(const CRecursionMap& source);
+    
+    /**
+     Gets total number of integral components overl all recursion term objects
+     included in recursion map object.
+     
+     @return the number of components.
+     */
+    int32_t getNumberOfComponents() const;
+    
+    /**
+     Finds recursion term object in recursion map object.
+
+     @param recursionTerm the recursion term object.
+     @return true if recursion term object is in recursion map objects,
+             false otherwise.
+     */
+    bool find(const CRecursionTerm& recursionTerm) const;
     
     /**
      Converts recursion map object to text output and insert it into output

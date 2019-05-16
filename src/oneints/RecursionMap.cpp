@@ -10,15 +10,23 @@
 
 CRecursionMap::CRecursionMap()
 {
-    
+    _angularForm = recblock::cc;
+}
+
+CRecursionMap::CRecursionMap(const recblock angularForm)
+{
+    _angularForm = angularForm;
 }
 
 CRecursionMap::CRecursionMap(const std::vector<CRecursionTerm>& recursionTerms,
-                             const std::vector<int32_t>&        recursionIndexes)
+                             const std::vector<int32_t>&        recursionIndexes,
+                             const recblock                     angularForm)
 
     : _recursionTerms(recursionTerms)
 
     , _recursionIndexes(recursionIndexes)
+
+    , _angularForm(angularForm)
 {
     
 }
@@ -28,6 +36,8 @@ CRecursionMap::CRecursionMap(const CRecursionMap& source)
     : _recursionTerms(source._recursionTerms)
 
     , _recursionIndexes(source._recursionIndexes)
+
+    , _angularForm(source._angularForm)
 {
     
 }
@@ -37,6 +47,8 @@ CRecursionMap::CRecursionMap(CRecursionMap&& source) noexcept
     : _recursionTerms(std::move(source._recursionTerms))
 
     , _recursionIndexes(std::move(source._recursionIndexes))
+
+    , _angularForm(std::move(source._angularForm))
 {
     
 }
@@ -55,6 +67,8 @@ CRecursionMap::operator=(const CRecursionMap& source)
     
     _recursionIndexes = source._recursionIndexes;
     
+    _angularForm = source._angularForm;
+    
     return *this;
 }
 
@@ -66,6 +80,8 @@ CRecursionMap::operator=(CRecursionMap&& source) noexcept
     _recursionTerms = std::move(source._recursionTerms);
     
     _recursionIndexes = std::move(source._recursionIndexes);
+    
+    _angularForm = std::move(source._angularForm);
     
     return *this;
 }
@@ -87,6 +103,8 @@ CRecursionMap::operator==(const CRecursionMap& other) const
         if (_recursionIndexes[i] != other._recursionIndexes[i]) return false;
     }
     
+    if (_angularForm != other._angularForm) return false;
+    
     return true;
 }
 
@@ -101,10 +119,51 @@ CRecursionMap::add(const CRecursionTerm& recursionTerm)
 {
     if (recursionTerm.isValid())
     {
-        _recursionTerms.push_back(recursionTerm);
+        if (!find(recursionTerm))
+        {
+            auto ncomps = getNumberOfComponents();
         
-        // FIX ME: add indexes
+            _recursionTerms.push_back(recursionTerm);
+        
+            _recursionIndexes.push_back(ncomps);
+        }
     }
+}
+
+void
+CRecursionMap::append(const CRecursionMap& source)
+{
+    if (_angularForm == source._angularForm)
+    {
+        for (size_t i = 0; i < source._recursionTerms.size(); i++)
+        {
+           add(source._recursionTerms[i]);
+        }
+    }
+}
+
+int32_t
+CRecursionMap::getNumberOfComponents() const
+{
+    int32_t ncomps = 0;
+    
+    for (size_t i = 0; i < _recursionTerms.size(); i++)
+    {
+        ncomps += _recursionTerms[i].getNumberOfComponents(_angularForm);
+    }
+    
+    return ncomps;
+}
+
+bool
+CRecursionMap::find(const CRecursionTerm& recursionTerm) const
+{
+    for (size_t i = 0; i < _recursionTerms.size(); i++)
+    {
+        if (recursionTerm == _recursionTerms[i]) return true;
+    }
+    
+    return false;
 }
 
 std::ostream&
@@ -132,6 +191,8 @@ operator<<(      std::ostream&  output,
         
         output << source._recursionIndexes[i] << std::endl;
     }
+    
+    output << "_angularForm: " << to_string(source._angularForm) << std::endl;
     
     return output;
 }

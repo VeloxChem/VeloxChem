@@ -197,3 +197,17 @@ TEST_F(CRecursionTermTest, ketSphericalComponents)
     
     ASSERT_EQ(105, rtc.ketSphericalComponents());
 }
+
+TEST_F(CRecursionTermTest, GetNumberOfComponents)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 1, 5);
+    
+    ASSERT_EQ(180, rta.getNumberOfComponents(recblock::cc));
+    
+    ASSERT_EQ(105, rta.getNumberOfComponents(recblock::sc));
+    
+    ASSERT_EQ(180, rta.getNumberOfComponents(recblock::cs));
+    
+    ASSERT_EQ(105, rta.getNumberOfComponents(recblock::ss));
+}

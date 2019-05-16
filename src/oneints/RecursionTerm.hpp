@@ -13,6 +13,7 @@
 #include <string>
 
 #include "FourIndexes.hpp"
+#include "RecursionBlock.hpp"
 
 /**
  Class CRecursionTerm stores meta data for primitive or auxilary integral
@@ -213,6 +214,14 @@ public:
      @return the number of Cartesian components.
      */
     int32_t ketSphericalComponents() const;
+    
+    /**
+     Gets number of components in integral.
+
+     @param angularForm the angular form of integral.
+     @return the number of components.
+     */
+    int32_t getNumberOfComponents(const recblock angularForm) const;
     
     /**
      Converts recursion term object to text output and insert it into output
