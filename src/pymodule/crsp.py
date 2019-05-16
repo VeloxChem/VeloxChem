@@ -46,8 +46,13 @@ class ComplexResponse:
             self.operators = settings['operators'].replace(' ', '')
             self.operators = self.operators.lower()
         if 'frequencies' in settings:
-            self.frequencies = settings['frequencies'].replace(' ', '')
-            self.frequencies = [float(w) for w in self.frequencies.split(',')]
+            self.frequencies = []
+            for w in settings['frequencies'].replace(' ', '').split(','):
+                if '-' in w:
+                    seq = tuple([float(x) for x in w.split('-')])
+                    self.frequencies += list(np.arange(*seq))
+                elif w:
+                    self.frequencies.append(float(w))
         if 'damping' in settings:
             self.damping = float(settings['damping'])
 
@@ -212,8 +217,6 @@ class ComplexResponse:
         self.ostream.print_info(
             'Precondition matrix created in {:.2f} sec.'.format(tm.time() -
                                                                 start_time))
-        self.ostream.print_blank()
-        self.ostream.flush()
 
         return precond
 
@@ -393,6 +396,8 @@ class ComplexResponse:
             precond = {
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
+            self.ostream.print_blank()
+            self.ostream.flush()
 
             # spawning initial trial vectors
 
@@ -740,7 +745,7 @@ class ComplexResponse:
         self.ostream.print_header(output_header.ljust(82))
         self.ostream.print_blank()
         for op, freq, nv in nvs:
-            ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+            ops_label = '<<{};{}>>_{:.3f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
                 ops_label, -nv.real, -nv.imag)
