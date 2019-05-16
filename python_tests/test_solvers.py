@@ -40,8 +40,8 @@ class TestSolvers(unittest.TestCase):
         if (rank == mpi_master()):
 
             self.assertEqual(density.ndim, 2)
-            self.assertEqual(density.shape[0], 24)
-            self.assertEqual(density.shape[1], 24)
+            self.assertEqual(density.shape[0], 41)
+            self.assertEqual(density.shape[1], 41)
 
             # number of electrons
 

@@ -200,7 +200,7 @@ class ComplexResponse:
         c_diag = (d * sdiag) * (ediag_sq + (w_sq + d_sq) * sdiag_sq)
         d_diag = (2 * w * d * ediag) * sdiag_sq
         p_diag = 1.0 / ((ediag_sq - (w_sq - d_sq) * sdiag_sq)**2 +
-                 (4 * w_sq * d_sq * sdiag_fp))
+                        (4 * w_sq * d_sq * sdiag_fp))
 
         pa_diag = p_diag * a_diag
         pb_diag = p_diag * b_diag
@@ -216,7 +216,6 @@ class ComplexResponse:
         self.ostream.flush()
 
         return precond
-
 
     def preconditioning(self, precond, v_in):
         """Creates trial vectors out of residuals and the preconditioner
@@ -235,7 +234,6 @@ class ComplexResponse:
         v_out = np.array([v_out_rg, v_out_ru, v_out_iu, v_out_ig]).flatten()
 
         return v_out
-
 
     def get_rhs(self, molecule, scf_tensors, ops):
         """Creates right-hand sides of complex linear response equations
@@ -261,12 +259,12 @@ class ComplexResponse:
 
         return gradients
 
-    def initial_guess(self, molecule, scf_tensors, d, ops, freqs, precond):
+    def initial_guess(self, op_grads, d, freqs, precond):
         """Creating initial guess (un-orthonormalized trials) out of gradients.
         """
 
         ig = {}
-        for op, grad in zip(ops, self.get_rhs(molecule, scf_tensors, ops)):
+        for op, grad in op_grads.items():
             gradger, gradung = self.decomp_sym(grad)
             grad = np.array(
                 [gradger.real, gradung.real, -gradung.imag,
@@ -398,8 +396,7 @@ class ComplexResponse:
 
             # spawning initial trial vectors
 
-            igs = self.initial_guess(molecule, scf_tensors, d, ops, freqs,
-                                     precond)
+            igs = self.initial_guess(v1, d, freqs, precond)
             bger, bung = self.setup_trials(igs)
 
             assert_msg_critical(
@@ -717,7 +714,9 @@ class ComplexResponse:
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
 
-        return solutions
+            return {(op, freq): nv for op, freq, nv in nvs}
+        else:
+            return None
 
     def check_convergence(self, relative_residual_norm):
         """Checks convergence"""
