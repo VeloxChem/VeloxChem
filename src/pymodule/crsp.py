@@ -190,55 +190,24 @@ class ComplexResponse:
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         sdiag_fp = sdiag**4
-        e0 = np.diag(ediag)
-        e0_sq = np.diag(ediag_sq)
-        s0 = np.diag(sdiag)
-        s0_sq = np.diag(sdiag_sq)
-        s0_fp = np.diag(sdiag_fp)
         w_sq = w**2
         d_sq = d**2
 
-        # constructing matrix blocks
+        # constructing matrix block diagonals
 
-        a_mat = np.matmul(e0, (e0_sq - (w_sq - d_sq) * s0_sq))
-        b_mat = np.matmul((w * s0), (e0_sq - (w_sq + d_sq) * s0_sq))
-        c_mat = np.matmul((d * s0), (e0_sq + (w_sq + d_sq) * s0_sq))
-        d_mat = np.matmul((2 * w * d * e0), s0_sq)
-        p_mat = np.linalg.inv((e0_sq - (w_sq - d_sq) * s0_sq)**2 +
-                              (4 * w_sq * d_sq * s0_fp))
-        pa_mat = np.matmul(p_mat, a_mat)
-        pb_mat = np.matmul(p_mat, b_mat)
-        pc_mat = np.matmul(p_mat, c_mat)
-        pd_mat = np.matmul(p_mat, d_mat)
+        a_diag = ediag * (ediag_sq - (w_sq - d_sq) * sdiag_sq)
+        b_diag = (w * sdiag) * (ediag_sq - (w_sq + d_sq) * sdiag_sq)
+        c_diag = (d * sdiag) * (ediag_sq + (w_sq + d_sq) * sdiag_sq)
+        d_diag = (2 * w * d * ediag) * sdiag_sq
+        p_diag = 1.0 / ((ediag_sq - (w_sq - d_sq) * sdiag_sq)**2 +
+                 (4 * w_sq * d_sq * sdiag_fp))
 
-        # creating empty matrix with wanted size
+        pa_diag = p_diag * a_diag
+        pb_diag = p_diag * b_diag
+        pc_diag = p_diag * c_diag
+        pd_diag = p_diag * d_diag
 
-        size = e0.shape[0]
-        precond = np.zeros((4 * size, 4 * size))
-
-        # filling diagonal elements (de) of matrix blocks:
-
-        for de in range(size):
-            precond[de, de] = pa_mat[de, de]
-            precond[de + size, de + size] = pa_mat[de, de]
-            precond[-de - 1, -de - 1] = -pa_mat[-de - 1, -de - 1]
-            precond[-(de + size) - 1, -(de + size) -
-                    1] = -pa_mat[-de - 1, -de - 1]
-
-            precond[de, de + size] = pb_mat[de, de]
-            precond[de + size, de] = pb_mat[de, de]
-            precond[-de - 1, -(de + size) - 1] = -pb_mat[-de - 1, -de - 1]
-            precond[-(de + size) - 1, -de - 1] = -pb_mat[-de - 1, -de - 1]
-
-            precond[size - de - 1, -(de + size) - 1] = pc_mat[-de - 1, -de - 1]
-            precond[-(de + size) - 1, size - de - 1] = pc_mat[-de - 1, -de - 1]
-            precond[de + size, de - size] = pc_mat[de, de]
-            precond[de - size, de + size] = pc_mat[de, de]
-
-            precond[de, de - size] = pd_mat[de, de]
-            precond[de - size, de] = pd_mat[de, de]
-            precond[de + size, de - 2 * size] = pd_mat[de, de]
-            precond[de - 2 * size, de + size] = pd_mat[de, de]
+        precond = np.array([pa_diag, pb_diag, pc_diag, pd_diag])
 
         self.ostream.print_info(
             'Precondition matrix created in {:.2f} sec.'.format(tm.time() -
@@ -247,6 +216,26 @@ class ComplexResponse:
         self.ostream.flush()
 
         return precond
+
+
+    def preconditioning(self, precond, v_in):
+        """Creates trial vectors out of residuals and the preconditioner
+        matrix.
+        """
+
+        pa, pb, pc, pd = precond[0], precond[1], precond[2], precond[3]
+
+        v_in_rg, v_in_ru, v_in_iu, v_in_ig = self.decomp_trials(v_in)
+
+        v_out_rg = pa * v_in_rg + pb * v_in_ru + pc * v_in_iu + pd * v_in_ig
+        v_out_ru = pb * v_in_rg + pa * v_in_ru + pd * v_in_iu + pc * v_in_ig
+        v_out_iu = pc * v_in_rg + pd * v_in_ru - pa * v_in_iu - pb * v_in_ig
+        v_out_ig = pd * v_in_rg + pc * v_in_ru - pb * v_in_iu - pa * v_in_ig
+
+        v_out = np.array([v_out_rg, v_out_ru, v_out_iu, v_out_ig]).flatten()
+
+        return v_out
+
 
     def get_rhs(self, molecule, scf_tensors, ops):
         """Creates right-hand sides of complex linear response equations
@@ -287,13 +276,13 @@ class ComplexResponse:
                 if gn < self.small_thresh:
                     ig[(op, w)] = np.zeros(grad.shape[0])
                 else:
-                    ig[(op, w)] = np.matmul(precond[w], grad)
+                    ig[(op, w)] = self.preconditioning(precond[w], grad)
 
         return ig
 
     def setup_trials(self,
                      vectors,
-                     td=None,
+                     pre=None,
                      bger=np.array([]),
                      bung=np.array([]),
                      normalize=True):
@@ -308,8 +297,8 @@ class ComplexResponse:
 
             # preconditioning trials:
 
-            if td is not None:
-                v = np.matmul(td[w], vec)
+            if pre is not None:
+                v = self.preconditioning(pre[w], vec)
             else:
                 v = vec
             if np.linalg.norm(v) > self.small_thresh:
@@ -672,7 +661,7 @@ class ComplexResponse:
                 trials_info = {'new_trials_ger': False, 'new_trials_ung': False}
 
                 new_trials_ger, new_trials_ung = self.setup_trials(residuals,
-                                                                   td=precond,
+                                                                   pre=precond,
                                                                    bger=bger,
                                                                    bung=bung)
 
