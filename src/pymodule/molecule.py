@@ -1,3 +1,5 @@
+import numpy as np
+
 from .veloxchemlib import Molecule
 
 
@@ -56,6 +58,21 @@ def _Molecule_from_dict(mol_dict):
     return mol
 
 
+def _Molecule_center_of_nuclear_charge(self):
+
+    elem_ids = self.elem_ids_to_numpy()
+    x_coords = self.x_to_numpy()
+    y_coords = self.y_to_numpy()
+    z_coords = self.z_to_numpy()
+
+    x_center = np.sum(x_coords * elem_ids.astype(float)) / np.sum(elem_ids)
+    y_center = np.sum(y_coords * elem_ids.astype(float)) / np.sum(elem_ids)
+    z_center = np.sum(z_coords * elem_ids.astype(float)) / np.sum(elem_ids)
+
+    return x_center, y_center, z_center
+
+
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_dict = _Molecule_from_dict
+Molecule.center_of_nuclear_charge = _Molecule_center_of_nuclear_charge
