@@ -121,6 +121,12 @@ class TestExciton(unittest.TestCase):
         self.assertTrue(diag_diff < 1.0e-6)
         self.assertTrue(abs_diff < 1.0e-6)
 
+        ref_eigvals, ref_eigvecs = np.linalg.eigh(ref_H)
+        eigvals, eigvecs = np.linalg.eigh(exciton_drv.H)
+
+        eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
+        self.assertTrue(eigval_diff < 1.0e-6)
+
 
 if __name__ == "__main__":
     unittest.main()
