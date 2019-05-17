@@ -252,6 +252,12 @@ void export_twoints(py::module& m)
         .value("ovov", moints::ovov)
         .value("ovvv", moints::ovvv)
         .value("vvvv", moints::vvvv)
+        .value("asym_oooo", moints::asym_oooo)
+        .value("asym_ooov", moints::asym_ooov)
+        .value("asym_oovv", moints::asym_oovv)
+        .value("asym_ovov", moints::asym_ovov)
+        .value("asym_ovvv", moints::asym_ovvv)
+        .value("asym_vvvv", moints::asym_vvvv)
     ;
 
     // CAOFockMatrix class
