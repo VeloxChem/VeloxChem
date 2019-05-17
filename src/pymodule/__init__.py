@@ -38,6 +38,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver
+from .excitondriver import ExcitonModelDriver
 from .rspdriver import ResponseDriver
 from .adconedriver import AdcOneDriver
 from .tdaexcidriver import TDAExciDriver

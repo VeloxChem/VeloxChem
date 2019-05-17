@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import numpy as np
 import unittest
 
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
@@ -9,6 +10,7 @@ from veloxchem.veloxchemlib import assemble_overlap_matrices
 from veloxchem.veloxchemlib import assemble_kinetic_energy_matrices
 from veloxchem.veloxchemlib import assemble_nuclear_potential_matrices
 from veloxchem.mpitask import MpiTask
+from veloxchem.excitondriver import ExcitonModelDriver
 
 
 class TestExciton(unittest.TestCase):
@@ -76,6 +78,48 @@ class TestExciton(unittest.TestCase):
                 mol_1, mol_2, basis, basis, V11, V22, V12, V21)
 
             self.assertEqual(V, V_exmod)
+
+    def test_exciton_model(self):
+
+        task = MpiTask(["inputs/exciton.inp", None], MPI.COMM_WORLD)
+        exciton_dict = task.input_dict['exciton']
+
+        exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis,
+                            exciton_dict['fragments'], exciton_dict['nstates'])
+
+        ref_H = np.array([
+            [
+                0.34427707, 0.00000000, 0.01212927, 0.00440677, 0.00045881,
+                0.00001154
+            ],
+            [
+                0.00000000, 0.41055831, -0.00268369, 0.00946559, 0.00000658,
+                -0.00002995
+            ],
+            [
+                0.01212927, -0.00268369, 0.31644641, 0.00000000, -0.01350857,
+                -0.00365320
+            ],
+            [
+                0.00440677, 0.00946559, 0.00000000, 0.40065260, -0.00690413,
+                0.01135558
+            ],
+            [
+                0.00045881, 0.00000658, -0.01350857, -0.00690413, 0.34427707,
+                0.00000000
+            ],
+            [
+                0.00001154, -0.00002995, -0.00365320, 0.01135558, 0.00000000,
+                0.41055831
+            ],
+        ])
+
+        diag_diff = np.max(np.abs(np.diag(exciton_drv.H) - np.diag(ref_H)))
+        abs_diff = np.max(np.abs(np.abs(exciton_drv.H) - np.abs(ref_H)))
+
+        self.assertTrue(diag_diff < 1.0e-6)
+        self.assertTrue(abs_diff < 1.0e-6)
 
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@ class ExcitonModelDriver:
         self.scf_max_iter = 150
 
         # tda settings
-        self.nstates = 2
+        self.nstates = 5
         self.tda_conv_thresh = 1.0e-4
         self.tda_max_iter = 100
 
@@ -47,12 +47,24 @@ class ExcitonModelDriver:
         # output stream
         self.ostream = ostream
 
-    def compute(self, molecule, basis, min_basis, fragments_input):
+    def compute(self, molecule, basis, min_basis, fragments_input,
+                nstates_input):
 
-        natoms = [int(n) for n in fragments_input.split(',')]
+        natoms_list = [n for n in fragments_input.replace(' ', '').split(',')]
+        natoms = []
+        for x in natoms_list:
+            if '*' in x:
+                content = x.split('*')
+                natoms += [int(content[0])] * int(content[1])
+            elif x:
+                natoms.append(int(x))
         assert_msg_critical(
             sum(natoms) == molecule.number_of_atoms(),
             'ExcitonModelDriver: Inconsistent number of atoms')
+
+        self.nstates = int(nstates_input)
+        assert_msg_critical(self.nstates > 0,
+                            'ExcitonModelDriver: Invalid number of LE states')
 
         if self.rank == mpi_master():
             self.print_title(natoms)

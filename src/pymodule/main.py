@@ -37,7 +37,7 @@ def main():
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis,
-                            exciton_dict['fragments'])
+                            exciton_dict['fragments'], exciton_dict['nstates'])
 
     # Hartree-Fock
 
