@@ -113,6 +113,19 @@ TEST_F(CRecursionTermTest, IsValid)
     ASSERT_FALSE(rtm.isValid());
 }
 
+TEST_F(CRecursionTermTest, GetOrder)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 1, 2);
+    
+    CRecursionTerm rtb({"Overlap"}, 3, false, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 1, 5);
+    
+    ASSERT_EQ(2, rta.getOrder());
+    
+    ASSERT_EQ(5, rtb.getOrder());
+}
+
 TEST_F(CRecursionTermTest, GetNumberOfOperatorComponents)
 {
     CRecursionTerm rta({"Overlap"}, 2, true, {2, 3, 4, 5}, {1, 3, 2, 3},
@@ -211,3 +224,25 @@ TEST_F(CRecursionTermTest, GetNumberOfComponents)
     
     ASSERT_EQ(105, rta.getNumberOfComponents(recblock::ss));
 }
+
+TEST_F(CRecursionTermTest, IsIntegral)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 1, 5);
+    
+    ASSERT_TRUE(rta.isIntegral({"Overlap"}, {2, 3, 4, 5}, {1, 3, 2, 3}, 2, 1));
+    
+    ASSERT_FALSE(rta.isIntegral({"Overlap"}, {2, 3, 4, 5}, {1, 3, 2, 3}, 2, 2));
+    
+    ASSERT_FALSE(rta.isIntegral({"Overlap"}, {2, 3, 4, 5}, {1, 3, 2, 3}, 1, 2));
+    
+    ASSERT_FALSE(rta.isIntegral({"Overlap"}, {1, 3, 4, 5}, {1, 3, 2, 3}, 2, 1));
+    
+    ASSERT_FALSE(rta.isIntegral({"Overlap"}, {2, 1, 4, 5}, {1, 3, 2, 3}, 2, 1));
+    
+    ASSERT_FALSE(rta.isIntegral({"Overlap"}, {2, 3, 4, 5}, {3, 3, 2, 3}, 2, 1));
+    
+    ASSERT_FALSE(rta.isIntegral({"Kinetic Energy"}, {2, 3, 4, 5}, {1, 3, 2, 3}, 2, 1));
+}
+
+

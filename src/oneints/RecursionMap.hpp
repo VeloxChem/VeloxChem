@@ -137,6 +137,48 @@ public:
     int32_t getNumberOfComponents() const;
     
     /**
+     Gets number of recursion term objects in recursion map object.
+
+     @return the number of recursion term objects.
+     */
+    int32_t getNumberOfTerms() const;
+    
+    /**
+     Gets recursion term from vector of recursion term objects.
+
+     @param iRecursionTerm the index of recursion term in vector of recursion
+            term  objects.
+     @return the recursion term object.
+     */
+    CRecursionTerm getTerm(const int32_t iRecursionTerm) const;
+    
+    /**
+     Gets index of recursion term object in space of recursion term objects
+     components.
+
+     @param recursionTerm the recursion term object.
+     @return the index of recursion term object.
+     */
+    int32_t getIndexOfTerm(const CRecursionTerm& recursionTerm) const;
+    
+    /**
+     Determines maximum order of recursion term object with specified properties
+     in vector of recursion term objects.
+
+     @param label the label of integrand operator.
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     @param braCenters the number of centers on bra side.
+     @param ketCenters the number of centers on ket side.
+     @return the maximum order of recursion term object.
+     */
+    int32_t getMaxOrder(const std::string&  label,
+                        const CFourIndexes& braAngularMomentum,
+                        const CFourIndexes& ketAngularMomentum,
+                        const int32_t       braCenters,
+                        const int32_t       ketCenters) const;
+    
+    /**
      Finds recursion term object in recursion map object.
 
      @param recursionTerm the recursion term object.
