@@ -109,7 +109,7 @@ class MOIntegralsDriver:
             else:
                 pair_den = AODensityMatrix()
 
-            print("Ranges:"cur_bra_ids, cur_ket_ids)
+            print("Ranges:", cur_bra_ids, cur_ket_ids)
             
             # broadcast pair densities via local communicators
             pair_den.broadcast(local_rank, local_comm)
