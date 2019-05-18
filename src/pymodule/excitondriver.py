@@ -104,6 +104,8 @@ class ExcitonModelDriver:
 
         self.monomers = [{} for i in range(nfragments)]
 
+        # Monomers
+
         for ind in range(nfragments):
 
             monomer_name = 'Monomer {}'.format(ind + 1)
@@ -167,14 +169,18 @@ class ExcitonModelDriver:
 
                 for s in range(self.nstates):
                     h = s + ind * self.nstates
+
+                    # LE excitation energy
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
+                    # LE transition dipole
                     vec = self.monomers[ind]['exc_vectors'][:, s]
-                    tdens = np.matmul(
+                    tdens = math.sqrt(2.0) * np.matmul(
                         mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
-                    tdens *= math.sqrt(2.0)
                     self.trans_dipoles[h, :] = np.array(
                         [np.sum(tdens * dipole_ints[d]) for d in range(3)])
+
+        # Dimers
 
         dimer_id = -1
 
@@ -372,7 +378,7 @@ class ExcitonModelDriver:
                             })
                             ct_ind += 1
 
-                # compute sigma vectors
+                # compute sigma vectors for LE(A), CT(AB), CT(BA)
                 if self.rank == mpi_master():
                     tdens = []
                     for vec in CI_vectors:
@@ -401,6 +407,8 @@ class ExcitonModelDriver:
                         sigma_vec = np.matmul(mo_occ.T,
                                               np.matmul(tfock, mo_vir))
 
+                        # skip LE(B) in CI_vectors
+                        # since sigma_vectors does not contain LE(B)
                         s2 = s
                         if s >= self.nstates:
                             s2 += self.nstates
@@ -416,14 +424,12 @@ class ExcitonModelDriver:
                             'name': CI_vectors[s2]['name'],
                         })
 
+                    # compute couplings
+                    # sigma_vectors contains LE(A), CT(AB), CT(BA)
+                    # CI_vectors[self.nstates:] contains LE(B), CT(AB), CT(BA)
+
                     for svec in sigma_vectors:
-                        if svec['frag'] == 'B':
-                            continue
-
-                        for cvec in CI_vectors:
-                            if cvec['frag'] == 'A':
-                                continue
-
+                        for cvec in CI_vectors[self.nstates:]:
                             if svec['index'] == cvec['index']:
                                 continue
 
@@ -448,31 +454,30 @@ class ExcitonModelDriver:
 
                         self.ostream.print_blank()
 
-                    for svec in sigma_vectors:
-                        if svec['type'] != 'CT':
-                            continue
+                    # compute CT excitation energies and transition dipoles
+                    # sigma_vectors[self.nstates:] contains CT(AB), CT(BA)
 
-                        for cvec in CI_vectors:
-                            if svec['index'] != cvec['index']:
-                                continue
+                    for ivec, svec in enumerate(sigma_vectors[self.nstates:]):
 
-                            energy = np.sum(svec['vec'] * cvec['vec'])
+                        # the CI vector that corresponds to svec
+                        cvec = CI_vectors[ivec + self.nstates * 2]
 
-                            self.H[svec['index'], svec['index']] = energy
+                        # CT excitation energy
+                        energy = np.sum(svec['vec'] * cvec['vec'])
 
-                            tdens = np.matmul(mo_occ,
-                                              np.matmul(cvec['vec'], mo_vir.T))
-                            tdens *= math.sqrt(2.0)
-                            self.trans_dipoles[svec['index'], :] = np.array([
-                                np.sum(tdens * dipole_ints[d]) for d in range(3)
-                            ])
+                        self.H[svec['index'], svec['index']] = energy
 
-                            valstr = '{} excitation energy:'.format(
-                                svec['type'])
-                            valstr += '  {:>26s}'.format(svec['name'])
+                        valstr = '{} excitation energy:'.format(svec['type'])
+                        valstr += '  {:>26s}'.format(svec['name'])
 
-                            valstr += '  {:20.12f}'.format(energy)
-                            self.ostream.print_header(valstr.ljust(92))
+                        valstr += '  {:20.12f}'.format(energy)
+                        self.ostream.print_header(valstr.ljust(92))
+
+                        # CT transition dipole
+                        tdens = math.sqrt(2.0) * np.matmul(
+                            mo_occ, np.matmul(cvec['vec'], mo_vir.T))
+                        self.trans_dipoles[svec['index'], :] = np.array(
+                            [np.sum(tdens * dipole_ints[d]) for d in range(3)])
 
                     self.ostream.print_blank()
 
