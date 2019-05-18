@@ -25,6 +25,7 @@ class ExcitonModelDriver:
 
         # exciton monomers
         self.monomers = None
+        self.natoms = None
 
         # eri settings
         self.qq_type = 'QQ_DEN'
@@ -36,6 +37,8 @@ class ExcitonModelDriver:
 
         # tda settings
         self.nstates = 5
+        self.ct_nocc = 1
+        self.ct_nvir = 1
         self.tda_conv_thresh = 1.0e-4
         self.tda_max_iter = 100
 
@@ -47,33 +50,48 @@ class ExcitonModelDriver:
         # output stream
         self.ostream = ostream
 
-    def compute(self, molecule, basis, min_basis, fragments_input,
-                nstates_input):
+    def update_settings(self, exciton_dict):
 
-        natoms_list = [n for n in fragments_input.replace(' ', '').split(',')]
-        natoms = []
+        assert_msg_critical('fragments' in exciton_dict,
+                            'ExcitonModelDriver: fragments not defined')
+
+        self.natoms = []
+        natoms_list = exciton_dict['fragments'].replace(' ', '').split(',')
         for x in natoms_list:
             if '*' in x:
                 content = x.split('*')
-                natoms += [int(content[0])] * int(content[1])
+                self.natoms += [int(content[0])] * int(content[1])
             elif x:
-                natoms.append(int(x))
+                self.natoms.append(int(x))
+
+        if 'nstates' in exciton_dict:
+            self.nstates = int(exciton_dict['nstates'])
+
+        if 'ct_nocc' in exciton_dict:
+            self.ct_nocc = int(exciton_dict['ct_nocc'])
+        if 'ct_nvir' in exciton_dict:
+            self.ct_nvir = int(exciton_dict['ct_nvir'])
+
+    def compute(self, molecule, basis, min_basis):
+
         assert_msg_critical(
-            sum(natoms) == molecule.number_of_atoms(),
+            sum(self.natoms) == molecule.number_of_atoms(),
             'ExcitonModelDriver: Inconsistent number of atoms')
 
-        self.nstates = int(nstates_input)
         assert_msg_critical(self.nstates > 0,
                             'ExcitonModelDriver: Invalid number of LE states')
 
         if self.rank == mpi_master():
-            self.print_title(natoms)
+            self.print_title(self.natoms)
 
-        nfragments = len(natoms)
-        start_indices = [sum(natoms[:i]) for i in range(nfragments)]
+        nfragments = len(self.natoms)
+        start_indices = [sum(self.natoms[:i]) for i in range(nfragments)]
 
-        self.H = np.zeros(
-            (nfragments * self.nstates, nfragments * self.nstates))
+        npairs = nfragments * (nfragments - 1) // 2
+        ct_states = self.ct_nocc * self.ct_nvir
+
+        self.H = np.zeros((nfragments * self.nstates + npairs * ct_states * 2,
+                           nfragments * self.nstates + npairs * ct_states * 2))
 
         self.monomers = [{} for i in range(nfragments)]
 
@@ -83,7 +101,8 @@ class ExcitonModelDriver:
             self.print_banner(monomer_name)
 
             # monomer molecule
-            monomer = molecule.get_sub_molecule(start_indices[ind], natoms[ind])
+            monomer = molecule.get_sub_molecule(start_indices[ind],
+                                                self.natoms[ind])
             if self.rank == mpi_master():
                 self.ostream.print_block(monomer.get_string())
                 self.ostream.flush()
@@ -126,13 +145,17 @@ class ExcitonModelDriver:
                     h = s + ind * self.nstates
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
+        dimer_id = -1
+
         for ind_A in range(nfragments):
             monomer_a = molecule.get_sub_molecule(start_indices[ind_A],
-                                                  natoms[ind_A])
+                                                  self.natoms[ind_A])
 
             for ind_B in range(ind_A + 1, nfragments):
                 monomer_b = molecule.get_sub_molecule(start_indices[ind_B],
-                                                      natoms[ind_B])
+                                                      self.natoms[ind_B])
+
+                dimer_id += 1
 
                 dimer_name = 'Dimer {} {}'.format(ind_A + 1, ind_B + 1)
                 self.print_banner(dimer_name)
@@ -208,7 +231,7 @@ class ExcitonModelDriver:
 
                 # compute Fock matrix
                 fock_mat = AOFockMatrix(dens_mat)
-                fock_mat.set_fock_type(fockmat.rgenjk, 0)
+                fock_mat.set_fock_type(fockmat.restjk, 0)
 
                 eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
                 screening = eri_drv.compute(get_qq_scheme(self.qq_type),
@@ -217,16 +240,16 @@ class ExcitonModelDriver:
                 fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
                 if self.rank == mpi_master():
-                    fock_mo = np.matmul(mo.T, np.matmul(fock_mat.to_numpy(0),
-                                                        mo))
+                    hcore = kin_mat.to_numpy() - npot_mat.to_numpy()
+                    fock = hcore + fock_mat.to_numpy(0)
+
+                    fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
                     fock_occ = fock_mo[:nocc, :nocc]
                     fock_vir = fock_mo[nocc:, nocc:]
 
                     # compute dimer energy
                     dimer_energy = dimer.nuclear_repulsion_energy()
-                    dimer_energy += fock_mat.get_energy(0, dens_mat, 0)
-                    dimer_energy += 2.0 * kin_mat.get_energy(dens_mat, 0)
-                    dimer_energy -= 2.0 * npot_mat.get_energy(dens_mat, 0)
+                    dimer_energy += np.sum(dens * (hcore + fock))
 
                     valstr = 'Dimer Energy:{:20.10f} au'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(92))
@@ -235,12 +258,43 @@ class ExcitonModelDriver:
 
                     # assemble TDA CI vectors
 
+                    vectors_A = self.monomers[ind_A]['exc_vectors']
+                    vectors_B = self.monomers[ind_B]['exc_vectors']
+
+                    CI_vectors = []
+
                     #          vir.A     vir.B                vir.A     vir.B
                     #       +---------+---------+          +---------+---------+
                     # occ.A |  LE(A)  |         |    occ.A |         |         |
                     #       +---------+---------+          +---------+---------+
                     # occ.B |         |         |    occ.B |         |  LE(B)  |
                     #       +---------+---------+          +---------+---------+
+
+                    for sA in range(self.nstates):
+                        vec_A = vectors_A[:, sA].reshape(nocc_A, nvir_A)
+                        ci_vec = np.zeros((nocc, nvir))
+                        ci_vec[:nocc_A, :nvir_A] = vec_A[:, :]
+                        CI_vectors.append({
+                            'vec': ci_vec,
+                            'frag': 'A',
+                            'type': 'LE',
+                            'index': ind_A * self.nstates + sA,
+                            'name': '{}e({}){}g'.format(ind_A + 1, sA + 1,
+                                                        ind_B + 1),
+                        })
+
+                    for sB in range(self.nstates):
+                        vec_B = vectors_B[:, sB].reshape(nocc_B, nvir_B)
+                        ci_vec = np.zeros((nocc, nvir))
+                        ci_vec[nocc_A:, nvir_A:] = vec_B[:, :]
+                        CI_vectors.append({
+                            'vec': ci_vec,
+                            'frag': 'B',
+                            'type': 'LE',
+                            'index': ind_B * self.nstates + sB,
+                            'name': '{}g{}e({})'.format(ind_A + 1, ind_B + 1,
+                                                        sB + 1),
+                        })
 
                     #          vir.A     vir.B                vir.A     vir.B
                     #       +---------+---------+          +---------+---------+
@@ -249,69 +303,133 @@ class ExcitonModelDriver:
                     # occ.B |         |         |    occ.B |  CT(BA) |         |
                     #       +---------+---------+          +---------+---------+
 
-                    vectors_A = self.monomers[ind_A]['exc_vectors']
-                    vectors_B = self.monomers[ind_B]['exc_vectors']
+                    ct_ind = nfragments * self.nstates
+                    ct_ind += dimer_id * ct_states * 2
 
-                    CI_vectors_A = []
-                    CI_vectors_B = []
+                    for oA in range(self.ct_nocc):
+                        for vB in range(self.ct_nvir):
+                            ci_vec = np.zeros((nocc, nvir))
+                            ci_vec[nocc_A - 1 - oA][nvir_A + vB] = 1.0
+                            CI_vectors.append({
+                                'vec': ci_vec,
+                                'frag': 'AB',
+                                'type': 'CT',
+                                'index': ct_ind,
+                                'name': '{}+(H{}){}-(L{})'.format(
+                                    ind_A + 1, oA, ind_B + 1, vB),
+                            })
+                            ct_ind += 1
 
-                    for sA in range(self.nstates):
-                        vec_A = vectors_A[:, sA].reshape(nocc_A, nvir_A)
-                        CI_vec_A = np.zeros((nocc, nvir))
-                        CI_vec_A[:nocc_A, :nvir_A] = vec_A[:, :]
-                        CI_vectors_A.append(CI_vec_A)
+                    for oB in range(self.ct_nocc):
+                        for vA in range(self.ct_nvir):
+                            ci_vec = np.zeros((nocc, nvir))
+                            ci_vec[nocc - 1 - oB][vA] = 1.0
+                            CI_vectors.append({
+                                'vec': ci_vec,
+                                'frag': 'BA',
+                                'type': 'CT',
+                                'index': ct_ind,
+                                'name': '{}-(L{}){}+(H{})'.format(
+                                    ind_A + 1, vA, ind_B + 1, oB),
+                            })
+                            ct_ind += 1
 
-                    for sB in range(self.nstates):
-                        vec_B = vectors_B[:, sB].reshape(nocc_B, nvir_B)
-                        CI_vec_B = np.zeros((nocc, nvir))
-                        CI_vec_B[nocc_A:, nvir_A:] = vec_B[:, :]
-                        CI_vectors_B.append(CI_vec_B)
-
-                # compute LE-LE couplings
+                # compute sigma vectors
                 if self.rank == mpi_master():
-                    tdens_A = []
-                    for sA in range(self.nstates):
-                        tdens_A.append(
-                            np.matmul(mo_occ,
-                                      np.matmul(CI_vectors_A[sA], mo_vir.T)))
-                    tdens_mat = AODensityMatrix(tdens_A, denmat.rest)
+                    tdens = []
+                    for vec in CI_vectors:
+                        if vec['frag'] == 'B':
+                            continue
+                        tdens.append(
+                            np.matmul(mo_occ, np.matmul(vec['vec'], mo_vir.T)))
+                    tdens_mat = AODensityMatrix(tdens, denmat.rest)
                 else:
                     tdens_mat = AODensityMatrix()
 
                 tdens_mat.broadcast(self.rank, self.comm)
 
                 tfock_mat = AOFockMatrix(tdens_mat)
-                for sA in range(self.nstates):
-                    tfock_mat.set_fock_type(fockmat.rgenjk, sA)
+                for s in range(tfock_mat.number_of_fock_matrices()):
+                    tfock_mat.set_fock_type(fockmat.rgenjk, s)
 
                 eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
                 tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
                 if self.rank == mpi_master():
-                    for sA in range(self.nstates):
-                        tfock = tfock_mat.to_numpy(sA)
-                        sigma_vec_A = np.matmul(mo_occ.T,
-                                                np.matmul(tfock, mo_vir))
+                    sigma_vectors = []
 
-                        sigma_vec_A -= np.matmul(fock_occ, CI_vectors_A[sA])
-                        sigma_vec_A += np.matmul(CI_vectors_A[sA], fock_vir)
+                    for s in range(tfock_mat.number_of_fock_matrices()):
+                        tfock = tfock_mat.to_numpy(s)
+                        sigma_vec = np.matmul(mo_occ.T,
+                                              np.matmul(tfock, mo_vir))
 
-                        for sB in range(self.nstates):
-                            coupling = np.sum(sigma_vec_A * CI_vectors_B[sB])
+                        s2 = s
+                        if s >= self.nstates:
+                            s2 += self.nstates
 
-                            hA = sA + ind_A * self.nstates
-                            hB = sB + ind_B * self.nstates
-                            self.H[hA, hB] = coupling
-                            self.H[hB, hA] = coupling
+                        sigma_vec -= np.matmul(fock_occ, CI_vectors[s2]['vec'])
+                        sigma_vec += np.matmul(CI_vectors[s2]['vec'], fock_vir)
 
-                            valstr = 'LE-LE coupling:'
-                            valstr += '  {}e({}){}g  {}g{}e({})'.format(
-                                ind_A + 1, sA + 1, ind_B + 1, ind_A + 1,
-                                ind_B + 1, sB + 1)
+                        sigma_vectors.append({
+                            'vec': sigma_vec,
+                            'frag': CI_vectors[s2]['frag'],
+                            'type': CI_vectors[s2]['type'],
+                            'index': CI_vectors[s2]['index'],
+                            'name': CI_vectors[s2]['name'],
+                        })
+
+                    for svec in sigma_vectors:
+                        if svec['frag'] == 'B':
+                            continue
+
+                        for cvec in CI_vectors:
+                            if cvec['frag'] == 'A':
+                                continue
+
+                            if svec['index'] == cvec['index']:
+                                continue
+
+                            coupling = np.sum(svec['vec'] * cvec['vec'])
+
+                            self.H[svec['index'], cvec['index']] = coupling
+                            self.H[cvec['index'], svec['index']] = coupling
+
+                            if svec['type'] == 'CT' and cvec['type'] == 'LE':
+                                valstr = '{}-{} coupling:'.format(
+                                    cvec['type'], svec['type'])
+                                valstr += '  {:>15s}  {:>15s}'.format(
+                                    cvec['name'], svec['name'])
+                            else:
+                                valstr = '{}-{} coupling:'.format(
+                                    svec['type'], cvec['type'])
+                                valstr += '  {:>15s}  {:>15s}'.format(
+                                    svec['name'], cvec['name'])
+
                             valstr += '  {:20.12f}'.format(coupling)
                             self.ostream.print_header(valstr.ljust(92))
+
                         self.ostream.print_blank()
-                        self.ostream.flush()
+
+                    for svec in sigma_vectors:
+                        if svec['type'] != 'CT':
+                            continue
+
+                        for cvec in CI_vectors:
+                            if svec['index'] != cvec['index']:
+                                continue
+
+                            energy = np.sum(svec['vec'] * cvec['vec'])
+
+                            self.H[svec['index'], svec['index']] = energy
+
+                            valstr = '{} excitation energy:'.format(
+                                svec['type'])
+                            valstr += '  {:>26s}'.format(svec['name'])
+
+                            valstr += '  {:20.12f}'.format(energy)
+                            self.ostream.print_header(valstr.ljust(92))
+
+                    self.ostream.print_blank()
 
         if self.rank == mpi_master():
             self.print_banner('Summary')
@@ -321,8 +439,9 @@ class ExcitonModelDriver:
             valstr = 'Eigenvalues:'
             self.ostream.print_header(valstr.ljust(92))
             for i, e in enumerate(eigvals):
-                valstr = 'E[{}]= {:12.6f} a.u. {:12.5f} eV'.format(
-                    i + 1, e, e * hartree_in_ev())
+                enestr = 'E[{}]='.format(i + 1)
+                valstr = '{:<8s} {:12.6f} a.u. {:12.5f} eV'.format(
+                    enestr, e, e * hartree_in_ev())
                 self.ostream.print_header(valstr.ljust(92))
             self.ostream.print_blank()
             self.ostream.flush()

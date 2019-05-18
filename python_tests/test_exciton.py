@@ -85,8 +85,8 @@ class TestExciton(unittest.TestCase):
         exciton_dict = task.input_dict['exciton']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
-        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis,
-                            exciton_dict['fragments'], exciton_dict['nstates'])
+        exciton_drv.update_settings(exciton_dict)
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         ref_H = np.array([
             [
@@ -115,17 +115,19 @@ class TestExciton(unittest.TestCase):
             ],
         ])
 
-        diag_diff = np.max(np.abs(np.diag(exciton_drv.H) - np.diag(ref_H)))
-        abs_diff = np.max(np.abs(np.abs(exciton_drv.H) - np.abs(ref_H)))
+        if task.mpi_rank == mpi_master():
 
-        self.assertTrue(diag_diff < 1.0e-6)
-        self.assertTrue(abs_diff < 1.0e-6)
+            diag_diff = np.max(np.abs(np.diag(exciton_drv.H) - np.diag(ref_H)))
+            abs_diff = np.max(np.abs(np.abs(exciton_drv.H) - np.abs(ref_H)))
 
-        ref_eigvals, ref_eigvecs = np.linalg.eigh(ref_H)
-        eigvals, eigvecs = np.linalg.eigh(exciton_drv.H)
+            self.assertTrue(diag_diff < 1.0e-6)
+            self.assertTrue(abs_diff < 1.0e-6)
 
-        eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
-        self.assertTrue(eigval_diff < 1.0e-6)
+            ref_eigvals, ref_eigvecs = np.linalg.eigh(ref_H)
+            eigvals, eigvecs = np.linalg.eigh(exciton_drv.H)
+
+            eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
+            self.assertTrue(eigval_diff < 1.0e-6)
 
 
 if __name__ == "__main__":
