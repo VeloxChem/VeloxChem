@@ -1,7 +1,9 @@
 import numpy as np
+import math
 
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
@@ -22,6 +24,8 @@ class ExcitonModelDriver:
     def __init__(self, comm, ostream):
 
         self.H = None
+        self.trans_dipoles = None
+        self.nuc_chg_center = None
 
         # exciton monomers
         self.monomers = None
@@ -93,6 +97,11 @@ class ExcitonModelDriver:
         self.H = np.zeros((nfragments * self.nstates + npairs * ct_states * 2,
                            nfragments * self.nstates + npairs * ct_states * 2))
 
+        self.trans_dipoles = np.zeros(
+            (nfragments * self.nstates + npairs * ct_states * 2, 3))
+
+        self.nuc_chg_center = molecule.center_of_nuclear_charge()
+
         self.monomers = [{} for i in range(nfragments)]
 
         for ind in range(nfragments):
@@ -106,6 +115,16 @@ class ExcitonModelDriver:
             if self.rank == mpi_master():
                 self.ostream.print_block(monomer.get_string())
                 self.ostream.flush()
+
+            # 1e integral
+            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+            dipole_drv.set_origin(*self.nuc_chg_center)
+            dipole_mats = dipole_drv.compute(monomer, basis)
+
+            if self.rank == mpi_master():
+                dipole_ints = (dipole_mats.x_to_numpy(),
+                               dipole_mats.y_to_numpy(),
+                               dipole_mats.z_to_numpy())
 
             # SCF calculation
             scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
@@ -141,9 +160,21 @@ class ExcitonModelDriver:
                 self.monomers[ind]['exc_vectors'] = abs_spec.get_property(
                     'eigenvectors')
 
+                nocc = monomer.number_of_alpha_electrons()
+                nvir = self.monomers[ind]['C'].shape[1] - nocc
+                mo_occ = self.monomers[ind]['C'][:, :nocc]
+                mo_vir = self.monomers[ind]['C'][:, nocc:]
+
                 for s in range(self.nstates):
                     h = s + ind * self.nstates
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
+
+                    vec = self.monomers[ind]['exc_vectors'][:, s]
+                    tdens = np.matmul(
+                        mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
+                    tdens *= math.sqrt(2.0)
+                    self.trans_dipoles[h, :] = np.array(
+                        [np.sum(tdens * dipole_ints[d]) for d in range(3)])
 
         dimer_id = -1
 
@@ -169,10 +200,17 @@ class ExcitonModelDriver:
                 # 1e integrals
                 kin_drv = KineticEnergyIntegralsDriver(self.comm)
                 npot_drv = NuclearPotentialIntegralsDriver(self.comm)
+                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                dipole_drv.set_origin(*self.nuc_chg_center)
+
+                kin_mat = kin_drv.compute(dimer, basis)
+                npot_mat = npot_drv.compute(dimer, basis)
+                dipole_mats = dipole_drv.compute(dimer, basis)
 
                 if self.rank == mpi_master():
-                    kin_mat = kin_drv.compute(dimer, basis)
-                    npot_mat = npot_drv.compute(dimer, basis)
+                    dipole_ints = (dipole_mats.x_to_numpy(),
+                                   dipole_mats.y_to_numpy(),
+                                   dipole_mats.z_to_numpy())
 
                     # get indices of monomer AOs in dimer
                     ao_inds_A, ao_inds_B = get_dimer_ao_indices(
@@ -422,6 +460,13 @@ class ExcitonModelDriver:
 
                             self.H[svec['index'], svec['index']] = energy
 
+                            tdens = np.matmul(mo_occ,
+                                              np.matmul(cvec['vec'], mo_vir.T))
+                            tdens *= math.sqrt(2.0)
+                            self.trans_dipoles[svec['index'], :] = np.array([
+                                np.sum(tdens * dipole_ints[d]) for d in range(3)
+                            ])
+
                             valstr = '{} excitation energy:'.format(
                                 svec['type'])
                             valstr += '  {:>26s}'.format(svec['name'])
@@ -435,14 +480,22 @@ class ExcitonModelDriver:
             self.print_banner('Summary')
 
             eigvals, eigvecs = np.linalg.eigh(self.H)
+            adia_trans_dipoles = np.matmul(eigvecs.T, self.trans_dipoles)
 
-            valstr = 'Eigenvalues:'
+            valstr = 'Adiabatic excited states:'
             self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_blank()
+
             for i, e in enumerate(eigvals):
                 enestr = 'E[{}]='.format(i + 1)
+                dip_strength = np.sum(adia_trans_dipoles[i, :]**2)
+                osc_strength = 2.0 / 3.0 * dip_strength * e
+
                 valstr = '{:<8s} {:12.6f} a.u. {:12.5f} eV'.format(
                     enestr, e, e * hartree_in_ev())
+                valstr += '    osc.str. {:12.5f}'.format(osc_strength)
                 self.ostream.print_header(valstr.ljust(92))
+
             self.ostream.print_blank()
             self.ostream.flush()
 
