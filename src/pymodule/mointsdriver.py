@@ -301,22 +301,22 @@ class MOIntegralsDriver:
         if mints_type == "VVVV":
             return moints.vvvv
         
-        if (mints_type == "ASYM_OOOO")
+        if mints_type == "ASYM_OOOO":
             return moints.asym_oooo
         
-        if (mints_type == "ASYM_OOOV")
+        if mints_type == "ASYM_OOOV":
             return moints.asym_ooov
         
-        if (mints_type == "ASYM_OVOV")
+        if mints_type == "ASYM_OVOV":
             return moints.asym_ovov
         
-        if (mints_type == "ASYM_OOVV")
+        if mints_type == "ASYM_OOVV":
             return moints.asym_oovv
         
-        if (mints_type == "ASYM_OVVV")
+        if mints_type == "ASYM_OVVV":
             return moints.asym_ovvv
         
-        if (mints_type == "ASYM_VVVV")
+        if mints_type == "ASYM_VVVV":
             return moints.asym_vvvv
 
         return None
