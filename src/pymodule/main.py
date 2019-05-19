@@ -60,6 +60,15 @@ def main():
         density = scf_drv.density
         scf_tensors = scf_drv.scf_tensors
 
+        # tranform integrals to MO basis
+        if 'ao2mo' in scf_dict:
+
+            moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
+
+            grps = [p for p in range(task.mpi_comm.Get_size())]
+            moints = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
+                                        scf_dict['ao2mo'].upper(), grps)
+                
     # Response
 
     if task_type == 'response':
