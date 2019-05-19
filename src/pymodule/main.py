@@ -69,7 +69,33 @@ def main():
             grps = [p for p in range(task.mpi_comm.Get_size())]
             moints = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
                                         scf_dict['ao2mo'].upper(), grps)
-                
+
+            # sketch for transforming MO integrals batches to antisymmetrized integrals
+            # Indexing scheme: occupied orbitals from 0..nocc
+            #                  virtual orbitals from nocc..ntot
+            #
+            # Select here external indexes space (one need to generalize this)
+            # if  mintstype == "OVOV":
+            #     bra_idx = (0, nocc)
+            #     ket_idx = (nocc, nocc + nvirt)
+            # Assuming we add to tensor ten[i,j,k,l]
+            # for idx, pair in enumerate(moints.get_gen_pairs()):
+            #
+            #   i = pair.first()
+            #   j = pair.second()
+            #
+            #   fxy = moints.xy_to_numpy()
+            #   fyx = moints.yx_to_numpy()
+            #
+            #    for k in bra_idx:
+            #        for l in ket_idx:
+            #           # aaaa, bbbb blocks
+            #           ten_aaaa[i,j,k,l] = fxy[k,l] - fyx[l,k]
+            #           # abab, baba
+            #           ten_abab[i,j,k,l] = fxy[k,l]
+            #           # abba, baba
+            #           ten_abba[i,j,k,l] = -fyx[l,k]
+        
     # Response
 
     if task_type == 'response':

@@ -140,6 +140,14 @@ CMOIntsBatch::append(const CAOFockMatrix&        aoFockMatrix,
         
         _moIntegrals.push_back(denblas::multAtB(braVector, tmat));
         
+        if (isAntisymmetrizedIntegrals(_batchType))
+        {
+            tmat = denblas::multAB(aoFockMatrix.getReferenceToFock(i),
+                                   braVector);
+            
+            _moIntegrals.push_back(denblas::multAtB(ketVector, tmat));
+        }
+        
         _generatorPairs.push_back(CTwoIndexes(braIndexes[i], ketIndexes[i]));
     }
 }
@@ -169,6 +177,28 @@ const double*
 CMOIntsBatch::getBatch(const int32_t iBatch) const
 {
     return _moIntegrals[iBatch].values();
+}
+
+const double*
+CMOIntsBatch::getBatchXY(const int32_t iBatch) const
+{
+    if (isAntisymmetrizedIntegrals(_batchType))
+    {
+        return _moIntegrals[2 * iBatch].values();
+    }
+    
+    return nullptr;
+}
+
+const double*
+CMOIntsBatch::getBatchYX(const int32_t iBatch) const
+{
+    if (isAntisymmetrizedIntegrals(_batchType))
+    {
+        return _moIntegrals[2 * iBatch + 1].values();
+    }
+    
+    return nullptr;
 }
 
 const double*
