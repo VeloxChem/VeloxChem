@@ -155,6 +155,61 @@ CRecursionMap::getNumberOfComponents() const
     return ncomps;
 }
 
+int32_t
+CRecursionMap::getNumberOfTerms() const
+{
+    return static_cast<int32_t>(_recursionTerms.size()); 
+}
+
+CRecursionTerm
+CRecursionMap::getTerm(const int32_t iRecursionTerm) const
+{
+    if (iRecursionTerm < getNumberOfComponents())
+    {
+        return _recursionTerms[iRecursionTerm];
+    }
+    
+    return CRecursionTerm(); 
+}
+
+int32_t
+CRecursionMap::getIndexOfTerm(const CRecursionTerm& recursionTerm) const
+{
+    for (size_t i = 0; i < _recursionTerms.size(); i++)
+    {
+        if (recursionTerm == _recursionTerms[i])
+        {
+            return _recursionIndexes[i]; 
+        }
+    }
+    
+    return -1;
+}
+
+int32_t
+CRecursionMap::getMaxOrder(const std::string&  label,
+                           const CFourIndexes& braAngularMomentum,
+                           const CFourIndexes& ketAngularMomentum,
+                           const int32_t       braCenters,
+                           const int32_t       ketCenters) const
+{
+    int32_t mord = -1;
+    
+    for (size_t i = 0; i < _recursionTerms.size(); i++)
+    {
+        if (_recursionTerms[i].isIntegral(label, braAngularMomentum,
+                                          ketAngularMomentum, braCenters,
+                                          ketCenters))
+        {
+            auto cord = _recursionTerms[i].getOrder();
+            
+            if (cord > mord) mord = cord;
+        }
+    }
+    
+    return mord;
+}
+
 bool
 CRecursionMap::find(const CRecursionTerm& recursionTerm) const
 {

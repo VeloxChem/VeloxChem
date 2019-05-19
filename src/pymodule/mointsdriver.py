@@ -109,6 +109,8 @@ class MOIntegralsDriver:
             else:
                 pair_den = AODensityMatrix()
 
+            print("Ranges:", cur_bra_ids, cur_ket_ids)
+            
             # broadcast pair densities via local communicators
             pair_den.broadcast(local_rank, local_comm)
 
@@ -276,6 +278,24 @@ class MOIntegralsDriver:
 
         if mints_type == "OOVV":
             return TwoIndexes(2, 3)
+        
+        if mints_type == "ASYM_OOOO":
+            return TwoIndexes(2, 3)
+    
+        if mints_type == "ASYM_OOOV":
+            return TwoIndexes(2, 3)
+        
+        if mints_type == "ASYM_OVOV":
+            return TwoIndexes(2, 3)
+
+        if mints_type == "ASYM_OOVV":
+            return TwoIndexes(2, 3)
+        
+        if mints_type == "ASYM_OVVV":
+            return TwoIndexes(2, 3)
+
+        if mints_type == "ASYM_VVVV":
+            return TwoIndexes(2, 3)
 
         return TwoIndexes(1, 3)
 
@@ -298,5 +318,23 @@ class MOIntegralsDriver:
 
         if mints_type == "VVVV":
             return moints.vvvv
+        
+        if mints_type == "ASYM_OOOO":
+            return moints.asym_oooo
+        
+        if mints_type == "ASYM_OOOV":
+            return moints.asym_ooov
+        
+        if mints_type == "ASYM_OVOV":
+            return moints.asym_ovov
+        
+        if mints_type == "ASYM_OOVV":
+            return moints.asym_oovv
+        
+        if mints_type == "ASYM_OVVV":
+            return moints.asym_ovvv
+        
+        if mints_type == "ASYM_VVVV":
+            return moints.asym_vvvv
 
         return None

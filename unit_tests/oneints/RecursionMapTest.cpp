@@ -179,3 +179,90 @@ TEST_F(CRecursionMapTest, GetNumberOfComponents)
     ASSERT_EQ(1152, rma.getNumberOfComponents());
 }
 
+TEST_F(CRecursionMapTest, GetNumberOfTerms)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 0, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Kinetic Energy"}, 2, false, {1, 2, 6, 3}, {3, 1, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionTerm rtc({"Kinetic Energy"}, 1, false, {1, 2, 6, 3}, {2, 2, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionMap rma({rta, rtb, rtc}, {0, 18, 828}, recblock::cc);
+    
+    ASSERT_EQ(3, rma.getNumberOfTerms());
+}
+
+TEST_F(CRecursionMapTest, GetTerm)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 0, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Kinetic Energy"}, 2, false, {1, 2, 6, 3}, {3, 1, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionTerm rtc({"Kinetic Energy"}, 1, false, {1, 2, 6, 3}, {2, 2, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionMap rma({rta, rtb, rtc}, {0, 18, 828}, recblock::cc);
+    
+    ASSERT_EQ(rta, rma.getTerm(0));
+    
+    ASSERT_EQ(rtb, rma.getTerm(1));
+    
+    ASSERT_EQ(rtc, rma.getTerm(2));
+}
+
+TEST_F(CRecursionMapTest, GetIndexOfTerm)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 0, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Kinetic Energy"}, 2, false, {1, 2, 6, 3}, {3, 1, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionTerm rtc({"Kinetic Energy"}, 1, false, {1, 2, 6, 3}, {2, 2, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionTerm rtd({"Kinetic Energy"}, 2, false, {1, 2, 6, 3}, {2, 2, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionMap rma({rta, rtb, rtc}, {0, 18, 828}, recblock::cc);
+    
+    ASSERT_EQ(0, rma.getIndexOfTerm(rta));
+    
+    ASSERT_EQ(18, rma.getIndexOfTerm(rtb));
+    
+    ASSERT_EQ(828, rma.getIndexOfTerm(rtc));
+    
+    ASSERT_EQ(-1, rma.getIndexOfTerm(rtd));
+}
+
+TEST_F(CRecursionMapTest, GetMaxOrder)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 0, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Kinetic Energy"}, 2, false, {1, 2, 6, 3}, {3, 1, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionTerm rtc({"Kinetic Energy"}, 1, false, {1, 2, 6, 3}, {2, 2, 7, 3},
+                       1, 2, 3);
+    
+    CRecursionTerm rtd({"Kinetic Energy"}, 2, false, {1, 2, 6, 3}, {2, 2, 7, 3},
+                       1, 2, 8);
+    
+    CRecursionMap rma({rta, rtb, rtc, rtd}, {0, 18, 828, 2300}, recblock::cc);
+    
+    ASSERT_EQ(5, rma.getMaxOrder({"Overlap"}, {2, 3, 4, 5}, {1, 0, 2, 3}, 1, 2));
+    
+    ASSERT_EQ(0, rma.getMaxOrder({"Kinetic Energy"}, {1, 2, 6, 3}, {3, 1, 7, 3}, 1, 2));
+    
+    ASSERT_EQ(8, rma.getMaxOrder({"Kinetic Energy"}, {1, 2, 6, 3}, {2, 2, 7, 3}, 1, 2));
+    
+    ASSERT_EQ(-1, rma.getMaxOrder({"Kinetic Energy"}, {1, 2, 6, 3}, {2, 2, 7, 3}, 1, 1));
+}
+
+

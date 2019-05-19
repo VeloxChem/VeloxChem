@@ -206,6 +206,12 @@ CRecursionTerm::isValid() const
 }
 
 int32_t
+CRecursionTerm::getOrder() const
+{
+    return _orderOfIntegral; 
+}
+
+int32_t
 CRecursionTerm::getNumberOfOperatorComponents() const
 {
     if (_orderOfOperator > -1)
@@ -273,6 +279,26 @@ CRecursionTerm::getNumberOfComponents(const recblock angularForm) const
     }
     
     return 0;
+}
+
+bool
+CRecursionTerm::isIntegral(const std::string&  label,
+                           const CFourIndexes& braAngularMomentum,
+                           const CFourIndexes& ketAngularMomentum,
+                           const int32_t       braCenters,
+                           const int32_t       ketCenters) const
+{
+    if (label != _labelOfOperator) return false;
+    
+    if (braAngularMomentum != _braAngularMomentum) return false;
+    
+    if (ketAngularMomentum != _ketAngularMomentum) return false;
+    
+    if (braCenters != _braCenters) return false;
+    
+    if (ketCenters != _ketCenters) return false; 
+    
+    return true;
 }
 
 bool

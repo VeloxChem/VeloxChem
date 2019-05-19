@@ -181,6 +181,13 @@ public:
     bool isValid() const;
     
     /**
+     Gets order of integral in recursion term object.
+
+     @return the order of integral.
+     */
+    int32_t getOrder() const;
+    
+    /**
      Gets number of tensorial components of integrand operator.
 
      @return the number of tensorial components.
@@ -222,6 +229,23 @@ public:
      @return the number of components.
      */
     int32_t getNumberOfComponents(const recblock angularForm) const;
+    
+    /**
+     Checks if recursion term object is integral with specific label, bra and
+     ket sides.
+
+     @param label the label of operator.
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     @param braCenters the number of centers on bra side.
+     @param ketCenters the number of centers on ket side.
+     @return true if recurion object is specified integral, false - otherwise.
+     */
+    bool isIntegral(const std::string&  label,
+                    const CFourIndexes& braAngularMomentum,
+                    const CFourIndexes& ketAngularMomentum,
+                    const int32_t       braCenters,
+                    const int32_t       ketCenters) const;
     
     /**
      Converts recursion term object to text output and insert it into output
