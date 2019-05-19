@@ -278,6 +278,24 @@ class MOIntegralsDriver:
 
         if mints_type == "OOVV":
             return TwoIndexes(2, 3)
+        
+        if mints_type == "ASYM_OOOO":
+            return TwoIndexes(2, 3)
+    
+        if mints_type == "ASYM_OOOV":
+            return TwoIndexes(2, 3)
+        
+        if mints_type == "ASYM_OVOV":
+            return TwoIndexes(2, 3)
+
+        if mints_type == "ASYM_OOVV":
+            return TwoIndexes(2, 3)
+        
+        if mints_type == "ASYM_OVVV":
+            return TwoIndexes(2, 3)
+
+        if mints_type == "ASYM_VVVV":
+            return TwoIndexes(2, 3)
 
         return TwoIndexes(1, 3)
 
