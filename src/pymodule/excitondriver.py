@@ -171,7 +171,6 @@ class ExcitonModelDriver:
 
             if self.rank == mpi_master():
                 self.monomers[ind]['C'] = scf_drv.scf_tensors['C'].copy()
-                self.monomers[ind]['F'] = scf_drv.scf_tensors['F'][0].copy()
 
             # TDA calculation
             abs_spec = Absorption({
@@ -189,9 +188,9 @@ class ExcitonModelDriver:
                 self.ostream.flush()
 
                 self.monomers[ind]['exc_energies'] = abs_spec.get_property(
-                    'eigenvalues')
+                    'eigenvalues').copy()
                 self.monomers[ind]['exc_vectors'] = abs_spec.get_property(
-                    'eigenvectors')
+                    'eigenvectors').copy()
 
                 nocc = monomer.number_of_alpha_electrons()
                 nvir = self.monomers[ind]['C'].shape[1] - nocc
