@@ -5,6 +5,7 @@ from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
+from .mointsdriver import MOIntegralsDriver
 from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
