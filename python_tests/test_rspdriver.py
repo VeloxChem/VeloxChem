@@ -32,15 +32,29 @@ class TestRspDriver(unittest.TestCase):
             'max_iter': 50,
         })
 
-        tda_exci.compute(task.molecule, task.ao_basis, scf_tensors)
+        tda_results = tda_exci.compute(task.molecule, task.ao_basis,
+                                       scf_tensors)
 
         if task.mpi_rank == mpi_master():
 
-            reigs, rnorms = tda_exci.solver.get_eigenvalues()
+            reigs = tda_results['eigenvalues']
+            osc_strs = tda_results['oscillator_strengths']
+            trans_dipoles = tda_results['transition_dipoles']
 
             ref_eigs = np.array([0.207436, 0.257474, 0.368358])
+            ref_osc_strs = np.array([0.0000, 0.0003, 0.2797])
+            ref_trans_dipoles = [
+                np.array([0.0000, 0.0000, 0.0000]),
+                np.array([0.0432, 0.0000, 0.0000]),
+                np.array([0.0000, -0.7546, 0.7546]),
+            ]
 
             self.assertTrue(np.max(np.abs(reigs - ref_eigs)) < 1.0e-6)
+            self.assertTrue(np.max(np.abs(osc_strs - ref_osc_strs)) < 1.0e-4)
+
+            for td, ref_td in zip(trans_dipoles, ref_trans_dipoles):
+                prefac = 1.0 if np.dot(td, ref_td) >= 0.0 else -1.0
+                self.assertTrue(np.max(np.abs(td - ref_td * prefac)) < 1.0e-4)
 
         # polarizability
         lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)

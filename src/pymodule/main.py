@@ -5,6 +5,7 @@ from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
+from .mointsdriver import MOIntegralsDriver
 from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
@@ -36,8 +37,8 @@ def main():
             exciton_dict = {}
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
-        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis,
-                            exciton_dict['fragments'], exciton_dict['nstates'])
+        exciton_drv.update_settings(exciton_dict)
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Hartree-Fock
 
@@ -60,6 +61,15 @@ def main():
         density = scf_drv.density
         scf_tensors = scf_drv.scf_tensors
 
+        # tranform integrals to MO basis
+        if 'ao2mo' in scf_dict:
+
+            moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
+
+            grps = [p for p in range(task.mpi_comm.Get_size())]
+            moints = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
+                                        scf_dict['ao2mo'].upper(), grps)
+                
     # Response
 
     if task_type == 'response':

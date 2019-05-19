@@ -9,6 +9,8 @@ basis: cc-pvdz
 @exciton
 fragments: 3 * 3
 nstates: 2
+ct_nocc: 1
+ct_nvir: 1
 @end
 
 @molecule

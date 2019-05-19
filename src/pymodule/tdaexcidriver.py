@@ -192,13 +192,17 @@ class TDAExciDriver:
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
 
+            transition_dipoles = self.comp_transition_dipoles(
+                dipole_ints, eigvecs, mo_occ, mo_vir)
+
             oscillator_strengths = self.comp_oscillator_strengths(
-                dipole_ints, eigvals, eigvecs, mo_occ, mo_vir)
+                transition_dipoles, eigvals)
 
             return {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
-                'oscillator_strengths': oscillator_strengths
+                'oscillator_strengths': oscillator_strengths,
+                'transition_dipoles': transition_dipoles,
             }
         else:
             return {}
@@ -352,21 +356,28 @@ class TDAExciDriver:
         else:
             return ()
 
-    def comp_oscillator_strengths(self, dipole_ints, eigvals, eigvecs, mo_occ,
-                                  mo_vir):
+    def comp_transition_dipoles(self, dipole_ints, eigvecs, mo_occ, mo_vir):
+
+        transition_dipoles = []
+
+        for s in range(self.nstates):
+            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
+            trans_dens *= math.sqrt(2.0)
+
+            transition_dipoles.append(
+                np.array(
+                    [np.sum(trans_dens * dipole_ints[d]) for d in range(3)]))
+
+        return transition_dipoles
+
+    def comp_oscillator_strengths(self, transition_dipoles, eigvals):
 
         oscillator_strengths = np.zeros((self.nstates,))
 
         for s in range(self.nstates):
             exc_ene = eigvals[s]
-            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
-
-            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
-            trans_dens *= math.sqrt(2.0)
-            trans_dipole = np.array(
-                [np.sum(trans_dens * dipole_ints[d]) for d in range(3)])
-
-            dipole_strength = np.sum(trans_dipole**2)
+            dipole_strength = np.sum(transition_dipoles[s]**2)
             oscillator_strengths[s] = 2.0 / 3.0 * dipole_strength * exc_ene
 
         return oscillator_strengths
