@@ -147,6 +147,8 @@ class ExcitonModelDriver:
                                                 self.natoms[ind])
             if self.rank == mpi_master():
                 self.ostream.print_block(monomer.get_string())
+                self.ostream.print_block(
+                    basis.get_string("Atomic Basis", monomer))
                 self.ostream.flush()
 
             # 1e integral
@@ -233,6 +235,8 @@ class ExcitonModelDriver:
                 dimer = Molecule(monomer_a, monomer_b)
                 if self.rank == mpi_master():
                     self.ostream.print_block(dimer.get_string())
+                    self.ostream.print_block(
+                        basis.get_string("Atomic Basis", dimer))
                     self.ostream.flush()
 
                 # 1e integrals
@@ -542,8 +546,6 @@ class ExcitonModelDriver:
                                         name_CA, name_CB)
                                     valstr += '  {:20.12f}'.format(coupling)
                                     self.ostream.print_header(valstr.ljust(92))
-
-                        self.ostream.print_blank()
 
                         # A(i)->C(a) vs B(j)->C(a): -f_ij
                         for vC in range(self.ct_nvir):
