@@ -235,16 +235,16 @@ class MOIntegralsDriver:
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
         
-        # case: asym_oovv
+        # case: asym_ovov
         if mints_type == "ASYM_OVOV":
             ket_dim = (nocc, nocc + nvirt)
 
-        # case: asym_oovv
+        # case: asym_ovvv
         if mints_type == "ASYM_OVVV":
             ket_dim = (nocc, nocc + nvirt)
 
-        # case: asym_oovv
-        if mints_type == "ASYM_OVVV":
+        # case: asym_vvvv
+        if mints_type == "ASYM_VVVV":
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
 
