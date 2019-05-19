@@ -2,18 +2,45 @@ from mpi4py import MPI
 import numpy as np
 import unittest
 
+from veloxchem.veloxchemlib import DenseMatrix
+from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
+from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
+from veloxchem.veloxchemlib import NuclearPotentialMatrix
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
 from veloxchem.veloxchemlib import mpi_master
-from veloxchem.veloxchemlib import assemble_overlap_matrices
-from veloxchem.veloxchemlib import assemble_kinetic_energy_matrices
-from veloxchem.veloxchemlib import assemble_nuclear_potential_matrices
+from veloxchem.veloxchemlib import get_dimer_ao_indices
 from veloxchem.mpitask import MpiTask
 from veloxchem.excitondriver import ExcitonModelDriver
 
 
 class TestExciton(unittest.TestCase):
+
+    @staticmethod
+    def assemble_matrices(ao_inds_1, ao_inds_2, s11, s12, s21, s22):
+
+        n1 = len(ao_inds_1)
+        n2 = len(ao_inds_2)
+        smat = np.zeros((n1 + n2, n1 + n2))
+
+        for row in range(n1):
+            for col in range(n1):
+                smat[ao_inds_1[row], ao_inds_1[col]] = s11[row, col]
+
+        for row in range(n1):
+            for col in range(n2):
+                smat[ao_inds_1[row], ao_inds_2[col]] = s12[row, col]
+
+        for row in range(n2):
+            for col in range(n1):
+                smat[ao_inds_2[row], ao_inds_1[col]] = s21[row, col]
+
+        for row in range(n2):
+            for col in range(n2):
+                smat[ao_inds_2[row], ao_inds_2[col]] = s22[row, col]
+
+        return smat
 
     def test_assemble_matrices(self):
 
@@ -30,6 +57,10 @@ class TestExciton(unittest.TestCase):
         mol_1 = molecule.get_sub_molecule(0, 4)
         mol_2 = molecule.get_sub_molecule(4, 5)
 
+        # get indices of AOs from sub molecules
+
+        ao_inds_1, ao_inds_2 = get_dimer_ao_indices(mol_1, mol_2, basis, basis)
+
         # compute overlap
 
         ovldrv = OverlapIntegralsDriver(comm)
@@ -41,9 +72,10 @@ class TestExciton(unittest.TestCase):
 
         if rank == mpi_master():
 
-            S_exmod = assemble_overlap_matrices(mol_1, mol_2, basis, basis, S11,
-                                                S22, S12, S21)
-
+            smat = self.assemble_matrices(ao_inds_1, ao_inds_2, S11.to_numpy(),
+                                          S12.to_numpy(), S21.to_numpy(),
+                                          S22.to_numpy())
+            S_exmod = OverlapMatrix(DenseMatrix(smat))
             self.assertEqual(S, S_exmod)
 
         # compute kinetic energy
@@ -57,10 +89,10 @@ class TestExciton(unittest.TestCase):
 
         if rank == mpi_master():
 
-            T_exmod = assemble_kinetic_energy_matrices(mol_1, mol_2, basis,
-                                                       basis, T11, T22, T12,
-                                                       T21)
-
+            tmat = self.assemble_matrices(ao_inds_1, ao_inds_2, T11.to_numpy(),
+                                          T12.to_numpy(), T21.to_numpy(),
+                                          T22.to_numpy())
+            T_exmod = KineticEnergyMatrix(DenseMatrix(tmat))
             self.assertEqual(T, T_exmod)
 
         # compute nuclear potential
@@ -74,9 +106,10 @@ class TestExciton(unittest.TestCase):
 
         if rank == mpi_master():
 
-            V_exmod = assemble_nuclear_potential_matrices(
-                mol_1, mol_2, basis, basis, V11, V22, V12, V21)
-
+            vmat = self.assemble_matrices(ao_inds_1, ao_inds_2, V11.to_numpy(),
+                                          V12.to_numpy(), V21.to_numpy(),
+                                          V22.to_numpy())
+            V_exmod = NuclearPotentialMatrix(DenseMatrix(vmat))
             self.assertEqual(V, V_exmod)
 
     def test_exciton_model(self):
