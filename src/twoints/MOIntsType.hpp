@@ -115,4 +115,29 @@ inline std::string to_string(const moints moIntsType)
     return std::string("UNKNOWN");
 }
 
+/**
+ Checks if enumerate class value corresponds to antisymmetrized integrals.
+
+ @param moIntsType  the enumerate class value.
+ @return true if enumerate class value corresponds to antisymmetrized integrals,
+         false otherwise.
+ */
+inline bool isAntisymmetrizedIntegrals(const moints moIntsType)
+{
+    if (moIntsType == moints::asym_oooo) return true;
+    
+    if (moIntsType == moints::asym_ooov) return true;
+    
+    if (moIntsType == moints::asym_oovv) return true;
+    
+    if (moIntsType == moints::asym_ovov) return true;
+    
+    if (moIntsType == moints::asym_ovvv) return true;
+    
+    if (moIntsType == moints::asym_vvvv) return true;
+    
+    return false;
+}
+
+
 #endif /* MOIntsType_hpp */

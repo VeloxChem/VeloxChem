@@ -167,6 +167,24 @@ public:
     const double* getBatch(const int32_t iBatch) const;
     
     /**
+     Gets MO integrals batch with XY contraction pattern for antisymmetrized
+     integrals batch.
+     
+     @param iBatch the index of MO integrals batch.
+     @return the constant pointer to first element of MO integrals batch.
+     */
+    const double* getBatchXY(const int32_t iBatch) const;
+    
+    /**
+     Gets MO integrals batch with YX contraction pattern for antisymmetrized
+     integrals batch.
+     
+     @param iBatch the index of MO integrals batch.
+     @return the constant pointer to first element of MO integrals batch.
+     */
+    const double* getBatchYX(const int32_t iBatch) const;
+    
+    /**
      Gets MO integrals batch for specific generator pair.
      
      @param iGeneratorPair the generator pair associated with MO integrals
