@@ -48,41 +48,39 @@ class DensityGuess:
         """Setter function for protected guess_type attribute."""
         self._guess_type = value
 
-    def validate_checkpoint(self, molecule, ao_basis, comm, ovl_thresh):
+    def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set):
         """Validates the checkpoint file.
 
-        Validates the checkpoint file by checking number of AOs and MOs.
+        Validates the checkpoint file by checking nuclear charges and basis set.
 
         Parameters
         ----------
-        molecule
-            The molecule.
-        ao_basis
-            The AO basis.
+        rank
+            The rank of the MPI process.
         comm
             The MPI communicator.
-        ovl_thresh
-            The atomic orbitals linear dependency threshold.
+        nuclear_charges
+            Numpy array of the nuclear charges.
+        basis_set
+            Name of the AO basis.
         """
 
-        rank = comm.Get_rank()
-        ovl_drv = OverlapIntegralsDriver(comm)
-        ovl_mat = ovl_drv.compute(molecule, ao_basis)
-
-        if rank == mpi_master():
-            oao_mat = ovl_mat.get_ortho_matrix(ovl_thresh)
-            nao = oao_mat.number_of_rows()
-            nmo = oao_mat.number_of_columns()
-
         valid = False
-        if self._checkpoint_file and isinstance(self._checkpoint_file, str):
-            if rank == mpi_master() and isfile(self._checkpoint_file):
-                mol_orbs = MolecularOrbitals.read_hdf5(self._checkpoint_file)
-                if (mol_orbs.number_aos() == nao and
-                        mol_orbs.number_mos() == nmo):
-                    valid = True
+
+        if (self._checkpoint_file and isinstance(self._checkpoint_file, str) and
+                rank == mpi_master() and isfile(self._checkpoint_file)):
+
+            hf_mo = MolecularOrbitals.read_hdf5(self._checkpoint_file)
+
+            if ('nuclear_charges' in hf_mo and
+                (hf_mo['nuclear_charges'] == nuclear_charges).all() and
+                    'basis_set' in hf_mo and
+                    hf_mo['basis_set'].upper() == basis_set.upper()):
+
+                valid = True
 
         valid = comm.bcast(valid, root=mpi_master())
+
         return valid
 
     def restart_density(self, molecule, comm, ostream):
@@ -101,7 +99,7 @@ class DensityGuess:
         """
 
         if comm.Get_rank() == mpi_master():
-            mol_orbs = MolecularOrbitals.read_hdf5(self._checkpoint_file)
+            mol_orbs = MolecularOrbitals.read_hdf5(self._checkpoint_file)['mo']
             den_mat = mol_orbs.get_density(molecule)
 
             restart_text = 'Restarting from checkpoint file: '

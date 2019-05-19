@@ -176,7 +176,8 @@ class ScfDriver:
         if self.restart:
             self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
             self.restart = self.den_guess.validate_checkpoint(
-                molecule, ao_basis, self.comm, self.ovl_thresh)
+                self.rank, self.comm, molecule.elem_ids_to_numpy(),
+                ao_basis.get_label())
 
         if self.restart:
             self.acc_type = "DIIS"
@@ -237,12 +238,13 @@ class ScfDriver:
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()
 
-    def write_checkpoint(self):
+    def write_checkpoint(self, nuclear_charges, basis_set):
         """Writes molecular orbitals to checkpoint file"""
 
         if self.rank == mpi_master() and not self.first_step:
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
-                self.mol_orbs.write_hdf5(self.checkpoint_file)
+                self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
+                                         basis_set)
 
     def comp_diis(self, molecule, ao_basis, min_basis):
         """Performs SCF calculation with C2-DIIS acceleration.
@@ -350,7 +352,8 @@ class ScfDriver:
 
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat)
 
-            self.write_checkpoint()
+            self.write_checkpoint(molecule.elem_ids_to_numpy(),
+                                  ao_basis.get_label())
 
             self.density = AODensityMatrix(den_mat)
 

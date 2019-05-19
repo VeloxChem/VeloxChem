@@ -130,13 +130,17 @@ class TestOrbData(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-            orb_rest.write_hdf5("inputs/dummy.h5")
+            nuc_chg = np.array([1, 8, 1], dtype=np.int32)
+            orb_rest.write_hdf5("inputs/dummy.h5", nuc_chg, 'sto-3g')
             dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
-            self.assertEqual(orb_rest, dummy)
+            self.assertEqual(orb_rest, dummy['mo'])
+            self.assertTrue((nuc_chg == dummy['nuclear_charges']).all())
+            self.assertEqual("sto-3g", dummy['basis_set'])
 
-            orb_unrest.write_hdf5("inputs/dummy.h5")
+            orb_unrest.write_hdf5("inputs/dummy.h5", basis_set='cc-pvdz')
             dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
-            self.assertEqual(orb_unrest, dummy)
+            self.assertEqual(orb_unrest, dummy['mo'])
+            self.assertEqual("cc-pvdz", dummy['basis_set'])
 
     def test_rest_density(self):
 
