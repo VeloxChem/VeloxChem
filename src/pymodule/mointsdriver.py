@@ -222,7 +222,7 @@ class MOIntegralsDriver:
 
         nocc, nvirt = self.get_num_orbitals(mol_orbs, molecule)
 
-        # cases: oooo, ooov, oovv, ovov
+        # cases: oooo, ooov, oovv, ovov, asym_oooo, asym_ooov, asym_oovv
         bra_dim = (0, nocc)
         ket_dim = (0, nocc)
 
@@ -232,6 +232,19 @@ class MOIntegralsDriver:
 
         # case: vvvv
         if mints_type == "VVVV":
+            bra_dim = (nocc, nocc + nvirt)
+            ket_dim = (nocc, nocc + nvirt)
+        
+        # case: asym_oovv
+        if mints_type == "ASYM_OVOV":
+            ket_dim = (nocc, nocc + nvirt)
+
+        # case: asym_oovv
+        if mints_type == "ASYM_OVVV":
+            ket_dim = (nocc, nocc + nvirt)
+
+        # case: asym_oovv
+        if mints_type == "ASYM_OVVV":
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
 
@@ -252,7 +265,7 @@ class MOIntegralsDriver:
 
         nocc, nvirt = self.get_num_orbitals(mol_orbs, molecule)
 
-        # cases: oovv, ovov, ovvv, vvvv
+        # cases: oovv, ovov, ovvv, vvvv, asym_oovv, asym_ovvv, asym_vvvv
         xmat = mol_orbs.alpha_orbitals(nocc, nvirt)
         ymat = mol_orbs.alpha_orbitals(nocc, nvirt)
 
@@ -263,6 +276,19 @@ class MOIntegralsDriver:
 
         # case: ooov
         if mints_type == "OOOV":
+            xmat = mol_orbs.alpha_orbitals(0, nocc)
+        
+        # case: asym_oooo
+        if mints_type == "ASYM_OOOO":
+            xmat = mol_orbs.alpha_orbitals(0, nocc)
+            ymat = mol_orbs.alpha_orbitals(0, nocc)
+        
+        # case: asym_ooov
+        if mints_type == "ASYM_OOOV":
+            xmat = mol_orbs.alpha_orbitals(0, nocc)
+        
+        # case: asym_ovov
+        if mints_type == "ASYM_OVOV":
             xmat = mol_orbs.alpha_orbitals(0, nocc)
 
         return (xmat, ymat)
