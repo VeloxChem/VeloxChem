@@ -1,4 +1,5 @@
 import numpy as np
+import time as tm
 import math
 
 from .veloxchemlib import KineticEnergyIntegralsDriver
@@ -78,6 +79,7 @@ class ExcitonModelDriver:
 
     def compute(self, molecule, basis, min_basis):
 
+        # sanity check
         assert_msg_critical(
             sum(self.natoms) == molecule.number_of_atoms(),
             'ExcitonModelDriver: Inconsistent number of atoms')
@@ -85,28 +87,57 @@ class ExcitonModelDriver:
         assert_msg_critical(self.nstates > 0,
                             'ExcitonModelDriver: Invalid number of LE states')
 
-        if self.rank == mpi_master():
-            self.print_title(self.natoms)
+        assert_msg_critical(self.ct_nocc >= 0 and self.ct_nvir >= 0,
+                            'ExcitonModelDriver: Invalid number of CT states')
 
+        # exciton model setup
         nfragments = len(self.natoms)
         start_indices = [sum(self.natoms[:i]) for i in range(nfragments)]
 
         npairs = nfragments * (nfragments - 1) // 2
         ct_states = self.ct_nocc * self.ct_nvir
 
-        self.H = np.zeros((nfragments * self.nstates + npairs * ct_states * 2,
-                           nfragments * self.nstates + npairs * ct_states * 2))
+        total_LE_states = nfragments * self.nstates
+        total_CT_states = npairs * ct_states * 2
+        total_num_states = total_LE_states + total_CT_states
 
-        self.trans_dipoles = np.zeros(
-            (nfragments * self.nstates + npairs * ct_states * 2, 3))
-
+        self.H = np.zeros((total_num_states, total_num_states))
+        self.trans_dipoles = np.zeros((total_num_states, 3))
         self.nuc_chg_center = molecule.center_of_nuclear_charge()
 
         self.monomers = [{} for i in range(nfragments)]
 
+        if self.rank == mpi_master():
+            self.print_title(total_LE_states, total_CT_states)
+
+        # dimer indices
+        dimer_id = np.zeros((nfragments, nfragments), dtype=np.int32)
+        dimer_count = 0
+        for ind_A in range(nfragments):
+            dimer_id[ind_A, ind_A] = -1
+            for ind_B in range(ind_A + 1, nfragments):
+                dimer_id[ind_A, ind_B] = dimer_count
+                dimer_id[ind_B, ind_A] = dimer_count
+                dimer_count += 1
+
+        # indices of diabatic excited states
+        excitation_id = np.zeros((nfragments, nfragments), dtype=np.int32)
+        for ind_A in range(nfragments):
+            # LE
+            excitation_id[ind_A, ind_A] = ind_A * self.nstates
+            for ind_B in range(ind_A + 1, nfragments):
+                ct_id = nfragments * self.nstates
+                ct_id += dimer_id[ind_A][ind_B] * ct_states * 2
+                # CT(A->B)
+                excitation_id[ind_A, ind_B] = ct_id
+                # CT(B->A)
+                excitation_id[ind_B, ind_A] = ct_id + ct_states
+
         # Monomers
 
         for ind in range(nfragments):
+
+            monomer_start_time = tm.time()
 
             monomer_name = 'Monomer {}'.format(ind + 1)
             self.print_banner(monomer_name)
@@ -168,9 +199,8 @@ class ExcitonModelDriver:
                 mo_vir = self.monomers[ind]['C'][:, nocc:]
 
                 for s in range(self.nstates):
-                    h = s + ind * self.nstates
-
                     # LE excitation energy
+                    h = excitation_id[ind, ind] + s
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
@@ -180,9 +210,12 @@ class ExcitonModelDriver:
                     self.trans_dipoles[h, :] = np.array(
                         [np.sum(tdens * dipole_ints[d]) for d in range(3)])
 
-        # Dimers
+            valstr = '*** Time used in monomer calculation:'
+            valstr += ' {:.2f} sec'.format(tm.time() - monomer_start_time)
+            self.ostream.print_block(valstr.ljust(92))
+            self.ostream.print_blank()
 
-        dimer_id = -1
+        # Dimers
 
         for ind_A in range(nfragments):
             monomer_a = molecule.get_sub_molecule(start_indices[ind_A],
@@ -192,7 +225,7 @@ class ExcitonModelDriver:
                 monomer_b = molecule.get_sub_molecule(start_indices[ind_B],
                                                       self.natoms[ind_B])
 
-                dimer_id += 1
+                dimer_start_time = tm.time()
 
                 dimer_name = 'Dimer {} {}'.format(ind_A + 1, ind_B + 1)
                 self.print_banner(dimer_name)
@@ -287,6 +320,7 @@ class ExcitonModelDriver:
                     hcore = kin_mat.to_numpy() - npot_mat.to_numpy()
                     fock = hcore + fock_mat.to_numpy(0)
 
+                    # compute Fock in MO basis
                     fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
                     fock_occ = fock_mo[:nocc, :nocc]
                     fock_vir = fock_mo[nocc:, nocc:]
@@ -322,7 +356,7 @@ class ExcitonModelDriver:
                             'vec': ci_vec,
                             'frag': 'A',
                             'type': 'LE',
-                            'index': ind_A * self.nstates + sA,
+                            'index': excitation_id[ind_A, ind_A] + sA,
                             'name': '{}e({}){}g'.format(ind_A + 1, sA + 1,
                                                         ind_B + 1),
                         })
@@ -335,7 +369,7 @@ class ExcitonModelDriver:
                             'vec': ci_vec,
                             'frag': 'B',
                             'type': 'LE',
-                            'index': ind_B * self.nstates + sB,
+                            'index': excitation_id[ind_B, ind_B] + sB,
                             'name': '{}g{}e({})'.format(ind_A + 1, ind_B + 1,
                                                         sB + 1),
                         })
@@ -347,43 +381,42 @@ class ExcitonModelDriver:
                     # occ.B |         |         |    occ.B |  CT(BA) |         |
                     #       +---------+---------+          +---------+---------+
 
-                    ct_ind = nfragments * self.nstates
-                    ct_ind += dimer_id * ct_states * 2
-
                     for oA in range(self.ct_nocc):
                         for vB in range(self.ct_nvir):
+                            ctAB = oA * self.ct_nvir + vB
                             ci_vec = np.zeros((nocc, nvir))
                             ci_vec[nocc_A - 1 - oA][nvir_A + vB] = 1.0
                             CI_vectors.append({
                                 'vec': ci_vec,
                                 'frag': 'AB',
                                 'type': 'CT',
-                                'index': ct_ind,
+                                'index': excitation_id[ind_A, ind_B] + ctAB,
                                 'name': '{}+(H{}){}-(L{})'.format(
                                     ind_A + 1, oA, ind_B + 1, vB),
                             })
-                            ct_ind += 1
 
                     for oB in range(self.ct_nocc):
                         for vA in range(self.ct_nvir):
+                            ctBA = oB * self.ct_nvir + vA
                             ci_vec = np.zeros((nocc, nvir))
                             ci_vec[nocc - 1 - oB][vA] = 1.0
                             CI_vectors.append({
                                 'vec': ci_vec,
                                 'frag': 'BA',
                                 'type': 'CT',
-                                'index': ct_ind,
+                                'index': excitation_id[ind_B, ind_A] + ctBA,
                                 'name': '{}-(L{}){}+(H{})'.format(
                                     ind_A + 1, vA, ind_B + 1, oB),
                             })
-                            ct_ind += 1
+
+                    # create masked CI_vectors containing LE(A), CT(AB), CT(BA)
+                    mask_ci_vectors = CI_vectors[:self.nstates] + CI_vectors[
+                        self.nstates * 2:]
 
                 # compute sigma vectors for LE(A), CT(AB), CT(BA)
                 if self.rank == mpi_master():
                     tdens = []
-                    for vec in CI_vectors:
-                        if vec['frag'] == 'B':
-                            continue
+                    for vec in mask_ci_vectors:
                         tdens.append(
                             np.matmul(mo_occ, np.matmul(vec['vec'], mo_vir.T)))
                     tdens_mat = AODensityMatrix(tdens, denmat.rest)
@@ -407,21 +440,17 @@ class ExcitonModelDriver:
                         sigma_vec = np.matmul(mo_occ.T,
                                               np.matmul(tfock, mo_vir))
 
-                        # skip LE(B) in CI_vectors
-                        # since sigma_vectors does not contain LE(B)
-                        s2 = s
-                        if s >= self.nstates:
-                            s2 += self.nstates
-
-                        sigma_vec -= np.matmul(fock_occ, CI_vectors[s2]['vec'])
-                        sigma_vec += np.matmul(CI_vectors[s2]['vec'], fock_vir)
+                        sigma_vec -= np.matmul(fock_occ,
+                                               mask_ci_vectors[s]['vec'])
+                        sigma_vec += np.matmul(mask_ci_vectors[s]['vec'],
+                                               fock_vir)
 
                         sigma_vectors.append({
                             'vec': sigma_vec,
-                            'frag': CI_vectors[s2]['frag'],
-                            'type': CI_vectors[s2]['type'],
-                            'index': CI_vectors[s2]['index'],
-                            'name': CI_vectors[s2]['name'],
+                            'frag': mask_ci_vectors[s]['frag'],
+                            'type': mask_ci_vectors[s]['type'],
+                            'index': mask_ci_vectors[s]['index'],
+                            'name': mask_ci_vectors[s]['name'],
                         })
 
                     # compute couplings
@@ -450,7 +479,11 @@ class ExcitonModelDriver:
                                     svec['name'], cvec['name'])
 
                             valstr += '  {:20.12f}'.format(coupling)
-                            self.ostream.print_header(valstr.ljust(92))
+
+                            if not (svec['type'] == 'CT' and
+                                    cvec['type'] == 'CT' and
+                                    svec['index'] > cvec['index']):
+                                self.ostream.print_header(valstr.ljust(92))
 
                         self.ostream.print_blank()
 
@@ -480,6 +513,70 @@ class ExcitonModelDriver:
                             [np.sum(tdens * dipole_ints[d]) for d in range(3)])
 
                     self.ostream.print_blank()
+
+                    # three-body CT-CT couplings
+
+                    for ind_C in range(nfragments):
+                        if ind_C == ind_A or ind_C == ind_B:
+                            continue
+
+                        # C(i)->A(a) vs C(i)->B(b): f_ab
+                        for oC in range(self.ct_nocc):
+                            for vA in range(self.ct_nvir):
+                                for vB in range(self.ct_nvir):
+                                    ctCA = oC * self.ct_nvir + vA
+                                    ctCB = oC * self.ct_nvir + vB
+                                    ctCA += excitation_id[ind_C, ind_A]
+                                    ctCB += excitation_id[ind_C, ind_B]
+
+                                    coupling = fock_vir[vA, nvir_A + vB]
+
+                                    self.H[ctCA, ctCB] = coupling
+                                    self.H[ctCB, ctCA] = coupling
+
+                                    valstr = 'CT-CT coupling:'
+                                    name_CA = '{}+(H{}){}-(L{})'.format(
+                                        ind_C + 1, oC, ind_A + 1, vA)
+                                    name_CB = '{}+(H{}){}-(L{})'.format(
+                                        ind_C + 1, oC, ind_B + 1, vB)
+                                    valstr += '  {:>15s}  {:>15s}'.format(
+                                        name_CA, name_CB)
+                                    valstr += '  {:20.12f}'.format(coupling)
+                                    self.ostream.print_header(valstr.ljust(92))
+
+                        self.ostream.print_blank()
+
+                        # A(i)->C(a) vs B(j)->C(a): -f_ij
+                        for vC in range(self.ct_nvir):
+                            for oA in range(self.ct_nocc):
+                                for oB in range(self.ct_nocc):
+                                    ctAC = oA * self.ct_nvir + vC
+                                    ctBC = oB * self.ct_nvir + vC
+                                    ctAC += excitation_id[ind_A, ind_C]
+                                    ctBC += excitation_id[ind_B, ind_C]
+
+                                    coupling = -fock_occ[nocc_A - 1 - oA, nocc -
+                                                         1 - oB]
+
+                                    self.H[ctAC, ctBC] = coupling
+                                    self.H[ctBC, ctAC] = coupling
+
+                                    valstr = 'CT-CT coupling:'
+                                    name_AC = '{}+(H{}){}-(L{})'.format(
+                                        ind_A + 1, oA, ind_C + 1, vC)
+                                    name_BC = '{}+(H{}){}-(L{})'.format(
+                                        ind_B + 1, oB, ind_C + 1, vC)
+                                    valstr += '  {:>15s}  {:>15s}'.format(
+                                        name_AC, name_BC)
+                                    valstr += '  {:20.12f}'.format(coupling)
+                                    self.ostream.print_header(valstr.ljust(92))
+
+                        self.ostream.print_blank()
+
+                valstr = '*** Time used in dimer calculation:'
+                valstr += ' {:.2f} sec'.format(tm.time() - dimer_start_time)
+                self.ostream.print_block(valstr.ljust(92))
+                self.ostream.print_blank()
 
         if self.rank == mpi_master():
             self.print_banner('Summary')
@@ -513,20 +610,24 @@ class ExcitonModelDriver:
         self.ostream.print_header(line)
         self.ostream.print_blank()
 
-    def print_title(self, natoms):
+    def print_title(self, num_LE, num_CT):
 
         self.print_banner('Exciton Model')
 
-        valstr = 'Total number of atoms:        {}'.format(sum(natoms))
+        num_atoms = sum(self.natoms)
+        num_frags = len(self.natoms)
+
+        valstr = 'Total number of atoms:        {}'.format(num_atoms)
         self.ostream.print_header(valstr.ljust(72))
-        valstr = 'Total number of monomers:     {}'.format(len(natoms))
+        valstr = 'Total number of monomers:     {}'.format(num_frags)
         self.ostream.print_header(valstr.ljust(72))
-        valstr = 'Total number of LE states:    {}'.format(
-            len(natoms) * self.nstates)
+        valstr = 'Total number of LE states:    {}'.format(num_LE)
+        self.ostream.print_header(valstr.ljust(72))
+        valstr = 'Total number of CT states:    {}'.format(num_CT)
         self.ostream.print_header(valstr.ljust(72))
         self.ostream.print_blank()
 
-        for i, n in enumerate(natoms):
+        for i, n in enumerate(self.natoms):
             valstr = 'Monomer  {}  has  {}  atoms'.format(i + 1, n)
             self.ostream.print_header(valstr.ljust(72))
         self.ostream.print_blank()
