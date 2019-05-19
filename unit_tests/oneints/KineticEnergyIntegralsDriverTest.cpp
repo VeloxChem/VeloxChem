@@ -11,7 +11,6 @@
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
-#include "AssembleMatrices.hpp"
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7409,80 +7408,6 @@ TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2O)
     CDenseMatrix m (intvals, kinmat.getNumberOfRows(), kinmat.getNumberOfColumns());
 
     ASSERT_EQ(kinmat, CKineticEnergyMatrix(m));
-}
-
-TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForH2ODimer)
-{
-    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
-    
-    auto mdimer = vlxmol::getMoleculeH2ODimer();
-
-    auto mh2o_1 = mdimer.getSubMolecule(0,3);
-
-    auto mh2o_2 = mdimer.getSubMolecule(3,3);
-    
-    auto mbas = vlxbas::getMolecularBasisForH2O();
-
-    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas);
-
-    CKineticEnergyMatrix S11 = kindrv.compute(mh2o_1, mbas);
-
-    CKineticEnergyMatrix S22 = kindrv.compute(mh2o_2, mbas);
-
-    CKineticEnergyMatrix S12 = kindrv.compute(mh2o_1, mh2o_2, mbas);
-
-    CKineticEnergyMatrix S21 = kindrv.compute(mh2o_2, mh2o_1, mbas);
-
-    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
-
-    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
-
-    CKineticEnergyMatrix S_new = dimerfunc::assembleKineticEnergyMatrices(
-                                            mh2o_1, mh2o_2, mbas, mbas,
-                                            S11, S22, S12, S21);
-
-    ASSERT_EQ(S, S_new);
-}
-
-TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForNH3CH4)
-{
-    CKineticEnergyIntegralsDriver kindrv(MPI_COMM_WORLD);
-
-    auto mdimer = vlxmol::getMoleculeNH3CH4();
-
-    auto mnh3 = mdimer.getSubMolecule(0,4);
-
-    auto mch4 = mdimer.getSubMolecule(4,5);
-    
-    auto mbas = vlxbas::getMinimalBasisForNH3CH4();
-
-    CKineticEnergyMatrix S = kindrv.compute(mdimer, mbas);
-
-    CKineticEnergyMatrix S11 = kindrv.compute(mnh3, mbas);
-
-    CKineticEnergyMatrix S22 = kindrv.compute(mch4, mbas);
-
-    CKineticEnergyMatrix S12 = kindrv.compute(mnh3, mch4, mbas);
-
-    CKineticEnergyMatrix S21 = kindrv.compute(mch4, mnh3, mbas);
-
-    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
-
-    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
-
-    CKineticEnergyMatrix S_new = dimerfunc::assembleKineticEnergyMatrices(
-                                            mnh3, mch4, mbas, mbas,
-                                            S11, S22, S12, S21);
-
-    ASSERT_EQ(S, S_new);
 }
 
 TEST_F(CKineticEnergyIntegralsDriverTest, ComputeKineticEnergyForTwoBasis)
