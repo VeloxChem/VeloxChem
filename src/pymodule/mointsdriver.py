@@ -292,7 +292,11 @@ class MOIntegralsDriver:
         return (xmat, ymat)
 
     def set_fock_matrices_type(self, mints_type, fock_matrices):
-
+        if mints_type.startswith("ASYM"):
+            nfock = fock_matrices.number_of_fock_matrices()
+            for i in range(nfock):
+                fock_matrices.set_fock_type(fockmat.rgenk, i)
+            return
         if mints_type != "OOVV":
             nfock = fock_matrices.number_of_fock_matrices()
             for i in range(nfock):
