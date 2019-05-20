@@ -65,25 +65,18 @@ class DensityGuess:
             Name of the AO basis.
         """
 
-        valid = False
-
         if (self._checkpoint_file and isinstance(self._checkpoint_file, str) and
                 rank == mpi_master() and isfile(self._checkpoint_file)):
-
-            hf_mo = MolecularOrbitals.read_hdf5(self._checkpoint_file)
-
-            if ('nuclear_charges' in hf_mo and
-                (hf_mo['nuclear_charges'] == nuclear_charges).all() and
-                    'basis_set' in hf_mo and
-                    hf_mo['basis_set'].upper() == basis_set.upper()):
-
-                valid = True
+            valid = MolecularOrbitals.match_hdf5(self._checkpoint_file,
+                                                 nuclear_charges, basis_set)
+        else:
+            valid = False
 
         valid = comm.bcast(valid, root=mpi_master())
 
         return valid
 
-    def restart_density(self, molecule, comm, ostream):
+    def restart_density(self, molecule, rank, ostream):
         """Reads initial AO density from checkpoint file.
 
         Reads initial molecular orbitals and AO density from checkpoint file.
@@ -92,14 +85,14 @@ class DensityGuess:
         ----------
         molecule
             The molecule.
-        comm
-            The MPI communicator.
+        rank
+            The rank of the MPI process.
         ostream
             The output stream.
         """
 
-        if comm.Get_rank() == mpi_master():
-            mol_orbs = MolecularOrbitals.read_hdf5(self._checkpoint_file)['mo']
+        if rank == mpi_master():
+            mol_orbs = MolecularOrbitals.read_hdf5(self._checkpoint_file)
             den_mat = mol_orbs.get_density(molecule)
 
             restart_text = 'Restarting from checkpoint file: '

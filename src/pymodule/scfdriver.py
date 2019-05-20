@@ -464,7 +464,7 @@ class ScfDriver:
         # guess: read from checkpoint file
         if self.den_guess.guess_type == "RESTART":
 
-            return self.den_guess.restart_density(molecule, self.comm,
+            return self.den_guess.restart_density(molecule, self.rank,
                                                   self.ostream)
 
         # guess: superposition of atomic densities
