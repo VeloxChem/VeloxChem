@@ -60,4 +60,4 @@ from .main import main
 # Environment variable: basis set path
 if 'VLXBASISPATH' not in os.environ:
     module_path = os.path.dirname(os.path.abspath(__file__))
-    os.environ['VLXBASISPATH'] = module_path + '/../../../basis'
+    os.environ['VLXBASISPATH'] = os.path.join(module_path, 'basis')

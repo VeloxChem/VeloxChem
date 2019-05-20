@@ -12,6 +12,7 @@ include Makefile.setup
 
 # Set TARGET and linker flags for VeloxChemMP shared library
 
+VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 PYVLX_MAIN := VeloxChemMain.py
@@ -64,6 +65,7 @@ debug: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	mkdir -p ../build/bin
 	$(CP) $(PYVLX_MAIN) $(CURDIR)/../build/bin
 
@@ -76,6 +78,7 @@ release: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	mkdir -p ../build/bin
 	$(CP) $(PYVLX_MAIN) $(CURDIR)/../build/bin
 
