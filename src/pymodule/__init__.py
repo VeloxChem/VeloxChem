@@ -1,5 +1,8 @@
-from mpi4py import MPI
-import os
+# mpi4py
+try:
+    from mpi4py import MPI
+except ImportError:
+    raise ImportError('Unable to import mpi4py.MPI')
 
 # C++ classes
 from .veloxchemlib import AtomBasis
@@ -59,6 +62,7 @@ from .qqscheme import get_qq_scheme
 from .main import main
 
 # Environment variable: basis set path
+import os
 if 'VLXBASISPATH' not in os.environ:
     module_path = os.path.dirname(os.path.abspath(__file__))
     os.environ['VLXBASISPATH'] = os.path.join(module_path, 'basis')
