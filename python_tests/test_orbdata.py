@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import os
 
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
@@ -15,7 +16,9 @@ class TestOrbData(unittest.TestCase):
 
     def test_get_label(self):
 
-        task = MpiTask(["inputs/dimer.inp", "inputs/dimer.out"], MPI.COMM_WORLD)
+        inpfile = os.path.join('inputs', 'dimer.inp')
+        outfile = os.path.join('inputs', 'dimer.out')
+        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
         self.assertEqual(task.ao_basis.get_label(), "DEF2-SVP")
 
     def test_density_matrix(self):
@@ -80,12 +83,14 @@ class TestOrbData(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-            d_rest.write_hdf5("inputs/dummy.h5")
-            dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
+            h5file = os.path.join('inputs', 'dummy.h5')
+
+            d_rest.write_hdf5(h5file)
+            dummy = AODensityMatrix.read_hdf5(h5file)
             self.assertEqual(d_rest, dummy)
 
-            d_unrest.write_hdf5("inputs/dummy.h5")
-            dummy = AODensityMatrix.read_hdf5("inputs/dummy.h5")
+            d_unrest.write_hdf5(h5file)
+            dummy = AODensityMatrix.read_hdf5(h5file)
             self.assertEqual(d_unrest, dummy)
 
     def test_orbitals_matrix(self):
@@ -130,21 +135,21 @@ class TestOrbData(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
+            h5file = os.path.join('inputs', 'dummy.h5')
+
             nuc_chg = np.array([1, 8, 1], dtype=np.int32)
-            orb_rest.write_hdf5("inputs/dummy.h5", nuc_chg, 'sto-3g')
-            dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
+            orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')
+            dummy = MolecularOrbitals.read_hdf5(h5file)
             self.assertEqual(orb_rest, dummy)
             self.assertTrue(
-                MolecularOrbitals.match_hdf5("inputs/dummy.h5", nuc_chg,
-                                             "sto-3g"))
+                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "sto-3g"))
 
             nuc_chg = np.array([1, 1, 8], dtype=np.int32)
-            orb_unrest.write_hdf5("inputs/dummy.h5", nuc_chg, 'cc-pvdz')
-            dummy = MolecularOrbitals.read_hdf5("inputs/dummy.h5")
+            orb_unrest.write_hdf5(h5file, nuc_chg, 'cc-pvdz')
+            dummy = MolecularOrbitals.read_hdf5(h5file)
             self.assertEqual(orb_unrest, dummy)
             self.assertTrue(
-                MolecularOrbitals.match_hdf5("inputs/dummy.h5", nuc_chg,
-                                             "cc-pvdz"))
+                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "cc-pvdz"))
 
     def test_rest_density(self):
 

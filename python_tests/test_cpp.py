@@ -1,5 +1,6 @@
 from mpi4py import MPI
 import unittest
+import os
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -12,7 +13,8 @@ class TestCppDriver(unittest.TestCase):
     def test_water_cpp(self):
 
         # scf
-        task = MpiTask(["inputs/water.inp", None], MPI.COMM_WORLD)
+        inpfile = os.path.join('inputs', 'water.inp')
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
