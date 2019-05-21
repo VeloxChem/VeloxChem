@@ -245,12 +245,16 @@ class MOIntegralsDriver:
         if mints_type == "ASYM_VVVV":
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
+        
+        usesym = self.use_symmetry(mints_type)
 
         # set up list of orbital pairs
         bra_ids = []
         ket_ids = []
         for i in range(bra_dim[0], bra_dim[1]):
             for j in range(ket_dim[0], ket_dim[1]):
+                if (i > j) and usesym:
+                    continue
                 bra_ids.append(i)
                 ket_ids.append(j)
 
@@ -292,11 +296,13 @@ class MOIntegralsDriver:
         return (xmat, ymat)
 
     def set_fock_matrices_type(self, mints_type, fock_matrices):
+        
         if mints_type.startswith("ASYM"):
             nfock = fock_matrices.number_of_fock_matrices()
             for i in range(nfock):
                 fock_matrices.set_fock_type(fockmat.rgenk, i)
             return
+        
         if mints_type != "OOVV":
             nfock = fock_matrices.number_of_fock_matrices()
             for i in range(nfock):
@@ -366,3 +372,19 @@ class MOIntegralsDriver:
             return moints.asym_vvvv
 
         return None
+
+    def use_symmetry(self, mints_type):
+
+        if mints_type == "ASYM_OOOO":
+            return True
+        
+        if mints_type == "ASYM_OOOV":
+            return True
+
+        if mints_type == "ASYM_OOVV":
+            return True
+        
+        if mints_type == "ASYM_VVVV":
+            return True
+        
+        return False
