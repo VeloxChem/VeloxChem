@@ -37,10 +37,21 @@ class MyInstall(SetuptoolsInstall):
 setup(
     name='VeloxChem',
     version='0.0',
-    packages=['veloxchem'],
-    package_dir={'veloxchem': 'build/python/veloxchem'},
-    package_data={'veloxchem': ['veloxchemlib.so', 'basis/*']},
-    scripts=['build/bin/VeloxChemMain.py'],
+    packages=[
+        'veloxchem',
+    ],
+    package_dir={
+        'veloxchem': os.path.join('build', 'python', 'veloxchem'),
+    },
+    package_data={
+        'veloxchem': [
+            'veloxchemlib.so',
+            os.path.join('basis', '*'),
+        ],
+    },
+    scripts=[
+        os.path.join('build', 'bin', 'VeloxChemMain.py'),
+    ],
     python_requires='>=3.4',
     install_requires=[
         'mpi4py>=3.0',
