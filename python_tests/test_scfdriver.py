@@ -11,7 +11,10 @@ class TestScfDriver(unittest.TestCase):
     def test_h2se_scf(self):
 
         inpfile = os.path.join('inputs', 'h2se.inp')
-        outfile = os.path.join('inputs', 'h2se.out')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 

@@ -113,6 +113,8 @@ class TestTwoInts(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             h5file = os.path.join('inputs', 'dummy.h5')
+            if not os.path.isfile(h5file):
+                h5file = os.path.join('python_tests', h5file)
 
             f_rest.write_hdf5(h5file)
             f2 = AOFockMatrix.read_hdf5(h5file)
@@ -121,7 +123,10 @@ class TestTwoInts(unittest.TestCase):
     def test_fock_build(self):
 
         inpfile = os.path.join('inputs', 'h2se.inp')
-        outfile = os.path.join('inputs', 'h2se.out')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
 
         molecule = task.molecule
@@ -145,6 +150,9 @@ class TestTwoInts(unittest.TestCase):
 
         if rank == mpi_master():
             densfile = os.path.join('inputs', 'h2se.dens.h5')
+            if not os.path.isfile(densfile):
+                densfile = os.path.join('python_tests', densfile)
+
             dmat = AODensityMatrix.read_hdf5(densfile)
         else:
             dmat = AODensityMatrix()
@@ -182,6 +190,9 @@ class TestTwoInts(unittest.TestCase):
         if rank == mpi_master():
 
             twoefile = os.path.join('inputs', 'h2se.twoe.h5')
+            if not os.path.isfile(twoefile):
+                twoefile = os.path.join('python_tests', twoefile)
+
             fock_ref = AOFockMatrix.read_hdf5(twoefile)
 
             F1 = fock.to_numpy(0)

@@ -14,7 +14,10 @@ class TestSolvers(unittest.TestCase):
     def test_sad_guess(self):
 
         inpfile = os.path.join('inputs', 'water.inp')
-        outfile = os.path.join('inputs', 'water.out')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
 
         molecule = task.molecule

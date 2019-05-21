@@ -10,6 +10,9 @@ class TestStreams(unittest.TestCase):
     def test_file(self):
 
         outfile = os.path.join('inputs', 'dummy.out')
+        if not os.path.isdir('inputs'):
+            outfile = os.path.join('python_tests', outfile)
+
         ostream = OutputStream(outfile)
         ostream.print_line("")
         ostream.print_title("")

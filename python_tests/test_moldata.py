@@ -73,7 +73,10 @@ class TestMolData(unittest.TestCase):
     def test_get_sub_molecule(self):
 
         inpfile = os.path.join('inputs', 'dimer.inp')
-        outfile = os.path.join('inputs', 'dimer.out')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
         molecule = task.molecule
 

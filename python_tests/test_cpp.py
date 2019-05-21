@@ -14,6 +14,9 @@ class TestCppDriver(unittest.TestCase):
 
         # scf
         inpfile = os.path.join('inputs', 'water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 

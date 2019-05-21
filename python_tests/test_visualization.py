@@ -15,6 +15,9 @@ class TestVisualization(unittest.TestCase):
     def test_visualization_driver(self):
 
         inpfile = os.path.join('inputs', 'h2se.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 

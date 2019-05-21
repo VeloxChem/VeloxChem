@@ -51,7 +51,10 @@ class TestOneInts(unittest.TestCase):
     def test_1e_integrals(self):
 
         inpfile = os.path.join('inputs', 'h2se.inp')
-        outfile = os.path.join('inputs', 'h2se.out')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
 
         molecule = task.molecule
@@ -79,6 +82,9 @@ class TestOneInts(unittest.TestCase):
         if rank == mpi_master():
 
             h5file = os.path.join('inputs', 'h2se.onee.h5')
+            if not os.path.isfile(h5file):
+                h5file = os.path.join('python_tests', h5file)
+
             hf = h5py.File(h5file, 'r')
             S2 = np.array(hf.get("overlap"))
             T2 = np.array(hf.get("kinetic_energy"))
@@ -103,8 +109,16 @@ class TestOneInts(unittest.TestCase):
         npotdrv = NuclearPotentialIntegralsDriver(comm)
 
         h2ofile = os.path.join('inputs', 'h2o.xyz')
+        if not os.path.isfile(h2ofile):
+            h2ofile = os.path.join('python_tests', h2ofile)
+
         nh3file = os.path.join('inputs', 'nh3.xyz')
+        if not os.path.isfile(nh3file):
+            nh3file = os.path.join('python_tests', nh3file)
+
         h5file = os.path.join('inputs', 'mix_basis_1e.h5')
+        if not os.path.isfile(h5file):
+            h5file = os.path.join('python_tests', h5file)
 
         # one molecule, one basis set
 

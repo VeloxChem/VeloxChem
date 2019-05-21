@@ -46,7 +46,10 @@ class TestExciton(unittest.TestCase):
     def test_assemble_matrices(self):
 
         inpfile = os.path.join('inputs', 'dimer.inp')
-        outfile = os.path.join('inputs', 'dimer.out')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
 
         molecule = task.molecule
@@ -118,6 +121,9 @@ class TestExciton(unittest.TestCase):
     def test_exciton_model(self):
 
         inpfile = os.path.join('inputs', 'exciton.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         exciton_dict = task.input_dict['exciton']
 

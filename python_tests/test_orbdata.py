@@ -17,7 +17,10 @@ class TestOrbData(unittest.TestCase):
     def test_get_label(self):
 
         inpfile = os.path.join('inputs', 'dimer.inp')
-        outfile = os.path.join('inputs', 'dimer.out')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
         self.assertEqual(task.ao_basis.get_label(), "DEF2-SVP")
 
@@ -84,6 +87,8 @@ class TestOrbData(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             h5file = os.path.join('inputs', 'dummy.h5')
+            if not os.path.isfile(h5file):
+                h5file = os.path.join('python_tests', h5file)
 
             d_rest.write_hdf5(h5file)
             dummy = AODensityMatrix.read_hdf5(h5file)
@@ -136,6 +141,8 @@ class TestOrbData(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             h5file = os.path.join('inputs', 'dummy.h5')
+            if not os.path.isfile(h5file):
+                h5file = os.path.join('python_tests', h5file)
 
             nuc_chg = np.array([1, 8, 1], dtype=np.int32)
             orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')
