@@ -52,7 +52,7 @@ setup(
     scripts=[
         os.path.join('build', 'bin', 'VeloxChemMain.py'),
     ],
-    python_requires='>=3.4',
+    python_requires='>=3.5',
     install_requires=[
         'mpi4py>=3.0',
         'numpy>=1.13',
