@@ -1,6 +1,7 @@
 from setuptools import setup
 from setuptools.command.build_py import build_py as SetuptoolsBuildPy
 from setuptools.command.install import install as SetuptoolsInstall
+from config.generate_setup import generate_setup
 import subprocess
 import sys
 import os
@@ -9,16 +10,21 @@ import os
 class MyBuildPy(SetuptoolsBuildPy):
 
     def run(self):
-        if self.make_veloxchem():
-            SetuptoolsBuildPy.run(self)
-        else:
-            print('Error: failed to build veloxchem')
-            sys.exit(1)
+        self.check_setup_file()
+        self.make_veloxchem()
+        SetuptoolsBuildPy.run(self)
 
     def make_veloxchem(self):
         process = subprocess.Popen('make -C src'.split(),
                                    stderr=subprocess.STDOUT)
-        return process.wait() == 0
+        if process.wait() != 0:
+            print('Error: failed to build veloxchem')
+            sys.exit(1)
+
+    def check_setup_file(self):
+        if not os.path.isfile(os.path.join('src', 'Makefile.setup')):
+            print('*** Generating Makefile.setup...')
+            generate_setup()
 
 
 class MyInstall(SetuptoolsInstall):

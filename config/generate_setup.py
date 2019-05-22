@@ -15,20 +15,30 @@ def find_exe(executables):
     return None
 
 
-if __name__ == '__main__':
+def generate_setup():
 
     # OS information
+
+    print('*** Checking operating system... ', end='')
 
     is_linux = ('Linux' == platform.system())
     is_macos = ('Darwin' == platform.system())
     if not (is_linux or is_macos):
+        print()
         print('*** Error: Unsupported OS!')
         print('***        Only Linux and MacOS are supported.')
         sys.exit(1)
 
     is_ubuntu = (is_linux and 'Ubuntu' in platform.uname()[3])
 
+    if is_linux:
+        print('Linux')
+    elif is_macos:
+        print('MacOS')
+
     # compiler information
+
+    print('*** Checking compiler... ', end='')
 
     if 'CXX' in os.environ:
         cxx = find_exe([os.environ['CXX']])
@@ -36,6 +46,7 @@ if __name__ == '__main__':
         cxx = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
 
     if cxx is None:
+        print()
         print('*** Error: Unable to find c++ compiler!')
         if 'CXX' in os.environ:
             print('***        Please make sure that CXX is correctly set.')
@@ -43,6 +54,8 @@ if __name__ == '__main__':
             print('***        Please make sure that mpiicpc, mpicxx, or')
             print('***        mpiCXX is in your PATH.')
         sys.exit(1)
+
+    print(cxx)
 
     if cxx in ['mpiicpc', 'mpicxx', 'mpiCXX']:
         try:
@@ -55,8 +68,8 @@ if __name__ == '__main__':
         use_gnu = (cxxname == 'g++')
         use_clang = (cxxname == 'clang++')
     else:
-        print('*** It seems that you are using a compiler wrapper.')
-        print('*** Please specify which compiler is being used')
+        print('It seems that you are using a compiler wrapper.')
+        print('Please specify which compiler is being used')
         answer = input('(intel/gnu/clang): ').lower()
         use_intel = (answer == 'intel')
         use_gnu = (answer == 'gnu')
@@ -69,10 +82,13 @@ if __name__ == '__main__':
 
     # math library
 
+    print('*** Checking math library... ', end='')
+
     use_mkl = 'MKLROOT' in os.environ
     use_openblas = not use_mkl and 'OPENBLASROOT' in os.environ
 
     if not (use_mkl or use_openblas):
+        print()
         print('*** Error: Unable to find math library!')
         print('***        Please make sure that you have set MKLROOT or')
         print('***        OPENBLASROOT')
@@ -93,6 +109,8 @@ if __name__ == '__main__':
     # mkl flags
 
     if use_mkl:
+        print('MKL')
+
         if use_intel or use_clang:
             mkl_thread = '-lmkl_intel_thread'
         elif use_gnu:
@@ -103,20 +121,20 @@ if __name__ == '__main__':
         else:
             mkl_rt = '-lmkl_intel_lp64 -lmkl_core'
 
+        # TODO: check existence of mkl_dir
         if is_linux:
             mkl_dir = os.path.join('$(MKLROOT)', 'lib', 'intel64')
         elif is_macos:
             mkl_dir = os.path.join('$(MKLROOT)', 'lib')
 
-        print('*** It seems that you are using mkl.')
-        print('*** Please specify avx for mkl')
+        # TODO: check existence of mkl_avx
+        print('Please specify avx for mkl')
         answer = input('(avx512/avx2/avx): ').lower()
         if answer in ['avx512', 'avx2', 'avx']:
             mkl_avx = '-lmkl_{}'.format(answer)
-            print('*** Using -lmkl_{}'.format(answer))
         else:
             mkl_avx = '-lmkl_def'
-            print('*** {} not recognized; using -lmkl_def'.format(answer))
+            print('{} not recognized; using -lmkl_def'.format(answer))
 
         mkl_libs = 'MKLLIBS := -L{} -Wl,-rpath,{}'.format(mkl_dir, mkl_dir)
         mkl_libs += os.linesep + 'MKLLIBS += {} {}'.format(mkl_rt, mkl_thread)
@@ -126,6 +144,9 @@ if __name__ == '__main__':
     # openblas flags
 
     if use_openblas:
+        print('OpenBLAS')
+
+        # TODO: check existence of openblas_dir and openblas lib
         openblas_dir = os.path.join('$(OPENBLASROOT)', 'lib')
         openblas_libs = 'OPENBLASLIBS := -L{} '.format(openblas_dir)
         openblas_libs += '-Wl,-rpath,{} -lopenblas '.format(openblas_dir)
@@ -140,19 +161,28 @@ if __name__ == '__main__':
 
     # pybind11 rootdir
 
+    print('*** Checking pybind11... ', end='')
+
     if 'PYBIND11ROOT' not in os.environ:
+        print()
         print('*** Error: Unable to find pybind11!')
         print('***        Please make sure that you have set PYBIND11ROOT')
         sys.exit(1)
 
+    # TODO: check existence of pybind11_root
     pybind11_root = os.environ['PYBIND11ROOT']
+
+    print(pybind11_root)
+
+    # TODO: add GPU detection
 
     # print Makefile.setup
 
     template_setup = 'Setup.template'
+    makefile_setup = os.path.join(os.pardir, 'src', 'Makefile.setup')
     if not os.path.isfile(template_setup):
         template_setup = os.path.join('config', template_setup)
-    makefile_setup = template_setup.replace('Setup.template', 'Makefile.setup')
+        makefile_setup = os.path.join('src', 'Makefile.setup')
 
     with open(template_setup, 'r') as f_temp:
         lines = f_temp.readlines()
@@ -194,4 +224,7 @@ if __name__ == '__main__':
                 print(line, end='', file=f_mkfile)
 
     print('*** Successfully generated {}'.format(makefile_setup))
-    print('*** Please copy {} to src'.format(makefile_setup))
+
+
+if __name__ == '__main__':
+    generate_setup()
