@@ -106,6 +106,9 @@ def generate_setup(template_file, setup_file):
         cxx_flags = '-Xpreprocessor -fopenmp'
         omp_flag = '-lomp'
 
+    if 'CXXFLAGS' in os.environ:
+        cxx_flags += ' {}'.format(os.environ['CXXFLAGS'])
+
     # mkl flags
 
     if use_mkl:
@@ -135,7 +138,8 @@ def generate_setup(template_file, setup_file):
             answer = 'def'
         mkl_avx = '-lmkl_{}'.format(answer)
 
-        mkl_libs = 'MKLLIBS := -L{} -Wl,-rpath,{}'.format(mkl_dir, mkl_dir)
+        mkl_libs = 'MKLLIBS := -L{}'.format(mkl_dir)
+        mkl_libs += os.linesep + 'MKLLIBS += -Wl,-rpath,{}'.format(mkl_dir)
         mkl_libs += os.linesep + 'MKLLIBS += {} {}'.format(mkl_rt, mkl_thread)
         mkl_libs += os.linesep + 'MKLLIBS += {} {} -lpthread -lm -ldl'.format(
             mkl_avx, omp_flag)
@@ -151,11 +155,11 @@ def generate_setup(template_file, setup_file):
                 openblas_dir))
             sys.exit(1)
 
-        openblas_dir = os.path.join('$(OPENBLASROOT)', 'lib')
-        openblas_libs = 'OPENBLASLIBS := -L{} '.format(openblas_dir)
-        openblas_libs += '-Wl,-rpath,{} -lopenblas '.format(openblas_dir)
-        openblas_libs += os.linesep + 'OPENBLASLIBS += {} '.format(omp_flag)
-        openblas_libs += '-lpthread -lm -ldl'
+        openblas_libs = 'OPENBLASLIBS := -L{}'.format(openblas_dir)
+        openblas_libs += os.linesep + 'OPENBLASLIBS += -Wl,-rpath,{}'.format(
+            openblas_dir)
+        openblas_libs += os.linesep + 'OPENBLASLIBS += -lopenblas {} {}'.format(
+            omp_flag, '-lpthread -lm -ldl')
 
     # extra flags for mac
 
