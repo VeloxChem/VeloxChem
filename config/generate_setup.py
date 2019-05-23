@@ -15,7 +15,7 @@ def find_exe(executables):
     return None
 
 
-def generate_setup():
+def generate_setup(template_file, setup_file):
 
     # OS information
 
@@ -121,20 +121,19 @@ def generate_setup():
         else:
             mkl_rt = '-lmkl_intel_lp64 -lmkl_core'
 
-        # TODO: check existence of mkl_dir
-        if is_linux:
-            mkl_dir = os.path.join('$(MKLROOT)', 'lib', 'intel64')
-        elif is_macos:
-            mkl_dir = os.path.join('$(MKLROOT)', 'lib')
+        mkl_dir = os.path.join(os.environ['MKLROOT'], 'lib', 'intel64')
+        if not os.path.isdir(mkl_dir):
+            mkl_dir = os.path.join(os.environ['MKLROOT'], 'lib')
+        if not os.path.isdir(mkl_dir):
+            print('*** Error: mkl lib dir {} does not exist!'.format(mkl_dir))
+            sys.exit(1)
 
-        # TODO: check existence of mkl_avx
         print('Please specify avx for mkl')
         answer = input('(avx512/avx2/avx): ').lower()
-        if answer in ['avx512', 'avx2', 'avx']:
-            mkl_avx = '-lmkl_{}'.format(answer)
-        else:
-            mkl_avx = '-lmkl_def'
+        if answer not in ['avx512', 'avx2', 'avx']:
             print('{} not recognized; using -lmkl_def'.format(answer))
+            answer = 'def'
+        mkl_avx = '-lmkl_{}'.format(answer)
 
         mkl_libs = 'MKLLIBS := -L{} -Wl,-rpath,{}'.format(mkl_dir, mkl_dir)
         mkl_libs += os.linesep + 'MKLLIBS += {} {}'.format(mkl_rt, mkl_thread)
@@ -146,7 +145,12 @@ def generate_setup():
     if use_openblas:
         print('OpenBLAS')
 
-        # TODO: check existence of openblas_dir and openblas lib
+        openblas_dir = os.path.join(os.environ['OPENBLASROOT'], 'lib')
+        if not os.path.isdir(openblas_dir):
+            print('*** Error: openblas lib dir {} does not exist!'.format(
+                openblas_dir))
+            sys.exit(1)
+
         openblas_dir = os.path.join('$(OPENBLASROOT)', 'lib')
         openblas_libs = 'OPENBLASLIBS := -L{} '.format(openblas_dir)
         openblas_libs += '-Wl,-rpath,{} -lopenblas '.format(openblas_dir)
@@ -169,25 +173,22 @@ def generate_setup():
         print('***        Please make sure that you have set PYBIND11ROOT')
         sys.exit(1)
 
-    # TODO: check existence of pybind11_root
     pybind11_root = os.environ['PYBIND11ROOT']
 
     print(pybind11_root)
+    if not os.path.isdir(pybind11_root):
+        print(
+            '*** Error: pybind11 dir {} does not exist!'.format(pybind11_root))
+        sys.exit(1)
 
     # TODO: add GPU detection
 
     # print Makefile.setup
 
-    template_setup = 'Setup.template'
-    makefile_setup = os.path.join(os.pardir, 'src', 'Makefile.setup')
-    if not os.path.isfile(template_setup):
-        template_setup = os.path.join('config', template_setup)
-        makefile_setup = os.path.join('src', 'Makefile.setup')
-
-    with open(template_setup, 'r') as f_temp:
+    with open(template_file, 'r') as f_temp:
         lines = f_temp.readlines()
 
-    with open(makefile_setup, 'w') as f_mkfile:
+    with open(setup_file, 'w') as f_mkfile:
         for line in lines:
             if '====placeholder====' in line:
                 print('# Automatically generated settings', file=f_mkfile)
@@ -223,8 +224,20 @@ def generate_setup():
             else:
                 print(line, end='', file=f_mkfile)
 
-    print('*** Successfully generated {}'.format(makefile_setup))
+    print('*** Successfully generated {}'.format(setup_file))
 
 
 if __name__ == '__main__':
-    generate_setup()
+
+    template_file = 'Setup.template'
+    setup_file = os.path.join(os.pardir, 'src', 'Makefile.setup')
+
+    if not os.path.isfile(template_file):
+        template_file = os.path.join('config', 'Setup.template')
+        setup_file = os.path.join('src', 'Makefile.setup')
+
+    if not os.path.isfile(template_file):
+        print('*** Error: Cannot find template file {}'.format(template_file))
+        sys.exit(1)
+
+    generate_setup(template_file, setup_file)

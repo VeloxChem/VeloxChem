@@ -22,9 +22,11 @@ class MyBuildPy(SetuptoolsBuildPy):
             sys.exit(1)
 
     def check_setup_file(self):
-        if not os.path.isfile(os.path.join('src', 'Makefile.setup')):
+        setup_file = os.path.join('src', 'Makefile.setup')
+        if not os.path.isfile(setup_file):
+            template_file = os.path.join('config', 'Setup.template')
             print('*** Generating Makefile.setup...')
-            generate_setup()
+            generate_setup(template_file, setup_file)
 
 
 class MyInstall(SetuptoolsInstall):
