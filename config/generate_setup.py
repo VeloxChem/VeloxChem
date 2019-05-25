@@ -15,6 +15,39 @@ def find_exe(executables):
     return None
 
 
+def get_command_output(command):
+    try:
+        output = subprocess.check_output(command)
+    except subprocess.CalledProcessError:
+        print()
+        print('*** Error: Unable to execute \'{}\''.format(' '.join(command)))
+        sys.exit(1)
+    return output.decode('utf-8')
+
+
+def find_avx_linux():
+    cpuinfo = os.path.join(os.sep, 'proc', 'cpuinfo')
+    output = get_command_output(['grep', 'avx', cpuinfo])
+    lines = output.split(os.linesep)
+    for avx in ['avx512', 'avx2', 'avx']:
+        for line in lines:
+            if line[:5] == 'flags' and avx in output:
+                return avx
+    return None
+
+
+def find_avx_macos():
+    output = get_command_output(['sysctl', '-a'])
+    lines = output.split(os.linesep)
+    for line in lines:
+        if 'machdep.cpu.leaf7_features' in line and 'AVX2' in line:
+            return 'avx2'
+    for line in lines:
+        if 'machdep.cpu.features' in line and 'AVX1' in line:
+            return 'avx'
+    return None
+
+
 def generate_setup(template_file, setup_file):
 
     # OS information
@@ -45,8 +78,9 @@ def generate_setup(template_file, setup_file):
     else:
         cxx = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
 
+    print(cxx)
+
     if cxx is None:
-        print()
         print('*** Error: Unable to find c++ compiler!')
         if 'CXX' in os.environ:
             print('***        Please make sure that CXX is correctly set.')
@@ -55,43 +89,27 @@ def generate_setup(template_file, setup_file):
             print('***        mpiCXX is in your PATH.')
         sys.exit(1)
 
-    print(cxx)
-
-    if cxx in ['mpiicpc', 'mpicxx', 'mpiCXX']:
-        try:
-            cxxname = subprocess.check_output([cxx, '-show'])
-        except subprocess.CalledProcessError:
-            print('*** Error: Unable to execute \'{} -show\'!'.format(cxx))
-            sys.exit(1)
-        cxxname = cxxname.split()[0].decode('utf-8')
-        use_intel = (cxxname == 'icpc')
-        use_gnu = (cxxname == 'g++')
-        use_clang = (cxxname == 'clang++')
-    else:
-        print('It seems that you are using a compiler wrapper.')
-        print('Please specify which compiler is being used')
-        answer = input('(intel/gnu/clang): ').lower()
-        use_intel = (answer == 'intel')
-        use_gnu = (answer == 'gnu')
-        use_clang = (answer == 'clang')
-
-    if not (use_intel or use_gnu or use_clang):
-        print('*** Error: Unsupported c++ compiler!')
-        print('***        Only Intel, GNU, and Clang compilers are supported.')
+    if cxx in ['icpc', 'g++', 'clang++']:
+        print('*** Error: {} is not a MPI compiler!'.format(cxx))
         sys.exit(1)
 
-    # math library
+    if cxx in ['mpiicpc', 'mpicxx', 'mpiCXX']:
+        cxxname = get_command_output([cxx, '-show'])
+    else:
+        cxxname = get_command_output([cxx, '--version'])
+    cxxname = cxxname.split()[0]
 
-    print('*** Checking math library... ', end='')
+    if cxxname in ['icc', 'gcc', 'clang']:
+        print('*** Error: {} is not a c++ compiler!'.format(cxx))
+        sys.exit(1)
 
-    use_mkl = 'MKLROOT' in os.environ
-    use_openblas = not use_mkl and 'OPENBLASROOT' in os.environ
+    use_intel = (cxxname == 'icpc')
+    use_gnu = (cxxname == 'g++')
+    use_clang = (cxxname == 'clang++')
 
-    if not (use_mkl or use_openblas):
-        print()
-        print('*** Error: Unable to find math library!')
-        print('***        Please make sure that you have set MKLROOT or')
-        print('***        OPENBLASROOT')
+    if not (use_intel or use_gnu or use_clang):
+        print('*** Error: Unrecognized c++ compiler!')
+        print('***        Only Intel, GNU, and Clang compilers are supported.')
         sys.exit(1)
 
     # cxx and omp flags
@@ -106,8 +124,20 @@ def generate_setup(template_file, setup_file):
         cxx_flags = '-Xpreprocessor -fopenmp'
         omp_flag = '-lomp'
 
-    if 'CXXFLAGS' in os.environ:
-        cxx_flags += ' {}'.format(os.environ['CXXFLAGS'])
+    # math library
+
+    print('*** Checking math library... ', end='')
+
+    use_mkl = 'MKLROOT' in os.environ
+    use_openblas = not use_mkl and 'OPENBLASROOT' in os.environ
+
+    if not (use_mkl or use_openblas):
+        print()
+        print('*** Error: Unable to find math library!')
+        print('***        Please make sure that you have set MKLROOT or')
+        print('***        OPENBLASROOT. OpenBLAS can be downloaded from')
+        print('***        https://github.com/xianyi/OpenBLAS')
+        sys.exit(1)
 
     # mkl flags
 
@@ -131,12 +161,17 @@ def generate_setup(template_file, setup_file):
             print('*** Error: mkl lib dir {} does not exist!'.format(mkl_dir))
             sys.exit(1)
 
-        print('Please specify avx for mkl')
-        answer = input('(avx512/avx2/avx): ').lower()
-        if answer not in ['avx512', 'avx2', 'avx']:
-            print('{} not recognized; using -lmkl_def'.format(answer))
-            answer = 'def'
-        mkl_avx = '-lmkl_{}'.format(answer)
+        print('*** Checking avx... ', end='')
+        if is_linux:
+            avx = find_avx_linux()
+        elif is_macos:
+            avx = find_avx_macos()
+        print(avx)
+
+        if avx is not None:
+            mkl_avx = '-lmkl_{}'.format(avx)
+        else:
+            mkl_avx = '-lmkl_def'
 
         mkl_libs = 'MKLLIBS := -L{}'.format(mkl_dir)
         mkl_libs += os.linesep + 'MKLLIBS += -Wl,-rpath,{}'.format(mkl_dir)
@@ -174,12 +209,14 @@ def generate_setup(template_file, setup_file):
     if 'PYBIND11ROOT' not in os.environ:
         print()
         print('*** Error: Unable to find pybind11!')
-        print('***        Please make sure that you have set PYBIND11ROOT')
+        print('***        Please make sure that you have set PYBIND11ROOT.')
+        print('***        pybind11 can be downloaded from')
+        print('***        https://github.com/pybind/pybind11')
         sys.exit(1)
 
     pybind11_root = os.environ['PYBIND11ROOT']
-
     print(pybind11_root)
+
     if not os.path.isdir(pybind11_root):
         print(
             '*** Error: pybind11 dir {} does not exist!'.format(pybind11_root))
