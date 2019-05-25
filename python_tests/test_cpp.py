@@ -49,9 +49,9 @@ class TestCppDriver(unittest.TestCase):
                 ('z', 0.5): complex(2.554879, 1.439370),
             }
 
-            for key in results:
-                real_val = results[key].real
-                imag_val = results[key].imag
+            for key in results['properties']:
+                real_val = results['properties'][key].real
+                imag_val = results['properties'][key].imag
                 real_ref = reference[key].real
                 imag_ref = reference[key].imag
                 self.assertTrue(abs(real_val - real_ref) < 1.0e-6)

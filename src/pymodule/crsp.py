@@ -342,7 +342,7 @@ class ComplexResponse:
 
         return new_ger, new_ung
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_tensors, rhs=None):
         """Solves for the approximate response vector iteratively
         while checking the residuals for convergence.
 
@@ -386,10 +386,13 @@ class ComplexResponse:
 
             # calling the gradients
 
-            v1 = {
-                op: v
-                for op, v in zip(ops, self.get_rhs(molecule, scf_tensors, ops))
-            }
+            if rhs is None:
+                v1 = {
+                    op: v for op, v in zip(
+                        ops, self.get_rhs(molecule, scf_tensors, ops))
+                }
+            else:
+                v1 = rhs
 
             # creating the preconditioner matrix
 
@@ -719,7 +722,10 @@ class ComplexResponse:
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
 
-            return {(op, freq): nv for op, freq, nv in nvs}
+            return {
+                'properties': {(op, freq): nv for op, freq, nv in nvs},
+                'solutions': solutions,
+            }
         else:
             return None
 
@@ -745,7 +751,7 @@ class ComplexResponse:
         self.ostream.print_header(output_header.ljust(82))
         self.ostream.print_blank()
         for op, freq, nv in nvs:
-            ops_label = '<<{};{}>>_{:.3f}'.format(op, op, freq)
+            ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
                 ops_label, -nv.real, -nv.imag)
