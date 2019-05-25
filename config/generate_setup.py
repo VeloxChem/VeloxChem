@@ -27,12 +27,12 @@ def get_command_output(command):
 
 def find_avx_linux():
     cpuinfo = os.path.join(os.sep, 'proc', 'cpuinfo')
-    output = get_command_output(['grep', 'avx', cpuinfo])
-    lines = output.split(os.linesep)
-    for avx in ['avx512', 'avx2', 'avx']:
-        for line in lines:
-            if line[:5] == 'flags' and avx in output:
-                return avx
+    if os.path.isfile(cpuinfo):
+        for avx in ['avx512', 'avx2', 'avx']:
+            with open(cpuinfo, 'r') as fh:
+                for line in fh:
+                    if line[:5] == 'flags' and avx in line:
+                        return avx
     return None
 
 
@@ -46,6 +46,33 @@ def find_avx_macos():
         if 'machdep.cpu.features' in line and 'AVX1' in line:
             return 'avx'
     return None
+
+
+def find_mkl_avx(is_linux, is_macos):
+
+    print('*** Checking avx... ', end='')
+    if is_linux:
+        avx = find_avx_linux()
+    elif is_macos:
+        avx = find_avx_macos()
+    print(avx)
+
+    if avx is not None:
+        mkl_avx = '-lmkl_{}'.format(avx)
+    else:
+        mkl_avx = '-lmkl_def'
+    return mkl_avx
+
+
+def check_ubuntu():
+    for name in ['lsb-release', 'os-release']:
+        fname = os.path.join(os.sep, 'etc', name)
+        if os.path.isfile(fname):
+            with open(fname, 'r') as fh:
+                for line in fh:
+                    if 'ubuntu' in line.lower():
+                        return True
+    return False
 
 
 def generate_setup(template_file, setup_file):
@@ -62,7 +89,7 @@ def generate_setup(template_file, setup_file):
         print('***        Only Linux and MacOS are supported.')
         sys.exit(1)
 
-    is_ubuntu = (is_linux and 'Ubuntu' in platform.uname()[3])
+    is_ubuntu = (is_linux and check_ubuntu())
 
     if is_linux:
         print('Linux')
@@ -144,16 +171,6 @@ def generate_setup(template_file, setup_file):
     if use_mkl:
         print('MKL')
 
-        if use_intel or use_clang:
-            mkl_thread = '-lmkl_intel_thread'
-        elif use_gnu:
-            mkl_thread = '-lmkl_gnu_thread'
-
-        if is_ubuntu and not use_intel:
-            mkl_rt = '-lmkl_rt'
-        else:
-            mkl_rt = '-lmkl_intel_lp64 -lmkl_core'
-
         mkl_dir = os.path.join(os.environ['MKLROOT'], 'lib', 'intel64')
         if not os.path.isdir(mkl_dir):
             mkl_dir = os.path.join(os.environ['MKLROOT'], 'lib')
@@ -161,23 +178,22 @@ def generate_setup(template_file, setup_file):
             print('*** Error: mkl lib dir {} does not exist!'.format(mkl_dir))
             sys.exit(1)
 
-        print('*** Checking avx... ', end='')
-        if is_linux:
-            avx = find_avx_linux()
-        elif is_macos:
-            avx = find_avx_macos()
-        print(avx)
-
-        if avx is not None:
-            mkl_avx = '-lmkl_{}'.format(avx)
+        if is_ubuntu and not use_intel:
+            mkl_rt = '-lmkl_rt'
         else:
-            mkl_avx = '-lmkl_def'
+            mkl_avx = find_mkl_avx(is_linux, is_macos)
+            mkl_rt = '-lmkl_intel_lp64 -lmkl_core {}'.format(mkl_avx)
+
+        if use_intel or use_clang:
+            mkl_thread = '-lmkl_intel_thread'
+        elif use_gnu:
+            mkl_thread = '-lmkl_gnu_thread'
 
         mkl_libs = 'MKLLIBS := -L{}'.format(mkl_dir)
         mkl_libs += os.linesep + 'MKLLIBS += -Wl,-rpath,{}'.format(mkl_dir)
         mkl_libs += os.linesep + 'MKLLIBS += {} {}'.format(mkl_rt, mkl_thread)
-        mkl_libs += os.linesep + 'MKLLIBS += {} {} -lpthread -lm -ldl'.format(
-            mkl_avx, omp_flag)
+        mkl_libs += os.linesep + 'MKLLIBS += {} -lpthread -lm -ldl'.format(
+            omp_flag)
 
     # openblas flags
 
