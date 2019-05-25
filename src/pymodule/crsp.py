@@ -187,8 +187,6 @@ class ComplexResponse:
         """Constructs the preconditioner matrix.
         """
 
-        start_time = tm.time()
-
         # spawning needed components
 
         ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
@@ -213,10 +211,6 @@ class ComplexResponse:
         pd_diag = p_diag * d_diag
 
         precond = np.array([pa_diag, pb_diag, pc_diag, pd_diag])
-
-        self.ostream.print_info(
-            'Precondition matrix created in {:.2f} sec.'.format(tm.time() -
-                                                                start_time))
 
         return precond
 
@@ -396,9 +390,14 @@ class ComplexResponse:
 
             # creating the preconditioner matrix
 
+            precond_start_time = tm.time()
             precond = {
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
+            self.ostream.print_info(
+                'Precondition {} created in {:.2f} sec.'.format(
+                    'matrices' if len(freqs) > 1 else 'matrix',
+                    tm.time() - precond_start_time))
             self.ostream.print_blank()
             self.ostream.flush()
 
