@@ -10,6 +10,7 @@
 #define RecursionBlock_hpp
 
 #include <cstdint>
+#include <string>
 
 /**
  Enumerate class recblock:
