@@ -62,6 +62,80 @@ TEST_F(CRecursionTermTest, MoveAssignment)
     ASSERT_EQ(rta, rtb);
 }
 
+TEST_F(CRecursionTermTest, SetLabel)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    rta.setLabel("Kinetic Energy");
+    
+    CRecursionTerm rtb({"Kinetic Energy"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(rta, rtb);
+}
+
+TEST_F(CRecursionTermTest, BraShift)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {4, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(rta.braShift(2, 0), rtb);
+    
+    CRecursionTerm rtc;
+    
+    ASSERT_EQ(rta.braShift(2, -1), rtc);
+    
+    ASSERT_EQ(rta.braShift(2, 1), rtc);
+}
+
+TEST_F(CRecursionTermTest, KetShift)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {2, 3, 4, 5}, {3, 7, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(rta.ketShift(2, 0), rtb);
+    
+    CRecursionTerm rtc({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 4, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(rta.ketShift(-3, 1), rtc);
+    
+    CRecursionTerm rtd;
+    
+    ASSERT_EQ(rta.braShift(2, -1), rtd);
+    
+    ASSERT_EQ(rta.braShift(2, 2), rtd);
+}
+
+TEST_F(CRecursionTermTest, OrderShift)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 4);
+    
+    ASSERT_EQ(rta.orderShift(-1), rtb);
+}
+
+TEST_F(CRecursionTermTest, OperatorShift)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Overlap"}, 1, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(rta.operatorShift(1), rtb);
+}
+
 TEST_F(CRecursionTermTest, IsValid)
 {
     CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3}, 1, 2, 5);
@@ -111,6 +185,29 @@ TEST_F(CRecursionTermTest, IsValid)
     CRecursionTerm rtm({"Overlap"}, 1, false, {2, -1, 3, 4}, {1, -7, -2, -3}, 1, 2, 5);
     
     ASSERT_FALSE(rtm.isValid());
+}
+
+TEST_F(CRecursionTermTest, IsBraOfZeroOrder)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3}, 1, 2, 5);
+    
+    ASSERT_FALSE(rta.isBraOfZeroOrder());
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {0, 0, 4, 5}, {1, 7, 2, 3}, 1, 2, 5);
+    
+    ASSERT_TRUE(rtb.isBraOfZeroOrder());
+    
+    CRecursionTerm rtc({"Overlap"}, 0, true, {0, 0, 4, 5}, {1, 7, 2, 3}, 2, 2, 5);
+    
+    ASSERT_TRUE(rtc.isBraOfZeroOrder());
+    
+    CRecursionTerm rtd({"Overlap"}, 0, true, {0, 0, 4, 5}, {1, 7, 2, 3}, 3, 2, 5);
+    
+    ASSERT_FALSE(rtd.isBraOfZeroOrder());
+    
+    CRecursionTerm rte({"Overlap"}, 0, true, {0, 0, 4, 5}, {1, 7, 2, 3}, -1, 2, 5);
+    
+    ASSERT_FALSE(rte.isBraOfZeroOrder());
 }
 
 TEST_F(CRecursionTermTest, GetOrder)

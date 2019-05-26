@@ -185,6 +185,71 @@ CRecursionTerm::operator!=(const CRecursionTerm& other) const
     return !(*this == other);
 }
 
+void
+CRecursionTerm::setLabel(const std::string labelOfOperator)
+{
+    _labelOfOperator = labelOfOperator; 
+}
+
+CRecursionTerm
+CRecursionTerm::braShift(const int32_t braValue,
+                         const int32_t braCenter) const
+{
+    auto bramom = _braAngularMomentum;
+    
+    if ((braCenter >= 0) && (braCenter < _braCenters))
+    {
+        bramom.shift(braValue, braCenter);
+    }
+    else
+    {
+        return CRecursionTerm();
+    }
+    
+    return CRecursionTerm(_labelOfOperator, _orderOfOperator, _isReducedOperator,
+                          bramom, _ketAngularMomentum, _braCenters, _ketCenters,
+                          _orderOfIntegral);
+}
+
+CRecursionTerm
+CRecursionTerm::ketShift(const int32_t ketValue,
+                         const int32_t ketCenter) const
+{
+    auto ketmom = _ketAngularMomentum;
+    
+    if ((ketCenter >= 0) && (ketCenter < _ketCenters))
+    {
+        ketmom.shift(ketValue, ketCenter);
+    }
+    else
+    {
+        return CRecursionTerm();
+    }
+    
+    return CRecursionTerm(_labelOfOperator, _orderOfOperator, _isReducedOperator,
+                          _braAngularMomentum, ketmom, _braCenters, _ketCenters,
+                          _orderOfIntegral);
+}
+
+CRecursionTerm
+CRecursionTerm::orderShift(const int32_t orderValue) const
+{
+    return CRecursionTerm(_labelOfOperator, _orderOfOperator, _isReducedOperator,
+                          _braAngularMomentum, _ketAngularMomentum,
+                          _braCenters, _ketCenters,
+                          _orderOfIntegral + orderValue);
+}
+
+CRecursionTerm
+CRecursionTerm::operatorShift(const int32_t operatorValue) const
+{
+    return CRecursionTerm(_labelOfOperator, _orderOfOperator + operatorValue,
+                          _isReducedOperator,
+                          _braAngularMomentum, _ketAngularMomentum,
+                          _braCenters, _ketCenters,
+                          _orderOfIntegral);
+}
+
 bool
 CRecursionTerm::isValid() const
 {
@@ -201,6 +266,21 @@ CRecursionTerm::isValid() const
     if (!_isValidAngularMomentum(_braAngularMomentum, _braCenters)) return false;
     
     if (!_isValidAngularMomentum(_ketAngularMomentum, _ketCenters)) return false;
+    
+    return true;
+}
+
+bool
+CRecursionTerm::isBraOfZeroOrder() const
+{
+    if (_braCenters <= 0)  return false;
+    
+    if (_braCenters > 4) return false;
+    
+    for (int32_t i = 0; i < _braCenters; i++)
+    {
+        if (_braAngularMomentum.value(i) != 0) return false;
+    }
     
     return true;
 }
@@ -321,7 +401,7 @@ int32_t
 CRecursionTerm::_numberOfCartesianComponents(const CFourIndexes& angularMomentum,
                                              const int32_t       nCenters) const
 {
-    if (nCenters == 0) return 0;
+    if (nCenters <= 0) return 0;
     
     if (nCenters > 4) return 0;
     

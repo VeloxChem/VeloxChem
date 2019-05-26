@@ -174,11 +174,62 @@ public:
     bool operator!=(const CRecursionTerm& other) const;
     
     /**
+     Sets label of operator in recursion term object.
+
+     @param labelOfOperator the label of operator.
+     */
+    void setLabel(const std::string labelOfOperator);
+    
+    /**
+     Creates recursion term object with shifted angular momentum on bra side.
+
+     @param braValue the shift value of angular momentum component.
+     @param braCenter the identifier of angular center on bra side.
+     @return the recursion term object.
+     */
+    CRecursionTerm braShift(const int32_t braValue,
+                            const int32_t braCenter) const;
+    
+    /**
+     Creates recursion term object with shifted angular momentum on ket side.
+     
+     @param ketValue the shift value of angular momentum component.
+     @param ketCenter the identifier of angular center on ket side.
+     @return the recursion term object.
+     */
+    CRecursionTerm ketShift(const int32_t ketValue,
+                            const int32_t ketCenter) const;
+    
+    /**
+     Creates recursion term object with shifted order of integral.
+
+     @param orderValue the shift value for order of integral.
+     @return the recursion term object.
+     */
+    CRecursionTerm orderShift(const int32_t orderValue) const;
+    
+    /**
+     Creates recursion term object with shifted order of integrand operator.
+
+     @param operatorValue the shift value for order of integrand operator.
+     @return the recursion term object.
+     */
+    CRecursionTerm operatorShift(const int32_t operatorValue) const;
+    
+    /**
      Checks if recursion term object is valid recursion term.
 
      @return true if recursion term object is valid recursion term, false otherwise.
      */
     bool isValid() const;
+    
+    /**
+     Checks if angular momentum on bra side is of zero order i.e. (0, 0, 0,...).
+
+     @return true if angular momentum on bra side is of zero order,
+             false otherwise.
+     */
+    bool isBraOfZeroOrder() const;
     
     /**
      Gets order of integral in recursion term object.

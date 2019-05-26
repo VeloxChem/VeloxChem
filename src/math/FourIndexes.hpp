@@ -110,6 +110,15 @@ public:
     bool operator!=(const CFourIndexes& other) const;
     
     /**
+     Shifts selected component of four indexes object by given value.
+
+     @param shiftValue the shift value.
+     @param iComponent the component of four indexes object.
+     */
+    void shift(const int32_t shiftValue,
+               const int32_t iComponent); 
+    
+    /**
      Gets first index from quadruple of indexes.
      
      @return the first index from quadruple of indexes.

@@ -125,6 +125,19 @@ CFourIndexes::operator!=(const CFourIndexes& other) const
     return !( (*this) == other);
 }
 
+void
+CFourIndexes::shift(const int32_t shiftValue,
+                    const int32_t iComponent)
+{
+    if (iComponent == 0) _iIndex += shiftValue;
+    
+    if (iComponent == 1) _jIndex += shiftValue;
+    
+    if (iComponent == 2) _kIndex += shiftValue;
+    
+    if (iComponent == 3) _lIndex += shiftValue;
+}
+
 int32_t
 CFourIndexes::first() const
 {
