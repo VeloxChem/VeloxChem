@@ -32,6 +32,30 @@ namespace t2crecfunc { // t2crecfunc namespace
      */
     std::vector<CRecursionTerm> obRecursionForKineticEnergy(const CRecursionTerm& recursionTerm);
     
+    /**
+     Applies Obara-Saika nuclear potential recursion to recursion term object.
+     
+     @param recursionTerm the recursion term object.
+     @return the vector of recursion term objects.
+     */
+    std::vector<CRecursionTerm> obRecursionForNuclearPotential(const CRecursionTerm& recursionTerm);
+    
+    /**
+     Applies Obara-Saika electric field recursion to recursion term object.
+     
+     @param recursionTerm the recursion term object.
+     @return the vector of recursion term objects.
+     */
+    std::vector<CRecursionTerm> obRecursionForElectricField(const CRecursionTerm& recursionTerm);
+    
+    /**
+     Applies Obara-Saika electric field gradient recursion to recursion term object.
+     
+     @param recursionTerm the recursion term object.
+     @return the vector of recursion term objects.
+     */
+    std::vector<CRecursionTerm> obRecursionForElectricFieldGradient(const CRecursionTerm& recursionTerm);
+    
 } // t2crecfunc namespace
 
 #endif /* TwoCentersRecursionFunctions_hpp */

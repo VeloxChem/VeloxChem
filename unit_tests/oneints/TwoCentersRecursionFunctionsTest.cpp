@@ -265,4 +265,137 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForKineticEnergyForDF)
     ASSERT_EQ(s0ta, rvec[4]);
 }
 
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForNuclearPotentialForSS)
+{
+    CRecursionTerm rta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForNuclearPotential(rta);
+    
+    ASSERT_EQ(1u, rvec.size());
+    
+    CRecursionTerm s0ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(s0ta, rvec[0]);
+}
 
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForNuclearPotentialForSP)
+{
+    CRecursionTerm rta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForNuclearPotential(rta);
+    
+    ASSERT_EQ(2u, rvec.size());
+    
+    CRecursionTerm k10ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                         1, 1, 0);
+    
+    CRecursionTerm k11ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                         1, 1, 1);
+    
+    ASSERT_EQ(k10ta, rvec[0]);
+    
+    ASSERT_EQ(k11ta, rvec[1]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForNuclearPotentialForSF)
+{
+    CRecursionTerm rta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {3, -1, -1, -1},
+                       1, 1, 2);
+    
+    auto rvec = t2crecfunc::obRecursionForNuclearPotential(rta);
+    
+    ASSERT_EQ(4u, rvec.size());
+    
+    CRecursionTerm k10ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                         1, 1, 2);
+    
+    CRecursionTerm k11ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                         1, 1, 3);
+    
+    CRecursionTerm k20ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                         1, 1, 2);
+    
+    CRecursionTerm k21ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                         1, 1, 3);
+    
+    ASSERT_EQ(k10ta, rvec[0]);
+    
+    ASSERT_EQ(k11ta, rvec[1]);
+    
+    ASSERT_EQ(k20ta, rvec[2]);
+    
+    ASSERT_EQ(k21ta, rvec[3]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForNuclearPotentialForPP)
+{
+    CRecursionTerm rta({"Nuclear Potential"}, 0, false, {1, -1, -1, -1}, {1, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForNuclearPotential(rta);
+    
+    ASSERT_EQ(4u, rvec.size());
+    
+    CRecursionTerm b10ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                         1, 1, 0);
+    
+    CRecursionTerm b11ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                         1, 1, 1);
+    
+    CRecursionTerm k10ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                         1, 1, 0);
+    
+    CRecursionTerm k11ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                         1, 1, 1);
+    
+    ASSERT_EQ(b10ta, rvec[0]);
+    
+    ASSERT_EQ(b11ta, rvec[1]);
+    
+    ASSERT_EQ(k10ta, rvec[2]);
+    
+    ASSERT_EQ(k11ta, rvec[3]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForNuclearPotentialForDD)
+{
+    CRecursionTerm rta({"Nuclear Potential"}, 0, false, {2, -1, -1, -1}, {2, -1, -1, -1},
+                       1, 1, 3);
+    
+    auto rvec = t2crecfunc::obRecursionForNuclearPotential(rta);
+    
+    ASSERT_EQ(6u, rvec.size());
+    
+    CRecursionTerm b10ta({"Nuclear Potential"}, 0, false, {1, -1, -1, -1}, {2, -1, -1, -1},
+                         1, 1, 3);
+    
+    CRecursionTerm b11ta({"Nuclear Potential"}, 0, false, {1, -1, -1, -1}, {2, -1, -1, -1},
+                         1, 1, 4);
+    
+    CRecursionTerm b20ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                         1, 1, 3);
+    
+    CRecursionTerm b21ta({"Nuclear Potential"}, 0, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                         1, 1, 4);
+    
+    CRecursionTerm k10ta({"Nuclear Potential"}, 0, false, {1, -1, -1, -1}, {1, -1, -1, -1},
+                         1, 1, 3);
+    
+    CRecursionTerm k11ta({"Nuclear Potential"}, 0, false, {1, -1, -1, -1}, {1, -1, -1, -1},
+                         1, 1, 4);
+    
+    ASSERT_EQ(b10ta, rvec[0]);
+    
+    ASSERT_EQ(b11ta, rvec[1]);
+    
+    ASSERT_EQ(b20ta, rvec[2]);
+    
+    ASSERT_EQ(b21ta, rvec[3]);
+    
+    ASSERT_EQ(k10ta, rvec[4]);
+    
+    ASSERT_EQ(k11ta, rvec[5]);
+}
