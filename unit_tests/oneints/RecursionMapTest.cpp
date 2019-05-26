@@ -143,6 +143,31 @@ TEST_F(CRecursionMapTest, Append)
     ASSERT_EQ(rma, rmc);
 }
 
+TEST_F(CRecursionMapTest, AppendWithVector)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 0, 2, 3},
+                       1, 2, 5);
+    
+    CRecursionTerm rtb({"Kinetic Energy"}, 2, false, {1, 2, 6, 3}, {3, 1, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionTerm rtc({"Kinetic Energy"}, 1, false, {1, 2, 6, 3}, {3, -1, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionTerm rtd({"Kinetic Energy"}, 1, false, {1, 2, 6, 3}, {2, 2, 7, 3},
+                       1, 2, 0);
+    
+    CRecursionMap rma({rta, rtb}, {0, 18}, recblock::cc);
+    
+    std::vector<CRecursionTerm> rvec({rtc, rtd, rta});
+    
+    rma.append(rvec);
+    
+    CRecursionMap rmc({rta, rtb, rtd}, {0, 18, 828}, recblock::cc);
+    
+    ASSERT_EQ(rma, rmc);
+}
+
 TEST_F(CRecursionMapTest, Find)
 {
     CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 0, 2, 3},

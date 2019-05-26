@@ -210,6 +210,14 @@ TEST_F(CRecursionTermTest, IsBraOfZeroOrder)
     ASSERT_FALSE(rte.isBraOfZeroOrder());
 }
 
+TEST_F(CRecursionTermTest, GetLabel)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},
+                       2, 1, 2);
+    
+    ASSERT_EQ(std::string("Overlap"), rta.getLabel());
+}
+
 TEST_F(CRecursionTermTest, GetOrder)
 {
     CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3},

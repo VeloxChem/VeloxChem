@@ -129,6 +129,14 @@ public:
     void append(const CRecursionMap& source);
     
     /**
+     Appends valid unique recursion objects from vector of recursion term
+     objects to recursion map object.
+     
+     @param recursionTerms the vector of recursion term objects.
+     */
+    void append(const std::vector<CRecursionTerm>& recursionTerms);
+    
+    /**
      Gets total number of integral components overl all recursion term objects
      included in recursion map object.
      

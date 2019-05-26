@@ -285,6 +285,12 @@ CRecursionTerm::isBraOfZeroOrder() const
     return true;
 }
 
+std::string
+CRecursionTerm::getLabel() const
+{
+    return _labelOfOperator; 
+}
+
 int32_t
 CRecursionTerm::getOrder() const
 {

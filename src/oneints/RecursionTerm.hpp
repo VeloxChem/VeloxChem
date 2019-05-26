@@ -232,6 +232,13 @@ public:
     bool isBraOfZeroOrder() const;
     
     /**
+     Gets label of integrand in recursion term object.
+
+     @return the label of integrand.
+     */
+    std::string getLabel() const;
+    
+    /**
      Gets order of integral in recursion term object.
 
      @return the order of integral.

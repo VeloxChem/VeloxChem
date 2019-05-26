@@ -142,6 +142,15 @@ CRecursionMap::append(const CRecursionMap& source)
     }
 }
 
+void
+CRecursionMap::append(const std::vector<CRecursionTerm>& recursionTerms)
+{
+    for (size_t i = 0; i < recursionTerms.size(); i++)
+    {
+        add(recursionTerms[i]);
+    }
+}
+
 int32_t
 CRecursionMap::getNumberOfComponents() const
 {
