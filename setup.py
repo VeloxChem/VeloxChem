@@ -71,4 +71,7 @@ setup(
         'install': MyInstall,
     },
     description='VeloxChem: an electronic structure code',
+    author='VeloxChem developers',
+    author_email='info@veloxchem.org',
+    url='http://veloxchem.org/',
 )
