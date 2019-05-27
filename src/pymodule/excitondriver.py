@@ -1,5 +1,6 @@
 import numpy as np
 import time as tm
+import h5py
 import math
 
 from .veloxchemlib import KineticEnergyIntegralsDriver
@@ -28,6 +29,8 @@ class ExcitonModelDriver:
         self.trans_dipoles = None
         self.nuc_chg_center = None
 
+        self.state_info = None
+
         # exciton monomers
         self.monomers = None
         self.natoms = None
@@ -55,6 +58,9 @@ class ExcitonModelDriver:
         # output stream
         self.ostream = ostream
 
+        # checkpoint file
+        self.checkpoint_file = None
+
     def update_settings(self, exciton_dict):
 
         assert_msg_critical('fragments' in exciton_dict,
@@ -76,6 +82,9 @@ class ExcitonModelDriver:
             self.ct_nocc = int(exciton_dict['ct_nocc'])
         if 'ct_nvir' in exciton_dict:
             self.ct_nvir = int(exciton_dict['ct_nvir'])
+
+        if 'checkpoint_file' in exciton_dict:
+            self.checkpoint_file = exciton_dict['checkpoint_file']
 
     def compute(self, molecule, basis, min_basis):
 
@@ -104,6 +113,8 @@ class ExcitonModelDriver:
         self.H = np.zeros((total_num_states, total_num_states))
         self.trans_dipoles = np.zeros((total_num_states, 3))
         self.nuc_chg_center = molecule.center_of_nuclear_charge()
+
+        self.state_info = [{} for s in range(total_num_states)]
 
         self.monomers = [{} for i in range(nfragments)]
 
@@ -173,6 +184,10 @@ class ExcitonModelDriver:
 
             if self.rank == mpi_master():
                 self.monomers[ind]['C'] = scf_drv.scf_tensors['C'].copy()
+
+            # update ERI screening threshold
+            if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
+                self.eri_thresh = scf_drv.eri_thresh
 
             # TDA calculation
             abs_spec = Absorption({
@@ -412,6 +427,13 @@ class ExcitonModelDriver:
                                     ind_A + 1, vA, ind_B + 1, oB),
                             })
 
+                    # update excited state information in self.state_info
+                    for vec in CI_vectors:
+                        state_id = vec['index']
+                        self.state_info[state_id]['frag'] = vec['frag']
+                        self.state_info[state_id]['type'] = vec['type']
+                        self.state_info[state_id]['name'] = vec['name']
+
                     # create masked CI_vectors containing LE(A), CT(AB), CT(BA)
                     mask_ci_vectors = CI_vectors[:self.nstates] + CI_vectors[
                         self.nstates * 2:]
@@ -600,7 +622,55 @@ class ExcitonModelDriver:
                 self.ostream.print_header(valstr.ljust(92))
 
             self.ostream.print_blank()
+
+            valstr = 'Characters of excited states:'
+            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_blank()
+
+            for s in range(eigvecs.shape[1]):
+                valstr = 'Excited state {}:'.format(s + 1)
+                self.ostream.print_header(valstr.ljust(92))
+                self.ostream.print_header(('-' * len(valstr)).ljust(92))
+
+                for k in range(eigvecs.shape[0]):
+                    composition = eigvecs[k, s]**2
+                    if (composition > 0.1):
+                        state_type = '{}({})'.format(
+                            self.state_info[k]['type'],
+                            self.state_info[k]['frag'],
+                        )
+                        valstr = '{:<10s} {:<15s} {:>6.1f}%'.format(
+                            state_type,
+                            self.state_info[k]['name'],
+                            composition * 100,
+                        )
+                        self.ostream.print_header(valstr.ljust(92))
+                self.ostream.print_blank()
+
             self.ostream.flush()
+
+            self.write_hdf5(self.H, self.trans_dipoles, eigvals, eigvecs,
+                            self.ostream)
+
+    def write_hdf5(self, hamiltonian, transition_dipoles, eigenvalues,
+                   eigenvectors, ostream):
+
+        if self.checkpoint_file is None:
+            return
+
+        hf = h5py.File(self.checkpoint_file, 'w')
+        hf.create_dataset('hamiltonian', data=hamiltonian, compression="gzip")
+        hf.create_dataset('transition_dipoles',
+                          data=transition_dipoles,
+                          compression="gzip")
+        hf.create_dataset('eigenvalues', data=eigenvalues, compression="gzip")
+        hf.create_dataset('eigenvectors', data=eigenvectors, compression="gzip")
+        hf.close()
+
+        valstr = '*** Exciton model data written to file: {}'.format(
+            self.checkpoint_file)
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
 
     def print_banner(self, title):
 

@@ -170,14 +170,23 @@ class InputParser:
         if self.is_basis_set:
             # for basis set, save basis set file name
             self.input_dict['basis_set_name'] = self.basis_set_name
+
         else:
             # for input file, save input file name and checkpoint file name
             if '.' in self.filename:
                 fname = '.'.join(self.filename.split('.')[:-1])
                 fchkp = fname + ".scf.h5"
+                fexciton = fname + ".exciton.h5"
             else:
                 fchkp = self.filename + ".scf.h5"
+                fexciton = self.filename + ".exciton.h5"
+
             self.input_dict["input_file"] = self.filename
+
             if "scf" not in self.input_dict:
                 self.input_dict["scf"] = {}
             self.input_dict["scf"]["checkpoint_file"] = fchkp
+
+            if "exciton" not in self.input_dict:
+                self.input_dict["exciton"] = {}
+            self.input_dict["exciton"]["checkpoint_file"] = fexciton
