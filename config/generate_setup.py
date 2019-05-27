@@ -178,6 +178,12 @@ def generate_setup(template_file, setup_file):
             print('*** Error: mkl lib dir {} does not exist!'.format(mkl_dir))
             sys.exit(1)
 
+        mkl_inc = os.path.join(os.environ['MKLROOT'], 'include')
+        if not os.path.isdir(mkl_inc):
+            print(
+                '*** Error: mkl include dir {} does not exist!'.format(mkl_inc))
+            sys.exit(1)
+
         if is_ubuntu and not use_intel:
             mkl_rt = '-lmkl_rt'
         else:
@@ -189,10 +195,11 @@ def generate_setup(template_file, setup_file):
         elif use_gnu:
             mkl_thread = '-lmkl_gnu_thread'
 
-        mkl_libs = 'MKLLIBS := -L{}'.format(mkl_dir)
-        mkl_libs += os.linesep + 'MKLLIBS += -Wl,-rpath,{}'.format(mkl_dir)
-        mkl_libs += os.linesep + 'MKLLIBS += {} {}'.format(mkl_rt, mkl_thread)
-        mkl_libs += os.linesep + 'MKLLIBS += {} -lpthread -lm -ldl'.format(
+        math_lib = 'MATH_INC := -I{}'.format(mkl_inc)
+        math_lib += os.linesep + 'MATH_LIB := -L{}'.format(mkl_dir)
+        math_lib += os.linesep + 'MATH_LIB += -Wl,-rpath,{}'.format(mkl_dir)
+        math_lib += os.linesep + 'MATH_LIB += {} {}'.format(mkl_rt, mkl_thread)
+        math_lib += os.linesep + 'MATH_LIB += {} -lpthread -lm -ldl'.format(
             omp_flag)
 
     # openblas flags
@@ -206,10 +213,17 @@ def generate_setup(template_file, setup_file):
                 openblas_dir))
             sys.exit(1)
 
-        openblas_libs = 'OPENBLASLIBS := -L{}'.format(openblas_dir)
-        openblas_libs += os.linesep + 'OPENBLASLIBS += -Wl,-rpath,{}'.format(
+        openblas_inc = os.path.join(os.environ['OPENBLASROOT'], 'include')
+        if not os.path.isdir(openblas_inc):
+            print('*** Error: openblas include dir {} does not exist!'.format(
+                openblas_inc))
+            sys.exit(1)
+
+        math_lib = 'MATH_INC := -I{}'.format(openblas_inc)
+        math_lib += os.linesep + 'MATH_LIB := -L{}'.format(openblas_dir)
+        math_lib += os.linesep + 'MATH_LIB += -Wl,-rpath,{}'.format(
             openblas_dir)
-        openblas_libs += os.linesep + 'OPENBLASLIBS += -lopenblas {} {}'.format(
+        math_lib += os.linesep + 'MATH_LIB += -lopenblas {} {}'.format(
             omp_flag, '-lpthread -lm -ldl')
 
     # extra flags for mac
@@ -238,6 +252,13 @@ def generate_setup(template_file, setup_file):
             '*** Error: pybind11 dir {} does not exist!'.format(pybind11_root))
         sys.exit(1)
 
+    # google test lib
+
+    if 'GTESTLIB' in os.environ:
+        gtest_lib = os.environ['GTESTLIB']
+    else:
+        gtest_lib = None
+
     # TODO: add GPU detection
 
     # print Makefile.setup
@@ -253,14 +274,13 @@ def generate_setup(template_file, setup_file):
 
                 print('USE_MPI := true', file=f_mkfile)
                 print('USE_GPU := false', file=f_mkfile)
-                print('', file=f_mkfile)
-
                 if use_mkl:
                     print('USE_MKL := true', file=f_mkfile)
-                    print(mkl_libs, file=f_mkfile)
                 else:
                     print('USE_MKL := false', file=f_mkfile)
-                    print(openblas_libs, file=f_mkfile)
+                print('', file=f_mkfile)
+
+                print(math_lib, file=f_mkfile)
                 print('', file=f_mkfile)
 
                 print('PYTHON :=', 'python3', file=f_mkfile)
@@ -276,6 +296,10 @@ def generate_setup(template_file, setup_file):
 
                 print('MACLIBS :=', maclibs, file=f_mkfile)
                 print('', file=f_mkfile)
+
+                if gtest_lib is not None:
+                    print('GST_LIB :=', gtest_lib, file=f_mkfile)
+                    print('', file=f_mkfile)
 
                 print('# Generic settings', file=f_mkfile)
             else:

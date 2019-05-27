@@ -38,14 +38,9 @@ endif
 
 # Math library
 
-ifeq ($(USE_MKL),true)
-  MATH_INC := $(MKLROOT)/include
-  LIB_LIST := $(MKLLIBS)
-else
-  MATH_ROOT := $(OPENBLASROOT)
-  MATH_INC := $(MATH_ROOT)/include
-  LIB_LIST := $(OPENBLASLIBS)
-endif
+LIB_LIST := $(MATH_LIB)
+
+# Extra flag for MacOS
 
 LIB_LIST += $(MACLIBS)
 
