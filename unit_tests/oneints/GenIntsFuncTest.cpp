@@ -46,5 +46,18 @@ TEST_F(CGenIntsFuncTest, GenRecursionMap)
                          recblock::cc);
     
     ASSERT_EQ(recmap, refmap);
-    
 }
+
+TEST_F(CGenIntsFuncTest, GenIntegral)
+{
+    CRecursionFunctionsList recfuncs;
+
+    CRecursionTerm rta({"Kinetic Energy"}, 0, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 0);
+    
+    ASSERT_EQ(rta, gintsfunc::genIntegral({"Kinetic Energy"}, 2, 1, 0));
+    
+    CRecursionTerm rtb({"Electric Field Gradient"}, 2, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 4);
+    
+    ASSERT_EQ(rtb, gintsfunc::genIntegral({"Electric Field Gradient"}, 2, 1, 4));
+}
+

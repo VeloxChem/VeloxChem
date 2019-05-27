@@ -50,4 +50,25 @@ namespace gintsfunc { // gintsfunc namespace
         return recmap;
     }
     
+    CRecursionTerm
+    genIntegral(const std::string& labelOfOperator,
+                const int32_t      braAngularMomentum,
+                const int32_t      ketAngularMomentum,
+                const int32_t      ordderOfOperator)
+    {
+        CFourIndexes bang(braAngularMomentum, -1, -1, -1);
+        
+        CFourIndexes kang(ketAngularMomentum, -1, -1, -1);
+        
+        // set number of operator component according to operator label
+        
+        int32_t opcomp = 0;
+        
+        if (labelOfOperator == std::string("Electric Field")) opcomp = 1;
+        
+        if (labelOfOperator == std::string("Electric Field Gradient")) opcomp = 2;
+        
+        return CRecursionTerm(labelOfOperator, opcomp, true, bang, kang, 1, 1, ordderOfOperator);;
+    }
+    
 } // gintsfunc namespace

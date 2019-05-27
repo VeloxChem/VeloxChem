@@ -28,6 +28,20 @@ namespace gintsfunc { // gintsfunc namespace
                                   const recblock                 angularForm, 
                                   const CRecursionFunctionsList& recursionFunctionsList);
     
+    /**
+     Generates recursion term corresponding to one-electron integral of given type.
+
+     @param labelOfOperator the label of integrand operator.
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     @param ordderOfOperator the order of integral.
+     @return the recursion term object. 
+     */
+    CRecursionTerm genIntegral(const std::string& labelOfOperator,
+                               const int32_t      braAngularMomentum,
+                               const int32_t      ketAngularMomentum,
+                               const int32_t      ordderOfOperator);
+    
 } // gintsfunc namespace
 
 #endif /* GenIntsFunc_hpp */
