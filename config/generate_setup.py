@@ -75,6 +75,20 @@ def check_ubuntu():
     return False
 
 
+def check_dir(dirname, label):
+    if not os.path.isdir(dirname):
+        print('*** Error: {} dir {} does not exist!'.format(
+            label, dirname))
+        sys.exit(1)
+
+
+def check_file(filename, label):
+    if not os.path.isfile(filename):
+        print('*** Error: {} file {} does not exist!'.format(
+            label, filename))
+        sys.exit(1)
+
+
 def generate_setup(template_file, setup_file):
 
     # OS information
@@ -171,18 +185,13 @@ def generate_setup(template_file, setup_file):
     if use_mkl:
         print('MKL')
 
+        mkl_inc = os.path.join(os.environ['MKLROOT'], 'include')
+        check_dir(mkl_inc, 'mkl include')
+
         mkl_dir = os.path.join(os.environ['MKLROOT'], 'lib', 'intel64')
         if not os.path.isdir(mkl_dir):
             mkl_dir = os.path.join(os.environ['MKLROOT'], 'lib')
-        if not os.path.isdir(mkl_dir):
-            print('*** Error: mkl lib dir {} does not exist!'.format(mkl_dir))
-            sys.exit(1)
-
-        mkl_inc = os.path.join(os.environ['MKLROOT'], 'include')
-        if not os.path.isdir(mkl_inc):
-            print(
-                '*** Error: mkl include dir {} does not exist!'.format(mkl_inc))
-            sys.exit(1)
+        check_dir(mkl_dir, 'mkl lib')
 
         if is_ubuntu and not use_intel:
             mkl_rt = '-lmkl_rt'
@@ -207,17 +216,11 @@ def generate_setup(template_file, setup_file):
     if use_openblas:
         print('OpenBLAS')
 
-        openblas_dir = os.path.join(os.environ['OPENBLASROOT'], 'lib')
-        if not os.path.isdir(openblas_dir):
-            print('*** Error: openblas lib dir {} does not exist!'.format(
-                openblas_dir))
-            sys.exit(1)
-
         openblas_inc = os.path.join(os.environ['OPENBLASROOT'], 'include')
-        if not os.path.isdir(openblas_inc):
-            print('*** Error: openblas include dir {} does not exist!'.format(
-                openblas_inc))
-            sys.exit(1)
+        check_dir(openblas_inc, 'openblas include')
+
+        openblas_dir = os.path.join(os.environ['OPENBLASROOT'], 'lib')
+        check_dir(openblas_dir, 'openblas lib')
 
         math_lib = 'MATH_INC := -I{}'.format(openblas_inc)
         math_lib += os.linesep + 'MATH_LIB := -L{}'.format(openblas_dir)
@@ -246,17 +249,21 @@ def generate_setup(template_file, setup_file):
 
     pybind11_root = os.environ['PYBIND11ROOT']
     print(pybind11_root)
-
-    if not os.path.isdir(pybind11_root):
-        print(
-            '*** Error: pybind11 dir {} does not exist!'.format(pybind11_root))
-        sys.exit(1)
+    check_dir(pybind11_root, 'pybind11 dir')
 
     # google test lib
 
-    if 'GTESTLIB' in os.environ:
-        gtest_lib = os.environ['GTESTLIB']
+    if 'GTESTROOT' in os.environ:
+        gtest_root = os.environ['GTESTROOT']
+        gtest_inc = os.path.join(gtest_root, 'include')
+        check_dir(gtest_inc, 'GoogleTest include')
+        if 'GTESTLIB' in os.environ:
+            gtest_lib = os.environ['GTESTLIB']
+        else:
+            gtest_lib = os.path.join(gtest_root, 'lib', 'libgtest.a')
+        check_file(gtest_lib, 'GoogleTest lib')
     else:
+        gtest_root = None
         gtest_lib = None
 
     # TODO: add GPU detection
@@ -297,7 +304,8 @@ def generate_setup(template_file, setup_file):
                 print('MACLIBS :=', maclibs, file=f_mkfile)
                 print('', file=f_mkfile)
 
-                if gtest_lib is not None:
+                if gtest_root is not None and gtest_lib is not None:
+                    print('GST_ROOT :=', gtest_root, file=f_mkfile)
                     print('GST_LIB :=', gtest_lib, file=f_mkfile)
                     print('', file=f_mkfile)
 
