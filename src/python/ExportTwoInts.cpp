@@ -48,6 +48,24 @@ CAOFockMatrix_to_numpy(const CAOFockMatrix& self,
                                          self.getNumberOfColumns(iFockMatrix));
 }
 
+static py::array_t<double>
+CAOFockMatrix_alpha_to_numpy(const CAOFockMatrix& self,
+                             const int32_t iFockMatrix)
+{
+    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix, false),
+                                         self.getNumberOfRows(iFockMatrix),
+                                         self.getNumberOfColumns(iFockMatrix));
+}
+
+static py::array_t<double>
+CAOFockMatrix_beta_to_numpy(const CAOFockMatrix& self,
+                            const int32_t iFockMatrix)
+{
+    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix, true),
+                                         self.getNumberOfRows(iFockMatrix),
+                                         self.getNumberOfColumns(iFockMatrix));
+}
+
 // Helper function for CAOFockMatrix constructor
 
 static std::shared_ptr<CAOFockMatrix>
@@ -250,6 +268,7 @@ void export_twoints(py::module& m)
         .value("rgenj",   fockmat::rgenj  )
         .value("rgenk",   fockmat::rgenk  )
         .value("rgenkx",  fockmat::rgenkx )
+        .value("unrestjk",  fockmat::unrestjk )
     ;
 
     // ericut enum class
@@ -290,11 +309,17 @@ void export_twoints(py::module& m)
         .def(py::init(&CAOFockMatrix_from_numpy_list))
         .def("__str__", &CAOFockMatrix_str)
         .def("to_numpy", &CAOFockMatrix_to_numpy)
-        .def("set_fock_type", &CAOFockMatrix::setFockType)
+        .def("alpha_to_numpy", &CAOFockMatrix_alpha_to_numpy)
+        .def("beta_to_numpy", &CAOFockMatrix_beta_to_numpy)
         .def("number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices)
-        .def("get_fock_type", &CAOFockMatrix::getFockType)
-        .def("get_scale_factor", &CAOFockMatrix::getScaleFactor)
-        .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier)
+        .def("set_fock_type", &CAOFockMatrix::setFockType,
+             py::arg(), py::arg(), py::arg("beta")=false)
+        .def("get_fock_type", &CAOFockMatrix::getFockType,
+             py::arg(), py::arg("beta")=false)
+        .def("get_scale_factor", &CAOFockMatrix::getScaleFactor,
+             py::arg(), py::arg("beta")=false)
+        .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier,
+             py::arg(), py::arg("beta")=false)
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
         .def("add", &CAOFockMatrix::add)
         .def("reduce_sum", &CAOFockMatrix_reduce_sum)

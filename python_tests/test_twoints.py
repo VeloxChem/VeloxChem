@@ -32,10 +32,15 @@ class TestTwoInts(unittest.TestCase):
         arr_kx = x * arr_k
         arr_jkx = arr_j + arr_kx
 
-        fock = AOFockMatrix([arr_jk, arr_jkx, arr_j, arr_k, arr_kx], [
-            fockmat.restjk, fockmat.restjkx, fockmat.restj, fockmat.restk,
-            fockmat.restkx
-        ], [1.0, x, 1.0, 1.0, x], [0, 0, 0, 0, 0])
+        fock = AOFockMatrix(
+            [arr_jk, arr_jkx, arr_j, arr_k, arr_kx],
+            [
+                fockmat.restjk, fockmat.restjkx, fockmat.restj, fockmat.restk,
+                fockmat.restkx
+            ],
+            [1.0, x, 1.0, 1.0, x],
+            [0, 0, 0, 0, 0],
+        )
 
         np_jkx = fock.to_numpy(1)
         np_j = fock.to_numpy(2)
@@ -50,6 +55,35 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(0, fock.get_density_identifier(2))
 
         self.assertEqual(5, fock.number_of_fock_matrices())
+
+    def test_unrestricted(self):
+
+        data_a = [[1., .2], [.2, 1.]]
+        data_b = [[.9, .5], [.5, .9]]
+
+        arr_a = np.array(data_a)
+        arr_b = np.array(data_b)
+
+        fock = AOFockMatrix(
+            [arr_a, arr_b],
+            [fockmat.unrestjk, fockmat.unrestjk],
+            [0.7, 0.6],
+            [1, 2],
+        )
+
+        self.assertEqual(1, fock.number_of_fock_matrices())
+
+        self.assertTrue((fock.alpha_to_numpy(0) == arr_a).all())
+        self.assertTrue((fock.beta_to_numpy(0) == arr_b).all())
+
+        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0))
+        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, True))
+
+        self.assertEqual(0.7, fock.get_scale_factor(0))
+        self.assertEqual(0.6, fock.get_scale_factor(0, True))
+
+        self.assertEqual(1, fock.get_density_identifier(0))
+        self.assertEqual(2, fock.get_density_identifier(0, True))
 
     def test_add_hcore(self):
 
