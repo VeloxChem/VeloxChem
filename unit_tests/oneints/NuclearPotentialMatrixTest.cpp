@@ -128,7 +128,7 @@ TEST_F(CNuclearPotentialMatrixTest, GetKineticEnergy)
                       3.0,  7.0,  3.0},
                     3, 3);
     
-    CAODensityMatrix dmat({da, db}, denmat::unrest);
+    CAODensityMatrix dmat({da, db}, denmat::rest);
     
     ASSERT_NEAR(19.0, smat.getNuclearPotentialEnergy(dmat, 0), 1.0e-13);
     
