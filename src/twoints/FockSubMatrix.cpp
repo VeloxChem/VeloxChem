@@ -279,9 +279,10 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
                            const int32_t nColumns,
                            const fockmat fockType) const
 {
-    // restricted Coulomb + exchange matrix
+    // restricted/unrestricted Coulomb + exchange matrix
     
-    if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx))
+    if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx) ||
+        (fockType == fockmat::unrestjk))
     {
         _addContribution(aoFockMatrix, nColumns, 0,
                          _startPositionsA, _startPositionsB,
@@ -562,9 +563,10 @@ CFockSubMatrix::_allocSubMatrices(const fockmat fockType,
         _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
     }
     
-    // restricted Coulomb + exchange matrix
+    // restricted/unrestricted Coulomb + exchange matrix
     
-    if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx))
+    if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx) ||
+        (fockType == fockmat::unrestjk))
     {
         auto matdim = _dimSubMatrixA * _dimSubMatrixB;
         
@@ -713,7 +715,7 @@ CFockSubMatrix::_allocSubMatrices(const fockmat fockType,
         
         _subFockMatrices.push_back(CMemBlock2D<double>(matdim, ncomp));
     }
-    
+
     // initialize all submatrices to zero
     
     for (size_t i = 0; i < _subFockMatrices.size(); i++)

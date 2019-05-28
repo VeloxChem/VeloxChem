@@ -28,11 +28,27 @@ CFockContainer::CFockContainer(const CAOFockMatrix*  aoFockMatrix,
 {
     auto nfock = aoFockMatrix->getNumberOfFockMatrices();
     
-    for (int32_t i = 0; i < nfock; i++)
+    if (aoFockMatrix->isRestricted())
     {
-        _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
-                                                  ketGtoPairsBlock,
-                                                  aoFockMatrix->getFockType(i)));
+        for (int32_t i = 0; i < nfock; i++)
+        {
+            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
+                                                      ketGtoPairsBlock,
+                                                      aoFockMatrix->getFockType(i)));
+        }
+    }
+    else
+    {
+        for (int32_t i = 0; i < nfock; i++)
+        {
+            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
+                                                      ketGtoPairsBlock,
+                                                      aoFockMatrix->getFockType(i)));
+
+            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
+                                                      ketGtoPairsBlock,
+                                                      aoFockMatrix->getFockType(i, true)));
+        }
     }
 }
 
@@ -102,11 +118,27 @@ CFockContainer::accumulate(CAOFockMatrix* aoFockMatrix)
 {
     auto nfock = aoFockMatrix->getNumberOfFockMatrices();
     
-    for (int32_t i = 0; i < nfock; i++)
+    if (aoFockMatrix->isRestricted())
     {
-        _subFockMatrices[i].accumulate(aoFockMatrix->getFock(i),
-                                       aoFockMatrix->getNumberOfColumns(i),
-                                       aoFockMatrix->getFockType(i));
+        for (int32_t i = 0; i < nfock; i++)
+        {
+            _subFockMatrices[i].accumulate(aoFockMatrix->getFock(i),
+                                           aoFockMatrix->getNumberOfColumns(i),
+                                           aoFockMatrix->getFockType(i));
+        }
+    }
+    else
+    {
+        for (int32_t i = 0; i < nfock; i++)
+        {
+            _subFockMatrices[2 * i].accumulate(aoFockMatrix->getFock(i),
+                                               aoFockMatrix->getNumberOfColumns(i),
+                                               aoFockMatrix->getFockType(i));
+
+            _subFockMatrices[2 * i + 1].accumulate(aoFockMatrix->getFock(i, true),
+                                                   aoFockMatrix->getNumberOfColumns(i),
+                                                   aoFockMatrix->getFockType(i, true));
+        }
     }
 }
 

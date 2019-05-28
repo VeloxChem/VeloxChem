@@ -219,6 +219,31 @@ class TestTwoInts(unittest.TestCase):
 
         fock.reduce_sum(rank, size, comm)
 
+        # compare with unrestricted Fock
+
+        if rank == mpi_master():
+            da = dmat.alpha_to_numpy(0)
+            db = dmat.beta_to_numpy(0)
+            d2 = AODensityMatrix([da, db], denmat.unrest)
+        else:
+            d2 = AODensityMatrix()
+        d2.broadcast(rank, comm)
+
+        f2 = AOFockMatrix(d2)
+        eridrv.compute(f2, d2, molecule, ao_basis, qqdata)
+        f2.reduce_sum(rank, size, comm)
+
+        self.assertEqual(1, f2.number_of_fock_matrices())
+        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0))
+        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, True))
+
+        self.assertTrue(
+            np.max(np.abs(fock.alpha_to_numpy(0) -
+                          f2.alpha_to_numpy(0))) < 1.0e-13)
+        self.assertTrue(
+            np.max(np.abs(fock.beta_to_numpy(0) -
+                          f2.beta_to_numpy(0))) < 1.0e-13)
+
         # compare with reference
 
         if rank == mpi_master():

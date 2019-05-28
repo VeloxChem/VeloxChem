@@ -84,6 +84,27 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
             _idDensityMatrices.push_back(i);
         }
         
+        // spin unrestricted open-shell Hatree-Fock
+        
+        if (dmtyp == denmat::unrest)
+        {
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
+            
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
+            
+            _fockTypes.push_back(fockmat::unrestjk);
+            
+            _fockTypes.push_back(fockmat::unrestjk);
+            
+            _scaleFactors.push_back(1.0);
+            
+            _scaleFactors.push_back(1.0);
+            
+            _idDensityMatrices.push_back(i);
+
+            _idDensityMatrices.push_back(i);
+        }
+        
         // FIX ME: Add unrestricted open-shell Hatree-Fock
     }
 }
@@ -222,21 +243,53 @@ CAOFockMatrix::zero()
 void
 CAOFockMatrix::symmetrize()
 {
-    for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+    if (isRestricted())
     {
-        if (isSymmetric(i)) _fockMatrices[i].symmetrize();
-        
-        // FIX ME: Add antisymmetric matrices
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            if (isSymmetric(i))
+            {
+                _fockMatrices[i].symmetrize();
+            }
+        }
     }
+    else
+    {
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            if (isSymmetric(i))
+            {
+                _fockMatrices[2 * i].symmetrize();
+
+                _fockMatrices[2 * i + 1].symmetrize();
+            }
+        }
+    }
+
+    // FIX ME: Add antisymmetric matrices
 }
 
 void
 CAOFockMatrix::add(const CAOFockMatrix& source)
 {
-    for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+    if (isRestricted())
     {
-        _fockMatrices[i] = denblas::addAB(_fockMatrices[i],
-                                          source._fockMatrices[i], 1.0);
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            _fockMatrices[i] = denblas::addAB(_fockMatrices[i],
+                                              source._fockMatrices[i], 1.0);
+        }
+    }
+    else
+    {
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            _fockMatrices[2 * i] = denblas::addAB(_fockMatrices[2 * i],
+                                                  source._fockMatrices[2 * i], 1.0);
+
+            _fockMatrices[2 * i + 1] = denblas::addAB(_fockMatrices[2 * i + 1],
+                                                      source._fockMatrices[2 * i + 1], 1.0);
+        }
     }
 }
 
@@ -520,16 +573,23 @@ CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
+        auto fockindex = iFockMatrix;
+
+        if (!isRestricted())
+        {
+            fockindex = 2 * iFockMatrix;
+        }
+
         // check if Fock matrix is square
         
-        if (_fockMatrices[iFockMatrix].getNumberOfRows() != _fockMatrices[iFockMatrix].getNumberOfColumns())
+        if (_fockMatrices[fockindex].getNumberOfRows() != _fockMatrices[fockindex].getNumberOfColumns())
         {
             return false;
         }
     
         // determine symmetry by Fock matrix type 
         
-        auto fcktyp = _fockTypes[iFockMatrix];
+        auto fcktyp = _fockTypes[fockindex];
     
         if (fcktyp == fockmat::restjk) return true;
     
