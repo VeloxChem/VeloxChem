@@ -305,19 +305,42 @@ CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMa
     // set up pointer to nuclear potential matrix
     
     auto pnucpot = nuclearPotentialMatrix.values();
-    
-    // set up pointer to Fock matrix
-    
-    auto pfock = _fockMatrices[iFockMatrix].values();
-    
-    // add core Hamiltonian contributions
-    
-    auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
-    
-    #pragma omp simd aligned(pfock, pkin, pnucpot: VLX_ALIGN)
-    for (int32_t i = 0; i < ndim; i++)
+
+    if (isRestricted())
     {
-        pfock[i] += pkin[i] - pnucpot[i];
+        // set up pointer to Fock matrix
+        
+        auto pfock = _fockMatrices[iFockMatrix].values();
+        
+        // add core Hamiltonian contributions
+        
+        auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
+        
+        #pragma omp simd aligned(pfock, pkin, pnucpot: VLX_ALIGN)
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            pfock[i] += pkin[i] - pnucpot[i];
+        }
+    }
+    else
+    {
+        // set up pointer to Fock matrix
+        
+        auto pfock_a = _fockMatrices[2 * iFockMatrix].values();
+
+        auto pfock_b = _fockMatrices[2 * iFockMatrix + 1].values();
+        
+        // add core Hamiltonian contributions
+        
+        auto ndim = _fockMatrices[2 * iFockMatrix].getNumberOfElements();
+        
+        #pragma omp simd aligned(pfock_a, pfock_b, pkin, pnucpot: VLX_ALIGN)
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            pfock_a[i] += pkin[i] - pnucpot[i];
+
+            pfock_b[i] += pkin[i] - pnucpot[i];
+        }
     }
 }
 
@@ -620,8 +643,19 @@ CAOFockMatrix::getElectronicEnergy(const int32_t           iFockMatrix,
         }
         else
         {
-            // TODO: add unrestricted electronic energy
-            return 0.0;
+            auto ifock_a = 2 * iFockMatrix;
+
+            auto ifock_b = 2 * iFockMatrix + 1;
+
+            auto idensity_a = 2 * iDensityMatrix;
+
+            auto idensity_b = 2 * iDensityMatrix + 1;
+
+            auto e_a = 0.5 * denblas::trace(_fockMatrices[ifock_a], aoDensityMatrix.getReferenceToDensity(idensity_a));
+
+            auto e_b = 0.5 * denblas::trace(_fockMatrices[ifock_b], aoDensityMatrix.getReferenceToDensity(idensity_b));
+
+            return e_a + e_b;
         }
     }
     

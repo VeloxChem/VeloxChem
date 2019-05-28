@@ -118,6 +118,9 @@ class ScfDriver:
         self.fock_matrices = deque()
         self.den_matrices = deque()
 
+        self.fock_matrices_beta = deque()
+        self.den_matrices_beta = deque()
+
         # density matrix
         self.density = AODensityMatrix()
 
@@ -224,6 +227,9 @@ class ScfDriver:
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
+        self.fock_matrices_beta.clear()
+        self.den_matrices_beta.clear()
+
         if self.rank == mpi_master():
             self.print_scf_energy()
             self.print_ground_state(molecule)
@@ -265,6 +271,9 @@ class ScfDriver:
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
+
+        self.fock_matrices_beta.clear()
+        self.den_matrices_beta.clear()
 
         ovl_mat, kin_mat, npot_mat, dipole_mats = self.comp_one_ints(
             molecule, ao_basis)
