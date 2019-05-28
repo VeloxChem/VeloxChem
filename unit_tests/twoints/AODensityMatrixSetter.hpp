@@ -22,6 +22,8 @@ CDenseMatrix getCvirMatrixForH2O();
 
 CAODensityMatrix getGenOODensityMatrixForH2O();
 
+CAODensityMatrix getUnrestDensityMatrixForH2O();
+
 } // vlxden namespace
 
 #endif /* AODensityMatrixSetter_hpp */
