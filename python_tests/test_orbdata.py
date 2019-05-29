@@ -87,7 +87,7 @@ class TestOrbData(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             h5file = os.path.join('inputs', 'dummy.h5')
-            if not os.path.isfile(h5file):
+            if not os.path.isdir('inputs'):
                 h5file = os.path.join('python_tests', h5file)
 
             d_rest.write_hdf5(h5file)
@@ -141,7 +141,7 @@ class TestOrbData(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             h5file = os.path.join('inputs', 'dummy.h5')
-            if not os.path.isfile(h5file):
+            if not os.path.isdir('inputs'):
                 h5file = os.path.join('python_tests', h5file)
 
             nuc_chg = np.array([1, 8, 1], dtype=np.int32)
