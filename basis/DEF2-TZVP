@@ -1,8 +1,4 @@
 @BASIS_SET DEF2-TZVP
-! Reference:  
-! H-Rn: F. Weigend and R. Ahlrichs, Phys. Chem. Chem. Phys., 7, 3297 (2005).
-! 
-! Last updated: 14/01/2015.
 
 @ATOMBASIS H
 S 3  1
@@ -3095,3 +3091,4 @@ F 1  1
 F 1  1
 2.100000000000e+00  1.000000000000e+00
 @END
+28774962ccb12db9ee150d4ba0ed1a0d
