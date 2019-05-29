@@ -1,11 +1,4 @@
 @BASIS_SET SADLEJ-PVTZ
-!   Sadlej pVTZ  EMSL  Basis Set Exchange Library   10/3/18 11:38 PM
-! A. J. Sadlej, Collec. Czech. Chem. Commun.  53, 1995 (1988)
-! A. J. Sadlej and M. Urban, J. Mol. Struct. (THEOCHEM) 234, 147 (1991)
-! A. J. Sadlej, Theor. Chim. Acta 79, 123 (1992)
-! A. J. Sadlej, Theor. Chim. Acta 81, 45 (1992)
-! A. J. Sadlej, Theor. Chim. Acta 81, 339 (1992)
-!
 
 @ATOMBASIS H
 S 4  1
@@ -1174,3 +1167,4 @@ F 2  1
 1.659587800000e+00  4.082540000000e-01
 6.526591000000e-01  2.750830000000e-01
 @END
+4893074cfed6859cad79d8f7cf533a68

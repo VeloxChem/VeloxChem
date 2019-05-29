@@ -1,8 +1,4 @@
 @BASIS_SET DEF2-QZVPP
-! Reference:  
-! H-Rn: F. Weigend and R. Ahlrichs, Phys. Chem. Chem. Phys., 7, 3297 (2005).
-! 
-! Last updated: 14/01/2015.
 
 @ATOMBASIS H
 S 4  1
@@ -4638,3 +4634,4 @@ F 1  1
 G 1  1
 4.763000000000e-01  1.000000000000e+00
 @END
+80c8b3d8d16f13496b9dd9ae8dc76cb4
