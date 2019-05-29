@@ -1,64 +1,68 @@
-import pathlib
-import sys
-import pytest
+import unittest
+import hashlib
 import os
-import hashlib, sys
+
 from veloxchem.inputparser import InputParser
 
-cases = [f.name for f in pathlib.Path("../basis").iterdir() if f.is_file]
-cases.remove('guess')
-cases.remove('MIN-CC-PVDZ')
-@pytest.mark.parametrize('case', cases)
-def test_acceptance(case):
-        this_basis = "../basis/" + case
-        make_file(this_basis,"mm")
-        # calculae md5 for mm
-        calculated_md5 = mdd5('mm')
-        # get reference md5 string
-        expected_md5 = open(this_basis).readlines()[-1]
-        if "\n" in expected_md5:
-            expected_md5 = expected_md5.split("\n")[0]
-        os.unlink("mm")
-        assert expected_md5 == calculated_md5
 
-def make_file(filename,fout):
-            basis_parser = InputParser(filename)
+class TestBasis(unittest.TestCase):
+
+    def test_basis_sets(self):
+
+        basis_dir = 'basis'
+        if not os.path.isdir(basis_dir):
+            basis_dir = os.path.join(os.pardir, basis_dir)
+
+        for basis_name in os.listdir(basis_dir):
+            if basis_name == 'MIN-CC-PVDZ':
+                continue
+
+            basis_file = os.path.join(basis_dir, basis_name)
+            if not os.path.isfile(basis_file):
+                continue
+
+            # get reference md5
+
+            f_basis = open(basis_file, 'r')
+            expected_md5 = f_basis.readlines()[-1].strip()
+            f_basis.close()
+
+            # get actual md5
+
+            basis_parser = InputParser(basis_file)
             basis_dict = basis_parser.get_dict()
-            L = list(basis_dict.keys())
-            L.pop(-1)
-            fo = open(fout, "w")
-            fo.write("@BASIS_SET " + str(filename.split("/")[2].upper()) + "\n\n")
-            count = int(0)
-            for l in L:
-                fo.write(
-                    "@"
-                    + str(l.split("_")[0].upper())
-                    + " "
-                    + str(l.split("_")[1].upper())
-                    + "\n"
-                )
-                for i in range((len(basis_dict[str(l)]))):
-                    if basis_dict[l][i].split()[0] in "SPDFGHIKL":
-                            sentence = str(basis_dict[l][i]).split()[0] + ' '+ str(basis_dict[l][i]).split()[1] + '  ' + str(basis_dict[l][i]).split()[2]
-                            fo.write(str(sentence))
-                    for z in range(len(basis_dict[l][i].split())):
-                            if basis_dict[l][i].split()[0] not in "SPDFGHIKL":
-                                    if z == 0:
-                                            fo.write("%18s" % basis_dict[l][i].split()[z])
-                                    else:
-                                            fo.write(" %19s" % basis_dict[l][i].split()[z])
-                    fo.write("\n")
-                count = count + 1
-                if count < len(L):
-                    fo.write("@END\n\n")
-                else:
-                    fo.write("@END\n")        
 
-def mdd5(filename):
-    hasher = hashlib.md5()
-    f = open(filename, "rb")
-    content = f.read()
-    hasher.update(content)
-    #print(hasher.hexdigest())
-    f.close()
-    return hasher.hexdigest()
+            basis_string = '@BASIS_SET ' + basis_name + os.linesep + os.linesep
+
+            for key in basis_dict:
+                if 'atombasis_' not in key:
+                    continue
+
+                content = key.split('_')
+                basis_string += '@' + content[0].upper() + ' '
+                basis_string += content[1].upper() + os.linesep
+
+                for line in basis_dict[key]:
+                    content = line.split()
+                    if content[0] in 'SPDFGHIKL':
+                        basis_string += content[0] + ' '
+                        basis_string += content[1] + '  '
+                        basis_string += content[2]
+                    else:
+                        basis_string += '{:>18s}'.format(content[0])
+                        for s in content[1:]:
+                            basis_string += ' {:>19s}'.format(s)
+                    basis_string += os.linesep
+
+                basis_string += '@END' + os.linesep + os.linesep
+
+            calculated_md5 = hashlib.md5(
+                basis_string[:-1].encode('utf-8')).hexdigest()
+
+            # verify md5
+
+            self.assertEqual(expected_md5, calculated_md5)
+
+
+if __name__ == "__main__":
+    unittest.main()
