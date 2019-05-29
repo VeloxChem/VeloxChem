@@ -17,6 +17,9 @@ class TestBasis(unittest.TestCase):
             if basis_name == 'MIN-CC-PVDZ':
                 continue
 
+            if 'RI' in basis_name:
+                continue
+
             basis_file = os.path.join(basis_dir, basis_name)
             if not os.path.isfile(basis_file):
                 continue
