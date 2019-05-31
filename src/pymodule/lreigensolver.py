@@ -1,18 +1,23 @@
+import itertools
 import numpy as np
 import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
+from .veloxchemlib import szblock
+from .veloxchemlib import hartree_in_ev
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrmat2vec
 from .lrmatvecdriver import swap_xy
 from .qqscheme import get_qq_scheme
+from .qqscheme import get_qq_type
 from .errorhandler import assert_msg_critical
 
 
-class LinearResponseSolver:
+class LinearResponseEigenSolver:
     """Implements linear response solver"""
 
     def __init__(self, comm, ostream):
@@ -28,10 +33,8 @@ class LinearResponseSolver:
             The output stream.
         """
 
-        # operators and frequencies
-        self.a_ops = 'xyz'
-        self.b_ops = 'xyz'
-        self.frequencies = (0,)
+        # number of states
+        self.nstates = 3
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -63,22 +66,18 @@ class LinearResponseSolver:
             The settings for the driver.
         """
 
-        if 'a_ops' in settings:
-            self.a_ops = settings['a_ops']
-        if 'b_ops' in settings:
-            self.b_ops = settings['b_ops']
-        if 'frequencies' in settings:
-            self.frequencies = settings['frequencies']
+        if 'nstates' in settings:
+            self.nstates = int(settings['nstates'])
 
         if 'eri_thresh' in settings:
-            self.eri_thresh = settings['eri_thresh']
+            self.eri_thresh = float(settings['eri_thresh'])
         if 'qq_type' in settings:
-            self.qq_type = settings['qq_type']
+            self.qq_type = str(settings['qq_type'])
 
         if 'conv_thresh' in settings:
-            self.conv_thresh = settings['conv_thresh']
+            self.conv_thresh = float(settings['conv_thresh'])
         if 'max_iter' in settings:
-            self.max_iter = settings['max_iter']
+            self.max_iter = int(settings['max_iter'])
 
     def compute(self, molecule, basis, scf_tensors):
         """Performs linear response calculation.
@@ -94,6 +93,9 @@ class LinearResponseSolver:
         scf_tensors
             The tensors from converged SCF wavefunction.
         """
+
+        if self.rank == mpi_master():
+            self.print_header()
 
         self.start_time = tm.time()
 
@@ -111,7 +113,6 @@ class LinearResponseSolver:
             nocc = nalpha
             norb = mo.shape[1]
             od, sd = construct_ed_sd(ea, nocc, norb)
-            td = {w: od - w * sd for w in self.frequencies}
         else:
             nocc = None
             norb = None
@@ -124,11 +125,7 @@ class LinearResponseSolver:
 
         # start linear response calculation
         if self.rank == mpi_master():
-            V1 = {
-                op: v for op, v in zip(
-                    self.b_ops, self.get_rhs(self.b_ops, scf_tensors, nocc))
-            }
-            igs = self.initial_guess(self.frequencies, V1, od, sd, td)
+            igs = self.initial_excitations(self.nstates, ea, nocc, norb)
             b = self.setup_trials(igs)
 
             assert_msg_critical(
@@ -141,8 +138,8 @@ class LinearResponseSolver:
         if self.rank == mpi_master():
             s2b = e2x_drv.s2n(b, scf_tensors, nocc)
 
-        solutions = {}
-        residuals = {}
+        excitations = [None] * self.nstates
+        exresiduals = [None] * self.nstates
         relative_residual_norm = {}
 
         # start iterations
@@ -150,29 +147,35 @@ class LinearResponseSolver:
 
             if self.rank == mpi_master():
                 self.cur_iter = i
-                nvs = []
+                ws = []
 
                 # next solution
-                for op, freq in igs:
-                    v = V1[op]
-                    reduced_solution = np.linalg.solve(
-                        np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
-                    solutions[(op, freq)] = np.matmul(b, reduced_solution)
-                    residuals[(op, freq)] = np.matmul(e2b - freq * s2b,
-                                                      reduced_solution) - v
 
-                    r = residuals[(op, freq)]
-                    n = solutions[(op, freq)]
+                E2 = b.T @ e2b
+                S2 = b.T @ s2b
 
-                    nv = np.dot(n, v)
-                    nvs.append((op, freq, nv))
+                wn, Xn = np.linalg.eig((np.linalg.solve(E2, S2)))
+                p = list(reversed(wn.argsort()))
+                wn = wn[p]
+                Xn = Xn[:, p]
+                for i in range(self.nstates):
+                    norm = np.sqrt(Xn[:, i].T @ S2 @ Xn[:, i])
+                    Xn[:, i] /= norm
+                reduced_ev = zip(1.0 / wn[:self.nstates],
+                                 Xn[:, :self.nstates].T)
 
+                for k, (w, reduced_X) in enumerate(reduced_ev):
+                    r = (e2b - w * s2b) @ reduced_X
+                    X = b @ reduced_X
                     rn = np.linalg.norm(r)
-                    nn = np.linalg.norm(n)
-                    relative_residual_norm[(op, freq)] = rn / nn
+                    xn = np.linalg.norm(X)
+                    exresiduals[k] = (w, r)
+                    excitations[k] = (w, X)
+                    relative_residual_norm[k] = rn / xn
+                    ws.append(w)
 
                 # write to output
-                self.print_iteration(relative_residual_norm, nvs)
+                self.print_iteration(relative_residual_norm, ws)
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -182,7 +185,8 @@ class LinearResponseSolver:
 
             # update trial vectors
             if self.rank == mpi_master():
-                new_trials = self.setup_trials(residuals, td=td, b=b)
+                tdx = {w: od - w * sd for w, x in excitations}
+                new_trials = self.setup_trials(exresiduals, tdx=tdx, b=b)
                 b = np.append(b, new_trials, axis=1)
             else:
                 new_trials = None
@@ -200,24 +204,65 @@ class LinearResponseSolver:
 
             assert_msg_critical(
                 self.is_converged,
-                'LinearResponseSolver.compute: failed to converge')
+                'LinearResponseEigenSolver.compute: failed to converge')
 
-        # calculate properties
         if self.rank == mpi_master():
-            v1 = {
-                op: v for op, v in zip(
-                    self.a_ops, self.get_rhs(self.a_ops, scf_tensors, nocc))
+            ops = 'xyz'
+            rhs = self.get_rhs(ops, scf_tensors, nocc)
+            V1 = {op: V for op, V in zip(ops, rhs)}
+
+            tms = {}
+            tms['w'] = np.array([s[0] for s in excitations])
+
+            eigvecs = [s[1] for s in excitations]
+            for op in ops:
+                tms[op] = np.array([np.dot(V1[op], vec) for vec in eigvecs])
+
+            osc = 2.0 / 3.0 * tms['w'] * (tms['x']**2 + tms['y']**2 +
+                                          tms['z']**2)
+
+            results = {
+                'excitation_energies': tms['w'],
+                'oscillator_strengths': osc,
             }
 
-            lrs = {}
-            for aop in self.a_ops:
-                for bop, w in solutions:
-                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[(bop, w)])
-            return lrs
+            self.print_summary(results)
+            return results
         else:
-            return None
+            return {}
 
-    def print_iteration(self, relative_residual_norm, nvs):
+    def print_header(self):
+        """Prints response eigen solver setup header to output stream.
+
+        Prints excitation calculation setup details to output stream.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header("Linear Response EigenSolver Setup")
+        self.ostream.print_header(35 * "=")
+        self.ostream.print_blank()
+
+        str_width = 60
+
+        cur_str = "Number Of States          : " + str(self.nstates)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "Max. Number Of Iterations : " + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "Convergence Threshold     : " + \
+            "{:.1e}".format(self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "ERI screening scheme      : " + get_qq_type(self.qq_type)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "ERI Screening Threshold   : " + \
+            "{:.1e}".format(self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
+        self.ostream.flush()
+
+    def print_iteration(self, relative_residual_norm, ws):
         """Prints information of the iteration"""
 
         output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
@@ -227,10 +272,10 @@ class LinearResponseSolver:
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(68))
         self.ostream.print_blank()
-        for op, freq, nv in nvs:
-            ops_label = '<<{};{}>>_{}'.format(op, op, freq)
-            rel_res = relative_residual_norm[(op, freq)]
-            output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
+        for k, w in enumerate(ws):
+            state_label = 'Excitation {}'.format(k + 1)
+            rel_res = relative_residual_norm[k]
+            output_iter = '{:<15s}: {:15.8f} '.format(state_label, w)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
             self.ostream.print_header(output_iter.ljust(68))
         self.ostream.print_blank()
@@ -247,6 +292,22 @@ class LinearResponseSolver:
         output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(68))
+        self.ostream.print_blank()
+
+    def print_summary(self, results):
+        """Prints summary to output stream"""
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Linear Response EigenSolver'.ljust(92))
+        self.ostream.print_header('---------------------------'.ljust(92))
+        for s, (e, f) in enumerate(
+                zip(results['excitation_energies'],
+                    results['oscillator_strengths'])):
+            output_abs = 'Excitation {:>5s}: '.format(str(s + 1))
+            output_abs += '{:15.8f} a.u. '.format(e)
+            output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
+            output_abs += '    osc.str.{:12.5f}'.format(f)
+            self.ostream.print_header(output_abs.ljust(92))
         self.ostream.print_blank()
 
     def check_convergence(self, relative_residual_norm):
@@ -279,36 +340,35 @@ class LinearResponseSolver:
         gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
         return gradients
 
-    def initial_guess(self, freqs, V1, od, sd, td):
+    def initial_excitations(self, nstates, ea, nocc, norb):
 
-        dim = od.shape[0]
+        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+        excitations = list(
+            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
 
-        ig = {}
-        for op, grad in V1.items():
-            gn = np.linalg.norm(grad)
-            for w in freqs:
-                if gn < self.small_thresh:
-                    ig[(op, w)] = np.zeros(dim)
-                else:
-                    ig[(op, w)] = grad / td[w]
-        return ig
+        ediag, sdiag = construct_ed_sd(ea, nocc, norb)
+        excitation_energies = 0.5 * ediag
 
-    def setup_trials(self, vectors, td=None, b=None, renormalize=True):
+        w = {ia: w for ia, w in zip(excitations, excitation_energies)}
+
+        final = []
+        for (i, a) in sorted(w, key=w.get)[:nstates]:
+            ia = excitations.index((i, a))
+            Xn = np.zeros(2 * len(excitations))
+            Xn[ia] = 1.0
+            final.append((w[(i, a)], Xn))
+        return final
+
+    def setup_trials(self, excitations, tdx=None, b=None, renormalize=True):
 
         trials = []
 
-        for (op, freq) in vectors:
-            vec = vectors[(op, freq)]
-
-            if td is not None:
-                v = vec / td[freq]
+        for w, X in excitations:
+            if tdx:
+                trials.append(X / tdx[w])
             else:
-                v = vec
-
-            if np.linalg.norm(v) > self.small_thresh:
-                trials.append(v)
-                if freq > self.small_thresh:
-                    trials.append(swap_xy(v))
+                trials.append(X)
+            trials.append(swap_xy(X))
 
         new_trials = np.array(trials).T
 
