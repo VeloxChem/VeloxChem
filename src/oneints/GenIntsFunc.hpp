@@ -21,11 +21,14 @@ namespace gintsfunc { // gintsfunc namespace
 
      @param recursionTerm the recursion term object.
      @param angularForm the angular form of recursion map object.
+     @param maxRepeatUnits the maximum number of repeated units in recursion
+            term subspace. 
      @param recursionFunctionsList the list of recursion functions.
      @return the recursion map object.
      */
     CRecursionMap genRecursionMap(const CRecursionTerm&          recursionTerm,
-                                  const recblock                 angularForm, 
+                                  const recblock                 angularForm,
+                                  const int32_t                  maxRepeatUnits,
                                   const CRecursionFunctionsList& recursionFunctionsList);
     
     /**
@@ -35,7 +38,7 @@ namespace gintsfunc { // gintsfunc namespace
      @param braAngularMomentum the angular momentum of bra side.
      @param ketAngularMomentum the angular momentum of ket side.
      @param ordderOfOperator the order of integral.
-     @return the recursion term object. 
+     @return the recursion term object.
      */
     CRecursionTerm genIntegral(const std::string& labelOfOperator,
                                const int32_t      braAngularMomentum,

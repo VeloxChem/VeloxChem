@@ -11,22 +11,30 @@
 CRecursionMap::CRecursionMap()
 {
     _angularForm = recblock::cc;
+    
+    _repeatUnits = 0;
 }
 
-CRecursionMap::CRecursionMap(const recblock angularForm)
+CRecursionMap::CRecursionMap(const recblock angularForm,
+                             const int32_t  repeatUnits)
 {
     _angularForm = angularForm;
+    
+    _repeatUnits = repeatUnits;
 }
 
 CRecursionMap::CRecursionMap(const std::vector<CRecursionTerm>& recursionTerms,
                              const std::vector<int32_t>&        recursionIndexes,
-                             const recblock                     angularForm)
+                             const recblock                     angularForm,
+                             const int32_t                      repeatUnits)
 
     : _recursionTerms(recursionTerms)
 
     , _recursionIndexes(recursionIndexes)
 
     , _angularForm(angularForm)
+
+    , _repeatUnits(repeatUnits)
 {
     
 }
@@ -38,6 +46,8 @@ CRecursionMap::CRecursionMap(const CRecursionMap& source)
     , _recursionIndexes(source._recursionIndexes)
 
     , _angularForm(source._angularForm)
+
+    , _repeatUnits(source._repeatUnits)
 {
     
 }
@@ -49,6 +59,8 @@ CRecursionMap::CRecursionMap(CRecursionMap&& source) noexcept
     , _recursionIndexes(std::move(source._recursionIndexes))
 
     , _angularForm(std::move(source._angularForm))
+
+    , _repeatUnits(std::move(source._repeatUnits))
 {
     
 }
@@ -69,6 +81,8 @@ CRecursionMap::operator=(const CRecursionMap& source)
     
     _angularForm = source._angularForm;
     
+    _repeatUnits = source._repeatUnits;
+    
     return *this;
 }
 
@@ -82,6 +96,8 @@ CRecursionMap::operator=(CRecursionMap&& source) noexcept
     _recursionIndexes = std::move(source._recursionIndexes);
     
     _angularForm = std::move(source._angularForm);
+    
+    _repeatUnits = std::move(source._repeatUnits);
     
     return *this;
 }
@@ -104,6 +120,8 @@ CRecursionMap::operator==(const CRecursionMap& other) const
     }
     
     if (_angularForm != other._angularForm) return false;
+    
+    if (_repeatUnits != other._repeatUnits) return false;
     
     return true;
 }
@@ -161,7 +179,7 @@ CRecursionMap::getNumberOfComponents() const
         ncomps += _recursionTerms[i].getNumberOfComponents(_angularForm);
     }
     
-    return ncomps;
+    return _repeatUnits * ncomps;
 }
 
 int32_t
@@ -173,7 +191,7 @@ CRecursionMap::getNumberOfTerms() const
 CRecursionTerm
 CRecursionMap::getTerm(const int32_t iRecursionTerm) const
 {
-    if (iRecursionTerm < getNumberOfComponents())
+    if (iRecursionTerm < getNumberOfTerms())
     {
         return _recursionTerms[iRecursionTerm];
     }

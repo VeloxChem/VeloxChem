@@ -13,9 +13,10 @@ namespace gintsfunc { // gintsfunc namespace
     CRecursionMap
     genRecursionMap(const CRecursionTerm&          recursionTerm,
                     const recblock                 angularForm,
+                    const int32_t                  maxRepeatUnits,
                     const CRecursionFunctionsList& recursionFunctionsList)
     {
-        CRecursionMap recmap(angularForm);
+        CRecursionMap recmap(angularForm, maxRepeatUnits);
         
         if (recursionTerm.isValid()) recmap.add(recursionTerm); 
         
