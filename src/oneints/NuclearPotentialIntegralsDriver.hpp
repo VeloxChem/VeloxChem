@@ -17,6 +17,7 @@
 #include "GtoContainer.hpp"
 #include "BoysFunction.hpp"
 #include "OneIntsDistributor.hpp"
+#include "RecursionMap.hpp"
 
 /**
  Class CNuclearPotentialIntegralsDriver computes one-electron nuclear potential
@@ -77,6 +78,7 @@ class CNuclearPotentialIntegralsDriver
 
      @param accBuffer the primitive integrals accumulation buffer.
      @param primBuffer the primitives recursion buffer.
+     @param primIndex the index of primitive nuclear repulsion integrals in primitive integrals buffer.
      @param charges the vector of point charges.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
@@ -85,6 +87,7 @@ class CNuclearPotentialIntegralsDriver
      */
     void _addPointChargeContribution(      CMemBlock2D<double>& accBuffer,
                                      const CMemBlock2D<double>& primBuffer,
+                                     const int32_t              primIndex,
                                      const CMemBlock<double>&   charges,
                                      const CGtoBlock&           braGtoBlock,
                                      const CGtoBlock&           ketGtoBlock,
@@ -100,7 +103,7 @@ class CNuclearPotentialIntegralsDriver
      side).
      
      @param primBuffer the primitives buffer.
-     @param auxBuffer the auxilary integrals buffer.
+     @param recursionMap the recursion map for Obara-Saika recursion.
      @param bfTable the Boys function evaluator.
      @param bfArguments the vector of Boys function arguments.
      @param bfValues the vector of Boys function values.
@@ -110,13 +113,12 @@ class CNuclearPotentialIntegralsDriver
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
      @param pcDistances the vector of distances R(PC) = P - C.
-     @param pcComponents the number of tensor components of distances R(PC) = P - C.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
     void _compPrimNuclearPotentialInts(      CMemBlock2D<double>&  primBuffer,
-                                             CMemBlock2D<double>&  auxBuffer,
+                                       const CRecursionMap&        recursionMap,
                                        const CBoysFunction&        bfTable,
                                              CMemBlock<double>&    bfArguments,
                                              CMemBlock2D<double>&  bfValues,
@@ -126,10 +128,22 @@ class CNuclearPotentialIntegralsDriver
                                        const CMemBlock2D<double>&  paDistances,
                                        const CMemBlock2D<double>&  pbDistances,
                                        const CMemBlock2D<double>&  pcDistances,
-                                       const int32_t               pcComponents, 
                                        const CGtoBlock&            braGtoBlock,
                                        const CGtoBlock&            ketGtoBlock,
                                        const int32_t               iContrGto) const;
+    
+    /**
+     Sets recursion map object for nuclear potential integrals of specified angular
+     momentum.
+     
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     
+     @return the recursion map for overlap integrals.
+     */
+    CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,
+                                   const int32_t ketAngularMomentum,
+                                   const int32_t maxNumberOfPrimitives) const;
     
 public:
     

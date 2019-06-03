@@ -13,7 +13,11 @@
 #include "OneIntsFunc.hpp"
 #include "BoysFunction.hpp"
 #include "StringFormat.hpp"
+#include "RecursionFunctionsList.hpp"
+#include "TwoCentersRecursionFunctions.hpp"
+#include "GenIntsFunc.hpp"
 
+#include "OverlapRecFuncForSX.hpp"
 #include "NuclearPotentialRecFuncForSX.hpp"
 #include "NuclearPotentialRecFuncForPX.hpp"
 #include "NuclearPotentialRecFuncForDX.hpp"
@@ -326,47 +330,36 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
     
     CMemBlock2D<double> rfacts(pdim, 3 * pmax);
     
-    // allocate P coordinates
+    // allocate P center coordinates
     
     CMemBlock2D<double> rp(pdim, 3 * pmax);
     
-    // set up tensors of PA and PB distances
+    // set up PA and PB distances
     
-    auto btcomps = intsfunc::getNumberOfComponentsInDistancesTensor(bang);
+    auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
-    auto ktcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
+    auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
-    auto rpa = (btcomps > 0) ? CMemBlock2D<double>(pdim, btcomps * pmax) : CMemBlock2D<double>();
+    // set up PC distances
     
-    auto rpb = (ktcomps > 0) ? CMemBlock2D<double>(pdim, ktcomps * pmax) : CMemBlock2D<double>();
-    
-    auto pcord = kang + bang;
-    
-    if (pcord == 0) pcord = 1;
-    
-    auto bkcomps = intsfunc::getNumberOfComponentsInDistancesTensor(pcord);
-    
-    auto rpc = CMemBlock2D<double>(pdim, bkcomps * pmax);
-    
-    // Boys function data
-    
-    auto bord = bang + kang;
-    
-    CBoysFunction bftab(bord);
-    
-    CMemBlock<double> bargs(pdim);
-    
-    CMemBlock2D<double> bvals(pdim, bord + 1);
+    auto rpc = CMemBlock2D<double>(pdim, 3 * pmax);
     
     // allocate primitives and auxilary integrals buffer
     
+    auto recmap = _setRecursionMap(bang, kang, pmax);
+    
+    auto nblock = recmap.getNumberOfComponents();
+    
+    CMemBlock2D<double> primbuffer(pdim, nblock * pmax);
+    
+    printf("TEST: (%i,%i) -> terms %i blocks %i\n", bang, kang,
+           recmap.getNumberOfTerms(), nblock);
+    
+    // allocate primitive integrals accumulation buffer
+    
     auto ncart = angmom::to_CartesianComponents(bang, kang);
     
-    CMemBlock2D<double> primbuffer(pdim, ncart * pmax);
-    
     CMemBlock2D<double> accbuffer(pdim, ncart * pmax);
-    
-    CMemBlock2D<double> auxbuffer(pdim, (bord + 1) * pmax);
     
     // allocate contracted Cartesian integrals buffer
     
@@ -380,9 +373,21 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
     
     CMemBlock2D<double> spherbuffer(kdim, nspher);
     
+    // set uo Boys function data
+    
+    CBoysFunction bftab(bang + kang);
+    
+    CMemBlock<double> bargs(pdim);
+    
+    CMemBlock2D<double> bvals(pdim, bang + kang + 1);
+    
     // determine bra and ket sides symmetry
     
     bool symbk = (bragtos == ketgtos);
+    
+    // set up index of primitive integrals
+    
+    auto pidx = recmap.getIndexOfTerm(gintsfunc::genIntegral({"Nuclear Potential"}, bang, kang, 0));
     
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -398,15 +403,15 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
         
         intsfunc::compCoordinatesForP(rp, rfacts, 3, bragtos, ketgtos, i);
         
-        // compute tensors of distances: R(PA) = P - A
+        // compute distances: R(PA) = P - A
         
-        intsfunc::compTensorsPA(rpa, rp, bragtos, ketgtos, i);
+        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
         
-        // compute tnesors of distances: R(PB) = P - B
+        // compute distances: R(PB) = P - B
         
-        intsfunc::compTensorsPB(rpb, rp, bragtos, ketgtos, i);
+        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
         
-        // reset accumulation buffer
+        // reset primitive integrals accumulation buffer
         
         accbuffer.zero();
         
@@ -414,19 +419,18 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
         
         for (int32_t j = 0; j < qvalues.size(); j++)
         {
-            // compute tensors: R(PC) = P - C
+            // compute distances: R(PC) = P - C
             
-            intsfunc::compTensorsPC(rpc, rp, qcoords, pcord, bragtos, ketgtos, i, j);
+            intsfunc::compDistancesPC(rpc, rp, qcoords, bragtos, ketgtos, i, j); 
             
             // compute primitive integrals
             
-            _compPrimNuclearPotentialInts(primbuffer, auxbuffer, bftab, bargs,
-                                          bvals, bord, rfacts, rab, rpa, rpb,
-                                          rpc, bkcomps, bragtos, ketgtos, i);
+            _compPrimNuclearPotentialInts(primbuffer, recmap, bftab, bargs, bvals, bang + kang,
+                                          rfacts, rab, rpa, rpb, rpc, bragtos, ketgtos, i);
             
             // add scaled contribution to accumulation buffer
             
-            _addPointChargeContribution(accbuffer, primbuffer, qvalues,
+            _addPointChargeContribution(accbuffer, primbuffer, pidx, qvalues,
                                         bragtos, ketgtos, i, j);
         }
         
@@ -440,15 +444,13 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
         
         // add batch of integrals to integrals matrix
         
-        // add batch of integrals to integrals matrix
-        
         distpat.distribute(spherbuffer, bragtos, ketgtos, symbk, i);
     }
 }
 
 void
 CNuclearPotentialIntegralsDriver::_compPrimNuclearPotentialInts(      CMemBlock2D<double>&  primBuffer,
-                                                                      CMemBlock2D<double>&  auxBuffer,
+                                                                const CRecursionMap&        recursionMap,
                                                                 const CBoysFunction&        bfTable,
                                                                       CMemBlock<double>&    bfArguments,
                                                                       CMemBlock2D<double>&  bfValues,
@@ -458,288 +460,62 @@ CNuclearPotentialIntegralsDriver::_compPrimNuclearPotentialInts(      CMemBlock2
                                                                 const CMemBlock2D<double>&  paDistances,
                                                                 const CMemBlock2D<double>&  pbDistances,
                                                                 const CMemBlock2D<double>&  pcDistances,
-                                                                const int32_t               pcComponents,
                                                                 const CGtoBlock&            braGtoBlock,
                                                                 const CGtoBlock&            ketGtoBlock,
                                                                 const int32_t               iContrGto) const
 {
-    // set up angular momentum on bra and ket sides
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 3, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    auto bang = braGtoBlock.getAngularMomentum();
+    npotrecfunc::compNuclearPotentialForSS(primBuffer, recursionMap, bfTable, bfArguments, bfValues, bfOrder,
+                                           osFactors, abDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    auto kang = ketGtoBlock.getAngularMomentum();
+    npotrecfunc::compNuclearPotentialForSP(primBuffer, recursionMap, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (s|A(0)|s) integrals
+    npotrecfunc::compNuclearPotentialForPS(primBuffer, recursionMap, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    npotrecfunc::compNuclearPotentialForSS(primBuffer, auxBuffer, bfTable,
-                                           bfArguments, bfValues, bfOrder,
-                                           osFactors, abDistances, pcDistances,
-                                           pcComponents, braGtoBlock, ketGtoBlock,
-                                           iContrGto);
-   
-    // compute (s|A(0)|p) integrals
-   
-    if ((bang == 0) && (kang == 1))
-    {
-        npotrecfunc::compNuclearPotentialForSP(primBuffer, auxBuffer, pbDistances,
-                                               pcDistances, braGtoBlock, ketGtoBlock,
-                                               iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForSD(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (p|A(0)|s) integrals
+    npotrecfunc::compNuclearPotentialForDS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 0))
-    {
-        npotrecfunc::compNuclearPotentialForPS(primBuffer, auxBuffer, paDistances,
-                                               pcDistances, braGtoBlock, ketGtoBlock,
-                                               iContrGto);
-        
-        return;
-    }
-
-    // compute (p|A(0)|p) integrals
+    npotrecfunc::compNuclearPotentialForSF(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 1))
-    {
-        npotrecfunc::compNuclearPotentialForPP(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForFS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (s|A(0)|d) integrals
-
-    if ((bang == 0) && (kang == 2))
-    {
-        npotrecfunc::compNuclearPotentialForSD(primBuffer, auxBuffer, osFactors,
-                                               pbDistances, pcDistances, braGtoBlock,
-                                               ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForSG(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (d|A(0)|s) integrals
-   
-    if ((bang == 2) && (kang == 0))
-    {
-        npotrecfunc::compNuclearPotentialForDS(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pcDistances, braGtoBlock,
-                                               ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForGS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (p|A(0)|d) integrals
+    npotrecfunc::compNuclearPotentialForPP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 2))
-    {
-        npotrecfunc::compNuclearPotentialForPD(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForPD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (d|A(0)|p) integrals
+    npotrecfunc::compNuclearPotentialForDP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 1))
-    {
-        npotrecfunc::compNuclearPotentialForDP(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForPF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (d|A(0)|d) integrals
+    npotrecfunc::compNuclearPotentialForFP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 2))
-    {
-        npotrecfunc::compNuclearPotentialForDD(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForPG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (s|A(0)|f) integrals
+    npotrecfunc::compNuclearPotentialForGP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 3))
-    {
-        npotrecfunc::compNuclearPotentialForSF(primBuffer, auxBuffer, osFactors,
-                                               pbDistances, pcDistances, braGtoBlock,
-                                               ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForDD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (f|A(0)|s) integrals
+    npotrecfunc::compNuclearPotentialForDF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 3) && (kang == 0))
-    {
-        npotrecfunc::compNuclearPotentialForFS(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pcDistances, braGtoBlock,
-                                               ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForFD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (p|A(0)|f) integrals
+    npotrecfunc::compNuclearPotentialForDG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 3))
-    {
-        npotrecfunc::compNuclearPotentialForPF(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForGD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (f|A(0)|p) integrals
+    npotrecfunc::compNuclearPotentialForFF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 3) && (kang == 1))
-    {
-        npotrecfunc::compNuclearPotentialForFP(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForFG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (d|A(0)|f) integrals
+    npotrecfunc::compNuclearPotentialForGF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 3))
-    {
-        npotrecfunc::compNuclearPotentialForDF(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (f|A(0)|d) integrals
-    
-    if ((bang == 3) && (kang == 2))
-    {
-        npotrecfunc::compNuclearPotentialForFD(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (f|A(0)|f) integrals
-    
-    if ((bang == 3) && (kang == 3))
-    {
-        npotrecfunc::compNuclearPotentialForFF(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (s|A(0)|g) integrals
-    
-    if ((bang == 0) && (kang == 4))
-    {
-        npotrecfunc::compNuclearPotentialForSG(primBuffer, auxBuffer, osFactors,
-                                               pbDistances, pcDistances, braGtoBlock,
-                                               ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (g|A(0)|s) integrals
-    
-    if ((bang == 4) && (kang == 0))
-    {
-        npotrecfunc::compNuclearPotentialForGS(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pcDistances, braGtoBlock,
-                                               ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (p|A(0)|g) integrals
-    
-    if ((bang == 1) && (kang == 4))
-    {
-        npotrecfunc::compNuclearPotentialForPG(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (g|A(0)|p) integrals
-    
-    if ((bang == 4) && (kang == 1))
-    {
-        npotrecfunc::compNuclearPotentialForGP(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (d|A(0)|g) integrals
-    
-    if ((bang == 2) && (kang == 4))
-    {
-        npotrecfunc::compNuclearPotentialForDG(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (g|A(0)|d) integrals
-    
-    if ((bang == 4) && (kang == 2))
-    {
-        npotrecfunc::compNuclearPotentialForGD(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (f|A(0)|g) integrals
-    
-    if ((bang == 3) && (kang == 4))
-    {
-        npotrecfunc::compNuclearPotentialForFG(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (g|A(0)|f) integrals
-    
-    if ((bang == 4) && (kang == 3))
-    {
-        npotrecfunc::compNuclearPotentialForGF(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (g|A(0)|g) integrals
-    
-    if ((bang == 4) && (kang == 4))
-    {
-        npotrecfunc::compNuclearPotentialForGG(primBuffer, auxBuffer, osFactors,
-                                               paDistances, pbDistances, pcDistances,
-                                               braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    npotrecfunc::compNuclearPotentialForGG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: add l > 4 recursion here
 }
@@ -747,6 +523,7 @@ CNuclearPotentialIntegralsDriver::_compPrimNuclearPotentialInts(      CMemBlock2
 void
 CNuclearPotentialIntegralsDriver::_addPointChargeContribution(      CMemBlock2D<double>& accBuffer,
                                                               const CMemBlock2D<double>& primBuffer,
+                                                              const int32_t              primIndex,
                                                               const CMemBlock<double>&   charges,
                                                               const CGtoBlock&           braGtoBlock,
                                                               const CGtoBlock&           ketGtoBlock,
@@ -785,7 +562,7 @@ CNuclearPotentialIntegralsDriver::_addPointChargeContribution(      CMemBlock2D<
         {
             auto abuf = accBuffer.data(i * ncart + j);
             
-            auto pbuf = primBuffer.data(i * ncart + j);
+            auto pbuf = primBuffer.data(primIndex + i * ncart + j);
             
             #pragma omp simd aligned(abuf, pbuf: VLX_ALIGN)
             for (int32_t k = 0; k < nprim; k++)
@@ -794,4 +571,22 @@ CNuclearPotentialIntegralsDriver::_addPointChargeContribution(      CMemBlock2D<
             }
         }
     }
+}
+
+CRecursionMap
+CNuclearPotentialIntegralsDriver::_setRecursionMap(const int32_t braAngularMomentum,
+                                                   const int32_t ketAngularMomentum,
+                                                   const int32_t maxNumberOfPrimitives) const
+{
+    CRecursionFunctionsList recfuncs;
+    
+    recfuncs.add(CRecursionFunction({"Overlap"}, &t2crecfunc::obRecursionForOverlap));
+    
+    recfuncs.add(CRecursionFunction({"Nuclear Potential"}, &t2crecfunc::obRecursionForNuclearPotential)); 
+    
+    auto rterm = gintsfunc::genIntegral({"Nuclear Potential"}, braAngularMomentum,
+                                        ketAngularMomentum, 0);
+    
+    return gintsfunc::genRecursionMap(rterm, recblock::cc, maxNumberOfPrimitives,
+                                      recfuncs);
 }

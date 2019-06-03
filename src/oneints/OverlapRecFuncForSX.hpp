@@ -21,6 +21,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param abDistances the vector of distances R(AB) = A - B.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -29,6 +30,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     void compOverlapForSS(      CMemBlock2D<double>& primBuffer,
                           const CRecursionMap&       recursionMap,
                           const CMemBlock2D<double>& osFactors,
+                          const int32_t              nOSFactors,
                           const CMemBlock2D<double>& abDistances,
                           const CGtoBlock&           braGtoBlock,
                           const CGtoBlock&           ketGtoBlock,
