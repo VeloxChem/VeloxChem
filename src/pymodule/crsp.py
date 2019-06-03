@@ -319,9 +319,9 @@ class ComplexResponse:
         # orthogonalizing new trial vectors against existing ones
 
         if bger.any():
-            new_ger = new_ger - np.matmul(np.matmul(bger, bger.T), new_ger)
+            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
         if bung.any():
-            new_ung = new_ung - np.matmul(np.matmul(bung, bung.T), new_ung)
+            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
 
         # normalizing new trial vectors
 
