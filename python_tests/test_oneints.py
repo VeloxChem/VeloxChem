@@ -2,6 +2,7 @@ from mpi4py import MPI
 import numpy as np
 import unittest
 import h5py
+import os
 
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
@@ -49,7 +50,12 @@ class TestOneInts(unittest.TestCase):
 
     def test_1e_integrals(self):
 
-        task = MpiTask(["inputs/h2se.inp", "inputs/h2se.out"], MPI.COMM_WORLD)
+        inpfile = os.path.join('inputs', 'h2se.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
+        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis
@@ -75,7 +81,11 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File("inputs/h2se.onee.h5", 'r')
+            h5file = os.path.join('inputs', 'h2se.onee.h5')
+            if not os.path.isfile(h5file):
+                h5file = os.path.join('python_tests', h5file)
+
+            hf = h5py.File(h5file, 'r')
             S2 = np.array(hf.get("overlap"))
             T2 = np.array(hf.get("kinetic_energy"))
             V2 = np.array(hf.get("nuclear_potential"))
@@ -98,12 +108,22 @@ class TestOneInts(unittest.TestCase):
         kindrv = KineticEnergyIntegralsDriver(comm)
         npotdrv = NuclearPotentialIntegralsDriver(comm)
 
-        bas_path = '../basis'
+        h2ofile = os.path.join('inputs', 'h2o.xyz')
+        if not os.path.isfile(h2ofile):
+            h2ofile = os.path.join('python_tests', h2ofile)
+
+        nh3file = os.path.join('inputs', 'nh3.xyz')
+        if not os.path.isfile(nh3file):
+            nh3file = os.path.join('python_tests', nh3file)
+
+        h5file = os.path.join('inputs', 'mix_basis_1e.h5')
+        if not os.path.isfile(h5file):
+            h5file = os.path.join('python_tests', h5file)
 
         # one molecule, one basis set
 
-        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
-        bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
+        mol_1 = Molecule.read_xyz(h2ofile)
+        bas_1 = MolecularBasis.read(mol_1, 'def2-svp')
 
         S11 = ovldrv.compute(mol_1, bas_1)
         T11 = kindrv.compute(mol_1, bas_1)
@@ -114,7 +134,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File("inputs/mix_basis_1e.h5", 'r')
+            hf = h5py.File(h5file)
             ref_S11 = np.array(hf.get("S_h2o_def2-svp"))
             ref_T11 = np.array(hf.get("T_h2o_def2-svp"))
             ref_V11 = np.array(hf.get("V_h2o_def2-svp"))
@@ -130,9 +150,9 @@ class TestOneInts(unittest.TestCase):
 
         # one molecule, two basis sets
 
-        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
-        bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
-        bas_2 = MolecularBasis.read(mol_1, 'cc-pvdz', bas_path)
+        mol_1 = Molecule.read_xyz(h2ofile)
+        bas_1 = MolecularBasis.read(mol_1, 'def2-svp')
+        bas_2 = MolecularBasis.read(mol_1, 'cc-pvdz')
 
         S12 = ovldrv.compute(mol_1, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, bas_1, bas_2)
@@ -140,7 +160,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File("inputs/mix_basis_1e.h5", 'r')
+            hf = h5py.File(h5file)
             ref_S12 = np.array(hf.get("S_h2o_def2-svp_cc-pvdz"))
             ref_T12 = np.array(hf.get("T_h2o_def2-svp_cc-pvdz"))
             ref_V12 = np.array(hf.get("V_h2o_def2-svp_cc-pvdz"))
@@ -156,10 +176,10 @@ class TestOneInts(unittest.TestCase):
 
         # two molecules, one basis set
 
-        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
-        mol_2 = Molecule.read_xyz('inputs/nh3.xyz')
+        mol_1 = Molecule.read_xyz(h2ofile)
+        mol_2 = Molecule.read_xyz(nh3file)
         mol = Molecule(mol_1, mol_2)
-        bas = MolecularBasis.read(mol, 'def2-svp', bas_path)
+        bas = MolecularBasis.read(mol, 'def2-svp')
 
         S12 = ovldrv.compute(mol_1, mol_2, bas)
         T12 = kindrv.compute(mol_1, mol_2, bas)
@@ -167,7 +187,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File("inputs/mix_basis_1e.h5", 'r')
+            hf = h5py.File(h5file)
             ref_S12 = np.array(hf.get("S_h2o_nh3_def2-svp"))
             ref_T12 = np.array(hf.get("T_h2o_nh3_def2-svp"))
             ref_V12 = np.array(hf.get("V_h2o_nh3_def2-svp"))
@@ -183,11 +203,11 @@ class TestOneInts(unittest.TestCase):
 
         # two molecules, two basis sets
 
-        mol_1 = Molecule.read_xyz('inputs/h2o.xyz')
-        mol_2 = Molecule.read_xyz('inputs/nh3.xyz')
+        mol_1 = Molecule.read_xyz(h2ofile)
+        mol_2 = Molecule.read_xyz(nh3file)
         mol = Molecule(mol_1, mol_2)
-        bas_1 = MolecularBasis.read(mol_1, 'def2-svp', bas_path)
-        bas_2 = MolecularBasis.read(mol_2, 'cc-pvdz', bas_path)
+        bas_1 = MolecularBasis.read(mol_1, 'def2-svp')
+        bas_2 = MolecularBasis.read(mol_2, 'cc-pvdz')
 
         S12 = ovldrv.compute(mol_1, mol_2, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, mol_2, bas_1, bas_2)
@@ -195,7 +215,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File("inputs/mix_basis_1e.h5", 'r')
+            hf = h5py.File(h5file)
             ref_S12 = np.array(hf.get("S_h2o_def2-svp_nh3_cc-pvdz"))
             ref_T12 = np.array(hf.get("T_h2o_def2-svp_nh3_cc-pvdz"))
             ref_V12 = np.array(hf.get("V_h2o_def2-svp_nh3_cc-pvdz"))

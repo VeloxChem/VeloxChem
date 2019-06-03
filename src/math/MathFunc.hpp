@@ -256,6 +256,14 @@ namespace mathfunc { // mathfunc namespace
               const int32_t bPosition,
               const int32_t nElements);
     
+    /**
+     Determines maximum number of components for tensor of given order.
+
+     @param order the order of tensor.
+     @return the number of components.
+     */
+    int32_t maxTensorComponents(const int32_t order);
+    
 } // mathfunc namespace
 
 #endif /* MathFunc_hpp */

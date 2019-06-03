@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import os
 
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
@@ -12,7 +13,12 @@ class TestSolvers(unittest.TestCase):
 
     def test_sad_guess(self):
 
-        task = MpiTask(["inputs/water.inp", "inputs/water.out"], MPI.COMM_WORLD)
+        inpfile = os.path.join('inputs', 'water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
+        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
 
         molecule = task.molecule
         ao_basis = task.ao_basis
@@ -40,8 +46,8 @@ class TestSolvers(unittest.TestCase):
         if (rank == mpi_master()):
 
             self.assertEqual(density.ndim, 2)
-            self.assertEqual(density.shape[0], 24)
-            self.assertEqual(density.shape[1], 24)
+            self.assertEqual(density.shape[0], 41)
+            self.assertEqual(density.shape[1], 41)
 
             # number of electrons
 

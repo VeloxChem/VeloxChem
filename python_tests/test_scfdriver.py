@@ -1,5 +1,6 @@
 from mpi4py import MPI
 import unittest
+import os
 
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
@@ -9,7 +10,12 @@ class TestScfDriver(unittest.TestCase):
 
     def test_h2se_scf(self):
 
-        task = MpiTask(["inputs/h2se.inp", "inputs/h2se.out"], MPI.COMM_WORLD)
+        inpfile = os.path.join('inputs', 'h2se.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
+        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)

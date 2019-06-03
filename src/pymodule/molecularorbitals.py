@@ -10,11 +10,11 @@ from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
 
-def _print_orbitals(self,
-                    molecule,
-                    ao_basis,
-                    all_orbs=False,
-                    ostream=OutputStream(sys.stdout)):
+def _MolecularOrbitals_print_orbitals(self,
+                                      molecule,
+                                      ao_basis,
+                                      all_orbs=False,
+                                      ostream=OutputStream(sys.stdout)):
 
     norb = self.number_mos()
 
@@ -39,8 +39,9 @@ def _print_orbitals(self,
         rnocc = [2.0 if x < nocc else 0.0 for x in range(norb)]
 
         for i in range(nstart, nend):
-            _print_coefficients(reigs[i], rnocc[i], i, rvecs[:, i], ao_map,
-                                0.15, ostream)
+            _MolecularOrbitals_print_coefficients(reigs[i], rnocc[i], i,
+                                                  rvecs[:, i], ao_map, 0.15,
+                                                  ostream)
 
         ostream.print_blank()
 
@@ -67,7 +68,8 @@ def _print_orbitals(self,
         assert_msg_critical(False, errmsg)
 
 
-def _print_coefficients(eigval, focc, iorb, coeffs, ao_map, thresh, ostream):
+def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
+                                          thresh, ostream):
     ostream.print_blank()
 
     valstr = "Molecular Orbital No.{:4d}:".format(iorb + 1)
@@ -104,7 +106,7 @@ def _print_coefficients(eigval, focc, iorb, coeffs, ao_map, thresh, ostream):
         ostream.print_header(valstr.ljust(92))
 
 
-def _get_density(self, molecule):
+def _MolecularOrbitals_get_density(self, molecule):
 
     if self.get_orbitals_type() == molorb.rest:
 
@@ -124,61 +126,99 @@ def _get_density(self, molecule):
         assert_msg_critical(False, errmsg)
 
 
-def _write_hdf5(self, fname):
+def _MolecularOrbitals_write_hdf5(self,
+                                  fname,
+                                  nuclear_charges=None,
+                                  basis_set=None):
 
     hf = h5py.File(fname, 'w')
 
-    name = "alpha_orbitals"
-    array = self.alpha_to_numpy()
-    hf.create_dataset(name, data=array, compression="gzip")
+    hf.create_dataset('alpha_orbitals',
+                      data=self.alpha_to_numpy(),
+                      compression='gzip')
 
-    name = "alpha_energies"
-    array = self.ea_to_numpy()
-    hf.create_dataset(name, data=array, compression="gzip")
+    hf.create_dataset('alpha_energies',
+                      data=self.ea_to_numpy(),
+                      compression='gzip')
 
     if self.get_orbitals_type() == molorb.unrest:
 
-        name = "beta_orbitals"
-        array = self.beta_to_numpy()
-        hf.create_dataset(name, data=array, compression="gzip")
+        hf.create_dataset('beta_orbitals',
+                          data=self.beta_to_numpy(),
+                          compression='gzip')
 
-        name = "beta_energies"
-        array = self.eb_to_numpy()
-        hf.create_dataset(name, data=array, compression="gzip")
+        hf.create_dataset('beta_energies',
+                          data=self.eb_to_numpy(),
+                          compression='gzip')
+
+    if nuclear_charges is not None:
+        hf.create_dataset('nuclear_charges',
+                          data=nuclear_charges,
+                          compression='gzip')
+
+    if basis_set is not None:
+        hf.create_dataset('basis_set',
+                          data=np.string_([basis_set]),
+                          compression='gzip')
 
     hf.close()
 
 
 @staticmethod
-def _read_hdf5(fname):
+def _MolecularOrbitals_read_hdf5(fname):
 
     hf = h5py.File(fname, 'r')
 
-    assert_msg_critical(
-        len(list(hf.keys())) == 2 or len(list(hf.keys())) == 4,
-        "MolecularOrbitals.read_hdf5: Incorrect number of datasets!")
+    orbs_type = molorb.rest
 
-    if len(list(hf.keys())) == 2:
-        orbs_type = molorb.rest
-    elif len(list(hf.keys())) == 4:
+    assert_msg_critical(
+        'alpha_orbitals' in hf.keys() and 'alpha_energies' in hf.keys(),
+        'MolecularOrbitals.read_hdf5: alpha orbitals/energies not found')
+
+    if 'beta_orbitals' in hf.keys() or 'beta_energies' in hf.keys():
         orbs_type = molorb.unrest
+
+        assert_msg_critical(
+            'beta_orbitals' in hf.keys() and 'beta_energies' in hf.keys(),
+            'MolecularOrbitals.read_hdf5: beta orbitals/energies not found')
 
     orbs = []
     enes = []
 
-    orbs.append(np.array(hf.get("alpha_orbitals")))
-    enes.append(np.array(hf.get("alpha_energies")))
+    orbs.append(np.array(hf.get('alpha_orbitals')))
+    enes.append(np.array(hf.get('alpha_energies')))
 
     if orbs_type == molorb.unrest:
-        orbs.append(np.array(hf.get("beta_orbitals")))
-        enes.append(np.array(hf.get("beta_energies")))
+        orbs.append(np.array(hf.get('beta_orbitals')))
+        enes.append(np.array(hf.get('beta_energies')))
 
     hf.close()
 
     return MolecularOrbitals(orbs, enes, orbs_type)
 
 
-MolecularOrbitals.get_density = _get_density
-MolecularOrbitals.write_hdf5 = _write_hdf5
-MolecularOrbitals.read_hdf5 = _read_hdf5
-MolecularOrbitals.print_orbitals = _print_orbitals
+@staticmethod
+def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
+
+    hf = h5py.File(fname, 'r')
+
+    match_nuclear_charges = False
+    if 'nuclear_charges' in hf:
+        hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
+        match_nuclear_charges = (hf_nuclear_charges == nuclear_charges).all()
+
+    match_basis_set = False
+    if 'basis_set' in hf:
+        hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
+        match_basis_set = (hf_basis_set.upper() == basis_set.upper())
+
+    hf.close()
+
+    return (match_nuclear_charges and match_basis_set)
+
+
+MolecularOrbitals.print_orbitals = _MolecularOrbitals_print_orbitals
+MolecularOrbitals.get_density = _MolecularOrbitals_get_density
+MolecularOrbitals.write_hdf5 = _MolecularOrbitals_write_hdf5
+MolecularOrbitals.read_hdf5 = _MolecularOrbitals_read_hdf5
+MolecularOrbitals.match_hdf5 = _MolecularOrbitals_match_hdf5

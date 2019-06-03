@@ -246,4 +246,19 @@ TEST_F(CMathFuncTest, CopyInteger)
     vlxtest::compare(veca, vecc, 5);
 }
 
+TEST_F(CMathFuncTest, MaxTensorComponents)
+{
+    ASSERT_EQ(0, mathfunc::maxTensorComponents(-1));
+    
+    ASSERT_EQ(1, mathfunc::maxTensorComponents(0));
+    
+    ASSERT_EQ(3, mathfunc::maxTensorComponents(1));
+    
+    ASSERT_EQ(9, mathfunc::maxTensorComponents(2));
+    
+    ASSERT_EQ(27, mathfunc::maxTensorComponents(3));
+    
+    ASSERT_EQ(81, mathfunc::maxTensorComponents(4));
+}
+
 

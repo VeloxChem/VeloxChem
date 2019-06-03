@@ -36,5 +36,4 @@ veloxchem_test:
     - cp config/Setup.Ubuntu.Intel src/Makefile.setup
     - make -j 6 -C src release && make -j 6 -C unit_tests release
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
-    - cd python_tests
-    - ../build/bin/UnitTestVeloxChemMP.x && python3 -m pytest -v --cov=../build/python/veloxchem
+    - ./build/bin/UnitTestVeloxChemMP.x && python3 -m pytest -v --cov=veloxchem

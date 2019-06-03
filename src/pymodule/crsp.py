@@ -46,8 +46,13 @@ class ComplexResponse:
             self.operators = settings['operators'].replace(' ', '')
             self.operators = self.operators.lower()
         if 'frequencies' in settings:
-            self.frequencies = settings['frequencies'].replace(' ', '')
-            self.frequencies = [float(w) for w in self.frequencies.split(',')]
+            self.frequencies = []
+            for w in settings['frequencies'].replace(' ', '').split(','):
+                if '-' in w:
+                    seq = tuple([float(x) for x in w.split('-')])
+                    self.frequencies += list(np.arange(*seq))
+                elif w:
+                    self.frequencies.append(float(w))
         if 'damping' in settings:
             self.damping = float(settings['damping'])
 
@@ -182,8 +187,6 @@ class ComplexResponse:
         """Constructs the preconditioner matrix.
         """
 
-        start_time = tm.time()
-
         # spawning needed components
 
         ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
@@ -200,7 +203,7 @@ class ComplexResponse:
         c_diag = (d * sdiag) * (ediag_sq + (w_sq + d_sq) * sdiag_sq)
         d_diag = (2 * w * d * ediag) * sdiag_sq
         p_diag = 1.0 / ((ediag_sq - (w_sq - d_sq) * sdiag_sq)**2 +
-                 (4 * w_sq * d_sq * sdiag_fp))
+                        (4 * w_sq * d_sq * sdiag_fp))
 
         pa_diag = p_diag * a_diag
         pb_diag = p_diag * b_diag
@@ -209,14 +212,7 @@ class ComplexResponse:
 
         precond = np.array([pa_diag, pb_diag, pc_diag, pd_diag])
 
-        self.ostream.print_info(
-            'Precondition matrix created in {:.2f} sec.'.format(tm.time() -
-                                                                start_time))
-        self.ostream.print_blank()
-        self.ostream.flush()
-
         return precond
-
 
     def preconditioning(self, precond, v_in):
         """Creates trial vectors out of residuals and the preconditioner
@@ -235,7 +231,6 @@ class ComplexResponse:
         v_out = np.array([v_out_rg, v_out_ru, v_out_iu, v_out_ig]).flatten()
 
         return v_out
-
 
     def get_rhs(self, molecule, scf_tensors, ops):
         """Creates right-hand sides of complex linear response equations
@@ -261,12 +256,12 @@ class ComplexResponse:
 
         return gradients
 
-    def initial_guess(self, molecule, scf_tensors, d, ops, freqs, precond):
+    def initial_guess(self, op_grads, d, freqs, precond):
         """Creating initial guess (un-orthonormalized trials) out of gradients.
         """
 
         ig = {}
-        for op, grad in zip(ops, self.get_rhs(molecule, scf_tensors, ops)):
+        for op, grad in op_grads.items():
             gradger, gradung = self.decomp_sym(grad)
             grad = np.array(
                 [gradger.real, gradung.real, -gradung.imag,
@@ -341,7 +336,7 @@ class ComplexResponse:
 
         return new_ger, new_ung
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_tensors, rhs=None):
         """Solves for the approximate response vector iteratively
         while checking the residuals for convergence.
 
@@ -385,21 +380,30 @@ class ComplexResponse:
 
             # calling the gradients
 
-            v1 = {
-                op: v
-                for op, v in zip(ops, self.get_rhs(molecule, scf_tensors, ops))
-            }
+            if rhs is None:
+                v1 = {
+                    op: v for op, v in zip(
+                        ops, self.get_rhs(molecule, scf_tensors, ops))
+                }
+            else:
+                v1 = rhs
 
             # creating the preconditioner matrix
 
+            precond_start_time = tm.time()
             precond = {
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
+            self.ostream.print_info(
+                'Precondition {} created in {:.2f} sec.'.format(
+                    'matrices' if len(freqs) > 1 else 'matrix',
+                    tm.time() - precond_start_time))
+            self.ostream.print_blank()
+            self.ostream.flush()
 
             # spawning initial trial vectors
 
-            igs = self.initial_guess(molecule, scf_tensors, d, ops, freqs,
-                                     precond)
+            igs = self.initial_guess(v1, d, freqs, precond)
             bger, bung = self.setup_trials(igs)
 
             assert_msg_critical(
@@ -717,7 +721,12 @@ class ComplexResponse:
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
 
-        return solutions
+            return {
+                'properties': {(op, freq): nv for op, freq, nv in nvs},
+                'solutions': solutions,
+            }
+        else:
+            return None
 
     def check_convergence(self, relative_residual_norm):
         """Checks convergence"""
@@ -741,7 +750,7 @@ class ComplexResponse:
         self.ostream.print_header(output_header.ljust(82))
         self.ostream.print_blank()
         for op, freq, nv in nvs:
-            ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+            ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
                 ops_label, -nv.real, -nv.imag)

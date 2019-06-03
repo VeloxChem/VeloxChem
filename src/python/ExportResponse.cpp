@@ -161,14 +161,7 @@ void export_response(py::module& m)
             m, "TDASigmaVectorDriver"
         )
         .def(py::init(&CTDASigmaVectorDriver_create))
-        .def("compute",
-             (std::vector<CDenseMatrix> (CTDASigmaVectorDriver::*)
-              (const std::vector<CExcitationVector>&,
-               const CScreeningContainer&,
-               const CMolecularOrbitals&,
-               const CMolecule&,
-               const CMolecularBasis&) const)
-             &CTDASigmaVectorDriver::compute)
+        .def("compute", &CTDASigmaVectorDriver::compute)
     ;
 }
     

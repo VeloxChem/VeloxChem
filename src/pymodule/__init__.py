@@ -1,4 +1,8 @@
-import os
+# mpi4py
+try:
+    from mpi4py import MPI
+except ImportError:
+    raise ImportError('Unable to import mpi4py.MPI')
 
 # C++ classes
 from .veloxchemlib import AtomBasis
@@ -38,10 +42,12 @@ from .scfrestdriver import ScfRestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver
+from .excitondriver import ExcitonModelDriver
 from .rspdriver import ResponseDriver
 from .adconedriver import AdcOneDriver
 from .tdaexcidriver import TDAExciDriver
 from .blockdavidson import BlockDavidsonSolver
+from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
 from .rspproperty import ResponseProperty
 from .rsppolarizability import Polarizability
@@ -57,6 +63,7 @@ from .qqscheme import get_qq_scheme
 from .main import main
 
 # Environment variable: basis set path
+import os
 if 'VLXBASISPATH' not in os.environ:
     module_path = os.path.dirname(os.path.abspath(__file__))
-    os.environ['VLXBASISPATH'] = module_path + '/../../../basis'
+    os.environ['VLXBASISPATH'] = os.path.join(module_path, 'basis')

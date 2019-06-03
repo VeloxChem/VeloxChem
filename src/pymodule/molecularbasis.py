@@ -24,11 +24,14 @@ def _MolecularBasis_read(mol,
     # 2. current directory
     # 3. VLXBASISPATH
 
-    basis_file = basis_path + '/' + basis_name.upper()
+    basis_file = os.path.join(basis_path, basis_name.upper())
+
     if not os.path.isfile(basis_file) and basis_path != '.':
-        basis_file = './' + basis_name.upper()
+        basis_file = os.path.join('.', basis_name.upper())
+
     if not os.path.isfile(basis_file) and 'VLXBASISPATH' in os.environ:
-        basis_file = os.environ['VLXBASISPATH'] + '/' + basis_name.upper()
+        basis_file = os.path.join(os.environ['VLXBASISPATH'],
+                                  basis_name.upper())
 
     basis_info = "Reading basis set: " + basis_file
     ostream.print_info(basis_info)

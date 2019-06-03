@@ -23,20 +23,21 @@ class ResponseProperty:
         self.rsp_driver = ResponseDriver(comm, ostream)
         self.rsp_driver.update_settings(self.rsp_input)
 
-    def compute(self, mol_orbs, molecule, basis):
+    def compute(self, molecule, basis, scf_tensors):
         """Performs response property/spectroscopy calculation.
 
         Parameters
         ----------
-        mol_orbs
-            The molecular orbitals.
         molecule
             The molecule.
         basis
             The AO basis set.
+        scf_tensors
+            The tensors from converged SCF wavefunction.
         """
 
-        self.rsp_property = self.rsp_driver.compute(mol_orbs, molecule, basis)
+        self.rsp_property = self.rsp_driver.compute(molecule, basis,
+                                                    scf_tensors)
 
     def get_property(self, req_list):
         """Gets response property/spectroscopy.

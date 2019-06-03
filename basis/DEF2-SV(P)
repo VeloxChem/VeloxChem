@@ -1,8 +1,4 @@
 @BASIS_SET DEF2-SV(P)
-! Reference:  
-! H-Rn: F. Weigend and R. Ahlrichs, Phys. Chem. Chem. Phys., 7, 3297 (2005).
-! 
-! Last updated: 14/01/2015.
 
 @ATOMBASIS H
 S 3  1
@@ -2378,3 +2374,4 @@ F 1  1
 F 1  1
 2.100000000000e+00  1.000000000000e+00
 @END
+889da457162ed68ead739a617575f521

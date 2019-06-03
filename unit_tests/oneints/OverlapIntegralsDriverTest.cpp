@@ -11,7 +11,6 @@
 #include "OverlapIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
-#include "AssembleMatrices.hpp"
 
 TEST_F(COverlapIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7410,80 +7409,6 @@ TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2O)
     CDenseMatrix m (intvals, ovlmat.getNumberOfRows(), ovlmat.getNumberOfColumns());
 
     ASSERT_EQ(ovlmat, COverlapMatrix(m));
-}
-
-TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForH2ODimer)
-{
-    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
-    
-    auto mdimer = vlxmol::getMoleculeH2ODimer();
-
-    auto mh2o_1 = mdimer.getSubMolecule(0,3);
-
-    auto mh2o_2 = mdimer.getSubMolecule(3,3);
-    
-    auto mbas = vlxbas::getMolecularBasisForH2O();
-
-    COverlapMatrix S = ovldrv.compute(mdimer, mbas);
-
-    COverlapMatrix S11 = ovldrv.compute(mh2o_1, mbas);
-
-    COverlapMatrix S22 = ovldrv.compute(mh2o_2, mbas);
-
-    COverlapMatrix S12 = ovldrv.compute(mh2o_1, mh2o_2, mbas);
-
-    COverlapMatrix S21 = ovldrv.compute(mh2o_2, mh2o_1, mbas);
-
-    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
-
-    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
-
-    COverlapMatrix S_new = dimerfunc::assembleOverlapMatrices(
-                                      mh2o_1, mh2o_2, mbas, mbas,
-                                      S11, S22, S12, S21);
-
-    ASSERT_EQ(S, S_new);
-}
-
-TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForNH3CH4)
-{
-    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
-
-    auto mdimer = vlxmol::getMoleculeNH3CH4();
-
-    auto mnh3 = mdimer.getSubMolecule(0,4);
-
-    auto mch4 = mdimer.getSubMolecule(4,5);
-    
-    auto mbas = vlxbas::getMinimalBasisForNH3CH4();
-
-    COverlapMatrix S = ovldrv.compute(mdimer, mbas);
-
-    COverlapMatrix S11 = ovldrv.compute(mnh3, mbas);
-
-    COverlapMatrix S22 = ovldrv.compute(mch4, mbas);
-
-    COverlapMatrix S12 = ovldrv.compute(mnh3, mch4, mbas);
-
-    COverlapMatrix S21 = ovldrv.compute(mch4, mnh3, mbas);
-
-    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
-
-    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
-
-    COverlapMatrix S_new = dimerfunc::assembleOverlapMatrices(
-                                      mnh3, mch4, mbas, mbas,
-                                      S11, S22, S12, S21);
-
-    ASSERT_EQ(S, S_new);
 }
 
 TEST_F(COverlapIntegralsDriverTest, ComputeOverlapForTwoBasis)

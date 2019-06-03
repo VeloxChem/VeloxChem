@@ -1,0 +1,30 @@
+@jobs
+task: exciton
+@end
+
+@method settings
+basis: cc-pvdz
+@end
+
+@exciton
+fragments: 3 * 3
+nstates: 2
+ct_nocc: 1
+ct_nvir: 1
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+units: au
+xyz:
+O   0.0   0.0   0.0
+H   0.1   1.4   1.1
+H   0.0  -1.4   1.1
+O   4.0   0.2  -0.1
+H   4.3   1.4   1.1
+H   4.1  -1.4   1.1
+O   8.0   0.0   0.0
+H   8.1   1.4   1.1
+H   8.0  -1.4   1.1
+@end

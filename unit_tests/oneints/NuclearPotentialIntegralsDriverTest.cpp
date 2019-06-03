@@ -11,7 +11,6 @@
 #include "NuclearPotentialIntegralsDriver.hpp"
 #include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
-#include "AssembleMatrices.hpp"
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeSSForLiH)
 {
@@ -7509,80 +7508,6 @@ TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2O)
     CDenseMatrix m (intvals, npotmat.getNumberOfRows(), npotmat.getNumberOfColumns());
 
     ASSERT_EQ(npotmat, CNuclearPotentialMatrix(m));
-}
-
-TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForH2ODimer)
-{
-    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
-    
-    auto mdimer = vlxmol::getMoleculeH2ODimer();
-
-    auto mh2o_1 = mdimer.getSubMolecule(0,3);
-
-    auto mh2o_2 = mdimer.getSubMolecule(3,3);
-
-    auto mbas = vlxbas::getMolecularBasisForH2O();
-
-    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas);
-
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mh2o_1, mbas, mdimer);
-                                                                  
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mh2o_2, mbas, mdimer);
-
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mh2o_1, mh2o_2, mbas, mdimer);
-
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mh2o_2, mh2o_1, mbas, mdimer);
-
-    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
-
-    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
-
-    CNuclearPotentialMatrix S_new = dimerfunc::assembleNuclearPotentialMatrices(
-                                               mh2o_1, mh2o_2, mbas, mbas,
-                                               S11, S22, S12, S21);
-
-    ASSERT_EQ(S, S_new);
-}
-
-TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForNH3CH4)
-{
-    CNuclearPotentialIntegralsDriver npotdrv(MPI_COMM_WORLD);
-
-    auto mdimer = vlxmol::getMoleculeNH3CH4();
-
-    auto mnh3 = mdimer.getSubMolecule(0,4);
-
-    auto mch4 = mdimer.getSubMolecule(4,5);
-    
-    auto mbas = vlxbas::getMinimalBasisForNH3CH4();
-
-    CNuclearPotentialMatrix S = npotdrv.compute(mdimer, mbas);
-
-    CNuclearPotentialMatrix S11 = npotdrv.compute(mnh3, mbas, mdimer);
-                                                                                
-    CNuclearPotentialMatrix S22 = npotdrv.compute(mch4, mbas, mdimer);
-
-    CNuclearPotentialMatrix S12 = npotdrv.compute(mnh3, mch4, mbas, mdimer);
-                                                                                
-    CNuclearPotentialMatrix S21 = npotdrv.compute(mch4, mnh3, mbas, mdimer);
-
-    ASSERT_EQ(S11.getNumberOfRows(), S12.getNumberOfRows());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S12.getNumberOfColumns());
-
-    ASSERT_EQ(S22.getNumberOfRows(), S21.getNumberOfRows());
-
-    ASSERT_EQ(S11.getNumberOfRows(), S21.getNumberOfColumns());
-
-    CNuclearPotentialMatrix S_new = dimerfunc::assembleNuclearPotentialMatrices(
-                                               mnh3, mch4, mbas, mbas,
-                                               S11, S22, S12, S21);
-
-    ASSERT_EQ(S, S_new);
 }
 
 TEST_F(CNuclearPotentialIntegralsDriverTest, ComputeNuclearPotentialForTwoBasis)

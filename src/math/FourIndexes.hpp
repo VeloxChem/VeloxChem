@@ -110,6 +110,15 @@ public:
     bool operator!=(const CFourIndexes& other) const;
     
     /**
+     Shifts selected component of four indexes object by given value.
+
+     @param shiftValue the shift value.
+     @param iComponent the component of four indexes object.
+     */
+    void shift(const int32_t shiftValue,
+               const int32_t iComponent); 
+    
+    /**
      Gets first index from quadruple of indexes.
      
      @return the first index from quadruple of indexes.
@@ -145,6 +154,14 @@ public:
              false - otherwise.
      */
     bool isValidQuadruple() const;
+    
+    /**
+     Gets specific four index component.
+
+     @param iComponent the index of four indexes object.
+     @return the values of requested index.
+     */
+    int32_t value(const int32_t iComponent) const;
     
     /**
      Converts four indexes object to text output and insert it into output text

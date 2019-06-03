@@ -125,6 +125,19 @@ CFourIndexes::operator!=(const CFourIndexes& other) const
     return !( (*this) == other);
 }
 
+void
+CFourIndexes::shift(const int32_t shiftValue,
+                    const int32_t iComponent)
+{
+    if (iComponent == 0) _iIndex += shiftValue;
+    
+    if (iComponent == 1) _jIndex += shiftValue;
+    
+    if (iComponent == 2) _kIndex += shiftValue;
+    
+    if (iComponent == 3) _lIndex += shiftValue;
+}
+
 int32_t
 CFourIndexes::first() const
 {
@@ -161,6 +174,20 @@ CFourIndexes::isValidQuadruple() const
     if (_lIndex < 0) return false;
     
     return true;
+}
+
+ int32_t
+CFourIndexes::value(const int32_t iComponent) const
+{
+    if (iComponent == 0) return _iIndex;
+    
+    if (iComponent == 1) return _jIndex;
+    
+    if (iComponent == 2) return _kIndex;
+    
+    if (iComponent == 3) return _lIndex;
+    
+    return -1;
 }
 
 std::ostream&

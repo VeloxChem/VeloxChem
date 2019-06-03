@@ -115,6 +115,24 @@ CMOIntsBatch_to_numpy_2(const CMOIntsBatch& self,
                                          self.getNumberOfColumns());
 }
 
+static py::array_t<double>
+CMOIntsBatchXY_to_numpy(const CMOIntsBatch& self,
+                        const int32_t iBatch)
+{
+    return vlx_general::pointer_to_numpy(self.getBatchXY(iBatch),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+    
+static py::array_t<double>
+CMOIntsBatchYX_to_numpy(const CMOIntsBatch& self,
+                        const int32_t iBatch)
+{
+    return vlx_general::pointer_to_numpy(self.getBatchYX(iBatch),
+                                         self.getNumberOfColumns(),
+                                         self.getNumberOfRows());
+}
+    
 // Helper function for collecting CMOIntsBatch on global master node
 
 static void
@@ -252,6 +270,12 @@ void export_twoints(py::module& m)
         .value("ovov", moints::ovov)
         .value("ovvv", moints::ovvv)
         .value("vvvv", moints::vvvv)
+        .value("asym_oooo", moints::asym_oooo)
+        .value("asym_ooov", moints::asym_ooov)
+        .value("asym_oovv", moints::asym_oovv)
+        .value("asym_ovov", moints::asym_ovov)
+        .value("asym_ovvv", moints::asym_ovvv)
+        .value("asym_vvvv", moints::asym_vvvv)
     ;
 
     // CAOFockMatrix class
@@ -340,6 +364,8 @@ void export_twoints(py::module& m)
         .def(py::init<>())
         .def("to_numpy", &CMOIntsBatch_to_numpy)
         .def("to_numpy", &CMOIntsBatch_to_numpy_2)
+        .def("xy_to_numpy", &CMOIntsBatchXY_to_numpy)
+        .def("yx_to_numpy", &CMOIntsBatchYX_to_numpy)
         .def("number_of_batches", &CMOIntsBatch::getNumberOfBatches)
         .def("number_of_rows", &CMOIntsBatch::getNumberOfRows)
         .def("number_of_columns", &CMOIntsBatch::getNumberOfColumns)

@@ -3,7 +3,7 @@ task: hf
 @end
 
 @method settings
-basis: def2-svp
+basis: aug-cc-pvdz
 basis path: ../../basis
 @end
 

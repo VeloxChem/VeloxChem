@@ -2,6 +2,7 @@ from mpi4py import MPI
 import numpy as np
 import unittest
 import math
+import os
 
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
@@ -111,15 +112,22 @@ class TestTwoInts(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-            f_rest.write_hdf5("inputs/dummy.h5")
+            h5file = os.path.join('inputs', 'dummy.h5')
+            if not os.path.isdir('inputs'):
+                h5file = os.path.join('python_tests', h5file)
 
-            f2 = AOFockMatrix.read_hdf5("inputs/dummy.h5")
-
+            f_rest.write_hdf5(h5file)
+            f2 = AOFockMatrix.read_hdf5(h5file)
             self.assertEqual(f_rest, f2)
 
     def test_fock_build(self):
 
-        task = MpiTask(["inputs/h2se.inp", "inputs/h2se.out"], MPI.COMM_WORLD)
+        inpfile = os.path.join('inputs', 'h2se.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+        outfile = inpfile.replace('.inp', '.out')
+
+        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
 
         molecule = task.molecule
         ao_basis = task.ao_basis
@@ -141,7 +149,11 @@ class TestTwoInts(unittest.TestCase):
         # read density
 
         if rank == mpi_master():
-            dmat = AODensityMatrix.read_hdf5("inputs/h2se.dens.h5")
+            densfile = os.path.join('inputs', 'h2se.dens.h5')
+            if not os.path.isfile(densfile):
+                densfile = os.path.join('python_tests', densfile)
+
+            dmat = AODensityMatrix.read_hdf5(densfile)
         else:
             dmat = AODensityMatrix()
 
@@ -177,7 +189,11 @@ class TestTwoInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            fock_ref = AOFockMatrix.read_hdf5("inputs/h2se.twoe.h5")
+            twoefile = os.path.join('inputs', 'h2se.twoe.h5')
+            if not os.path.isfile(twoefile):
+                twoefile = os.path.join('python_tests', twoefile)
+
+            fock_ref = AOFockMatrix.read_hdf5(twoefile)
 
             F1 = fock.to_numpy(0)
             F2 = fock_ref.to_numpy(0)
