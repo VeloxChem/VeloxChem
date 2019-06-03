@@ -13,7 +13,6 @@ class Absorption(ResponseProperty):
         rsp_input['property'] = 'absorption'
         rsp_input['response'] = 'linear'
         rsp_input['residue'] = 'single'
-        # rsp_input['operators'] = ('xyz',)
 
         if 'spin' in rsp_dict:
             rsp_input['spin'] = rsp_dict['spin']

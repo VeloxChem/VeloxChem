@@ -6,7 +6,6 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
-from .veloxchemlib import hartree_in_ev
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
@@ -218,16 +217,20 @@ class LinearResponseEigenSolver:
             for op in ops:
                 tms[op] = np.array([np.dot(V1[op], vec) for vec in eigvecs])
 
+            trans_dipoles = [
+                np.array([tms['x'][s], tms['y'][s], tms['z'][s]])
+                for s in range(self.nstates)
+            ]
+
             osc = 2.0 / 3.0 * tms['w'] * (tms['x']**2 + tms['y']**2 +
                                           tms['z']**2)
 
-            results = {
-                'excitation_energies': tms['w'],
+            return {
+                'eigenvalues': tms['w'],
+                'eigenvectors': np.array(eigvecs).T,
+                'transition_dipoles': trans_dipoles,
                 'oscillator_strengths': osc,
             }
-
-            self.print_summary(results)
-            return results
         else:
             return {}
 
@@ -292,22 +295,6 @@ class LinearResponseEigenSolver:
         output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(68))
-        self.ostream.print_blank()
-
-    def print_summary(self, results):
-        """Prints summary to output stream"""
-
-        self.ostream.print_blank()
-        self.ostream.print_header('Linear Response EigenSolver'.ljust(92))
-        self.ostream.print_header('---------------------------'.ljust(92))
-        for s, (e, f) in enumerate(
-                zip(results['excitation_energies'],
-                    results['oscillator_strengths'])):
-            output_abs = 'Excitation {:>5s}: '.format(str(s + 1))
-            output_abs += '{:15.8f} a.u. '.format(e)
-            output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
-            output_abs += '    osc.str.{:12.5f}'.format(f)
-            self.ostream.print_header(output_abs.ljust(92))
         self.ostream.print_blank()
 
     def check_convergence(self, relative_residual_norm):
