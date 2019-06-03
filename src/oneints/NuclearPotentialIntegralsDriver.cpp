@@ -352,9 +352,6 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
     
     CMemBlock2D<double> primbuffer(pdim, nblock * pmax);
     
-    printf("TEST: (%i,%i) -> terms %i blocks %i\n", bang, kang,
-           recmap.getNumberOfTerms(), nblock);
-    
     // allocate primitive integrals accumulation buffer
     
     auto ncart = angmom::to_CartesianComponents(bang, kang);
