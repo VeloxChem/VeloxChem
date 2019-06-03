@@ -30,7 +30,7 @@ BraceWrapping:
   SplitEmptyNamespace:   true
 BreakBeforeBraces: Custom
 BreakConstructorInitializers: BeforeComma
-ColumnLimit: 120
+ColumnLimit: 150
 Cpp11BracedListStyle: true
 DerivePointerAlignment: true
 IndentWidth: 4
