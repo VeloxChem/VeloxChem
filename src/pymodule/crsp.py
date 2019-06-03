@@ -251,7 +251,7 @@ class ComplexResponse:
         # creating mo gradient matrices and converting them into vectors
 
         matrices = tuple(
-            [mo.T @ (s @ d @ prop[p] - prop[p] @ d @ s) @ mo for p in ops])
+            [mo.T @ (s @ d @ prop[p].T - prop[p].T @ d @ s) @ mo for p in ops])
         gradients = tuple([lrmat2vec(m, nocc, norb) for m in matrices])
 
         return gradients
