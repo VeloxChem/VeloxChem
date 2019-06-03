@@ -16,6 +16,7 @@
 #include "RecursionFunctionsList.hpp"
 #include "TwoCentersRecursionFunctions.hpp"
 #include "GenIntsFunc.hpp"
+
 #include "OverlapRecFuncForSX.hpp"
 #include "OverlapRecFuncForPX.hpp"
 #include "OverlapRecFuncForDX.hpp"
@@ -266,10 +267,7 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
     
     auto nblock = recmap.getNumberOfComponents();
     
-    printf("TEST: (%i,%i) -> terms %i blocks %i\n", bang, kang,
-           recmap.getNumberOfTerms(), nblock);
-    
-    CMemBlock2D<double> primbuffer(pdim, nblock * pmax);
+    CMemBlock2D<double> primbuffer(pdim, nblock);
     
     // allocate contracted Cartesian integrals buffer
     
@@ -337,7 +335,7 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>& primBuf
                                               const CGtoBlock&           ketGtoBlock,
                                               const int32_t              iContrGto) const
 {
-    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 2, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
