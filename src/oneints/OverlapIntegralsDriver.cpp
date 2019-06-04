@@ -13,6 +13,9 @@
 #include "GenFunc.hpp"
 #include "MemBlock.hpp"
 #include "StringFormat.hpp"
+#include "RecursionFunctionsList.hpp"
+#include "TwoCentersRecursionFunctions.hpp"
+#include "GenIntsFunc.hpp"
 
 #include "OverlapRecFuncForSX.hpp"
 #include "OverlapRecFuncForPX.hpp"
@@ -254,29 +257,23 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
     
     // set up tensors of PA and PB distances
     
-    auto btcomps = intsfunc::getNumberOfComponentsInDistancesTensor(bang);
+    auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
-    auto ktcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
-    
-    bool userpa2b = btcomps * ktcomps > 0;
-    
-    auto rpa = (btcomps > 0) ? CMemBlock2D<double>(pdim, btcomps * pmax) : CMemBlock2D<double>();
-    
-    auto rpb = (ktcomps > 0) ? CMemBlock2D<double>(pdim, ktcomps * pmax) : CMemBlock2D<double>();
-    
-    auto rpa2b = (userpa2b) ? CMemBlock2D<double>(pdim, btcomps * ktcomps * pmax) : CMemBlock2D<double>();
+    auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
 
     // allocate primitives and auxilary integrals buffer
     
-    auto ncart = angmom::to_CartesianComponents(bang, kang);
+    auto recmap = _setRecursionMap(bang, kang, pmax);
     
-    CMemBlock2D<double> primbuffer(pdim, ncart * pmax);
+    auto nblock = recmap.getNumberOfComponents();
     
-    CMemBlock2D<double> auxbuffer(pdim, pmax);
+    CMemBlock2D<double> primbuffer(pdim, nblock);
     
     // allocate contracted Cartesian integrals buffer
     
     auto kdim = ketgtos.getNumberOfContrGtos();
+    
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
     
     CMemBlock2D<double> cartbuffer(kdim, ncart);
     
@@ -289,316 +286,120 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* di
     // determine bra and ket sides symmetry
     
     bool symbk = (bragtos == ketgtos);
-    
-    // set up primitive GTOs positions
-    
-    auto spos = braGtoBlock.getStartPositions();
-    
-    auto epos = braGtoBlock.getEndPositions();
 
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
         // compute distances: R(AB) = A - B
-        
+
         intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
-        
+
         // compute Obara-Saika recursion factors
-        
+
         intsfunc::compFactorsForOverlap(rfacts, bragtos, ketgtos, i);
-        
+
         // compute tensors of distances: R(PA) = P - A
-        
-        intsfunc::compTensorsPA(rpa, rab, rfacts, 2, bragtos, ketgtos, i);
-        
+
+        intsfunc::compDistancesPA(rpa, rab, rfacts, 2, bragtos, ketgtos, i);
+
         // compute tensors of distances: R(PB) = P - B
-        
-        intsfunc::compTensorsPB(rpb, rab, rfacts, 2, bragtos, ketgtos, i);
-        
-        // compute tensor products: R(PA) x P(PB)
-        
-        intsfunc::compTensorsProduct(rpa2b, rpa, rpb, btcomps, ktcomps, epos[i] - spos[i]);
-        
+
+        intsfunc::compDistancesPB(rpb, rab, rfacts, 2, bragtos, ketgtos, i);
+
         // compite primitive overlap integrals
-        
-        _compPrimOverlapInts(primbuffer, auxbuffer, rfacts, rab, rpa, rpb, rpa2b, 
-                             bragtos, ketgtos, i);
-        
+
+        _compPrimOverlapInts(primbuffer, recmap, rfacts, rab, rpa, rpb, bragtos,
+                             ketgtos, i);
+
         // contract primitive overlap integrals
-        
+
         genfunc::contract(cartbuffer, primbuffer, 0, bragtos, ketgtos, i);
-        
+
         // transform Cartesian to spherical integrals
-        
+
         genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0, kdim);
-        
+
         // add batch of integrals to integrals matrix
-        
+
         distpat.distribute(spherbuffer, bragtos, ketgtos, symbk, i);
     }
 }
 
 void
-COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>&  primBuffer,
-                                                    CMemBlock2D<double>&  auxBuffer,
-                                              const CMemBlock2D<double>&  osFactors,
-                                              const CMemBlock2D<double>&  abDistances,
-                                              const CMemBlock2D<double>&  paDistances,
-                                              const CMemBlock2D<double>&  pbDistances,
-                                              const CMemBlock2D<double>&  pa2pbDistances,
-                                              const CGtoBlock&            braGtoBlock,
-                                              const CGtoBlock&            ketGtoBlock,
-                                              const int32_t               iContrGto) const
+COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>& primBuffer,
+                                              const CRecursionMap&       recursionMap,
+                                              const CMemBlock2D<double>& osFactors,
+                                              const CMemBlock2D<double>& abDistances,
+                                              const CMemBlock2D<double>& paDistances,
+                                              const CMemBlock2D<double>& pbDistances,
+                                              const CGtoBlock&           braGtoBlock,
+                                              const CGtoBlock&           ketGtoBlock,
+                                              const int32_t              iContrGto) const
 {
-    // set up angular momentum on bra and ket sides
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 2, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    auto bang = braGtoBlock.getAngularMomentum();
+    ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    auto kang = ketGtoBlock.getAngularMomentum();
+    ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S||S) primitive integrals
+    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForSS(primBuffer, auxBuffer, osFactors, abDistances,
-                                 braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S||P) primitive integrals
+    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 1))
-    {
-        ovlrecfunc::compOverlapForSP(primBuffer, auxBuffer, pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S||D) primitive integrals
+    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 2))
-    {
-        ovlrecfunc::compOverlapForSD(primBuffer, auxBuffer, osFactors, pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S||F) primitive integrals
+    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 3))
-    {
-        ovlrecfunc::compOverlapForSF(primBuffer, auxBuffer, osFactors, pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S||G) primitive integrals
+    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 4))
-    {
-        ovlrecfunc::compOverlapForSG(primBuffer, auxBuffer, osFactors, pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P||S) primitive integrals
+    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 0))
-    {
-        ovlrecfunc::compOverlapForPS(primBuffer, auxBuffer, paDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P||P) primitive integrals
+    ovlrecfunc::compOverlapForGP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 1))
-    {
-        ovlrecfunc::compOverlapForPP(primBuffer, auxBuffer, osFactors, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P||D) primitive integrals
+    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 2))
-    {
-        ovlrecfunc::compOverlapForPD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P||F) primitive integrals
+    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 3))
-    {
-        ovlrecfunc::compOverlapForPF(primBuffer, auxBuffer, osFactors, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P||G) primitive integrals
+    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 4))
-    {
-        ovlrecfunc::compOverlapForPG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (D||S) primitive integrals
+    ovlrecfunc::compOverlapForGF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 0))
-    {
-        ovlrecfunc::compOverlapForDS(primBuffer, auxBuffer, osFactors, paDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (D||P) primitive integrals
-    
-    if ((bang == 2) && (kang == 1))
-    {
-        ovlrecfunc::compOverlapForDP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (D||D) primitive integrals
-    
-    if ((bang == 2) && (kang == 2))
-    {
-        ovlrecfunc::compOverlapForDD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (D||F) primitive integrals
-    
-    if ((bang == 2) && (kang == 3))
-    {
-        ovlrecfunc::compOverlapForDF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (D||G) primitive integrals
-    
-    if ((bang == 2) && (kang == 4))
-    {
-        ovlrecfunc::compOverlapForDG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (F||S) primitive integrals
-    
-    if ((bang == 3) && (kang == 0))
-    {
-        ovlrecfunc::compOverlapForFS(primBuffer, auxBuffer, osFactors, paDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (F||P) primitive integrals
-    
-    if ((bang == 3) && (kang == 1))
-    {
-        ovlrecfunc::compOverlapForFP(primBuffer, auxBuffer, osFactors, paDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (F||D) primitive integrals
-    
-    if ((bang == 3) && (kang == 2))
-    {
-        ovlrecfunc::compOverlapForFD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (F||F) primitive integrals
-    
-    if ((bang == 3) && (kang == 3))
-    {
-        ovlrecfunc::compOverlapForFF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (F||G) primitive integrals
-    
-    if ((bang == 3) && (kang == 4))
-    {
-        ovlrecfunc::compOverlapForFG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (G||S) primitive integrals
-    
-    if ((bang == 4) && (kang == 0))
-    {
-        ovlrecfunc::compOverlapForGS(primBuffer, auxBuffer, osFactors, paDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (G||P) primitive integrals
-    
-    if ((bang == 4) && (kang == 1))
-    {
-        ovlrecfunc::compOverlapForGP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (G||D) primitive integrals
-    
-    if ((bang == 4) && (kang == 2))
-    {
-        ovlrecfunc::compOverlapForGD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (G||F) primitive integrals
-    
-    if ((bang == 4) && (kang == 3))
-    {
-        ovlrecfunc::compOverlapForGF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (G||G) primitive integrals
-    
-    if ((bang == 4) && (kang == 4))
-    {
-        ovlrecfunc::compOverlapForGG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                     braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: Add l > 4 terms if needed
+}
+
+CRecursionMap
+COverlapIntegralsDriver::_setRecursionMap(const int32_t braAngularMomentum,
+                                          const int32_t ketAngularMomentum,
+                                          const int32_t maxNumberOfPrimitives) const
+{
+    CRecursionFunctionsList recfuncs;
+    
+    recfuncs.add(CRecursionFunction({"Overlap"}, &t2crecfunc::obRecursionForOverlap));
+  
+    auto rterm = gintsfunc::genIntegral({"Overlap"}, braAngularMomentum,
+                                        ketAngularMomentum, 0);
+    
+    return gintsfunc::genRecursionMap(rterm, recblock::cc, maxNumberOfPrimitives,
+                                      recfuncs);
 }

@@ -191,6 +191,7 @@ class ExcitonModelDriver:
 
             # TDA calculation
             abs_spec = Absorption({
+                'tamm_dancoff': 'yes',
                 'nstates': self.nstates,
                 'qq_type': self.qq_type,
                 'eri_thresh': self.eri_thresh,

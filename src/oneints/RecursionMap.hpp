@@ -38,6 +38,12 @@ class CRecursionMap
      */
     recblock _angularForm;
     
+    /**
+     The number of repeated units in recursion term subspace.
+     */
+    int32_t _repeatUnits;
+    
+    
 public:
     
     /**
@@ -50,19 +56,25 @@ public:
      recursion term objects.
      
      @param angularForm the angular form of recursion term objects.
+     @param repeatUnits the maximum number of repeated units in recursion term
+            subspace.
      */
-    CRecursionMap(const recblock angularForm);
+    CRecursionMap(const recblock angularForm,
+                  const int32_t  repeatUnits);
     
     /**
      Creates a recursion map object from vector of recursion term objects.
      
      @param recursionTerms the vector of recursion term objects.
      @param recursionIndexes the vector of recursion indexes.
-     @param angularForm the angular form of recursion term objects. 
+     @param angularForm the angular form of recursion term objects.
+     @param repeatUnits the maximum number of repeated units in recursion term
+            subspace.
      */
     CRecursionMap(const std::vector<CRecursionTerm>& recursionTerms,
                   const std::vector<int32_t>&        recursionIndexes,
-                  const recblock                     angularForm);
+                  const recblock                     angularForm,
+                  const int32_t                      repeatUnits);
     
     /**
      Creates a recursion map object by copying other recursion map object.

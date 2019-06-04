@@ -232,3 +232,24 @@ def construct_ed_sd(orb_ene, nocc, norb):
     sdiag[lz:] = -2.0
 
     return ediag, sdiag
+
+
+def swap_xy(xy):
+    """Swaps X and Y parts of response vector"""
+
+    assert_msg_critical(
+        len(xy.shape) == 1 or len(xy.shape) == 2,
+        'LinearResponseSolver.swap: invalid shape of XY')
+
+    half_rows = xy.shape[0] // 2
+    yx = xy.copy()
+
+    if len(xy.shape) == 1:
+        yx[:half_rows] = xy[half_rows:]
+        yx[half_rows:] = xy[:half_rows]
+
+    elif len(xy.shape) == 2:
+        yx[:half_rows, :] = xy[half_rows:, :]
+        yx[half_rows:, :] = xy[:half_rows, :]
+
+    return yx

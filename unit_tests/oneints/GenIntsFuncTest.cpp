@@ -21,7 +21,7 @@ TEST_F(CGenIntsFuncTest, GenRecursionMap)
     
     CRecursionTerm rta({"Kinetic Energy"}, 0, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 0);
     
-    auto recmap = gintsfunc::genRecursionMap(rta, recblock::cc, recfuncs);
+    auto recmap = gintsfunc::genRecursionMap(rta, recblock::cc, 1, recfuncs);
     
     CRecursionTerm t11({"Kinetic Energy"}, 0, true, {1, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 0);
     
@@ -43,7 +43,7 @@ TEST_F(CGenIntsFuncTest, GenRecursionMap)
     
     CRecursionMap refmap({rta, t11, t01, s01, t10, s21, s11, s10, t00, s00},
                          {  0,  18,  27,  30,  33,  36,  54,  63,  66,  67},
-                         recblock::cc);
+                         recblock::cc, 1);
     
     ASSERT_EQ(recmap, refmap);
 }

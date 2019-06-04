@@ -7,6 +7,7 @@ from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrmat2vec
+from .lrmatvecdriver import swap_xy
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
 
@@ -307,7 +308,7 @@ class LinearResponseSolver:
             if np.linalg.norm(v) > self.small_thresh:
                 trials.append(v)
                 if freq > self.small_thresh:
-                    trials.append(self.swap(v))
+                    trials.append(swap_xy(v))
 
         new_trials = np.array(trials).T
 
@@ -318,24 +319,3 @@ class LinearResponseSolver:
             new_trials = truncate_and_normalize(new_trials, self.small_thresh)
 
         return new_trials
-
-    @staticmethod
-    def swap(xy):
-        """Swaps X and Y parts of response vector"""
-
-        assert_msg_critical(
-            len(xy.shape) == 1 or len(xy.shape) == 2,
-            'LinearResponseSolver.swap: invalid shape of XY')
-
-        half_rows = xy.shape[0] // 2
-        yx = xy.copy()
-
-        if len(xy.shape) == 1:
-            yx[:half_rows] = xy[half_rows:]
-            yx[half_rows:] = xy[:half_rows]
-
-        elif len(xy.shape) == 2:
-            yx[:half_rows, :] = xy[half_rows:, :]
-            yx[half_rows:, :] = xy[:half_rows, :]
-
-        return yx

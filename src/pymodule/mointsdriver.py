@@ -108,7 +108,7 @@ class MOIntegralsDriver:
                 pair_den = mol_orbs.get_pair_density(cur_bra_ids, cur_ket_ids)
             else:
                 pair_den = AODensityMatrix()
-            
+
             # broadcast pair densities via local communicators
             pair_den.broadcast(local_rank, local_comm)
 
@@ -232,7 +232,7 @@ class MOIntegralsDriver:
         if mints_type == "VVVV":
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
-        
+
         # case: asym_ovov
         if mints_type == "ASYM_OVOV":
             ket_dim = (nocc, nocc + nvirt)
@@ -245,7 +245,7 @@ class MOIntegralsDriver:
         if mints_type == "ASYM_VVVV":
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
-        
+
         usesym = self.use_symmetry(mints_type)
 
         # set up list of orbital pairs
@@ -279,16 +279,16 @@ class MOIntegralsDriver:
         # case: ooov
         if mints_type == "OOOV":
             xmat = mol_orbs.alpha_orbitals(0, nocc)
-        
+
         # case: asym_oooo
         if mints_type == "ASYM_OOOO":
             xmat = mol_orbs.alpha_orbitals(0, nocc)
             ymat = mol_orbs.alpha_orbitals(0, nocc)
-        
+
         # case: asym_ooov
         if mints_type == "ASYM_OOOV":
             xmat = mol_orbs.alpha_orbitals(0, nocc)
-        
+
         # case: asym_ovov
         if mints_type == "ASYM_OVOV":
             xmat = mol_orbs.alpha_orbitals(0, nocc)
@@ -296,13 +296,13 @@ class MOIntegralsDriver:
         return (xmat, ymat)
 
     def set_fock_matrices_type(self, mints_type, fock_matrices):
-        
+
         if mints_type.startswith("ASYM"):
             nfock = fock_matrices.number_of_fock_matrices()
             for i in range(nfock):
                 fock_matrices.set_fock_type(fockmat.rgenk, i)
             return
-        
+
         if mints_type != "OOVV":
             nfock = fock_matrices.number_of_fock_matrices()
             for i in range(nfock):
@@ -312,19 +312,19 @@ class MOIntegralsDriver:
 
         if mints_type == "OOVV":
             return TwoIndexes(2, 3)
-        
+
         if mints_type == "ASYM_OOOO":
             return TwoIndexes(2, 3)
-    
+
         if mints_type == "ASYM_OOOV":
             return TwoIndexes(2, 3)
-        
+
         if mints_type == "ASYM_OVOV":
             return TwoIndexes(2, 3)
 
         if mints_type == "ASYM_OOVV":
             return TwoIndexes(2, 3)
-        
+
         if mints_type == "ASYM_OVVV":
             return TwoIndexes(2, 3)
 
@@ -352,22 +352,22 @@ class MOIntegralsDriver:
 
         if mints_type == "VVVV":
             return moints.vvvv
-        
+
         if mints_type == "ASYM_OOOO":
             return moints.asym_oooo
-        
+
         if mints_type == "ASYM_OOOV":
             return moints.asym_ooov
-        
+
         if mints_type == "ASYM_OVOV":
             return moints.asym_ovov
-        
+
         if mints_type == "ASYM_OOVV":
             return moints.asym_oovv
-        
+
         if mints_type == "ASYM_OVVV":
             return moints.asym_ovvv
-        
+
         if mints_type == "ASYM_VVVV":
             return moints.asym_vvvv
 
@@ -377,14 +377,14 @@ class MOIntegralsDriver:
 
         if mints_type == "ASYM_OOOO":
             return True
-        
+
         if mints_type == "ASYM_OOOV":
             return True
 
         if mints_type == "ASYM_OOVV":
             return True
-        
+
         if mints_type == "ASYM_VVVV":
             return True
-        
+
         return False

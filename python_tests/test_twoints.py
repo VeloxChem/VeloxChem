@@ -147,7 +147,7 @@ class TestTwoInts(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             h5file = os.path.join('inputs', 'dummy.h5')
-            if not os.path.isfile(h5file):
+            if not os.path.isdir('inputs'):
                 h5file = os.path.join('python_tests', h5file)
 
             f_rest.write_hdf5(h5file)
