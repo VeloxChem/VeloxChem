@@ -239,6 +239,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     compOverlapForSD(      CMemBlock2D<double>& primBuffer,
                      const CRecursionMap&       recursionMap,
                      const CMemBlock2D<double>& osFactors,
+                     const int32_t              nOSFactors,
                      const CMemBlock2D<double>& pbDistances,
                      const CGtoBlock&           braGtoBlock,
                      const CGtoBlock&           ketGtoBlock,
@@ -282,7 +283,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PB) = P - B
 
@@ -343,6 +344,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     compOverlapForDS(      CMemBlock2D<double>& primBuffer,
                      const CRecursionMap&       recursionMap,
                      const CMemBlock2D<double>& osFactors,
+                     const int32_t              nOSFactors,
                      const CMemBlock2D<double>& paDistances,
                      const CGtoBlock&           braGtoBlock,
                      const CGtoBlock&           ketGtoBlock,
@@ -386,7 +388,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 
@@ -447,6 +449,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     compOverlapForSF(      CMemBlock2D<double>& primBuffer,
                      const CRecursionMap&       recursionMap,
                      const CMemBlock2D<double>& osFactors,
+                     const int32_t              nOSFactors,
                      const CMemBlock2D<double>& pbDistances,
                      const CGtoBlock&           braGtoBlock,
                      const CGtoBlock&           ketGtoBlock,
@@ -490,7 +493,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PB) = P - B
 
@@ -579,6 +582,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     compOverlapForFS(      CMemBlock2D<double>& primBuffer,
                      const CRecursionMap&       recursionMap,
                      const CMemBlock2D<double>& osFactors,
+                     const int32_t              nOSFactors,
                      const CMemBlock2D<double>& paDistances,
                      const CGtoBlock&           braGtoBlock,
                      const CGtoBlock&           ketGtoBlock,
@@ -622,7 +626,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 
@@ -711,6 +715,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     compOverlapForSG(      CMemBlock2D<double>& primBuffer,
                      const CRecursionMap&       recursionMap,
                      const CMemBlock2D<double>& osFactors,
+                     const int32_t              nOSFactors,
                      const CMemBlock2D<double>& pbDistances,
                      const CGtoBlock&           braGtoBlock,
                      const CGtoBlock&           ketGtoBlock,
@@ -754,7 +759,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PB) = P - B
 
@@ -879,6 +884,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
     compOverlapForGS(      CMemBlock2D<double>& primBuffer,
                      const CRecursionMap&       recursionMap,
                      const CMemBlock2D<double>& osFactors,
+                     const int32_t              nOSFactors,
                      const CMemBlock2D<double>& paDistances,
                      const CGtoBlock&           braGtoBlock,
                      const CGtoBlock&           ketGtoBlock,
@@ -922,7 +928,7 @@ namespace ovlrecfunc { // ovlrecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 

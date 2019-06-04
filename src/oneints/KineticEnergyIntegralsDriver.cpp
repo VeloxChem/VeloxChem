@@ -12,13 +12,23 @@
 #include "AngularMomentum.hpp"
 #include "OneIntsFunc.hpp"
 #include "StringFormat.hpp"
+#include "RecursionFunctionsList.hpp"
+#include "TwoCentersRecursionFunctions.hpp"
+#include "GenIntsFunc.hpp"
 
+#include "OverlapRecFuncForSX.hpp"
 #include "KineticEnergyRecFuncForSX.hpp"
+#include "OverlapRecFuncForPX.hpp"
 #include "KineticEnergyRecFuncForPX.hpp"
+#include "OverlapRecFuncForDX.hpp"
 #include "KineticEnergyRecFuncForDX.hpp"
+#include "OverlapRecFuncForFF.hpp"
 #include "KineticEnergyRecFuncForFF.hpp"
+#include "OverlapRecFuncForFG.hpp"
 #include "KineticEnergyRecFuncForFG.hpp"
+#include "OverlapRecFuncForGF.hpp"
 #include "KineticEnergyRecFuncForGF.hpp"
+#include "OverlapRecFuncForGG.hpp"
 #include "KineticEnergyRecFuncForGG.hpp"
 
 CKineticEnergyIntegralsDriver::CKineticEnergyIntegralsDriver(MPI_Comm comm)
@@ -253,29 +263,23 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
     
     // set up tensors of PA and PB distances
     
-    auto btcomps = intsfunc::getNumberOfComponentsInDistancesTensor(bang);
+    auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
-    auto ktcomps = intsfunc::getNumberOfComponentsInDistancesTensor(kang);
-    
-    bool userpa2b = btcomps * ktcomps > 0;
-    
-    auto rpa = (btcomps > 0) ? CMemBlock2D<double>(pdim, btcomps * pmax) : CMemBlock2D<double>();
-    
-    auto rpb = (ktcomps > 0) ? CMemBlock2D<double>(pdim, ktcomps * pmax) : CMemBlock2D<double>();
-    
-    auto rpa2b = (userpa2b) ? CMemBlock2D<double>(pdim, btcomps * ktcomps * pmax) : CMemBlock2D<double>();
+    auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
     // allocate primitives and auxilary integrals buffer
     
-    auto ncart = angmom::to_CartesianComponents(bang, kang);
+    auto recmap = _setRecursionMap(bang, kang, pmax);
     
-    CMemBlock2D<double> primbuffer(pdim, ncart * pmax);
+    auto nblock = recmap.getNumberOfComponents();
     
-    CMemBlock2D<double> auxbuffer(pdim, 2 * pmax);
+    CMemBlock2D<double> primbuffer(pdim, nblock);
     
     // allocate contracted Cartesian integrals buffer
     
     auto kdim = ketgtos.getNumberOfContrGtos();
+    
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
     
     CMemBlock2D<double> cartbuffer(kdim, ncart);
     
@@ -289,12 +293,6 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
     
     bool symbk = (bragtos == ketgtos);
     
-    // set up primitive GTOs positions
-    
-    auto spos = braGtoBlock.getStartPositions();
-    
-    auto epos = braGtoBlock.getEndPositions();
-    
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
         // compute distances: R(AB) = A - B
@@ -305,22 +303,17 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
         
         intsfunc::compFactorsForKineticEnergy(rfacts, bragtos, ketgtos, i);
         
-        // compute tensors of distances: R(PA) = P - A
+        // compute distances: R(PA) = P - A
         
-        intsfunc::compTensorsPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
+        intsfunc::compDistancesPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
         
-        // compute tensors of distances: R(PB) = P - B
+        // compute distances: R(PB) = P - B
         
-        intsfunc::compTensorsPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
-        
-        // compute tensor products: R(PA) x P(PB)
-        
-        intsfunc::compTensorsProduct(rpa2b, rpa, rpb, btcomps, ktcomps, epos[i] - spos[i]);
+        intsfunc::compDistancesPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
         
         // compite primitive kinetic energy integrals
         
-        _compPrimKineticEnergyInts(primbuffer, auxbuffer, rfacts, rab, rpa, rpb, rpa2b,
-                                   bragtos, ketgtos, i);
+        _compPrimKineticEnergyInts(primbuffer, recmap, rfacts, rab, rpa, rpb, bragtos, ketgtos, i);
         
         // contract primitive kinetic energy integrals
         
@@ -338,267 +331,132 @@ CKineticEnergyIntegralsDriver::_compKineticEnergyForGtoBlocks(      COneIntsDist
 
 void
 CKineticEnergyIntegralsDriver::_compPrimKineticEnergyInts(      CMemBlock2D<double>&  primBuffer,
-                                                                CMemBlock2D<double>&  auxBuffer,
+                                                          const CRecursionMap&        recursionMap,
                                                           const CMemBlock2D<double>&  osFactors,
                                                           const CMemBlock2D<double>&  abDistances,
                                                           const CMemBlock2D<double>&  paDistances,
                                                           const CMemBlock2D<double>&  pbDistances,
-                                                          const CMemBlock2D<double>&  pa2pbDistances,
                                                           const CGtoBlock&            braGtoBlock,
                                                           const CGtoBlock&            ketGtoBlock,
                                                           const int32_t               iContrGto) const
 {
-    // set up angular momentum on bra and ket sides
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 4, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    auto bang = braGtoBlock.getAngularMomentum();
+    kinrecfunc::compKineticEnergyForSS(primBuffer, recursionMap, osFactors, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    auto kang = ketGtoBlock.getAngularMomentum();
+    ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S|T|S) primitive integrals
+    kinrecfunc::compKineticEnergyForSP(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    kinrecfunc::compKineticEnergyForSS(primBuffer, auxBuffer, osFactors, abDistances, 
-                                       braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S|T|P) primitive integrals
+    kinrecfunc::compKineticEnergyForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 1))
-    {
-        kinrecfunc::compKineticEnergyForSP(primBuffer, auxBuffer, osFactors, pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S|T|D) primitive integrals
+    kinrecfunc::compKineticEnergyForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 2))
-    {
-        kinrecfunc::compKineticEnergyForSD(primBuffer, auxBuffer, osFactors, pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S|T|F) primitive integrals
+    kinrecfunc::compKineticEnergyForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 3))
-    {
-        kinrecfunc::compKineticEnergyForSF(primBuffer, auxBuffer, osFactors, pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (S|T|G) primitive integrals
+    kinrecfunc::compKineticEnergyForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 0) && (kang == 4))
-    {
-        kinrecfunc::compKineticEnergyForSG(primBuffer, auxBuffer, osFactors, pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P|T|S) primitive integrals
+    kinrecfunc::compKineticEnergyForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 0))
-    {
-        kinrecfunc::compKineticEnergyForPS(primBuffer, auxBuffer, osFactors, paDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P|T|P) primitive integrals
+    kinrecfunc::compKineticEnergyForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 1))
-    {
-        kinrecfunc::compKineticEnergyForPP(primBuffer, auxBuffer, osFactors, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P|T|D) primitive integrals
+    kinrecfunc::compKineticEnergyForGS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 2))
-    {
-        kinrecfunc::compKineticEnergyForPD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P|T|F) primitive integrals
+    kinrecfunc::compKineticEnergyForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 3))
-    {
-        kinrecfunc::compKineticEnergyForPF(primBuffer, auxBuffer, osFactors, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (P|T|G) primitive integrals
+    kinrecfunc::compKineticEnergyForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 1) && (kang == 4))
-    {
-        kinrecfunc::compKineticEnergyForPG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (D|T|S) primitive integrals
+    kinrecfunc::compKineticEnergyForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 0))
-    {
-        kinrecfunc::compKineticEnergyForDS(primBuffer, auxBuffer, osFactors, paDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (D|T|P) primitive integrals
+    kinrecfunc::compKineticEnergyForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 1))
-    {
-        kinrecfunc::compKineticEnergyForDP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (D|T|D) primitive integrals
+    kinrecfunc::compKineticEnergyForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 2))
-    {
-        kinrecfunc::compKineticEnergyForDD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (D|T|F) primitive integrals
+    kinrecfunc::compKineticEnergyForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 3))
-    {
-        kinrecfunc::compKineticEnergyForDF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (D|T|G) primitive integrals
+    kinrecfunc::compKineticEnergyForGP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 2) && (kang == 4))
-    {
-        kinrecfunc::compKineticEnergyForDG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (F|T|S) primitive integrals
+    kinrecfunc::compKineticEnergyForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 3) && (kang == 0))
-    {
-        kinrecfunc::compKineticEnergyForFS(primBuffer, auxBuffer, osFactors, paDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (F|T|P) primitive integrals
+    kinrecfunc::compKineticEnergyForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 3) && (kang == 1))
-    {
-        kinrecfunc::compKineticEnergyForFP(primBuffer, auxBuffer, osFactors, paDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (F|T|D) primitive integrals
+    kinrecfunc::compKineticEnergyForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 3) && (kang == 2))
-    {
-        kinrecfunc::compKineticEnergyForFD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (F|T|F) primitive integrals
+    kinrecfunc::compKineticEnergyForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 3) && (kang == 3))
-    {
-        kinrecfunc::compKineticEnergyForFF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (F|T|G) primitive integrals
+    kinrecfunc::compKineticEnergyForGD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 3) && (kang == 4))
-    {
-        kinrecfunc::compKineticEnergyForFG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (G|T|S) primitive integrals
+    kinrecfunc::compKineticEnergyForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 4) && (kang == 0))
-    {
-        kinrecfunc::compKineticEnergyForGS(primBuffer, auxBuffer, osFactors, paDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (G|T|P) primitive integrals
+    kinrecfunc::compKineticEnergyForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 4) && (kang == 1))
-    {
-        kinrecfunc::compKineticEnergyForGP(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (G|T|D) primitive integrals
+    kinrecfunc::compKineticEnergyForGF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    if ((bang == 4) && (kang == 2))
-    {
-        kinrecfunc::compKineticEnergyForGD(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    ovlrecfunc::compOverlapForGG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // compute (G|T|F) primitive integrals
-    
-    if ((bang == 4) && (kang == 3))
-    {
-        kinrecfunc::compKineticEnergyForGF(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
-    
-    // compute (G|T|G) primitive integrals
-    
-    if ((bang == 4) && (kang == 4))
-    {
-        kinrecfunc::compKineticEnergyForGG(primBuffer, auxBuffer, osFactors, paDistances, pbDistances, pa2pbDistances,
-                                           braGtoBlock, ketGtoBlock, iContrGto);
-        
-        return;
-    }
+    kinrecfunc::compKineticEnergyForGG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: Add l > 4 terms if needed
 }
 
+CRecursionMap
+CKineticEnergyIntegralsDriver::_setRecursionMap(const int32_t braAngularMomentum,
+                                                const int32_t ketAngularMomentum,
+                                                const int32_t maxNumberOfPrimitives) const
+{
+    CRecursionFunctionsList recfuncs;
+    
+    recfuncs.add(CRecursionFunction({"Overlap"}, &t2crecfunc::obRecursionForOverlap));
+    
+    recfuncs.add(CRecursionFunction({"Kinetic Energy"}, &t2crecfunc::obRecursionForKineticEnergy));
+    
+    auto rterm = gintsfunc::genIntegral({"Kinetic Energy"}, braAngularMomentum,
+                                        ketAngularMomentum, 0);
+    
+    return gintsfunc::genRecursionMap(rterm, recblock::cc, maxNumberOfPrimitives,
+                                      recfuncs);
+}

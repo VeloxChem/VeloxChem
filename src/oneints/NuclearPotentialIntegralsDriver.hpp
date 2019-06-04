@@ -138,7 +138,6 @@ class CNuclearPotentialIntegralsDriver
      
      @param braAngularMomentum the angular momentum of bra side.
      @param ketAngularMomentum the angular momentum of ket side.
-     
      @return the recursion map for overlap integrals.
      */
     CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,

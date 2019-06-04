@@ -341,49 +341,49 @@ COverlapIntegralsDriver::_compPrimOverlapInts(      CMemBlock2D<double>& primBuf
     
     ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForGS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForGP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForGD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForGF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ovlrecfunc::compOverlapForGG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: Add l > 4 terms if needed
 }

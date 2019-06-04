@@ -21,6 +21,7 @@
 #include "VecIndexes.hpp"
 #include "SparseMatrix.hpp"
 #include "OneIntsDistributor.hpp"
+#include "RecursionMap.hpp"
 
 /**
  Class CKineticEnergyIntegralsDriver computes one-electron kinetic energy
@@ -76,26 +77,36 @@ class CKineticEnergyIntegralsDriver
      side).
      
      @param primBuffer the primitives buffer.
-     @param auxBuffer the auxilary integrals buffer.
+     @param recursionMap the recursion map for Obara-Saika recursion.
      @param osFactors the Obara-Saika recursion factors.
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
-     @param pa2pbDistances the vector of distances products R(PA) x R(PB).
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
     void _compPrimKineticEnergyInts(      CMemBlock2D<double>&  primBuffer,
-                                          CMemBlock2D<double>&  auxBuffer,
+                                    const CRecursionMap&        recursionMap,
                                     const CMemBlock2D<double>&  osFactors,
                                     const CMemBlock2D<double>&  abDistances,
                                     const CMemBlock2D<double>&  paDistances,
                                     const CMemBlock2D<double>&  pbDistances,
-                                    const CMemBlock2D<double>&  pa2pbDistances,
                                     const CGtoBlock&            braGtoBlock,
                                     const CGtoBlock&            ketGtoBlock,
                                     const int32_t               iContrGto) const;
+    
+    /**
+     Sets recursion map object for overlap integrals of specified angular
+     momentum.
+     
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     @return the recursion map for overlap integrals.
+     */
+    CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,
+                                   const int32_t ketAngularMomentum,
+                                   const int32_t maxNumberOfPrimitives) const;
     
 public:
     
