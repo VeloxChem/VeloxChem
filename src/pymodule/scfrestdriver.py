@@ -180,8 +180,8 @@ class ScfRestrictedDriver(ScfDriver):
                     self.fock_matrices.popleft()
                     self.den_matrices.popleft()
 
-                self.fock_matrices.append(np.copy(fock_mat.to_numpy(0)))
-                self.den_matrices.append(np.copy(den_mat.alpha_to_numpy(0)))
+                self.fock_matrices.append(fock_mat.alpha_to_numpy(0))
+                self.den_matrices.append(den_mat.alpha_to_numpy(0))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """Computes effective spin restricted closed shell Fock/Kohn-Sham
@@ -219,7 +219,7 @@ class ScfRestrictedDriver(ScfDriver):
 
                 return self.get_scaled_fock(weights)
 
-            return np.copy(fock_mat.to_numpy(0))
+            return fock_mat.alpha_to_numpy(0)
 
         return None
 
