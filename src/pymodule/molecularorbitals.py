@@ -52,14 +52,44 @@ def _MolecularOrbitals_print_orbitals(self,
         ostream.print_header("Spin Unrestricted Alpha Orbitals")
         ostream.print_header("--------------------------------")
 
-        # FIX ME
+        nalpha = molecule.number_of_alpha_electrons()
+
+        if all_orbs:
+            nstart, nend = 0, norb
+        else:
+            nstart, nend = max(0, nalpha - 5), min(norb, nalpha + 5)
+
+        uvecs = self.alpha_to_numpy()
+        ueigs = self.ea_to_numpy()
+        unocc = [1.0 if x < nalpha else 0.0 for x in range(norb)]
+
+        for i in range(nstart, nend):
+            _MolecularOrbitals_print_coefficients(ueigs[i], unocc[i], i,
+                                                  uvecs[:, i], ao_map, 0.15,
+                                                  ostream)
 
         ostream.print_blank()
 
         ostream.print_header("Spin Unrestricted Beta Orbitals")
         ostream.print_header("-------------------------------")
 
-        # FIX ME
+        nbeta = molecule.number_of_beta_electrons()
+
+        if all_orbs:
+            nstart, nend = 0, norb
+        else:
+            nstart, nend = max(0, nbeta - 5), min(norb, nbeta + 5)
+
+        uvecs = self.beta_to_numpy()
+        ueigs = self.eb_to_numpy()
+        unocc = [1.0 if x < nbeta else 0.0 for x in range(norb)]
+
+        for i in range(nstart, nend):
+            _MolecularOrbitals_print_coefficients(ueigs[i], unocc[i], i,
+                                                  uvecs[:, i], ao_map, 0.15,
+                                                  ostream)
+
+        ostream.print_blank()
 
     else:
 
