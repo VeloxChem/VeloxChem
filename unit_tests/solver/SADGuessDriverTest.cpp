@@ -54,7 +54,7 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     auto S22 = ovldrv.compute(h2o, ao_basis);
 
-    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22);
+    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, true);
 
     ASSERT_EQ(1, dsad.getNumberOfDensityMatrices());
 

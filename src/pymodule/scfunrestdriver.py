@@ -329,6 +329,35 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return AODensityMatrix()
 
+    def compute_s2(self, molecule, smat, mol_orbs):
+        """Computes expectation value <S**2>
+
+        Computes expectation value of the S**2 operator.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        smat
+            The overlap matrix (numpy array).
+        mol_orbs
+            The molecular orbitals.
+        """
+
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+
+        a_b = float(nalpha - nbeta) / 2.0
+        s2_exact = a_b * (a_b + 1.0)
+
+        Cocc_a = mol_orbs.alpha_to_numpy()[:, :nalpha]
+        Cocc_b = mol_orbs.beta_to_numpy()[:, :nbeta]
+
+        ovl_a_b = np.matmul(Cocc_a.T, np.matmul(smat, Cocc_b))
+        s2 = s2_exact + nbeta - np.sum(ovl_a_b**2)
+
+        return s2
+
     def print_scf_energy(self):
         """Prints SCF energy information to output stream.
 

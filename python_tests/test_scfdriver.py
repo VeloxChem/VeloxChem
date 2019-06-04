@@ -35,8 +35,12 @@ class TestScfDriver(unittest.TestCase):
         scf_unrest_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         e_uhf = scf_unrest_drv.get_scf_energy()
+        s2 = scf_unrest_drv.compute_s2(task.molecule,
+                                       scf_unrest_drv.scf_tensors['S'],
+                                       scf_unrest_drv.mol_orbs)
 
         self.assertAlmostEqual(-2400.38319890, e_uhf, 8)
+        self.assertAlmostEqual(0.7619, s2, 4)
 
         task.finish()
 
