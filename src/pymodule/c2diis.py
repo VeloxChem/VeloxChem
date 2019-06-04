@@ -54,6 +54,50 @@ class CTwoDiis:
             self.error_vectors.append(
                 np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat)))
 
+    def compute_unrestricted_error_vectors(self, fock_matrices,
+                                           fock_matrices_beta, density_matrices,
+                                           density_matrices_beta,
+                                           overlap_matrix, oao_matrix):
+        """Computes error vectors for unrestricted Fock.
+
+        Computes error vectors for list of AO Fock matrices using (FDS - SDF)
+        in orthogonal AO basis.
+
+        Parameters
+        ----------
+        fock_matrices
+            The list of AO Fock matrices (alpha spin).
+        fock_matrices_beta
+            The list of AO Fock matrices (beta spin).
+        density_matrices
+            The list of AO density matrices (alpha spin).
+        density_matrices_beta
+            The list of AO density matrices (beta spin).
+        overlap_matrix
+            The overlap matrix.
+        oao_matrix
+            The orthogonalization matrix.
+        """
+
+        smat = overlap_matrix.to_numpy()
+        tmat = oao_matrix.to_numpy()
+
+        self.error_vectors.clear()
+
+        for fmat_a, fmat_b, dmat_a, dmat_b in zip(fock_matrices,
+                                                  fock_matrices_beta,
+                                                  density_matrices,
+                                                  density_matrices_beta):
+
+            fds_a = np.matmul(fmat_a, np.matmul(dmat_a, smat))
+            fds_b = np.matmul(fmat_b, np.matmul(dmat_b, smat))
+
+            err_a = np.matmul(tmat.T, np.matmul(fds_a - fds_a.T, tmat))
+            err_b = np.matmul(tmat.T, np.matmul(fds_b - fds_b.T, tmat))
+
+            err_tot = np.vstack((err_a, err_b))
+            self.error_vectors.append(err_tot)
+
     def compute_weights(self):
         """Computes C2-DIIS weights.
 

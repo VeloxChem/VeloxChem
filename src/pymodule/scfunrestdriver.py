@@ -107,6 +107,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             smat = ovl_mat.to_numpy()
+            tmat = oao_mat.to_numpy()
 
             dmat_a = den_mat.alpha_to_numpy(0)
             dmat_b = den_mat.beta_to_numpy(0)
@@ -114,23 +115,16 @@ class ScfUnrestrictedDriver(ScfDriver):
             fmat_a = fock_mat.alpha_to_numpy(0)
             fmat_b = fock_mat.beta_to_numpy(0)
 
-            tmat = oao_mat.to_numpy()
-
             fds_a = np.matmul(fmat_a, np.matmul(dmat_a, smat))
-            sdf_a = np.matmul(smat, np.matmul(dmat_a, fmat_a))
-
             fds_b = np.matmul(fmat_b, np.matmul(dmat_b, smat))
-            sdf_b = np.matmul(smat, np.matmul(dmat_b, fmat_b))
 
-            # fx = np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat))
+            e_grad_a = np.linalg.norm(
+                np.matmul(tmat.transpose(), np.matmul(fds_a - fds_a.T, tmat)))
 
-            e_grad_a = 2.0 * np.linalg.norm(
-                np.matmul(tmat.transpose(), np.matmul(fds_a - sdf_a, tmat)))
+            e_grad_b = np.linalg.norm(
+                np.matmul(tmat.transpose(), np.matmul(fds_b - fds_b.T, tmat)))
 
-            e_grad_b = 2.0 * np.linalg.norm(
-                np.matmul(tmat.transpose(), np.matmul(fds_b - sdf_b, tmat)))
-
-            e_grad = max(e_grad_a, e_grad_b)
+            e_grad = e_grad_a + e_grad_b
         else:
             e_grad = 0.0
 
@@ -200,12 +194,11 @@ class ScfUnrestrictedDriver(ScfDriver):
                     self.fock_matrices_beta.popleft()
                     self.den_matrices_beta.popleft()
 
-                self.fock_matrices.append(np.copy(fock_mat.alpha_to_numpy(0)))
-                self.den_matrices.append(np.copy(den_mat.alpha_to_numpy(0)))
+                self.fock_matrices.append(fock_mat.alpha_to_numpy(0))
+                self.den_matrices.append(den_mat.alpha_to_numpy(0))
 
-                self.fock_matrices_beta.append(
-                    np.copy(fock_mat.beta_to_numpy(0)))
-                self.den_matrices_beta.append(np.copy(den_mat.beta_to_numpy(0)))
+                self.fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
+                self.den_matrices_beta.append(den_mat.beta_to_numpy(0))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """Computes effective spin unrestricted open shell Fock/Kohn-Sham
@@ -234,33 +227,19 @@ class ScfUnrestrictedDriver(ScfDriver):
 
             if len(self.fock_matrices) > 1:
 
-                acc_diis_a = CTwoDiis()
-                acc_diis_b = CTwoDiis()
+                acc_diis = CTwoDiis()
 
-                acc_diis_a.compute_error_vectors(self.fock_matrices,
-                                                 self.den_matrices, ovl_mat,
-                                                 oao_mat)
-                acc_diis_b.compute_error_vectors(self.fock_matrices_beta,
-                                                 self.den_matrices_beta,
-                                                 ovl_mat, oao_mat)
+                acc_diis.compute_unrestricted_error_vectors(
+                    self.fock_matrices, self.fock_matrices_beta,
+                    self.den_matrices, self.den_matrices_beta, ovl_mat, oao_mat)
 
-                err_a = acc_diis_a.comp_bmatrix()
-                err_b = acc_diis_b.comp_bmatrix()
+                weights = acc_diis.compute_weights()
 
-                bmat = 0.5 * (err_a + err_b)
-                beigs, bvecs = np.linalg.eigh(bmat)
+                return self.get_scaled_fock(weights)
 
-                weights_a = acc_diis_a.pick_weights(
-                    acc_diis_a.norm_bvectors(bvecs))
-                weights_b = acc_diis_b.pick_weights(
-                    acc_diis_b.norm_bvectors(bvecs))
+            return fock_mat.alpha_to_numpy(0), fock_mat.beta_to_numpy(0)
 
-                return self.get_scaled_fock((weights_a, weights_b))
-
-            return (np.copy(fock_mat.alpha_to_numpy(0)),
-                    np.copy(fock_mat.beta_to_numpy(0)))
-
-        return None
+        return None, None
 
     def get_scaled_fock(self, weights):
         """Computes scaled spin unrestricted open shell Fock/Kohn-Sham matrix.
@@ -277,14 +256,14 @@ class ScfUnrestrictedDriver(ScfDriver):
             The scaled Fock/Kohn-Sham matrix.
         """
 
-        effmat_a = np.zeros(self.fock_matrices[0].shape, dtype=float)
-        effmat_b = np.zeros(self.fock_matrices[1].shape, dtype=float)
+        effmat_a = np.zeros(self.fock_matrices[0].shape)
+        effmat_b = np.zeros(self.fock_matrices_beta[0].shape)
 
-        for ind, (fa, fb) in enumerate(
-                zip(self.fock_matrices, self.fock_matrices_beta)):
+        for w, fa, fb in zip(weights, self.fock_matrices,
+                             self.fock_matrices_beta):
 
-            effmat_a += weights[0][ind] * fa
-            effmat_b += weights[1][ind] * fb
+            effmat_a += w * fa
+            effmat_b += w * fb
 
         return effmat_a, effmat_b
 
