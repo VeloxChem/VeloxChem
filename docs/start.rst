@@ -31,7 +31,7 @@ Running
 
 ::
 
-    $ VeloxChem water.inp water.out
+    $ python -m veloxchem water.inp water.out
 
 
 
