@@ -25,6 +25,8 @@ class ScfRestrictedDriver(ScfDriver):
 
         super().__init__(comm, ostream)
 
+        self.restricted = True
+
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         """Computes spin restricted closed shell SCF energy components.
 

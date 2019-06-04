@@ -25,6 +25,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         super().__init__(comm, ostream)
 
+        self.restricted = False
+
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         """Computes spin unrestricted open shell SCF energy components.
 

@@ -122,6 +122,7 @@ class CSADGuessDriver
      @param basis_2 the molecular (larger) basis set.
      @param S12 the crossing overlap matrix between basis_1 and basis_2.
      @param S22 the overlap matrix computed from basis_2.
+     @param restricted the flag for generating restricted initial guess
      @return the density matrix of SAD guess.
      */
     CAODensityMatrix
@@ -129,7 +130,8 @@ class CSADGuessDriver
                   const CMolecularBasis& basis_1,
                   const CMolecularBasis& basis_2,
                   const COverlapMatrix&  S12,
-                  const COverlapMatrix&  S22) const;
+                  const COverlapMatrix&  S22,
+                  const bool             restricted) const;
     
 public:
     
@@ -153,6 +155,7 @@ public:
      @param basis_2 the molecular (larger) basis set.
      @param S12 the crossing overlap matrix between basis_1 and basis_2.
      @param S22 the overlap matrix computed from basis_2.
+     @param restricted the flag for generating restricted initial guess
      @return the density matrix of SAD guess.
      */
     CAODensityMatrix
@@ -160,7 +163,8 @@ public:
             const CMolecularBasis& basis_1,
             const CMolecularBasis& basis_2,
             const COverlapMatrix&  S12,
-            const COverlapMatrix&  S22) const;
+            const COverlapMatrix&  S22,
+            const bool             restricted) const;
     
     /**
      Computes indicies of atomic orbitals that are located on each atom.

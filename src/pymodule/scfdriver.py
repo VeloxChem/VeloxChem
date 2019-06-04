@@ -78,6 +78,8 @@ class ScfDriver:
         The number of MPI processes.
     restart
         The flag for restarting from checkpoint file
+    restricted
+        The flag for restricted SCF
     """
 
     def __init__(self, comm, ostream):
@@ -141,6 +143,9 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+
+        # restricted?
+        self.restricted = True
 
     def update_settings(self, scf_dict):
 
@@ -480,7 +485,8 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.comm, self.ostream)
+                                              ovl_mat, self.restricted,
+                                              self.comm, self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
         if self.den_guess.guess_type == "PRCMO":
