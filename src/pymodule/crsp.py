@@ -7,6 +7,7 @@ from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrmat2vec
+from .lrmatvecdriver import lrvec2mat
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -442,6 +443,7 @@ class ComplexResponse:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
+        kappas = {}
 
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
@@ -577,6 +579,9 @@ class ComplexResponse:
                         x[pos] = complex(x_real[pos], x_imag[pos])
 
                     solutions[(op, w)] = x
+
+                    kappas[(op, w)] = (lrvec2mat(x.real,nocc,norb)
+                                      + 1j*lrvec2mat(x.imag,nocc,norb))
 
                     # composing E2 and S2 matrices projected onto solution
                     # subspace
@@ -724,6 +729,7 @@ class ComplexResponse:
             return {
                 'properties': {(op, freq): nv for op, freq, nv in nvs},
                 'solutions': solutions,
+                'kappas': kappas,
             }
         else:
             return None
