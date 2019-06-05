@@ -7,7 +7,9 @@ SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
-PYTHONPATH = ../build/python
+
+VLX_SOURCE = ../src
+PYTHONPATH = $(VLX_SOURCE):.
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -21,7 +23,6 @@ help:
 	@PYTHONPATH=$(PYTHONPATH) $(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 api:
-	sphinx-apidoc -o . $(PYTHONPATH)
+	PYTHONPATH=$(PYTHONPATH) sphinx-apidoc -o . $(VLX_SOURCE)
 serve:
 	python -m webbrowser -t http://localhost:8000/_build/html; python -m http.server
-
