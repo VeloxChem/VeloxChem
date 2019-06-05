@@ -22,7 +22,7 @@ help:
 %: Makefile
 	@PYTHONPATH=$(PYTHONPATH) $(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-api:
+api: links
 	PYTHONPATH=$(PYTHONPATH) sphinx-apidoc -o api $(VLX_SOURCE)
 links:
-	cd ../src/pymodule && ln -s ../../docs/mocks/veloxchemlib.py .
+	cd ../src/pymodule && ln -sf ../../docs/mocks/veloxchemlib.py .
