@@ -9,7 +9,7 @@ SOURCEDIR     = .
 BUILDDIR      = _build
 
 VLX_SOURCE = ../src
-PYTHONPATH = $(VLX_SOURCE):.
+PYTHONPATH = $(VLX_SOURCE):mocks
 
 # Put it first so that "make" without argument is like "make help".
 help:
