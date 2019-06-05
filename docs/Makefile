@@ -23,6 +23,6 @@ help:
 	@PYTHONPATH=$(PYTHONPATH) $(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 api:
-	PYTHONPATH=$(PYTHONPATH) sphinx-apidoc -o . $(VLX_SOURCE)
-serve:
-	python -m webbrowser -t http://localhost:8000/_build/html; python -m http.server
+	PYTHONPATH=$(PYTHONPATH) sphinx-apidoc -o api $(VLX_SOURCE)
+links:
+	cd ../src/pymodule && ln -s ../../docs/mocks/veloxchemlib.py .

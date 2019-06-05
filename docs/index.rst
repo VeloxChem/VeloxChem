@@ -13,7 +13,7 @@ Welcome to VeloxChem's documentation!
    installation.rst
    start.rst
 
-   modules.rst
+   api/modules.rst
 
 
 Indices and tables
