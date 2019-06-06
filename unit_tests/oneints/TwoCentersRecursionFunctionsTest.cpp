@@ -399,3 +399,123 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForNuclearPotentialForDD)
     
     ASSERT_EQ(k11ta, rvec[5]);
 }
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForElectricDipoleForSP)
+{
+    CRecursionTerm rta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForElectricDipole(rta);
+    
+    ASSERT_EQ(2u, rvec.size());
+    
+    CRecursionTerm k1ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k2ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(k1ta, rvec[0]);
+    
+    ASSERT_EQ(k2ta, rvec[1]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForElectricDipoleForSF)
+{
+    CRecursionTerm rta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {3, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForElectricDipole(rta);
+    
+    ASSERT_EQ(3u, rvec.size());
+    
+    CRecursionTerm k1ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k2ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k3ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(k1ta, rvec[0]);
+    
+    ASSERT_EQ(k2ta, rvec[1]);
+    
+    ASSERT_EQ(k3ta, rvec[2]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForElectricDipoleForPS)
+{
+    CRecursionTerm rta({"Electric Dipole"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForElectricDipole(rta);
+    
+    ASSERT_EQ(2u, rvec.size());
+    
+    CRecursionTerm b1ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b2ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(b1ta, rvec[0]);
+    
+    ASSERT_EQ(b2ta, rvec[1]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForElectricDipoleForDS)
+{
+    CRecursionTerm rta({"Electric Dipole"}, 1, false, {2, -1, -1, -1}, {0, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForElectricDipole(rta);
+    
+    ASSERT_EQ(3u, rvec.size());
+    
+    CRecursionTerm b1ta({"Electric Dipole"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b2ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b3ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(b1ta, rvec[0]);
+    
+    ASSERT_EQ(b2ta, rvec[1]);
+    
+    ASSERT_EQ(b3ta, rvec[2]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForElectricDipoleForDF)
+{
+    CRecursionTerm rta({"Electric Dipole"}, 1, false, {2, -1, -1, -1}, {3, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForElectricDipole(rta);
+    
+    ASSERT_EQ(4u, rvec.size());
+    
+    CRecursionTerm b1ta({"Electric Dipole"}, 1, false, {1, -1, -1, -1}, {3, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b2ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {3, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k1ta({"Electric Dipole"}, 1, false, {1, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b3ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {3, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(b1ta, rvec[0]);
+    
+    ASSERT_EQ(b2ta, rvec[1]);
+    
+    ASSERT_EQ(k1ta, rvec[2]);
+    
+    ASSERT_EQ(b3ta, rvec[3]);
+}

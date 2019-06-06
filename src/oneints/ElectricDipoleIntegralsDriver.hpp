@@ -18,8 +18,8 @@
 #include "ExecMode.hpp"
 #include "ElectricDipoleMatrix.hpp"
 #include "GtoContainer.hpp"
-#include "VecIndexes.hpp"
 #include "OneIntsDistributor.hpp"
+#include "RecursionMap.hpp"
 
 /**
  Class CElectricDipoleIntegralsDriver computes one-electron electric dipole
@@ -103,8 +103,7 @@ class CElectricDipoleIntegralsDriver
      side).
      
      @param primBuffer the primitives buffer.
-     @param recPattern the recursion pattern.
-     @param recIndexes the indexes of data blocks in recursion pattern.
+     @param recursionMap the recursion map for Obara-Saika recursion.
      @param osFactors the Obara-Saika recursion factors.
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
@@ -115,8 +114,7 @@ class CElectricDipoleIntegralsDriver
      @param iContrGto the index of contracted GTO on bra side.
      */
     void _compPrimElectricDipoleInts(      CMemBlock2D<double>&  primBuffer,
-                                     const CVecThreeIndexes&     recPattern,
-                                     const std::vector<int32_t>& recIndexes,
+                                     const CRecursionMap&        recursionMap, 
                                      const CMemBlock2D<double>&  osFactors,
                                      const CMemBlock2D<double>&  abDistances,
                                      const CMemBlock2D<double>&  paDistances,
@@ -127,30 +125,16 @@ class CElectricDipoleIntegralsDriver
                                      const int32_t               iContrGto) const;
     
     /**
-     Gets Obara-Saika recursion pattern for specific combination of GTOs blocks
-     on bra and ket sides.
-
-     @param braGtoBlock the GTOs block on bra side.
-     @param ketGtoBlock the GTOs block on ket side.
-     @return the vector of two indexes object with recursion pattern.
+     Sets recursion map object for electric dipole integrals of specified angular
+     momentum.
+     
+     @param braAngularMomentum the angular momentum of bra side.
+     @param ketAngularMomentum the angular momentum of ket side.
+     @return the recursion map for overlap integrals.
      */
-    CVecThreeIndexes _getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                          const CGtoBlock& ketGtoBlock) const;
-    
-    /**
-     Gets vector of unified indexes of primitive GTOs buffer for specific
-     Obara-Saika recursion pattern.
-
-     @param recIndexes the vector of starting indexes of data blocks in recursion
-            pattern.
-     @param recPattern the recursion pattern.
-     @param maxPrimGtos the maximum number of primitive GTOs in contracted
-            GTO on bra side.
-     @return the total number of blocks in recursion pattern.
-     */
-    int32_t _getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                           const CVecThreeIndexes&     recPattern,
-                                           const int32_t               maxPrimGtos) const;
+    CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,
+                                   const int32_t ketAngularMomentum,
+                                   const int32_t maxNumberOfPrimitives) const;
     
 public:
     
