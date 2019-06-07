@@ -6,8 +6,8 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef ElectricDipoleIntegralsDriver_hpp
-#define ElectricDipoleIntegralsDriver_hpp
+#ifndef LinearMomemtumIntegralsDriver_hpp
+#define LinearMomemtumIntegralsDriver_hpp
 
 #include <cstdint>
 
@@ -16,18 +16,18 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "ExecMode.hpp"
-#include "ElectricDipoleMatrix.hpp"
+#include "LinearMomentumMatrix.hpp"
 #include "GtoContainer.hpp"
 #include "OneIntsDistributor.hpp"
 #include "RecursionMap.hpp"
 
 /**
- Class CElectricDipoleIntegralsDriver computes one-electron electric dipole
+ Class CLinearMomentumIntegralsDriver computes one-electron linear momentum
  integrals.
  
  @author Z. Rinkevicius
  */
-class CElectricDipoleIntegralsDriver
+class CLinearMomentumIntegralsDriver
 {
     /**
      The rank of associated local MPI process.
@@ -45,57 +45,36 @@ class CElectricDipoleIntegralsDriver
     MPI_Comm _locComm;
     
     /**
-     The Cartesian X coordinate of electric dipole origin.
-     */
-    double _xOrigin;
-    
-    /**
-     The Cartesian Y coordinate of electric dipole origin.
-     */
-    double _yOrigin;
-    
-    /**
-     The Cartesian Z coordinate of electric dipole origin.
-     */
-    double _zOrigin;
-    
-    /**
-     Comutes electric dipole integrals for pair of GTOs containers.
-
+     Comutes linear momentum integrals for pair of GTOs containers.
+     
      @param braGtoContainer the GTOs container for bra side.
      @param ketGtoContainer the GTOs container for ket side.
-     @return the electric dipole matrix object.
+     @return the linear momentum matrix object.
      */
-    CElectricDipoleMatrix _compElectricDipoleIntegrals(const CGtoContainer* braGtoContainer,
+    CLinearMomentumMatrix _compLinearMomentumIntegrals(const CGtoContainer* braGtoContainer,
                                                        const CGtoContainer* ketGtoContainer) const;
     
     /**
-     Computes electric dipole integrals for specific pair of GTOs blocks and
+     Computes linear momentum integrals for specific pair of GTOs blocks and
      stores integrals in given distribution buffer.
      
      @param distPatternX the pointer to X component of integrals distribution
-            pattern.
+     pattern.
      @param distPatternY the pointer to Y component of integrals distribution
-            pattern.
+     pattern.
      @param distPatternZ the pointer to Z component of integrals distribution
-            pattern.
-     @param xOrigin the Cartesian X coordinate of electric dipole origin.
-     @param yOrigin the Cartesian Y coordinate of electric dipole origin.
-     @param zOrigin the Cartesian Z coordinate of electric dipole origin.
+     pattern.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
-    void _compElectricDipoleForGtoBlocks(      COneIntsDistribution* distPatternX,
+    void _compLinearMomentumForGtoBlocks(      COneIntsDistribution* distPatternX,
                                                COneIntsDistribution* distPatternY,
                                                COneIntsDistribution* distPatternZ,
-                                         const double                xOrigin,
-                                         const double                yOrigin,
-                                         const double                zOrigin,
                                          const CGtoBlock&            braGtoBlock,
                                          const CGtoBlock&            ketGtoBlock) const;
     
     /**
-     Computes batch of primitive electric dipole integrals using Obara-Saika
+     Computes batch of primitive linear momentum integrals using Obara-Saika
      recursion and stores results in primitives buffer.
      Reference: S. Obara, A. Saika, J. Chem. Phys. 84, 3963 (1986).
      
@@ -108,29 +87,27 @@ class CElectricDipoleIntegralsDriver
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
-     @param pcDistances the vector of distances R(PC) = P - C.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
-    void _compPrimElectricDipoleInts(      CMemBlock2D<double>&  primBuffer,
-                                     const CRecursionMap&        recursionMap, 
+    void _compPrimLinearMomentumInts(      CMemBlock2D<double>&  primBuffer,
+                                     const CRecursionMap&        recursionMap,
                                      const CMemBlock2D<double>&  osFactors,
                                      const CMemBlock2D<double>&  abDistances,
                                      const CMemBlock2D<double>&  paDistances,
                                      const CMemBlock2D<double>&  pbDistances,
-                                     const CMemBlock2D<double>&  pcDistances,
                                      const CGtoBlock&            braGtoBlock,
                                      const CGtoBlock&            ketGtoBlock,
                                      const int32_t               iContrGto) const;
     
     /**
-     Sets recursion map object for electric dipole integrals of specified angular
+     Sets recursion map object for linear momentum integrals of specified angular
      momentum.
      
      @param braAngularMomentum the angular momentum of bra side.
      @param ketAngularMomentum the angular momentum of ket side.
-     @return the recursion map for electric dipole integrals.
+     @return the recursion map for linear momentum integrals.
      */
     CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,
                                    const int32_t ketAngularMomentum,
@@ -139,84 +116,73 @@ class CElectricDipoleIntegralsDriver
 public:
     
     /**
-     Creates a electric dipole integrals driver object using MPI info.
+     Creates a linear momentum integrals driver object using MPI info.
      
      @param comm the MPI communicator.
      */
-    CElectricDipoleIntegralsDriver(MPI_Comm comm);
+    CLinearMomentumIntegralsDriver(MPI_Comm comm);
     
     /**
-     Destroys a electric dipole integrals driver object.
+     Destroys a linear momentum integrals driver object.
      */
-    ~CElectricDipoleIntegralsDriver();
+    ~CLinearMomentumIntegralsDriver();
     
     /**
-     Sets origin of electric dipole.
-
-     @param xOrigin the Cartesian X coordinate of electric dipole origin.
-     @param yOrigin the Cartesian Y coordinate of electric dipole origin.
-     @param zOrigin the Cartesian Z coordinate of electric dipole origin.
-     */
-    void setElectricDipoleOrigin(const double xOrigin,
-                                 const double yOrigin,
-                                 const double zOrigin);
-    
-    /**
-     Computes electric dipole integrals for molecule in specific basis set and
+     Computes linear momentum integrals for molecule in specific basis set and
      stores results in electric dipole matrix object.
-
+     
      @param molecule the molecule.
      @param basis the molecular basis.
-     @return the electric dipole matrix object.
+     @return the linear momentum matrix object.
      */
-    CElectricDipoleMatrix compute(const CMolecule&       molecule,
+    CLinearMomentumMatrix compute(const CMolecule&       molecule,
                                   const CMolecularBasis& basis) const;
     
     /**
-     Computes electric dipole integrals for molecule in two basis sets and stores
+     Computes linear momentum integrals for molecule in two basis sets and stores
      results in electric dipole matrix object.
      
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of overlap matrix.
      @param ketBasis the molecular basis for ket side of overlap matrix.
-     @return the electric dipole matrix object.
+     @return the linear momentum matrix object.
      */
-    CElectricDipoleMatrix compute(const CMolecule&       molecule,
+    CLinearMomentumMatrix compute(const CMolecule&       molecule,
                                   const CMolecularBasis& braBasis,
                                   const CMolecularBasis& ketBasis) const;
     
     /**
-     Computes electric dipole integrals for two molecules in basis set and
+     Computes linear momentum integrals for two molecules in basis set and
      stores results in electric dipole matrix object.
      
      @param braMolecule the molecule for bra side of overlap matrix.
      @param ketMolecule the molecule for ket side of overlap matrix.
      @param basis the molecular basis.
-     @return the electric dipole matrix object.
+     @return the linear momentum matrix object.
      */
-    CElectricDipoleMatrix compute(const CMolecule&       braMolecule,
+    CLinearMomentumMatrix compute(const CMolecule&       braMolecule,
                                   const CMolecule&       ketMolecule,
                                   const CMolecularBasis& basis) const;
     
     /**
-     Computes electric dipole integrals for two molecules in different basis
+     Computes linear momentum integrals for two molecules in different basis
      sets and stores results in electric dipole matrix object.
      
      @param braMolecule the molecule for bra side of overlap matrix.
      @param ketMolecule the molecule for ket side of overlap matrix.
      @param braBasis the molecular basis for bra side of overlap matrix.
      @param ketBasis the molecular basis for ket side of overlap matrix.
-     @return the electric dipole matrix object.
+     @return the linear momentum matrix object.
      */
-    CElectricDipoleMatrix compute(const CMolecule&       braMolecule,
+    CLinearMomentumMatrix compute(const CMolecule&       braMolecule,
                                   const CMolecule&       ketMolecule,
                                   const CMolecularBasis& braBasis,
                                   const CMolecularBasis& ketBasis) const;
     
     /**
-     Computes electric dipole integrals blocks for pair of GTOs blocks and
+     Computes linear momentum integrals blocks for pair of GTOs blocks and
      stores them into integrals batch.
- 
+     
      @param intsBatchX the pointer to batch buffer of X component of electric
             dipole integrals.
      @param intsBatchY the pointer to batch buffer of Y component of electric
@@ -233,4 +199,4 @@ public:
                  const CGtoBlock& ketGtoBlock) const;
 };
 
-#endif /* ElectricDipoleIntegralsDriver_hpp */
+#endif /* LinearMomemtumIntegralsDriver_hpp */

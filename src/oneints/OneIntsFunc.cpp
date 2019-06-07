@@ -318,6 +318,74 @@ namespace intsfunc { // intsfunc namespace
     }
     
     void
+    compFactorsForLinearMomentum(      CMemBlock2D<double>& osFactors,
+                                 const CGtoBlock&           braGtoBlock,
+                                 const CGtoBlock&           ketGtoBlock,
+                                 const int32_t              iContrGto)
+    {
+        // set up angular momentum for bra and ket sides
+        
+        auto bang = braGtoBlock.getAngularMomentum();
+        
+        auto kang = ketGtoBlock.getAngularMomentum();
+        
+        // set up pointers to primitives data on bra side
+        
+        auto bexp = braGtoBlock.getExponents();
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto kexp = ketGtoBlock.getExponents();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(4 * idx);
+            
+            auto fz = osFactors.data(4 * idx + 1);
+            
+            auto fb = bexp[i];
+            
+            #pragma omp simd aligned(fx, fz, kexp: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                fx[j] = 1.0 / (fb + kexp[j]);
+                
+                fz[j] = fb * kexp[j] * fx[j];
+            }
+            
+            if (kang > 1)
+            {
+                auto ga = osFactors.data(4 * idx + 2);
+                
+                #pragma omp simd aligned(ga: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++) ga[j] = fb;
+            }
+            
+            if (bang > 1)
+            {
+                auto gb = osFactors.data(4 * idx + 3);
+                
+                #pragma omp simd aligned(gb, kexp: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++) gb[j] = kexp[j];
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
     compDistancesPA(      CMemBlock2D<double>& paDistances,
                     const CMemBlock2D<double>& abDistances,
                     const CMemBlock2D<double>& osFactors,

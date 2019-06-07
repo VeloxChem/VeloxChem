@@ -431,7 +431,7 @@ CNuclearPotentialIntegralsDriver::_compNuclearPotentialForGtoBlocks(      COneIn
                                         bragtos, ketgtos, i, j);
         }
         
-        // contract primitive overlap integrals
+        // contract primitive nuclear potential integrals
         
         genfunc::contract(cartbuffer, accbuffer, 0, bragtos, ketgtos, i);
         

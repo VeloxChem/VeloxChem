@@ -49,6 +49,14 @@ namespace t2crecfunc { // t2crecfunc namespace
     std::vector<CRecursionTerm> obRecursionForElectricDipole(const CRecursionTerm& recursionTerm);
     
     /**
+     Applies Obara-Saika linear momentum recursion to recursion term object.
+     
+     @param recursionTerm the recursion term object.
+     @return the vector of recursion term objects.
+     */
+    std::vector<CRecursionTerm> obRecursionForLinearMomentum(const CRecursionTerm& recursionTerm);
+    
+    /**
      Applies Obara-Saika electric field recursion to recursion term object.
      
      @param recursionTerm the recursion term object.

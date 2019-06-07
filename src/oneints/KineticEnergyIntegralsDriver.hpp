@@ -102,7 +102,7 @@ class CKineticEnergyIntegralsDriver
      
      @param braAngularMomentum the angular momentum of bra side.
      @param ketAngularMomentum the angular momentum of ket side.
-     @return the recursion map for overlap integrals.
+     @return the recursion map for kinetic energy integrals.
      */
     CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,
                                    const int32_t ketAngularMomentum,

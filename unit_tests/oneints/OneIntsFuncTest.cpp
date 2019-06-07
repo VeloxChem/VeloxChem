@@ -179,6 +179,41 @@ TEST_F(COneIntsFuncTest, compFactorsForElectronicPotential)
     ASSERT_EQ(facts, refxz);
 }
 
+TEST_F(COneIntsFuncTest, compFactorsForLinearMomentum)
+{
+    CMolecularBasis bas = vlxbas::getTestBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 2);
+    
+    CGtoBlock pket(lih, bas, 2);
+    
+    CMemBlock2D<double> facts(6, 8);
+    
+    intsfunc::compFactorsForLinearMomentum(facts, pbra, pket, 0);
+    
+    CMemBlock2D<double> refxz({1.0000/5.6000, 1.0000/4.3000, 1.0000/4.0000,
+                               1.0000/5.8000, 1.0000/4.8000, 1.0000/3.6000,
+                               7.8400/5.6000, 4.2000/4.3000, 3.3600/4.0000,
+                               8.4000/5.8000, 5.6000/4.8000, 2.2400/3.6000,
+                                      2.8000,        2.8000,        2.8000,
+                                      2.8000,        2.8000,        2.8000,
+                                      2.8000,        1.5000,        1.2000,
+                                      3.0000,        2.0000,        0.8000,
+                               1.0000/4.3000, 1.0000/3.0000, 1.0000/2.7000,
+                               1.0000/4.5000, 1.0000/3.5000, 1.0000/2.3000,
+                               4.2000/4.3000, 2.2500/3.0000, 1.8000/2.7000,
+                               4.5000/4.5000, 3.0000/3.5000, 1.2000/2.3000,
+                                      1.5000,        1.5000,        1.5000,
+                                      1.5000,        1.5000,        1.5000,
+                                      2.8000,        1.5000,        1.2000,
+                                      3.0000,        2.0000,        0.8000},
+                              6, 8);
+    
+    ASSERT_EQ(facts, refxz);
+}
+
 TEST_F(COneIntsFuncTest, CompDistancesPA)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();

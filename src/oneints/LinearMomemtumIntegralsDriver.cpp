@@ -6,7 +6,7 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "ElectricDipoleIntegralsDriver.hpp"
+#include "LinearMomemtumIntegralsDriver.hpp"
 
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
@@ -18,55 +18,26 @@
 #include "TwoCentersRecursionFunctions.hpp"
 
 #include "OverlapRecFuncForSX.hpp"
-#include "ElectricDipoleRecFuncForSX.hpp"
-#include "OverlapRecFuncForPX.hpp"
-#include "ElectricDipoleRecFuncForPX.hpp"
-#include "OverlapRecFuncForDX.hpp"
-#include "ElectricDipoleRecFuncForDX.hpp"
-#include "OverlapRecFuncForFF.hpp"
-#include "ElectricDipoleRecFuncForFF.hpp"
-#include "OverlapRecFuncForFG.hpp"
-#include "ElectricDipoleRecFuncForFG.hpp"
-#include "ElectricDipoleRecFuncForGF.hpp"
-#include "ElectricDipoleRecFuncForGG.hpp"
 
-CElectricDipoleIntegralsDriver::CElectricDipoleIntegralsDriver(MPI_Comm comm)
-
-    : _xOrigin(0.0)
-
-    , _yOrigin(0.0)
-
-    , _zOrigin(0.0)
+CLinearMomentumIntegralsDriver::CLinearMomentumIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
     
     _locNodes = mpi::nodes(comm);
-
+    
     mpi::duplicate(comm, &_locComm);
 }
 
-CElectricDipoleIntegralsDriver::~CElectricDipoleIntegralsDriver()
+CLinearMomentumIntegralsDriver::~CLinearMomentumIntegralsDriver()
 {
     mpi::destroy(&_locComm);
 }
 
-void
-CElectricDipoleIntegralsDriver::setElectricDipoleOrigin(const double xOrigin,
-                                                        const double yOrigin,
-                                                        const double zOrigin)
-{
-    _xOrigin = xOrigin;
-    
-    _yOrigin = yOrigin;
-    
-    _zOrigin = zOrigin; 
-}
-
-CElectricDipoleMatrix
-CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
+CLinearMomentumMatrix
+CLinearMomentumIntegralsDriver::compute(const CMolecule&       molecule,
                                         const CMolecularBasis& basis) const
 {
-    CElectricDipoleMatrix dipmat;
+    CLinearMomentumMatrix lmommat;
     
     if (_locRank == mpi::master())
     {
@@ -74,20 +45,20 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
         
         CGtoContainer bracontr(molecule, basis);
         
-        // compute electric dipole integrals
+        // compute linear momentum integrals
         
-        dipmat = _compElectricDipoleIntegrals(&bracontr, &bracontr);
+        lmommat = _compLinearMomentumIntegrals(&bracontr, &bracontr);
     }
     
-    return dipmat;
+    return lmommat;
 }
 
-CElectricDipoleMatrix
-CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
+CLinearMomentumMatrix
+CLinearMomentumIntegralsDriver::compute(const CMolecule&       molecule,
                                         const CMolecularBasis& braBasis,
                                         const CMolecularBasis& ketBasis) const
 {
-    CElectricDipoleMatrix dipmat;
+    CLinearMomentumMatrix lmommat;
     
     if (_locRank == mpi::master())
     {
@@ -97,20 +68,20 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       molecule,
         
         CGtoContainer ketcontr(molecule, ketBasis);
         
-        // compute electric dipole integrals
+        // compute linear momentum integrals
         
-        dipmat = _compElectricDipoleIntegrals(&bracontr, &ketcontr);
+        lmommat = _compLinearMomentumIntegrals(&bracontr, &ketcontr);
     }
     
-    return dipmat;
+    return lmommat;
 }
 
-CElectricDipoleMatrix
-CElectricDipoleIntegralsDriver::compute(const CMolecule&       braMolecule,
+CLinearMomentumMatrix
+CLinearMomentumIntegralsDriver::compute(const CMolecule&       braMolecule,
                                         const CMolecule&       ketMolecule,
                                         const CMolecularBasis& basis) const
 {
-    CElectricDipoleMatrix dipmat;
+    CLinearMomentumMatrix lmommat;
     
     if (_locRank == mpi::master())
     {
@@ -120,21 +91,21 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         CGtoContainer ketcontr(ketMolecule, basis);
         
-        // compute electric dipole integrals
+        // compute linear momentum integrals
         
-        dipmat = _compElectricDipoleIntegrals(&bracontr, &ketcontr);
+        lmommat = _compLinearMomentumIntegrals(&bracontr, &ketcontr);
     }
     
-    return dipmat;
+    return lmommat;
 }
 
-CElectricDipoleMatrix
-CElectricDipoleIntegralsDriver::compute(const CMolecule&       braMolecule,
+CLinearMomentumMatrix
+CLinearMomentumIntegralsDriver::compute(const CMolecule&       braMolecule,
                                         const CMolecule&       ketMolecule,
                                         const CMolecularBasis& braBasis,
                                         const CMolecularBasis& ketBasis) const
 {
-    CElectricDipoleMatrix dipmat;
+    CLinearMomentumMatrix lmommat;
     
     if (_locRank == mpi::master())
     {
@@ -144,16 +115,16 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         CGtoContainer ketcontr(ketMolecule, ketBasis);
         
-        // compute electric integrals
+        // compute linear momentum integrals
         
-        dipmat = _compElectricDipoleIntegrals(&bracontr, &ketcontr);
+        lmommat = _compLinearMomentumIntegrals(&bracontr, &ketcontr);
     }
     
-    return dipmat;
+    return lmommat;
 }
 
 void
-CElectricDipoleIntegralsDriver::compute(      double*    intsBatchX,
+CLinearMomentumIntegralsDriver::compute(      double*    intsBatchX,
                                               double*    intsBatchY,
                                               double*    intsBatchZ,
                                         const CGtoBlock& braGtoBlock,
@@ -177,14 +148,13 @@ CElectricDipoleIntegralsDriver::compute(      double*    intsBatchX,
     
     COneIntsDistribution distz(intsBatchZ, nrow, ncol, dist1e::batch);
     
-    // compute electric dipole integrals
+    // compute linear momentum integrals
     
-    _compElectricDipoleForGtoBlocks(&distx, &disty, &distz, _xOrigin, _yOrigin,
-                                    _zOrigin, braGtoBlock, ketGtoBlock);
+    _compLinearMomentumForGtoBlocks(&distx, &disty, &distz, braGtoBlock, ketGtoBlock);
 }
 
-CElectricDipoleMatrix
-CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer* braGtoContainer,
+CLinearMomentumMatrix
+CLinearMomentumIntegralsDriver::_compLinearMomentumIntegrals(const CGtoContainer* braGtoContainer,
                                                              const CGtoContainer* ketGtoContainer) const
 {
     // check if GTOs containers are same on bra and ket sides
@@ -207,7 +177,7 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
     
     // set up distributio pattern
     
-    dist1e dstyp = (symbk) ? dist1e::symsq : dist1e::rect;
+    dist1e dstyp = (symbk) ? dist1e::antisq : dist1e::rect;
     
     COneIntsDistribution* distpatx = new COneIntsDistribution(dipxmat.values(),
                                                               nrow, ncol, dstyp);
@@ -217,19 +187,11 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
     
     COneIntsDistribution* distpatz = new COneIntsDistribution(dipzmat.values(),
                                                               nrow, ncol, dstyp);
-    
-    // copy origin coordinates
-    
-    auto origx = _xOrigin;
-    
-    auto origy = _yOrigin;
-    
-    auto origz = _zOrigin;
-    
+
     // compute electric dipole integral blocks
     
     #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpatx,\
-                                distpaty, distpatz, origx, origy, origz, symbk)
+                                distpaty, distpatz, symbk)
     {
         #pragma omp single nowait
         {
@@ -253,9 +215,8 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
                     {
                         auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
-                        _compElectricDipoleForGtoBlocks(distpatx, distpaty,
-                                                        distpatz, origx, origy,
-                                                        origz, bgtos, kgtos);
+                        _compLinearMomentumForGtoBlocks(distpatx, distpaty,
+                                                        distpatz, bgtos, kgtos);
                     }
                 }
             }
@@ -270,17 +231,13 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleIntegrals(const CGtoContainer
     
     delete distpatz;
     
-    return CElectricDipoleMatrix(dipxmat, dipymat, dipzmat, _xOrigin, _yOrigin,
-                                 _zOrigin);
+    return CLinearMomentumMatrix(dipxmat, dipymat, dipzmat);
 }
 
 void
-CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDistribution* distPatternX,
+CLinearMomentumIntegralsDriver::_compLinearMomentumForGtoBlocks(      COneIntsDistribution* distPatternX,
                                                                       COneIntsDistribution* distPatternY,
                                                                       COneIntsDistribution* distPatternZ,
-                                                                const double                xOrigin,
-                                                                const double                yOrigin,
-                                                                const double                zOrigin, 
                                                                 const CGtoBlock&            braGtoBlock,
                                                                 const CGtoBlock&            ketGtoBlock) const
 {
@@ -320,19 +277,11 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
     
     CMemBlock2D<double> rfacts(pdim, 2 * pmax);
     
-    // allocate P center coordinates
-    
-    CMemBlock2D<double> rp(pdim, 3 * pmax);
-    
     // set up PA and PB distances
     
     auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
     auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
-    
-    // set up PC distances
-    
-    auto rpc = CMemBlock2D<double>(pdim, 3 * pmax);
     
     // allocate primitives and auxilary integrals buffer
     
@@ -368,7 +317,7 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
     
     // set up indexes for contraction
     
-    auto pidx = recmap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true,
+    auto pidx = recmap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true,
                                                      {bang, -1, -1, -1}, {kang, -1, -1, -1}, 1, 1, 0));
     
     auto spos = braGtoBlock.getStartPositions();
@@ -378,7 +327,7 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
     // determine bra and ket sides symmetry
     
     bool symbk = (bragtos == ketgtos);
-
+    
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
         // compute bra dimensions and shift
@@ -395,27 +344,27 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
         
         intsfunc::compFactorsForOverlap(rfacts, bragtos, ketgtos, i);
         
-        // compute coordinates of center P
-        
-        intsfunc::compCoordinatesForP(rp, rfacts, 2, bragtos, ketgtos, i);
-        
-        // compute distances: R(PA) = P - A
-        
-        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
-        
-        // compute distances: R(PB) = P - B
-        
-        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
-        
-        // compute distances: R(PC) = P - C
-        
-        intsfunc::compDistancesPC(rpc, rp, _xOrigin, _yOrigin, _zOrigin,
-                                  bragtos, ketgtos, i);
-        
-        // compute primitive electric dipole integrals
-        
-        _compPrimElectricDipoleInts(primbuffer, recmap, rfacts, rab, rpa,
-                                    rpb, rpc, bragtos, ketgtos, i);
+//        // compute coordinates of center P
+//
+//        intsfunc::compCoordinatesForP(rp, rfacts, 2, bragtos, ketgtos, i);
+//
+//        // compute distances: R(PA) = P - A
+//
+//        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
+//
+//        // compute distances: R(PB) = P - B
+//
+//        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
+//
+//        // compute distances: R(PC) = P - C
+//
+//        intsfunc::compDistancesPC(rpc, rp, _xOrigin, _yOrigin, _zOrigin,
+//                                  bragtos, ketgtos, i);
+//
+//        // compute primitive electric dipole integrals
+//
+//        _compPrimElectricDipoleInts(primbuffer, recmap, rfacts, rab, rpa,
+//                                    rpb, rpc, bragtos, ketgtos, i);
         
         // contract primitive linear momentum integrals
         
@@ -446,112 +395,24 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
 }
 
 void
-CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<double>&  primBuffer,
-                                                            const CRecursionMap&        recursionMap, 
+CLinearMomentumIntegralsDriver::_compPrimLinearMomentumInts(      CMemBlock2D<double>&  primBuffer,
+                                                            const CRecursionMap&        recursionMap,
                                                             const CMemBlock2D<double>&  osFactors,
                                                             const CMemBlock2D<double>&  abDistances,
                                                             const CMemBlock2D<double>&  paDistances,
                                                             const CMemBlock2D<double>&  pbDistances,
-                                                            const CMemBlock2D<double>&  pcDistances,
                                                             const CGtoBlock&            braGtoBlock,
                                                             const CGtoBlock&            ketGtoBlock,
                                                             const int32_t               iContrGto) const
 {
     ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 2, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForSS(primBuffer, recursionMap, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForSP(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForGS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForGP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForGD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForGF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
-    ediprecfunc::compElectricDipoleForGG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
-    
+  
     // NOTE: add l > 4 recursion here
 }
 
 CRecursionMap
-CElectricDipoleIntegralsDriver::_setRecursionMap(const int32_t braAngularMomentum,
+CLinearMomentumIntegralsDriver::_setRecursionMap(const int32_t braAngularMomentum,
                                                  const int32_t ketAngularMomentum,
                                                  const int32_t maxNumberOfPrimitives) const
 {
@@ -559,9 +420,9 @@ CElectricDipoleIntegralsDriver::_setRecursionMap(const int32_t braAngularMomentu
     
     recfuncs.add(CRecursionFunction({"Overlap"}, &t2crecfunc::obRecursionForOverlap));
     
-    recfuncs.add(CRecursionFunction({"Electric Dipole"}, &t2crecfunc::obRecursionForElectricDipole));
+    recfuncs.add(CRecursionFunction({"Linear Momentum"}, &t2crecfunc::obRecursionForLinearMomentum));
     
-    auto rterm = gintsfunc::genIntegral({"Electric Dipole"}, braAngularMomentum,
+    auto rterm = gintsfunc::genIntegral({"Linear Momentum"}, braAngularMomentum,
                                         ketAngularMomentum, 0);
     
     return gintsfunc::genRecursionMap(rterm, recblock::cc, maxNumberOfPrimitives,

@@ -67,6 +67,8 @@ namespace gintsfunc { // gintsfunc namespace
         
         if (labelOfOperator == std::string("Electric Dipole")) opcomp = 1;
         
+        if (labelOfOperator == std::string("Linear Momentum")) opcomp = 1;
+        
         if (labelOfOperator == std::string("Electric Field")) opcomp = 1;
         
         if (labelOfOperator == std::string("Electric Field Gradient")) opcomp = 2;

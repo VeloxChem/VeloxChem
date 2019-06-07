@@ -282,9 +282,9 @@ COneIntsDistribution::_distSpherIntsIntoAntiSymMatrix(const CMemBlock2D<double>&
                 
                 for (int32_t k = 0; k < kdim; k++)
                 {
-                    _intsData[bidx * _nColumns + kidx[k]] = -fvals[k];
+                    _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
                     
-                    _intsData[kidx[k] * _nColumns + bidx] =  fvals[k];
+                    _intsData[kidx[k] * _nColumns + bidx] = -fvals[k];
                 }
             }
         }
