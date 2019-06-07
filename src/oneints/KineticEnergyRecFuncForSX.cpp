@@ -73,7 +73,6 @@ namespace kinrecfunc { // kinrecfunc namespace
             
             idx++;
         }
-
     }
 
     void

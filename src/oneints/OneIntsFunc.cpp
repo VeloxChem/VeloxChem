@@ -365,7 +365,7 @@ namespace intsfunc { // intsfunc namespace
                 fz[j] = fb * kexp[j] * fx[j];
             }
             
-            if (kang > 1)
+            if (kang >= 0)
             {
                 auto ga = osFactors.data(4 * idx + 2);
                 
@@ -373,7 +373,7 @@ namespace intsfunc { // intsfunc namespace
                 for (int32_t j = 0; j < nprim; j++) ga[j] = fb;
             }
             
-            if (bang > 1)
+            if (bang > 0)
             {
                 auto gb = osFactors.data(4 * idx + 3);
                 
@@ -396,7 +396,9 @@ namespace intsfunc { // intsfunc namespace
     {
         // skip computation for zero angular momentum on bra side
         
-        if (braGtoBlock.getAngularMomentum() == 0) return;
+        if (paDistances.isEmpty()) return;
+        
+        //if (braGtoBlock.getAngularMomentum() == 0) return;
         
         // set up pointers to primitives data on bra side
         

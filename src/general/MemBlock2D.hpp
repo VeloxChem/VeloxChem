@@ -218,6 +218,13 @@ public:
     void zero();
     
     /**
+     Checks if 2D memory block object is empty.
+
+     @return true if 2D memory block object is empty, false otherwise.
+     */
+    bool isEmpty() const;
+    
+    /**
      Gets pointer to specific data chunk in 2D memory block.
      
      @param iBlock the index of data chunk.
@@ -544,6 +551,15 @@ void
 CMemBlock2D<T>::zero()
 {
     _data.zero(); 
+}
+
+template <class T>
+bool
+CMemBlock2D<T>::isEmpty() const
+{
+    if (_nElements == 0) return true;
+    
+    return false;
 }
 
 template<class T>

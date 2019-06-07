@@ -6,7 +6,7 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "LinearMomemtumIntegralsDriver.hpp"
+#include "LinearMomentumIntegralsDriver.hpp"
 
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
@@ -18,6 +18,17 @@
 #include "TwoCentersRecursionFunctions.hpp"
 
 #include "OverlapRecFuncForSX.hpp"
+#include "LinearMomentumRecFuncForSX.hpp"
+#include "OverlapRecFuncForPX.hpp"
+#include "LinearMomentumRecFuncForPX.hpp"
+#include "OverlapRecFuncForDX.hpp"
+#include "LinearMomentumRecFuncForDX.hpp"
+#include "OverlapRecFuncForFF.hpp"
+#include "LinearMomentumRecFuncForFF.hpp"
+#include "OverlapRecFuncForFG.hpp"
+#include "LinearMomentumRecFuncForFG.hpp"
+#include "LinearMomentumRecFuncForGF.hpp"
+#include "LinearMomentumRecFuncForGG.hpp"
 
 CLinearMomentumIntegralsDriver::CLinearMomentumIntegralsDriver(MPI_Comm comm)
 {
@@ -275,11 +286,11 @@ CLinearMomentumIntegralsDriver::_compLinearMomentumForGtoBlocks(      COneIntsDi
     
     auto pmax = bragtos.getMaxContractionDepth();
     
-    CMemBlock2D<double> rfacts(pdim, 2 * pmax);
+    CMemBlock2D<double> rfacts(pdim, 4 * pmax);
     
     // set up PA and PB distances
     
-    auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
+    auto rpa = CMemBlock2D<double>(pdim, 3 * pmax);
     
     auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
@@ -342,29 +353,19 @@ CLinearMomentumIntegralsDriver::_compLinearMomentumForGtoBlocks(      COneIntsDi
         
         // compute Obara-Saika recursion factors
         
-        intsfunc::compFactorsForOverlap(rfacts, bragtos, ketgtos, i);
+        intsfunc::compFactorsForLinearMomentum(rfacts, bragtos, ketgtos, i);
         
-//        // compute coordinates of center P
-//
-//        intsfunc::compCoordinatesForP(rp, rfacts, 2, bragtos, ketgtos, i);
-//
-//        // compute distances: R(PA) = P - A
-//
-//        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
-//
-//        // compute distances: R(PB) = P - B
-//
-//        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
-//
-//        // compute distances: R(PC) = P - C
-//
-//        intsfunc::compDistancesPC(rpc, rp, _xOrigin, _yOrigin, _zOrigin,
-//                                  bragtos, ketgtos, i);
-//
-//        // compute primitive electric dipole integrals
-//
-//        _compPrimElectricDipoleInts(primbuffer, recmap, rfacts, rab, rpa,
-//                                    rpb, rpc, bragtos, ketgtos, i);
+        // compute distances: R(PA) = P - A
+        
+        intsfunc::compDistancesPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
+
+        // compute distances: R(PB) = P - B
+
+        intsfunc::compDistancesPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
+
+        // compute primitive electric dipole integrals
+
+        _compPrimLinearMomentumInts(primbuffer, recmap, rfacts, rab, rpa, rpb, bragtos, ketgtos, i);
         
         // contract primitive linear momentum integrals
         
@@ -405,8 +406,95 @@ CLinearMomentumIntegralsDriver::_compPrimLinearMomentumInts(      CMemBlock2D<do
                                                             const CGtoBlock&            ketGtoBlock,
                                                             const int32_t               iContrGto) const
 {
-    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 2, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 4, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
+    lmomrecfunc::compLinearMomentumForSS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSP(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForGS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForGP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForGD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForGF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForGG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
   
     // NOTE: add l > 4 recursion here
 }

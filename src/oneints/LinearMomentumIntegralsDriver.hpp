@@ -6,8 +6,8 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef LinearMomemtumIntegralsDriver_hpp
-#define LinearMomemtumIntegralsDriver_hpp
+#ifndef LinearMomentumIntegralsDriver_hpp
+#define LinearMomentumIntegralsDriver_hpp
 
 #include <cstdint>
 
@@ -199,4 +199,4 @@ public:
                  const CGtoBlock& ketGtoBlock) const;
 };
 
-#endif /* LinearMomemtumIntegralsDriver_hpp */
+#endif /* LinearMomentumIntegralsDriver_hpp */

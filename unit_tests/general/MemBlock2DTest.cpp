@@ -128,6 +128,17 @@ TEST_F(CMemBlock2DTest, Zero)
     ASSERT_EQ(ma, mb);
 }
 
+TEST_F(CMemBlock2DTest, IsEmpty)
+{
+    CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);
+    
+    ASSERT_FALSE(ma.isEmpty());
+    
+    CMemBlock2D<double> mb;
+    
+    ASSERT_TRUE(mb.isEmpty()); 
+}
+
 TEST_F(CMemBlock2DTest, Data)
 {
     CMemBlock2D<double> ma({1.0, 2.0, 3.0, 6.0}, 2, 2);

@@ -2620,7 +2620,6 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeFPForLiH)
     ASSERT_EQ(dipzmat, CDenseMatrix(intzvals, 28, 12));
 }
 
-
 TEST_F(CElectricDipoleIntegralsDriverTest, ComputeSGForLiH)
 {
     CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
