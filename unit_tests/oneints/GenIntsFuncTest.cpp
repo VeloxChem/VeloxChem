@@ -50,8 +50,6 @@ TEST_F(CGenIntsFuncTest, GenRecursionMap)
 
 TEST_F(CGenIntsFuncTest, GenIntegral)
 {
-    CRecursionFunctionsList recfuncs;
-
     CRecursionTerm rta({"Kinetic Energy"}, 0, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 0);
     
     ASSERT_EQ(rta, gintsfunc::genIntegral({"Kinetic Energy"}, 2, 1, 0));
@@ -59,5 +57,29 @@ TEST_F(CGenIntsFuncTest, GenIntegral)
     CRecursionTerm rtb({"Electric Field Gradient"}, 2, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 4);
     
     ASSERT_EQ(rtb, gintsfunc::genIntegral({"Electric Field Gradient"}, 2, 1, 4));
+    
+    CRecursionTerm rtc({"Linear Momentum"}, 1, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 4);
+    
+    ASSERT_EQ(rtc, gintsfunc::genIntegral({"Linear Momentum"}, 2, 1, 4));
+    
+    CRecursionTerm rtd({"Angular Momentum"}, 1, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 4);
+    
+    ASSERT_EQ(rtd, gintsfunc::genIntegral({"Angular Momentum"}, 2, 1, 4));
+    
+    CRecursionTerm rte({"Electric Dipole"}, 1, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 4);
+    
+    ASSERT_EQ(rte, gintsfunc::genIntegral({"Electric Dipole"}, 2, 1, 4));
+    
+    CRecursionTerm rtf({"Electric Field"}, 1, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 4);
+    
+    ASSERT_EQ(rtf, gintsfunc::genIntegral({"Electric Field"}, 2, 1, 4));
+    
+    CRecursionTerm rtk({"Overlap"}, 0, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 0);
+    
+    ASSERT_EQ(rtk, gintsfunc::genIntegral({"Overlap"}, 2, 1, 0));
+    
+    CRecursionTerm rtl({"Nuclear Potential"}, 0, true, {2, -1, -1, -1}, {1, -1, -1, -1}, 1, 1, 0);
+    
+    ASSERT_EQ(rtl, gintsfunc::genIntegral({"Nuclear Potential"}, 2, 1, 0));
 }
 

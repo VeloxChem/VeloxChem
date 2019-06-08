@@ -308,6 +308,79 @@ namespace t2crecfunc { // t2crecfunc namespace
     }
     
     std::vector<CRecursionTerm>
+    obRecursionForAngularMomentum(const CRecursionTerm& recursionTerm)
+    {
+        std::vector<CRecursionTerm> obvec;
+        
+        auto rterm = recursionTerm;
+        
+        if (recursionTerm.isBraOfZeroOrder())
+        {
+            auto k1term = rterm.ketShift(-1, 0);
+            
+            if (k1term.isValid())
+            {
+                obvec.push_back(k1term);
+                
+                auto k2term = k1term.ketShift(-1, 0);
+                
+                if (k2term.isValid()) obvec.push_back(k2term);
+                
+                auto k3term = k1term.operatorShift(-1);
+                
+                k3term.setLabel({"Overlap"});
+                
+                if (k3term.isValid()) obvec.push_back(k3term);
+            }
+        }
+        else
+        {
+            auto b1term = rterm.braShift(-1, 0);
+            
+            if (b1term.isValid())
+            {
+                obvec.push_back(b1term);
+                
+                auto b2term = b1term.braShift(-1, 0);
+                
+                if (b2term.isValid()) obvec.push_back(b2term);
+                
+                auto k1term = b1term.ketShift(-1, 0);
+                
+                if (k1term.isValid()) obvec.push_back(k1term);
+                
+                auto b3term = b1term.operatorShift(-1);
+                
+                b3term.setLabel({"Overlap"});
+                
+                if (b3term.isValid()) obvec.push_back(b3term);
+                
+                auto k2term = k1term.operatorShift(-1);
+                
+                if (k2term.isValid())
+                {
+                    k2term.setLabel({"Overlap"});
+                    
+                    obvec.push_back(k2term); 
+                }
+            }
+        }
+        
+        // special case: (S|P|S) integral
+        
+        if (obvec.empty() && rterm.isValid())
+        {
+            rterm.setLabel({"Overlap"});
+            
+            auto nterm = rterm.operatorShift(-1);
+            
+            if (nterm.isValid()) obvec.push_back(nterm);
+        }
+        
+        return obvec;
+    }
+    
+    std::vector<CRecursionTerm>
     obRecursionForElectricField(const CRecursionTerm& recursionTerm)
     {
         std::vector<CRecursionTerm> obvec;

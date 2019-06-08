@@ -199,7 +199,7 @@ CLinearMomentumIntegralsDriver::_compLinearMomentumIntegrals(const CGtoContainer
     COneIntsDistribution* distpatz = new COneIntsDistribution(dipzmat.values(),
                                                               nrow, ncol, dstyp);
 
-    // compute electric dipole integral blocks
+    // compute linear momentum integral blocks
     
     #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpatx,\
                                 distpaty, distpatz, symbk)

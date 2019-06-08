@@ -144,7 +144,7 @@ CElectricDipoleIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         CGtoContainer ketcontr(ketMolecule, ketBasis);
         
-        // compute electric integrals
+        // compute electric dipole integrals
         
         dipmat = _compElectricDipoleIntegrals(&bracontr, &ketcontr);
     }

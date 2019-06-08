@@ -639,3 +639,128 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForLinearMomentumForDF)
     
     ASSERT_EQ(b3ta, rvec[3]);
 }
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumMomentumForSP)
+{
+    CRecursionTerm rta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
+    
+    ASSERT_EQ(2u, rvec.size());
+    
+    CRecursionTerm k1ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k2ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(k1ta, rvec[0]);
+    
+    ASSERT_EQ(k2ta, rvec[1]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForSF)
+{
+    CRecursionTerm rta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {3, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
+    
+    ASSERT_EQ(3u, rvec.size());
+    
+    CRecursionTerm k1ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k2ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k3ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(k1ta, rvec[0]);
+    
+    ASSERT_EQ(k2ta, rvec[1]);
+    
+    ASSERT_EQ(k3ta, rvec[2]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForPS)
+{
+    CRecursionTerm rta({"Angular Momentum"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
+    
+    ASSERT_EQ(2u, rvec.size());
+    
+    CRecursionTerm b1ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b2ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(b1ta, rvec[0]);
+    
+    ASSERT_EQ(b2ta, rvec[1]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDS)
+{
+    CRecursionTerm rta({"Angular Momentum"}, 1, false, {2, -1, -1, -1}, {0, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
+    
+    ASSERT_EQ(3u, rvec.size());
+    
+    CRecursionTerm b1ta({"Angular Momentum"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b2ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b3ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(b1ta, rvec[0]);
+    
+    ASSERT_EQ(b2ta, rvec[1]);
+    
+    ASSERT_EQ(b3ta, rvec[2]);
+}
+
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDF)
+{
+    CRecursionTerm rta({"Angular Momentum"}, 1, false, {2, -1, -1, -1}, {3, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
+    
+    ASSERT_EQ(5u, rvec.size());
+    
+    CRecursionTerm b1ta({"Angular Momentum"}, 1, false, {1, -1, -1, -1}, {3, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b2ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {3, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k1ta({"Angular Momentum"}, 1, false, {1, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b3ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {3, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k2ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(b1ta, rvec[0]);
+    
+    ASSERT_EQ(b2ta, rvec[1]);
+    
+    ASSERT_EQ(k1ta, rvec[2]);
+    
+    ASSERT_EQ(b3ta, rvec[3]);
+    
+    ASSERT_EQ(k2ta, rvec[4]);
+}

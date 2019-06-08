@@ -61,7 +61,7 @@ CAngularMomentumIntegralsDriver::compute(const CMolecule&       molecule,
         
         CGtoContainer bracontr(molecule, basis);
         
-        // compute electric dipole integrals
+        // compute angular momentum integrals
         
         dipmat = _compAngularMomentumIntegrals(&bracontr, &bracontr);
     }
@@ -84,7 +84,7 @@ CAngularMomentumIntegralsDriver::compute(const CMolecule&       molecule,
         
         CGtoContainer ketcontr(molecule, ketBasis);
         
-        // compute electric dipole integrals
+        // compute angular momentum integrals
         
         dipmat = _compAngularMomentumIntegrals(&bracontr, &ketcontr);
     }
@@ -107,7 +107,7 @@ CAngularMomentumIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         CGtoContainer ketcontr(ketMolecule, basis);
         
-        // compute electric dipole integrals
+        // compute angular momentum integrals
         
         dipmat = _compAngularMomentumIntegrals(&bracontr, &ketcontr);
     }
@@ -131,7 +131,7 @@ CAngularMomentumIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         CGtoContainer ketcontr(ketMolecule, ketBasis);
         
-        // compute electric integrals
+        // compute angular momentum integrals
         
         dipmat = _compAngularMomentumIntegrals(&bracontr, &ketcontr);
     }
@@ -164,7 +164,7 @@ CAngularMomentumIntegralsDriver::compute(   double*    intsBatchX,
     
     COneIntsDistribution distz(intsBatchZ, nrow, ncol, dist1e::batch);
     
-    // compute electric dipole integrals
+    // compute angular momentum integrals
     
     _compAngularMomentumForGtoBlocks(&distx, &disty, &distz, _xOrigin, _yOrigin,
                                     _zOrigin, braGtoBlock, ketGtoBlock);
@@ -184,7 +184,7 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumIntegrals(const CGtoContain
     
     auto ncol = ketGtoContainer->getNumberOfAtomicOrbitals();
     
-    // allocate dense matrix for electric dipole integrals
+    // allocate dense matrix for angular momentum integrals
     
     CDenseMatrix dipxmat(nrow, ncol);
     
@@ -213,7 +213,7 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumIntegrals(const CGtoContain
     
     auto origz = _zOrigin;
     
-    // compute electric dipole integral blocks
+    // compute angular momentum integral blocks
     
     #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpatx,\
                                 distpaty, distpatz, origx, origy, origz, symbk)
@@ -454,13 +454,11 @@ CAngularMomentumIntegralsDriver::_setRecursionMap(const int32_t braAngularMoment
 {
     CRecursionFunctionsList recfuncs;
     
-    // FIX ME::::::
-    
     recfuncs.add(CRecursionFunction({"Overlap"}, &t2crecfunc::obRecursionForOverlap));
     
-   // recfuncs.add(CRecursionFunction({"Electric Dipole"}, &t2crecfunc::obRecursionForAngularMomentum));
+    recfuncs.add(CRecursionFunction({"Angular Momentum"}, &t2crecfunc::obRecursionForAngularMomentum));
     
-    auto rterm = gintsfunc::genIntegral({"Electric Dipole"}, braAngularMomentum,
+    auto rterm = gintsfunc::genIntegral({"Angular Momentum"}, braAngularMomentum,
                                         ketAngularMomentum, 0);
     
     return gintsfunc::genRecursionMap(rterm, recblock::cc, maxNumberOfPrimitives,
