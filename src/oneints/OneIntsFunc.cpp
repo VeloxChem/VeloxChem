@@ -43,6 +43,70 @@ namespace intsfunc { // intsfunc namespace
                             ketGtoBlock.getCoordinatesZ(),
                             ketGtoBlock.getNumberOfPrimGtos());
     }
+    
+    void
+    compDistancesAC(      CMemBlock2D<double>& acDistances,
+                    const double               xCoordinateC,
+                    const double               yCoordinateC,
+                    const double               zCoordinateC,
+                    const CGtoBlock&           braGtoBlock,
+                    const CGtoBlock&           ketGtoBlock,
+                    const int32_t              iContrGto)
+    {
+        // set up pointers to primitives data on bra side
+        
+        auto brx = braGtoBlock.getCoordinatesX();
+        
+        auto bry = braGtoBlock.getCoordinatesY();
+        
+        auto brz = braGtoBlock.getCoordinatesZ();
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        mathfunc::set_to(acDistances.data(0), brx[spos[iContrGto]] - xCoordinateC, nprim);
+        
+        mathfunc::set_to(acDistances.data(1), bry[spos[iContrGto]] - yCoordinateC, nprim);
+        
+        mathfunc::set_to(acDistances.data(2), brz[spos[iContrGto]] - zCoordinateC, nprim);
+    }
+    
+    void
+    compDistancesBC(      CMemBlock2D<double>& bcDistances,
+                    const double               xCoordinateC,
+                    const double               yCoordinateC,
+                    const double               zCoordinateC,
+                    const CGtoBlock&           ketGtoBlock)
+    {
+        // set up pointers to distances R(BC) = B - C
+        
+        auto rbcx = bcDistances.data(0);
+        
+        auto rbcy = bcDistances.data(1);
+        
+        auto rbcz = bcDistances.data(2);
+        
+        // set up pointers to primitives data on ket side
+        
+        auto rbx = ketGtoBlock.getCoordinatesX();
+        
+        auto rby = ketGtoBlock.getCoordinatesY();
+        
+        auto rbz = ketGtoBlock.getCoordinatesZ();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        #pragma omp simd aligned(rbcx, rbcy, rbcz, rbx, rby, rbz: VLX_ALIGN)
+        for (int32_t i = 0; i < nprim; i++)
+        {
+            rbcx[i] = rbx[i] - xCoordinateC;
+            
+            rbcy[i] = rby[i] - yCoordinateC;
+            
+            rbcz[i] = rbz[i] - zCoordinateC;
+        }
+    }
 
     void
     compFactorsForOverlap(      CMemBlock2D<double>& osFactors,
@@ -366,6 +430,74 @@ namespace intsfunc { // intsfunc namespace
             }
             
             if (kang >= 0)
+            {
+                auto ga = osFactors.data(4 * idx + 2);
+                
+                #pragma omp simd aligned(ga: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++) ga[j] = fb;
+            }
+            
+            if (bang > 0)
+            {
+                auto gb = osFactors.data(4 * idx + 3);
+                
+                #pragma omp simd aligned(gb, kexp: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++) gb[j] = kexp[j];
+            }
+            
+            idx++;
+        }
+    }
+    
+    void
+    compFactorsForAngularMomentum(      CMemBlock2D<double>& osFactors,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto)
+    {
+        // set up angular momentum for bra and ket sides
+        
+        auto bang = braGtoBlock.getAngularMomentum();
+        
+        auto kang = ketGtoBlock.getAngularMomentum();
+        
+        // set up pointers to primitives data on bra side
+        
+        auto bexp = braGtoBlock.getExponents();
+        
+        auto spos = braGtoBlock.getStartPositions();
+        
+        auto epos = braGtoBlock.getEndPositions();
+        
+        // set up pointers to primitives data on ket side
+        
+        auto kexp = ketGtoBlock.getExponents();
+        
+        auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+        
+        // loop over contracted GTO on bra side
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+        {
+            // set up pointers to Obara-Saika factors
+            
+            auto fx = osFactors.data(4 * idx);
+            
+            auto fz = osFactors.data(4 * idx + 1);
+            
+            auto fb = bexp[i];
+            
+            #pragma omp simd aligned(fx, fz, kexp: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+            {
+                fx[j] = 1.0 / (fb + kexp[j]);
+                
+                fz[j] = fb * kexp[j] * fx[j];
+            }
+            
+            if (kang > 0)
             {
                 auto ga = osFactors.data(4 * idx + 2);
                 

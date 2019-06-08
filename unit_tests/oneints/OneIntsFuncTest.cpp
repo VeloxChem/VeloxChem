@@ -45,6 +45,59 @@ TEST_F(COneIntsFuncTest, CompDistancesAB)
     ASSERT_EQ(rab, refba);
 }
 
+TEST_F(COneIntsFuncTest, CompDistancesAC)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoBlock pket(lih, bas, 1);
+    
+    CMemBlock2D<double> rac(4, 3);
+    
+    intsfunc::compDistancesAC(rac, 2.0, 4.0, 3.0, pbra, pket, 0);
+    
+    CMemBlock2D<double> refac({-2.0, -2.0, -2.0,  -2.0,
+                               -4.0, -4.0, -4.0,  -4.0,
+                               -3.0, -3.0, -3.0,  -3.0},
+                              4, 3);
+    
+    ASSERT_EQ(rac, refac);
+    
+    intsfunc::compDistancesAC(rac, 2.0, 4.0, 3.0, pbra, pket, 2);
+    
+    CMemBlock2D<double> refaci({-2.0, -2.0, -2.0, -2.0,
+                                -4.0, -4.0, -4.0, -4.0,
+                                -1.8, -1.8, -1.8, -1.8},
+                              4, 3);
+    
+    ASSERT_EQ(rac, refaci);
+}
+
+TEST_F(COneIntsFuncTest, CompDistancesBC)
+{
+    CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 1);
+    
+    CGtoBlock pket(lih, bas, 1);
+    
+    CMemBlock2D<double> rbc(4, 3);
+    
+    intsfunc::compDistancesBC(rbc, 2.0, 4.0, 3.0, pket);
+    
+    CMemBlock2D<double> refbc({-2.0, -2.0, -2.0, -2.0,
+                               -4.0, -4.0, -4.0, -4.0,
+                               -3.0, -3.0, -3.0, -1.8},
+                               4, 3);
+    
+    ASSERT_EQ(rbc, refbc);
+}
+
 TEST_F(COneIntsFuncTest, compFactorsForOverlap)
 {
     CMolecularBasis bas = vlxbas::getMolecularBasisForLiH();
@@ -192,6 +245,41 @@ TEST_F(COneIntsFuncTest, compFactorsForLinearMomentum)
     CMemBlock2D<double> facts(6, 8);
     
     intsfunc::compFactorsForLinearMomentum(facts, pbra, pket, 0);
+    
+    CMemBlock2D<double> refxz({1.0000/5.6000, 1.0000/4.3000, 1.0000/4.0000,
+                               1.0000/5.8000, 1.0000/4.8000, 1.0000/3.6000,
+                               7.8400/5.6000, 4.2000/4.3000, 3.3600/4.0000,
+                               8.4000/5.8000, 5.6000/4.8000, 2.2400/3.6000,
+                                      2.8000,        2.8000,        2.8000,
+                                      2.8000,        2.8000,        2.8000,
+                                      2.8000,        1.5000,        1.2000,
+                                      3.0000,        2.0000,        0.8000,
+                               1.0000/4.3000, 1.0000/3.0000, 1.0000/2.7000,
+                               1.0000/4.5000, 1.0000/3.5000, 1.0000/2.3000,
+                               4.2000/4.3000, 2.2500/3.0000, 1.8000/2.7000,
+                               4.5000/4.5000, 3.0000/3.5000, 1.2000/2.3000,
+                                      1.5000,        1.5000,        1.5000,
+                                      1.5000,        1.5000,        1.5000,
+                                      2.8000,        1.5000,        1.2000,
+                                      3.0000,        2.0000,        0.8000},
+                              6, 8);
+    
+    ASSERT_EQ(facts, refxz);
+}
+
+TEST_F(COneIntsFuncTest, compFactorsForAngularMomentum)
+{
+    CMolecularBasis bas = vlxbas::getTestBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    CGtoBlock pbra(lih, bas, 2);
+    
+    CGtoBlock pket(lih, bas, 2);
+    
+    CMemBlock2D<double> facts(6, 8);
+    
+    intsfunc::compFactorsForAngularMomentum(facts, pbra, pket, 0);
     
     CMemBlock2D<double> refxz({1.0000/5.6000, 1.0000/4.3000, 1.0000/4.0000,
                                1.0000/5.8000, 1.0000/4.8000, 1.0000/3.6000,

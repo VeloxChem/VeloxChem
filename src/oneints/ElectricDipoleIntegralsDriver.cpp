@@ -409,7 +409,7 @@ CElectricDipoleIntegralsDriver::_compElectricDipoleForGtoBlocks(      COneIntsDi
         
         // compute distances: R(PC) = P - C
         
-        intsfunc::compDistancesPC(rpc, rp, _xOrigin, _yOrigin, _zOrigin,
+        intsfunc::compDistancesPC(rpc, rp, xOrigin, yOrigin, zOrigin,
                                   bragtos, ketgtos, i);
         
         // compute primitive electric dipole integrals

@@ -34,6 +34,40 @@ namespace intsfunc { // intsfunc namespace
                          const int32_t              iContrGto);
     
     /**
+     Computes distances between specific contracted GTO on bra side and arbitrary position vector C.
+     
+     @param acDistances the vector of Cartesian R(AC) = A - C distances.
+     @param xCoordinateC the Cartesian X coordinate of center C.
+     @param yCoordinateC the Cartesian Y coordinate of center C.
+     @param zCoordinateC the Cartesian Z coordinate of center C.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compDistancesAC(      CMemBlock2D<double>& acDistances,
+                         const double               xCoordinateC,
+                         const double               yCoordinateC,
+                         const double               zCoordinateC,
+                         const CGtoBlock&           braGtoBlock,
+                         const CGtoBlock&           ketGtoBlock,
+                         const int32_t              iContrGto);
+    
+    /**
+     Computes distances between specific contracted GTO on ket side and arbitrary position vector C.
+     
+     @param acDistances the vector of Cartesian R(BC) = B - C distances.
+     @param xCoordinateC the Cartesian X coordinate of center C.
+     @param yCoordinateC the Cartesian Y coordinate of center C.
+     @param zCoordinateC the Cartesian Z coordinate of center C.
+     @param ketGtoBlock the GTOs block on ket side.
+     */
+    void compDistancesBC(      CMemBlock2D<double>& acDistances,
+                         const double               xCoordinateC,
+                         const double               yCoordinateC,
+                         const double               zCoordinateC,
+                         const CGtoBlock&           ketGtoBlock);
+    
+    /**
      Computes Obara-Saika factors for overlap integrals.
 
      @param osFactors the vector of Obara-Saika factors.
@@ -97,6 +131,19 @@ namespace intsfunc { // intsfunc namespace
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto);
+    
+    /**
+     Computes Obara-Saika factors for angular momentum integrals.
+     
+     @param osFactors the vector of Obara-Saika factors.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     */
+    void compFactorsForAngularMomentum(      CMemBlock2D<double>& osFactors,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
     
     /**
      Computes vector of distances between center P of combined primitive GTOs

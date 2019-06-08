@@ -241,8 +241,8 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumIntegrals(const CGtoContain
                         auto kgtos = ketGtoContainer->getGtoBlock(j);
                         
                         _compAngularMomentumForGtoBlocks(distpatx, distpaty,
-                                                        distpatz, origx, origy,
-                                                        origz, bgtos, kgtos);
+                                                         distpatz, origx, origy,
+                                                         origz, bgtos, kgtos);
                     }
                 }
             }
@@ -303,23 +303,19 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumForGtoBlocks(      COneInts
     
     CMemBlock2D<double> rab(pdim, 3);
     
+    CMemBlock2D<double> rac(pdim, 3);
+    
+    CMemBlock2D<double> rbc(pdim, 3);
+    
     auto pmax = bragtos.getMaxContractionDepth();
     
     CMemBlock2D<double> rfacts(pdim, 2 * pmax);
-    
-    // allocate P center coordinates
-    
-    CMemBlock2D<double> rp(pdim, 3 * pmax);
     
     // set up PA and PB distances
     
     auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
     auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
-    
-    // set up PC distances
-    
-    auto rpc = CMemBlock2D<double>(pdim, 3 * pmax);
     
     // allocate primitives and auxilary integrals buffer
     
@@ -355,7 +351,7 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumForGtoBlocks(      COneInts
     
     // set up indexes for contraction
     
-    auto pidx = recmap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true,
+    auto pidx = recmap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true,
                                                      {bang, -1, -1, -1}, {kang, -1, -1, -1}, 1, 1, 0));
     
     auto spos = braGtoBlock.getStartPositions();
@@ -365,6 +361,10 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumForGtoBlocks(      COneInts
     // determine bra and ket sides symmetry
     
     bool symbk = (bragtos == ketgtos);
+    
+    // compute distances: R(BC) = B - C
+    
+    intsfunc::compDistancesBC(rbc, xOrigin, yOrigin, zOrigin, ketgtos);
 
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -378,31 +378,26 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumForGtoBlocks(      COneInts
         
         intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
         
+        // compute distances: R(AC) = A - C
+        
+        intsfunc::compDistancesAC(rab, xOrigin, yOrigin, zOrigin, bragtos, ketgtos, i);
+        
         // compute Obara-Saika recursion factors
         
-        intsfunc::compFactorsForOverlap(rfacts, bragtos, ketgtos, i);
-        
-        // compute coordinates of center P
-        
-        intsfunc::compCoordinatesForP(rp, rfacts, 2, bragtos, ketgtos, i);
+        intsfunc::compFactorsForAngularMomentum(rfacts, bragtos, ketgtos, i);
         
         // compute distances: R(PA) = P - A
         
-        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
+        intsfunc::compDistancesPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
         
-        // compute distances: R(PB) = P - B
+        // compute distances: R(PA) = P - B
         
-        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
+        intsfunc::compDistancesPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
         
-        // compute distances: R(PC) = P - C
+        // compute primitive angular momentum integrals
         
-        intsfunc::compDistancesPC(rpc, rp, _xOrigin, _yOrigin, _zOrigin,
-                                  bragtos, ketgtos, i);
-        
-        // compute primitive electric dipole integrals
-        
-        _compPrimAngularMomentumInts(primbuffer, recmap, rfacts, rab, rpa,
-                                    rpb, rpc, bragtos, ketgtos, i);
+        _compPrimAngularMomentumInts(primbuffer, recmap, rfacts, rab, rac, rbc, rpa, rpb,
+                                     bragtos, ketgtos, i);
         
         // contract primitive linear momentum integrals
         
@@ -437,9 +432,10 @@ CAngularMomentumIntegralsDriver::_compPrimAngularMomentumInts(      CMemBlock2D<
                                                               const CRecursionMap&        recursionMap,
                                                               const CMemBlock2D<double>&  osFactors,
                                                               const CMemBlock2D<double>&  abDistances,
+                                                              const CMemBlock2D<double>&  acDistances,
+                                                              const CMemBlock2D<double>&  bcDistances,
                                                               const CMemBlock2D<double>&  paDistances,
                                                               const CMemBlock2D<double>&  pbDistances,
-                                                              const CMemBlock2D<double>&  pcDistances,
                                                               const CGtoBlock&            braGtoBlock,
                                                               const CGtoBlock&            ketGtoBlock,
                                                               const int32_t               iContrGto) const
