@@ -939,7 +939,9 @@ namespace intsfunc { // intsfunc namespace
         
         auto bang = braGtoBlock.getAngularMomentum();
         
-        if (bang == 0) return;
+        //if (bang == 0) return;
+        
+        if (paDistances.isEmpty()) return; 
         
         // set up pointers to primitives data on bra side
         
@@ -1033,7 +1035,9 @@ namespace intsfunc { // intsfunc namespace
     {
         // skip computation for zero angular momentum on bra side
         
-        if (braGtoBlock.getAngularMomentum() == 0) return;
+        if (paDistances.isEmpty()) return; 
+        
+        // if (braGtoBlock.getAngularMomentum() == 0) return;
         
         // set up pointers to primitives data on bra side
         

@@ -59,18 +59,18 @@ TEST_F(COneIntsFuncTest, CompDistancesAC)
     
     intsfunc::compDistancesAC(rac, 2.0, 4.0, 3.0, pbra, pket, 0);
     
-    CMemBlock2D<double> refac({-2.0, -2.0, -2.0,  -2.0,
-                               -4.0, -4.0, -4.0,  -4.0,
-                               -3.0, -3.0, -3.0,  -3.0},
+    CMemBlock2D<double> refac({ -2.0, -2.0,  -2.0, -2.0,
+                                -4.0, -4.0,  -4.0, -4.0,
+                                -3.0, -3.0,  -3.0, -3.0},
                               4, 3);
     
     ASSERT_EQ(rac, refac);
     
     intsfunc::compDistancesAC(rac, 2.0, 4.0, 3.0, pbra, pket, 2);
     
-    CMemBlock2D<double> refaci({-2.0, -2.0, -2.0, -2.0,
-                                -4.0, -4.0, -4.0, -4.0,
-                                -1.8, -1.8, -1.8, -1.8},
+    CMemBlock2D<double> refaci({ -2.0, -2.0, -2.0, -2.0,
+                                 -4.0, -4.0, -4.0, -4.0,
+                                 -1.8, -1.8, -1.8, -1.8},
                               4, 3);
     
     ASSERT_EQ(rac, refaci);

@@ -41,6 +41,8 @@ namespace lmomrecfunc { // lmomrecfunc namespace
         auto pidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true,
                                                                {0, -1, -1, -1}, {0, -1, -1, -1}, 1, 1, 0));
         
+        if (pidx == -1) return; 
+        
         // loop over contracted GTO on bra side
         
         int32_t idx = 0;
@@ -63,22 +65,22 @@ namespace lmomrecfunc { // lmomrecfunc namespace
             
             auto fovl = primBuffer.data(sidx + idx);
             
-            auto fpipx = primBuffer.data(pidx + idx);
+            auto fmomx = primBuffer.data(pidx + idx);
             
-            auto fpipy = primBuffer.data(pidx + bdim + idx);
+            auto fmomy = primBuffer.data(pidx + bdim + idx);
             
-            auto fpipz = primBuffer.data(pidx + 2 * bdim + idx);
+            auto fmomz = primBuffer.data(pidx + 2 * bdim + idx);
             
-            #pragma omp simd aligned(fovl, fpipx, fpipy, fpipz, fga: VLX_ALIGN)
+            #pragma omp simd aligned(fovl, fmomx, fmomy, fmomz, fga: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                double fx = 2.0 * fga[j];
+                double fx = 2.0 * fga[j] * fovl[j];
                 
-                fpipx[j] = fx * pax[j] * fovl[j];
+                fmomx[j] = fx * pax[j];
                 
-                fpipy[j] = fx * pay[j] * fovl[j];
+                fmomy[j] = fx * pay[j];
                 
-                fpipz[j] = fx * paz[j] * fovl[j];
+                fmomz[j] = fx * paz[j];
             }
             
             idx++;

@@ -21,6 +21,9 @@
 #include "OneIntsDistributor.hpp"
 #include "RecursionMap.hpp"
 
+#include "OverlapRecFuncForSX.hpp"
+#include "ElectricDipoleRecFuncForSX.hpp"
+
 /**
  Class CAngularMomentumIntegralsDriver computes one-electron angular momentum
  integrals.
@@ -106,10 +109,9 @@ class CAngularMomentumIntegralsDriver
      @param recursionMap the recursion map for Obara-Saika recursion.
      @param osFactors the Obara-Saika recursion factors.
      @param abDistances the vector of distances R(AB) = A - B.
-     @param acDistances the vector of distances R(AC) = A - C.
-     @param bcDistances the vector of distances R(BC) = B - C.
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
+     @param pcDistances the vector of distances R(PC) = P - C.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
@@ -118,10 +120,9 @@ class CAngularMomentumIntegralsDriver
                                       const CRecursionMap&       recursionMap,
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& abDistances,
-                                      const CMemBlock2D<double>& acDistances,
-                                      const CMemBlock2D<double>& bcDistances,
                                       const CMemBlock2D<double>& paDistances,
                                       const CMemBlock2D<double>& pbDistances,
+                                      const CMemBlock2D<double>& pcDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
                                       const int32_t              iContrGto) const;

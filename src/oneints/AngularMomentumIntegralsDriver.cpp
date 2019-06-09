@@ -17,6 +17,11 @@
 #include "GenIntsFunc.hpp"
 #include "TwoCentersRecursionFunctions.hpp"
 
+#include "OverlapRecFuncForSX.hpp"
+#include "LinearMomentumRecFuncForSX.hpp"
+#include "ElectricDipoleRecFuncForSX.hpp"
+#include "AngularMomentumRecFuncForSX.hpp"
+
 CAngularMomentumIntegralsDriver::CAngularMomentumIntegralsDriver(MPI_Comm comm)
 
     : _xOrigin(0.0)
@@ -303,19 +308,23 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumForGtoBlocks(      COneInts
     
     CMemBlock2D<double> rab(pdim, 3);
     
-    CMemBlock2D<double> rac(pdim, 3);
-    
-    CMemBlock2D<double> rbc(pdim, 3);
-    
     auto pmax = bragtos.getMaxContractionDepth();
     
-    CMemBlock2D<double> rfacts(pdim, 2 * pmax);
+    CMemBlock2D<double> rfacts(pdim, 4 * pmax);
+    
+    // allocate P center coordinates
+    
+    CMemBlock2D<double> rp(pdim, 3 * pmax);
     
     // set up PA and PB distances
     
-    auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
+    auto rpa = CMemBlock2D<double>(pdim, 3 * pmax);
     
     auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
+    
+    // set up PC distances
+    
+    auto rpc = CMemBlock2D<double>(pdim, 3 * pmax);
     
     // allocate primitives and auxilary integrals buffer
     
@@ -361,10 +370,6 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumForGtoBlocks(      COneInts
     // determine bra and ket sides symmetry
     
     bool symbk = (bragtos == ketgtos);
-    
-    // compute distances: R(BC) = B - C
-    
-    intsfunc::compDistancesBC(rbc, xOrigin, yOrigin, zOrigin, ketgtos);
 
     for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
     {
@@ -378,25 +383,30 @@ CAngularMomentumIntegralsDriver::_compAngularMomentumForGtoBlocks(      COneInts
         
         intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
         
-        // compute distances: R(AC) = A - C
-        
-        intsfunc::compDistancesAC(rab, xOrigin, yOrigin, zOrigin, bragtos, ketgtos, i);
-        
         // compute Obara-Saika recursion factors
         
-        intsfunc::compFactorsForAngularMomentum(rfacts, bragtos, ketgtos, i);
+        intsfunc::compFactorsForLinearMomentum(rfacts, bragtos, ketgtos, i);
+        
+        // compute coordinates of center P
+        
+        intsfunc::compCoordinatesForP(rp, rfacts, 4, bragtos, ketgtos, i);
         
         // compute distances: R(PA) = P - A
         
-        intsfunc::compDistancesPA(rpa, rab, rfacts, 4, bragtos, ketgtos, i);
+        intsfunc::compDistancesPA(rpa, rp, bragtos, ketgtos, i);
         
-        // compute distances: R(PA) = P - B
+        // compute distances: R(PB) = P - B
         
-        intsfunc::compDistancesPB(rpb, rab, rfacts, 4, bragtos, ketgtos, i);
+        intsfunc::compDistancesPB(rpb, rp, bragtos, ketgtos, i);
+        
+        // compute distances: R(PC) = P - C
+        
+        intsfunc::compDistancesPC(rpc, rp, xOrigin, yOrigin, zOrigin,
+                                  bragtos, ketgtos, i);
         
         // compute primitive angular momentum integrals
         
-        _compPrimAngularMomentumInts(primbuffer, recmap, rfacts, rab, rac, rbc, rpa, rpb,
+        _compPrimAngularMomentumInts(primbuffer, recmap, rfacts, rab, rpa, rpb, rpc,
                                      bragtos, ketgtos, i);
         
         // contract primitive linear momentum integrals
@@ -432,14 +442,23 @@ CAngularMomentumIntegralsDriver::_compPrimAngularMomentumInts(      CMemBlock2D<
                                                               const CRecursionMap&        recursionMap,
                                                               const CMemBlock2D<double>&  osFactors,
                                                               const CMemBlock2D<double>&  abDistances,
-                                                              const CMemBlock2D<double>&  acDistances,
-                                                              const CMemBlock2D<double>&  bcDistances,
                                                               const CMemBlock2D<double>&  paDistances,
                                                               const CMemBlock2D<double>&  pbDistances,
+                                                              const CMemBlock2D<double>&  pcDistances,
                                                               const CGtoBlock&            braGtoBlock,
                                                               const CGtoBlock&            ketGtoBlock,
                                                               const int32_t               iContrGto) const
 {
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 4, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForSS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForSS(primBuffer, recursionMap, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
     // NOTE: add l > 4 recursion here
 }
 
@@ -451,6 +470,10 @@ CAngularMomentumIntegralsDriver::_setRecursionMap(const int32_t braAngularMoment
     CRecursionFunctionsList recfuncs;
     
     recfuncs.add(CRecursionFunction({"Overlap"}, &t2crecfunc::obRecursionForOverlap));
+    
+    recfuncs.add(CRecursionFunction({"Electric Dipole"}, &t2crecfunc::obRecursionForElectricDipole));
+    
+    recfuncs.add(CRecursionFunction({"Linear Momentum"}, &t2crecfunc::obRecursionForLinearMomentum));
     
     recfuncs.add(CRecursionFunction({"Angular Momentum"}, &t2crecfunc::obRecursionForAngularMomentum));
     

@@ -647,35 +647,15 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumMomentumF
     
     auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
     
-    ASSERT_EQ(2u, rvec.size());
+    ASSERT_EQ(3u, rvec.size());
     
     CRecursionTerm k1ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
     
-    CRecursionTerm k2ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+    CRecursionTerm k2ta({"Linear Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
     
-    ASSERT_EQ(k1ta, rvec[0]);
-    
-    ASSERT_EQ(k2ta, rvec[1]);
-}
-
-TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForSF)
-{
-    CRecursionTerm rta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {3, -1, -1, -1},
-                       1, 1, 0);
-    
-    auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
-    
-    ASSERT_EQ(3u, rvec.size());
-    
-    CRecursionTerm k1ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {2, -1, -1, -1},
-                        1, 1, 0);
-    
-    CRecursionTerm k2ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {1, -1, -1, -1},
-                        1, 1, 0);
-    
-    CRecursionTerm k3ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+    CRecursionTerm k3ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
     
     ASSERT_EQ(k1ta, rvec[0]);
@@ -685,6 +665,36 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForSF)
     ASSERT_EQ(k3ta, rvec[2]);
 }
 
+TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForSF)
+{
+    CRecursionTerm rta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {3, -1, -1, -1},
+                       1, 1, 0);
+    
+    auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
+    
+    ASSERT_EQ(4u, rvec.size());
+    
+    CRecursionTerm k1ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k2ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {1, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k3ta({"Linear Momentum"}, 1, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm k4ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {2, -1, -1, -1},
+                        1, 1, 0);
+    
+    ASSERT_EQ(k1ta, rvec[0]);
+    
+    ASSERT_EQ(k2ta, rvec[1]);
+    
+    ASSERT_EQ(k3ta, rvec[2]);
+    
+    ASSERT_EQ(k4ta, rvec[3]);
+}
+
 TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForPS)
 {
     CRecursionTerm rta({"Angular Momentum"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
@@ -692,17 +702,22 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForPS)
     
     auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
     
-    ASSERT_EQ(2u, rvec.size());
+    ASSERT_EQ(3u, rvec.size());
     
     CRecursionTerm b1ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
     
-    CRecursionTerm b2ta({"Overlap"}, 0, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+    CRecursionTerm b2ta({"Linear Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b3ta({"Electric Dipole"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
     
     ASSERT_EQ(b1ta, rvec[0]);
     
     ASSERT_EQ(b2ta, rvec[1]);
+    
+    ASSERT_EQ(b3ta, rvec[2]);
 }
 
 TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDS)
@@ -712,7 +727,7 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDS)
     
     auto rvec = t2crecfunc::obRecursionForAngularMomentum(rta);
     
-    ASSERT_EQ(3u, rvec.size());
+    ASSERT_EQ(4u, rvec.size());
     
     CRecursionTerm b1ta({"Angular Momentum"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
@@ -720,7 +735,10 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDS)
     CRecursionTerm b2ta({"Angular Momentum"}, 1, false, {0, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
     
-    CRecursionTerm b3ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+    CRecursionTerm b3ta({"Linear Momentum"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
+                        1, 1, 0);
+    
+    CRecursionTerm b4ta({"Electric Dipole"}, 1, false, {1, -1, -1, -1}, {0, -1, -1, -1},
                         1, 1, 0);
     
     ASSERT_EQ(b1ta, rvec[0]);
@@ -728,6 +746,8 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDS)
     ASSERT_EQ(b2ta, rvec[1]);
     
     ASSERT_EQ(b3ta, rvec[2]);
+    
+    ASSERT_EQ(b4ta, rvec[3]);
 }
 
 TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDF)
@@ -748,10 +768,10 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDF)
     CRecursionTerm k1ta({"Angular Momentum"}, 1, false, {1, -1, -1, -1}, {2, -1, -1, -1},
                         1, 1, 0);
     
-    CRecursionTerm b3ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {3, -1, -1, -1},
+    CRecursionTerm b3ta({"Linear Momentum"}, 1, false, {1, -1, -1, -1}, {3, -1, -1, -1},
                         1, 1, 0);
     
-    CRecursionTerm k2ta({"Overlap"}, 0, false, {1, -1, -1, -1}, {2, -1, -1, -1},
+    CRecursionTerm b4ta({"Electric Dipole"}, 1, false, {1, -1, -1, -1}, {3, -1, -1, -1},
                         1, 1, 0);
     
     ASSERT_EQ(b1ta, rvec[0]);
@@ -762,5 +782,5 @@ TEST_F(CTwoCentersRecursionFunctionsTest, ObRecursionForAngularMomentumForDF)
     
     ASSERT_EQ(b3ta, rvec[3]);
     
-    ASSERT_EQ(k2ta, rvec[4]);
+    ASSERT_EQ(b4ta, rvec[4]);
 }

@@ -40,6 +40,8 @@ namespace ediprecfunc { // ediprecfunc namespace
         auto didx = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true,
                                                                {0, -1, -1, -1}, {0, -1, -1, -1}, 1, 1, 0));
         
+        if (didx == -1) return; 
+        
         // loop over contracted GTO on bra side
         
         int32_t idx = 0;
@@ -68,11 +70,13 @@ namespace ediprecfunc { // ediprecfunc namespace
                                      pcy, pcz: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
-                fdipx[j] = pcx[j] * fovl[j];
+                double fx = fovl[j];
                 
-                fdipy[j] = pcy[j] * fovl[j];
+                fdipx[j] = pcx[j] * fx;
                 
-                fdipz[j] = pcz[j] * fovl[j];
+                fdipy[j] = pcy[j] * fx;
+                
+                fdipz[j] = pcz[j] * fx;
             }
             
             idx++;

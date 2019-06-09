@@ -326,11 +326,13 @@ namespace t2crecfunc { // t2crecfunc namespace
                 
                 if (k2term.isValid()) obvec.push_back(k2term);
                 
-                auto k3term = k1term.operatorShift(-1);
+                k1term.setLabel({"Linear Momentum"});
                 
-                k3term.setLabel({"Overlap"});
+                obvec.push_back(k1term);
                 
-                if (k3term.isValid()) obvec.push_back(k3term);
+                k1term.setLabel({"Electric Dipole"});
+                
+                obvec.push_back(k1term);
             }
         }
         else
@@ -351,18 +353,13 @@ namespace t2crecfunc { // t2crecfunc namespace
                 
                 auto b3term = b1term.operatorShift(-1);
                 
-                b3term.setLabel({"Overlap"});
+                b1term.setLabel({"Linear Momentum"});
                 
-                if (b3term.isValid()) obvec.push_back(b3term);
+                obvec.push_back(b1term);
                 
-                auto k2term = k1term.operatorShift(-1);
+                b1term.setLabel({"Electric Dipole"});
                 
-                if (k2term.isValid())
-                {
-                    k2term.setLabel({"Overlap"});
-                    
-                    obvec.push_back(k2term); 
-                }
+                obvec.push_back(b1term);
             }
         }
         
