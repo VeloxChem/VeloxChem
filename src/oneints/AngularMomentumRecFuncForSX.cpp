@@ -100,7 +100,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                              const CRecursionMap&       recursionMap,
                              const CMemBlock2D<double>& osFactors,
                              const CMemBlock2D<double>& pbDistances,
-                             const CMemBlock2D<double>& acDistances,
                              const CGtoBlock&           braGtoBlock,
                              const CGtoBlock&           ketGtoBlock,
                              const int32_t              iContrGto)
@@ -116,19 +115,11 @@ namespace amomrecfunc { // amomrecfunc namespace
         // set up pointers to primitives data on ket side
 
         auto nprim = ketGtoBlock.getNumberOfPrimGtos();
-        
-        // set up pointers to tensors product of distances R(AC) = A - C
-        
-        auto ac_x = acDistances.data(0);
-        
-        auto ac_y = acDistances.data(1);
-        
-        auto ac_z = acDistances.data(2);
 
         // set up index of integral
 
-        auto pidx_l_0_1_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true, 
-                                                         {0, -1, -1, -1}, {1, -1, -1, -1}, 
+        auto pidx_l_0_1_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true,
+                                                         {0, -1, -1, -1}, {1, -1, -1, -1},
                                                          1, 1, 0));
 
         // check if integral is needed in recursion expansion
@@ -137,12 +128,16 @@ namespace amomrecfunc { // amomrecfunc namespace
 
         // set up indexes of auxilary integral
 
-        auto pidx_l_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true, 
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
+        auto pidx_l_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true,
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
                                                          1, 1, 0));
 
-        auto pidx_s_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true, 
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
+        auto pidx_p_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true,
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
+                                                         1, 1, 0));
+
+        auto pidx_d_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true,
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
                                                          1, 1, 0));
 
         // loop over contracted GTO on bra side
@@ -167,37 +162,47 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             // set up pointers to auxilary integrals
 
-            auto tlx_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + idx); 
+            auto tlx_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + idx);
 
-            auto tly_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + bdim + idx); 
+            auto tly_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + bdim + idx);
 
-            auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx); 
+            auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx);
 
-            auto ts_0_0_0 = primBuffer.data(pidx_s_0_0_m0 + idx); 
+            auto tpx_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + idx);
+
+            auto tpy_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + bdim + idx);
+
+            auto tpz_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + 2 * bdim + idx);
+
+            auto tdx_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + idx);
+
+            auto tdy_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + bdim + idx);
+
+            auto tdz_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + 2 * bdim + idx);
 
             // set up pointers to integrals
 
-            auto tlx_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx); 
+            auto tlx_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx);
 
-            auto tly_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx); 
+            auto tly_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx);
 
-            auto tlz_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx); 
+            auto tlz_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx);
 
-            auto tlx_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 1); 
+            auto tlx_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 1);
 
-            auto tly_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 1); 
+            auto tly_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 1);
 
-            auto tlz_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 1); 
+            auto tlz_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 1);
 
-            auto tlx_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 2); 
+            auto tlx_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 2);
 
-            auto tly_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 2); 
+            auto tly_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 2);
 
-            auto tlz_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 2); 
+            auto tlz_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 2);
 
-            #pragma omp simd aligned(ac_x, ac_y, ac_z, fga, fx, pb_x, pb_y, pb_z, tlx_0_0_0, tlx_0_x_0, tlx_0_y_0, \
-                                     tlx_0_z_0, tly_0_0_0, tly_0_x_0, tly_0_y_0, tly_0_z_0, tlz_0_0_0, tlz_0_x_0, \
-                                     tlz_0_y_0, tlz_0_z_0, ts_0_0_0: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, pb_x, pb_y, pb_z, tdx_0_0_0, tdy_0_0_0, tdz_0_0_0, tlx_0_0_0, \
+                                     tlx_0_x_0, tlx_0_y_0, tlx_0_z_0, tly_0_0_0, tly_0_x_0, tly_0_y_0, tly_0_z_0, \
+                                     tlz_0_0_0, tlz_0_x_0, tlz_0_y_0, tlz_0_z_0, tpx_0_0_0, tpy_0_0_0, tpz_0_0_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl1_fga = fga[j];
@@ -206,19 +211,19 @@ namespace amomrecfunc { // amomrecfunc namespace
 
                 tlx_0_x_0[j] = pb_x[j] * tlx_0_0_0[j];
 
-                tly_0_x_0[j] = pb_x[j] * tly_0_0_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_0_0[j];
+                tly_0_x_0[j] = pb_x[j] * tly_0_0_0[j] + 0.5 * fl1_fx * tpz_0_0_0[j] - fl1_fx * fl1_fga * tdz_0_0_0[j];
 
-                tlz_0_x_0[j] = pb_x[j] * tlz_0_0_0[j] - ac_y[j] * fl1_fx * fl1_fga * ts_0_0_0[j];
+                tlz_0_x_0[j] = pb_x[j] * tlz_0_0_0[j] - 0.5 * fl1_fx * tpy_0_0_0[j] + fl1_fx * fl1_fga * tdy_0_0_0[j];
 
-                tlx_0_y_0[j] = pb_y[j] * tlx_0_0_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_0_0[j];
+                tlx_0_y_0[j] = pb_y[j] * tlx_0_0_0[j] - 0.5 * fl1_fx * tpz_0_0_0[j] + fl1_fx * fl1_fga * tdz_0_0_0[j];
 
                 tly_0_y_0[j] = pb_y[j] * tly_0_0_0[j];
 
-                tlz_0_y_0[j] = pb_y[j] * tlz_0_0_0[j] + ac_x[j] * fl1_fx * fl1_fga * ts_0_0_0[j];
+                tlz_0_y_0[j] = pb_y[j] * tlz_0_0_0[j] + 0.5 * fl1_fx * tpx_0_0_0[j] - fl1_fx * fl1_fga * tdx_0_0_0[j];
 
-                tlx_0_z_0[j] = pb_z[j] * tlx_0_0_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_0_0[j];
+                tlx_0_z_0[j] = pb_z[j] * tlx_0_0_0[j] + 0.5 * fl1_fx * tpy_0_0_0[j] - fl1_fx * fl1_fga * tdy_0_0_0[j];
 
-                tly_0_z_0[j] = pb_z[j] * tly_0_0_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_0_0[j];
+                tly_0_z_0[j] = pb_z[j] * tly_0_0_0[j] - 0.5 * fl1_fx * tpx_0_0_0[j] + fl1_fx * fl1_fga * tdx_0_0_0[j];
 
                 tlz_0_z_0[j] = pb_z[j] * tlz_0_0_0[j];
             }

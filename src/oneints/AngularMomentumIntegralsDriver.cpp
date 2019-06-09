@@ -457,6 +457,8 @@ CAngularMomentumIntegralsDriver::_compPrimAngularMomentumInts(      CMemBlock2D<
     
     lmomrecfunc::compLinearMomentumForSS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
+    amomrecfunc::compAngularMomentumForSP(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
     amomrecfunc::compAngularMomentumForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: add l > 4 recursion here
