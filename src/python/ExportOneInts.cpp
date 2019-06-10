@@ -24,7 +24,11 @@
 #include "NuclearPotentialMatrix.hpp"
 #include "NuclearPotentialIntegralsDriver.hpp"
 #include "ElectricDipoleMatrix.hpp"
+#include "LinearMomentumMatrix.hpp"
+#include "AngularMomentumMatrix.hpp"
 #include "ElectricDipoleIntegralsDriver.hpp"
+#include "LinearMomentumIntegralsDriver.hpp"
+#include "AngularMomentumIntegralsDriver.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportOneInts.hpp"
@@ -195,6 +199,102 @@ CElectricDipoleMatrix_y_to_numpy(const CElectricDipoleMatrix& self)
 
 static py::array_t<double>
 CElectricDipoleMatrix_z_to_numpy(const CElectricDipoleMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.zvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+// Helper function for CLinearMomentumIntegralsDriver constructor
+
+static std::shared_ptr<CLinearMomentumIntegralsDriver>
+CLinearMomentumIntegralsDriver_create(py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CLinearMomentumIntegralsDriver>(
+        new CLinearMomentumIntegralsDriver(*comm_ptr)
+        );
+}
+
+// Helper function for printing CLinearMomentumMatrix
+
+static std::string
+CLinearMomentumMatrix_str (const CLinearMomentumMatrix& self)
+{
+    return self.getStringForComponentX() +
+           self.getStringForComponentY() +
+           self.getStringForComponentZ();
+}
+
+// Helper function for converting CLinearMomentumMatrix to numpy array
+
+static py::array_t<double>
+CLinearMomentumMatrix_x_to_numpy(const CLinearMomentumMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.xvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CLinearMomentumMatrix_y_to_numpy(const CLinearMomentumMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.yvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CLinearMomentumMatrix_z_to_numpy(const CLinearMomentumMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.zvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+    
+// Helper function for CAngularMomentumIntegralsDriver constructor
+
+static std::shared_ptr<CAngularMomentumIntegralsDriver>
+CAngularMomentumIntegralsDriver_create(py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CAngularMomentumIntegralsDriver>(
+        new CAngularMomentumIntegralsDriver(*comm_ptr)
+        );
+}
+
+// Helper function for printing CAngularMomentumMatrix
+
+static std::string
+CAngularMomentumMatrix_str (const CAngularMomentumMatrix& self)
+{
+    return self.getStringForComponentX() +
+           self.getStringForComponentY() +
+           self.getStringForComponentZ();
+}
+
+// Helper function for converting CAngularMomentumMatrix to numpy array
+
+static py::array_t<double>
+CAngularMomentumMatrix_x_to_numpy(const CAngularMomentumMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.xvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CAngularMomentumMatrix_y_to_numpy(const CAngularMomentumMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.yvalues(),
+                                         self.getNumberOfRows(),
+                                         self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CAngularMomentumMatrix_z_to_numpy(const CAngularMomentumMatrix& self)
 {
     return vlx_general::pointer_to_numpy(self.zvalues(),
                                          self.getNumberOfRows(),
@@ -422,6 +522,116 @@ void export_oneints(py::module& m)
                const CMolecularBasis&,
                const CMolecularBasis&) const)
              &CElectricDipoleIntegralsDriver::compute)
+    ;
+    
+    // CLinearMomentumMatrix class
+
+    py::class_< CLinearMomentumMatrix,
+                std::shared_ptr<CLinearMomentumMatrix> >
+        (
+            m, "LinearMomentumMatrix"
+        )
+        .def(py::init<>())
+        .def(py::init<const CDenseMatrix&,
+                      const CDenseMatrix&,
+                      const CDenseMatrix&>())
+        .def(py::init<const CLinearMomentumMatrix&>())
+        .def("__str__", &CLinearMomentumMatrix_str)
+        .def("x_to_numpy", &CLinearMomentumMatrix_x_to_numpy)
+        .def("y_to_numpy", &CLinearMomentumMatrix_y_to_numpy)
+        .def("z_to_numpy", &CLinearMomentumMatrix_z_to_numpy)
+        .def(py::self == py::self)
+    ;
+
+    // CLinearMomentumIntegralsDriver class
+
+    py::class_< CLinearMomentumIntegralsDriver,
+                std::shared_ptr<CLinearMomentumIntegralsDriver> >
+        (
+            m, "LinearMomentumIntegralsDriver"
+        )
+        .def(py::init(&CLinearMomentumIntegralsDriver_create))
+        .def("compute",
+             (CLinearMomentumMatrix (CLinearMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&) const)
+             &CLinearMomentumIntegralsDriver::compute)
+        .def("compute",
+             (CLinearMomentumMatrix (CLinearMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &CLinearMomentumIntegralsDriver::compute)
+        .def("compute",
+             (CLinearMomentumMatrix (CLinearMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&) const)
+             &CLinearMomentumIntegralsDriver::compute)
+        .def("compute",
+             (CLinearMomentumMatrix (CLinearMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &CLinearMomentumIntegralsDriver::compute)
+    ;
+    
+    // CAngularMomentumMatrix class
+
+    py::class_< CAngularMomentumMatrix,
+                std::shared_ptr<CAngularMomentumMatrix> >
+        (
+            m, "AngularMomentumMatrix"
+        )
+        .def(py::init<>())
+        .def(py::init<const CDenseMatrix&,
+                      const CDenseMatrix&,
+                      const CDenseMatrix&,
+                      const double,
+                      const double,
+                      const double>())
+        .def(py::init<const CAngularMomentumMatrix&>())
+        .def("__str__", &CAngularMomentumMatrix_str)
+        .def("x_to_numpy", &CAngularMomentumMatrix_x_to_numpy)
+        .def("y_to_numpy", &CAngularMomentumMatrix_y_to_numpy)
+        .def("z_to_numpy", &CAngularMomentumMatrix_z_to_numpy)
+        .def(py::self == py::self)
+    ;
+    
+    // CAngularMomentumIntegralsDriver class
+
+    py::class_< CAngularMomentumIntegralsDriver,
+                std::shared_ptr<CAngularMomentumIntegralsDriver> >
+        (
+            m, "AngularMomentumIntegralsDriver"
+        )
+        .def(py::init(&CAngularMomentumIntegralsDriver_create))
+        .def("set_origin", &CAngularMomentumIntegralsDriver::setAngularMomentumOrigin)
+        .def("compute",
+             (CAngularMomentumMatrix (CAngularMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&) const)
+             &CAngularMomentumIntegralsDriver::compute)
+        .def("compute",
+             (CAngularMomentumMatrix (CAngularMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &CAngularMomentumIntegralsDriver::compute)
+        .def("compute",
+             (CAngularMomentumMatrix (CAngularMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&) const)
+             &CAngularMomentumIntegralsDriver::compute)
+        .def("compute",
+             (CAngularMomentumMatrix (CAngularMomentumIntegralsDriver::*)
+              (const CMolecule&,
+               const CMolecule&,
+               const CMolecularBasis&,
+               const CMolecularBasis&) const)
+             &CAngularMomentumIntegralsDriver::compute)
     ;
 }
 

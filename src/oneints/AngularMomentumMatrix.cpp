@@ -22,11 +22,11 @@ CAngularMomentumMatrix::CAngularMomentumMatrix()
 }
 
 CAngularMomentumMatrix::CAngularMomentumMatrix(const CDenseMatrix& xMatrix,
-                                             const CDenseMatrix& yMatrix,
-                                             const CDenseMatrix& zMatrix,
-                                             const double        xOrigin,
-                                             const double        yOrigin,
-                                             const double        zOrigin)
+                                               const CDenseMatrix& yMatrix,
+                                               const CDenseMatrix& zMatrix,
+                                               const double        xOrigin,
+                                               const double        yOrigin,
+                                               const double        zOrigin)
 
     : _xOrigin(xOrigin)
 
