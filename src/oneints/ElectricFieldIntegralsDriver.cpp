@@ -11,7 +11,23 @@
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
 #include "OneIntsFunc.hpp"
-#include "ElectricFieldRecFunc.hpp"
+#include "RecursionFunctionsList.hpp"
+#include "GenIntsFunc.hpp"
+#include "TwoCentersRecursionFunctions.hpp"
+
+#include "OverlapRecFuncForSX.hpp"
+#include "NuclearPotentialRecFuncForSX.hpp"
+#include "ElectricFieldRecFuncForSX.hpp"
+#include "NuclearPotentialRecFuncForPX.hpp"
+#include "ElectricFieldRecFuncForPX.hpp"
+#include "NuclearPotentialRecFuncForDX.hpp"
+#include "ElectricFieldRecFuncForDX.hpp"
+#include "NuclearPotentialRecFuncForFF.hpp"
+#include "ElectricFieldRecFuncForFF.hpp"
+#include "NuclearPotentialRecFuncForFG.hpp"
+#include "ElectricFieldRecFuncForFG.hpp"
+#include "ElectricFieldRecFuncForGF.hpp"
+#include "ElectricFieldRecFuncForGG.hpp"
 
 CElectricFieldIntegralsDriver::CElectricFieldIntegralsDriver(MPI_Comm comm)
 {
@@ -42,17 +58,15 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       molecule,
         
         CGtoContainer bracontr(molecule, basis);
         
-        // set up poinr dipoles data
+        // set up point dipoles data
         
         auto dipoles = CMemBlock2D<double>({1.0, 1.0, 1.0}, 1, 3);
         
-        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ},
-                                           1, 3);
+        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ}, 1, 3);
         
         // compute electric field integrals
         
-        efieldmat = _compElectricFieldIntegrals(&dipoles, &coords, &bracontr,
-                                                &bracontr);
+        efieldmat = _compElectricFieldIntegrals(&dipoles, &coords, &bracontr, &bracontr);
     }
     
     return efieldmat;
@@ -103,13 +117,11 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       molecule,
         
         auto dipoles = CMemBlock2D<double>({1.0, 1.0, 1.0}, 1, 3);
         
-        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ},
-                                           1, 3);
+        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ}, 1, 3);
         
         // compute electric field integrals
         
-        efieldmat = _compElectricFieldIntegrals(&dipoles, &coords, &bracontr,
-                                                 &ketcontr);
+        efieldmat = _compElectricFieldIntegrals(&dipoles, &coords, &bracontr, &ketcontr);
     }
     
     return efieldmat;
@@ -164,8 +176,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         auto dipoles = CMemBlock2D<double>({1.0, 1.0, 1.0}, 1, 3);
         
-        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ},
-                                           1, 3);
+        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ}, 1, 3);
         
         // compute electric field integrals
         
@@ -196,8 +207,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
         
         // compute electric field integrals
         
-        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr,
-                                                &ketcontr);
+        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr, &ketcontr);
     }
     
     return efieldmat;
@@ -226,8 +236,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         auto dipoles = CMemBlock2D<double>({1.0, 1.0, 1.0}, 1, 3);
         
-        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ},
-                                           1, 3);
+        auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ}, 1, 3);
         
         // compute nuclear potential integrals
         
@@ -258,8 +267,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
         
         // compute nuclear potential integrals
         
-        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr,
-                                                &ketcontr);
+        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr, &ketcontr);
     }
     
     return efieldmat;
@@ -283,8 +291,6 @@ CElectricFieldIntegralsDriver::compute(         double*              intsBatchX,
     auto ncol = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum())
     
               * ketGtoBlock.getNumberOfContrGtos();
-    
-    // set up distribution pattern
     
     // set up distribution pattern
     
@@ -414,11 +420,17 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
     
     auto dipcoords = *coordinates;
     
+    // set up angular momentum data
+    
+    auto bang = bragtos.getAngularMomentum();
+    
+    auto kang = ketgtos.getAngularMomentum();
+    
     // set up spherical angular momentum for bra and ket sides
     
-    CSphericalMomentum bmom(bragtos.getAngularMomentum());
+    CSphericalMomentum bmom(bang);
     
-    CSphericalMomentum kmom(ketgtos.getAngularMomentum());
+    CSphericalMomentum kmom(kang);
     
     // allocate prefactors used in Obara-Saika recursion
     
@@ -430,35 +442,29 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
     
     CMemBlock2D<double> rfacts(pdim, 3 * pmax);
     
+    // allocate P center coordinates
+    
     CMemBlock2D<double> rp(pdim, 3 * pmax);
     
-    CMemBlock2D<double> rpa(pdim, 3 * pmax);
+    // set up PA and PB distances
     
-    CMemBlock2D<double> rpb(pdim, 3 * pmax);
+    auto rpa = (bang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
-    CMemBlock2D<double> rpc(pdim, 3 * pmax);
+    auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
     
-    // generate recursion pattern
+    // set up PC distances
     
-    auto recvec = _getRecursionPattern(bragtos, ketgtos);
+    auto rpc = CMemBlock2D<double>(pdim, 3 * pmax);
     
-    // set up angular momentum data
+    // allocate primitives and auxilary integrals buffer
     
-    auto bang = bragtos.getAngularMomentum();
+    auto recmap = _setRecursionMap(bang, kang, pmax);
     
-    auto kang = ketgtos.getAngularMomentum();
+    auto nblock = recmap.getNumberOfComponents();
     
-    // set up primitives buffer indexes
+    CMemBlock2D<double> primbuffer(pdim, nblock * pmax);
     
-    std::vector<int32_t> recidx;
-    
-    auto nblk = _getIndexesForRecursionPattern(recidx, recvec, pmax);
-    
-    // allocate primitives integrals buffer
-    
-    CMemBlock2D<double> pbuffer(pdim, nblk);
-    
-    // allocate accumulation buffer
+    // allocate primitive integrals accumulation buffer
     
     auto ncart = angmom::to_CartesianComponents(bang, kang);
     
@@ -488,21 +494,20 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
     
     // set up indexes for contraction
     
-    auto pidx = genfunc::findQuadrupleIndex(recidx, recvec, {bang, kang, 0, 0});
+    auto pidx = recmap.getIndexOfTerm(CRecursionTerm({"Electric Field"}, 1, true,
+                                                     {bang, -1, -1, -1}, {kang, -1, -1, -1}, 1, 1, 0));
     
     auto spos = braGtoBlock.getStartPositions();
     
     auto epos = braGtoBlock.getEndPositions();
     
-    // initialize Boys function evaluator
+    // set uo Boys function data
     
-    auto bord = genfunc::maxOrderOfPair(recvec, 0, 0);
-    
-    CBoysFunction bftab(bord);
+    CBoysFunction bftab(bang + kang + 1);
     
     CMemBlock<double> bargs(pdim);
     
-    CMemBlock2D<double> bvals(pdim, bord + 1);
+    CMemBlock2D<double> bvals(pdim, bang + kang + 2);
     
     // determine bra and ket sides symmetry
     
@@ -550,13 +555,12 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
             
             // compute primitive integrals
             
-            _compPrimElectricFieldInts(pbuffer, recvec, recidx, bftab, bargs,
-                                       bvals, bord, rfacts, rab, rpa, rpb,
-                                       rpc, bragtos, ketgtos, i);
+            _compPrimElectricFieldInts(primbuffer, recmap, bftab, bargs, bvals, bang + kang + 1,
+                                       rfacts, rab, rpa, rpb, rpc, bragtos, ketgtos, i);
             
             // add scaled contribution to accumulation buffer
             
-            _addPointDipoleContribution(accbuffer, pbuffer, pidx, dipvalues,
+            _addPointDipoleContribution(accbuffer, primbuffer, pidx, dipvalues,
                                         bragtos, ketgtos, i, j);
         }
         
@@ -584,297 +588,6 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
         
         distpatz.distribute(spherbufferz, bragtos, ketgtos, symbk, i);
     }
-}
-
-CVecFourIndexes
-CElectricFieldIntegralsDriver::_getRecursionPattern(const CGtoBlock& braGtoBlock,
-                                                    const CGtoBlock& ketGtoBlock) const
-{
-    // set up angular momentum
-    
-    auto bang = braGtoBlock.getAngularMomentum();
-    
-    auto kang = ketGtoBlock.getAngularMomentum();
-    
-    // set up recursion buffer
-    
-    CVecFourIndexes recvec;
-    
-    recvec.reserve((bang + 1) * (kang + 1));
-    
-    // set up indexing counters
-    
-    int32_t spos = 0;
-    
-    int32_t epos = 1;
-    
-    // set up initial state of recursion buffer
-    
-    recvec.push_back(CFourIndexes(bang, kang, 0, 0));
-    
-    while (true)
-    {
-        // internal new recursion terms counter
-        
-        int32_t nterms = 0;
-        
-        // generate bra and ket Obara-Saika recursion terms
-        
-        for (int32_t i = spos; i < epos; i++)
-        {
-            CFourIndexes cidx(recvec[i]);
-            
-            if (cidx.fourth() == 0)
-            {
-                // electric field recursion
-                
-                if (cidx.first() != 0)
-                {
-                    // general recursion for bra and ket sides
-                
-                    // (a - 1 |A(1)| b)^(m) term
-                
-                    CFourIndexes t10idx(cidx.first() - 1,  cidx.second(),
-                                        
-                                        cidx.third(), 0);
-                
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t10idx)) nterms++;
-                
-                    // (a - 1 |A(1)| b)^(m+1) term
-                
-                    CFourIndexes t11idx(cidx.first() - 1,  cidx.second(),
-                                        
-                                        cidx.third() + 1, 0);
-                
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t11idx)) nterms++;
-                
-                    // (a - 2 |A(1)| b)^(m) term
-                
-                    CFourIndexes t20idx(cidx.first() - 2,  cidx.second(),
-                                        
-                                        cidx.third(), 0);
-                
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t20idx)) nterms++;
-                
-                    // (a - 2 |A(1)| b)^(m+1) term
-                
-                    CFourIndexes t21idx(cidx.first() - 2,  cidx.second(),
-                                        
-                                        cidx.third() + 1, 0);
-                
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t21idx)) nterms++;
-                
-                    // (a - 1 |A(1)| b - 1)^(m) term
-                
-                    CFourIndexes tk0idx(cidx.first() - 1,  cidx.second() - 1,
-                                        
-                                        cidx.third(), 0);
-                
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, tk0idx)) nterms++;
-                
-                    // (a - 1 |A(1)| b - 1)^(m+1) term
-                
-                    CFourIndexes tk1idx(cidx.first() - 1,  cidx.second() - 1,
-                                        
-                                        cidx.third() + 1, 0);
-                
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, tk1idx)) nterms++;
-                
-                    // (a - 1 |A(0)| b)^(m+1) term
-                
-                    CFourIndexes s10idx(cidx.first() - 1,  cidx.second(),
-                                        
-                                        cidx.third() + 1, 1);
-                
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
-                }
-                else
-                {
-                    // simplified recursion for ket sides
-                    
-                    // (0 |A(1)| b - 1)^(m) term
-                    
-                    CFourIndexes t10idx(cidx.first(),  cidx.second() - 1,
-                                        
-                                        cidx.third(), 0);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t10idx)) nterms++;
-                    
-                    // (0 |A(1)| b - 1)^(m+1) term
-                    
-                    CFourIndexes t11idx(cidx.first(),  cidx.second() - 1,
-                                        
-                                        cidx.third() + 1, 0);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t11idx)) nterms++;
-                    
-                    // (0 |A(1)| b - 2)^(m) term
-                    
-                    CFourIndexes t20idx(cidx.first(),  cidx.second() - 2,
-                                         
-                                         cidx.third(), 0);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t20idx)) nterms++;
-                    
-                    // (0 |A(1)| b - 2)^(m+1) term
-                    
-                    CFourIndexes t21idx(cidx.first(),  cidx.second() - 2,
-                                         
-                                        cidx.third() + 1, 0);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, t21idx)) nterms++;
-                    
-                    // (0 |A(0)| b - 1)^(m+1) term
-                    
-                    CFourIndexes s10idx(cidx.first(),  cidx.second() - 1,
-                                        
-                                        cidx.third() + 1 , 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
-                }
-            }
-            else
-            {
-                // nuclear repulsion recursion
-                
-                if (cidx.first() != 0)
-                {
-                    // general recursion for bra and ket sides
-                    
-                    // (a - 1 |A(0)| b)^(m) term
-                    
-                    CFourIndexes s10idx(cidx.first() - 1,  cidx.second(),
-                                        
-                                        cidx.third(), 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
-                    
-                    // (a - 1 |A(0)| b)^(m+1) term
-                    
-                    CFourIndexes s11idx(cidx.first() - 1,  cidx.second(),
-                                        
-                                        cidx.third() + 1, 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s11idx)) nterms++;
-                    
-                    // (a - 2 |A(0)| b)^(m) term
-                    
-                    CFourIndexes s20idx(cidx.first() - 2,  cidx.second(),
-                                        
-                                        cidx.third(), 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s20idx)) nterms++;
-                    
-                    // (a - 2 |A(0)| b)^(m+1) term
-                    
-                    CFourIndexes s21idx(cidx.first() - 2,  cidx.second(),
-                                        
-                                        cidx.third() + 1, 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s21idx)) nterms++;
-                    
-                    // (a - 1 |A(0)| b - 1)^(m) term
-                    
-                    CFourIndexes sk0idx(cidx.first() - 1,  cidx.second() - 1,
-                                        
-                                        cidx.third(), 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, sk0idx)) nterms++;
-                    
-                    // (a - 1 |A(0)| b - 1)^(m+1) term
-                    
-                    CFourIndexes sk1idx(cidx.first() - 1,  cidx.second() - 1,
-                                        
-                                        cidx.third() + 1, 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, sk1idx)) nterms++;
-                }
-                else
-                {
-                    // simplified recursion for ket sides
-                    
-                    // (0 |A(0)| b - 1)^(m) term
-                    
-                    CFourIndexes s10idx(cidx.first(),  cidx.second() - 1,
-                                        
-                                        cidx.third(), 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s10idx)) nterms++;
-                    
-                    // (0 |A(0)| b - 1)^(m+1) term
-                    
-                    CFourIndexes s11idx(cidx.first(),  cidx.second() - 1,
-                                        
-                                        cidx.third() + 1, 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s11idx)) nterms++;
-                    
-                    // (0 |A(0)| b - 2)^(m) term
-                    
-                    CFourIndexes s20idx(cidx.first(),  cidx.second() - 2,
-                                        
-                                        cidx.third(), 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s20idx)) nterms++;
-                    
-                    // (0 |A(0)| b - 2)^(m+1) term
-                    
-                    CFourIndexes s21idx(cidx.first(),  cidx.second() - 2,
-                                        
-                                        cidx.third() + 1, 1);
-                    
-                    if (genfunc::addValidAndUniqueQuadruple(recvec, s21idx)) nterms++;
-                }
-            }
-        }
-        
-        // break loop, all recursion terms are generrated
-        
-        if (nterms == 0) break;
-        
-        // update counters
-        
-        spos  = epos;
-        
-        epos += nterms;
-    }
-    
-    return recvec;
-}
-
-int32_t
-CElectricFieldIntegralsDriver::_getIndexesForRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                                              const CVecFourIndexes&     recPattern,
-                                                              const int32_t              maxPrimGtos) const
-{
-    // clear vector and reserve memory
-    
-    recIndexes.clear();
-    
-    recIndexes.reserve(recPattern.size() + 1);
-    
-    // loop over recursion pattern
-    
-    int32_t nblk = 0;
-    
-    for (size_t i = 0; i < recPattern.size(); i++)
-    {
-        recIndexes.push_back(nblk);
-        
-        auto cblk = maxPrimGtos * angmom::to_CartesianComponents(recPattern[i].first(),
-                                                                 recPattern[i].second());
-        
-        if (recPattern[i].fourth() == 0)
-        {
-            nblk += 3 * cblk;
-        }
-        else
-        {
-            nblk += cblk;
-        }
-    }
-    
-    return nblk;
 }
 
 void
@@ -937,8 +650,7 @@ CElectricFieldIntegralsDriver::_addPointDipoleContribution(      CMemBlock2D<dou
 
 void
 CElectricFieldIntegralsDriver::_compPrimElectricFieldInts(      CMemBlock2D<double>&  primBuffer,
-                                                          const CVecFourIndexes&      recPattern,
-                                                          const std::vector<int32_t>& recIndexes,
+                                                          const CRecursionMap&        recursionMap, 
                                                           const CBoysFunction&        bfTable,
                                                                 CMemBlock<double>&    bfArguments,
                                                                 CMemBlock2D<double>&  bfValues,
@@ -952,13 +664,114 @@ CElectricFieldIntegralsDriver::_compPrimElectricFieldInts(      CMemBlock2D<doub
                                                           const CGtoBlock&            ketGtoBlock,
                                                           const int32_t               iContrGto) const
 {
-    // compute (s|A(1)|s) integrals
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 3, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    efieldrecfunc::compElectricFieldForSS(primBuffer, recPattern, recIndexes,
-                                          bfTable, bfArguments, bfValues,
-                                          bfOrder, osFactors, abDistances,
-                                          pcDistances, braGtoBlock, ketGtoBlock,
-                                          iContrGto);
+    npotrecfunc::compNuclearPotentialForSS(primBuffer, recursionMap, bfTable, bfArguments, bfValues, bfOrder,
+                                           osFactors, abDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    // FIX ME: ...
+    efieldrecfunc::compElectricFieldForSS(primBuffer, recursionMap, osFactors, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForSP(primBuffer, recursionMap, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForPS(primBuffer, recursionMap, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForSP(primBuffer, recursionMap, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForSD(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForPS(primBuffer, recursionMap, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForDS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForSD(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForSF(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForDS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForFS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForSF(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForSG(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForFS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForGS(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForPP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForPD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForPP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForDP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForPF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForDP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForFP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForSG(primBuffer, recursionMap, osFactors, pbDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForPG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForFP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForGP(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForPD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForDD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForPF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForDF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForDD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForFD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForPG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForDG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForFD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForGD(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForDF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForFF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForFF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForGF(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForDG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForFG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    npotrecfunc::compNuclearPotentialForFG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    efieldrecfunc::compElectricFieldForGG(primBuffer, recursionMap, osFactors, paDistances, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
+}
+
+CRecursionMap
+CElectricFieldIntegralsDriver::_setRecursionMap(const int32_t braAngularMomentum,
+                                                const int32_t ketAngularMomentum,
+                                                const int32_t maxNumberOfPrimitives) const
+{
+    CRecursionFunctionsList recfuncs;
+    
+    recfuncs.add(CRecursionFunction({"Nuclear Potential"}, &t2crecfunc::obRecursionForNuclearPotential));
+    
+    recfuncs.add(CRecursionFunction({"Electric Field"}, &t2crecfunc::obRecursionForElectricField));
+    
+    auto rterm = gintsfunc::genIntegral({"Electric Field"}, braAngularMomentum,
+                                        ketAngularMomentum, 0);
+    
+    return gintsfunc::genRecursionMap(rterm, recblock::cc, maxNumberOfPrimitives,
+                                      recfuncs);
 }

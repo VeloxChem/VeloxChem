@@ -191,6 +191,12 @@ CRecursionTerm::setLabel(const std::string labelOfOperator)
     _labelOfOperator = labelOfOperator; 
 }
 
+void
+CRecursionTerm::setOrder(const int32_t orderOfIntegral)
+{
+    _orderOfIntegral = orderOfIntegral;
+}
+
 CRecursionTerm
 CRecursionTerm::braShift(const int32_t braValue,
                          const int32_t braCenter) const

@@ -181,6 +181,13 @@ public:
     void setLabel(const std::string labelOfOperator);
     
     /**
+     Sets order of integrals in recursion term object.
+     
+     @param orderOfIntegral the order of integral.
+     */
+    void setOrder(const int32_t orderOfIntegral);
+    
+    /**
      Creates recursion term object with shifted angular momentum on bra side.
 
      @param braValue the shift value of angular momentum component.

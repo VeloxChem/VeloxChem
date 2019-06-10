@@ -173,6 +173,8 @@ namespace t2crecfunc { // t2crecfunc namespace
         {
             rterm.setLabel("Overlap");
             
+            rterm.setOrder(0); 
+            
             obvec.push_back(rterm);
         }
         

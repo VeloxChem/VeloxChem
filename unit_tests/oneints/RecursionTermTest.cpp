@@ -75,6 +75,20 @@ TEST_F(CRecursionTermTest, SetLabel)
     ASSERT_EQ(rta, rtb);
 }
 
+TEST_F(CRecursionTermTest, SetOrder)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 2);
+    
+    rta.setOrder(5);
+    
+    CRecursionTerm rtb({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
+                       1, 2, 5);
+    
+    ASSERT_EQ(rta, rtb);
+}
+
+
 TEST_F(CRecursionTermTest, BraShift)
 {
     CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 7, 2, 3},
