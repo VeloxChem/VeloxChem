@@ -580,8 +580,8 @@ class ComplexResponse:
 
                     solutions[(op, w)] = x
 
-                    kappas[(op, w)] = (lrvec2mat(x.real,nocc,norb)
-                                      + 1j*lrvec2mat(x.imag,nocc,norb))
+                    kappas[(op, w)] = (lrvec2mat(x.real, nocc, norb) +
+                                       1j * lrvec2mat(x.imag, nocc, norb))
 
                     # composing E2 and S2 matrices projected onto solution
                     # subspace
