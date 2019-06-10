@@ -14,6 +14,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     compElectricDipoleForFF(      CMemBlock2D<double>& primBuffer,
                             const CRecursionMap&       recursionMap,
                             const CMemBlock2D<double>& osFactors,
+                            const int32_t              nOSFactors,
                             const CMemBlock2D<double>& paDistances,
                             const CGtoBlock&           braGtoBlock,
                             const CGtoBlock&           ketGtoBlock,
@@ -22,6 +23,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         ediprecfunc::compElectricDipoleForFF_0_50(primBuffer,
                                                   recursionMap,
                                                   osFactors,
+                                                  nOSFactors,
                                                   paDistances, 
                                                   braGtoBlock,
                                                   ketGtoBlock,
@@ -30,6 +32,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         ediprecfunc::compElectricDipoleForFF_50_100(primBuffer,
                                                     recursionMap,
                                                     osFactors,
+                                                    nOSFactors,
                                                     paDistances, 
                                                     braGtoBlock,
                                                     ketGtoBlock,
@@ -38,6 +41,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         ediprecfunc::compElectricDipoleForFF_100_150(primBuffer,
                                                      recursionMap,
                                                      osFactors,
+                                                     nOSFactors,
                                                      paDistances, 
                                                      braGtoBlock,
                                                      ketGtoBlock,
@@ -46,6 +50,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         ediprecfunc::compElectricDipoleForFF_150_200(primBuffer,
                                                      recursionMap,
                                                      osFactors,
+                                                     nOSFactors,
                                                      paDistances, 
                                                      braGtoBlock,
                                                      ketGtoBlock,
@@ -54,6 +59,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         ediprecfunc::compElectricDipoleForFF_200_250(primBuffer,
                                                      recursionMap,
                                                      osFactors,
+                                                     nOSFactors,
                                                      paDistances, 
                                                      braGtoBlock,
                                                      ketGtoBlock,
@@ -62,6 +68,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         ediprecfunc::compElectricDipoleForFF_250_300(primBuffer,
                                                      recursionMap,
                                                      osFactors,
+                                                     nOSFactors,
                                                      paDistances, 
                                                      braGtoBlock,
                                                      ketGtoBlock,
@@ -72,6 +79,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     compElectricDipoleForFF_0_50(      CMemBlock2D<double>& primBuffer,
                                  const CRecursionMap&       recursionMap,
                                  const CMemBlock2D<double>& osFactors,
+                                 const int32_t              nOSFactors,
                                  const CMemBlock2D<double>& paDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
@@ -127,7 +135,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 
@@ -694,6 +702,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     compElectricDipoleForFF_50_100(      CMemBlock2D<double>& primBuffer,
                                    const CRecursionMap&       recursionMap,
                                    const CMemBlock2D<double>& osFactors,
+                                   const int32_t              nOSFactors,
                                    const CMemBlock2D<double>& paDistances,
                                    const CGtoBlock&           braGtoBlock,
                                    const CGtoBlock&           ketGtoBlock,
@@ -749,7 +758,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 
@@ -1277,6 +1286,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     compElectricDipoleForFF_100_150(      CMemBlock2D<double>& primBuffer,
                                     const CRecursionMap&       recursionMap,
                                     const CMemBlock2D<double>& osFactors,
+                                    const int32_t              nOSFactors,
                                     const CMemBlock2D<double>& paDistances,
                                     const CGtoBlock&           braGtoBlock,
                                     const CGtoBlock&           ketGtoBlock,
@@ -1328,7 +1338,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 
@@ -1763,6 +1773,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     compElectricDipoleForFF_150_200(      CMemBlock2D<double>& primBuffer,
                                     const CRecursionMap&       recursionMap,
                                     const CMemBlock2D<double>& osFactors,
+                                    const int32_t              nOSFactors,
                                     const CMemBlock2D<double>& paDistances,
                                     const CGtoBlock&           braGtoBlock,
                                     const CGtoBlock&           ketGtoBlock,
@@ -1818,7 +1829,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 
@@ -2308,6 +2319,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     compElectricDipoleForFF_200_250(      CMemBlock2D<double>& primBuffer,
                                     const CRecursionMap&       recursionMap,
                                     const CMemBlock2D<double>& osFactors,
+                                    const int32_t              nOSFactors,
                                     const CMemBlock2D<double>& paDistances,
                                     const CGtoBlock&           braGtoBlock,
                                     const CGtoBlock&           ketGtoBlock,
@@ -2363,7 +2375,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 
@@ -2891,6 +2903,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     compElectricDipoleForFF_250_300(      CMemBlock2D<double>& primBuffer,
                                     const CRecursionMap&       recursionMap,
                                     const CMemBlock2D<double>& osFactors,
+                                    const int32_t              nOSFactors,
                                     const CMemBlock2D<double>& paDistances,
                                     const CGtoBlock&           braGtoBlock,
                                     const CGtoBlock&           ketGtoBlock,
@@ -2946,7 +2959,7 @@ namespace ediprecfunc { // ediprecfunc namespace
         {
             // set up pointers to Obara-Saika factors
 
-            auto fx = osFactors.data(2 * idx);
+            auto fx = osFactors.data(nOSFactors * idx);
 
             // set up pointers to tensors product of distances R(PA) = P - A
 

@@ -118,8 +118,8 @@ namespace amomrecfunc { // amomrecfunc namespace
 
         // set up index of integral
 
-        auto pidx_l_0_1_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true,
-                                                         {0, -1, -1, -1}, {1, -1, -1, -1},
+        auto pidx_l_0_1_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {1, -1, -1, -1}, 
                                                          1, 1, 0));
 
         // check if integral is needed in recursion expansion
@@ -128,16 +128,16 @@ namespace amomrecfunc { // amomrecfunc namespace
 
         // set up indexes of auxilary integral
 
-        auto pidx_l_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true,
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
+        auto pidx_l_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_p_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true,
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
+        auto pidx_p_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_d_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true,
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
+        auto pidx_d_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
         // loop over contracted GTO on bra side
@@ -162,43 +162,43 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             // set up pointers to auxilary integrals
 
-            auto tlx_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + idx);
+            auto tlx_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + idx); 
 
-            auto tly_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + bdim + idx);
+            auto tly_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + bdim + idx); 
 
-            auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx);
+            auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx); 
 
-            auto tpx_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + idx);
+            auto tpx_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + idx); 
 
-            auto tpy_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + bdim + idx);
+            auto tpy_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + bdim + idx); 
 
-            auto tpz_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + 2 * bdim + idx);
+            auto tpz_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + 2 * bdim + idx); 
 
-            auto tdx_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + idx);
+            auto tdx_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + idx); 
 
-            auto tdy_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + bdim + idx);
+            auto tdy_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + bdim + idx); 
 
-            auto tdz_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + 2 * bdim + idx);
+            auto tdz_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + 2 * bdim + idx); 
 
             // set up pointers to integrals
 
-            auto tlx_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx);
+            auto tlx_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx); 
 
-            auto tly_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx);
+            auto tly_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx); 
 
-            auto tlz_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx);
+            auto tlz_0_x_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx); 
 
-            auto tlx_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 1);
+            auto tlx_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 1); 
 
-            auto tly_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 1);
+            auto tly_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 1); 
 
-            auto tlz_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 1);
+            auto tlz_0_y_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 1); 
 
-            auto tlx_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 2);
+            auto tlx_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * idx + 2); 
 
-            auto tly_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 2);
+            auto tly_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 3 * bdim + 3 * idx + 2); 
 
-            auto tlz_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 2);
+            auto tlz_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 2); 
 
             #pragma omp simd aligned(fga, fx, pb_x, pb_y, pb_z, tdx_0_0_0, tdy_0_0_0, tdz_0_0_0, tlx_0_0_0, \
                                      tlx_0_x_0, tlx_0_y_0, tlx_0_z_0, tly_0_0_0, tly_0_x_0, tly_0_y_0, tly_0_z_0, \
@@ -255,8 +255,8 @@ namespace amomrecfunc { // amomrecfunc namespace
 
         // set up index of integral
 
-        auto pidx_l_1_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true,
-                                                         {1, -1, -1, -1}, {0, -1, -1, -1},
+        auto pidx_l_1_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true, 
+                                                         {1, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
         // check if integral is needed in recursion expansion
@@ -265,16 +265,16 @@ namespace amomrecfunc { // amomrecfunc namespace
 
         // set up indexes of auxilary integral
 
-        auto pidx_l_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true,
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
+        auto pidx_l_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Angular Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_p_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true,
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
+        auto pidx_p_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_d_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true,
-                                                         {0, -1, -1, -1}, {0, -1, -1, -1},
+        auto pidx_d_0_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
+                                                         {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
         // loop over contracted GTO on bra side
@@ -299,43 +299,43 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             // set up pointers to auxilary integrals
 
-            auto tlx_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + idx);
+            auto tlx_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + idx); 
 
-            auto tly_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + bdim + idx);
+            auto tly_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + bdim + idx); 
 
-            auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx);
+            auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx); 
 
-            auto tpx_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + idx);
+            auto tpx_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + idx); 
 
-            auto tpy_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + bdim + idx);
+            auto tpy_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + bdim + idx); 
 
-            auto tpz_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + 2 * bdim + idx);
+            auto tpz_0_0_0 = primBuffer.data(pidx_p_0_0_m0 + 2 * bdim + idx); 
 
-            auto tdx_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + idx);
+            auto tdx_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + idx); 
 
-            auto tdy_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + bdim + idx);
+            auto tdy_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + bdim + idx); 
 
-            auto tdz_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + 2 * bdim + idx);
+            auto tdz_0_0_0 = primBuffer.data(pidx_d_0_0_m0 + 2 * bdim + idx); 
 
             // set up pointers to integrals
 
-            auto tlx_x_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * idx);
+            auto tlx_x_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * idx); 
 
-            auto tly_x_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * bdim + 3 * idx);
+            auto tly_x_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * bdim + 3 * idx); 
 
-            auto tlz_x_0_0 = primBuffer.data(pidx_l_1_0_m0 + 6 * bdim + 3 * idx);
+            auto tlz_x_0_0 = primBuffer.data(pidx_l_1_0_m0 + 6 * bdim + 3 * idx); 
 
-            auto tlx_y_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * idx + 1);
+            auto tlx_y_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * idx + 1); 
 
-            auto tly_y_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * bdim + 3 * idx + 1);
+            auto tly_y_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * bdim + 3 * idx + 1); 
 
-            auto tlz_y_0_0 = primBuffer.data(pidx_l_1_0_m0 + 6 * bdim + 3 * idx + 1);
+            auto tlz_y_0_0 = primBuffer.data(pidx_l_1_0_m0 + 6 * bdim + 3 * idx + 1); 
 
-            auto tlx_z_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * idx + 2);
+            auto tlx_z_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * idx + 2); 
 
-            auto tly_z_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * bdim + 3 * idx + 2);
+            auto tly_z_0_0 = primBuffer.data(pidx_l_1_0_m0 + 3 * bdim + 3 * idx + 2); 
 
-            auto tlz_z_0_0 = primBuffer.data(pidx_l_1_0_m0 + 6 * bdim + 3 * idx + 2);
+            auto tlz_z_0_0 = primBuffer.data(pidx_l_1_0_m0 + 6 * bdim + 3 * idx + 2); 
 
             #pragma omp simd aligned(fgb, fx, pa_x, pa_y, pa_z, tdx_0_0_0, tdy_0_0_0, tdz_0_0_0, tlx_0_0_0, \
                                      tlx_x_0_0, tlx_y_0_0, tlx_z_0_0, tly_0_0_0, tly_x_0_0, tly_y_0_0, tly_z_0_0, \
@@ -374,7 +374,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                              const CRecursionMap&       recursionMap,
                              const CMemBlock2D<double>& osFactors,
                              const CMemBlock2D<double>& pbDistances,
-                             const CMemBlock2D<double>& acDistances,
                              const CGtoBlock&           braGtoBlock,
                              const CGtoBlock&           ketGtoBlock,
                              const int32_t              iContrGto)
@@ -411,7 +410,11 @@ namespace amomrecfunc { // amomrecfunc namespace
                                                          {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_s_0_1_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true, 
+        auto pidx_p_0_1_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {1, -1, -1, -1}, 
+                                                         1, 1, 0));
+
+        auto pidx_d_0_1_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
                                                          {0, -1, -1, -1}, {1, -1, -1, -1}, 
                                                          1, 1, 0));
 
@@ -434,14 +437,6 @@ namespace amomrecfunc { // amomrecfunc namespace
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
-
-            // set up pointers to tensors product of distances R(AC) = A - C
-
-            auto ac_x = acDistances.data(3 * idx);
-
-            auto ac_y = acDistances.data(3 * idx + 1);
-
-            auto ac_z = acDistances.data(3 * idx + 2);
 
             // set up pointers to auxilary integrals
 
@@ -469,11 +464,37 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx); 
 
-            auto ts_0_x_0 = primBuffer.data(pidx_s_0_1_m0 + 3 * idx); 
+            auto tpy_0_x_0 = primBuffer.data(pidx_p_0_1_m0 + 3 * bdim + 3 * idx); 
 
-            auto ts_0_y_0 = primBuffer.data(pidx_s_0_1_m0 + 3 * idx + 1); 
+            auto tpz_0_x_0 = primBuffer.data(pidx_p_0_1_m0 + 6 * bdim + 3 * idx); 
 
-            auto ts_0_z_0 = primBuffer.data(pidx_s_0_1_m0 + 3 * idx + 2); 
+            auto tpx_0_y_0 = primBuffer.data(pidx_p_0_1_m0 + 3 * idx + 1); 
+
+            auto tpy_0_y_0 = primBuffer.data(pidx_p_0_1_m0 + 3 * bdim + 3 * idx + 1); 
+
+            auto tpz_0_y_0 = primBuffer.data(pidx_p_0_1_m0 + 6 * bdim + 3 * idx + 1); 
+
+            auto tpx_0_z_0 = primBuffer.data(pidx_p_0_1_m0 + 3 * idx + 2); 
+
+            auto tpy_0_z_0 = primBuffer.data(pidx_p_0_1_m0 + 3 * bdim + 3 * idx + 2); 
+
+            auto tpz_0_z_0 = primBuffer.data(pidx_p_0_1_m0 + 6 * bdim + 3 * idx + 2); 
+
+            auto tdy_0_x_0 = primBuffer.data(pidx_d_0_1_m0 + 3 * bdim + 3 * idx); 
+
+            auto tdz_0_x_0 = primBuffer.data(pidx_d_0_1_m0 + 6 * bdim + 3 * idx); 
+
+            auto tdx_0_y_0 = primBuffer.data(pidx_d_0_1_m0 + 3 * idx + 1); 
+
+            auto tdy_0_y_0 = primBuffer.data(pidx_d_0_1_m0 + 3 * bdim + 3 * idx + 1); 
+
+            auto tdz_0_y_0 = primBuffer.data(pidx_d_0_1_m0 + 6 * bdim + 3 * idx + 1); 
+
+            auto tdx_0_z_0 = primBuffer.data(pidx_d_0_1_m0 + 3 * idx + 2); 
+
+            auto tdy_0_z_0 = primBuffer.data(pidx_d_0_1_m0 + 3 * bdim + 3 * idx + 2); 
+
+            auto tdz_0_z_0 = primBuffer.data(pidx_d_0_1_m0 + 6 * bdim + 3 * idx + 2); 
 
             // set up pointers to integrals
 
@@ -513,12 +534,13 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_0_zz_0 = primBuffer.data(pidx_l_0_2_m0 + 12 * bdim + 6 * idx + 5); 
 
-            #pragma omp simd aligned(ac_x, ac_y, ac_z, fga, fx, pb_x, pb_y, pb_z, tlx_0_0_0, tlx_0_x_0, tlx_0_xx_0, \
+            #pragma omp simd aligned(fga, fx, pb_x, pb_y, pb_z, tdx_0_y_0, tdx_0_z_0, tdy_0_x_0, tdy_0_y_0, \
+                                     tdy_0_z_0, tdz_0_x_0, tdz_0_y_0, tdz_0_z_0, tlx_0_0_0, tlx_0_x_0, tlx_0_xx_0, \
                                      tlx_0_xy_0, tlx_0_xz_0, tlx_0_y_0, tlx_0_yy_0, tlx_0_yz_0, tlx_0_z_0, tlx_0_zz_0, \
                                      tly_0_0_0, tly_0_x_0, tly_0_xx_0, tly_0_xy_0, tly_0_xz_0, tly_0_y_0, tly_0_yy_0, \
                                      tly_0_yz_0, tly_0_z_0, tly_0_zz_0, tlz_0_0_0, tlz_0_x_0, tlz_0_xx_0, tlz_0_xy_0, \
-                                     tlz_0_xz_0, tlz_0_y_0, tlz_0_yy_0, tlz_0_yz_0, tlz_0_z_0, tlz_0_zz_0, ts_0_x_0, \
-                                     ts_0_y_0, ts_0_z_0: VLX_ALIGN)
+                                     tlz_0_xz_0, tlz_0_y_0, tlz_0_yy_0, tlz_0_yz_0, tlz_0_z_0, tlz_0_zz_0, tpx_0_y_0, \
+                                     tpx_0_z_0, tpy_0_x_0, tpy_0_y_0, tpy_0_z_0, tpz_0_x_0, tpz_0_y_0, tpz_0_z_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl1_fga = fga[j];
@@ -527,37 +549,37 @@ namespace amomrecfunc { // amomrecfunc namespace
 
                 tlx_0_xx_0[j] = pb_x[j] * tlx_0_x_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j];
 
-                tly_0_xx_0[j] = pb_x[j] * tly_0_x_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_x_0[j];
+                tly_0_xx_0[j] = pb_x[j] * tly_0_x_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] + 0.5 * fl1_fx * tpz_0_x_0[j] - fl1_fx * fl1_fga * tdz_0_x_0[j];
 
-                tlz_0_xx_0[j] = pb_x[j] * tlz_0_x_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_x_0[j];
+                tlz_0_xx_0[j] = pb_x[j] * tlz_0_x_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] - 0.5 * fl1_fx * tpy_0_x_0[j] + fl1_fx * fl1_fga * tdy_0_x_0[j];
 
                 tlx_0_xy_0[j] = pb_x[j] * tlx_0_y_0[j];
 
-                tly_0_xy_0[j] = pb_x[j] * tly_0_y_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_y_0[j];
+                tly_0_xy_0[j] = pb_x[j] * tly_0_y_0[j] + 0.5 * fl1_fx * tpz_0_y_0[j] - fl1_fx * fl1_fga * tdz_0_y_0[j];
 
-                tlz_0_xy_0[j] = pb_x[j] * tlz_0_y_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_y_0[j];
+                tlz_0_xy_0[j] = pb_x[j] * tlz_0_y_0[j] - 0.5 * fl1_fx * tpy_0_y_0[j] + fl1_fx * fl1_fga * tdy_0_y_0[j];
 
                 tlx_0_xz_0[j] = pb_x[j] * tlx_0_z_0[j];
 
-                tly_0_xz_0[j] = pb_x[j] * tly_0_z_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_z_0[j];
+                tly_0_xz_0[j] = pb_x[j] * tly_0_z_0[j] + 0.5 * fl1_fx * tpz_0_z_0[j] - fl1_fx * fl1_fga * tdz_0_z_0[j];
 
-                tlz_0_xz_0[j] = pb_x[j] * tlz_0_z_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_z_0[j];
+                tlz_0_xz_0[j] = pb_x[j] * tlz_0_z_0[j] - 0.5 * fl1_fx * tpy_0_z_0[j] + fl1_fx * fl1_fga * tdy_0_z_0[j];
 
-                tlx_0_yy_0[j] = pb_y[j] * tlx_0_y_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_y_0[j];
+                tlx_0_yy_0[j] = pb_y[j] * tlx_0_y_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] - 0.5 * fl1_fx * tpz_0_y_0[j] + fl1_fx * fl1_fga * tdz_0_y_0[j];
 
                 tly_0_yy_0[j] = pb_y[j] * tly_0_y_0[j] + 0.5 * fl1_fx * tly_0_0_0[j];
 
-                tlz_0_yy_0[j] = pb_y[j] * tlz_0_y_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_y_0[j];
+                tlz_0_yy_0[j] = pb_y[j] * tlz_0_y_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] + 0.5 * fl1_fx * tpx_0_y_0[j] - fl1_fx * fl1_fga * tdx_0_y_0[j];
 
-                tlx_0_yz_0[j] = pb_y[j] * tlx_0_z_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_z_0[j];
+                tlx_0_yz_0[j] = pb_y[j] * tlx_0_z_0[j] - 0.5 * fl1_fx * tpz_0_z_0[j] + fl1_fx * fl1_fga * tdz_0_z_0[j];
 
                 tly_0_yz_0[j] = pb_y[j] * tly_0_z_0[j];
 
-                tlz_0_yz_0[j] = pb_y[j] * tlz_0_z_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_z_0[j];
+                tlz_0_yz_0[j] = pb_y[j] * tlz_0_z_0[j] + 0.5 * fl1_fx * tpx_0_z_0[j] - fl1_fx * fl1_fga * tdx_0_z_0[j];
 
-                tlx_0_zz_0[j] = pb_z[j] * tlx_0_z_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] - ac_y[j] * fl1_fx * fl1_fga * ts_0_z_0[j];
+                tlx_0_zz_0[j] = pb_z[j] * tlx_0_z_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] + 0.5 * fl1_fx * tpy_0_z_0[j] - fl1_fx * fl1_fga * tdy_0_z_0[j];
 
-                tly_0_zz_0[j] = pb_z[j] * tly_0_z_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] + ac_x[j] * fl1_fx * fl1_fga * ts_0_z_0[j];
+                tly_0_zz_0[j] = pb_z[j] * tly_0_z_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] - 0.5 * fl1_fx * tpx_0_z_0[j] + fl1_fx * fl1_fga * tdx_0_z_0[j];
 
                 tlz_0_zz_0[j] = pb_z[j] * tlz_0_z_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j];
             }
@@ -571,7 +593,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                              const CRecursionMap&       recursionMap,
                              const CMemBlock2D<double>& osFactors,
                              const CMemBlock2D<double>& paDistances,
-                             const CMemBlock2D<double>& bcDistances,
                              const CGtoBlock&           braGtoBlock,
                              const CGtoBlock&           ketGtoBlock,
                              const int32_t              iContrGto)
@@ -608,7 +629,11 @@ namespace amomrecfunc { // amomrecfunc namespace
                                                          {0, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_s_1_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true, 
+        auto pidx_p_1_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {1, -1, -1, -1}, {0, -1, -1, -1}, 
+                                                         1, 1, 0));
+
+        auto pidx_d_1_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
                                                          {1, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
@@ -631,14 +656,6 @@ namespace amomrecfunc { // amomrecfunc namespace
             auto pa_y = paDistances.data(3 * idx + 1);
 
             auto pa_z = paDistances.data(3 * idx + 2);
-
-            // set up pointers to tensors product of distances R(BC) = B - C
-
-            auto bc_x = bcDistances.data(3 * idx);
-
-            auto bc_y = bcDistances.data(3 * idx + 1);
-
-            auto bc_z = bcDistances.data(3 * idx + 2);
 
             // set up pointers to auxilary integrals
 
@@ -666,11 +683,37 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_0_0_0 = primBuffer.data(pidx_l_0_0_m0 + 2 * bdim + idx); 
 
-            auto ts_x_0_0 = primBuffer.data(pidx_s_1_0_m0 + 3 * idx); 
+            auto tpy_x_0_0 = primBuffer.data(pidx_p_1_0_m0 + 3 * bdim + 3 * idx); 
 
-            auto ts_y_0_0 = primBuffer.data(pidx_s_1_0_m0 + 3 * idx + 1); 
+            auto tpz_x_0_0 = primBuffer.data(pidx_p_1_0_m0 + 6 * bdim + 3 * idx); 
 
-            auto ts_z_0_0 = primBuffer.data(pidx_s_1_0_m0 + 3 * idx + 2); 
+            auto tpx_y_0_0 = primBuffer.data(pidx_p_1_0_m0 + 3 * idx + 1); 
+
+            auto tpy_y_0_0 = primBuffer.data(pidx_p_1_0_m0 + 3 * bdim + 3 * idx + 1); 
+
+            auto tpz_y_0_0 = primBuffer.data(pidx_p_1_0_m0 + 6 * bdim + 3 * idx + 1); 
+
+            auto tpx_z_0_0 = primBuffer.data(pidx_p_1_0_m0 + 3 * idx + 2); 
+
+            auto tpy_z_0_0 = primBuffer.data(pidx_p_1_0_m0 + 3 * bdim + 3 * idx + 2); 
+
+            auto tpz_z_0_0 = primBuffer.data(pidx_p_1_0_m0 + 6 * bdim + 3 * idx + 2); 
+
+            auto tdy_x_0_0 = primBuffer.data(pidx_d_1_0_m0 + 3 * bdim + 3 * idx); 
+
+            auto tdz_x_0_0 = primBuffer.data(pidx_d_1_0_m0 + 6 * bdim + 3 * idx); 
+
+            auto tdx_y_0_0 = primBuffer.data(pidx_d_1_0_m0 + 3 * idx + 1); 
+
+            auto tdy_y_0_0 = primBuffer.data(pidx_d_1_0_m0 + 3 * bdim + 3 * idx + 1); 
+
+            auto tdz_y_0_0 = primBuffer.data(pidx_d_1_0_m0 + 6 * bdim + 3 * idx + 1); 
+
+            auto tdx_z_0_0 = primBuffer.data(pidx_d_1_0_m0 + 3 * idx + 2); 
+
+            auto tdy_z_0_0 = primBuffer.data(pidx_d_1_0_m0 + 3 * bdim + 3 * idx + 2); 
+
+            auto tdz_z_0_0 = primBuffer.data(pidx_d_1_0_m0 + 6 * bdim + 3 * idx + 2); 
 
             // set up pointers to integrals
 
@@ -710,12 +753,13 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_zz_0_0 = primBuffer.data(pidx_l_2_0_m0 + 12 * bdim + 6 * idx + 5); 
 
-            #pragma omp simd aligned(bc_x, bc_y, bc_z, fgb, fx, pa_x, pa_y, pa_z, tlx_0_0_0, tlx_x_0_0, tlx_xx_0_0, \
+            #pragma omp simd aligned(fgb, fx, pa_x, pa_y, pa_z, tdx_y_0_0, tdx_z_0_0, tdy_x_0_0, tdy_y_0_0, \
+                                     tdy_z_0_0, tdz_x_0_0, tdz_y_0_0, tdz_z_0_0, tlx_0_0_0, tlx_x_0_0, tlx_xx_0_0, \
                                      tlx_xy_0_0, tlx_xz_0_0, tlx_y_0_0, tlx_yy_0_0, tlx_yz_0_0, tlx_z_0_0, tlx_zz_0_0, \
                                      tly_0_0_0, tly_x_0_0, tly_xx_0_0, tly_xy_0_0, tly_xz_0_0, tly_y_0_0, tly_yy_0_0, \
                                      tly_yz_0_0, tly_z_0_0, tly_zz_0_0, tlz_0_0_0, tlz_x_0_0, tlz_xx_0_0, tlz_xy_0_0, \
-                                     tlz_xz_0_0, tlz_y_0_0, tlz_yy_0_0, tlz_yz_0_0, tlz_z_0_0, tlz_zz_0_0, ts_x_0_0, \
-                                     ts_y_0_0, ts_z_0_0: VLX_ALIGN)
+                                     tlz_xz_0_0, tlz_y_0_0, tlz_yy_0_0, tlz_yz_0_0, tlz_z_0_0, tlz_zz_0_0, tpx_y_0_0, \
+                                     tpx_z_0_0, tpy_x_0_0, tpy_y_0_0, tpy_z_0_0, tpz_x_0_0, tpz_y_0_0, tpz_z_0_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl1_fgb = fgb[j];
@@ -724,37 +768,37 @@ namespace amomrecfunc { // amomrecfunc namespace
 
                 tlx_xx_0_0[j] = pa_x[j] * tlx_x_0_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j];
 
-                tly_xx_0_0[j] = pa_x[j] * tly_x_0_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_x_0_0[j];
+                tly_xx_0_0[j] = pa_x[j] * tly_x_0_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] + 0.5 * fl1_fx * tpz_x_0_0[j] + fl1_fx * fl1_fgb * tdz_x_0_0[j];
 
-                tlz_xx_0_0[j] = pa_x[j] * tlz_x_0_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_x_0_0[j];
+                tlz_xx_0_0[j] = pa_x[j] * tlz_x_0_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] - 0.5 * fl1_fx * tpy_x_0_0[j] - fl1_fx * fl1_fgb * tdy_x_0_0[j];
 
                 tlx_xy_0_0[j] = pa_x[j] * tlx_y_0_0[j];
 
-                tly_xy_0_0[j] = pa_x[j] * tly_y_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_y_0_0[j];
+                tly_xy_0_0[j] = pa_x[j] * tly_y_0_0[j] + 0.5 * fl1_fx * tpz_y_0_0[j] + fl1_fx * fl1_fgb * tdz_y_0_0[j];
 
-                tlz_xy_0_0[j] = pa_x[j] * tlz_y_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_y_0_0[j];
+                tlz_xy_0_0[j] = pa_x[j] * tlz_y_0_0[j] - 0.5 * fl1_fx * tpy_y_0_0[j] - fl1_fx * fl1_fgb * tdy_y_0_0[j];
 
                 tlx_xz_0_0[j] = pa_x[j] * tlx_z_0_0[j];
 
-                tly_xz_0_0[j] = pa_x[j] * tly_z_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_z_0_0[j];
+                tly_xz_0_0[j] = pa_x[j] * tly_z_0_0[j] + 0.5 * fl1_fx * tpz_z_0_0[j] + fl1_fx * fl1_fgb * tdz_z_0_0[j];
 
-                tlz_xz_0_0[j] = pa_x[j] * tlz_z_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_z_0_0[j];
+                tlz_xz_0_0[j] = pa_x[j] * tlz_z_0_0[j] - 0.5 * fl1_fx * tpy_z_0_0[j] - fl1_fx * fl1_fgb * tdy_z_0_0[j];
 
-                tlx_yy_0_0[j] = pa_y[j] * tlx_y_0_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_y_0_0[j];
+                tlx_yy_0_0[j] = pa_y[j] * tlx_y_0_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] - 0.5 * fl1_fx * tpz_y_0_0[j] - fl1_fx * fl1_fgb * tdz_y_0_0[j];
 
                 tly_yy_0_0[j] = pa_y[j] * tly_y_0_0[j] + 0.5 * fl1_fx * tly_0_0_0[j];
 
-                tlz_yy_0_0[j] = pa_y[j] * tlz_y_0_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_y_0_0[j];
+                tlz_yy_0_0[j] = pa_y[j] * tlz_y_0_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j] + 0.5 * fl1_fx * tpx_y_0_0[j] + fl1_fx * fl1_fgb * tdx_y_0_0[j];
 
-                tlx_yz_0_0[j] = pa_y[j] * tlx_z_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_z_0_0[j];
+                tlx_yz_0_0[j] = pa_y[j] * tlx_z_0_0[j] - 0.5 * fl1_fx * tpz_z_0_0[j] - fl1_fx * fl1_fgb * tdz_z_0_0[j];
 
                 tly_yz_0_0[j] = pa_y[j] * tly_z_0_0[j];
 
-                tlz_yz_0_0[j] = pa_y[j] * tlz_z_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_z_0_0[j];
+                tlz_yz_0_0[j] = pa_y[j] * tlz_z_0_0[j] + 0.5 * fl1_fx * tpx_z_0_0[j] + fl1_fx * fl1_fgb * tdx_z_0_0[j];
 
-                tlx_zz_0_0[j] = pa_z[j] * tlx_z_0_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] - bc_y[j] * fl1_fx * fl1_fgb * ts_z_0_0[j];
+                tlx_zz_0_0[j] = pa_z[j] * tlx_z_0_0[j] + 0.5 * fl1_fx * tlx_0_0_0[j] + 0.5 * fl1_fx * tpy_z_0_0[j] + fl1_fx * fl1_fgb * tdy_z_0_0[j];
 
-                tly_zz_0_0[j] = pa_z[j] * tly_z_0_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] + bc_x[j] * fl1_fx * fl1_fgb * ts_z_0_0[j];
+                tly_zz_0_0[j] = pa_z[j] * tly_z_0_0[j] + 0.5 * fl1_fx * tly_0_0_0[j] - 0.5 * fl1_fx * tpx_z_0_0[j] - fl1_fx * fl1_fgb * tdx_z_0_0[j];
 
                 tlz_zz_0_0[j] = pa_z[j] * tlz_z_0_0[j] + 0.5 * fl1_fx * tlz_0_0_0[j];
             }
@@ -768,7 +812,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                              const CRecursionMap&       recursionMap,
                              const CMemBlock2D<double>& osFactors,
                              const CMemBlock2D<double>& pbDistances,
-                             const CMemBlock2D<double>& acDistances,
                              const CGtoBlock&           braGtoBlock,
                              const CGtoBlock&           ketGtoBlock,
                              const int32_t              iContrGto)
@@ -805,7 +848,11 @@ namespace amomrecfunc { // amomrecfunc namespace
                                                          {0, -1, -1, -1}, {1, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_s_0_2_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true, 
+        auto pidx_p_0_2_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {2, -1, -1, -1}, 
+                                                         1, 1, 0));
+
+        auto pidx_d_0_2_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
                                                          {0, -1, -1, -1}, {2, -1, -1, -1}, 
                                                          1, 1, 0));
 
@@ -828,14 +875,6 @@ namespace amomrecfunc { // amomrecfunc namespace
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
-
-            // set up pointers to tensors product of distances R(AC) = A - C
-
-            auto ac_x = acDistances.data(3 * idx);
-
-            auto ac_y = acDistances.data(3 * idx + 1);
-
-            auto ac_z = acDistances.data(3 * idx + 2);
 
             // set up pointers to auxilary integrals
 
@@ -893,17 +932,65 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_0_z_0 = primBuffer.data(pidx_l_0_1_m0 + 6 * bdim + 3 * idx + 2); 
 
-            auto ts_0_xx_0 = primBuffer.data(pidx_s_0_2_m0 + 6 * idx); 
+            auto tpy_0_xx_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * bdim + 6 * idx); 
 
-            auto ts_0_xy_0 = primBuffer.data(pidx_s_0_2_m0 + 6 * idx + 1); 
+            auto tpz_0_xx_0 = primBuffer.data(pidx_p_0_2_m0 + 12 * bdim + 6 * idx); 
 
-            auto ts_0_xz_0 = primBuffer.data(pidx_s_0_2_m0 + 6 * idx + 2); 
+            auto tpy_0_xy_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * bdim + 6 * idx + 1); 
 
-            auto ts_0_yy_0 = primBuffer.data(pidx_s_0_2_m0 + 6 * idx + 3); 
+            auto tpz_0_xy_0 = primBuffer.data(pidx_p_0_2_m0 + 12 * bdim + 6 * idx + 1); 
 
-            auto ts_0_yz_0 = primBuffer.data(pidx_s_0_2_m0 + 6 * idx + 4); 
+            auto tpy_0_xz_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * bdim + 6 * idx + 2); 
 
-            auto ts_0_zz_0 = primBuffer.data(pidx_s_0_2_m0 + 6 * idx + 5); 
+            auto tpz_0_xz_0 = primBuffer.data(pidx_p_0_2_m0 + 12 * bdim + 6 * idx + 2); 
+
+            auto tpx_0_yy_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * idx + 3); 
+
+            auto tpy_0_yy_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * bdim + 6 * idx + 3); 
+
+            auto tpz_0_yy_0 = primBuffer.data(pidx_p_0_2_m0 + 12 * bdim + 6 * idx + 3); 
+
+            auto tpx_0_yz_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * idx + 4); 
+
+            auto tpy_0_yz_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * bdim + 6 * idx + 4); 
+
+            auto tpz_0_yz_0 = primBuffer.data(pidx_p_0_2_m0 + 12 * bdim + 6 * idx + 4); 
+
+            auto tpx_0_zz_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * idx + 5); 
+
+            auto tpy_0_zz_0 = primBuffer.data(pidx_p_0_2_m0 + 6 * bdim + 6 * idx + 5); 
+
+            auto tpz_0_zz_0 = primBuffer.data(pidx_p_0_2_m0 + 12 * bdim + 6 * idx + 5); 
+
+            auto tdy_0_xx_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * bdim + 6 * idx); 
+
+            auto tdz_0_xx_0 = primBuffer.data(pidx_d_0_2_m0 + 12 * bdim + 6 * idx); 
+
+            auto tdy_0_xy_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * bdim + 6 * idx + 1); 
+
+            auto tdz_0_xy_0 = primBuffer.data(pidx_d_0_2_m0 + 12 * bdim + 6 * idx + 1); 
+
+            auto tdy_0_xz_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * bdim + 6 * idx + 2); 
+
+            auto tdz_0_xz_0 = primBuffer.data(pidx_d_0_2_m0 + 12 * bdim + 6 * idx + 2); 
+
+            auto tdx_0_yy_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * idx + 3); 
+
+            auto tdy_0_yy_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * bdim + 6 * idx + 3); 
+
+            auto tdz_0_yy_0 = primBuffer.data(pidx_d_0_2_m0 + 12 * bdim + 6 * idx + 3); 
+
+            auto tdx_0_yz_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * idx + 4); 
+
+            auto tdy_0_yz_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * bdim + 6 * idx + 4); 
+
+            auto tdz_0_yz_0 = primBuffer.data(pidx_d_0_2_m0 + 12 * bdim + 6 * idx + 4); 
+
+            auto tdx_0_zz_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * idx + 5); 
+
+            auto tdy_0_zz_0 = primBuffer.data(pidx_d_0_2_m0 + 6 * bdim + 6 * idx + 5); 
+
+            auto tdz_0_zz_0 = primBuffer.data(pidx_d_0_2_m0 + 12 * bdim + 6 * idx + 5); 
 
             // set up pointers to integrals
 
@@ -967,7 +1054,9 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_0_zzz_0 = primBuffer.data(pidx_l_0_3_m0 + 20 * bdim + 10 * idx + 9); 
 
-            #pragma omp simd aligned(ac_x, ac_y, ac_z, fga, fx, pb_x, pb_y, pb_z, tlx_0_x_0, tlx_0_xx_0, tlx_0_xxx_0, \
+            #pragma omp simd aligned(fga, fx, pb_x, pb_y, pb_z, tdx_0_yy_0, tdx_0_yz_0, tdx_0_zz_0, tdy_0_xx_0, \
+                                     tdy_0_xy_0, tdy_0_xz_0, tdy_0_yy_0, tdy_0_yz_0, tdy_0_zz_0, tdz_0_xx_0, tdz_0_xy_0, \
+                                     tdz_0_xz_0, tdz_0_yy_0, tdz_0_yz_0, tdz_0_zz_0, tlx_0_x_0, tlx_0_xx_0, tlx_0_xxx_0, \
                                      tlx_0_xxy_0, tlx_0_xxz_0, tlx_0_xy_0, tlx_0_xyy_0, tlx_0_xyz_0, tlx_0_xz_0, \
                                      tlx_0_xzz_0, tlx_0_y_0, tlx_0_yy_0, tlx_0_yyy_0, tlx_0_yyz_0, tlx_0_yz_0, \
                                      tlx_0_yzz_0, tlx_0_z_0, tlx_0_zz_0, tlx_0_zzz_0, tly_0_x_0, tly_0_xx_0, tly_0_xxx_0, \
@@ -976,8 +1065,9 @@ namespace amomrecfunc { // amomrecfunc namespace
                                      tly_0_yzz_0, tly_0_z_0, tly_0_zz_0, tly_0_zzz_0, tlz_0_x_0, tlz_0_xx_0, tlz_0_xxx_0, \
                                      tlz_0_xxy_0, tlz_0_xxz_0, tlz_0_xy_0, tlz_0_xyy_0, tlz_0_xyz_0, tlz_0_xz_0, \
                                      tlz_0_xzz_0, tlz_0_y_0, tlz_0_yy_0, tlz_0_yyy_0, tlz_0_yyz_0, tlz_0_yz_0, \
-                                     tlz_0_yzz_0, tlz_0_z_0, tlz_0_zz_0, tlz_0_zzz_0, ts_0_xx_0, ts_0_xy_0, ts_0_xz_0, \
-                                     ts_0_yy_0, ts_0_yz_0, ts_0_zz_0: VLX_ALIGN)
+                                     tlz_0_yzz_0, tlz_0_z_0, tlz_0_zz_0, tlz_0_zzz_0, tpx_0_yy_0, tpx_0_yz_0, tpx_0_zz_0, \
+                                     tpy_0_xx_0, tpy_0_xy_0, tpy_0_xz_0, tpy_0_yy_0, tpy_0_yz_0, tpy_0_zz_0, tpz_0_xx_0, \
+                                     tpz_0_xy_0, tpz_0_xz_0, tpz_0_yy_0, tpz_0_yz_0, tpz_0_zz_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl1_fga = fga[j];
@@ -986,61 +1076,61 @@ namespace amomrecfunc { // amomrecfunc namespace
 
                 tlx_0_xxx_0[j] = pb_x[j] * tlx_0_xx_0[j] + fl1_fx * tlx_0_x_0[j];
 
-                tly_0_xxx_0[j] = pb_x[j] * tly_0_xx_0[j] + fl1_fx * tly_0_x_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xx_0[j];
+                tly_0_xxx_0[j] = pb_x[j] * tly_0_xx_0[j] + fl1_fx * tly_0_x_0[j] + 0.5 * fl1_fx * tpz_0_xx_0[j] - fl1_fx * fl1_fga * tdz_0_xx_0[j];
 
-                tlz_0_xxx_0[j] = pb_x[j] * tlz_0_xx_0[j] + fl1_fx * tlz_0_x_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xx_0[j];
+                tlz_0_xxx_0[j] = pb_x[j] * tlz_0_xx_0[j] + fl1_fx * tlz_0_x_0[j] - 0.5 * fl1_fx * tpy_0_xx_0[j] + fl1_fx * fl1_fga * tdy_0_xx_0[j];
 
                 tlx_0_xxy_0[j] = pb_x[j] * tlx_0_xy_0[j] + 0.5 * fl1_fx * tlx_0_y_0[j];
 
-                tly_0_xxy_0[j] = pb_x[j] * tly_0_xy_0[j] + 0.5 * fl1_fx * tly_0_y_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xy_0[j];
+                tly_0_xxy_0[j] = pb_x[j] * tly_0_xy_0[j] + 0.5 * fl1_fx * tly_0_y_0[j] + 0.5 * fl1_fx * tpz_0_xy_0[j] - fl1_fx * fl1_fga * tdz_0_xy_0[j];
 
-                tlz_0_xxy_0[j] = pb_x[j] * tlz_0_xy_0[j] + 0.5 * fl1_fx * tlz_0_y_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xy_0[j];
+                tlz_0_xxy_0[j] = pb_x[j] * tlz_0_xy_0[j] + 0.5 * fl1_fx * tlz_0_y_0[j] - 0.5 * fl1_fx * tpy_0_xy_0[j] + fl1_fx * fl1_fga * tdy_0_xy_0[j];
 
                 tlx_0_xxz_0[j] = pb_x[j] * tlx_0_xz_0[j] + 0.5 * fl1_fx * tlx_0_z_0[j];
 
-                tly_0_xxz_0[j] = pb_x[j] * tly_0_xz_0[j] + 0.5 * fl1_fx * tly_0_z_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xz_0[j];
+                tly_0_xxz_0[j] = pb_x[j] * tly_0_xz_0[j] + 0.5 * fl1_fx * tly_0_z_0[j] + 0.5 * fl1_fx * tpz_0_xz_0[j] - fl1_fx * fl1_fga * tdz_0_xz_0[j];
 
-                tlz_0_xxz_0[j] = pb_x[j] * tlz_0_xz_0[j] + 0.5 * fl1_fx * tlz_0_z_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xz_0[j];
+                tlz_0_xxz_0[j] = pb_x[j] * tlz_0_xz_0[j] + 0.5 * fl1_fx * tlz_0_z_0[j] - 0.5 * fl1_fx * tpy_0_xz_0[j] + fl1_fx * fl1_fga * tdy_0_xz_0[j];
 
                 tlx_0_xyy_0[j] = pb_x[j] * tlx_0_yy_0[j];
 
-                tly_0_xyy_0[j] = pb_x[j] * tly_0_yy_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_yy_0[j];
+                tly_0_xyy_0[j] = pb_x[j] * tly_0_yy_0[j] + 0.5 * fl1_fx * tpz_0_yy_0[j] - fl1_fx * fl1_fga * tdz_0_yy_0[j];
 
-                tlz_0_xyy_0[j] = pb_x[j] * tlz_0_yy_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_yy_0[j];
+                tlz_0_xyy_0[j] = pb_x[j] * tlz_0_yy_0[j] - 0.5 * fl1_fx * tpy_0_yy_0[j] + fl1_fx * fl1_fga * tdy_0_yy_0[j];
 
                 tlx_0_xyz_0[j] = pb_x[j] * tlx_0_yz_0[j];
 
-                tly_0_xyz_0[j] = pb_x[j] * tly_0_yz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_yz_0[j];
+                tly_0_xyz_0[j] = pb_x[j] * tly_0_yz_0[j] + 0.5 * fl1_fx * tpz_0_yz_0[j] - fl1_fx * fl1_fga * tdz_0_yz_0[j];
 
-                tlz_0_xyz_0[j] = pb_x[j] * tlz_0_yz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_yz_0[j];
+                tlz_0_xyz_0[j] = pb_x[j] * tlz_0_yz_0[j] - 0.5 * fl1_fx * tpy_0_yz_0[j] + fl1_fx * fl1_fga * tdy_0_yz_0[j];
 
                 tlx_0_xzz_0[j] = pb_x[j] * tlx_0_zz_0[j];
 
-                tly_0_xzz_0[j] = pb_x[j] * tly_0_zz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_zz_0[j];
+                tly_0_xzz_0[j] = pb_x[j] * tly_0_zz_0[j] + 0.5 * fl1_fx * tpz_0_zz_0[j] - fl1_fx * fl1_fga * tdz_0_zz_0[j];
 
-                tlz_0_xzz_0[j] = pb_x[j] * tlz_0_zz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_zz_0[j];
+                tlz_0_xzz_0[j] = pb_x[j] * tlz_0_zz_0[j] - 0.5 * fl1_fx * tpy_0_zz_0[j] + fl1_fx * fl1_fga * tdy_0_zz_0[j];
 
-                tlx_0_yyy_0[j] = pb_y[j] * tlx_0_yy_0[j] + fl1_fx * tlx_0_y_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_yy_0[j];
+                tlx_0_yyy_0[j] = pb_y[j] * tlx_0_yy_0[j] + fl1_fx * tlx_0_y_0[j] - 0.5 * fl1_fx * tpz_0_yy_0[j] + fl1_fx * fl1_fga * tdz_0_yy_0[j];
 
                 tly_0_yyy_0[j] = pb_y[j] * tly_0_yy_0[j] + fl1_fx * tly_0_y_0[j];
 
-                tlz_0_yyy_0[j] = pb_y[j] * tlz_0_yy_0[j] + fl1_fx * tlz_0_y_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_yy_0[j];
+                tlz_0_yyy_0[j] = pb_y[j] * tlz_0_yy_0[j] + fl1_fx * tlz_0_y_0[j] + 0.5 * fl1_fx * tpx_0_yy_0[j] - fl1_fx * fl1_fga * tdx_0_yy_0[j];
 
-                tlx_0_yyz_0[j] = pb_y[j] * tlx_0_yz_0[j] + 0.5 * fl1_fx * tlx_0_z_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_yz_0[j];
+                tlx_0_yyz_0[j] = pb_y[j] * tlx_0_yz_0[j] + 0.5 * fl1_fx * tlx_0_z_0[j] - 0.5 * fl1_fx * tpz_0_yz_0[j] + fl1_fx * fl1_fga * tdz_0_yz_0[j];
 
                 tly_0_yyz_0[j] = pb_y[j] * tly_0_yz_0[j] + 0.5 * fl1_fx * tly_0_z_0[j];
 
-                tlz_0_yyz_0[j] = pb_y[j] * tlz_0_yz_0[j] + 0.5 * fl1_fx * tlz_0_z_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_yz_0[j];
+                tlz_0_yyz_0[j] = pb_y[j] * tlz_0_yz_0[j] + 0.5 * fl1_fx * tlz_0_z_0[j] + 0.5 * fl1_fx * tpx_0_yz_0[j] - fl1_fx * fl1_fga * tdx_0_yz_0[j];
 
-                tlx_0_yzz_0[j] = pb_y[j] * tlx_0_zz_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_zz_0[j];
+                tlx_0_yzz_0[j] = pb_y[j] * tlx_0_zz_0[j] - 0.5 * fl1_fx * tpz_0_zz_0[j] + fl1_fx * fl1_fga * tdz_0_zz_0[j];
 
                 tly_0_yzz_0[j] = pb_y[j] * tly_0_zz_0[j];
 
-                tlz_0_yzz_0[j] = pb_y[j] * tlz_0_zz_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_zz_0[j];
+                tlz_0_yzz_0[j] = pb_y[j] * tlz_0_zz_0[j] + 0.5 * fl1_fx * tpx_0_zz_0[j] - fl1_fx * fl1_fga * tdx_0_zz_0[j];
 
-                tlx_0_zzz_0[j] = pb_z[j] * tlx_0_zz_0[j] + fl1_fx * tlx_0_z_0[j] - ac_y[j] * fl1_fx * fl1_fga * ts_0_zz_0[j];
+                tlx_0_zzz_0[j] = pb_z[j] * tlx_0_zz_0[j] + fl1_fx * tlx_0_z_0[j] + 0.5 * fl1_fx * tpy_0_zz_0[j] - fl1_fx * fl1_fga * tdy_0_zz_0[j];
 
-                tly_0_zzz_0[j] = pb_z[j] * tly_0_zz_0[j] + fl1_fx * tly_0_z_0[j] + ac_x[j] * fl1_fx * fl1_fga * ts_0_zz_0[j];
+                tly_0_zzz_0[j] = pb_z[j] * tly_0_zz_0[j] + fl1_fx * tly_0_z_0[j] - 0.5 * fl1_fx * tpx_0_zz_0[j] + fl1_fx * fl1_fga * tdx_0_zz_0[j];
 
                 tlz_0_zzz_0[j] = pb_z[j] * tlz_0_zz_0[j] + fl1_fx * tlz_0_z_0[j];
             }
@@ -1054,7 +1144,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                              const CRecursionMap&       recursionMap,
                              const CMemBlock2D<double>& osFactors,
                              const CMemBlock2D<double>& paDistances,
-                             const CMemBlock2D<double>& bcDistances,
                              const CGtoBlock&           braGtoBlock,
                              const CGtoBlock&           ketGtoBlock,
                              const int32_t              iContrGto)
@@ -1091,7 +1180,11 @@ namespace amomrecfunc { // amomrecfunc namespace
                                                          {1, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_s_2_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true, 
+        auto pidx_p_2_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {2, -1, -1, -1}, {0, -1, -1, -1}, 
+                                                         1, 1, 0));
+
+        auto pidx_d_2_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
                                                          {2, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
@@ -1114,14 +1207,6 @@ namespace amomrecfunc { // amomrecfunc namespace
             auto pa_y = paDistances.data(3 * idx + 1);
 
             auto pa_z = paDistances.data(3 * idx + 2);
-
-            // set up pointers to tensors product of distances R(BC) = B - C
-
-            auto bc_x = bcDistances.data(3 * idx);
-
-            auto bc_y = bcDistances.data(3 * idx + 1);
-
-            auto bc_z = bcDistances.data(3 * idx + 2);
 
             // set up pointers to auxilary integrals
 
@@ -1179,17 +1264,65 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_z_0_0 = primBuffer.data(pidx_l_1_0_m0 + 6 * bdim + 3 * idx + 2); 
 
-            auto ts_xx_0_0 = primBuffer.data(pidx_s_2_0_m0 + 6 * idx); 
+            auto tpy_xx_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * bdim + 6 * idx); 
 
-            auto ts_xy_0_0 = primBuffer.data(pidx_s_2_0_m0 + 6 * idx + 1); 
+            auto tpz_xx_0_0 = primBuffer.data(pidx_p_2_0_m0 + 12 * bdim + 6 * idx); 
 
-            auto ts_xz_0_0 = primBuffer.data(pidx_s_2_0_m0 + 6 * idx + 2); 
+            auto tpy_xy_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * bdim + 6 * idx + 1); 
 
-            auto ts_yy_0_0 = primBuffer.data(pidx_s_2_0_m0 + 6 * idx + 3); 
+            auto tpz_xy_0_0 = primBuffer.data(pidx_p_2_0_m0 + 12 * bdim + 6 * idx + 1); 
 
-            auto ts_yz_0_0 = primBuffer.data(pidx_s_2_0_m0 + 6 * idx + 4); 
+            auto tpy_xz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * bdim + 6 * idx + 2); 
 
-            auto ts_zz_0_0 = primBuffer.data(pidx_s_2_0_m0 + 6 * idx + 5); 
+            auto tpz_xz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 12 * bdim + 6 * idx + 2); 
+
+            auto tpx_yy_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * idx + 3); 
+
+            auto tpy_yy_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * bdim + 6 * idx + 3); 
+
+            auto tpz_yy_0_0 = primBuffer.data(pidx_p_2_0_m0 + 12 * bdim + 6 * idx + 3); 
+
+            auto tpx_yz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * idx + 4); 
+
+            auto tpy_yz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * bdim + 6 * idx + 4); 
+
+            auto tpz_yz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 12 * bdim + 6 * idx + 4); 
+
+            auto tpx_zz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * idx + 5); 
+
+            auto tpy_zz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 6 * bdim + 6 * idx + 5); 
+
+            auto tpz_zz_0_0 = primBuffer.data(pidx_p_2_0_m0 + 12 * bdim + 6 * idx + 5); 
+
+            auto tdy_xx_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * bdim + 6 * idx); 
+
+            auto tdz_xx_0_0 = primBuffer.data(pidx_d_2_0_m0 + 12 * bdim + 6 * idx); 
+
+            auto tdy_xy_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * bdim + 6 * idx + 1); 
+
+            auto tdz_xy_0_0 = primBuffer.data(pidx_d_2_0_m0 + 12 * bdim + 6 * idx + 1); 
+
+            auto tdy_xz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * bdim + 6 * idx + 2); 
+
+            auto tdz_xz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 12 * bdim + 6 * idx + 2); 
+
+            auto tdx_yy_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * idx + 3); 
+
+            auto tdy_yy_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * bdim + 6 * idx + 3); 
+
+            auto tdz_yy_0_0 = primBuffer.data(pidx_d_2_0_m0 + 12 * bdim + 6 * idx + 3); 
+
+            auto tdx_yz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * idx + 4); 
+
+            auto tdy_yz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * bdim + 6 * idx + 4); 
+
+            auto tdz_yz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 12 * bdim + 6 * idx + 4); 
+
+            auto tdx_zz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * idx + 5); 
+
+            auto tdy_zz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 6 * bdim + 6 * idx + 5); 
+
+            auto tdz_zz_0_0 = primBuffer.data(pidx_d_2_0_m0 + 12 * bdim + 6 * idx + 5); 
 
             // set up pointers to integrals
 
@@ -1253,7 +1386,9 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_zzz_0_0 = primBuffer.data(pidx_l_3_0_m0 + 20 * bdim + 10 * idx + 9); 
 
-            #pragma omp simd aligned(bc_x, bc_y, bc_z, fgb, fx, pa_x, pa_y, pa_z, tlx_x_0_0, tlx_xx_0_0, tlx_xxx_0_0, \
+            #pragma omp simd aligned(fgb, fx, pa_x, pa_y, pa_z, tdx_yy_0_0, tdx_yz_0_0, tdx_zz_0_0, tdy_xx_0_0, \
+                                     tdy_xy_0_0, tdy_xz_0_0, tdy_yy_0_0, tdy_yz_0_0, tdy_zz_0_0, tdz_xx_0_0, tdz_xy_0_0, \
+                                     tdz_xz_0_0, tdz_yy_0_0, tdz_yz_0_0, tdz_zz_0_0, tlx_x_0_0, tlx_xx_0_0, tlx_xxx_0_0, \
                                      tlx_xxy_0_0, tlx_xxz_0_0, tlx_xy_0_0, tlx_xyy_0_0, tlx_xyz_0_0, tlx_xz_0_0, \
                                      tlx_xzz_0_0, tlx_y_0_0, tlx_yy_0_0, tlx_yyy_0_0, tlx_yyz_0_0, tlx_yz_0_0, \
                                      tlx_yzz_0_0, tlx_z_0_0, tlx_zz_0_0, tlx_zzz_0_0, tly_x_0_0, tly_xx_0_0, tly_xxx_0_0, \
@@ -1262,8 +1397,9 @@ namespace amomrecfunc { // amomrecfunc namespace
                                      tly_yzz_0_0, tly_z_0_0, tly_zz_0_0, tly_zzz_0_0, tlz_x_0_0, tlz_xx_0_0, tlz_xxx_0_0, \
                                      tlz_xxy_0_0, tlz_xxz_0_0, tlz_xy_0_0, tlz_xyy_0_0, tlz_xyz_0_0, tlz_xz_0_0, \
                                      tlz_xzz_0_0, tlz_y_0_0, tlz_yy_0_0, tlz_yyy_0_0, tlz_yyz_0_0, tlz_yz_0_0, \
-                                     tlz_yzz_0_0, tlz_z_0_0, tlz_zz_0_0, tlz_zzz_0_0, ts_xx_0_0, ts_xy_0_0, ts_xz_0_0, \
-                                     ts_yy_0_0, ts_yz_0_0, ts_zz_0_0: VLX_ALIGN)
+                                     tlz_yzz_0_0, tlz_z_0_0, tlz_zz_0_0, tlz_zzz_0_0, tpx_yy_0_0, tpx_yz_0_0, tpx_zz_0_0, \
+                                     tpy_xx_0_0, tpy_xy_0_0, tpy_xz_0_0, tpy_yy_0_0, tpy_yz_0_0, tpy_zz_0_0, tpz_xx_0_0, \
+                                     tpz_xy_0_0, tpz_xz_0_0, tpz_yy_0_0, tpz_yz_0_0, tpz_zz_0_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl1_fgb = fgb[j];
@@ -1272,61 +1408,61 @@ namespace amomrecfunc { // amomrecfunc namespace
 
                 tlx_xxx_0_0[j] = pa_x[j] * tlx_xx_0_0[j] + fl1_fx * tlx_x_0_0[j];
 
-                tly_xxx_0_0[j] = pa_x[j] * tly_xx_0_0[j] + fl1_fx * tly_x_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xx_0_0[j];
+                tly_xxx_0_0[j] = pa_x[j] * tly_xx_0_0[j] + fl1_fx * tly_x_0_0[j] + 0.5 * fl1_fx * tpz_xx_0_0[j] + fl1_fx * fl1_fgb * tdz_xx_0_0[j];
 
-                tlz_xxx_0_0[j] = pa_x[j] * tlz_xx_0_0[j] + fl1_fx * tlz_x_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xx_0_0[j];
+                tlz_xxx_0_0[j] = pa_x[j] * tlz_xx_0_0[j] + fl1_fx * tlz_x_0_0[j] - 0.5 * fl1_fx * tpy_xx_0_0[j] - fl1_fx * fl1_fgb * tdy_xx_0_0[j];
 
                 tlx_xxy_0_0[j] = pa_x[j] * tlx_xy_0_0[j] + 0.5 * fl1_fx * tlx_y_0_0[j];
 
-                tly_xxy_0_0[j] = pa_x[j] * tly_xy_0_0[j] + 0.5 * fl1_fx * tly_y_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xy_0_0[j];
+                tly_xxy_0_0[j] = pa_x[j] * tly_xy_0_0[j] + 0.5 * fl1_fx * tly_y_0_0[j] + 0.5 * fl1_fx * tpz_xy_0_0[j] + fl1_fx * fl1_fgb * tdz_xy_0_0[j];
 
-                tlz_xxy_0_0[j] = pa_x[j] * tlz_xy_0_0[j] + 0.5 * fl1_fx * tlz_y_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xy_0_0[j];
+                tlz_xxy_0_0[j] = pa_x[j] * tlz_xy_0_0[j] + 0.5 * fl1_fx * tlz_y_0_0[j] - 0.5 * fl1_fx * tpy_xy_0_0[j] - fl1_fx * fl1_fgb * tdy_xy_0_0[j];
 
                 tlx_xxz_0_0[j] = pa_x[j] * tlx_xz_0_0[j] + 0.5 * fl1_fx * tlx_z_0_0[j];
 
-                tly_xxz_0_0[j] = pa_x[j] * tly_xz_0_0[j] + 0.5 * fl1_fx * tly_z_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xz_0_0[j];
+                tly_xxz_0_0[j] = pa_x[j] * tly_xz_0_0[j] + 0.5 * fl1_fx * tly_z_0_0[j] + 0.5 * fl1_fx * tpz_xz_0_0[j] + fl1_fx * fl1_fgb * tdz_xz_0_0[j];
 
-                tlz_xxz_0_0[j] = pa_x[j] * tlz_xz_0_0[j] + 0.5 * fl1_fx * tlz_z_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xz_0_0[j];
+                tlz_xxz_0_0[j] = pa_x[j] * tlz_xz_0_0[j] + 0.5 * fl1_fx * tlz_z_0_0[j] - 0.5 * fl1_fx * tpy_xz_0_0[j] - fl1_fx * fl1_fgb * tdy_xz_0_0[j];
 
                 tlx_xyy_0_0[j] = pa_x[j] * tlx_yy_0_0[j];
 
-                tly_xyy_0_0[j] = pa_x[j] * tly_yy_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_yy_0_0[j];
+                tly_xyy_0_0[j] = pa_x[j] * tly_yy_0_0[j] + 0.5 * fl1_fx * tpz_yy_0_0[j] + fl1_fx * fl1_fgb * tdz_yy_0_0[j];
 
-                tlz_xyy_0_0[j] = pa_x[j] * tlz_yy_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_yy_0_0[j];
+                tlz_xyy_0_0[j] = pa_x[j] * tlz_yy_0_0[j] - 0.5 * fl1_fx * tpy_yy_0_0[j] - fl1_fx * fl1_fgb * tdy_yy_0_0[j];
 
                 tlx_xyz_0_0[j] = pa_x[j] * tlx_yz_0_0[j];
 
-                tly_xyz_0_0[j] = pa_x[j] * tly_yz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_yz_0_0[j];
+                tly_xyz_0_0[j] = pa_x[j] * tly_yz_0_0[j] + 0.5 * fl1_fx * tpz_yz_0_0[j] + fl1_fx * fl1_fgb * tdz_yz_0_0[j];
 
-                tlz_xyz_0_0[j] = pa_x[j] * tlz_yz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_yz_0_0[j];
+                tlz_xyz_0_0[j] = pa_x[j] * tlz_yz_0_0[j] - 0.5 * fl1_fx * tpy_yz_0_0[j] - fl1_fx * fl1_fgb * tdy_yz_0_0[j];
 
                 tlx_xzz_0_0[j] = pa_x[j] * tlx_zz_0_0[j];
 
-                tly_xzz_0_0[j] = pa_x[j] * tly_zz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_zz_0_0[j];
+                tly_xzz_0_0[j] = pa_x[j] * tly_zz_0_0[j] + 0.5 * fl1_fx * tpz_zz_0_0[j] + fl1_fx * fl1_fgb * tdz_zz_0_0[j];
 
-                tlz_xzz_0_0[j] = pa_x[j] * tlz_zz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_zz_0_0[j];
+                tlz_xzz_0_0[j] = pa_x[j] * tlz_zz_0_0[j] - 0.5 * fl1_fx * tpy_zz_0_0[j] - fl1_fx * fl1_fgb * tdy_zz_0_0[j];
 
-                tlx_yyy_0_0[j] = pa_y[j] * tlx_yy_0_0[j] + fl1_fx * tlx_y_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_yy_0_0[j];
+                tlx_yyy_0_0[j] = pa_y[j] * tlx_yy_0_0[j] + fl1_fx * tlx_y_0_0[j] - 0.5 * fl1_fx * tpz_yy_0_0[j] - fl1_fx * fl1_fgb * tdz_yy_0_0[j];
 
                 tly_yyy_0_0[j] = pa_y[j] * tly_yy_0_0[j] + fl1_fx * tly_y_0_0[j];
 
-                tlz_yyy_0_0[j] = pa_y[j] * tlz_yy_0_0[j] + fl1_fx * tlz_y_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_yy_0_0[j];
+                tlz_yyy_0_0[j] = pa_y[j] * tlz_yy_0_0[j] + fl1_fx * tlz_y_0_0[j] + 0.5 * fl1_fx * tpx_yy_0_0[j] + fl1_fx * fl1_fgb * tdx_yy_0_0[j];
 
-                tlx_yyz_0_0[j] = pa_y[j] * tlx_yz_0_0[j] + 0.5 * fl1_fx * tlx_z_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_yz_0_0[j];
+                tlx_yyz_0_0[j] = pa_y[j] * tlx_yz_0_0[j] + 0.5 * fl1_fx * tlx_z_0_0[j] - 0.5 * fl1_fx * tpz_yz_0_0[j] - fl1_fx * fl1_fgb * tdz_yz_0_0[j];
 
                 tly_yyz_0_0[j] = pa_y[j] * tly_yz_0_0[j] + 0.5 * fl1_fx * tly_z_0_0[j];
 
-                tlz_yyz_0_0[j] = pa_y[j] * tlz_yz_0_0[j] + 0.5 * fl1_fx * tlz_z_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_yz_0_0[j];
+                tlz_yyz_0_0[j] = pa_y[j] * tlz_yz_0_0[j] + 0.5 * fl1_fx * tlz_z_0_0[j] + 0.5 * fl1_fx * tpx_yz_0_0[j] + fl1_fx * fl1_fgb * tdx_yz_0_0[j];
 
-                tlx_yzz_0_0[j] = pa_y[j] * tlx_zz_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_zz_0_0[j];
+                tlx_yzz_0_0[j] = pa_y[j] * tlx_zz_0_0[j] - 0.5 * fl1_fx * tpz_zz_0_0[j] - fl1_fx * fl1_fgb * tdz_zz_0_0[j];
 
                 tly_yzz_0_0[j] = pa_y[j] * tly_zz_0_0[j];
 
-                tlz_yzz_0_0[j] = pa_y[j] * tlz_zz_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_zz_0_0[j];
+                tlz_yzz_0_0[j] = pa_y[j] * tlz_zz_0_0[j] + 0.5 * fl1_fx * tpx_zz_0_0[j] + fl1_fx * fl1_fgb * tdx_zz_0_0[j];
 
-                tlx_zzz_0_0[j] = pa_z[j] * tlx_zz_0_0[j] + fl1_fx * tlx_z_0_0[j] - bc_y[j] * fl1_fx * fl1_fgb * ts_zz_0_0[j];
+                tlx_zzz_0_0[j] = pa_z[j] * tlx_zz_0_0[j] + fl1_fx * tlx_z_0_0[j] + 0.5 * fl1_fx * tpy_zz_0_0[j] + fl1_fx * fl1_fgb * tdy_zz_0_0[j];
 
-                tly_zzz_0_0[j] = pa_z[j] * tly_zz_0_0[j] + fl1_fx * tly_z_0_0[j] + bc_x[j] * fl1_fx * fl1_fgb * ts_zz_0_0[j];
+                tly_zzz_0_0[j] = pa_z[j] * tly_zz_0_0[j] + fl1_fx * tly_z_0_0[j] - 0.5 * fl1_fx * tpx_zz_0_0[j] - fl1_fx * fl1_fgb * tdx_zz_0_0[j];
 
                 tlz_zzz_0_0[j] = pa_z[j] * tlz_zz_0_0[j] + fl1_fx * tlz_z_0_0[j];
             }
@@ -1340,7 +1476,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                              const CRecursionMap&       recursionMap,
                              const CMemBlock2D<double>& osFactors,
                              const CMemBlock2D<double>& pbDistances,
-                             const CMemBlock2D<double>& acDistances,
                              const CGtoBlock&           braGtoBlock,
                              const CGtoBlock&           ketGtoBlock,
                              const int32_t              iContrGto)
@@ -1377,7 +1512,11 @@ namespace amomrecfunc { // amomrecfunc namespace
                                                          {0, -1, -1, -1}, {2, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_s_0_3_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true, 
+        auto pidx_p_0_3_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {0, -1, -1, -1}, {3, -1, -1, -1}, 
+                                                         1, 1, 0));
+
+        auto pidx_d_0_3_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
                                                          {0, -1, -1, -1}, {3, -1, -1, -1}, 
                                                          1, 1, 0));
 
@@ -1400,14 +1539,6 @@ namespace amomrecfunc { // amomrecfunc namespace
             auto pb_y = pbDistances.data(3 * idx + 1);
 
             auto pb_z = pbDistances.data(3 * idx + 2);
-
-            // set up pointers to tensors product of distances R(AC) = A - C
-
-            auto ac_x = acDistances.data(3 * idx);
-
-            auto ac_y = acDistances.data(3 * idx + 1);
-
-            auto ac_z = acDistances.data(3 * idx + 2);
 
             // set up pointers to auxilary integrals
 
@@ -1507,25 +1638,101 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_0_zz_0 = primBuffer.data(pidx_l_0_2_m0 + 12 * bdim + 6 * idx + 5); 
 
-            auto ts_0_xxx_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx); 
+            auto tpy_0_xxx_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx); 
 
-            auto ts_0_xxy_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 1); 
+            auto tpz_0_xxx_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx); 
 
-            auto ts_0_xxz_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 2); 
+            auto tpy_0_xxy_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 1); 
 
-            auto ts_0_xyy_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 3); 
+            auto tpz_0_xxy_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 1); 
 
-            auto ts_0_xyz_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 4); 
+            auto tpy_0_xxz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 2); 
 
-            auto ts_0_xzz_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 5); 
+            auto tpz_0_xxz_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 2); 
 
-            auto ts_0_yyy_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 6); 
+            auto tpy_0_xyy_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 3); 
 
-            auto ts_0_yyz_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 7); 
+            auto tpz_0_xyy_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 3); 
 
-            auto ts_0_yzz_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 8); 
+            auto tpy_0_xyz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 4); 
 
-            auto ts_0_zzz_0 = primBuffer.data(pidx_s_0_3_m0 + 10 * idx + 9); 
+            auto tpz_0_xyz_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 4); 
+
+            auto tpy_0_xzz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 5); 
+
+            auto tpz_0_xzz_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 5); 
+
+            auto tpx_0_yyy_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * idx + 6); 
+
+            auto tpy_0_yyy_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 6); 
+
+            auto tpz_0_yyy_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 6); 
+
+            auto tpx_0_yyz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * idx + 7); 
+
+            auto tpy_0_yyz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 7); 
+
+            auto tpz_0_yyz_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 7); 
+
+            auto tpx_0_yzz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * idx + 8); 
+
+            auto tpy_0_yzz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 8); 
+
+            auto tpz_0_yzz_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 8); 
+
+            auto tpx_0_zzz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * idx + 9); 
+
+            auto tpy_0_zzz_0 = primBuffer.data(pidx_p_0_3_m0 + 10 * bdim + 10 * idx + 9); 
+
+            auto tpz_0_zzz_0 = primBuffer.data(pidx_p_0_3_m0 + 20 * bdim + 10 * idx + 9); 
+
+            auto tdy_0_xxx_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx); 
+
+            auto tdz_0_xxx_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx); 
+
+            auto tdy_0_xxy_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 1); 
+
+            auto tdz_0_xxy_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 1); 
+
+            auto tdy_0_xxz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 2); 
+
+            auto tdz_0_xxz_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 2); 
+
+            auto tdy_0_xyy_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 3); 
+
+            auto tdz_0_xyy_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 3); 
+
+            auto tdy_0_xyz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 4); 
+
+            auto tdz_0_xyz_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 4); 
+
+            auto tdy_0_xzz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 5); 
+
+            auto tdz_0_xzz_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 5); 
+
+            auto tdx_0_yyy_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * idx + 6); 
+
+            auto tdy_0_yyy_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 6); 
+
+            auto tdz_0_yyy_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 6); 
+
+            auto tdx_0_yyz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * idx + 7); 
+
+            auto tdy_0_yyz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 7); 
+
+            auto tdz_0_yyz_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 7); 
+
+            auto tdx_0_yzz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * idx + 8); 
+
+            auto tdy_0_yzz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 8); 
+
+            auto tdz_0_yzz_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 8); 
+
+            auto tdx_0_zzz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * idx + 9); 
+
+            auto tdy_0_zzz_0 = primBuffer.data(pidx_d_0_3_m0 + 10 * bdim + 10 * idx + 9); 
+
+            auto tdz_0_zzz_0 = primBuffer.data(pidx_d_0_3_m0 + 20 * bdim + 10 * idx + 9); 
 
             // set up pointers to integrals
 
@@ -1619,24 +1826,30 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_0_zzzz_0 = primBuffer.data(pidx_l_0_4_m0 + 30 * bdim + 15 * idx + 14); 
 
-            #pragma omp simd aligned(ac_x, ac_y, ac_z, fga, fx, pb_x, pb_y, pb_z, tlx_0_xx_0, tlx_0_xxx_0, \
-                                     tlx_0_xxxx_0, tlx_0_xxxy_0, tlx_0_xxxz_0, tlx_0_xxy_0, tlx_0_xxyy_0, tlx_0_xxyz_0, \
-                                     tlx_0_xxz_0, tlx_0_xxzz_0, tlx_0_xy_0, tlx_0_xyy_0, tlx_0_xyyy_0, tlx_0_xyyz_0, \
-                                     tlx_0_xyz_0, tlx_0_xyzz_0, tlx_0_xz_0, tlx_0_xzz_0, tlx_0_xzzz_0, tlx_0_yy_0, \
-                                     tlx_0_yyy_0, tlx_0_yyyy_0, tlx_0_yyyz_0, tlx_0_yyz_0, tlx_0_yyzz_0, tlx_0_yz_0, \
-                                     tlx_0_yzz_0, tlx_0_yzzz_0, tlx_0_zz_0, tlx_0_zzz_0, tlx_0_zzzz_0, tly_0_xx_0, \
-                                     tly_0_xxx_0, tly_0_xxxx_0, tly_0_xxxy_0, tly_0_xxxz_0, tly_0_xxy_0, tly_0_xxyy_0, \
-                                     tly_0_xxyz_0, tly_0_xxz_0, tly_0_xxzz_0, tly_0_xy_0, tly_0_xyy_0, tly_0_xyyy_0, \
-                                     tly_0_xyyz_0, tly_0_xyz_0, tly_0_xyzz_0, tly_0_xz_0, tly_0_xzz_0, tly_0_xzzz_0, \
-                                     tly_0_yy_0, tly_0_yyy_0, tly_0_yyyy_0, tly_0_yyyz_0, tly_0_yyz_0, tly_0_yyzz_0, \
-                                     tly_0_yz_0, tly_0_yzz_0, tly_0_yzzz_0, tly_0_zz_0, tly_0_zzz_0, tly_0_zzzz_0, \
-                                     tlz_0_xx_0, tlz_0_xxx_0, tlz_0_xxxx_0, tlz_0_xxxy_0, tlz_0_xxxz_0, tlz_0_xxy_0, \
-                                     tlz_0_xxyy_0, tlz_0_xxyz_0, tlz_0_xxz_0, tlz_0_xxzz_0, tlz_0_xy_0, tlz_0_xyy_0, \
-                                     tlz_0_xyyy_0, tlz_0_xyyz_0, tlz_0_xyz_0, tlz_0_xyzz_0, tlz_0_xz_0, tlz_0_xzz_0, \
-                                     tlz_0_xzzz_0, tlz_0_yy_0, tlz_0_yyy_0, tlz_0_yyyy_0, tlz_0_yyyz_0, tlz_0_yyz_0, \
-                                     tlz_0_yyzz_0, tlz_0_yz_0, tlz_0_yzz_0, tlz_0_yzzz_0, tlz_0_zz_0, tlz_0_zzz_0, \
-                                     tlz_0_zzzz_0, ts_0_xxx_0, ts_0_xxy_0, ts_0_xxz_0, ts_0_xyy_0, ts_0_xyz_0, ts_0_xzz_0, \
-                                     ts_0_yyy_0, ts_0_yyz_0, ts_0_yzz_0, ts_0_zzz_0: VLX_ALIGN)
+            #pragma omp simd aligned(fga, fx, pb_x, pb_y, pb_z, tdx_0_yyy_0, tdx_0_yyz_0, tdx_0_yzz_0, \
+                                     tdx_0_zzz_0, tdy_0_xxx_0, tdy_0_xxy_0, tdy_0_xxz_0, tdy_0_xyy_0, tdy_0_xyz_0, \
+                                     tdy_0_xzz_0, tdy_0_yyy_0, tdy_0_yyz_0, tdy_0_yzz_0, tdy_0_zzz_0, tdz_0_xxx_0, \
+                                     tdz_0_xxy_0, tdz_0_xxz_0, tdz_0_xyy_0, tdz_0_xyz_0, tdz_0_xzz_0, tdz_0_yyy_0, \
+                                     tdz_0_yyz_0, tdz_0_yzz_0, tdz_0_zzz_0, tlx_0_xx_0, tlx_0_xxx_0, tlx_0_xxxx_0, \
+                                     tlx_0_xxxy_0, tlx_0_xxxz_0, tlx_0_xxy_0, tlx_0_xxyy_0, tlx_0_xxyz_0, tlx_0_xxz_0, \
+                                     tlx_0_xxzz_0, tlx_0_xy_0, tlx_0_xyy_0, tlx_0_xyyy_0, tlx_0_xyyz_0, tlx_0_xyz_0, \
+                                     tlx_0_xyzz_0, tlx_0_xz_0, tlx_0_xzz_0, tlx_0_xzzz_0, tlx_0_yy_0, tlx_0_yyy_0, \
+                                     tlx_0_yyyy_0, tlx_0_yyyz_0, tlx_0_yyz_0, tlx_0_yyzz_0, tlx_0_yz_0, tlx_0_yzz_0, \
+                                     tlx_0_yzzz_0, tlx_0_zz_0, tlx_0_zzz_0, tlx_0_zzzz_0, tly_0_xx_0, tly_0_xxx_0, \
+                                     tly_0_xxxx_0, tly_0_xxxy_0, tly_0_xxxz_0, tly_0_xxy_0, tly_0_xxyy_0, tly_0_xxyz_0, \
+                                     tly_0_xxz_0, tly_0_xxzz_0, tly_0_xy_0, tly_0_xyy_0, tly_0_xyyy_0, tly_0_xyyz_0, \
+                                     tly_0_xyz_0, tly_0_xyzz_0, tly_0_xz_0, tly_0_xzz_0, tly_0_xzzz_0, tly_0_yy_0, \
+                                     tly_0_yyy_0, tly_0_yyyy_0, tly_0_yyyz_0, tly_0_yyz_0, tly_0_yyzz_0, tly_0_yz_0, \
+                                     tly_0_yzz_0, tly_0_yzzz_0, tly_0_zz_0, tly_0_zzz_0, tly_0_zzzz_0, tlz_0_xx_0, \
+                                     tlz_0_xxx_0, tlz_0_xxxx_0, tlz_0_xxxy_0, tlz_0_xxxz_0, tlz_0_xxy_0, tlz_0_xxyy_0, \
+                                     tlz_0_xxyz_0, tlz_0_xxz_0, tlz_0_xxzz_0, tlz_0_xy_0, tlz_0_xyy_0, tlz_0_xyyy_0, \
+                                     tlz_0_xyyz_0, tlz_0_xyz_0, tlz_0_xyzz_0, tlz_0_xz_0, tlz_0_xzz_0, tlz_0_xzzz_0, \
+                                     tlz_0_yy_0, tlz_0_yyy_0, tlz_0_yyyy_0, tlz_0_yyyz_0, tlz_0_yyz_0, tlz_0_yyzz_0, \
+                                     tlz_0_yz_0, tlz_0_yzz_0, tlz_0_yzzz_0, tlz_0_zz_0, tlz_0_zzz_0, tlz_0_zzzz_0, \
+                                     tpx_0_yyy_0, tpx_0_yyz_0, tpx_0_yzz_0, tpx_0_zzz_0, tpy_0_xxx_0, tpy_0_xxy_0, \
+                                     tpy_0_xxz_0, tpy_0_xyy_0, tpy_0_xyz_0, tpy_0_xzz_0, tpy_0_yyy_0, tpy_0_yyz_0, \
+                                     tpy_0_yzz_0, tpy_0_zzz_0, tpz_0_xxx_0, tpz_0_xxy_0, tpz_0_xxz_0, tpz_0_xyy_0, \
+                                     tpz_0_xyz_0, tpz_0_xzz_0, tpz_0_yyy_0, tpz_0_yyz_0, tpz_0_yzz_0, tpz_0_zzz_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl1_fga = fga[j];
@@ -1645,91 +1858,91 @@ namespace amomrecfunc { // amomrecfunc namespace
 
                 tlx_0_xxxx_0[j] = pb_x[j] * tlx_0_xxx_0[j] + 1.5 * fl1_fx * tlx_0_xx_0[j];
 
-                tly_0_xxxx_0[j] = pb_x[j] * tly_0_xxx_0[j] + 1.5 * fl1_fx * tly_0_xx_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xxx_0[j];
+                tly_0_xxxx_0[j] = pb_x[j] * tly_0_xxx_0[j] + 1.5 * fl1_fx * tly_0_xx_0[j] + 0.5 * fl1_fx * tpz_0_xxx_0[j] - fl1_fx * fl1_fga * tdz_0_xxx_0[j];
 
-                tlz_0_xxxx_0[j] = pb_x[j] * tlz_0_xxx_0[j] + 1.5 * fl1_fx * tlz_0_xx_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xxx_0[j];
+                tlz_0_xxxx_0[j] = pb_x[j] * tlz_0_xxx_0[j] + 1.5 * fl1_fx * tlz_0_xx_0[j] - 0.5 * fl1_fx * tpy_0_xxx_0[j] + fl1_fx * fl1_fga * tdy_0_xxx_0[j];
 
                 tlx_0_xxxy_0[j] = pb_x[j] * tlx_0_xxy_0[j] + fl1_fx * tlx_0_xy_0[j];
 
-                tly_0_xxxy_0[j] = pb_x[j] * tly_0_xxy_0[j] + fl1_fx * tly_0_xy_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xxy_0[j];
+                tly_0_xxxy_0[j] = pb_x[j] * tly_0_xxy_0[j] + fl1_fx * tly_0_xy_0[j] + 0.5 * fl1_fx * tpz_0_xxy_0[j] - fl1_fx * fl1_fga * tdz_0_xxy_0[j];
 
-                tlz_0_xxxy_0[j] = pb_x[j] * tlz_0_xxy_0[j] + fl1_fx * tlz_0_xy_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xxy_0[j];
+                tlz_0_xxxy_0[j] = pb_x[j] * tlz_0_xxy_0[j] + fl1_fx * tlz_0_xy_0[j] - 0.5 * fl1_fx * tpy_0_xxy_0[j] + fl1_fx * fl1_fga * tdy_0_xxy_0[j];
 
                 tlx_0_xxxz_0[j] = pb_x[j] * tlx_0_xxz_0[j] + fl1_fx * tlx_0_xz_0[j];
 
-                tly_0_xxxz_0[j] = pb_x[j] * tly_0_xxz_0[j] + fl1_fx * tly_0_xz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xxz_0[j];
+                tly_0_xxxz_0[j] = pb_x[j] * tly_0_xxz_0[j] + fl1_fx * tly_0_xz_0[j] + 0.5 * fl1_fx * tpz_0_xxz_0[j] - fl1_fx * fl1_fga * tdz_0_xxz_0[j];
 
-                tlz_0_xxxz_0[j] = pb_x[j] * tlz_0_xxz_0[j] + fl1_fx * tlz_0_xz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xxz_0[j];
+                tlz_0_xxxz_0[j] = pb_x[j] * tlz_0_xxz_0[j] + fl1_fx * tlz_0_xz_0[j] - 0.5 * fl1_fx * tpy_0_xxz_0[j] + fl1_fx * fl1_fga * tdy_0_xxz_0[j];
 
                 tlx_0_xxyy_0[j] = pb_x[j] * tlx_0_xyy_0[j] + 0.5 * fl1_fx * tlx_0_yy_0[j];
 
-                tly_0_xxyy_0[j] = pb_x[j] * tly_0_xyy_0[j] + 0.5 * fl1_fx * tly_0_yy_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xyy_0[j];
+                tly_0_xxyy_0[j] = pb_x[j] * tly_0_xyy_0[j] + 0.5 * fl1_fx * tly_0_yy_0[j] + 0.5 * fl1_fx * tpz_0_xyy_0[j] - fl1_fx * fl1_fga * tdz_0_xyy_0[j];
 
-                tlz_0_xxyy_0[j] = pb_x[j] * tlz_0_xyy_0[j] + 0.5 * fl1_fx * tlz_0_yy_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xyy_0[j];
+                tlz_0_xxyy_0[j] = pb_x[j] * tlz_0_xyy_0[j] + 0.5 * fl1_fx * tlz_0_yy_0[j] - 0.5 * fl1_fx * tpy_0_xyy_0[j] + fl1_fx * fl1_fga * tdy_0_xyy_0[j];
 
                 tlx_0_xxyz_0[j] = pb_x[j] * tlx_0_xyz_0[j] + 0.5 * fl1_fx * tlx_0_yz_0[j];
 
-                tly_0_xxyz_0[j] = pb_x[j] * tly_0_xyz_0[j] + 0.5 * fl1_fx * tly_0_yz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xyz_0[j];
+                tly_0_xxyz_0[j] = pb_x[j] * tly_0_xyz_0[j] + 0.5 * fl1_fx * tly_0_yz_0[j] + 0.5 * fl1_fx * tpz_0_xyz_0[j] - fl1_fx * fl1_fga * tdz_0_xyz_0[j];
 
-                tlz_0_xxyz_0[j] = pb_x[j] * tlz_0_xyz_0[j] + 0.5 * fl1_fx * tlz_0_yz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xyz_0[j];
+                tlz_0_xxyz_0[j] = pb_x[j] * tlz_0_xyz_0[j] + 0.5 * fl1_fx * tlz_0_yz_0[j] - 0.5 * fl1_fx * tpy_0_xyz_0[j] + fl1_fx * fl1_fga * tdy_0_xyz_0[j];
 
                 tlx_0_xxzz_0[j] = pb_x[j] * tlx_0_xzz_0[j] + 0.5 * fl1_fx * tlx_0_zz_0[j];
 
-                tly_0_xxzz_0[j] = pb_x[j] * tly_0_xzz_0[j] + 0.5 * fl1_fx * tly_0_zz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_xzz_0[j];
+                tly_0_xxzz_0[j] = pb_x[j] * tly_0_xzz_0[j] + 0.5 * fl1_fx * tly_0_zz_0[j] + 0.5 * fl1_fx * tpz_0_xzz_0[j] - fl1_fx * fl1_fga * tdz_0_xzz_0[j];
 
-                tlz_0_xxzz_0[j] = pb_x[j] * tlz_0_xzz_0[j] + 0.5 * fl1_fx * tlz_0_zz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_xzz_0[j];
+                tlz_0_xxzz_0[j] = pb_x[j] * tlz_0_xzz_0[j] + 0.5 * fl1_fx * tlz_0_zz_0[j] - 0.5 * fl1_fx * tpy_0_xzz_0[j] + fl1_fx * fl1_fga * tdy_0_xzz_0[j];
 
                 tlx_0_xyyy_0[j] = pb_x[j] * tlx_0_yyy_0[j];
 
-                tly_0_xyyy_0[j] = pb_x[j] * tly_0_yyy_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_yyy_0[j];
+                tly_0_xyyy_0[j] = pb_x[j] * tly_0_yyy_0[j] + 0.5 * fl1_fx * tpz_0_yyy_0[j] - fl1_fx * fl1_fga * tdz_0_yyy_0[j];
 
-                tlz_0_xyyy_0[j] = pb_x[j] * tlz_0_yyy_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_yyy_0[j];
+                tlz_0_xyyy_0[j] = pb_x[j] * tlz_0_yyy_0[j] - 0.5 * fl1_fx * tpy_0_yyy_0[j] + fl1_fx * fl1_fga * tdy_0_yyy_0[j];
 
                 tlx_0_xyyz_0[j] = pb_x[j] * tlx_0_yyz_0[j];
 
-                tly_0_xyyz_0[j] = pb_x[j] * tly_0_yyz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_yyz_0[j];
+                tly_0_xyyz_0[j] = pb_x[j] * tly_0_yyz_0[j] + 0.5 * fl1_fx * tpz_0_yyz_0[j] - fl1_fx * fl1_fga * tdz_0_yyz_0[j];
 
-                tlz_0_xyyz_0[j] = pb_x[j] * tlz_0_yyz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_yyz_0[j];
+                tlz_0_xyyz_0[j] = pb_x[j] * tlz_0_yyz_0[j] - 0.5 * fl1_fx * tpy_0_yyz_0[j] + fl1_fx * fl1_fga * tdy_0_yyz_0[j];
 
                 tlx_0_xyzz_0[j] = pb_x[j] * tlx_0_yzz_0[j];
 
-                tly_0_xyzz_0[j] = pb_x[j] * tly_0_yzz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_yzz_0[j];
+                tly_0_xyzz_0[j] = pb_x[j] * tly_0_yzz_0[j] + 0.5 * fl1_fx * tpz_0_yzz_0[j] - fl1_fx * fl1_fga * tdz_0_yzz_0[j];
 
-                tlz_0_xyzz_0[j] = pb_x[j] * tlz_0_yzz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_yzz_0[j];
+                tlz_0_xyzz_0[j] = pb_x[j] * tlz_0_yzz_0[j] - 0.5 * fl1_fx * tpy_0_yzz_0[j] + fl1_fx * fl1_fga * tdy_0_yzz_0[j];
 
                 tlx_0_xzzz_0[j] = pb_x[j] * tlx_0_zzz_0[j];
 
-                tly_0_xzzz_0[j] = pb_x[j] * tly_0_zzz_0[j] - ac_z[j] * fl1_fx * fl1_fga * ts_0_zzz_0[j];
+                tly_0_xzzz_0[j] = pb_x[j] * tly_0_zzz_0[j] + 0.5 * fl1_fx * tpz_0_zzz_0[j] - fl1_fx * fl1_fga * tdz_0_zzz_0[j];
 
-                tlz_0_xzzz_0[j] = pb_x[j] * tlz_0_zzz_0[j] + ac_y[j] * fl1_fx * fl1_fga * ts_0_zzz_0[j];
+                tlz_0_xzzz_0[j] = pb_x[j] * tlz_0_zzz_0[j] - 0.5 * fl1_fx * tpy_0_zzz_0[j] + fl1_fx * fl1_fga * tdy_0_zzz_0[j];
 
-                tlx_0_yyyy_0[j] = pb_y[j] * tlx_0_yyy_0[j] + 1.5 * fl1_fx * tlx_0_yy_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_yyy_0[j];
+                tlx_0_yyyy_0[j] = pb_y[j] * tlx_0_yyy_0[j] + 1.5 * fl1_fx * tlx_0_yy_0[j] - 0.5 * fl1_fx * tpz_0_yyy_0[j] + fl1_fx * fl1_fga * tdz_0_yyy_0[j];
 
                 tly_0_yyyy_0[j] = pb_y[j] * tly_0_yyy_0[j] + 1.5 * fl1_fx * tly_0_yy_0[j];
 
-                tlz_0_yyyy_0[j] = pb_y[j] * tlz_0_yyy_0[j] + 1.5 * fl1_fx * tlz_0_yy_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_yyy_0[j];
+                tlz_0_yyyy_0[j] = pb_y[j] * tlz_0_yyy_0[j] + 1.5 * fl1_fx * tlz_0_yy_0[j] + 0.5 * fl1_fx * tpx_0_yyy_0[j] - fl1_fx * fl1_fga * tdx_0_yyy_0[j];
 
-                tlx_0_yyyz_0[j] = pb_y[j] * tlx_0_yyz_0[j] + fl1_fx * tlx_0_yz_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_yyz_0[j];
+                tlx_0_yyyz_0[j] = pb_y[j] * tlx_0_yyz_0[j] + fl1_fx * tlx_0_yz_0[j] - 0.5 * fl1_fx * tpz_0_yyz_0[j] + fl1_fx * fl1_fga * tdz_0_yyz_0[j];
 
                 tly_0_yyyz_0[j] = pb_y[j] * tly_0_yyz_0[j] + fl1_fx * tly_0_yz_0[j];
 
-                tlz_0_yyyz_0[j] = pb_y[j] * tlz_0_yyz_0[j] + fl1_fx * tlz_0_yz_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_yyz_0[j];
+                tlz_0_yyyz_0[j] = pb_y[j] * tlz_0_yyz_0[j] + fl1_fx * tlz_0_yz_0[j] + 0.5 * fl1_fx * tpx_0_yyz_0[j] - fl1_fx * fl1_fga * tdx_0_yyz_0[j];
 
-                tlx_0_yyzz_0[j] = pb_y[j] * tlx_0_yzz_0[j] + 0.5 * fl1_fx * tlx_0_zz_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_yzz_0[j];
+                tlx_0_yyzz_0[j] = pb_y[j] * tlx_0_yzz_0[j] + 0.5 * fl1_fx * tlx_0_zz_0[j] - 0.5 * fl1_fx * tpz_0_yzz_0[j] + fl1_fx * fl1_fga * tdz_0_yzz_0[j];
 
                 tly_0_yyzz_0[j] = pb_y[j] * tly_0_yzz_0[j] + 0.5 * fl1_fx * tly_0_zz_0[j];
 
-                tlz_0_yyzz_0[j] = pb_y[j] * tlz_0_yzz_0[j] + 0.5 * fl1_fx * tlz_0_zz_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_yzz_0[j];
+                tlz_0_yyzz_0[j] = pb_y[j] * tlz_0_yzz_0[j] + 0.5 * fl1_fx * tlz_0_zz_0[j] + 0.5 * fl1_fx * tpx_0_yzz_0[j] - fl1_fx * fl1_fga * tdx_0_yzz_0[j];
 
-                tlx_0_yzzz_0[j] = pb_y[j] * tlx_0_zzz_0[j] + ac_z[j] * fl1_fx * fl1_fga * ts_0_zzz_0[j];
+                tlx_0_yzzz_0[j] = pb_y[j] * tlx_0_zzz_0[j] - 0.5 * fl1_fx * tpz_0_zzz_0[j] + fl1_fx * fl1_fga * tdz_0_zzz_0[j];
 
                 tly_0_yzzz_0[j] = pb_y[j] * tly_0_zzz_0[j];
 
-                tlz_0_yzzz_0[j] = pb_y[j] * tlz_0_zzz_0[j] - ac_x[j] * fl1_fx * fl1_fga * ts_0_zzz_0[j];
+                tlz_0_yzzz_0[j] = pb_y[j] * tlz_0_zzz_0[j] + 0.5 * fl1_fx * tpx_0_zzz_0[j] - fl1_fx * fl1_fga * tdx_0_zzz_0[j];
 
-                tlx_0_zzzz_0[j] = pb_z[j] * tlx_0_zzz_0[j] + 1.5 * fl1_fx * tlx_0_zz_0[j] - ac_y[j] * fl1_fx * fl1_fga * ts_0_zzz_0[j];
+                tlx_0_zzzz_0[j] = pb_z[j] * tlx_0_zzz_0[j] + 1.5 * fl1_fx * tlx_0_zz_0[j] + 0.5 * fl1_fx * tpy_0_zzz_0[j] - fl1_fx * fl1_fga * tdy_0_zzz_0[j];
 
-                tly_0_zzzz_0[j] = pb_z[j] * tly_0_zzz_0[j] + 1.5 * fl1_fx * tly_0_zz_0[j] + ac_x[j] * fl1_fx * fl1_fga * ts_0_zzz_0[j];
+                tly_0_zzzz_0[j] = pb_z[j] * tly_0_zzz_0[j] + 1.5 * fl1_fx * tly_0_zz_0[j] - 0.5 * fl1_fx * tpx_0_zzz_0[j] + fl1_fx * fl1_fga * tdx_0_zzz_0[j];
 
                 tlz_0_zzzz_0[j] = pb_z[j] * tlz_0_zzz_0[j] + 1.5 * fl1_fx * tlz_0_zz_0[j];
             }
@@ -1743,7 +1956,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                              const CRecursionMap&       recursionMap,
                              const CMemBlock2D<double>& osFactors,
                              const CMemBlock2D<double>& paDistances,
-                             const CMemBlock2D<double>& bcDistances,
                              const CGtoBlock&           braGtoBlock,
                              const CGtoBlock&           ketGtoBlock,
                              const int32_t              iContrGto)
@@ -1780,7 +1992,11 @@ namespace amomrecfunc { // amomrecfunc namespace
                                                          {2, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
-        auto pidx_s_3_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true, 
+        auto pidx_p_3_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Linear Momentum"}, 1, true, 
+                                                         {3, -1, -1, -1}, {0, -1, -1, -1}, 
+                                                         1, 1, 0));
+
+        auto pidx_d_3_0_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electric Dipole"}, 1, true, 
                                                          {3, -1, -1, -1}, {0, -1, -1, -1}, 
                                                          1, 1, 0));
 
@@ -1803,14 +2019,6 @@ namespace amomrecfunc { // amomrecfunc namespace
             auto pa_y = paDistances.data(3 * idx + 1);
 
             auto pa_z = paDistances.data(3 * idx + 2);
-
-            // set up pointers to tensors product of distances R(BC) = B - C
-
-            auto bc_x = bcDistances.data(3 * idx);
-
-            auto bc_y = bcDistances.data(3 * idx + 1);
-
-            auto bc_z = bcDistances.data(3 * idx + 2);
 
             // set up pointers to auxilary integrals
 
@@ -1910,25 +2118,101 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_zz_0_0 = primBuffer.data(pidx_l_2_0_m0 + 12 * bdim + 6 * idx + 5); 
 
-            auto ts_xxx_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx); 
+            auto tpy_xxx_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx); 
 
-            auto ts_xxy_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 1); 
+            auto tpz_xxx_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx); 
 
-            auto ts_xxz_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 2); 
+            auto tpy_xxy_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 1); 
 
-            auto ts_xyy_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 3); 
+            auto tpz_xxy_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 1); 
 
-            auto ts_xyz_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 4); 
+            auto tpy_xxz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 2); 
 
-            auto ts_xzz_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 5); 
+            auto tpz_xxz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 2); 
 
-            auto ts_yyy_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 6); 
+            auto tpy_xyy_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 3); 
 
-            auto ts_yyz_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 7); 
+            auto tpz_xyy_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 3); 
 
-            auto ts_yzz_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 8); 
+            auto tpy_xyz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 4); 
 
-            auto ts_zzz_0_0 = primBuffer.data(pidx_s_3_0_m0 + 10 * idx + 9); 
+            auto tpz_xyz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 4); 
+
+            auto tpy_xzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 5); 
+
+            auto tpz_xzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 5); 
+
+            auto tpx_yyy_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * idx + 6); 
+
+            auto tpy_yyy_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 6); 
+
+            auto tpz_yyy_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 6); 
+
+            auto tpx_yyz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * idx + 7); 
+
+            auto tpy_yyz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 7); 
+
+            auto tpz_yyz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 7); 
+
+            auto tpx_yzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * idx + 8); 
+
+            auto tpy_yzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 8); 
+
+            auto tpz_yzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 8); 
+
+            auto tpx_zzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * idx + 9); 
+
+            auto tpy_zzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 10 * bdim + 10 * idx + 9); 
+
+            auto tpz_zzz_0_0 = primBuffer.data(pidx_p_3_0_m0 + 20 * bdim + 10 * idx + 9); 
+
+            auto tdy_xxx_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx); 
+
+            auto tdz_xxx_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx); 
+
+            auto tdy_xxy_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 1); 
+
+            auto tdz_xxy_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 1); 
+
+            auto tdy_xxz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 2); 
+
+            auto tdz_xxz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 2); 
+
+            auto tdy_xyy_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 3); 
+
+            auto tdz_xyy_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 3); 
+
+            auto tdy_xyz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 4); 
+
+            auto tdz_xyz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 4); 
+
+            auto tdy_xzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 5); 
+
+            auto tdz_xzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 5); 
+
+            auto tdx_yyy_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * idx + 6); 
+
+            auto tdy_yyy_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 6); 
+
+            auto tdz_yyy_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 6); 
+
+            auto tdx_yyz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * idx + 7); 
+
+            auto tdy_yyz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 7); 
+
+            auto tdz_yyz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 7); 
+
+            auto tdx_yzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * idx + 8); 
+
+            auto tdy_yzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 8); 
+
+            auto tdz_yzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 8); 
+
+            auto tdx_zzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * idx + 9); 
+
+            auto tdy_zzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 10 * bdim + 10 * idx + 9); 
+
+            auto tdz_zzz_0_0 = primBuffer.data(pidx_d_3_0_m0 + 20 * bdim + 10 * idx + 9); 
 
             // set up pointers to integrals
 
@@ -2022,24 +2306,30 @@ namespace amomrecfunc { // amomrecfunc namespace
 
             auto tlz_zzzz_0_0 = primBuffer.data(pidx_l_4_0_m0 + 30 * bdim + 15 * idx + 14); 
 
-            #pragma omp simd aligned(bc_x, bc_y, bc_z, fgb, fx, pa_x, pa_y, pa_z, tlx_xx_0_0, tlx_xxx_0_0, \
-                                     tlx_xxxx_0_0, tlx_xxxy_0_0, tlx_xxxz_0_0, tlx_xxy_0_0, tlx_xxyy_0_0, tlx_xxyz_0_0, \
-                                     tlx_xxz_0_0, tlx_xxzz_0_0, tlx_xy_0_0, tlx_xyy_0_0, tlx_xyyy_0_0, tlx_xyyz_0_0, \
-                                     tlx_xyz_0_0, tlx_xyzz_0_0, tlx_xz_0_0, tlx_xzz_0_0, tlx_xzzz_0_0, tlx_yy_0_0, \
-                                     tlx_yyy_0_0, tlx_yyyy_0_0, tlx_yyyz_0_0, tlx_yyz_0_0, tlx_yyzz_0_0, tlx_yz_0_0, \
-                                     tlx_yzz_0_0, tlx_yzzz_0_0, tlx_zz_0_0, tlx_zzz_0_0, tlx_zzzz_0_0, tly_xx_0_0, \
-                                     tly_xxx_0_0, tly_xxxx_0_0, tly_xxxy_0_0, tly_xxxz_0_0, tly_xxy_0_0, tly_xxyy_0_0, \
-                                     tly_xxyz_0_0, tly_xxz_0_0, tly_xxzz_0_0, tly_xy_0_0, tly_xyy_0_0, tly_xyyy_0_0, \
-                                     tly_xyyz_0_0, tly_xyz_0_0, tly_xyzz_0_0, tly_xz_0_0, tly_xzz_0_0, tly_xzzz_0_0, \
-                                     tly_yy_0_0, tly_yyy_0_0, tly_yyyy_0_0, tly_yyyz_0_0, tly_yyz_0_0, tly_yyzz_0_0, \
-                                     tly_yz_0_0, tly_yzz_0_0, tly_yzzz_0_0, tly_zz_0_0, tly_zzz_0_0, tly_zzzz_0_0, \
-                                     tlz_xx_0_0, tlz_xxx_0_0, tlz_xxxx_0_0, tlz_xxxy_0_0, tlz_xxxz_0_0, tlz_xxy_0_0, \
-                                     tlz_xxyy_0_0, tlz_xxyz_0_0, tlz_xxz_0_0, tlz_xxzz_0_0, tlz_xy_0_0, tlz_xyy_0_0, \
-                                     tlz_xyyy_0_0, tlz_xyyz_0_0, tlz_xyz_0_0, tlz_xyzz_0_0, tlz_xz_0_0, tlz_xzz_0_0, \
-                                     tlz_xzzz_0_0, tlz_yy_0_0, tlz_yyy_0_0, tlz_yyyy_0_0, tlz_yyyz_0_0, tlz_yyz_0_0, \
-                                     tlz_yyzz_0_0, tlz_yz_0_0, tlz_yzz_0_0, tlz_yzzz_0_0, tlz_zz_0_0, tlz_zzz_0_0, \
-                                     tlz_zzzz_0_0, ts_xxx_0_0, ts_xxy_0_0, ts_xxz_0_0, ts_xyy_0_0, ts_xyz_0_0, ts_xzz_0_0, \
-                                     ts_yyy_0_0, ts_yyz_0_0, ts_yzz_0_0, ts_zzz_0_0: VLX_ALIGN)
+            #pragma omp simd aligned(fgb, fx, pa_x, pa_y, pa_z, tdx_yyy_0_0, tdx_yyz_0_0, tdx_yzz_0_0, \
+                                     tdx_zzz_0_0, tdy_xxx_0_0, tdy_xxy_0_0, tdy_xxz_0_0, tdy_xyy_0_0, tdy_xyz_0_0, \
+                                     tdy_xzz_0_0, tdy_yyy_0_0, tdy_yyz_0_0, tdy_yzz_0_0, tdy_zzz_0_0, tdz_xxx_0_0, \
+                                     tdz_xxy_0_0, tdz_xxz_0_0, tdz_xyy_0_0, tdz_xyz_0_0, tdz_xzz_0_0, tdz_yyy_0_0, \
+                                     tdz_yyz_0_0, tdz_yzz_0_0, tdz_zzz_0_0, tlx_xx_0_0, tlx_xxx_0_0, tlx_xxxx_0_0, \
+                                     tlx_xxxy_0_0, tlx_xxxz_0_0, tlx_xxy_0_0, tlx_xxyy_0_0, tlx_xxyz_0_0, tlx_xxz_0_0, \
+                                     tlx_xxzz_0_0, tlx_xy_0_0, tlx_xyy_0_0, tlx_xyyy_0_0, tlx_xyyz_0_0, tlx_xyz_0_0, \
+                                     tlx_xyzz_0_0, tlx_xz_0_0, tlx_xzz_0_0, tlx_xzzz_0_0, tlx_yy_0_0, tlx_yyy_0_0, \
+                                     tlx_yyyy_0_0, tlx_yyyz_0_0, tlx_yyz_0_0, tlx_yyzz_0_0, tlx_yz_0_0, tlx_yzz_0_0, \
+                                     tlx_yzzz_0_0, tlx_zz_0_0, tlx_zzz_0_0, tlx_zzzz_0_0, tly_xx_0_0, tly_xxx_0_0, \
+                                     tly_xxxx_0_0, tly_xxxy_0_0, tly_xxxz_0_0, tly_xxy_0_0, tly_xxyy_0_0, tly_xxyz_0_0, \
+                                     tly_xxz_0_0, tly_xxzz_0_0, tly_xy_0_0, tly_xyy_0_0, tly_xyyy_0_0, tly_xyyz_0_0, \
+                                     tly_xyz_0_0, tly_xyzz_0_0, tly_xz_0_0, tly_xzz_0_0, tly_xzzz_0_0, tly_yy_0_0, \
+                                     tly_yyy_0_0, tly_yyyy_0_0, tly_yyyz_0_0, tly_yyz_0_0, tly_yyzz_0_0, tly_yz_0_0, \
+                                     tly_yzz_0_0, tly_yzzz_0_0, tly_zz_0_0, tly_zzz_0_0, tly_zzzz_0_0, tlz_xx_0_0, \
+                                     tlz_xxx_0_0, tlz_xxxx_0_0, tlz_xxxy_0_0, tlz_xxxz_0_0, tlz_xxy_0_0, tlz_xxyy_0_0, \
+                                     tlz_xxyz_0_0, tlz_xxz_0_0, tlz_xxzz_0_0, tlz_xy_0_0, tlz_xyy_0_0, tlz_xyyy_0_0, \
+                                     tlz_xyyz_0_0, tlz_xyz_0_0, tlz_xyzz_0_0, tlz_xz_0_0, tlz_xzz_0_0, tlz_xzzz_0_0, \
+                                     tlz_yy_0_0, tlz_yyy_0_0, tlz_yyyy_0_0, tlz_yyyz_0_0, tlz_yyz_0_0, tlz_yyzz_0_0, \
+                                     tlz_yz_0_0, tlz_yzz_0_0, tlz_yzzz_0_0, tlz_zz_0_0, tlz_zzz_0_0, tlz_zzzz_0_0, \
+                                     tpx_yyy_0_0, tpx_yyz_0_0, tpx_yzz_0_0, tpx_zzz_0_0, tpy_xxx_0_0, tpy_xxy_0_0, \
+                                     tpy_xxz_0_0, tpy_xyy_0_0, tpy_xyz_0_0, tpy_xzz_0_0, tpy_yyy_0_0, tpy_yyz_0_0, \
+                                     tpy_yzz_0_0, tpy_zzz_0_0, tpz_xxx_0_0, tpz_xxy_0_0, tpz_xxz_0_0, tpz_xyy_0_0, \
+                                     tpz_xyz_0_0, tpz_xzz_0_0, tpz_yyy_0_0, tpz_yyz_0_0, tpz_yzz_0_0, tpz_zzz_0_0: VLX_ALIGN)
             for (int32_t j = 0; j < nprim; j++)
             {
                 double fl1_fgb = fgb[j];
@@ -2048,91 +2338,91 @@ namespace amomrecfunc { // amomrecfunc namespace
 
                 tlx_xxxx_0_0[j] = pa_x[j] * tlx_xxx_0_0[j] + 1.5 * fl1_fx * tlx_xx_0_0[j];
 
-                tly_xxxx_0_0[j] = pa_x[j] * tly_xxx_0_0[j] + 1.5 * fl1_fx * tly_xx_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xxx_0_0[j];
+                tly_xxxx_0_0[j] = pa_x[j] * tly_xxx_0_0[j] + 1.5 * fl1_fx * tly_xx_0_0[j] + 0.5 * fl1_fx * tpz_xxx_0_0[j] + fl1_fx * fl1_fgb * tdz_xxx_0_0[j];
 
-                tlz_xxxx_0_0[j] = pa_x[j] * tlz_xxx_0_0[j] + 1.5 * fl1_fx * tlz_xx_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xxx_0_0[j];
+                tlz_xxxx_0_0[j] = pa_x[j] * tlz_xxx_0_0[j] + 1.5 * fl1_fx * tlz_xx_0_0[j] - 0.5 * fl1_fx * tpy_xxx_0_0[j] - fl1_fx * fl1_fgb * tdy_xxx_0_0[j];
 
                 tlx_xxxy_0_0[j] = pa_x[j] * tlx_xxy_0_0[j] + fl1_fx * tlx_xy_0_0[j];
 
-                tly_xxxy_0_0[j] = pa_x[j] * tly_xxy_0_0[j] + fl1_fx * tly_xy_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xxy_0_0[j];
+                tly_xxxy_0_0[j] = pa_x[j] * tly_xxy_0_0[j] + fl1_fx * tly_xy_0_0[j] + 0.5 * fl1_fx * tpz_xxy_0_0[j] + fl1_fx * fl1_fgb * tdz_xxy_0_0[j];
 
-                tlz_xxxy_0_0[j] = pa_x[j] * tlz_xxy_0_0[j] + fl1_fx * tlz_xy_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xxy_0_0[j];
+                tlz_xxxy_0_0[j] = pa_x[j] * tlz_xxy_0_0[j] + fl1_fx * tlz_xy_0_0[j] - 0.5 * fl1_fx * tpy_xxy_0_0[j] - fl1_fx * fl1_fgb * tdy_xxy_0_0[j];
 
                 tlx_xxxz_0_0[j] = pa_x[j] * tlx_xxz_0_0[j] + fl1_fx * tlx_xz_0_0[j];
 
-                tly_xxxz_0_0[j] = pa_x[j] * tly_xxz_0_0[j] + fl1_fx * tly_xz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xxz_0_0[j];
+                tly_xxxz_0_0[j] = pa_x[j] * tly_xxz_0_0[j] + fl1_fx * tly_xz_0_0[j] + 0.5 * fl1_fx * tpz_xxz_0_0[j] + fl1_fx * fl1_fgb * tdz_xxz_0_0[j];
 
-                tlz_xxxz_0_0[j] = pa_x[j] * tlz_xxz_0_0[j] + fl1_fx * tlz_xz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xxz_0_0[j];
+                tlz_xxxz_0_0[j] = pa_x[j] * tlz_xxz_0_0[j] + fl1_fx * tlz_xz_0_0[j] - 0.5 * fl1_fx * tpy_xxz_0_0[j] - fl1_fx * fl1_fgb * tdy_xxz_0_0[j];
 
                 tlx_xxyy_0_0[j] = pa_x[j] * tlx_xyy_0_0[j] + 0.5 * fl1_fx * tlx_yy_0_0[j];
 
-                tly_xxyy_0_0[j] = pa_x[j] * tly_xyy_0_0[j] + 0.5 * fl1_fx * tly_yy_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xyy_0_0[j];
+                tly_xxyy_0_0[j] = pa_x[j] * tly_xyy_0_0[j] + 0.5 * fl1_fx * tly_yy_0_0[j] + 0.5 * fl1_fx * tpz_xyy_0_0[j] + fl1_fx * fl1_fgb * tdz_xyy_0_0[j];
 
-                tlz_xxyy_0_0[j] = pa_x[j] * tlz_xyy_0_0[j] + 0.5 * fl1_fx * tlz_yy_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xyy_0_0[j];
+                tlz_xxyy_0_0[j] = pa_x[j] * tlz_xyy_0_0[j] + 0.5 * fl1_fx * tlz_yy_0_0[j] - 0.5 * fl1_fx * tpy_xyy_0_0[j] - fl1_fx * fl1_fgb * tdy_xyy_0_0[j];
 
                 tlx_xxyz_0_0[j] = pa_x[j] * tlx_xyz_0_0[j] + 0.5 * fl1_fx * tlx_yz_0_0[j];
 
-                tly_xxyz_0_0[j] = pa_x[j] * tly_xyz_0_0[j] + 0.5 * fl1_fx * tly_yz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xyz_0_0[j];
+                tly_xxyz_0_0[j] = pa_x[j] * tly_xyz_0_0[j] + 0.5 * fl1_fx * tly_yz_0_0[j] + 0.5 * fl1_fx * tpz_xyz_0_0[j] + fl1_fx * fl1_fgb * tdz_xyz_0_0[j];
 
-                tlz_xxyz_0_0[j] = pa_x[j] * tlz_xyz_0_0[j] + 0.5 * fl1_fx * tlz_yz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xyz_0_0[j];
+                tlz_xxyz_0_0[j] = pa_x[j] * tlz_xyz_0_0[j] + 0.5 * fl1_fx * tlz_yz_0_0[j] - 0.5 * fl1_fx * tpy_xyz_0_0[j] - fl1_fx * fl1_fgb * tdy_xyz_0_0[j];
 
                 tlx_xxzz_0_0[j] = pa_x[j] * tlx_xzz_0_0[j] + 0.5 * fl1_fx * tlx_zz_0_0[j];
 
-                tly_xxzz_0_0[j] = pa_x[j] * tly_xzz_0_0[j] + 0.5 * fl1_fx * tly_zz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_xzz_0_0[j];
+                tly_xxzz_0_0[j] = pa_x[j] * tly_xzz_0_0[j] + 0.5 * fl1_fx * tly_zz_0_0[j] + 0.5 * fl1_fx * tpz_xzz_0_0[j] + fl1_fx * fl1_fgb * tdz_xzz_0_0[j];
 
-                tlz_xxzz_0_0[j] = pa_x[j] * tlz_xzz_0_0[j] + 0.5 * fl1_fx * tlz_zz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_xzz_0_0[j];
+                tlz_xxzz_0_0[j] = pa_x[j] * tlz_xzz_0_0[j] + 0.5 * fl1_fx * tlz_zz_0_0[j] - 0.5 * fl1_fx * tpy_xzz_0_0[j] - fl1_fx * fl1_fgb * tdy_xzz_0_0[j];
 
                 tlx_xyyy_0_0[j] = pa_x[j] * tlx_yyy_0_0[j];
 
-                tly_xyyy_0_0[j] = pa_x[j] * tly_yyy_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_yyy_0_0[j];
+                tly_xyyy_0_0[j] = pa_x[j] * tly_yyy_0_0[j] + 0.5 * fl1_fx * tpz_yyy_0_0[j] + fl1_fx * fl1_fgb * tdz_yyy_0_0[j];
 
-                tlz_xyyy_0_0[j] = pa_x[j] * tlz_yyy_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_yyy_0_0[j];
+                tlz_xyyy_0_0[j] = pa_x[j] * tlz_yyy_0_0[j] - 0.5 * fl1_fx * tpy_yyy_0_0[j] - fl1_fx * fl1_fgb * tdy_yyy_0_0[j];
 
                 tlx_xyyz_0_0[j] = pa_x[j] * tlx_yyz_0_0[j];
 
-                tly_xyyz_0_0[j] = pa_x[j] * tly_yyz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_yyz_0_0[j];
+                tly_xyyz_0_0[j] = pa_x[j] * tly_yyz_0_0[j] + 0.5 * fl1_fx * tpz_yyz_0_0[j] + fl1_fx * fl1_fgb * tdz_yyz_0_0[j];
 
-                tlz_xyyz_0_0[j] = pa_x[j] * tlz_yyz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_yyz_0_0[j];
+                tlz_xyyz_0_0[j] = pa_x[j] * tlz_yyz_0_0[j] - 0.5 * fl1_fx * tpy_yyz_0_0[j] - fl1_fx * fl1_fgb * tdy_yyz_0_0[j];
 
                 tlx_xyzz_0_0[j] = pa_x[j] * tlx_yzz_0_0[j];
 
-                tly_xyzz_0_0[j] = pa_x[j] * tly_yzz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_yzz_0_0[j];
+                tly_xyzz_0_0[j] = pa_x[j] * tly_yzz_0_0[j] + 0.5 * fl1_fx * tpz_yzz_0_0[j] + fl1_fx * fl1_fgb * tdz_yzz_0_0[j];
 
-                tlz_xyzz_0_0[j] = pa_x[j] * tlz_yzz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_yzz_0_0[j];
+                tlz_xyzz_0_0[j] = pa_x[j] * tlz_yzz_0_0[j] - 0.5 * fl1_fx * tpy_yzz_0_0[j] - fl1_fx * fl1_fgb * tdy_yzz_0_0[j];
 
                 tlx_xzzz_0_0[j] = pa_x[j] * tlx_zzz_0_0[j];
 
-                tly_xzzz_0_0[j] = pa_x[j] * tly_zzz_0_0[j] - bc_z[j] * fl1_fx * fl1_fgb * ts_zzz_0_0[j];
+                tly_xzzz_0_0[j] = pa_x[j] * tly_zzz_0_0[j] + 0.5 * fl1_fx * tpz_zzz_0_0[j] + fl1_fx * fl1_fgb * tdz_zzz_0_0[j];
 
-                tlz_xzzz_0_0[j] = pa_x[j] * tlz_zzz_0_0[j] + bc_y[j] * fl1_fx * fl1_fgb * ts_zzz_0_0[j];
+                tlz_xzzz_0_0[j] = pa_x[j] * tlz_zzz_0_0[j] - 0.5 * fl1_fx * tpy_zzz_0_0[j] - fl1_fx * fl1_fgb * tdy_zzz_0_0[j];
 
-                tlx_yyyy_0_0[j] = pa_y[j] * tlx_yyy_0_0[j] + 1.5 * fl1_fx * tlx_yy_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_yyy_0_0[j];
+                tlx_yyyy_0_0[j] = pa_y[j] * tlx_yyy_0_0[j] + 1.5 * fl1_fx * tlx_yy_0_0[j] - 0.5 * fl1_fx * tpz_yyy_0_0[j] - fl1_fx * fl1_fgb * tdz_yyy_0_0[j];
 
                 tly_yyyy_0_0[j] = pa_y[j] * tly_yyy_0_0[j] + 1.5 * fl1_fx * tly_yy_0_0[j];
 
-                tlz_yyyy_0_0[j] = pa_y[j] * tlz_yyy_0_0[j] + 1.5 * fl1_fx * tlz_yy_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_yyy_0_0[j];
+                tlz_yyyy_0_0[j] = pa_y[j] * tlz_yyy_0_0[j] + 1.5 * fl1_fx * tlz_yy_0_0[j] + 0.5 * fl1_fx * tpx_yyy_0_0[j] + fl1_fx * fl1_fgb * tdx_yyy_0_0[j];
 
-                tlx_yyyz_0_0[j] = pa_y[j] * tlx_yyz_0_0[j] + fl1_fx * tlx_yz_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_yyz_0_0[j];
+                tlx_yyyz_0_0[j] = pa_y[j] * tlx_yyz_0_0[j] + fl1_fx * tlx_yz_0_0[j] - 0.5 * fl1_fx * tpz_yyz_0_0[j] - fl1_fx * fl1_fgb * tdz_yyz_0_0[j];
 
                 tly_yyyz_0_0[j] = pa_y[j] * tly_yyz_0_0[j] + fl1_fx * tly_yz_0_0[j];
 
-                tlz_yyyz_0_0[j] = pa_y[j] * tlz_yyz_0_0[j] + fl1_fx * tlz_yz_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_yyz_0_0[j];
+                tlz_yyyz_0_0[j] = pa_y[j] * tlz_yyz_0_0[j] + fl1_fx * tlz_yz_0_0[j] + 0.5 * fl1_fx * tpx_yyz_0_0[j] + fl1_fx * fl1_fgb * tdx_yyz_0_0[j];
 
-                tlx_yyzz_0_0[j] = pa_y[j] * tlx_yzz_0_0[j] + 0.5 * fl1_fx * tlx_zz_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_yzz_0_0[j];
+                tlx_yyzz_0_0[j] = pa_y[j] * tlx_yzz_0_0[j] + 0.5 * fl1_fx * tlx_zz_0_0[j] - 0.5 * fl1_fx * tpz_yzz_0_0[j] - fl1_fx * fl1_fgb * tdz_yzz_0_0[j];
 
                 tly_yyzz_0_0[j] = pa_y[j] * tly_yzz_0_0[j] + 0.5 * fl1_fx * tly_zz_0_0[j];
 
-                tlz_yyzz_0_0[j] = pa_y[j] * tlz_yzz_0_0[j] + 0.5 * fl1_fx * tlz_zz_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_yzz_0_0[j];
+                tlz_yyzz_0_0[j] = pa_y[j] * tlz_yzz_0_0[j] + 0.5 * fl1_fx * tlz_zz_0_0[j] + 0.5 * fl1_fx * tpx_yzz_0_0[j] + fl1_fx * fl1_fgb * tdx_yzz_0_0[j];
 
-                tlx_yzzz_0_0[j] = pa_y[j] * tlx_zzz_0_0[j] + bc_z[j] * fl1_fx * fl1_fgb * ts_zzz_0_0[j];
+                tlx_yzzz_0_0[j] = pa_y[j] * tlx_zzz_0_0[j] - 0.5 * fl1_fx * tpz_zzz_0_0[j] - fl1_fx * fl1_fgb * tdz_zzz_0_0[j];
 
                 tly_yzzz_0_0[j] = pa_y[j] * tly_zzz_0_0[j];
 
-                tlz_yzzz_0_0[j] = pa_y[j] * tlz_zzz_0_0[j] - bc_x[j] * fl1_fx * fl1_fgb * ts_zzz_0_0[j];
+                tlz_yzzz_0_0[j] = pa_y[j] * tlz_zzz_0_0[j] + 0.5 * fl1_fx * tpx_zzz_0_0[j] + fl1_fx * fl1_fgb * tdx_zzz_0_0[j];
 
-                tlx_zzzz_0_0[j] = pa_z[j] * tlx_zzz_0_0[j] + 1.5 * fl1_fx * tlx_zz_0_0[j] - bc_y[j] * fl1_fx * fl1_fgb * ts_zzz_0_0[j];
+                tlx_zzzz_0_0[j] = pa_z[j] * tlx_zzz_0_0[j] + 1.5 * fl1_fx * tlx_zz_0_0[j] + 0.5 * fl1_fx * tpy_zzz_0_0[j] + fl1_fx * fl1_fgb * tdy_zzz_0_0[j];
 
-                tly_zzzz_0_0[j] = pa_z[j] * tly_zzz_0_0[j] + 1.5 * fl1_fx * tly_zz_0_0[j] + bc_x[j] * fl1_fx * fl1_fgb * ts_zzz_0_0[j];
+                tly_zzzz_0_0[j] = pa_z[j] * tly_zzz_0_0[j] + 1.5 * fl1_fx * tly_zz_0_0[j] - 0.5 * fl1_fx * tpx_zzz_0_0[j] - fl1_fx * fl1_fgb * tdx_zzz_0_0[j];
 
                 tlz_zzzz_0_0[j] = pa_z[j] * tlz_zzz_0_0[j] + 1.5 * fl1_fx * tlz_zz_0_0[j];
             }

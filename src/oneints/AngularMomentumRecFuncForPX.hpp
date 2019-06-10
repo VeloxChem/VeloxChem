@@ -12,470 +12,428 @@
 #include "GtoBlock.hpp"
 #include "RecursionMap.hpp"
 
-namespace ediprecfunc { // ediprecfunc namespace
+namespace amomrecfunc { // amomrecfunc namespace
 
     /**
-    Computes batch of primitive (P|D|P) electric dipole integrals and stores
+    Computes batch of primitive (P|L|P) angular momentum integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compElectricDipoleForPP(      CMemBlock2D<double>& primBuffer,
-                                 const CRecursionMap&       recursionMap,
-                                 const CMemBlock2D<double>& osFactors,
-                                 const int32_t              nOSFactors,
-                                 const CMemBlock2D<double>& paDistances,
-                                 const CGtoBlock&           braGtoBlock,
-                                 const CGtoBlock&           ketGtoBlock,
-                                 const int32_t              iContrGto);
+    void compAngularMomentumForPP(      CMemBlock2D<double>& primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto);
 
     /**
-    Computes batch of primitive (P|D|D) electric dipole integrals and stores
+    Computes batch of primitive (P|L|D) angular momentum integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compElectricDipoleForPD(      CMemBlock2D<double>& primBuffer,
-                                 const CRecursionMap&       recursionMap,
-                                 const CMemBlock2D<double>& osFactors,
-                                 const int32_t              nOSFactors,
-                                 const CMemBlock2D<double>& paDistances,
-                                 const CGtoBlock&           braGtoBlock,
-                                 const CGtoBlock&           ketGtoBlock,
-                                 const int32_t              iContrGto);
+    void compAngularMomentumForPD(      CMemBlock2D<double>& primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (0,27) of primitive (P|D|D) electric dipole integrals and stores
+    Computes sub-batch (0,27) of primitive (P|L|D) angular momentum integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compElectricDipoleForPD_0_27(      CMemBlock2D<double>& primBuffer,
-                                      const CRecursionMap&       recursionMap,
-                                      const CMemBlock2D<double>& osFactors,
-                                      const int32_t              nOSFactors,
-                                      const CMemBlock2D<double>& paDistances,
-                                      const CGtoBlock&           braGtoBlock,
-                                      const CGtoBlock&           ketGtoBlock,
-                                      const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (27,54) of primitive (P|D|D) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPD_27_54(      CMemBlock2D<double>& primBuffer,
+    void compAngularMomentumForPD_0_27(      CMemBlock2D<double>& primBuffer,
                                        const CRecursionMap&       recursionMap,
                                        const CMemBlock2D<double>& osFactors,
-                                       const int32_t              nOSFactors,
                                        const CMemBlock2D<double>& paDistances,
                                        const CGtoBlock&           braGtoBlock,
                                        const CGtoBlock&           ketGtoBlock,
                                        const int32_t              iContrGto);
 
     /**
-    Computes batch of primitive (D|D|P) electric dipole integrals and stores
+    Computes sub-batch (27,54) of primitive (P|L|D) angular momentum integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compElectricDipoleForDP(      CMemBlock2D<double>& primBuffer,
-                                 const CRecursionMap&       recursionMap,
-                                 const CMemBlock2D<double>& osFactors,
-                                 const int32_t              nOSFactors,
-                                 const CMemBlock2D<double>& paDistances,
-                                 const CGtoBlock&           braGtoBlock,
-                                 const CGtoBlock&           ketGtoBlock,
-                                 const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (0,27) of primitive (D|D|P) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForDP_0_27(      CMemBlock2D<double>& primBuffer,
-                                      const CRecursionMap&       recursionMap,
-                                      const CMemBlock2D<double>& osFactors,
-                                      const int32_t              nOSFactors,
-                                      const CMemBlock2D<double>& paDistances,
-                                      const CGtoBlock&           braGtoBlock,
-                                      const CGtoBlock&           ketGtoBlock,
-                                      const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (27,54) of primitive (D|D|P) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForDP_27_54(      CMemBlock2D<double>& primBuffer,
-                                       const CRecursionMap&       recursionMap,
-                                       const CMemBlock2D<double>& osFactors,
-                                       const int32_t              nOSFactors,
-                                       const CMemBlock2D<double>& paDistances,
-                                       const CGtoBlock&           braGtoBlock,
-                                       const CGtoBlock&           ketGtoBlock,
-                                       const int32_t              iContrGto);
-
-    /**
-    Computes batch of primitive (P|D|F) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPF(      CMemBlock2D<double>& primBuffer,
-                                 const CRecursionMap&       recursionMap,
-                                 const CMemBlock2D<double>& osFactors,
-                                 const int32_t              nOSFactors,
-                                 const CMemBlock2D<double>& paDistances,
-                                 const CGtoBlock&           braGtoBlock,
-                                 const CGtoBlock&           ketGtoBlock,
-                                 const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (0,45) of primitive (P|D|F) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPF_0_45(      CMemBlock2D<double>& primBuffer,
-                                      const CRecursionMap&       recursionMap,
-                                      const CMemBlock2D<double>& osFactors,
-                                      const int32_t              nOSFactors,
-                                      const CMemBlock2D<double>& paDistances,
-                                      const CGtoBlock&           braGtoBlock,
-                                      const CGtoBlock&           ketGtoBlock,
-                                      const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (45,90) of primitive (P|D|F) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPF_45_90(      CMemBlock2D<double>& primBuffer,
-                                       const CRecursionMap&       recursionMap,
-                                       const CMemBlock2D<double>& osFactors,
-                                       const int32_t              nOSFactors,
-                                       const CMemBlock2D<double>& paDistances,
-                                       const CGtoBlock&           braGtoBlock,
-                                       const CGtoBlock&           ketGtoBlock,
-                                       const int32_t              iContrGto);
-
-    /**
-    Computes batch of primitive (F|D|P) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForFP(      CMemBlock2D<double>& primBuffer,
-                                 const CRecursionMap&       recursionMap,
-                                 const CMemBlock2D<double>& osFactors,
-                                 const int32_t              nOSFactors,
-                                 const CMemBlock2D<double>& paDistances,
-                                 const CGtoBlock&           braGtoBlock,
-                                 const CGtoBlock&           ketGtoBlock,
-                                 const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (0,45) of primitive (F|D|P) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForFP_0_45(      CMemBlock2D<double>& primBuffer,
-                                      const CRecursionMap&       recursionMap,
-                                      const CMemBlock2D<double>& osFactors,
-                                      const int32_t              nOSFactors,
-                                      const CMemBlock2D<double>& paDistances,
-                                      const CGtoBlock&           braGtoBlock,
-                                      const CGtoBlock&           ketGtoBlock,
-                                      const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (45,90) of primitive (F|D|P) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForFP_45_90(      CMemBlock2D<double>& primBuffer,
-                                       const CRecursionMap&       recursionMap,
-                                       const CMemBlock2D<double>& osFactors,
-                                       const int32_t              nOSFactors,
-                                       const CMemBlock2D<double>& paDistances,
-                                       const CGtoBlock&           braGtoBlock,
-                                       const CGtoBlock&           ketGtoBlock,
-                                       const int32_t              iContrGto);
-
-    /**
-    Computes batch of primitive (P|D|G) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPG(      CMemBlock2D<double>& primBuffer,
-                                 const CRecursionMap&       recursionMap,
-                                 const CMemBlock2D<double>& osFactors,
-                                 const int32_t              nOSFactors,
-                                 const CMemBlock2D<double>& paDistances,
-                                 const CGtoBlock&           braGtoBlock,
-                                 const CGtoBlock&           ketGtoBlock,
-                                 const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (0,45) of primitive (P|D|G) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPG_0_45(      CMemBlock2D<double>& primBuffer,
-                                      const CRecursionMap&       recursionMap,
-                                      const CMemBlock2D<double>& osFactors,
-                                      const int32_t              nOSFactors,
-                                      const CMemBlock2D<double>& paDistances,
-                                      const CGtoBlock&           braGtoBlock,
-                                      const CGtoBlock&           ketGtoBlock,
-                                      const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (45,90) of primitive (P|D|G) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPG_45_90(      CMemBlock2D<double>& primBuffer,
-                                       const CRecursionMap&       recursionMap,
-                                       const CMemBlock2D<double>& osFactors,
-                                       const int32_t              nOSFactors,
-                                       const CMemBlock2D<double>& paDistances,
-                                       const CGtoBlock&           braGtoBlock,
-                                       const CGtoBlock&           ketGtoBlock,
-                                       const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (90,135) of primitive (P|D|G) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForPG_90_135(      CMemBlock2D<double>& primBuffer,
+    void compAngularMomentumForPD_27_54(      CMemBlock2D<double>& primBuffer,
                                         const CRecursionMap&       recursionMap,
                                         const CMemBlock2D<double>& osFactors,
-                                        const int32_t              nOSFactors,
                                         const CMemBlock2D<double>& paDistances,
                                         const CGtoBlock&           braGtoBlock,
                                         const CGtoBlock&           ketGtoBlock,
                                         const int32_t              iContrGto);
 
     /**
-    Computes batch of primitive (G|D|P) electric dipole integrals and stores
+    Computes batch of primitive (D|L|P) angular momentum integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compElectricDipoleForGP(      CMemBlock2D<double>& primBuffer,
-                                 const CRecursionMap&       recursionMap,
-                                 const CMemBlock2D<double>& osFactors,
-                                 const int32_t              nOSFactors,
-                                 const CMemBlock2D<double>& paDistances,
-                                 const CGtoBlock&           braGtoBlock,
-                                 const CGtoBlock&           ketGtoBlock,
-                                 const int32_t              iContrGto);
+    void compAngularMomentumForDP(      CMemBlock2D<double>& primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (0,45) of primitive (G|D|P) electric dipole integrals and stores
+    Computes sub-batch (0,27) of primitive (D|L|P) angular momentum integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compElectricDipoleForGP_0_45(      CMemBlock2D<double>& primBuffer,
-                                      const CRecursionMap&       recursionMap,
-                                      const CMemBlock2D<double>& osFactors,
-                                      const int32_t              nOSFactors,
-                                      const CMemBlock2D<double>& paDistances,
-                                      const CGtoBlock&           braGtoBlock,
-                                      const CGtoBlock&           ketGtoBlock,
-                                      const int32_t              iContrGto);
-
-    /**
-    Computes sub-batch (45,90) of primitive (G|D|P) electric dipole integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
-    @param paDistances the vector of distances R(PA) = P - A.
-    @param braGtoBlock the GTOs block on bra side.
-    @param ketGtoBlock the GTOs block on ket side.
-    @param iContrGto the index of contracted GTO on bra side.
-    */
-    void compElectricDipoleForGP_45_90(      CMemBlock2D<double>& primBuffer,
+    void compAngularMomentumForDP_0_27(      CMemBlock2D<double>& primBuffer,
                                        const CRecursionMap&       recursionMap,
                                        const CMemBlock2D<double>& osFactors,
-                                       const int32_t              nOSFactors,
                                        const CMemBlock2D<double>& paDistances,
                                        const CGtoBlock&           braGtoBlock,
                                        const CGtoBlock&           ketGtoBlock,
                                        const int32_t              iContrGto);
 
     /**
-    Computes sub-batch (90,135) of primitive (G|D|P) electric dipole integrals and stores
+    Computes sub-batch (27,54) of primitive (D|L|P) angular momentum integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
     */
-    void compElectricDipoleForGP_90_135(      CMemBlock2D<double>& primBuffer,
+    void compAngularMomentumForDP_27_54(      CMemBlock2D<double>& primBuffer,
                                         const CRecursionMap&       recursionMap,
                                         const CMemBlock2D<double>& osFactors,
-                                        const int32_t              nOSFactors,
                                         const CMemBlock2D<double>& paDistances,
                                         const CGtoBlock&           braGtoBlock,
                                         const CGtoBlock&           ketGtoBlock,
                                         const int32_t              iContrGto);
 
+    /**
+    Computes batch of primitive (P|L|F) angular momentum integrals and stores
+    results in primitives buffer.
 
-} // ediprecfunc namespace
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForPF(      CMemBlock2D<double>& primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,45) of primitive (P|L|F) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForPF_0_45(      CMemBlock2D<double>& primBuffer,
+                                       const CRecursionMap&       recursionMap,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (45,90) of primitive (P|L|F) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForPF_45_90(      CMemBlock2D<double>& primBuffer,
+                                        const CRecursionMap&       recursionMap,
+                                        const CMemBlock2D<double>& osFactors,
+                                        const CMemBlock2D<double>& paDistances,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
+
+    /**
+    Computes batch of primitive (F|L|P) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForFP(      CMemBlock2D<double>& primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,45) of primitive (F|L|P) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForFP_0_45(      CMemBlock2D<double>& primBuffer,
+                                       const CRecursionMap&       recursionMap,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (45,90) of primitive (F|L|P) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForFP_45_90(      CMemBlock2D<double>& primBuffer,
+                                        const CRecursionMap&       recursionMap,
+                                        const CMemBlock2D<double>& osFactors,
+                                        const CMemBlock2D<double>& paDistances,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
+
+    /**
+    Computes batch of primitive (P|L|G) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForPG(      CMemBlock2D<double>& primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,45) of primitive (P|L|G) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForPG_0_45(      CMemBlock2D<double>& primBuffer,
+                                       const CRecursionMap&       recursionMap,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (45,90) of primitive (P|L|G) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForPG_45_90(      CMemBlock2D<double>& primBuffer,
+                                        const CRecursionMap&       recursionMap,
+                                        const CMemBlock2D<double>& osFactors,
+                                        const CMemBlock2D<double>& paDistances,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (90,135) of primitive (P|L|G) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForPG_90_135(      CMemBlock2D<double>& primBuffer,
+                                         const CRecursionMap&       recursionMap,
+                                         const CMemBlock2D<double>& osFactors,
+                                         const CMemBlock2D<double>& paDistances,
+                                         const CGtoBlock&           braGtoBlock,
+                                         const CGtoBlock&           ketGtoBlock,
+                                         const int32_t              iContrGto);
+
+    /**
+    Computes batch of primitive (G|L|P) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForGP(      CMemBlock2D<double>& primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (0,45) of primitive (G|L|P) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForGP_0_45(      CMemBlock2D<double>& primBuffer,
+                                       const CRecursionMap&       recursionMap,
+                                       const CMemBlock2D<double>& osFactors,
+                                       const CMemBlock2D<double>& paDistances,
+                                       const CGtoBlock&           braGtoBlock,
+                                       const CGtoBlock&           ketGtoBlock,
+                                       const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (45,90) of primitive (G|L|P) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForGP_45_90(      CMemBlock2D<double>& primBuffer,
+                                        const CRecursionMap&       recursionMap,
+                                        const CMemBlock2D<double>& osFactors,
+                                        const CMemBlock2D<double>& paDistances,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
+
+    /**
+    Computes sub-batch (90,135) of primitive (G|L|P) angular momentum integrals and stores
+    results in primitives buffer.
+
+    @param primBuffer the primitives buffer.
+    @param recursionMap the recursion map object.
+    @param osFactors the Obara-Saika recursion factors.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param braGtoBlock the GTOs block on bra side.
+    @param ketGtoBlock the GTOs block on ket side.
+    @param iContrGto the index of contracted GTO on bra side.
+    */
+    void compAngularMomentumForGP_90_135(      CMemBlock2D<double>& primBuffer,
+                                         const CRecursionMap&       recursionMap,
+                                         const CMemBlock2D<double>& osFactors,
+                                         const CMemBlock2D<double>& paDistances,
+                                         const CGtoBlock&           braGtoBlock,
+                                         const CGtoBlock&           ketGtoBlock,
+                                         const int32_t              iContrGto);
+
+
+} // amomrecfunc namespace
 

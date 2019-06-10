@@ -21,6 +21,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -29,6 +30,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG(      CMemBlock2D<double>& primBuffer,
                                  const CRecursionMap&       recursionMap,
                                  const CMemBlock2D<double>& osFactors,
+                                 const int32_t              nOSFactors,
                                  const CMemBlock2D<double>& paDistances,
                                  const CGtoBlock&           braGtoBlock,
                                  const CGtoBlock&           ketGtoBlock,
@@ -41,6 +43,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -49,6 +52,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_0_49(      CMemBlock2D<double>& primBuffer,
                                       const CRecursionMap&       recursionMap,
                                       const CMemBlock2D<double>& osFactors,
+                                      const int32_t              nOSFactors,
                                       const CMemBlock2D<double>& paDistances,
                                       const CGtoBlock&           braGtoBlock,
                                       const CGtoBlock&           ketGtoBlock,
@@ -61,6 +65,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -69,6 +74,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_49_98(      CMemBlock2D<double>& primBuffer,
                                        const CRecursionMap&       recursionMap,
                                        const CMemBlock2D<double>& osFactors,
+                                       const int32_t              nOSFactors,
                                        const CMemBlock2D<double>& paDistances,
                                        const CGtoBlock&           braGtoBlock,
                                        const CGtoBlock&           ketGtoBlock,
@@ -81,6 +87,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -89,6 +96,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_98_147(      CMemBlock2D<double>& primBuffer,
                                         const CRecursionMap&       recursionMap,
                                         const CMemBlock2D<double>& osFactors,
+                                        const int32_t              nOSFactors,
                                         const CMemBlock2D<double>& paDistances,
                                         const CGtoBlock&           braGtoBlock,
                                         const CGtoBlock&           ketGtoBlock,
@@ -101,6 +109,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -109,6 +118,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_147_195(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -121,6 +131,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -129,6 +140,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_195_243(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -141,6 +153,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
+    @param nOSFactors the number of Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
@@ -149,6 +162,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_243_291(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -169,6 +183,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_291_339(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -189,6 +204,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_339_387(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -209,6 +225,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_387_435(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -229,6 +246,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_435_483(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -249,6 +267,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_483_531(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -269,6 +288,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_531_579(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -289,6 +309,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_579_627(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,
@@ -309,6 +330,7 @@ namespace ediprecfunc { // ediprecfunc namespace
     void compElectricDipoleForGG_627_675(      CMemBlock2D<double>& primBuffer,
                                          const CRecursionMap&       recursionMap,
                                          const CMemBlock2D<double>& osFactors,
+                                         const int32_t              nOSFactors,
                                          const CMemBlock2D<double>& paDistances,
                                          const CGtoBlock&           braGtoBlock,
                                          const CGtoBlock&           ketGtoBlock,

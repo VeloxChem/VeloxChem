@@ -461,49 +461,49 @@ CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<do
     
     ediprecfunc::compElectricDipoleForSS(primBuffer, recursionMap, pcDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForSP(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForSP(primBuffer, recursionMap, osFactors, 2,  pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForPS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForSD(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForDS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForSF(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForFS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForSG(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForGS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForGS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForPP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForPD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForDP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForPF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForFP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
@@ -511,17 +511,17 @@ CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<do
     
     ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForPG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForGP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForGP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForDD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForDF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForFD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
@@ -529,23 +529,23 @@ CElectricDipoleIntegralsDriver::_compPrimElectricDipoleInts(      CMemBlock2D<do
     
     ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForDG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForGD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForGD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForFF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForFG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForGF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForGF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
-    ediprecfunc::compElectricDipoleForGG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ediprecfunc::compElectricDipoleForGG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: add l > 4 recursion here
 }

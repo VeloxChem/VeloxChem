@@ -21,6 +21,24 @@
 #include "LinearMomentumRecFuncForSX.hpp"
 #include "ElectricDipoleRecFuncForSX.hpp"
 #include "AngularMomentumRecFuncForSX.hpp"
+#include "OverlapRecFuncForPX.hpp"
+#include "LinearMomentumRecFuncForPX.hpp"
+#include "ElectricDipoleRecFuncForPX.hpp"
+#include "AngularMomentumRecFuncForPX.hpp"
+#include "OverlapRecFuncForDX.hpp"
+#include "LinearMomentumRecFuncForDX.hpp"
+#include "ElectricDipoleRecFuncForDX.hpp"
+#include "AngularMomentumRecFuncForDX.hpp"
+#include "OverlapRecFuncForFF.hpp"
+#include "LinearMomentumRecFuncForFF.hpp"
+#include "ElectricDipoleRecFuncForFF.hpp"
+#include "AngularMomentumRecFuncForFF.hpp"
+#include "AngularMomentumRecFuncForGF.hpp"
+#include "OverlapRecFuncForFG.hpp"
+#include "LinearMomentumRecFuncForFG.hpp"
+#include "ElectricDipoleRecFuncForFG.hpp"
+#include "AngularMomentumRecFuncForFG.hpp"
+#include "AngularMomentumRecFuncForGG.hpp"
 
 CAngularMomentumIntegralsDriver::CAngularMomentumIntegralsDriver(MPI_Comm comm)
 
@@ -460,6 +478,164 @@ CAngularMomentumIntegralsDriver::_compPrimAngularMomentumInts(      CMemBlock2D<
     amomrecfunc::compAngularMomentumForSP(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     amomrecfunc::compAngularMomentumForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForSP(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForPS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSP(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForSD(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForDS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSD(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForSF(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForFS(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSF(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForGS(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForPP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForDP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForSG(primBuffer, recursionMap, osFactors, 4, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForSG(primBuffer, recursionMap, osFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForFP(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForGP(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForPD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForDD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForPF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForFD(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForGD(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForPG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForPG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForDF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForFF(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForGF(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForDG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForDG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    ediprecfunc::compElectricDipoleForFG(primBuffer, recursionMap, osFactors, 4, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    lmomrecfunc::compLinearMomentumForFG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    
+    amomrecfunc::compAngularMomentumForGG(primBuffer, recursionMap, osFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
     
     // NOTE: add l > 4 recursion here
 }

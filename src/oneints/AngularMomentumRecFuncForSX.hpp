@@ -21,8 +21,8 @@ namespace amomrecfunc { // amomrecfunc namespace
     @param primBuffer the primitives buffer.
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
-    @param acDistances the vector of distances R(AC) = A - C.
-    @param bcDistances the vector of distances R(BC) = B - C.
+    @param paDistances the vector of distances R(PA) = P - A.
+    @param pcDistances the vector of distances R(PC) = P - C.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -30,8 +30,8 @@ namespace amomrecfunc { // amomrecfunc namespace
     void compAngularMomentumForSS(      CMemBlock2D<double>& primBuffer,
                                   const CRecursionMap&       recursionMap,
                                   const CMemBlock2D<double>& osFactors,
-                                  const CMemBlock2D<double>& acDistances,
-                                  const CMemBlock2D<double>& bcDistances,
+                                  const CMemBlock2D<double>& paDistances,
+                                  const CMemBlock2D<double>& pcDistances,
                                   const CGtoBlock&           braGtoBlock,
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto);
@@ -84,7 +84,6 @@ namespace amomrecfunc { // amomrecfunc namespace
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
     @param pbDistances the vector of distances R(PB) = P - B.
-    @param acDistances the vector of distances R(AC) = A - C.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -93,7 +92,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                                   const CRecursionMap&       recursionMap,
                                   const CMemBlock2D<double>& osFactors,
                                   const CMemBlock2D<double>& pbDistances,
-                                  const CMemBlock2D<double>& acDistances,
                                   const CGtoBlock&           braGtoBlock,
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto);
@@ -106,7 +104,6 @@ namespace amomrecfunc { // amomrecfunc namespace
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
-    @param bcDistances the vector of distances R(BC) = B - C.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -115,7 +112,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                                   const CRecursionMap&       recursionMap,
                                   const CMemBlock2D<double>& osFactors,
                                   const CMemBlock2D<double>& paDistances,
-                                  const CMemBlock2D<double>& bcDistances,
                                   const CGtoBlock&           braGtoBlock,
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto);
@@ -128,7 +124,6 @@ namespace amomrecfunc { // amomrecfunc namespace
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
     @param pbDistances the vector of distances R(PB) = P - B.
-    @param acDistances the vector of distances R(AC) = A - C.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -137,7 +132,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                                   const CRecursionMap&       recursionMap,
                                   const CMemBlock2D<double>& osFactors,
                                   const CMemBlock2D<double>& pbDistances,
-                                  const CMemBlock2D<double>& acDistances,
                                   const CGtoBlock&           braGtoBlock,
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto);
@@ -150,7 +144,6 @@ namespace amomrecfunc { // amomrecfunc namespace
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
-    @param bcDistances the vector of distances R(BC) = B - C.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -159,7 +152,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                                   const CRecursionMap&       recursionMap,
                                   const CMemBlock2D<double>& osFactors,
                                   const CMemBlock2D<double>& paDistances,
-                                  const CMemBlock2D<double>& bcDistances,
                                   const CGtoBlock&           braGtoBlock,
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto);
@@ -172,7 +164,6 @@ namespace amomrecfunc { // amomrecfunc namespace
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
     @param pbDistances the vector of distances R(PB) = P - B.
-    @param acDistances the vector of distances R(AC) = A - C.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -181,7 +172,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                                   const CRecursionMap&       recursionMap,
                                   const CMemBlock2D<double>& osFactors,
                                   const CMemBlock2D<double>& pbDistances,
-                                  const CMemBlock2D<double>& acDistances,
                                   const CGtoBlock&           braGtoBlock,
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto);
@@ -194,7 +184,6 @@ namespace amomrecfunc { // amomrecfunc namespace
     @param recursionMap the recursion map object.
     @param osFactors the Obara-Saika recursion factors.
     @param paDistances the vector of distances R(PA) = P - A.
-    @param bcDistances the vector of distances R(BC) = B - C.
     @param braGtoBlock the GTOs block on bra side.
     @param ketGtoBlock the GTOs block on ket side.
     @param iContrGto the index of contracted GTO on bra side.
@@ -203,7 +192,6 @@ namespace amomrecfunc { // amomrecfunc namespace
                                   const CRecursionMap&       recursionMap,
                                   const CMemBlock2D<double>& osFactors,
                                   const CMemBlock2D<double>& paDistances,
-                                  const CMemBlock2D<double>& bcDistances,
                                   const CGtoBlock&           braGtoBlock,
                                   const CGtoBlock&           ketGtoBlock,
                                   const int32_t              iContrGto);
