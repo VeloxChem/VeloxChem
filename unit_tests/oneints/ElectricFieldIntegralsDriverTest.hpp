@@ -6,18 +6,18 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef NuclearPotentialIntegralsDriverTest_hpp
-#define NuclearPotentialIntegralsDriverTest_hpp
+#ifndef ElectricFieldIntegralsDriverTest_hpp
+#define ElectricFieldIntegralsDriverTest_hpp
 
 #include "gtest/gtest.h"
 
-class CNuclearPotentialIntegralsDriverTest : public ::testing::Test
+class CElectricFieldIntegralsDriverTest : public ::testing::Test
 {
 protected:
     
-    CNuclearPotentialIntegralsDriverTest() {};
+    CElectricFieldIntegralsDriverTest() {};
     
-    virtual ~CNuclearPotentialIntegralsDriverTest() {};
+    virtual ~CElectricFieldIntegralsDriverTest() {};
 };
 
-#endif /* NuclearPotentialIntegralsDriverTest_hpp */
+#endif /* ElectricFieldIntegralsDriverTest_hpp */

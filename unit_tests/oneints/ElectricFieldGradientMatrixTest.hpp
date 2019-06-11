@@ -6,18 +6,18 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef NuclearPotentialIntegralsDriverTest_hpp
-#define NuclearPotentialIntegralsDriverTest_hpp
+#ifndef ElectricFieldGradientMatrixTest_hpp
+#define ElectricFieldGradientMatrixTest_hpp
 
 #include "gtest/gtest.h"
 
-class CNuclearPotentialIntegralsDriverTest : public ::testing::Test
+class CElectricFieldGradientMatrixTest : public ::testing::Test
 {
 protected:
     
-    CNuclearPotentialIntegralsDriverTest() {};
+    CElectricFieldGradientMatrixTest() {};
     
-    virtual ~CNuclearPotentialIntegralsDriverTest() {};
+    virtual ~CElectricFieldGradientMatrixTest() {};
 };
 
-#endif /* NuclearPotentialIntegralsDriverTest_hpp */
+#endif /* ElectricFieldGradientMatrixTest_hpp */

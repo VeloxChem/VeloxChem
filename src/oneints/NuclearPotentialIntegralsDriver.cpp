@@ -577,8 +577,6 @@ CNuclearPotentialIntegralsDriver::_setRecursionMap(const int32_t braAngularMomen
 {
     CRecursionFunctionsList recfuncs;
     
-    recfuncs.add(CRecursionFunction({"Overlap"}, &t2crecfunc::obRecursionForOverlap));
-    
     recfuncs.add(CRecursionFunction({"Nuclear Potential"}, &t2crecfunc::obRecursionForNuclearPotential)); 
     
     auto rterm = gintsfunc::genIntegral({"Nuclear Potential"}, braAngularMomentum,
