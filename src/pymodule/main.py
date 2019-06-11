@@ -1,5 +1,6 @@
 from mpi4py import MPI
 import sys
+import os
 
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
@@ -21,6 +22,19 @@ from .errorhandler import assert_msg_critical
 def main():
 
     assert_msg_critical(mpi_initialized(), "MPI: Initialized")
+
+    if len(sys.argv) <= 1 or sys.argv[1] in ['-h', '--help']:
+        info_txt = [
+            '',
+            '=================   VeloxChem   =================',
+            'Usage:',
+            '    VeloxChemMain.py input_file [output_file]',
+            '  or:',
+            '    python3 -m veloxchem input_file [output_file]',
+            '',
+        ]
+        print(os.linesep.join(info_txt), file=sys.stdout)
+        sys.exit(0)
 
     # set up MPI task
 
