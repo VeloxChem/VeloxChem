@@ -27,13 +27,16 @@ class TestCppDriver(unittest.TestCase):
         cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
 
         cpp_solver.update_settings({
-            'operators': 'xyz',
+            'a_operator': 'dipole',
+            'a_components': 'xyz',
+            'b_operator': 'dipole',
+            'b_components': 'xyz',
             'frequencies': '0, 0.5',
-            'damping': 1.0,
-            'eri_thresh': 1.0e-12,
+            'damping': '1.0',
+            'eri_thresh': '1.0e-12',
             'qq_type': 'QQ_DEN',
-            'conv_thresh': 1.0e-6,
-            'max_iter': 50,
+            'conv_thresh': '1.0e-6',
+            'max_iter': '50',
         })
 
         results = cpp_solver.compute(task.molecule, task.ao_basis, scf_tensors)
@@ -41,17 +44,19 @@ class TestCppDriver(unittest.TestCase):
         if task.mpi_rank == mpi_master():
 
             reference = {
-                ('x', 0): complex(2.817683, 0.000000),
-                ('y', 0): complex(3.292074, 0.000000),
-                ('z', 0): complex(3.061127, 0.000000),
-                ('x', 0.5): complex(2.398085, 1.264313),
-                ('y', 0.5): complex(2.661202, 1.628714),
-                ('z', 0.5): complex(2.554879, 1.439370),
+                ('x', 'x', 0.0): complex(2.817683, 0.000000),
+                ('y', 'y', 0.0): complex(3.292074, 0.000000),
+                ('z', 'z', 0.0): complex(3.061127, 0.000000),
+                ('x', 'x', 0.5): complex(2.398085, 1.264313),
+                ('y', 'y', 0.5): complex(2.661202, 1.628714),
+                ('z', 'z', 0.5): complex(2.554879, 1.439370),
             }
 
             for key in results['properties']:
-                real_val = results['properties'][key].real
-                imag_val = results['properties'][key].imag
+                if key not in reference:
+                    continue
+                real_val = -results['properties'][key].real
+                imag_val = -results['properties'][key].imag
                 real_ref = reference[key].real
                 imag_ref = reference[key].imag
                 self.assertTrue(abs(real_val - real_ref) < 1.0e-6)

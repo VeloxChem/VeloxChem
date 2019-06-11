@@ -32,7 +32,7 @@ class ResponseDriver:
         """
 
         # calculation type
-        self.prop_type = 'EXCITATION'
+        self.prop_type = 'ABSORPTION'
         self.nstates = 3
         self.tamm_dancoff = False
         self.triplet = False
@@ -55,16 +55,6 @@ class ResponseDriver:
 
     def update_settings(self, rsp_input):
 
-        # calculation type
-        if 'nstates' in rsp_input:
-            self.nstates = int(rsp_input['nstates'])
-        if 'tamm_dancoff' in rsp_input:
-            key = rsp_input['tamm_dancoff'].lower()
-            self.tamm_dancoff = True if key == 'yes' else False
-        if 'spin' in rsp_input:
-            key = rsp_input['spin'].lower()
-            self.triplet = True if key[0] == 't' else False
-
         # solver settings
         if 'conv_thresh' in rsp_input:
             self.conv_thresh = float(rsp_input['conv_thresh'])
@@ -78,13 +68,24 @@ class ResponseDriver:
             self.qq_type = rsp_input['qq_type'].upper()
 
         # properties
-        if rsp_input['property'].lower() == 'polarizability':
-            self.prop_type = 'POLARIZABILITY'
-            self.a_ops, self.b_ops = rsp_input['operators']
-            self.frequencies = rsp_input['frequencies']
+        if rsp_input['property'].lower() == 'absorption':
+            self.prop_type = 'ABSORPTION'
+            if 'nstates' in rsp_input:
+                self.nstates = int(rsp_input['nstates'])
+            if 'tamm_dancoff' in rsp_input:
+                key = rsp_input['tamm_dancoff'].lower()
+                self.tamm_dancoff = True if key in ['yes', 'y'] else False
+            if 'spin' in rsp_input:
+                key = rsp_input['spin'].lower()
+                self.triplet = True if key[0] == 't' else False
 
-        elif rsp_input['property'].lower() == 'absorption':
-            self.prop_type = 'EXCITATION'
+        elif rsp_input['property'].lower() == 'polarizability':
+            self.prop_type = 'POLARIZABILITY'
+            self.a_operator = rsp_input['a_operator']
+            self.a_components = rsp_input['a_components']
+            self.b_operator = rsp_input['b_operator']
+            self.b_components = rsp_input['b_components']
+            self.frequencies = rsp_input['frequencies']
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """Performs molecular property calculation.
@@ -106,7 +107,7 @@ class ResponseDriver:
 
         # Linear response eigensolver
 
-        if self.prop_type.upper() in ['EXCITATION']:
+        if self.prop_type.upper() in ['ABSORPTION']:
             if not self.tamm_dancoff:
                 eigensolver = LinearResponseEigenSolver(self.comm, self.ostream)
                 assert_msg_critical(
@@ -131,8 +132,10 @@ class ResponseDriver:
             lr_solver = LinearResponseSolver(self.comm, self.ostream)
 
             lr_solver.update_settings({
-                'a_ops': self.a_ops,
-                'b_ops': self.b_ops,
+                'a_operator': self.a_operator,
+                'a_components': self.a_components,
+                'b_operator': self.b_operator,
+                'b_components': self.b_components,
                 'frequencies': self.frequencies,
                 'eri_thresh': self.eri_thresh,
                 'qq_type': self.qq_type,
@@ -158,7 +161,7 @@ class ResponseDriver:
         cur_str = 'Molecular Property Type   : ' + self.prop_str()
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.prop_type in ['EXCITATION']:
+        if self.prop_type in ['ABSORPTION']:
             if self.tamm_dancoff:
                 cur_str = "Response Equations Type   : Tamm-Dancoff"
                 self.ostream.print_header(cur_str.ljust(str_width))
@@ -194,7 +197,7 @@ class ResponseDriver:
         if self.prop_type == 'POLARIZABILITY':
             return 'Polarizability'
 
-        if self.prop_type == 'EXCITATION':
+        if self.prop_type == 'ABSORPTION':
             if not self.triplet:
                 return 'Singlet Excited States'
             else:

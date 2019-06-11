@@ -67,11 +67,11 @@ class TestRspDriver(unittest.TestCase):
         lr_solver.update_settings({
             'a_ops': 'xyz',
             'b_ops': 'xyz',
-            'frequencies': (0,),
-            'eri_thresh': 1.0e-12,
+            'frequencies': '0,',
+            'eri_thresh': '1.0e-12',
             'qq_type': 'QQ_DEN',
-            'conv_thresh': 1.0e-5,
-            'max_iter': 50,
+            'conv_thresh': '1.0e-5',
+            'max_iter': '50',
         })
 
         lr_prop = lr_solver.compute(task.molecule, task.ao_basis, scf_tensors)

@@ -1,4 +1,5 @@
 import re
+import numpy as np
 
 from .errorhandler import assert_msg_critical
 
@@ -190,3 +191,15 @@ class InputParser:
             if "exciton" not in self.input_dict:
                 self.input_dict["exciton"] = {}
             self.input_dict["exciton"]["checkpoint_file"] = fexciton
+
+
+def parse_frequencies(input_frequencies):
+
+    frequencies = []
+    for w in input_frequencies.replace(' ', '').split(','):
+        if '-' in w:
+            seq = [float(x) for x in w.split('-')[:3]]
+            frequencies += list(np.arange(*seq))
+        elif w:
+            frequencies.append(float(w))
+    return frequencies

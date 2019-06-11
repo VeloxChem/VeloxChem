@@ -4,6 +4,8 @@ import math
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import LinearMomentumIntegralsDriver
+from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import mpi_master
@@ -183,6 +185,8 @@ class TDAExciDriver:
         # compute 1e dipole integrals
 
         dipole_ints = self.comp_dipole_ints(molecule, basis)
+        linmom_ints = self.comp_linear_momentum_ints(molecule, basis)
+        angmom_ints = self.comp_angular_momentum_ints(molecule, basis)
 
         # print converged excited states
 
@@ -198,11 +202,15 @@ class TDAExciDriver:
             oscillator_strengths = self.comp_oscillator_strengths(
                 transition_dipoles, eigvals)
 
+            rotatory_strengths = self.comp_rotatory_strengths(
+                linmom_ints, angmom_ints, eigvals, eigvecs, mo_occ, mo_vir)
+
             return {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
-                'oscillator_strengths': oscillator_strengths,
                 'transition_dipoles': transition_dipoles,
+                'oscillator_strengths': oscillator_strengths,
+                'rotatory_strengths': rotatory_strengths,
             }
         else:
             return {}
@@ -356,6 +364,31 @@ class TDAExciDriver:
         else:
             return ()
 
+    def comp_linear_momentum_ints(self, molecule, basis):
+
+        linmom_drv = LinearMomentumIntegralsDriver(self.comm)
+        linmom_mats = linmom_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
+            return (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
+                    linmom_mats.z_to_numpy())
+        else:
+            return ()
+
+    def comp_angular_momentum_ints(self, molecule, basis):
+
+        xc, yc, zc = molecule.center_of_nuclear_charge()
+
+        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+        angmom_drv.set_origin(xc, yc, zc)
+        angmom_mats = angmom_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
+            return (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
+                    angmom_mats.z_to_numpy())
+        else:
+            return ()
+
     def comp_transition_dipoles(self, dipole_ints, eigvecs, mo_occ, mo_vir):
 
         transition_dipoles = []
@@ -381,6 +414,25 @@ class TDAExciDriver:
             oscillator_strengths[s] = 2.0 / 3.0 * dipole_strength * exc_ene
 
         return oscillator_strengths
+
+    def comp_rotatory_strengths(self, linmom_ints, angmom_ints, eigvals,
+                                eigvecs, mo_occ, mo_vir):
+
+        rotatory_strengths = np.zeros((self.nstates,))
+
+        for s in range(self.nstates):
+            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
+            trans_dens *= math.sqrt(2.0)
+
+            linmom = np.array(
+                [np.sum(trans_dens * linmom_ints[d]) for d in range(3)])
+            angmom = np.array(
+                [np.sum(trans_dens * angmom_ints[d]) for d in range(3)])
+
+            rotatory_strengths[s] = -np.dot(linmom, angmom) / eigvals[s]
+
+        return rotatory_strengths
 
     def print_iter_data(self, iter):
         """Prints excited states solver iteration data to output stream.

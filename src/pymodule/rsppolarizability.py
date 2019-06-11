@@ -1,4 +1,5 @@
 from .rspproperty import ResponseProperty
+from .inputparser import parse_frequencies
 
 
 class Polarizability(ResponseProperty):
@@ -13,19 +14,14 @@ class Polarizability(ResponseProperty):
         rsp_input['response'] = 'linear'
         rsp_input['residue'] = 'none'
 
-        if 'operators' in rsp_dict:
-            operators = rsp_dict['operators'].replace(' ', '')
-            operators = operators.lower().split(',')
-            rsp_input['operators'] = tuple(operators)
-        else:
-            rsp_input['operators'] = ('xyz', 'xyz')
+        rsp_input['a_operator'] = 'dipole'
+        rsp_input['a_components'] = 'xyz'
 
-        if 'frequencies' in rsp_dict:
-            frequencies = rsp_dict['frequencies'].replace(' ', '')
-            frequencies = frequencies.split(',')
-            rsp_input['frequencies'] = tuple(map(float, frequencies))
-        else:
-            rsp_input['frequencies'] = (0,)
+        rsp_input['b_operator'] = 'dipole'
+        rsp_input['b_components'] = 'xyz'
+
+        if 'frequencies' not in rsp_dict:
+            rsp_input['frequencies'] = '0'
 
         super().__init__(rsp_input)
 
@@ -38,13 +34,13 @@ class Polarizability(ResponseProperty):
     def print_property(self, ostream):
         """Prints polarizability to output stream"""
 
-        for w in self.rsp_input['frequencies']:
-            w_str = 'Polarizability (w={})'.format(w)
+        for w in parse_frequencies(self.rsp_input['frequencies']):
+            w_str = 'Polarizability (w={:.4f})'.format(w)
             ostream.print_header(w_str.ljust(68))
             ostream.print_header(('-' * len(w_str)).ljust(68))
-            for a in self.rsp_input['operators'][0]:
-                for b in self.rsp_input['operators'][1]:
-                    ops_label = '<<{};{}>>_{}'.format(a, b, w)
+            for a in self.rsp_input['a_components']:
+                for b in self.rsp_input['b_components']:
+                    ops_label = '<<{};{}>>_{:.4f}'.format(a, b, w)
                     output_alpha = '{:<15s} {:15.8f}'.format(
                         ops_label, self.rsp_property[(a, b, w)])
                     ostream.print_header(output_alpha.ljust(68))

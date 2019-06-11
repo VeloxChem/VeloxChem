@@ -9,7 +9,7 @@ from .veloxchemlib import szblock
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
-from .lrmatvecdriver import lrmat2vec
+from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import swap_xy
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -205,31 +205,51 @@ class LinearResponseEigenSolver:
                 self.is_converged,
                 'LinearResponseEigenSolver.compute: failed to converge')
 
+        dipole_rhs = get_rhs('dipole', 'xyz', molecule, basis, scf_tensors,
+                             self.rank, self.comm)
+        linmom_rhs = get_rhs('linear_momentum', 'xyz', molecule, basis,
+                             scf_tensors, self.rank, self.comm)
+        angmom_rhs = get_rhs('angular_momentum', 'xyz', molecule, basis,
+                             scf_tensors, self.rank, self.comm)
+
         if self.rank == mpi_master():
-            ops = 'xyz'
-            rhs = self.get_rhs(ops, scf_tensors, nocc)
-            V1 = {op: V for op, V in zip(ops, rhs)}
+            V_dipole = {op: V for op, V in zip('xyz', dipole_rhs)}
+            V_linmom = {op: V for op, V in zip('xyz', linmom_rhs)}
+            V_angmom = {op: V for op, V in zip('xyz', angmom_rhs)}
 
             tms = {}
-            tms['w'] = np.array([s[0] for s in excitations])
+            velo_tms = {}
+            magn_tms = {}
 
+            eigvals = [s[0] for s in excitations]
             eigvecs = [s[1] for s in excitations]
-            for op in ops:
-                tms[op] = np.array([np.dot(V1[op], vec) for vec in eigvecs])
+
+            for comp in 'xyz':
+                tms[comp] = np.array(
+                    [np.dot(V_dipole[comp], vec) for vec in eigvecs])
+                velo_tms[comp] = np.array(
+                    [np.dot(V_linmom[comp], vec) for vec in eigvecs])
+                magn_tms[comp] = np.array(
+                    [np.dot(V_angmom[comp], vec) for vec in eigvecs])
 
             trans_dipoles = [
                 np.array([tms['x'][s], tms['y'][s], tms['z'][s]])
                 for s in range(self.nstates)
             ]
 
-            osc = 2.0 / 3.0 * tms['w'] * (tms['x']**2 + tms['y']**2 +
-                                          tms['z']**2)
+            osc = 2.0 / 3.0 * np.array(eigvals) * (tms['x']**2 + tms['y']**2 +
+                                                   tms['z']**2)
+
+            rot_vel = -(velo_tms['x'] * magn_tms['x'] +
+                        velo_tms['y'] * magn_tms['y'] +
+                        velo_tms['z'] * magn_tms['z']) / np.array(eigvals)
 
             return {
-                'eigenvalues': tms['w'],
+                'eigenvalues': np.array(eigvals),
                 'eigenvectors': np.array(eigvecs).T,
                 'transition_dipoles': trans_dipoles,
                 'oscillator_strengths': osc,
+                'rotatory_strengths': rot_vel,
             }
         else:
             return {}
@@ -307,25 +327,6 @@ class LinearResponseEigenSolver:
 
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
-
-    def get_rhs(self, ops, scf_tensors, nocc):
-        """Create right-hand sides of linear response equations"""
-
-        mo = scf_tensors['C']
-        S = scf_tensors['S']
-        D = scf_tensors['D'][0] + scf_tensors['D'][1]
-        dipoles = scf_tensors['Mu']
-
-        norb = mo.shape[1]
-
-        if 'x' in ops or 'y' in ops or 'z' in ops:
-            props = {k: v for k, v in zip('xyz', dipoles)}
-
-        matrices = tuple(
-            mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
-
-        gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
-        return gradients
 
     def initial_excitations(self, nstates, ea, nocc, norb):
 

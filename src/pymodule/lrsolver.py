@@ -6,10 +6,11 @@ from .veloxchemlib import mpi_master
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
-from .lrmatvecdriver import lrmat2vec
+from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import swap_xy
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_frequencies
 
 
 class LinearResponseSolver:
@@ -29,8 +30,10 @@ class LinearResponseSolver:
         """
 
         # operators and frequencies
-        self.a_ops = 'xyz'
-        self.b_ops = 'xyz'
+        self.a_operator = 'dipole'
+        self.a_components = 'xyz'
+        self.b_operator = 'dipole'
+        self.b_components = 'xyz'
         self.frequencies = (0,)
 
         # ERI settings
@@ -63,22 +66,26 @@ class LinearResponseSolver:
             The settings for the driver.
         """
 
-        if 'a_ops' in settings:
-            self.a_ops = settings['a_ops']
-        if 'b_ops' in settings:
-            self.b_ops = settings['b_ops']
+        if 'a_operator' in settings:
+            self.a_operator = settings['a_operator'].lower()
+        if 'a_components' in settings:
+            self.a_components = settings['a_components'].lower()
+        if 'b_operator' in settings:
+            self.b_operator = settings['b_operator'].lower()
+        if 'b_components' in settings:
+            self.b_components = settings['b_components'].lower()
         if 'frequencies' in settings:
-            self.frequencies = settings['frequencies']
+            self.frequencies = parse_frequencies(settings['frequencies'])
 
         if 'eri_thresh' in settings:
-            self.eri_thresh = settings['eri_thresh']
+            self.eri_thresh = float(settings['eri_thresh'])
         if 'qq_type' in settings:
             self.qq_type = settings['qq_type']
 
         if 'conv_thresh' in settings:
-            self.conv_thresh = settings['conv_thresh']
+            self.conv_thresh = float(settings['conv_thresh'])
         if 'max_iter' in settings:
-            self.max_iter = settings['max_iter']
+            self.max_iter = int(settings['max_iter'])
 
     def compute(self, molecule, basis, scf_tensors):
         """Performs linear response calculation.
@@ -122,12 +129,14 @@ class LinearResponseSolver:
 
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
+        a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
+                        scf_tensors, self.rank, self.comm)
+        b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
+                        scf_tensors, self.rank, self.comm)
+
         # start linear response calculation
         if self.rank == mpi_master():
-            V1 = {
-                op: v for op, v in zip(
-                    self.b_ops, self.get_rhs(self.b_ops, scf_tensors, nocc))
-            }
+            V1 = {op: v for op, v in zip(self.b_components, b_rhs)}
             igs = self.initial_guess(self.frequencies, V1, od, sd, td)
             b = self.setup_trials(igs)
 
@@ -204,13 +213,9 @@ class LinearResponseSolver:
 
         # calculate properties
         if self.rank == mpi_master():
-            v1 = {
-                op: v for op, v in zip(
-                    self.a_ops, self.get_rhs(self.a_ops, scf_tensors, nocc))
-            }
-
+            v1 = {op: v for op, v in zip(self.a_components, a_rhs)}
             lrs = {}
-            for aop in self.a_ops:
+            for aop in self.a_components:
                 for bop, w in solutions:
                     lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[(bop, w)])
             return lrs
@@ -228,7 +233,7 @@ class LinearResponseSolver:
         self.ostream.print_header(output_header.ljust(68))
         self.ostream.print_blank()
         for op, freq, nv in nvs:
-            ops_label = '<<{};{}>>_{}'.format(op, op, freq)
+            ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
@@ -259,25 +264,6 @@ class LinearResponseSolver:
 
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
-
-    def get_rhs(self, ops, scf_tensors, nocc):
-        """Create right-hand sides of linear response equations"""
-
-        mo = scf_tensors['C']
-        S = scf_tensors['S']
-        D = scf_tensors['D'][0] + scf_tensors['D'][1]
-        dipoles = scf_tensors['Mu']
-
-        norb = mo.shape[1]
-
-        if 'x' in ops or 'y' in ops or 'z' in ops:
-            props = {k: v for k, v in zip('xyz', dipoles)}
-
-        matrices = tuple(
-            mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
-
-        gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
-        return gradients
 
     def initial_guess(self, freqs, V1, od, sd, td):
 
