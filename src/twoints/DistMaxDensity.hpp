@@ -145,8 +145,30 @@ namespace distmaxden { // distmaxden namespace
                             const CGtoPairsBlock&      ketGtoPairsBlock,
                             const int32_t              nKetContrPairs,
                             const int32_t              iContrPair);
-    
 
+    /**
+     Determines maximum density elements for vector of GTOs pairs on ket side
+     and GTOs pair on bra side in case of spin unrestricted Fock matrix, 2J + K.
+
+     @param maxDensityElements maxDensityElements the vector of maximum density
+            elements.
+     @param densityMatrixAlpha the constant pointer to alpha AO density matrix.
+     @param densityMatrixBeta the constant pointer to beta AO density matrix.
+     @param nDensityColumns the number of columns in AO density matrix.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param nKetContrPairs the number of contracted GTOs pairs on ket side.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void getMaxUnrestDenJK(      CMemBlock<double>&   maxDensityElements,
+                           const double*              densityMatrixAlpha,
+                           const double*              densityMatrixBeta,
+                           const int32_t              nDensityColumns,
+                           const CGtoPairsBlock&      braGtoPairsBlock,
+                           const CGtoPairsBlock&      ketGtoPairsBlock,
+                           const int32_t              nKetContrPairs,
+                           const int32_t              iContrPair);
+    
 } // distmaxden namespace
 
 #endif /* DistMaxDensity_hpp */

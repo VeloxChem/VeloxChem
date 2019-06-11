@@ -111,7 +111,22 @@ CKineticEnergyMatrix::getKineticEnergy(const CAODensityMatrix& aoDensityMatrix,
 {
     if (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices())
     {
-        return denblas::trace(_matrix, aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
+        if (aoDensityMatrix.getDensityType() == denmat::rest)
+        {
+            return denblas::trace(_matrix, aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
+        }
+        else
+        {
+            auto idensity_a = 2 * iDensityMatrix;
+
+            auto idensity_b = 2 * iDensityMatrix + 1;
+
+            auto e_a = 0.5 * denblas::trace(_matrix, aoDensityMatrix.getReferenceToDensity(idensity_a));
+
+            auto e_b = 0.5 * denblas::trace(_matrix, aoDensityMatrix.getReferenceToDensity(idensity_b));
+
+            return e_a + e_b;
+        }
     }
     
     return 0.0;

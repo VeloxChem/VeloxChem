@@ -77,6 +77,8 @@ class ScfDriver:
         The number of MPI processes.
     restart
         The flag for restarting from checkpoint file
+    restricted
+        The flag for restricted SCF
     """
 
     def __init__(self, comm, ostream):
@@ -117,6 +119,9 @@ class ScfDriver:
         self.fock_matrices = deque()
         self.den_matrices = deque()
 
+        self.fock_matrices_beta = deque()
+        self.den_matrices_beta = deque()
+
         # density matrix
         self.density = AODensityMatrix()
 
@@ -137,6 +142,9 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+
+        # restricted?
+        self.restricted = True
 
     def update_settings(self, scf_dict):
 
@@ -223,9 +231,17 @@ class ScfDriver:
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
+        self.fock_matrices_beta.clear()
+        self.den_matrices_beta.clear()
+
         if self.rank == mpi_master():
             self.print_scf_energy()
-            self.print_ground_state(molecule)
+            if self.restricted:
+                s2 = 0.0
+            else:
+                s2 = self.compute_s2(molecule, self.scf_tensors['S'],
+                                     self.mol_orbs)
+            self.print_ground_state(molecule, s2)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False,
                                          self.ostream)
 
@@ -264,6 +280,9 @@ class ScfDriver:
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
+
+        self.fock_matrices_beta.clear()
+        self.den_matrices_beta.clear()
 
         ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis)
 
@@ -463,7 +482,8 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.comm, self.ostream)
+                                              ovl_mat, self.restricted,
+                                              self.comm, self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
         if self.den_guess.guess_type == "PRCMO":
@@ -998,7 +1018,24 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
-    def print_ground_state(self, molecule):
+    def compute_s2(self, molecule, smat, mol_orbs):
+        """Computes expectation value <S**2>
+
+        Computes expectation value of the S**2 operator.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        smat
+            The overlap matrix (numpy array).
+        mol_orbs
+            The molecular orbitals.
+        """
+
+        return None
+
+    def print_ground_state(self, molecule, s2):
         """Prints ground state information to output stream.
 
         Prints ground state information to output stream.
@@ -1025,6 +1062,10 @@ class ScfDriver:
         sz = 0.5 * (mult - 1.0)
         valstr = "Magnetic Quantum Number (S_z) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
+
+        if not self.restricted:
+            valstr = "Expectation value of S**2     :{:8.4f}".format(s2)
+            self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
 
