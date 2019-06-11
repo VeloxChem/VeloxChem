@@ -238,7 +238,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       braMolecule,
         
         auto coords  = CMemBlock2D<double>({coordinateX, coordinateY, coordinateZ}, 1, 3);
         
-        // compute nuclear potential integrals
+        // compute electric field integrals
         
         efieldmat = _compElectricFieldIntegrals(&dipoles, &coords, &bracontr,
                                                 &ketcontr);
@@ -265,7 +265,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
         
         CGtoContainer ketcontr(ketMolecule, ketBasis);
         
-        // compute nuclear potential integrals
+        // compute electric field integrals
         
         efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr, &ketcontr);
     }
@@ -462,7 +462,7 @@ CElectricFieldIntegralsDriver::_compElectricFieldForGtoBlocks(      COneIntsDist
     
     auto nblock = recmap.getNumberOfComponents();
     
-    CMemBlock2D<double> primbuffer(pdim, nblock * pmax);
+    CMemBlock2D<double> primbuffer(pdim, nblock);
     
     // allocate primitive integrals accumulation buffer
     

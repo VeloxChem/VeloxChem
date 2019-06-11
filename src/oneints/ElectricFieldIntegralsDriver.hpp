@@ -92,7 +92,7 @@ class CElectricFieldIntegralsDriver
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
-     @param iPointDipole the index of point dipole in vector point dipoles.
+     @param iPointDipole the index of point dipole in vector of point dipoles.
      */
     void _addPointDipoleContribution(      CMemBlock2D<double>& accBuffer,
                                      const CMemBlock2D<double>& primBuffer,
@@ -142,7 +142,7 @@ class CElectricFieldIntegralsDriver
                                     const int32_t               iContrGto) const;
     
     /**
-     Sets recursion map object for electric dipole integrals of specified angular
+     Sets recursion map object for electric field integrals of specified angular
      momentum.
      
      @param braAngularMomentum the angular momentum of bra side.
@@ -186,14 +186,14 @@ public:
     
     /**
      Computes electric field integrals for molecules in specific basis set for
-     given set of point dipoles and stores results in nuclear potential matrix
+     given set of point dipoles and stores results in electric field matrix
      object.
      
      @param molecule the molecule.
      @param basis the molecular basis.
      @param dipoles the vector of point dipoles.
      @param coordinates the vector of point dipoles coordinates.
-     @return the nuclear potential matrix object.
+     @return the electric field matrix object.
      */
     CElectricFieldMatrix compute(const CMolecule&           molecule,
                                  const CMolecularBasis&     basis,

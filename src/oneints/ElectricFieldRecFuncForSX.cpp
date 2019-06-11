@@ -84,7 +84,7 @@ namespace efieldrecfunc { // efieldrecfunc namespace
                 
                 auto fa = primBuffer.data(sidx + idx);
                 
-                #pragma omp simd aligned(fg, pc_x, pc_y, pc_z, fex, fa: VLX_ALIGN)
+                #pragma omp simd aligned(fg, pc_x, pc_y, pc_z, fex, fey, fez, fa: VLX_ALIGN)
                 for (int32_t j = 0; j < nprim; j++)
                 {
                     double fx = 2.0 * fg[j] * fa[j];
@@ -99,7 +99,6 @@ namespace efieldrecfunc { // efieldrecfunc namespace
                 idx++;
             }
         }
-
     }
 
     void
