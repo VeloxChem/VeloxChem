@@ -39,6 +39,7 @@ from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver

@@ -6,6 +6,7 @@ from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
@@ -68,9 +69,20 @@ def main():
         else:
             scf_dict = {}
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        nalpha = task.molecule.number_of_alpha_electrons()
+        nbeta = task.molecule.number_of_beta_electrons()
+
+        if nalpha == nbeta:
+            scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        else:
+            scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(scf_dict)
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        if not scf_drv.restricted:
+            # unrestricted calculation: wave function only
+            task.finish()
+            sys.exit(0)
 
         # molecular orbitals
 
