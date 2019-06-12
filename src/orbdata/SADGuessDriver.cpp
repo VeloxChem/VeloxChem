@@ -315,7 +315,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     csad_beta.zero();
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
     {
         // elemental index (nuclear charge) for this atom
