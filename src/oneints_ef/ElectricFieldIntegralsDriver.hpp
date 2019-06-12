@@ -13,17 +13,17 @@
 
 #include "mpi.h"
 
-#include "MemBlock2D.hpp"
-#include "GtoContainer.hpp"
-#include "ElectricFieldMatrix.hpp"
-#include "OneIntsDistributor.hpp"
 #include "BoysFunction.hpp"
+#include "ElectricFieldMatrix.hpp"
+#include "GtoContainer.hpp"
+#include "MemBlock2D.hpp"
+#include "OneIntsDistributor.hpp"
 #include "RecursionMap.hpp"
 
 /**
  Class CElectricFieldIntegralsDriver computes one-electron electric field
  integrals.
- 
+
  @author Z. Rinkevicius
  */
 class CElectricFieldIntegralsDriver
@@ -32,20 +32,20 @@ class CElectricFieldIntegralsDriver
      The rank of associated local MPI process.
      */
     int32_t _locRank;
-    
+
     /**
      The total number of local MPI processes.
      */
     int32_t _locNodes;
-    
+
     /**
      The local MPI communicator.
      */
     MPI_Comm _locComm;
-    
+
     /**
      Comutes electric field integrals for pair of GTOs containers.
-     
+
      @param dipoles the vector of point dipoles.
      @param coordinates the vector of point dipoles coordines.
      @param braGtoContainer the GTOs container for bra side.
@@ -56,10 +56,10 @@ class CElectricFieldIntegralsDriver
                                                      const CMemBlock2D<double>* coordinates,
                                                      const CGtoContainer*       braGtoContainer,
                                                      const CGtoContainer*       ketGtoContainer) const;
-    
+
     /**
      Computes electric field integrals for specific pair of GTOs blocks.
-     
+
      @param distPatternX the pointer to X component of integrals distribution
             pattern.
      @param distPatternY the pointer to Y component of integrals distribution
@@ -71,19 +71,19 @@ class CElectricFieldIntegralsDriver
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
-    void _compElectricFieldForGtoBlocks(      COneIntsDistribution* distPatternX,
-                                              COneIntsDistribution* distPatternY,
-                                              COneIntsDistribution* distPatternZ,
-                                        const CMemBlock2D<double>*  dipoles,
-                                        const CMemBlock2D<double>*  coordinates,
-                                        const CGtoBlock&            braGtoBlock,
-                                        const CGtoBlock&            ketGtoBlock) const;
-    
+    void _compElectricFieldForGtoBlocks(COneIntsDistribution*      distPatternX,
+                                        COneIntsDistribution*      distPatternY,
+                                        COneIntsDistribution*      distPatternZ,
+                                        const CMemBlock2D<double>* dipoles,
+                                        const CMemBlock2D<double>* coordinates,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock) const;
+
     /**
      Adds single point dipole contribution from primitives recursion buffer to
      primitives accumulation buffer, which contains primitive electric field
      integrals.
-     
+
      @param accBuffer the primitive integrals accumulation buffer.
      @param primBuffer the primitives recursion buffer.
      @param primIndex the index of specific integrals in primitives recursion
@@ -94,7 +94,7 @@ class CElectricFieldIntegralsDriver
      @param iContrGto the index of contracted GTO on bra side.
      @param iPointDipole the index of point dipole in vector of point dipoles.
      */
-    void _addPointDipoleContribution(      CMemBlock2D<double>& accBuffer,
+    void _addPointDipoleContribution(CMemBlock2D<double>&       accBuffer,
                                      const CMemBlock2D<double>& primBuffer,
                                      const int32_t              primIndex,
                                      const CMemBlock2D<double>& dipoles,
@@ -102,15 +102,15 @@ class CElectricFieldIntegralsDriver
                                      const CGtoBlock&           ketGtoBlock,
                                      const int32_t              iContrGto,
                                      const int32_t              iPointDipole) const;
-    
+
     /**
      Computes batch of primitive electric field integrals using Obara-Saika
      recursion and stores results in primitives buffer.
      Reference: S. Obara, A. Saika, J. Chem. Phys. 84, 3963 (1986).
-     
+
      Batch size: (one contracted GTO on bra side) x (all contracted GTOs on ket
      side).
-     
+
      @param primBuffer the primitives buffer.
      @param recursionMap the recursion map for Obara-Saika recursion.
      @param bfTable the Boys function evaluator.
@@ -126,51 +126,48 @@ class CElectricFieldIntegralsDriver
      @param ketGtoBlock the GTOs block on ket side.
      @param iContrGto the index of contracted GTO on bra side.
      */
-    void _compPrimElectricFieldInts(      CMemBlock2D<double>&  primBuffer,
-                                    const CRecursionMap&        recursionMap,
-                                    const CBoysFunction&        bfTable,
-                                          CMemBlock<double>&    bfArguments,
-                                          CMemBlock2D<double>&  bfValues,
-                                    const int32_t               bfOrder,
-                                    const CMemBlock2D<double>&  osFactors,
-                                    const CMemBlock2D<double>&  abDistances,
-                                    const CMemBlock2D<double>&  paDistances,
-                                    const CMemBlock2D<double>&  pbDistances,
-                                    const CMemBlock2D<double>&  pcDistances,
-                                    const CGtoBlock&            braGtoBlock,
-                                    const CGtoBlock&            ketGtoBlock,
-                                    const int32_t               iContrGto) const;
-    
+    void _compPrimElectricFieldInts(CMemBlock2D<double>&       primBuffer,
+                                    const CRecursionMap&       recursionMap,
+                                    const CBoysFunction&       bfTable,
+                                    CMemBlock<double>&         bfArguments,
+                                    CMemBlock2D<double>&       bfValues,
+                                    const int32_t              bfOrder,
+                                    const CMemBlock2D<double>& osFactors,
+                                    const CMemBlock2D<double>& abDistances,
+                                    const CMemBlock2D<double>& paDistances,
+                                    const CMemBlock2D<double>& pbDistances,
+                                    const CMemBlock2D<double>& pcDistances,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto) const;
+
     /**
      Sets recursion map object for electric field integrals of specified angular
      momentum.
-     
+
      @param braAngularMomentum the angular momentum of bra side.
      @param ketAngularMomentum the angular momentum of ket side.
      @return the recursion map for electric dipole integrals.
      */
-    CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,
-                                   const int32_t ketAngularMomentum,
-                                   const int32_t maxNumberOfPrimitives) const;
-    
-public:
-    
+    CRecursionMap _setRecursionMap(const int32_t braAngularMomentum, const int32_t ketAngularMomentum, const int32_t maxNumberOfPrimitives) const;
+
+   public:
     /**
      Creates a electric field integrals driver object using MPI info.
-     
+
      @param comm the MPI communicator.
      */
     CElectricFieldIntegralsDriver(MPI_Comm comm);
-    
+
     /**
      Destroys a electric field integrals driver object.
      */
     ~CElectricFieldIntegralsDriver();
-    
+
     /**
      Computes electric field integrals for molecule in specific basis set at
      specified position and stores results in electric field matrix object.
-     
+
      @param molecule the molecule.
      @param basis the molecular basis.
      @param coordinateX the Cartesian X coordinate of electric field position.
@@ -183,12 +180,12 @@ public:
                                  const double           coordinateX,
                                  const double           coordinateY,
                                  const double           coordinateZ) const;
-    
+
     /**
      Computes electric field integrals for molecules in specific basis set for
      given set of point dipoles and stores results in electric field matrix
      object.
-     
+
      @param molecule the molecule.
      @param basis the molecular basis.
      @param dipoles the vector of point dipoles.
@@ -199,11 +196,11 @@ public:
                                  const CMolecularBasis&     basis,
                                  const CMemBlock2D<double>* dipoles,
                                  const CMemBlock2D<double>* coordinates) const;
-    
+
     /**
      Computes electric field integrals for molecule in two basis sets at
      specified position and stores results in electric field matrix object.
-     
+
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of electric field matrix.
      @param ketBasis the molecular basis for ket side of electric field matrix.
@@ -218,11 +215,11 @@ public:
                                  const double           coordinateX,
                                  const double           coordinateY,
                                  const double           coordinateZ) const;
-    
+
     /**
      Computes electric field integrals for molecule in two basis sets for given
      set of point dipoles and stores results in electric field matrix object.
-     
+
      @param molecule the molecule.
      @param braBasis the molecular basis for bra side of electric field matrix.
      @param ketBasis the molecular basis for ket side of electric field matrix.
@@ -235,12 +232,12 @@ public:
                                  const CMolecularBasis&     ketBasis,
                                  const CMemBlock2D<double>* dipoles,
                                  const CMemBlock2D<double>* coordinates) const;
-    
+
     /**
      Computes electric field integrals for two molecules in specific basis
      set at specific position and stores results in electric field matrix
      object.
-     
+
      @param braMolecule the molecule for bra side of electric field matrix.
      @param ketMolecule the molecule for ket side of electric field matrix.
      @param basis the molecular basis.
@@ -255,12 +252,12 @@ public:
                                  const double           coordinateX,
                                  const double           coordinateY,
                                  const double           coordinateZ) const;
-    
+
     /**
      Computes electric field integrals for two molecules in specific basis
      set for set of point dipoles and stores results in electric field matrix
      object.
-     
+
      @param braMolecule the molecule for bra side of electric field matrix.
      @param ketMolecule the molecule for ket side of electric field matrix.
      @param basis the molecular basis.
@@ -273,11 +270,11 @@ public:
                                  const CMolecularBasis&     basis,
                                  const CMemBlock2D<double>* dipoles,
                                  const CMemBlock2D<double>* coordinates) const;
-    
+
     /**
      Computes electric field integrals for two molecules in two basis sets
      at specified position and stores results in electric field matrix object.
-     
+
      @param braMolecule the molecule for bra side of electric field matrix.
      @param ketMolecule the molecule for ket side of electric field matrix.
      @param braBasis the molecular basis for bra side of electric field matrix.
@@ -294,12 +291,12 @@ public:
                                  const double           coordinateX,
                                  const double           coordinateY,
                                  const double           coordinateZ) const;
-    
+
     /**
      Computes electric field integrals for two molecules in two basis sets
      for set of point dipoles and stores results in electric field matrix
      object.
-     
+
      @param braMolecule the molecule for bra side of electric field matrix.
      @param ketMolecule the molecule for ket side of electric field matrix.
      @param braBasis the molecular basis for bra side of electric field matrix.
@@ -314,11 +311,11 @@ public:
                                  const CMolecularBasis&     ketBasis,
                                  const CMemBlock2D<double>* dipoles,
                                  const CMemBlock2D<double>* coordinates) const;
-    
+
     /**
      Computes electric field integrals blocks for pair of GTOs blocks and
      stores them into integrals batch.
-     
+
      @param intsBatchX the pointer to batch buffer of X component of electric
             field integrals.
      @param intsBatchY the pointer to batch buffer of Y component of electric
@@ -330,9 +327,9 @@ public:
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
-    void compute(      double*              intsBatchX,
-                       double*              intsBatchY,
-                       double*              intsBatchZ,
+    void compute(double*                    intsBatchX,
+                 double*                    intsBatchY,
+                 double*                    intsBatchZ,
                  const CMemBlock2D<double>* dipoles,
                  const CMemBlock2D<double>* coordinates,
                  const CGtoBlock&           braGtoBlock,
