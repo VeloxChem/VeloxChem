@@ -16,7 +16,7 @@
 
 /**
  Class CMolecularGrid class generates molecular grid.
- 
+
  @author Z. Rinkevicius
  */
 class CMolecularGrid
@@ -31,8 +31,7 @@ class CMolecularGrid
      */
     CMemBlock2D<double> _gridPoints;
 
-public:
-    
+   public:
     /**
      Creates an empty molecular grid object.
      */
@@ -40,21 +39,21 @@ public:
 
     /**
      Creates a molecular grid object.
-     
+
      @param gridPoints the 2D memory block object with grid points data.
      */
     CMolecularGrid(const CMemBlock2D<double>& gridPoints);
 
     /**
      Creates a molecular grid object by copying other molecular grid object.
-     
+
      @param source the molecular grid object.
      */
     CMolecularGrid(const CMolecularGrid& source);
 
     /**
      Creates a molecular grid object by by moving other molecular grid object.
-     
+
      @param source the molecular grid object.
      */
     CMolecularGrid(CMolecularGrid&& source) noexcept;
@@ -66,21 +65,21 @@ public:
 
     /**
      Assigns a molecular grid object by copying other molecular grid object.
-     
+
      @param source the molecular grid object.
      */
     CMolecularGrid& operator=(const CMolecularGrid& source);
 
     /**
      Assigns a molecular grid object by moving other molecular grid object.
-     
+
      @param source the molecular grid object.
      */
     CMolecularGrid& operator=(CMolecularGrid&& source) noexcept;
 
     /**
      Compares molecular grid object with other molecular grid object.
-     
+
      @param other the molecular grid object.
      @return true if molecular grid objects are equal, false otherwise.
      */
@@ -88,7 +87,7 @@ public:
 
     /**
      Compares molecular grid object with other molecular grid object.
-     
+
      @param other the molecular grid object.
      @return true if molecular grid objects are not equal, false otherwise.
      */
@@ -100,31 +99,31 @@ public:
      @return the number of grid points.
      */
     int32_t getNumberOfGridPoints() const;
-    
+
     /**
      Gets Cartesian X coordinates of grid points in molecular grid object.
 
      @return he pointer to Cartesian X coordinates of grid points.
      */
     const double* getCoordinatesX() const;
-    
+
     /**
      Gets Cartesian Y coordinates of grid points in molecular grid object.
-     
+
      @return the pointer to Cartesian Y coordinates of grid points.
      */
     const double* getCoordinatesY() const;
-    
+
     /**
      Gets Cartesian Z coordinates of grid points in molecular grid object.
-     
+
      @return the pointer to Cartesian Z coordinates of grid points.
      */
     const double* getCoordinatesZ() const;
-    
+
     /**
      Gets weights of grid points in molecular grid object.
-     
+
      @return the pointer to weights of grid points.
      */
     const double* getWeights() const;
@@ -138,9 +137,7 @@ public:
      @param nodes the number of nodes in MPI domain.
      @param comm he MPI communicator.
      */
-    void distribute(int32_t  rank,
-                    int32_t  nodes,
-                    MPI_Comm comm);
+    void distribute(int32_t rank, int32_t nodes, MPI_Comm comm);
 
     /**
      Converts molecular grid object to text and insert it into output text
@@ -149,8 +146,7 @@ public:
      @param output the output text stream.
      @param source the molecular grid.
      */
-    friend std::ostream& operator<<(      std::ostream&   output,
-                                    const CMolecularGrid& source);
+    friend std::ostream& operator<<(std::ostream& output, const CMolecularGrid& source);
 };
 
 #endif /* MolecularGrid_hpp */

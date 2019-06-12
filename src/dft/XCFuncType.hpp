@@ -13,7 +13,7 @@
 
 /**
  Enumerate class xcfun:
- 
+
  Defines supported exchange-correlation functional keys:
  xcfun::lda  - the local density approximation
  xcfun::gga  - the generalized gradient approximation
@@ -32,15 +32,16 @@ enum class xcfun
  @param functional the enumerate class value.
  @return the label of enumerate class value.
  */
-inline std::string to_string(const xcfun functional)
+inline std::string
+to_string(const xcfun functional)
 {
     if (functional == xcfun::lda) return std::string("LDA");
-    
+
     if (functional == xcfun::gga) return std::string("GGA");
-    
+
     if (functional == xcfun::mgga) return std::string("MGGA");
-    
-    return std::string("UNKNOWN"); 
+
+    return std::string("UNKNOWN");
 }
 
 #endif /* XCFuncType_hpp */

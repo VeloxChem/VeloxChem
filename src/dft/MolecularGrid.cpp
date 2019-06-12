@@ -12,7 +12,6 @@ CMolecularGrid::CMolecularGrid()
 
     : _isDistributed(false)
 {
-
 }
 
 CMolecularGrid::CMolecularGrid(const CMemBlock2D<double>& gridPoints)
@@ -21,7 +20,6 @@ CMolecularGrid::CMolecularGrid(const CMemBlock2D<double>& gridPoints)
 
     , _gridPoints(gridPoints)
 {
-
 }
 
 CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
@@ -30,7 +28,6 @@ CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
 
     , _gridPoints(source._gridPoints)
 {
-
 }
 
 CMolecularGrid::CMolecularGrid(CMolecularGrid&& source) noexcept
@@ -39,12 +36,10 @@ CMolecularGrid::CMolecularGrid(CMolecularGrid&& source) noexcept
 
     , _gridPoints(std::move(source._gridPoints))
 {
-
 }
 
 CMolecularGrid::~CMolecularGrid()
 {
-
 }
 
 CMolecularGrid&
@@ -64,7 +59,7 @@ CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
 {
     if (this == &source) return *this;
 
-    _isDistributed = std::move(source._isDistributed); 
+    _isDistributed = std::move(source._isDistributed);
 
     _gridPoints = std::move(source._gridPoints);
 
@@ -75,7 +70,7 @@ bool
 CMolecularGrid::operator==(const CMolecularGrid& other) const
 {
     if (_isDistributed != other._isDistributed) return false;
-    
+
     if (_gridPoints != other._gridPoints) return false;
 
     return true;
@@ -118,9 +113,7 @@ CMolecularGrid::getWeights() const
 }
 
 void
-CMolecularGrid::distribute(int32_t  rank,
-                           int32_t  nodes,
-                           MPI_Comm comm)
+CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
     if (!_isDistributed)
     {
@@ -131,8 +124,7 @@ CMolecularGrid::distribute(int32_t  rank,
 }
 
 std::ostream&
-operator<<(      std::ostream&   output,
-           const CMolecularGrid& source)
+operator<<(std::ostream& output, const CMolecularGrid& source)
 {
     output << std::endl;
 

@@ -16,7 +16,7 @@
 /**
  Class CLog3Quadrature class generates M4T2 aka "Log3" quadrature.
  Reference: O. Treutler and R. Ahlrichs, J. Chem. Phys. 102, 346 (1995).
- 
+
  @author Z. Rinkevicius
  */
 class CLog3Quadrature
@@ -38,16 +38,14 @@ class CLog3Quadrature
      */
     double _getXiFactor() const;
 
-public:
-
+   public:
     /**
      Creates a Log3 quadrature object.
-     
+
      @param nRadialPoints the number of radial points.
      @param idElemental the identifier of chemical element.
      */
-    CLog3Quadrature(const int32_t nRadialPoints,
-                    const int32_t idElemental);
+    CLog3Quadrature(const int32_t nRadialPoints, const int32_t idElemental);
 
     /**
      Destroys a Log3 quadrature object.
@@ -56,7 +54,7 @@ public:
 
     /**
      Generates quadrature points for radial Log3 quadrature.
-     
+
      @return the quadrature points (coordinates, weights).
      */
     CMemBlock2D<double> generate() const;
