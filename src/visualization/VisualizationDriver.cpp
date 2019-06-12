@@ -209,7 +209,7 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 
     // calculate psi on grid points
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
         double xp = x0 + dx * ix;
@@ -297,7 +297,7 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 
     // calculate densities on grid points
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
         double xp = x0 + dx * ix;
