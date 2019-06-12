@@ -281,6 +281,7 @@ class ComplexResponse:
                      pre=None,
                      bger=np.array([]),
                      bung=np.array([]),
+                     res_norm=None,
                      normalize=True):
         """Returns orthonormalized trial vectors. Takes set of vectors,
         preconditioner matrix, gerade and ungerade subspaces as input
@@ -289,16 +290,17 @@ class ComplexResponse:
 
         trials = []
         for (op, w) in vectors:
-            vec = np.array(vectors[(op, w)])
+            if res_norm == None or res_norm[(op, w)] > self.conv_thresh:
+                vec = np.array(vectors[(op, w)])
 
-            # preconditioning trials:
+                # preconditioning trials:
 
-            if pre is not None:
-                v = self.preconditioning(pre[w], vec)
-            else:
-                v = vec
-            if np.linalg.norm(v) > self.small_thresh:
-                trials.append(v)
+                if pre is not None:
+                    v = self.preconditioning(pre[w], vec)
+                else:
+                    v = vec
+                if np.linalg.norm(v) > self.small_thresh:
+                    trials.append(v)
 
         new_trials = np.array(trials).T
 
@@ -326,14 +328,14 @@ class ComplexResponse:
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
 
-            new_ger = truncate_and_normalize(new_ger, self.small_thresh)
+            new_ger = truncate_and_normalize(self, new_ger, self.small_thresh)
 
         if new_ung.any() and normalize:
 
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
 
-            new_ung = truncate_and_normalize(new_ung, self.small_thresh)
+            new_ung = truncate_and_normalize(self, new_ung, self.small_thresh)
 
         return new_ger, new_ung
 
@@ -443,209 +445,212 @@ class ComplexResponse:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
+        nvs = {}
         kappas = {}
 
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
 
             if self.rank == mpi_master():
-                nvs = []
 
                 for op, w in igs:
-                    grad = v1[op]
+                    if iteration == 0 or relative_residual_norm[(op, w)] > self.conv_thresh:
 
-                    gradger, gradung = self.decomp_sym(grad)
-                    full_size = gradger.shape[0]
+                        grad = v1[op]
 
-                    # projections onto gerade and ungerade subspaces:
+                        gradger, gradung = self.decomp_sym(grad)
+                        full_size = gradger.shape[0]
 
-                    if bger.any():
-                        g_realger = np.matmul(bger.T, gradger.real)
-                        g_imagger = np.matmul(bger.T, gradger.imag)
-
-                        e2gg = np.matmul(bger.T, e2bger)
-
-                        ntrials_ger = bger.shape[1]
-
-                    else:
-                        ntrials_ger = 0
-
-                    if bung.any():
-                        g_realung = np.matmul(bung.T, gradung.real)
-                        g_imagung = np.matmul(bung.T, gradung.imag)
-
-                        e2uu = np.matmul(bung.T, e2bung)
+                        # projections onto gerade and ungerade subspaces:
 
                         if bger.any():
-                            s2ug = np.matmul(bung.T, s2bung)
+                            g_realger = np.matmul(bger.T, gradger.real)
+                            g_imagger = np.matmul(bger.T, gradger.imag)
 
-                        ntrials_ung = bung.shape[1]
+                            e2gg = np.matmul(bger.T, e2bger)
 
-                    else:
-                        ntrials_ung = 0
+                            ntrials_ger = bger.shape[1]
 
-                    # creating gradient and matrix for linear equation
+                        else:
+                            ntrials_ger = 0
 
-                    size = 2 * (ntrials_ger + ntrials_ung)
+                        if bung.any():
+                            g_realung = np.matmul(bung.T, gradung.real)
+                            g_imagung = np.matmul(bung.T, gradung.imag)
 
-                    # gradient
+                            e2uu = np.matmul(bung.T, e2bung)
 
-                    g = np.zeros(size)
+                            if bger.any():
+                                s2ug = np.matmul(bung.T, s2bung)
 
-                    for pos in range(ntrials_ger):
-                        g[pos] = g_realger[pos]
-                        g[-pos - 1] = -g_imagger[-pos - 1]
+                            ntrials_ung = bung.shape[1]
 
-                    for pos in range(ntrials_ung):
-                        g[pos + ntrials_ger] = g_realung[pos]
-                        g[-(pos + ntrials_ger) - 1] = -g_imagung[-pos - 1]
+                        else:
+                            ntrials_ung = 0
 
-                    # matrix
+                        # creating gradient and matrix for linear equation
 
-                    mat = np.zeros((size, size))
+                        size = 2 * (ntrials_ger + ntrials_ung)
 
-                    # filling E2gg
+                        # gradient
 
-                    for row in range(ntrials_ger):
-                        for col in range(ntrials_ger):
-                            mat[row, col] = e2gg[row, col]
-                            mat[-row - 1, -col - 1] = -e2gg[-row - 1, -col - 1]
+                        g = np.zeros(size)
 
-                    # filling E2uu
+                        for pos in range(ntrials_ger):
+                            g[pos] = g_realger[pos]
+                            g[-pos - 1] = -g_imagger[-pos - 1]
 
-                    for row in range(ntrials_ung):
-                        for col in range(ntrials_ung):
-                            mat[(row + ntrials_ger),
-                                (col + ntrials_ger)] = e2uu[row, col]
-                            mat[-(row + ntrials_ger) - 1, -(col + ntrials_ger) -
-                                1] = -e2uu[-row - 1, -col - 1]
+                        for pos in range(ntrials_ung):
+                            g[pos + ntrials_ger] = g_realung[pos]
+                            g[-(pos + ntrials_ger) - 1] = -g_imagung[-pos - 1]
 
-                    for row in range(ntrials_ung):
-                        for col in range(ntrials_ger):
+                        # matrix
 
-                            # filling S2ug
+                        mat = np.zeros((size, size))
 
-                            mat[(row + ntrials_ger), col] = -w * s2ug[row, col]
-                            mat[-(row + ntrials_ger) -
-                                1, col] = d * s2ug[-row - 1, col]
-                            mat[(row + ntrials_ger), -col -
-                                1] = d * s2ug[row, -col - 1]
-                            mat[-(row + ntrials_ger) - 1, -col -
-                                1] = w * s2ug[-row - 1, -col - 1]
+                        # filling E2gg
 
-                            # filling S2ug.T (interchanging of row and col)
+                        for row in range(ntrials_ger):
+                            for col in range(ntrials_ger):
+                                mat[row, col] = e2gg[row, col]
+                                mat[-row - 1, -col - 1] = -e2gg[-row - 1, -col - 1]
 
-                            mat[col, (row + ntrials_ger)] = -w * s2ug[row, col]
-                            mat[col, -(row + ntrials_ger) -
-                                1] = d * s2ug[-row - 1, col]
-                            mat[-col - 1,
-                                (row + ntrials_ger)] = d * s2ug[row, -col - 1]
-                            mat[-col - 1, -(row + ntrials_ger) -
-                                1] = w * s2ug[-row - 1, -col - 1]
+                        # filling E2uu
 
-                    # solving matrix equation
+                        for row in range(ntrials_ung):
+                            for col in range(ntrials_ung):
+                                mat[(row + ntrials_ger),
+                                    (col + ntrials_ger)] = e2uu[row, col]
+                                mat[-(row + ntrials_ger) - 1, -(col + ntrials_ger) -
+                                    1] = -e2uu[-row - 1, -col - 1]
 
-                    c = np.linalg.solve(mat, g)
+                        for row in range(ntrials_ung):
+                            for col in range(ntrials_ger):
 
-                    # extracting the 4 components of c...
+                                # filling S2ug
 
-                    c_realger, c_imagger = np.zeros(ntrials_ger), np.zeros(
-                        ntrials_ger)
-                    c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
-                        ntrials_ung)
+                                mat[(row + ntrials_ger), col] = -w * s2ug[row, col]
+                                mat[-(row + ntrials_ger) -
+                                    1, col] = d * s2ug[-row - 1, col]
+                                mat[(row + ntrials_ger), -col -
+                                    1] = d * s2ug[row, -col - 1]
+                                mat[-(row + ntrials_ger) - 1, -col -
+                                    1] = w * s2ug[-row - 1, -col - 1]
 
-                    for pos in range(ntrials_ger):
-                        c_realger[pos] = c[pos]
-                        c_imagger[-pos - 1] = c[-pos - 1]
+                                # filling S2ug.T (interchanging of row and col)
 
-                    for pos in range(ntrials_ung):
-                        c_realung[pos] = c[pos + ntrials_ger]
-                        c_imagung[-pos - 1] = c[-(pos + ntrials_ger) - 1]
+                                mat[col, (row + ntrials_ger)] = -w * s2ug[row, col]
+                                mat[col, -(row + ntrials_ger) -
+                                    1] = d * s2ug[-row - 1, col]
+                                mat[-col - 1,
+                                    (row + ntrials_ger)] = d * s2ug[row, -col - 1]
+                                mat[-col - 1, -(row + ntrials_ger) -
+                                    1] = w * s2ug[-row - 1, -col - 1]
 
-                    # ...and projecting them onto respective subspace
+                        # solving matrix equation
 
-                    x_realger = np.matmul(bger, c_realger)
-                    x_imagger = np.matmul(bger, c_imagger)
-                    x_realung = np.matmul(bung, c_realung)
-                    x_imagung = np.matmul(bung, c_imagung)
+                        c = np.linalg.solve(mat, g)
 
-                    # composing response vector
+                        # extracting the 4 components of c...
 
-                    x_real = x_realger + x_realung
-                    x_imag = x_imagung + x_imagger
-                    x = np.zeros(len(x_real), dtype=complex)
+                        c_realger, c_imagger = np.zeros(ntrials_ger), np.zeros(
+                            ntrials_ger)
+                        c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
+                            ntrials_ung)
 
-                    for pos in range(len(x_real)):
-                        x[pos] = complex(x_real[pos], x_imag[pos])
+                        for pos in range(ntrials_ger):
+                            c_realger[pos] = c[pos]
+                            c_imagger[-pos - 1] = c[-pos - 1]
 
-                    solutions[(op, w)] = x
+                        for pos in range(ntrials_ung):
+                            c_realung[pos] = c[pos + ntrials_ger]
+                            c_imagung[-pos - 1] = c[-(pos + ntrials_ger) - 1]
 
-                    kappas[(op, w)] = (lrvec2mat(x.real,nocc,norb)
-                                      + 1j*lrvec2mat(x.imag,nocc,norb))
+                        # ...and projecting them onto respective subspace
 
-                    # composing E2 and S2 matrices projected onto solution
-                    # subspace
+                        x_realger = np.matmul(bger, c_realger)
+                        x_imagger = np.matmul(bger, c_imagger)
+                        x_realung = np.matmul(bung, c_realung)
+                        x_imagung = np.matmul(bung, c_imagung)
 
-                    if bger.any():
-                        e2realger = np.matmul(e2bger, c_realger)
-                        e2imagger = np.matmul(e2bger, c_imagger)
-                        s2realger = np.matmul(s2bung, c_realger)
-                        s2imagger = np.matmul(s2bung, c_imagger)
+                        # composing response vector
 
-                    else:
-                        e2realger = np.zeros(full_size)
-                        e2imagger = np.zeros(full_size)
-                        s2realger = np.zeros(full_size)
-                        s2imagger = np.zeros(full_size)
+                        x_real = x_realger + x_realung
+                        x_imag = x_imagung + x_imagger
+                        x = np.zeros(len(x_real), dtype=complex)
 
-                    if bung.any():
-                        e2realung = np.matmul(e2bung, c_realung)
-                        e2imagung = np.matmul(e2bung, c_imagung)
-                        s2realung = np.matmul(s2bger, c_realung)
-                        s2imagung = np.matmul(s2bger, c_imagung)
+                        for pos in range(len(x_real)):
+                            x[pos] = complex(x_real[pos], x_imag[pos])
 
-                    else:
-                        e2realung = np.zeros(full_size)
-                        e2imagung = np.zeros(full_size)
-                        s2realung = np.zeros(full_size)
-                        s2imagung = np.zroes(full_size)
+                        solutions[(op, w)] = x
 
-                    # calculating the residual components
+                        kappas[(op, w)] = (lrvec2mat(x.real,nocc,norb)
+                                          + 1j*lrvec2mat(x.imag,nocc,norb))
 
-                    r_realger = (e2realger - w * s2realung + d * s2imagung -
-                                 gradger.real)
-                    r_realung = (e2realung - w * s2realger + d * s2imagger -
-                                 gradung.real)
-                    r_imagung = (-e2imagung + w * s2imagger + d * s2realger +
-                                 gradung.imag)
-                    r_imagger = (-e2imagger + w * s2imagung + d * s2realung +
-                                 gradger.imag)
+                        # composing E2 and S2 matrices projected onto solution
+                        # subspace
 
-                    # composing total residual
+                        if bger.any():
+                            e2realger = np.matmul(e2bger, c_realger)
+                            e2imagger = np.matmul(e2bger, c_imagger)
+                            s2realger = np.matmul(s2bung, c_realger)
+                            s2imagger = np.matmul(s2bung, c_imagger)
 
-                    r_real = r_realger + r_realung
-                    r_imag = r_imagung + r_imagger
-                    r = np.zeros(len(r_real), dtype=complex)
+                        else:
+                            e2realger = np.zeros(full_size)
+                            e2imagger = np.zeros(full_size)
+                            s2realger = np.zeros(full_size)
+                            s2imagger = np.zeros(full_size)
 
-                    for pos in range(len(r_real)):
-                        r[pos] = complex(r_real[pos], r_imag[pos])
+                        if bung.any():
+                            e2realung = np.matmul(e2bung, c_realung)
+                            e2imagung = np.matmul(e2bung, c_imagung)
+                            s2realung = np.matmul(s2bger, c_realung)
+                            s2imagung = np.matmul(s2bger, c_imagung)
 
-                    residuals[(op, w)] = np.array(
-                        [r_realger, r_realung, r_imagung, r_imagger]).flatten()
+                        else:
+                            e2realung = np.zeros(full_size)
+                            e2imagung = np.zeros(full_size)
+                            s2realung = np.zeros(full_size)
+                            s2imagung = np.zroes(full_size)
 
-                    n = solutions[(op, w)]
+                        # calculating the residual components
 
-                    # calculating relative residual norm for convergence check
+                        r_realger = (e2realger - w * s2realung + d * s2imagung -
+                                     gradger.real)
+                        r_realung = (e2realung - w * s2realger + d * s2imagger -
+                                     gradung.real)
+                        r_imagung = (-e2imagung + w * s2imagger + d * s2realger +
+                                     gradung.imag)
+                        r_imagger = (-e2imagger + w * s2imagung + d * s2realung +
+                                     gradger.imag)
 
-                    nv = np.matmul(n, grad)
-                    nvs.append((op, w, nv))
+                        # composing total residual
 
-                    rn = np.linalg.norm(r)
-                    nn = np.linalg.norm(n)
-                    if nn != 0:
-                        relative_residual_norm[(op, w)] = rn / nn
-                    else:
-                        relative_residual_norm[(op, w)] = 0
+                        r_real = r_realger + r_realung
+                        r_imag = r_imagung + r_imagger
+                        r = np.zeros(len(r_real), dtype=complex)
+
+                        for pos in range(len(r_real)):
+                            r[pos] = complex(r_real[pos], r_imag[pos])
+
+                        residuals[(op, w)] = np.array(
+                            [r_realger, r_realung, r_imagung, r_imagger]).flatten()
+
+                        n = solutions[(op, w)]
+
+                        # calculating relative residual norm for convergence check
+
+                        nv = np.matmul(n, grad)
+                        #nvs.append((op, w, nv))
+                        nvs[(op, w)] = nv
+
+                        rn = np.linalg.norm(r)
+                        nn = np.linalg.norm(n)
+                        if nn != 0:
+                            relative_residual_norm[(op, w)] = rn / nn
+                        else:
+                            relative_residual_norm[(op, w)] = 0
 
                 # write to output
 
@@ -672,7 +677,9 @@ class ComplexResponse:
                 new_trials_ger, new_trials_ung = self.setup_trials(residuals,
                                                                    pre=precond,
                                                                    bger=bger,
-                                                                   bung=bung)
+                                                                   bung=bung,
+                                                                   res_norm=
+                                                                   relative_residual_norm)
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
@@ -727,7 +734,8 @@ class ComplexResponse:
                                 'ComplexResponseSolver: failed to converge')
 
             return {
-                'properties': {(op, freq): nv for op, freq, nv in nvs},
+                #'properties': {(op, freq): nv for op, freq, nv in nvs},
+                'properties': nvs,
                 'solutions': solutions,
                 'kappas': kappas,
             }
@@ -755,7 +763,8 @@ class ComplexResponse:
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(82))
         self.ostream.print_blank()
-        for op, freq, nv in nvs:
+        #for op, freq, nv in nvs:
+        for (op, freq), nv in nvs.items():
             ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
