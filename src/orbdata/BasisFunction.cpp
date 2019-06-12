@@ -8,9 +8,9 @@
 
 #include "BasisFunction.hpp"
 
-#include <utility>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 #include "MathConst.hpp"
 #include "MpiFunc.hpp"
@@ -19,12 +19,9 @@ CBasisFunction::CBasisFunction()
 
     : _angularMomentum(-1)
 {
-
 }
 
-CBasisFunction::CBasisFunction(const std::vector<double>& exponents,
-                               const std::vector<double>& normFactors,
-                               const int32_t              angularMomentum)
+CBasisFunction::CBasisFunction(const std::vector<double>& exponents, const std::vector<double>& normFactors, const int32_t angularMomentum)
 
     : _exponents(exponents)
 
@@ -33,7 +30,6 @@ CBasisFunction::CBasisFunction(const std::vector<double>& exponents,
     , _angularMomentum(angularMomentum)
 
 {
-
 }
 
 CBasisFunction::CBasisFunction(const CBasisFunction& source)
@@ -44,7 +40,6 @@ CBasisFunction::CBasisFunction(const CBasisFunction& source)
 
     , _angularMomentum(source._angularMomentum)
 {
-
 }
 
 CBasisFunction::CBasisFunction(CBasisFunction&& source) noexcept
@@ -55,12 +50,10 @@ CBasisFunction::CBasisFunction(CBasisFunction&& source) noexcept
 
     , _angularMomentum(std::move(source._angularMomentum))
 {
-
 }
 
 CBasisFunction::~CBasisFunction()
 {
-
 }
 
 CBasisFunction&
@@ -85,7 +78,7 @@ CBasisFunction::operator=(CBasisFunction&& source) noexcept
     _exponents = std::move(source._exponents);
 
     _normFactors = std::move(source._normFactors);
-    
+
     _angularMomentum = std::move(source._angularMomentum);
 
     return *this;
@@ -113,7 +106,7 @@ CBasisFunction::operator==(const CBasisFunction& other) const
             return false;
         }
     }
-    
+
     if (_angularMomentum != other._angularMomentum) return false;
 
     return true;
@@ -144,8 +137,7 @@ CBasisFunction::setAngularMomentum(const int32_t angularMomentum)
 }
 
 void
-CBasisFunction::add(const double exponent,
-                    const double normFactor)
+CBasisFunction::add(const double exponent, const double normFactor)
 {
     _exponents.push_back(exponent);
 
@@ -166,27 +158,27 @@ CBasisFunction::normalize()
     // normalize primitive GBFs
 
     _rescale();
-    
+
     // compute overlap
-    
+
     auto sz = _exponents.size();
-    
+
     double ovl = 0.0;
-    
+
     for (size_t i = 0; i < sz; i++)
     {
         ovl += _overlap(i, i);
-        
+
         for (size_t j = i + 1; j < sz; j++)
         {
             ovl += 2.0 * _overlap(i, j);
         }
     }
-    
+
     // renormaliza primitive BFs
-    
+
     ovl = 1.0 / std::sqrt(ovl);
-    
+
     for (size_t i = 0; i < sz; i++)
     {
         _normFactors[i] *= ovl;
@@ -233,17 +225,17 @@ CBasisFunction::_rescale()
         {
             _normFactors[i] *= 2.0 * std::sqrt(_exponents[i]);
         }
-     
+
         return;
     }
 
     if (_angularMomentum == 2)
     {
         double f = 2.0 / std::sqrt(3.0);
-        
+
         for (size_t i = 0; i < _exponents.size(); i++)
         {
-            _normFactors[i] *=  f * _exponents[i];
+            _normFactors[i] *= f * _exponents[i];
         }
 
         return;
@@ -252,7 +244,7 @@ CBasisFunction::_rescale()
     if (_angularMomentum == 3)
     {
         double f = 4.0 / std::sqrt(15.0);
-        
+
         for (size_t i = 0; i < _exponents.size(); i++)
         {
             _normFactors[i] *= f * _exponents[i] * std::sqrt(_exponents[i]);
@@ -264,10 +256,10 @@ CBasisFunction::_rescale()
     if (_angularMomentum == 4)
     {
         double f = 2.0 / std::sqrt(105.0);
-        
+
         for (size_t i = 0; i < _exponents.size(); i++)
         {
-            _normFactors[i] *=  f * _exponents[i] * _exponents[i];
+            _normFactors[i] *= f * _exponents[i] * _exponents[i];
         }
 
         return;
@@ -276,12 +268,12 @@ CBasisFunction::_rescale()
     if (_angularMomentum == 5)
     {
         double f = 4.0 / std::sqrt(945.0);
-        
+
         for (size_t i = 0; i < _exponents.size(); i++)
         {
             _normFactors[i] *= f * _exponents[i] * _exponents[i]
-            
-                            * std::sqrt(_exponents[i]);
+
+                               * std::sqrt(_exponents[i]);
         }
 
         return;
@@ -290,13 +282,12 @@ CBasisFunction::_rescale()
     if (_angularMomentum == 6)
     {
         double f = 4.0 / std::sqrt(10395.0);
-        
+
         for (size_t i = 0; i < _exponents.size(); i++)
         {
-            _normFactors[i] *=  f * _exponents[i] * _exponents[i]
+            _normFactors[i] *= f * _exponents[i] * _exponents[i]
 
-                            * _exponents[i];
-
+                               * _exponents[i];
         }
 
         return;
@@ -304,37 +295,35 @@ CBasisFunction::_rescale()
 }
 
 double
-CBasisFunction::_overlap(const size_t iComponent,
-                         const size_t jComponent) const
+CBasisFunction::_overlap(const size_t iComponent, const size_t jComponent) const
 {
     auto fab = 1.0 / (_exponents[iComponent] + _exponents[jComponent]);
 
     auto ovl = _normFactors[iComponent] * _normFactors[jComponent]
 
-             * std::pow(mathconst::getPiValue() * fab, 1.5);
+               * std::pow(mathconst::getPiValue() * fab, 1.5);
 
     if (_angularMomentum == 0) return ovl;
 
-    if (_angularMomentum == 1) return  0.5 * fab * ovl;
-    
+    if (_angularMomentum == 1) return 0.5 * fab * ovl;
+
     auto fab2 = fab * fab;
 
     if (_angularMomentum == 2) return 3.0 * fab2 * ovl;
-    
+
     if (_angularMomentum == 3) return 7.5 * fab2 * fab * ovl;
 
     if (_angularMomentum == 4) return 420.0 * fab2 * fab2 * ovl;
-    
+
     if (_angularMomentum == 5) return 1890.0 * fab2 * fab2 * fab * ovl;
-    
+
     if (_angularMomentum == 6) return 41580.0 * fab2 * fab2 * fab2 * ovl;
 
     return std::numeric_limits<double>::quiet_NaN();
 }
 
 void
-CBasisFunction::broadcast(int32_t  rank,
-                          MPI_Comm comm)
+CBasisFunction::broadcast(int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -347,8 +336,7 @@ CBasisFunction::broadcast(int32_t  rank,
 }
 
 std::ostream&
-operator<<(      std::ostream&   output, 
-           const CBasisFunction& source)
+operator<<(std::ostream& output, const CBasisFunction& source)
 {
     output << std::endl;
 
@@ -369,7 +357,7 @@ operator<<(      std::ostream&   output,
 
     for (size_t i = 0; i < source._normFactors.size(); i++)
     {
-        output << "_normFactors[" << i  << "]: "<< std::endl;
+        output << "_normFactors[" << i << "]: " << std::endl;
 
         output << source._normFactors[i] << std::endl;
     }

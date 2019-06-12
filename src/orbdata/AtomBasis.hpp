@@ -21,7 +21,7 @@
 /**
  Class CAtomBasis stores data about atomic basis set and provides set of methods
  for handling of atomic basis set data.
- 
+
  @author Z. Rinkevicius
  */
 class CAtomBasis
@@ -41,23 +41,22 @@ class CAtomBasis
      */
     int32_t _maxAngularMomentum;
 
-public:
-
+   public:
     /**
      Creates an empty atom basis object.
      */
     CAtomBasis();
-   
+
     /**
      Creates a atom basis object by copying other atom basis object.
-     
+
      @param source the atom basis object.
      */
     CAtomBasis(const CAtomBasis& source);
 
     /**
      Creates a atom basis object by moving other atom basis object.
-     
+
      @param source the atom basis object.
      */
     CAtomBasis(CAtomBasis&& source) noexcept;
@@ -66,24 +65,24 @@ public:
      Destroys a atom basis object.
      */
     ~CAtomBasis();
-    
+
     /**
      Assigns a atom basis object by copying other atom basis object.
-     
+
      @param source the atom basis object.
      */
     CAtomBasis& operator=(const CAtomBasis& source);
-    
+
     /**
      Assigns a atom basis object by moving other atom basis object.
-     
+
      @param source the atom basis object.
      */
     CAtomBasis& operator=(CAtomBasis&& source) noexcept;
 
     /**
      Compares atom basis object with other atom basis object.
-     
+
      @param other the atom basis object.
      @return true if atom basis objects are equal, false otherwise.
      */
@@ -91,7 +90,7 @@ public:
 
     /**
      Compares atom basis object with other atom basis object.
-     
+
      @param other the atom basis object.
      @return true if atom basis objects are not equal, false otherwise.
      */
@@ -176,25 +175,23 @@ public:
      @return the valence atom basis.
      */
     CAtomBasis reduceToValenceBasis() const;
-    
+
     /**
      Broadcasts atom basis object within domain of MPI communicator.
-     
+
      @param rank the rank of MPI process.
      @param comm the MPI communicator.
      */
-    void broadcast(int32_t  rank,
-                   MPI_Comm comm);
+    void broadcast(int32_t rank, MPI_Comm comm);
 
     /**
      Converts atom basis object to text output and insert it into output
      text stream.
-     
+
      @param output the output text stream.
      @param source the atom basis object.
      */
-    friend std::ostream& operator<<(      std::ostream& output,
-                                    const CAtomBasis&   source);
+    friend std::ostream& operator<<(std::ostream& output, const CAtomBasis& source);
 };
 
 #endif /* AtomBasis_hpp */

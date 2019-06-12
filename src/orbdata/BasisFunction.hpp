@@ -18,7 +18,7 @@
 /**
  Class CBasisFunction stores data about single contracted basis function and
  provides set of methods for handling of basis function data.
- 
+
  @author Z. Rinkevicius
  */
 class CBasisFunction
@@ -51,11 +51,9 @@ class CBasisFunction
      @param jComponent the index of second primitve Gaussain function.
      @return the overlap between two primitive Gaussian functions.
      */
-    double _overlap(const size_t iComponent,
-                    const size_t jComponent) const;
+    double _overlap(const size_t iComponent, const size_t jComponent) const;
 
-public:
-
+   public:
     /**
      Creates an empty basis function object.
      */
@@ -63,26 +61,24 @@ public:
 
     /**
      Creates a basis function object.
-     
+
      @param exponents the vector of exponents of primitive Gaussian functions.
      @param normFactors the vector of normalization factors of primitive
             Gaussian functions.
      @param angularMomentum the angular momentum of basis function.
      */
-    CBasisFunction(const std::vector<double>& exponents,
-                   const std::vector<double>& normFactors,
-                   const int32_t              angularMomentum);
+    CBasisFunction(const std::vector<double>& exponents, const std::vector<double>& normFactors, const int32_t angularMomentum);
 
     /**
      Creates a basis function object by copying other basis function object.
-     
+
      @param source the basis function object.
      */
     CBasisFunction(const CBasisFunction& source);
 
     /**
      Creates a basis function object by moving other basis function object.
-     
+
      @param source the basis function object.
      */
     CBasisFunction(CBasisFunction&& source) noexcept;
@@ -94,21 +90,21 @@ public:
 
     /**
      Assigns a basis function object by copying other basis function object.
-     
+
      @param source the basis function object.
      */
     CBasisFunction& operator=(const CBasisFunction& source);
 
     /**
      Assigns a basis function object by moving other basis function object.
-     
+
      @param source the basis function object.
      */
     CBasisFunction& operator=(CBasisFunction&& source) noexcept;
 
     /**
      Compares basis function object with other basis function object.
-     
+
      @param other the basis function object.
      @return true if basis function objects are equal, false otherwise.
      */
@@ -116,7 +112,7 @@ public:
 
     /**
      Compares basis function object with other basis function object.
-     
+
      @param other the basis function object.
      @return true if basis function objects are not equal, false otherwise.
      */
@@ -151,8 +147,7 @@ public:
      @param exponent the exponent of primitive Gaussian function.
      @param normFactor the normalization factor of primitive Gaussian function.
      */
-    void add(const double exponent,
-             const double normFactor);
+    void add(const double exponent, const double normFactor);
 
     /**
      Normalizes basis function.
@@ -179,32 +174,30 @@ public:
      @return the angular momentum.
      */
     int32_t getAngularMomentum() const;
-    
+
     /**
      Gets number of primitive Gaussian functions in basis function.
 
      @return the number of primitive Gaussian functions.
      */
     int32_t getNumberOfPrimitiveFunctions() const;
-    
+
     /**
      Broadcasts basis function object within domain of MPI communicator.
 
      @param rank the rank of MPI process.
      @param comm the MPI communicator.
      */
-    void broadcast(int32_t  rank,
-                   MPI_Comm comm);
+    void broadcast(int32_t rank, MPI_Comm comm);
 
     /**
      Converts basis function object to text output and insert it into output
      text stream.
-     
+
      @param output the output text stream.
      @param source the basis function object.
      */
-    friend std::ostream& operator<<(      std::ostream&   output,
-                                    const CBasisFunction& source);
+    friend std::ostream& operator<<(std::ostream& output, const CBasisFunction& source);
 };
 
 #endif /* BasisFunction_hpp */

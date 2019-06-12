@@ -11,10 +11,7 @@
 namespace aoindices {  // aoindices namespace
 
 std::vector<std::vector<int32_t>>
-getDimerAOIndices(const CMolecule&       mol_1,
-                  const CMolecule&       mol_2,
-                  const CMolecularBasis& basis_1,
-                  const CMolecularBasis& basis_2)
+getDimerAOIndices(const CMolecule& mol_1, const CMolecule& mol_2, const CMolecularBasis& basis_1, const CMolecularBasis& basis_2)
 {
     // get indices of atomic orbitals located on each molecule
 
