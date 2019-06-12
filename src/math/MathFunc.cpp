@@ -10,273 +10,245 @@
 
 #include "MathConst.hpp"
 
-namespace mathfunc { // mathfunc namespace
+namespace mathfunc {  // mathfunc namespace
 
-    void
-    zero(      double* vector,
-         const int32_t nElements)
+void
+zero(double* vector, const int32_t nElements)
+{
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] = 0.0;
+}
+
+void
+zero(int32_t* vector, const int32_t nElements)
+{
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] = 0;
+}
+
+void
+set_to(double* vector, const double value, const int32_t nElements)
+{
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] = value;
+}
+
+void
+set_to(int32_t* vector, const int32_t value, const int32_t nElements)
+{
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] = value;
+}
+
+double
+sum(const double* vector, const int32_t nElements)
+{
+    double fsum = 0.0;
+
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        fsum += vector[i];
+
+    return fsum;
+}
+
+int32_t
+sum(const int32_t* vector, const int32_t nElements)
+{
+    int32_t isum = 0;
+
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        isum += vector[i];
+
+    return isum;
+}
+
+void
+scale(double* vector, const double factor, const int32_t nElements)
+{
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] *= factor;
+}
+
+void
+add_scaled(double* aVector, const double* bVector, const double factor, const int32_t nElements)
+{
+    #pragma omp simd aligned(aVector, bVector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
     {
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) vector[i] = 0.0;
+        aVector[i] += factor * bVector[i];
     }
-    
-    void
-    zero(      int32_t* vector,
-         const int32_t nElements)
+}
+
+double
+max(const double* vector, const int32_t nElements)
+{
+    double fmax = vector[0];
+
+    for (int32_t i = 1; i < nElements; i++)
     {
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) vector[i] = 0;
+        auto cmax = vector[i];
+
+        if (cmax > fmax) fmax = cmax;
     }
 
-    void
-    set_to(      double* vector,
-           const double  value,
-           const int32_t nElements)
+    return fmax;
+}
+
+int32_t
+max(const int32_t* vector, const int32_t nElements)
+{
+    auto imax = vector[0];
+
+    for (int32_t i = 1; i < nElements; i++)
     {
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) vector[i] = value;
+        auto cmax = vector[i];
+
+        if (cmax > imax) imax = cmax;
     }
-    
-    void
-    set_to(      int32_t* vector,
-           const int32_t  value,
-           const int32_t  nElements)
+
+    return imax;
+}
+
+void
+normalize(double* vector, const int32_t nElements)
+{
+    auto factor = 1.0 / mathfunc::sum(vector, nElements);
+
+    #pragma omp simd aligned(vector: VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] *= factor;
+}
+
+void
+indexes(int32_t* aVector, const int32_t* bVector, const int32_t nElements)
+{
+    int32_t index = 0;
+
+    for (int32_t i = 0; i < nElements; i++)
     {
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) vector[i] = value;
-    }
+        aVector[i] = index;
 
-    double
-    sum(const double* vector,
-        const int32_t nElements)
+        index += bVector[i];
+    }
+}
+
+void
+indexes(int32_t* aVector, const int32_t* bVector, const int32_t offset, const int32_t nElements)
+{
+    int32_t index = offset;
+
+    for (int32_t i = 0; i < nElements; i++)
     {
-        double fsum = 0.0;
+        aVector[i] = index;
 
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) fsum += vector[i];
-
-        return fsum;
+        index += bVector[i];
     }
+}
 
-    int32_t
-    sum(const int32_t* vector,
-        const int32_t  nElements)
+void
+ordering(int32_t* aVector, const int32_t* bVector, const int32_t nElements)
+{
+    int32_t cidx = 0;
+
+    for (int32_t i = 0; i < nElements; i++)
     {
-        int32_t isum = 0;
+        if (bVector[i] == 1)
+        {
+            aVector[cidx] = i;
 
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) isum += vector[i];
-
-        return isum;
+            cidx++;
+        }
     }
-    
-    void
-    scale(      double* vector,
-          const double  factor,
+}
+
+void
+distances(double*       abDistancesX,
+          double*       abDistancesY,
+          double*       abDistancesZ,
+          const double  aCoordX,
+          const double  aCoordY,
+          const double  aCoordZ,
+          const double* bCoordsX,
+          const double* bCoordsY,
+          const double* bCoordsZ,
           const int32_t nElements)
-    {
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) vector[i] *= factor;
-    }
-    
-    void
-    add_scaled(      double* aVector,
-               const double* bVector,
-               const double  factor,
-               const int32_t nElements)
-    {
-        #pragma omp simd aligned(aVector, bVector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            aVector[i] += factor * bVector[i];
-        }
-    }
-    
-    double
-    max(const double* vector,
-        const int32_t nElements)
-    {
-        double fmax = vector[0];
-        
-        for (int32_t i = 1; i < nElements; i++)
-        {
-            auto cmax = vector[i];
-            
-            if (cmax > fmax) fmax = cmax;
-        }
-        
-        return fmax;
-    }
-    
-    int32_t
-    max(const int32_t* vector,
-        const int32_t  nElements)
-    {
-        auto imax = vector[0];
-        
-        for (int32_t i = 1; i < nElements; i++)
-        {
-            auto cmax = vector[i];
-            
-            if (cmax > imax) imax= cmax;
-        }
-        
-        return imax;
-    }
-
-    void
-    normalize(      double* vector,
-              const int32_t nElements)
-    {
-        auto factor = 1.0 / mathfunc::sum(vector, nElements);
-
-        #pragma omp simd aligned(vector: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++) vector[i] *= factor;
-    }
-
-    void
-    indexes(      int32_t* aVector,
-            const int32_t* bVector,
-            const int32_t  nElements)
-    {
-        int32_t index = 0;
-
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            aVector[i] = index;
-
-            index += bVector[i];
-        }
-    }
-    
-    void
-    indexes(      int32_t* aVector,
-            const int32_t* bVector,
-            const int32_t  offset,
-            const int32_t  nElements)
-    {
-        int32_t index = offset;
-        
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            aVector[i] = index;
-            
-            index += bVector[i];
-        }
-    }
-    
-    void
-    ordering(      int32_t* aVector,
-             const int32_t* bVector,
-             const int32_t  nElements)
-    {
-        int32_t cidx = 0;
-        
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            if (bVector[i] == 1)
-            {
-                aVector[cidx] = i;
-                
-                cidx++;
-            }
-        }
-    }
-    
-    void
-    distances(      double* abDistancesX,
-                    double* abDistancesY,
-                    double* abDistancesZ,
-              const double  aCoordX,
-              const double  aCoordY,
-              const double  aCoordZ,
-              const double* bCoordsX,
-              const double* bCoordsY,
-              const double* bCoordsZ,
-              const int32_t nElements)
-    {
-        #pragma omp simd aligned(abDistancesX, abDistancesY, abDistancesZ,\
+{
+    #pragma omp simd aligned(abDistancesX, abDistancesY, abDistancesZ,\
                                  bCoordsX, bCoordsY, bCoordsZ: VLX_ALIGN)
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            abDistancesX[i] = aCoordX - bCoordsX[i];
-            
-            abDistancesY[i] = aCoordY - bCoordsY[i];
-            
-            abDistancesZ[i] = aCoordZ - bCoordsZ[i];
-        }
-    }
-    
-    void
-    quadChebyshevOfKindTwo(      double* coordinates,
-                                 double* weights,
-                           const int32_t nPoints)
+    for (int32_t i = 0; i < nElements; i++)
     {
-        // prefactor
-        
-        auto fstep = mathconst::getPiValue()
-                   / (static_cast<double>(nPoints) + 1.0);
-        
-        // loop over grid points
-        
-        for (int32_t i = 1; i < nPoints + 1; i++)
-        {
-            auto farg = static_cast<double>(i) * fstep;
-            
-            coordinates[i - 1]  = std::cos(farg);
-            
-            auto warg= std::sin(farg);
-            
-            weights[i - 1] = fstep * warg * warg;
-        }
-    }
-    
-    void
-    copy(      int32_t* aVector,
-         const int32_t  aPosition,
-         const int32_t* bVector,
-         const int32_t  bPosition,
-         const int32_t  nElements)
-    {
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            aVector[aPosition + i] = bVector[bPosition + i];
-        }
-    }
-    
-    void
-    copy(      double* aVector,
-         const int32_t aPosition,
-         const double* bVector,
-         const int32_t bPosition,
-         const int32_t nElements)
-    {
-        for (int32_t i = 0; i < nElements; i++)
-        {
-            aVector[aPosition + i] = bVector[bPosition + i];
-        }
-    }
-    
-    int32_t
-    maxTensorComponents(const int32_t order)
-    {
-        int32_t ncomps = 0;
-        
-        if (order == 0) ncomps = 1;
-        
-        if (order > 0)
-        {
-            ncomps = 3;
-            
-            for (int32_t i = 1; i < order; i++)
-            {
-                ncomps *= 3;
-            }
-        }
-        
-        return ncomps; 
-    }
-    
-} // mathfunc namespace
+        abDistancesX[i] = aCoordX - bCoordsX[i];
 
+        abDistancesY[i] = aCoordY - bCoordsY[i];
 
+        abDistancesZ[i] = aCoordZ - bCoordsZ[i];
+    }
+}
+
+void
+quadChebyshevOfKindTwo(double* coordinates, double* weights, const int32_t nPoints)
+{
+    // prefactor
+
+    auto fstep = mathconst::getPiValue() / (static_cast<double>(nPoints) + 1.0);
+
+    // loop over grid points
+
+    for (int32_t i = 1; i < nPoints + 1; i++)
+    {
+        auto farg = static_cast<double>(i) * fstep;
+
+        coordinates[i - 1] = std::cos(farg);
+
+        auto warg = std::sin(farg);
+
+        weights[i - 1] = fstep * warg * warg;
+    }
+}
+
+void
+copy(int32_t* aVector, const int32_t aPosition, const int32_t* bVector, const int32_t bPosition, const int32_t nElements)
+{
+    for (int32_t i = 0; i < nElements; i++)
+    {
+        aVector[aPosition + i] = bVector[bPosition + i];
+    }
+}
+
+void
+copy(double* aVector, const int32_t aPosition, const double* bVector, const int32_t bPosition, const int32_t nElements)
+{
+    for (int32_t i = 0; i < nElements; i++)
+    {
+        aVector[aPosition + i] = bVector[bPosition + i];
+    }
+}
+
+int32_t
+maxTensorComponents(const int32_t order)
+{
+    int32_t ncomps = 0;
+
+    if (order == 0) ncomps = 1;
+
+    if (order > 0)
+    {
+        ncomps = 3;
+
+        for (int32_t i = 1; i < order; i++)
+        {
+            ncomps *= 3;
+        }
+    }
+
+    return ncomps;
+}
+
+}  // namespace mathfunc
