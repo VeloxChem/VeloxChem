@@ -328,14 +328,14 @@ class ComplexResponse:
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
 
-            new_ger = truncate_and_normalize(self, new_ger, self.small_thresh)
+            new_ger = truncate_and_normalize(new_ger, self.small_thresh)
 
         if new_ung.any() and normalize:
 
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
 
-            new_ung = truncate_and_normalize(self, new_ung, self.small_thresh)
+            new_ung = truncate_and_normalize(new_ung, self.small_thresh)
 
         return new_ger, new_ung
 
@@ -454,7 +454,8 @@ class ComplexResponse:
             if self.rank == mpi_master():
 
                 for op, w in igs:
-                    if iteration == 0 or relative_residual_norm[(op, w)] > self.conv_thresh:
+                    if iteration == 0 or (relative_residual_norm[(op, w)]
+                                         > self.conv_thresh):
 
                         grad = v1[op]
 
@@ -642,7 +643,6 @@ class ComplexResponse:
                         # calculating relative residual norm for convergence check
 
                         nv = np.matmul(n, grad)
-                        #nvs.append((op, w, nv))
                         nvs[(op, w)] = nv
 
                         rn = np.linalg.norm(r)
@@ -679,7 +679,7 @@ class ComplexResponse:
                                                                    bger=bger,
                                                                    bung=bung,
                                                                    res_norm=
-                                                                   relative_residual_norm)
+                                                        relative_residual_norm)
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
@@ -734,7 +734,6 @@ class ComplexResponse:
                                 'ComplexResponseSolver: failed to converge')
 
             return {
-                #'properties': {(op, freq): nv for op, freq, nv in nvs},
                 'properties': nvs,
                 'solutions': solutions,
                 'kappas': kappas,
@@ -763,7 +762,6 @@ class ComplexResponse:
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(82))
         self.ostream.print_blank()
-        #for op, freq, nv in nvs:
         for (op, freq), nv in nvs.items():
             ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
