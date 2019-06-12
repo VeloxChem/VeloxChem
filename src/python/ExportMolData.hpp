@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace vlx_moldata { // vlx_moldata namespace
+namespace vlx_moldata {  // vlx_moldata namespace
 
 /**
  Exports classes/functions in src/moldata to python.
  */
 void export_moldata(py::module& m);
 
-} // vlx_moldata namespace
+}  // namespace vlx_moldata
 
 #endif /* ExportMolData_hpp */

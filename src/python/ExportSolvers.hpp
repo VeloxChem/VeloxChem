@@ -13,13 +13,13 @@
 
 namespace py = pybind11;
 
-namespace vlx_solvers { // vlx_solvers namespace
+namespace vlx_solvers {  // vlx_solvers namespace
 
 /**
  Exports classes/functions in src/solvers to python.
  */
 void export_solvers(py::module& m);
 
-} // vlx_solvers namespace
+}  // namespace vlx_solvers
 
 #endif /* ExportSolvers_hpp */

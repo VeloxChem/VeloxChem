@@ -16,17 +16,18 @@
 
 namespace py = pybind11;
 
-namespace vlx_gpu { // vlx_gpu namespace
+namespace vlx_gpu {  // vlx_gpu namespace
 
 // Exports classes/functions in src/gpu to python
 
-void export_gpu(py::module& m)
+void
+export_gpu(py::module& m)
 {
-    #ifdef ENABLE_GPU
+#ifdef ENABLE_GPU
 
     m.def("get_device_properties", &gpu::getDeviceProperties);
 
-    #endif
+#endif
 }
 
-} // vlx_gpu namespace
+}  // namespace vlx_gpu

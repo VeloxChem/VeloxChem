@@ -6,27 +6,27 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 
+#include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <pybind11/operators.h>
 
 #include <mpi.h>
 #include <memory>
-#include <vector>
 #include <string>
+#include <vector>
 
-#include "Codata.hpp"
-#include "Molecule.hpp"
-#include "VdwRadii.hpp"
-#include "ErrorHandler.hpp"
-#include "StringFormat.hpp"
 #include "ChemicalElement.hpp"
+#include "Codata.hpp"
+#include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
+#include "Molecule.hpp"
+#include "StringFormat.hpp"
+#include "VdwRadii.hpp"
 
 namespace py = pybind11;
 
-namespace vlx_moldata { // vlx_moldata namespace
+namespace vlx_moldata {  // vlx_moldata namespace
 
 // Helper function for CMolecule constructor
 
@@ -49,8 +49,7 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 
     auto scale = 1.0 / units::getBohrValueInAngstroms();
 
-    if (fstr::upcase(units) == "AU" || fstr::upcase(units) == "BOHR" ||
-        fstr::upcase(units) == "BOHRS")
+    if (fstr::upcase(units) == "AU" || fstr::upcase(units) == "BOHR" || fstr::upcase(units) == "BOHRS")
     {
         scale = 1.0;
     }
@@ -91,15 +90,13 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 
     // form molecule
 
-    return std::shared_ptr<CMolecule>(
-            new CMolecule(coords_au, charges, masses, labels, idselem)
-            );
+    return std::shared_ptr<CMolecule>(new CMolecule(coords_au, charges, masses, labels, idselem));
 }
 
 static std::shared_ptr<CMolecule>
 CMolecule_from_array(const std::vector<std::string>& labels,
                      const py::array_t<double>&      py_coords,
-                     const std::string&              units=std::string("angs"))
+                     const std::string&              units = std::string("angs"))
 {
     // NOTE:
     // The Python Molecule constructor expects the coordinates as a 2d numpy array,
@@ -117,8 +114,7 @@ CMolecule_from_array(const std::vector<std::string>& labels,
 
     std::string errmol("CMolecule_from_array: Inconsistent size");
 
-    errors::assertMsgCritical(
-        py_coords.shape(0) == static_cast<ssize_t>(labels.size()), errmol);
+    errors::assertMsgCritical(py_coords.shape(0) == static_cast<ssize_t>(labels.size()), errmol);
 
     errors::assertMsgCritical(py_coords.shape(1) == 3, errmol);
 
@@ -149,7 +145,7 @@ CMolecule_from_array(const std::vector<std::string>& labels,
 static std::shared_ptr<CMolecule>
 CMolecule_from_array_2(const std::vector<int32_t>& idselem,
                        const py::array_t<double>&  py_coords,
-                       const std::string&          units=std::string("angs"))
+                       const std::string&          units = std::string("angs"))
 {
     std::vector<std::string> labels;
 
@@ -196,22 +192,19 @@ CMolecule_beta_elec(const CMolecule& self)
 static py::array_t<double>
 CMolecule_x_to_numpy(const CMolecule& self)
 {
-    return vlx_general::pointer_to_numpy(self.getCoordinatesX(),
-                                         self.getNumberOfAtoms());
+    return vlx_general::pointer_to_numpy(self.getCoordinatesX(), self.getNumberOfAtoms());
 }
 
 static py::array_t<double>
 CMolecule_y_to_numpy(const CMolecule& self)
 {
-    return vlx_general::pointer_to_numpy(self.getCoordinatesY(),
-                                         self.getNumberOfAtoms());
+    return vlx_general::pointer_to_numpy(self.getCoordinatesY(), self.getNumberOfAtoms());
 }
 
 static py::array_t<double>
 CMolecule_z_to_numpy(const CMolecule& self)
 {
-    return vlx_general::pointer_to_numpy(self.getCoordinatesZ(),
-                                         self.getNumberOfAtoms());
+    return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), self.getNumberOfAtoms());
 }
 
 // Helper function for getting VDW radii for molecule
@@ -219,10 +212,9 @@ CMolecule_z_to_numpy(const CMolecule& self)
 static py::array_t<double>
 CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 {
-    auto atomradii = vdwradii::getRadii(self);
+    auto atomradii = self.getVdwRadii();
 
-    return vlx_general::pointer_to_numpy(atomradii.data(),
-                                         self.getNumberOfAtoms());
+    return vlx_general::pointer_to_numpy(atomradii.data(), atomradii.size());
 }
 
 // Helper function for getting nuclear charges for molecule
@@ -230,8 +222,7 @@ CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 static py::array_t<int32_t>
 CMolecule_elem_ids_to_numpy(const CMolecule& self)
 {
-    return vlx_general::pointer_to_numpy(self.getIdsElemental(),
-                                         self.getNumberOfAtoms());
+    return vlx_general::pointer_to_numpy(self.getIdsElemental(), self.getNumberOfAtoms());
 }
 
 // Helper function for getting elemental composition
@@ -242,7 +233,7 @@ CMolecule_get_elem_comp(const CMolecule& self)
     py::list elemcomp;
 
     auto elmlist = self.getElementalComposition();
-    
+
     for (auto p = elmlist.cbegin(); p != elmlist.cend(); ++p)
     {
         elemcomp.append(*p);
@@ -276,8 +267,7 @@ CMolecule_check_multiplicity(const CMolecule& self)
 // Helper function for checking proximity of atoms
 
 static void
-CMolecule_check_proximity(const CMolecule& self,
-                          const double     minDistance)
+CMolecule_check_proximity(const CMolecule& self, const double minDistance)
 {
     std::string errproxi("Molecule.check_proximity: Atoms too close");
 
@@ -287,9 +277,7 @@ CMolecule_check_proximity(const CMolecule& self,
 // Helper function for broadcasting CMolecule object
 
 static void
-CMolecule_broadcast(CMolecule& self,
-                    int32_t    rank,
-                    py::object py_comm)
+CMolecule_broadcast(CMolecule& self, int32_t rank, py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
@@ -298,21 +286,17 @@ CMolecule_broadcast(CMolecule& self,
 
 // Exports classes/functions in src/moldata to python
 
-void export_moldata(py::module& m)
+void
+export_moldata(py::module& m)
 {
     // CMolecule class
 
-    py::class_< CMolecule, std::shared_ptr<CMolecule> >
-        (
-            m, "Molecule"
-        )
+    py::class_<CMolecule, std::shared_ptr<CMolecule>>(m, "Molecule")
         .def(py::init<>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
-        .def(py::init(&CMolecule_from_array),
-             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
-        .def(py::init(&CMolecule_from_array_2),
-             py::arg(), py::arg(), py::arg("units")=std::string("angs"))
+        .def(py::init(&CMolecule_from_array), py::arg(), py::arg(), py::arg("units") = std::string("angs"))
+        .def(py::init(&CMolecule_from_array_2), py::arg(), py::arg(), py::arg("units") = std::string("angs"))
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)
@@ -321,17 +305,10 @@ void export_moldata(py::module& m)
         .def("get_string", &CMolecule::printGeometry)
         .def("check_proximity", &CMolecule_check_proximity)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
+        .def("number_of_atoms", (int32_t(CMolecule::*)() const) & CMolecule::getNumberOfAtoms)
+        .def("number_of_atoms", (int32_t(CMolecule::*)(const int32_t) const) & CMolecule::getNumberOfAtoms)
         .def("number_of_atoms",
-             (int32_t (CMolecule::*)() const)
-             &CMolecule::getNumberOfAtoms)
-        .def("number_of_atoms",
-             (int32_t (CMolecule::*)(const int32_t) const)
-             &CMolecule::getNumberOfAtoms)
-        .def("number_of_atoms",
-             (int32_t (CMolecule::*)(const int32_t,
-                                     const int32_t,
-                                     const int32_t) const)
-             &CMolecule::getNumberOfAtoms)
+             (int32_t(CMolecule::*)(const int32_t, const int32_t, const int32_t) const) & CMolecule::getNumberOfAtoms)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
         .def("number_of_alpha_electrons", &CMolecule_alpha_elec)
         .def("number_of_beta_electrons", &CMolecule_beta_elec)
@@ -343,25 +320,16 @@ void export_moldata(py::module& m)
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("get_elemental_composition", &CMolecule_get_elem_comp)
         .def("broadcast", &CMolecule_broadcast)
-        .def(py::self == py::self)
-    ;
+        .def(py::self == py::self);
 
     // CChemicalElement class
 
-    py::class_< CChemicalElement, std::shared_ptr<CChemicalElement> >
-        (
-            m, "ChemicalElement"
-        )
+    py::class_<CChemicalElement, std::shared_ptr<CChemicalElement>>(m, "ChemicalElement")
         .def(py::init<>())
-        .def("set_atom_type",
-             (bool (CChemicalElement::*)(const std::string&))
-             &CChemicalElement::setAtomType)
-        .def("set_atom_type",
-             (bool (CChemicalElement::*)(const int32_t))
-             &CChemicalElement::setAtomType)
+        .def("set_atom_type", (bool (CChemicalElement::*)(const std::string&)) & CChemicalElement::setAtomType)
+        .def("set_atom_type", (bool (CChemicalElement::*)(const int32_t)) & CChemicalElement::setAtomType)
         .def("get_name", &CChemicalElement::getName)
-        .def(py::self == py::self)
-    ;
+        .def(py::self == py::self);
 }
 
-} // vlx_moldata namespace
+}  // namespace vlx_moldata
