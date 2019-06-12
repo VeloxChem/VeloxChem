@@ -16,17 +16,14 @@ CTwoIndexes::CTwoIndexes()
 
     , _jIndex(-1)
 {
-
 }
 
-CTwoIndexes::CTwoIndexes(const int32_t iIndex,
-                         const int32_t jIndex)
+CTwoIndexes::CTwoIndexes(const int32_t iIndex, const int32_t jIndex)
 
     : _iIndex(iIndex)
 
     , _jIndex(jIndex)
 {
-
 }
 
 CTwoIndexes::CTwoIndexes(const CTwoIndexes& source)
@@ -35,7 +32,6 @@ CTwoIndexes::CTwoIndexes(const CTwoIndexes& source)
 
     , _jIndex(source._jIndex)
 {
-
 }
 
 CTwoIndexes::CTwoIndexes(CTwoIndexes&& source) noexcept
@@ -44,12 +40,10 @@ CTwoIndexes::CTwoIndexes(CTwoIndexes&& source) noexcept
 
     , _jIndex(std::move(source._jIndex))
 {
-
 }
 
 CTwoIndexes::~CTwoIndexes()
 {
-
 }
 
 CTwoIndexes&
@@ -82,7 +76,7 @@ CTwoIndexes::operator==(const CTwoIndexes& other) const
     if (this == &other) return true;
 
     if (_iIndex != other._iIndex) return false;
-    
+
     if (_jIndex != other._jIndex) return false;
 
     return true;
@@ -91,8 +85,7 @@ CTwoIndexes::operator==(const CTwoIndexes& other) const
 bool
 CTwoIndexes::operator!=(const CTwoIndexes& other) const
 {
-
-    return !( (*this) == other);
+    return !((*this) == other);
 }
 
 int32_t
@@ -111,23 +104,22 @@ bool
 CTwoIndexes::isValidPair() const
 {
     if (_iIndex < 0) return false;
-    
-    if (_jIndex < 0) return false; 
-    
+
+    if (_jIndex < 0) return false;
+
     return true;
 }
 
 std::ostream&
-operator<<(      std::ostream& output,
-           const CTwoIndexes&  source)
+operator<<(std::ostream& output, const CTwoIndexes& source)
 {
     output << std::endl;
-    
+
     output << "[CTwoIndexes (Object):" << &source << "]" << std::endl;
-    
-    output << "_iIndex: " << source._iIndex <<  std::endl;
-    
-    output << "_jIndex: " << source._jIndex <<  std::endl;
-    
+
+    output << "_iIndex: " << source._iIndex << std::endl;
+
+    output << "_jIndex: " << source._jIndex << std::endl;
+
     return output;
 }

@@ -11,15 +11,13 @@
 
 #include <string>
 
-namespace errors { // errors namespace
+namespace errors {  // errors namespace
 
 /**
  Prints message and aborts in case of a critical error.
  */
-void
-assertMsgCritical(const bool         condition,
-                  const std::string& message);
+void assertMsgCritical(const bool condition, const std::string& message);
 
-} // errors namespace
+}  // namespace errors
 
 #endif /* ErrorHandler_hpp */

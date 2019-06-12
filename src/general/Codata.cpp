@@ -8,7 +8,7 @@
 
 #include "Codata.hpp"
 
-namespace units { // units namespace
+namespace units {  // units namespace
 
 double
 getBohrValueInAngstroms()
@@ -22,4 +22,4 @@ getHatreeValueInElectronVolts()
     return 27.21138505;
 }
 
-} // units namespace
+}  // namespace units

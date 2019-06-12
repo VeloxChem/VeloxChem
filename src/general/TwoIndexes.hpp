@@ -15,7 +15,7 @@
 /**
  Class CTwoIndexes stores information about pair of indexes and provides
  functions to manipulate these indexes.
- 
+
  @author Z. Rinkevicius
  */
 class CTwoIndexes
@@ -30,8 +30,7 @@ class CTwoIndexes
      */
     int32_t _jIndex;
 
-public:
-
+   public:
     /**
      Creates an empty two indexes object.
      */
@@ -39,23 +38,22 @@ public:
 
     /**
      Creates a two indexes object.
-     
+
      @param iIndex the first index from pair of indexes.
      @param jIndex the second index from pair of indexes.
      */
-    CTwoIndexes(const int32_t iIndex,
-                const int32_t jIndex);
+    CTwoIndexes(const int32_t iIndex, const int32_t jIndex);
 
     /**
      Creates a two indexes object by copying other two indexes object.
-     
+
      @param source the two indexes object.
      */
     CTwoIndexes(const CTwoIndexes& source);
 
     /**
      Creates a two indexes object by moving other two indexes object.
-     
+
      @param source the two indexes object.
      */
     CTwoIndexes(CTwoIndexes&& source) noexcept;
@@ -67,21 +65,21 @@ public:
 
     /**
      Assigns a two indexes object by copying other two indexes object.
-     
+
      @param source the two indexes object.
      */
     CTwoIndexes& operator=(const CTwoIndexes& source);
 
     /**
      Assigns a two indexes object by moving other two indexes object.
-     
+
      @param source the two indexes object.
      */
     CTwoIndexes& operator=(CTwoIndexes&& source) noexcept;
 
     /**
      Compares two indexes object with other two indexes object.
-     
+
      @param other the two indexes object.
      @return true if two indexes objects are equal, false otherwise.
      */
@@ -89,7 +87,7 @@ public:
 
     /**
      Compares two indexes object with other two indexes object.
-     
+
      @param other the two indexes object.
      @return true if two indexes objects are not equal, false otherwise.
      */
@@ -104,27 +102,26 @@ public:
 
     /**
      Gets second index from pair of indexes.
-     
+
      @return the second index from pair of indexes.
      */
     int32_t second() const;
-    
+
     /**
      Check if pair of indexes represents valid index pair (0..+Inf, +0..Inf).
 
      @return true if pair of indexes is valid index pair, false - otherwise.
      */
     bool isValidPair() const;
-    
+
     /**
      Converts two indexes object to text output and insert it into output text
      stream.
-     
+
      @param output the output text stream.
      @param source the two indexes object.
      */
-    friend std::ostream& operator<<(      std::ostream& output,
-                                    const CTwoIndexes&  source);
+    friend std::ostream& operator<<(std::ostream& output, const CTwoIndexes& source);
 };
 
 #endif /* TwoIndexes_hpp */

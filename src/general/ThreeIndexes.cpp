@@ -18,12 +18,9 @@ CThreeIndexes::CThreeIndexes()
 
     , _kIndex(-1)
 {
-
 }
 
-CThreeIndexes::CThreeIndexes(const int32_t iIndex,
-                             const int32_t jIndex,
-                             const int32_t kIndex)
+CThreeIndexes::CThreeIndexes(const int32_t iIndex, const int32_t jIndex, const int32_t kIndex)
 
     : _iIndex(iIndex)
 
@@ -31,7 +28,6 @@ CThreeIndexes::CThreeIndexes(const int32_t iIndex,
 
     , _kIndex(kIndex)
 {
-
 }
 
 CThreeIndexes::CThreeIndexes(const CThreeIndexes& source)
@@ -42,7 +38,6 @@ CThreeIndexes::CThreeIndexes(const CThreeIndexes& source)
 
     , _kIndex(source._kIndex)
 {
-
 }
 
 CThreeIndexes::CThreeIndexes(CThreeIndexes&& source) noexcept
@@ -53,12 +48,10 @@ CThreeIndexes::CThreeIndexes(CThreeIndexes&& source) noexcept
 
     , _kIndex(std::move(source._kIndex))
 {
-
 }
 
 CThreeIndexes::~CThreeIndexes()
 {
-
 }
 
 CThreeIndexes&
@@ -71,7 +64,7 @@ CThreeIndexes::operator=(const CThreeIndexes& source)
     _jIndex = source._jIndex;
 
     _kIndex = source._kIndex;
-    
+
     return *this;
 }
 
@@ -85,7 +78,7 @@ CThreeIndexes::operator=(CThreeIndexes&& source) noexcept
     _jIndex = std::move(source._jIndex);
 
     _kIndex = std::move(source._kIndex);
-    
+
     return *this;
 }
 
@@ -95,19 +88,18 @@ CThreeIndexes::operator==(const CThreeIndexes& other) const
     if (this == &other) return true;
 
     if (_iIndex != other._iIndex) return false;
-    
+
     if (_jIndex != other._jIndex) return false;
 
     if (_kIndex != other._kIndex) return false;
-    
+
     return true;
 }
 
 bool
 CThreeIndexes::operator!=(const CThreeIndexes& other) const
 {
-
-    return !( (*this) == other);
+    return !((*this) == other);
 }
 
 int32_t
@@ -132,27 +124,26 @@ bool
 CThreeIndexes::isValidTriple() const
 {
     if (_iIndex < 0) return false;
-    
-    if (_jIndex < 0) return false; 
-    
+
+    if (_jIndex < 0) return false;
+
     if (_kIndex < 0) return false;
-    
+
     return true;
 }
 
 std::ostream&
-operator<<(      std::ostream&  output,
-           const CThreeIndexes& source)
+operator<<(std::ostream& output, const CThreeIndexes& source)
 {
     output << std::endl;
-    
+
     output << "[CThreeIndexes (Object):" << &source << "]" << std::endl;
-    
-    output << "_iIndex: " << source._iIndex <<  std::endl;
-    
-    output << "_jIndex: " << source._jIndex <<  std::endl;
-    
-    output << "_kIndex: " << source._kIndex <<  std::endl;
-    
+
+    output << "_iIndex: " << source._iIndex << std::endl;
+
+    output << "_jIndex: " << source._jIndex << std::endl;
+
+    output << "_kIndex: " << source._kIndex << std::endl;
+
     return output;
 }

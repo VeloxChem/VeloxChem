@@ -9,10 +9,10 @@
 #ifndef MemAlloc_hpp
 #define MemAlloc_hpp
 
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 
-namespace mem // mem namespace
+namespace mem  // mem namespace
 {
 
 /**
@@ -30,6 +30,6 @@ void* malloc(const size_t size);
  */
 void free(void* pointer);
 
-} // mem namespace
+}  // namespace mem
 
 #endif /* MemAlloc_hpp */

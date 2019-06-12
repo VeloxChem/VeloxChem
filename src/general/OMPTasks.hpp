@@ -16,7 +16,7 @@
 /**
  Class COMPTasks stores information about OMP tasks distribution for linear
  jobs lists.
- 
+
  @author Z. Rinkevicius
  */
 class COMPTasks
@@ -25,27 +25,26 @@ class COMPTasks
      The number of OMP threads.
      */
     int32_t _nOMPThreads;
-    
+
     /**
      The number of OMP tasks assigned to single OMP thread.
      */
     int32_t _nTasksPerThread;
-    
+
     /**
      The vector of task sizes in linear jobs list.
      */
     CMemBlock<int32_t> _taskSizes;
-    
+
     /**
      The vector of task positions in linear jobs list.
      */
     CMemBlock<int32_t> _taskPositions;
 
-public:
-
+   public:
     /**
      Creates a OMP tasks object by copying other atom basis object.
-     
+
      @param nTasksPerThread the number of OMP tasks per a single OMP thread.
      */
     COMPTasks(const int32_t nTasksPerThread);
@@ -54,7 +53,7 @@ public:
      Destroys a OMP tasks object.
      */
     ~COMPTasks();
-    
+
     /**
      Sets the sizes and start positions of all tasks in OMP tasks object for
      specific linear jobs list.
@@ -62,21 +61,21 @@ public:
      @param nElements the number of elements in linear jobs list.
      */
     void set(const int32_t nElements);
-    
+
     /**
      Gets constant pointer to task sizes vector.
 
      @return the pointer to task sizes vector.
      */
     const int32_t* getTaskSizes() const;
-    
+
     /**
      Gets constant pointer to task start positions vector.
 
      @return the pointer to task start positions vector.
      */
     const int32_t* getTaskPositions() const;
-    
+
     /**
      Gets total number of tasks in OMP tasks object.
 

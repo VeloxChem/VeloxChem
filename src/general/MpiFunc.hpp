@@ -10,20 +10,24 @@
 #define MpiFunc_hpp
 
 #include <cstdint>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "mpi.h"
 
-namespace mpi { // mpi namespace
-    
+namespace mpi {  // mpi namespace
+
 /**
  Defines a default rank of master MPI process.
 
  @return the rank of master MPI process.
 */
-inline int32_t master() { return 0;}
-  
+inline int32_t
+master()
+{
+    return 0;
+}
+
 /**
  Initializes parallel execution mode driven by MPI.
 
@@ -31,8 +35,7 @@ inline int32_t master() { return 0;}
  @param argv the array of command line arguments.
  @return true if success, false otherwise.
  */
-bool init(int    argc,
-          char** argv);
+bool init(int argc, char** argv);
 
 /**
  Check if MPI has been initialized.
@@ -47,7 +50,7 @@ bool initialized();
  @return true if success, false otherwise.
  */
 bool finalize();
-    
+
 /**
  Determines a rank of MPI process within MPI communicator.
 
@@ -55,7 +58,7 @@ bool finalize();
  @return the rank of MPI process.
 */
 int32_t rank(MPI_Comm comm);
-    
+
 /**
  Determines a number of MPI processes within MPI communicator.
 
@@ -70,9 +73,8 @@ int32_t nodes(MPI_Comm comm);
  @param comm1 the MPI communicator.
  @param comm2 the copy of MPI communicator.
  */
-void duplicate(MPI_Comm  comm1, 
-               MPI_Comm* comm2);
-    
+void duplicate(MPI_Comm comm1, MPI_Comm* comm2);
+
 /**
  Destroys data in MPI communicator.
 
@@ -87,17 +89,15 @@ void destroy(MPI_Comm* comm);
  @param comm2 the second MPI communicator.
  @return true if MPI communicators is equal, false otherwise.
  */
-bool compare(MPI_Comm comm1,
-             MPI_Comm comm2);
-    
+bool compare(MPI_Comm comm1, MPI_Comm comm2);
+
 /**
  Broadcasts an integer number within MPI communicator.
 
  @param value the integer number.
  @param comm the MPI communicator.
  */
-void bcast(int32_t& value,
-           MPI_Comm comm);
+void bcast(int32_t& value, MPI_Comm comm);
 
 /**
  Broadcasts a real number within MPI communicator.
@@ -105,9 +105,8 @@ void bcast(int32_t& value,
  @param value the real number.
  @param comm the MPI communicator.
  */
-void bcast(double&  value,
-           MPI_Comm comm);
-    
+void bcast(double& value, MPI_Comm comm);
+
 /**
  Broadcasts a boolean within MPI communicator.
 
@@ -115,19 +114,16 @@ void bcast(double&  value,
  @param rank the rank of MPI process.
  @param comm the MPI communicator.
  */
-void bcast(bool&    value,
-           int32_t  rank,
-           MPI_Comm comm);
-    
+void bcast(bool& value, int32_t rank, MPI_Comm comm);
+
 /**
  Broadcasts a symbol within domain of MPI communicator.
 
  @param value the symbol.
  @param comm the MPI communicator.
  */
-void bcast(char&    value,
-           MPI_Comm comm);
-    
+void bcast(char& value, MPI_Comm comm);
+
 /**
  Broadcasts vector of integer numbers within domain of MPI communicator.
 
@@ -135,10 +131,8 @@ void bcast(char&    value,
  @param rank the rank of MPI process.
  @param comm the MPI communicator.
  */
-void bcast(std::vector<int32_t>& vector,
-           int32_t               rank,
-           MPI_Comm              comm);
-    
+void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm);
+
 /**
  Broadcasts vector of real numbers within domain of MPI communicator.
 
@@ -146,10 +140,8 @@ void bcast(std::vector<int32_t>& vector,
  @param rank the rank of MPI process.
  @param comm the MPI communicator.
  */
-void bcast(std::vector<double>& vector,
-           int32_t              rank,
-           MPI_Comm             comm);
-  
+void bcast(std::vector<double>& vector, int32_t rank, MPI_Comm comm);
+
 /**
  Broadcasts a string within domain of MPI communicator.
 
@@ -157,11 +149,8 @@ void bcast(std::vector<double>& vector,
  @param rank the rank of MPI process.
  @param comm the MPI communicator.
  */
-void bcast(std::string& str,
-           int32_t      rank,
-           MPI_Comm     comm);
-    
-    
+void bcast(std::string& str, int32_t rank, MPI_Comm comm);
+
 /**
  Broadcasts vector of stringd within domain of MPI communicator.
 
@@ -169,34 +158,26 @@ void bcast(std::string& str,
  @param rank the rank of MPI process.
  @param comm the MPI communicator.
  */
-void bcast(std::vector<std::string>& vector,
-           int32_t                   rank,
-           MPI_Comm                  comm);
-    
+void bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm);
+
 /**
  Sends a real number to destination MPI process.
- 
+
  @param value the real number.
  @param rank the rank of destination MPI process.
  @param comm the MPI communicator.
 */
-void
-send(      double&  value,
-     const int32_t  rank,
-           MPI_Comm comm);
-    
+void send(double& value, const int32_t rank, MPI_Comm comm);
+
 /**
  Receives a real number to source MPI process.
-     
+
  @param value the real number.
  @param rank the rank of source MPI process.
  @param comm the MPI communicator.
 */
-void
-receive(      double&  value,
-        const int32_t  rank,
-              MPI_Comm comm);
-   
+void receive(double& value, const int32_t rank, MPI_Comm comm);
+
 /**
  Determines batch size associated with MPI process for data vector within domain
  of MPI communicator.
@@ -206,10 +187,8 @@ receive(      double&  value,
  @param nodes the number of nodes in MPI communicator domain.
  @return the size of data batch.
  */
-int32_t batch_size(const int32_t nElements,
-                   const int32_t rank,
-                   const int32_t nodes);
-    
+int32_t batch_size(const int32_t nElements, const int32_t rank, const int32_t nodes);
+
 /**
  Determines offset of batch associated with MPI process within indexing
  space of MPI communicator domain.
@@ -219,9 +198,7 @@ int32_t batch_size(const int32_t nElements,
  @param nodes the number of nodes in MPI domain.
  @return the offset of batch.
  */
-int32_t batch_offset(const int32_t nElements,
-                     const int32_t rank,
-                     const int32_t nodes);
+int32_t batch_offset(const int32_t nElements, const int32_t rank, const int32_t nodes);
 
 /**
  Creates batches distribution pattern for data vector with given number of
@@ -231,9 +208,7 @@ int32_t batch_offset(const int32_t nElements,
  @param nElements the number of elements in data vector.
  @param nodes the number of nodes in MPI communicator domain.
  */
-void batches_pattern(      int32_t* pattern,
-                     const int32_t  nElements,
-                     const int32_t  nodes);
+void batches_pattern(int32_t* pattern, const int32_t nElements, const int32_t nodes);
 /**
  Gathers vector of integers on master MPI process by taking single integer from
  all MPI processes within domain of MPI communicator.
@@ -243,11 +218,8 @@ void batches_pattern(      int32_t* pattern,
  @param rank the rank of MPI process.
  @param comm the MPI communicator.
  */
-void gather(int32_t* vector,
-            int32_t  value,
-            int32_t  rank,
-            MPI_Comm comm);
-    
+void gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm);
+
 /**
  Gathers vector of real numbers on master MPI process by taking single real
  number from all MPI processes within domain of MPI communicator.
@@ -257,10 +229,7 @@ void gather(int32_t* vector,
  @param rank the rank of MPI process.
  @param comm the MPI communicator.
  */
-void gather(double*  vector,
-            double   value,
-            int32_t  rank,
-            MPI_Comm comm);
+void gather(double* vector, double value, int32_t rank, MPI_Comm comm);
 
 /**
  Sums vector of real numbers on master MPI process from vectors of real numbers
@@ -271,10 +240,7 @@ void gather(double*  vector,
  @param nElements the number of elements in vector.
  @param comm the MPI communicator.
  */
-void reduce_sum(const double*  source,
-                      double*  destination,
-                const int32_t  nElements,
-                      MPI_Comm comm);
+void reduce_sum(const double* source, double* destination, const int32_t nElements, MPI_Comm comm);
 
 /**
  Terminates all MPI processes and prints error message to standard error stream.
@@ -282,10 +248,8 @@ void reduce_sum(const double*  source,
  @param errorcode the MPI error code.
  @param label the label of function in which MPI error occured.
  */
-void abort(const int   errorcode,
-           const char* label);
-    
-} // mpi namespace
+void abort(const int errorcode, const char* label);
 
+}  // namespace mpi
 
 #endif /* MpiFunc_hpp */

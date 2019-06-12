@@ -9,7 +9,7 @@
 #ifndef Codata_hpp
 #define Codata_hpp
 
-namespace units { // units namespace
+namespace units {  // units namespace
 
 /**
  Gets a Bohr value in Angstroms.
@@ -25,6 +25,6 @@ double getBohrValueInAngstroms();
  */
 double getHatreeValueInElectronVolts();
 
-} // units namespace
+}  // namespace units
 
 #endif /* Codata_hpp */
