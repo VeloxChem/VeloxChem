@@ -8,17 +8,17 @@
 
 #include "SADGuessDriver.hpp"
 
-#include "StringFormat.hpp"
-#include "DenseLinearAlgebra.hpp"
-#include "DenseDiagonalizer.hpp"
 #include "AODensityMatrix.hpp"
+#include "DenseDiagonalizer.hpp"
+#include "DenseLinearAlgebra.hpp"
 #include "DensityMatrixType.hpp"
 #include "ErrorHandler.hpp"
+#include "StringFormat.hpp"
 
 CSADGuessDriver::CSADGuessDriver(MPI_Comm comm)
 {
-    _locRank  = mpi::rank(comm);
-    
+    _locRank = mpi::rank(comm);
+
     _locNodes = mpi::nodes(comm);
 
     mpi::duplicate(comm, &_locComm);
@@ -33,72 +33,66 @@ std::vector<double>
 CSADGuessDriver::_getOcc1s(double occ) const
 {
     //                           1s
-    return std::vector<double>({ occ });
+    return std::vector<double>({occ});
 }
 
 std::vector<double>
 CSADGuessDriver::_getOcc2s(double occ) const
 {
     //                           1s   2s
-    return std::vector<double>({ 1.0, occ });
+    return std::vector<double>({1.0, occ});
 }
 
 std::vector<double>
 CSADGuessDriver::_getOcc2s2p(double occ) const
 {
     //                           1s   2s   2p-1 2p0  2p+1
-    return std::vector<double>({ 1.0, occ, occ, occ, occ });
+    return std::vector<double>({1.0, occ, occ, occ, occ});
 }
 
 std::vector<double>
 CSADGuessDriver::_getOcc3s(double occ) const
 {
     //                           1s   2s   3s   2p-1 2p0  2p+1
-    return std::vector<double>({ 1.0, 1.0, occ, 1.0, 1.0, 1.0 });
+    return std::vector<double>({1.0, 1.0, occ, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
 CSADGuessDriver::_getOcc3s3p(double occ) const
 {
     //                           1s   2s   3s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
-    return std::vector<double>({ 1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ });
+    return std::vector<double>({1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
 }
 
 std::vector<double>
 CSADGuessDriver::_getOcc4s(double occ) const
 {
     //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
-    return std::vector<double>({ 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 });
+    return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
 CSADGuessDriver::_getOcc3d(double occ) const
 {
-    //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
-    return std::vector<double>({ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-
-    //                           3d-2 3d-1 3d0  3d+1 3d+2
-                                 occ, occ, occ, occ, occ });
+    //                           1s   2s   3s   4s  2p-1 3p-1 2p0  3p0  2p+1 3p+1 3d-2 3d-1 3d0  3d+1 3d+2
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ});
 }
 
 std::vector<double>
 CSADGuessDriver::_getOcc4s4p(double occ) const
 {
-    //                           1s   2s   3s   4s   2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1
-    return std::vector<double>({ 1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ,
-
-    //                           3d-2 3d-1 3d0  3d+1 3d+2
-                                 1.0, 1.0, 1.0, 1.0, 1.0 });
+    //                           1s   2s   3s   4s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 3d-1 3d0  3d+1 3d+2
+    return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
-std::vector< std::vector<double> >
+std::vector<std::vector<double>>
 CSADGuessDriver::_buildQocc() const
 {
-    std::vector< std::vector<double> > qocc;
+    std::vector<std::vector<double>> qocc;
 
     // dummy atom
 
-    qocc.push_back(std::vector<double> ());
+    qocc.push_back(std::vector<double>());
 
     // H,He
 
@@ -191,11 +185,10 @@ CSADGuessDriver::_buildQocc() const
     return qocc;
 }
 
-std::vector< std::vector<int32_t> >
-CSADGuessDriver::getAOIndicesOfAtoms(const CMolecule&       molecule,
-                                     const CMolecularBasis& basis) const
+std::vector<std::vector<int32_t>>
+CSADGuessDriver::getAOIndicesOfAtoms(const CMolecule& molecule, const CMolecularBasis& basis) const
 {
-    std::vector< std::vector<int32_t> > aoinds_atoms;
+    std::vector<std::vector<int32_t>> aoinds_atoms;
 
     int32_t natoms = molecule.getNumberOfAtoms();
 
@@ -236,14 +229,14 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
                          const bool             restricted) const
 {
     CAODensityMatrix dsad;
-    
+
     if (_locRank == mpi::master())
     {
         // generate SAD guess
-        
+
         dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22, restricted);
     }
-    
+
     return dsad;
 }
 
@@ -306,23 +299,23 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     double alpha_elec = 0.5 * (-charge + mult_1);
 
-    double beta_elec  = 0.5 * (-charge - mult_1);
+    double beta_elec = 0.5 * (-charge - mult_1);
 
     alpha_elec /= static_cast<double>(nao_1);
 
-    beta_elec  /= static_cast<double>(nao_1);
+    beta_elec /= static_cast<double>(nao_1);
 
     // C_SAD matrix
 
-    CDenseMatrix csad_alpha (nao_2, nao_1);
+    CDenseMatrix csad_alpha(nao_2, nao_1);
 
-    CDenseMatrix csad_beta  (nao_2, nao_1);
+    CDenseMatrix csad_beta(nao_2, nao_1);
 
     csad_alpha.zero();
 
     csad_beta.zero();
 
-    #pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
     for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
     {
         // elemental index (nuclear charge) for this atom
@@ -334,24 +327,24 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         const std::vector<int32_t>& aoinds_1 = aoinds_atoms_1[atomidx];
 
         const std::vector<int32_t>& aoinds_2 = aoinds_atoms_2[atomidx];
-        
+
         // set up AO indices dimensions
-        
+
         auto naodim_1 = static_cast<int32_t>(aoinds_1.size());
-        
+
         auto naodim_2 = static_cast<int32_t>(aoinds_2.size());
 
         // size checking
-        
+
         std::string err_ao_size("SADGuessDriver - Mismatch between basis set & occupation number");
 
         errors::assertMsgCritical(qocc[idelem].size() == aoinds_1.size(), err_ao_size);
-        
+
         // atomic block of AOs
 
-        CDenseMatrix block_12 (naodim_1, naodim_2);
+        CDenseMatrix block_12(naodim_1, naodim_2);
 
-        CDenseMatrix block_22 (naodim_2, naodim_2);
+        CDenseMatrix block_22(naodim_2, naodim_2);
 
         block_12.zero();
 
@@ -361,8 +354,8 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         {
             for (int32_t j = 0; j < naodim_2; j++)
             {
-                block_12.values()[i * naodim_2 + j] = 
-                    
+                block_12.values()[i * naodim_2 + j] =
+
                     S12.values()[aoinds_1[i] * nao_2 + aoinds_2[j]];
             }
         }
@@ -371,15 +364,15 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         {
             for (int32_t j = 0; j < naodim_2; j++)
             {
-                block_22.values()[i * naodim_2 + j] = 
-                    
+                block_22.values()[i * naodim_2 + j] =
+
                     S22.values()[aoinds_2[i] * nao_2 + aoinds_2[j]];
             }
         }
 
         // A = S12' C1(identity)
 
-        CDenseMatrix mat_c1 (naodim_1, naodim_1);
+        CDenseMatrix mat_c1(naodim_1, naodim_1);
 
         mat_c1.zero();
 
@@ -428,7 +421,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         {
             for (int32_t i = 0; i < naodim_1; i++)
             {
-                csad_alpha.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
+                csad_alpha.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] =
 
                     mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + alpha_elec);
             }
@@ -436,13 +429,13 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         // update csad_beta
 
-        if (! restricted)
+        if (!restricted)
         {
             for (int32_t j = 0; j < naodim_2; j++)
             {
                 for (int32_t i = 0; i < naodim_1; i++)
                 {
-                    csad_beta.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] = 
+                    csad_beta.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] =
 
                         mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + beta_elec);
                 }
@@ -464,7 +457,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
     {
         dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
 
-        dsad.push_back(denblas::multABt(csad_beta,  csad_beta));
+        dsad.push_back(denblas::multABt(csad_beta, csad_beta));
 
         return CAODensityMatrix(dsad, denmat::unrest);
     }

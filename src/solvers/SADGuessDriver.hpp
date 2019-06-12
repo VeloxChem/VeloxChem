@@ -13,16 +13,16 @@
 
 #include "mpi.h"
 
-#include "Molecule.hpp"
-#include "MolecularBasis.hpp"
-#include "DenseMatrix.hpp"
-#include "OverlapMatrix.hpp"
 #include "AODensityMatrix.hpp"
+#include "DenseMatrix.hpp"
 #include "DensityMatrixType.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "OverlapMatrix.hpp"
 
 /**
  Class CSADGuessDriver computes SAD initial guess.
- 
+
  @author X. Li
  */
 class CSADGuessDriver
@@ -31,12 +31,12 @@ class CSADGuessDriver
      The rank of associated local MPI process.
      */
     int32_t _locRank;
-    
+
     /**
      The total number of local MPI processes.
      */
     int32_t _locNodes;
-    
+
     /**
      The local MPI communicator.
      */
@@ -113,7 +113,7 @@ class CSADGuessDriver
              the second dimension for occupation numbers.
      */
     std::vector<std::vector<double>> _buildQocc() const;
-    
+
     /**
      Computes SAD initial guess.
 
@@ -125,28 +125,26 @@ class CSADGuessDriver
      @param restricted the flag for generating restricted initial guess
      @return the density matrix of SAD guess.
      */
-    CAODensityMatrix
-    _compSADGuess(const CMolecule&       molecule,
-                  const CMolecularBasis& basis_1,
-                  const CMolecularBasis& basis_2,
-                  const COverlapMatrix&  S12,
-                  const COverlapMatrix&  S22,
-                  const bool             restricted) const;
-    
-public:
-    
+    CAODensityMatrix _compSADGuess(const CMolecule&       molecule,
+                                   const CMolecularBasis& basis_1,
+                                   const CMolecularBasis& basis_2,
+                                   const COverlapMatrix&  S12,
+                                   const COverlapMatrix&  S22,
+                                   const bool             restricted) const;
+
+   public:
     /**
      Creates a SAD guess driver object using MPI info.
-     
+
      @param comm the MPI communicator.
      */
     CSADGuessDriver(MPI_Comm comm);
-    
+
     /**
      Destroys a SAD guess driver object.
      */
     ~CSADGuessDriver();
-    
+
     /**
      Computes SAD initial guess.
 
@@ -158,25 +156,22 @@ public:
      @param restricted the flag for generating restricted initial guess
      @return the density matrix of SAD guess.
      */
-    CAODensityMatrix
-    compute(const CMolecule&       molecule,
-            const CMolecularBasis& basis_1,
-            const CMolecularBasis& basis_2,
-            const COverlapMatrix&  S12,
-            const COverlapMatrix&  S22,
-            const bool             restricted) const;
-    
+    CAODensityMatrix compute(const CMolecule&       molecule,
+                             const CMolecularBasis& basis_1,
+                             const CMolecularBasis& basis_2,
+                             const COverlapMatrix&  S12,
+                             const COverlapMatrix&  S22,
+                             const bool             restricted) const;
+
     /**
      Computes indicies of atomic orbitals that are located on each atom.
-     
+
      @param molecule the molecule.
      @param basis the molecular basis set.
      @return a vector of vector with the first dimension for atoms and the
              second dimension for atomic orbitals.
      */
-    std::vector< std::vector<int32_t> >
-    getAOIndicesOfAtoms(const CMolecule&       molecule,
-                        const CMolecularBasis& basis) const;
+    std::vector<std::vector<int32_t>> getAOIndicesOfAtoms(const CMolecule& molecule, const CMolecularBasis& basis) const;
 };
 
 #endif /* SADGuessDriver_hpp */
