@@ -540,6 +540,12 @@ namespace t2crecfunc { // t2crecfunc namespace
             auto nterm = (rterm.orderShift(1)).operatorShift(-1);
             
             if (nterm.isValid()) obvec.push_back(nterm);
+            
+            rterm.setLabel({"Nuclear Potential"});
+            
+            auto mterm = (rterm.orderShift(1)).operatorShift(-2);
+            
+            if (mterm.isValid()) obvec.push_back(mterm);
         }
         
         return obvec;
