@@ -15,6 +15,7 @@ from .molecularorbitals import MolecularOrbitals
 from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .errorhandler import assert_msg_critical
 
 
 class ScfDriver:
@@ -399,11 +400,16 @@ class ScfDriver:
                 'E': None,
                 'S': None,
                 'D': None,
-                'F': None
+                'F': None,
             }
 
         if self.rank == mpi_master():
             self.print_scf_finish(start_time)
+
+        if self.rank == mpi_master():
+            if not self.first_step:
+                assert_msg_critical(self.is_converged,
+                                    'ScfDriver.compute: failed to converge')
 
     def comp_one_ints(self, molecule, basis):
         """Computes one-electron integrals required for SCF calculation.
@@ -849,7 +855,7 @@ class ScfDriver:
             if self.is_converged:
                 valstr += "converged in "
             else:
-                valstr += "not converged in "
+                valstr += "NOT converged in "
             valstr += str(self.num_iter)
             valstr += " iterations. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
@@ -930,6 +936,9 @@ class ScfDriver:
 
         if self.den_guess.guess_type == "SAD":
             return "Superposition of Atomic Densities"
+
+        if self.den_guess.guess_type == "RESTART":
+            return "Restart from Checkpoint"
 
         return "Undefined"
 
