@@ -7,96 +7,97 @@
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
 #include <cmath>
-#include <string>
 #include <sstream>
+#include <string>
 
 #include "DeviceProp.hpp"
 #include "StringFormat.hpp"
 
-namespace gpu { // gpu namespace
+namespace gpu {  // gpu namespace
 
-    std::string getDeviceProperties()
+std::string
+getDeviceProperties()
+{
+    std::string str("GPU Devices");
+
+    std::stringstream ss;
+
+    const int32_t width = 50;
+
+    ss << str << "\n";
+
+    ss << std::string(str.size() + 2, '=') << "\n\n";
+
+    int32_t devcnt = 0;
+
+    cudaGetDeviceCount(&devcnt);
+
+    for (int32_t i = 0; i < devcnt; i++)
     {
-        std::string str("GPU Devices");
+        cudaDeviceProp prop;
 
-        std::stringstream ss;
+        cudaGetDeviceProperties(&prop, i);
 
-        const int32_t width = 50;
+        str.assign("GPU device ID: ");
 
-        ss << str << "\n";
+        str.append(std::to_string(i));
 
-        ss << std::string(str.size() + 2, '=') << "\n\n";
+        ss << fstr::format(str, width, fmt::left) << "\n";
 
-        int32_t devcnt = 0;
+        str.assign("  Device name:             ");
 
-        cudaGetDeviceCount(&devcnt);
+        str.append(prop.name);
 
-        for (int32_t i = 0; i < devcnt; i++)
-        {
-            cudaDeviceProp prop;
+        ss << fstr::format(str, width, fmt::left) << "\n";
 
-            cudaGetDeviceProperties(&prop, i);
+        str.assign("  Compute capability:      ");
 
-            str.assign("GPU device ID: ");
+        str.append(std::to_string(prop.major));
 
-            str.append(std::to_string(i));
+        str.append(".");
 
-            ss << fstr::format(str, width, fmt::left) << "\n";
+        str.append(std::to_string(prop.minor));
 
-            str.assign("  Device name:             ");
+        ss << fstr::format(str, width, fmt::left) << "\n";
 
-            str.append(prop.name);
+        str.assign("  Multiprocessor count:    ");
 
-            ss << fstr::format(str, width, fmt::left) << "\n";
+        str.append(std::to_string(prop.multiProcessorCount));
 
-            str.assign("  Compute capability:      ");
+        ss << fstr::format(str, width, fmt::left) << "\n";
 
-            str.append(std::to_string(prop.major));
+        str.assign("  Max clock rate:          ");
 
-            str.append(".");
+        str.append(fstr::to_string(prop.clockRate * 1.0e-6, 2));
 
-            str.append(std::to_string(prop.minor));
+        str.append(" GHz");
 
-            ss << fstr::format(str, width, fmt::left) << "\n";
+        ss << fstr::format(str, width, fmt::left) << "\n";
 
-            str.assign("  Multiprocessor count:    ");
+        str.assign("  Global memory:           ");
 
-            str.append(std::to_string(prop.multiProcessorCount));
+        double glbmem = (double)prop.totalGlobalMem / std::pow(1024, 3);
 
-            ss << fstr::format(str, width, fmt::left) << "\n";
+        str.append(fstr::to_string(glbmem, 0));
 
-            str.assign("  Max clock rate:          ");
+        str.append(" GB");
 
-            str.append(fstr::to_string(prop.clockRate * 1.0e-6, 2));
+        ss << fstr::format(str, width, fmt::left) << "\n";
 
-            str.append(" GHz");
+        str.assign("  Peak memory bandwidth:   ");
 
-            ss << fstr::format(str, width, fmt::left) << "\n";
+        double bandwidth = 2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e+6;
 
-            str.assign("  Global memory:           ");
+        str.append(fstr::to_string(bandwidth, 0));
 
-            double glbmem = (double)prop.totalGlobalMem / std::pow(1024, 3);
+        str.append(" GB/s");
 
-            str.append(fstr::to_string(glbmem, 0));
+        ss << fstr::format(str, width, fmt::left) << "\n";
 
-            str.append(" GB");
-
-            ss << fstr::format(str, width, fmt::left) << "\n";
-
-            str.assign("  Peak memory bandwidth:   ");
-
-            double bandwidth = 2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e+6;
-
-            str.append(fstr::to_string(bandwidth, 0));
-
-            str.append(" GB/s");
-
-            ss << fstr::format(str, width, fmt::left) << "\n";
-
-            if (i < devcnt - 1) ss << "\n";
-        }
-
-        return ss.str();
+        if (i < devcnt - 1) ss << "\n";
     }
 
+    return ss.str();
 }
+
+}  // namespace gpu

@@ -11,8 +11,7 @@
 
 namespace gpu {
 
-    std::string getDeviceProperties();
-
+std::string getDeviceProperties();
 }
 
 #endif
