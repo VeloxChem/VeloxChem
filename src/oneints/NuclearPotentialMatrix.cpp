@@ -12,42 +12,37 @@
 
 CNuclearPotentialMatrix::CNuclearPotentialMatrix()
 {
-    
 }
 
 CNuclearPotentialMatrix::CNuclearPotentialMatrix(const CDenseMatrix& matrix)
 
     : _matrix(matrix)
 {
-    
 }
 
 CNuclearPotentialMatrix::CNuclearPotentialMatrix(const CNuclearPotentialMatrix& source)
 
     : _matrix(source._matrix)
 {
-    
 }
 
 CNuclearPotentialMatrix::CNuclearPotentialMatrix(CNuclearPotentialMatrix&& source) noexcept
 
     : _matrix(std::move(source._matrix))
 {
-    
 }
 
 CNuclearPotentialMatrix::~CNuclearPotentialMatrix()
 {
-    
 }
 
 CNuclearPotentialMatrix&
 CNuclearPotentialMatrix::operator=(const CNuclearPotentialMatrix& source)
 {
     if (this == &source) return *this;
-    
+
     _matrix = source._matrix;
-    
+
     return *this;
 }
 
@@ -55,9 +50,9 @@ CNuclearPotentialMatrix&
 CNuclearPotentialMatrix::operator=(CNuclearPotentialMatrix&& source) noexcept
 {
     if (this == &source) return *this;
-    
+
     _matrix = std::move(source._matrix);
-    
+
     return *this;
 }
 
@@ -65,7 +60,7 @@ bool
 CNuclearPotentialMatrix::operator==(const CNuclearPotentialMatrix& other) const
 {
     if (_matrix != other._matrix) return false;
-    
+
     return true;
 }
 
@@ -106,8 +101,7 @@ CNuclearPotentialMatrix::values() const
 }
 
 double
-CNuclearPotentialMatrix::getNuclearPotentialEnergy(const CAODensityMatrix& aoDensityMatrix,
-                                                   const int32_t           iDensityMatrix) const
+CNuclearPotentialMatrix::getNuclearPotentialEnergy(const CAODensityMatrix& aoDensityMatrix, const int32_t iDensityMatrix) const
 {
     if (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices())
     {
@@ -128,19 +122,18 @@ CNuclearPotentialMatrix::getNuclearPotentialEnergy(const CAODensityMatrix& aoDen
             return e_a + e_b;
         }
     }
-    
+
     return 0;
 }
 
 std::ostream&
-operator<<(      std::ostream&         output,
-           const CNuclearPotentialMatrix& source)
+operator<<(std::ostream& output, const CNuclearPotentialMatrix& source)
 {
     output << std::endl;
-    
+
     output << "[CNuclearPotentialMatrix (Object):" << &source << "]" << std::endl;
-    
+
     output << "_matrix: " << source._matrix << std::endl;
-    
+
     return output;
 }

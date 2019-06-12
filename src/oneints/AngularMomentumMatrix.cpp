@@ -18,7 +18,6 @@ CAngularMomentumMatrix::CAngularMomentumMatrix()
 
     , _zOrigin(0.0)
 {
-    
 }
 
 CAngularMomentumMatrix::CAngularMomentumMatrix(const CDenseMatrix& xMatrix,
@@ -40,7 +39,6 @@ CAngularMomentumMatrix::CAngularMomentumMatrix(const CDenseMatrix& xMatrix,
 
     , _zMatrix(zMatrix)
 {
-    
 }
 
 CAngularMomentumMatrix::CAngularMomentumMatrix(const CAngularMomentumMatrix& source)
@@ -57,7 +55,6 @@ CAngularMomentumMatrix::CAngularMomentumMatrix(const CAngularMomentumMatrix& sou
 
     , _zMatrix(source._zMatrix)
 {
-    
 }
 
 CAngularMomentumMatrix::CAngularMomentumMatrix(CAngularMomentumMatrix&& source) noexcept
@@ -74,31 +71,29 @@ CAngularMomentumMatrix::CAngularMomentumMatrix(CAngularMomentumMatrix&& source) 
 
     , _zMatrix(std::move(source._zMatrix))
 {
-    
 }
 
 CAngularMomentumMatrix::~CAngularMomentumMatrix()
 {
-    
 }
 
 CAngularMomentumMatrix&
 CAngularMomentumMatrix::operator=(const CAngularMomentumMatrix& source)
 {
     if (this == &source) return *this;
-    
+
     _xMatrix = source._xMatrix;
-    
+
     _yMatrix = source._yMatrix;
-    
+
     _zMatrix = source._zMatrix;
-    
+
     _xOrigin = source._xOrigin;
-    
+
     _yOrigin = source._yOrigin;
-    
+
     _zOrigin = source._zOrigin;
-    
+
     return *this;
 }
 
@@ -106,19 +101,19 @@ CAngularMomentumMatrix&
 CAngularMomentumMatrix::operator=(CAngularMomentumMatrix&& source) noexcept
 {
     if (this == &source) return *this;
-    
+
     _xMatrix = std::move(source._xMatrix);
-    
+
     _yMatrix = std::move(source._yMatrix);
-    
+
     _zMatrix = std::move(source._zMatrix);
-    
+
     _xOrigin = std::move(source._xOrigin);
-    
+
     _yOrigin = std::move(source._yOrigin);
-    
+
     _zOrigin = std::move(source._zOrigin);
-    
+
     return *this;
 }
 
@@ -126,17 +121,17 @@ bool
 CAngularMomentumMatrix::operator==(const CAngularMomentumMatrix& other) const
 {
     if (_xMatrix != other._xMatrix) return false;
-    
+
     if (_yMatrix != other._yMatrix) return false;
-    
+
     if (_zMatrix != other._zMatrix) return false;
-    
+
     if (std::fabs(_xOrigin - other._xOrigin) > 1.0e-13) return false;
-    
+
     if (std::fabs(_yOrigin - other._yOrigin) > 1.0e-13) return false;
-    
+
     if (std::fabs(_zOrigin - other._zOrigin) > 1.0e-13) return false;
-    
+
     return true;
 }
 
@@ -147,14 +142,12 @@ CAngularMomentumMatrix::operator!=(const CAngularMomentumMatrix& other) const
 }
 
 void
-CAngularMomentumMatrix::setOriginCoordinates(const double xOrigin,
-                                            const double yOrigin,
-                                            const double zOrigin)
+CAngularMomentumMatrix::setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin)
 {
     _xOrigin = xOrigin;
-    
+
     _yOrigin = yOrigin;
-    
+
     _zOrigin = zOrigin;
 }
 
@@ -231,24 +224,23 @@ CAngularMomentumMatrix::getOriginCoordinateZ() const
 }
 
 std::ostream&
-operator<<(      std::ostream&  output,
-           const CAngularMomentumMatrix& source)
+operator<<(std::ostream& output, const CAngularMomentumMatrix& source)
 {
     output << std::endl;
-    
+
     output << "[CAngularMomentumMatrix (Object):" << &source << "]" << std::endl;
-    
+
     output << "_xMatrix: " << source._xMatrix << std::endl;
-    
+
     output << "_yMatrix: " << source._yMatrix << std::endl;
-    
+
     output << "_zMatrix: " << source._zMatrix << std::endl;
-    
+
     output << "_xOrigin: " << source._xOrigin << std::endl;
-    
+
     output << "_yOrigin: " << source._yOrigin << std::endl;
-    
+
     output << "_zOrigin: " << source._zOrigin << std::endl;
-    
+
     return output;
 }

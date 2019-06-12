@@ -12,42 +12,37 @@
 
 CKineticEnergyMatrix::CKineticEnergyMatrix()
 {
-    
 }
 
 CKineticEnergyMatrix::CKineticEnergyMatrix(const CDenseMatrix& matrix)
 
     : _matrix(matrix)
 {
-    
 }
 
 CKineticEnergyMatrix::CKineticEnergyMatrix(const CKineticEnergyMatrix& source)
 
     : _matrix(source._matrix)
 {
-    
 }
 
 CKineticEnergyMatrix::CKineticEnergyMatrix(CKineticEnergyMatrix&& source) noexcept
 
     : _matrix(std::move(source._matrix))
 {
-    
 }
 
 CKineticEnergyMatrix::~CKineticEnergyMatrix()
 {
-    
 }
 
 CKineticEnergyMatrix&
 CKineticEnergyMatrix::operator=(const CKineticEnergyMatrix& source)
 {
     if (this == &source) return *this;
-    
+
     _matrix = source._matrix;
-    
+
     return *this;
 }
 
@@ -55,9 +50,9 @@ CKineticEnergyMatrix&
 CKineticEnergyMatrix::operator=(CKineticEnergyMatrix&& source) noexcept
 {
     if (this == &source) return *this;
-    
+
     _matrix = std::move(source._matrix);
-    
+
     return *this;
 }
 
@@ -65,7 +60,7 @@ bool
 CKineticEnergyMatrix::operator==(const CKineticEnergyMatrix& other) const
 {
     if (_matrix != other._matrix) return false;
-    
+
     return true;
 }
 
@@ -106,8 +101,7 @@ CKineticEnergyMatrix::values() const
 }
 
 double
-CKineticEnergyMatrix::getKineticEnergy(const CAODensityMatrix& aoDensityMatrix,
-                                       const int32_t           iDensityMatrix) const
+CKineticEnergyMatrix::getKineticEnergy(const CAODensityMatrix& aoDensityMatrix, const int32_t iDensityMatrix) const
 {
     if (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices())
     {
@@ -128,19 +122,18 @@ CKineticEnergyMatrix::getKineticEnergy(const CAODensityMatrix& aoDensityMatrix,
             return e_a + e_b;
         }
     }
-    
+
     return 0.0;
 }
 
 std::ostream&
-operator<<(      std::ostream&         output,
-           const CKineticEnergyMatrix& source)
+operator<<(std::ostream& output, const CKineticEnergyMatrix& source)
 {
     output << std::endl;
-    
+
     output << "[CKineticEnergyMatrix (Object):" << &source << "]" << std::endl;
-    
+
     output << "_matrix: " << source._matrix << std::endl;
-    
+
     return output;
 }

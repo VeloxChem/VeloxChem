@@ -12,12 +12,9 @@
 
 CLinearMomentumMatrix::CLinearMomentumMatrix()
 {
-    
 }
 
-CLinearMomentumMatrix::CLinearMomentumMatrix(const CDenseMatrix& xMatrix,
-                                             const CDenseMatrix& yMatrix,
-                                             const CDenseMatrix& zMatrix)
+CLinearMomentumMatrix::CLinearMomentumMatrix(const CDenseMatrix& xMatrix, const CDenseMatrix& yMatrix, const CDenseMatrix& zMatrix)
 
     : _xMatrix(xMatrix)
 
@@ -25,7 +22,6 @@ CLinearMomentumMatrix::CLinearMomentumMatrix(const CDenseMatrix& xMatrix,
 
     , _zMatrix(zMatrix)
 {
-    
 }
 
 CLinearMomentumMatrix::CLinearMomentumMatrix(const CLinearMomentumMatrix& source)
@@ -36,7 +32,6 @@ CLinearMomentumMatrix::CLinearMomentumMatrix(const CLinearMomentumMatrix& source
 
     , _zMatrix(source._zMatrix)
 {
-    
 }
 
 CLinearMomentumMatrix::CLinearMomentumMatrix(CLinearMomentumMatrix&& source) noexcept
@@ -47,25 +42,23 @@ CLinearMomentumMatrix::CLinearMomentumMatrix(CLinearMomentumMatrix&& source) noe
 
     , _zMatrix(std::move(source._zMatrix))
 {
-    
 }
 
 CLinearMomentumMatrix::~CLinearMomentumMatrix()
 {
-    
 }
 
 CLinearMomentumMatrix&
 CLinearMomentumMatrix::operator=(const CLinearMomentumMatrix& source)
 {
     if (this == &source) return *this;
-    
+
     _xMatrix = source._xMatrix;
-    
+
     _yMatrix = source._yMatrix;
-    
+
     _zMatrix = source._zMatrix;
-    
+
     return *this;
 }
 
@@ -73,13 +66,13 @@ CLinearMomentumMatrix&
 CLinearMomentumMatrix::operator=(CLinearMomentumMatrix&& source) noexcept
 {
     if (this == &source) return *this;
-    
+
     _xMatrix = std::move(source._xMatrix);
-    
+
     _yMatrix = std::move(source._yMatrix);
-    
+
     _zMatrix = std::move(source._zMatrix);
-    
+
     return *this;
 }
 
@@ -87,11 +80,11 @@ bool
 CLinearMomentumMatrix::operator==(const CLinearMomentumMatrix& other) const
 {
     if (_xMatrix != other._xMatrix) return false;
-    
+
     if (_yMatrix != other._yMatrix) return false;
-    
+
     if (_zMatrix != other._zMatrix) return false;
-    
+
     return true;
 }
 
@@ -156,18 +149,17 @@ CLinearMomentumMatrix::zvalues() const
 }
 
 std::ostream&
-operator<<(      std::ostream&  output,
-           const CLinearMomentumMatrix& source)
+operator<<(std::ostream& output, const CLinearMomentumMatrix& source)
 {
     output << std::endl;
-    
+
     output << "[CLinearMomentumMatrix (Object):" << &source << "]" << std::endl;
-    
+
     output << "_xMatrix: " << source._xMatrix << std::endl;
-    
+
     output << "_yMatrix: " << source._yMatrix << std::endl;
-    
+
     output << "_zMatrix: " << source._zMatrix << std::endl;
-    
+
     return output;
 }
