@@ -166,7 +166,7 @@ class ExcitonModelDriver:
             if self.rank == mpi_master():
                 self.ostream.print_block(monomer.get_string())
                 self.ostream.print_block(
-                    basis.get_string("Atomic Basis", monomer))
+                    basis.get_string('Atomic Basis', monomer))
                 self.ostream.flush()
 
             # 1e integral
@@ -278,7 +278,7 @@ class ExcitonModelDriver:
                 if self.rank == mpi_master():
                     self.ostream.print_block(dimer.get_string())
                     self.ostream.print_block(
-                        basis.get_string("Atomic Basis", dimer))
+                        basis.get_string('Atomic Basis', dimer))
                     self.ostream.flush()
 
                 # 1e integrals
@@ -704,22 +704,26 @@ class ExcitonModelDriver:
 
             self.ostream.flush()
 
-            self.write_hdf5(self.H, self.trans_dipoles, eigvals, eigvecs,
-                            self.ostream)
+            self.write_hdf5(eigvals, eigvecs, self.ostream)
 
-    def write_hdf5(self, hamiltonian, transition_dipoles, eigenvalues,
-                   eigenvectors, ostream):
+    def write_hdf5(self, eigenvalues, eigenvectors, ostream):
 
         if self.checkpoint_file is None:
             return
 
         hf = h5py.File(self.checkpoint_file, 'w')
-        hf.create_dataset('hamiltonian', data=hamiltonian, compression="gzip")
+        hf.create_dataset('hamiltonian', data=self.H, compression='gzip')
         hf.create_dataset('transition_dipoles',
-                          data=transition_dipoles,
-                          compression="gzip")
-        hf.create_dataset('eigenvalues', data=eigenvalues, compression="gzip")
-        hf.create_dataset('eigenvectors', data=eigenvectors, compression="gzip")
+                          data=self.trans_dipoles,
+                          compression='gzip')
+        hf.create_dataset('transition_velocity_dipoles',
+                          data=self.velo_trans_dipoles,
+                          compression='gzip')
+        hf.create_dataset('transition_magnetic_dipoles',
+                          data=self.magn_trans_dipoles,
+                          compression='gzip')
+        hf.create_dataset('eigenvalues', data=eigenvalues, compression='gzip')
+        hf.create_dataset('eigenvectors', data=eigenvectors, compression='gzip')
         hf.close()
 
         valstr = '*** Exciton model data written to file: {}'.format(
