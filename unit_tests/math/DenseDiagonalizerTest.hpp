@@ -13,11 +13,10 @@
 
 class CDenseDiagonalizerTest : public ::testing::Test
 {
-protected:
-    
-    CDenseDiagonalizerTest() {};
-    
-    virtual ~CDenseDiagonalizerTest() {};
+   protected:
+    CDenseDiagonalizerTest(){};
+
+    virtual ~CDenseDiagonalizerTest(){};
 };
 
 #endif /* DenseDiagonalizerTest_hpp */

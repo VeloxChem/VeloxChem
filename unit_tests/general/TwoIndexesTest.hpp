@@ -13,11 +13,10 @@
 
 class CTwoIndexesTest : public ::testing::Test
 {
-protected:
+   protected:
+    CTwoIndexesTest(){};
 
-    CTwoIndexesTest() {};
-
-    virtual ~CTwoIndexesTest() {};
+    virtual ~CTwoIndexesTest(){};
 };
 
 #endif /* TwoIndexesTest_hpp */

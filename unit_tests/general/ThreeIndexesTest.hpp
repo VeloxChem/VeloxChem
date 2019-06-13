@@ -13,11 +13,10 @@
 
 class CThreeIndexesTest : public ::testing::Test
 {
-protected:
-    
-    CThreeIndexesTest() {};
-    
-    virtual ~CThreeIndexesTest() {};
+   protected:
+    CThreeIndexesTest(){};
+
+    virtual ~CThreeIndexesTest(){};
 };
 
 #endif /* ThreeIndexesTest_hpp */

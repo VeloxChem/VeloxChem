@@ -13,11 +13,10 @@
 
 class CMpiFuncTest : public ::testing::Test
 {
-protected:
+   protected:
+    CMpiFuncTest(){};
 
-    CMpiFuncTest() {};
-
-    virtual ~CMpiFuncTest() {};
+    virtual ~CMpiFuncTest(){};
 };
 
 #endif /* MpiFuncTest_hpp */

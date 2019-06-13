@@ -13,11 +13,10 @@
 
 class CDenseMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CDenseMatrixTest() {};
-    
-    virtual ~CDenseMatrixTest() {};
+   protected:
+    CDenseMatrixTest(){};
+
+    virtual ~CDenseMatrixTest(){};
 };
 
 #endif /* DenseMatrixTest_hpp */

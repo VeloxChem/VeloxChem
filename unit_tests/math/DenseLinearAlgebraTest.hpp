@@ -13,11 +13,10 @@
 
 class CDenseLinearAlgebraTest : public ::testing::Test
 {
-protected:
-    
-    CDenseLinearAlgebraTest() {};
-    
-    virtual ~CDenseLinearAlgebraTest() {};
+   protected:
+    CDenseLinearAlgebraTest(){};
+
+    virtual ~CDenseLinearAlgebraTest(){};
 };
 
 #endif /* DenseLinearAlgebraTest_hpp */

@@ -13,11 +13,10 @@
 
 class CChemicalElementTest : public ::testing::Test
 {
-protected:
+   protected:
+    CChemicalElementTest(){};
 
-    CChemicalElementTest() {};
-
-    virtual ~CChemicalElementTest() {};
+    virtual ~CChemicalElementTest(){};
 };
 
 #endif /* ChemicalElementTest_hpp */

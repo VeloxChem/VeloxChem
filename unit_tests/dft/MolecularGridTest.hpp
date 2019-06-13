@@ -13,11 +13,10 @@
 
 class CMolecularGridTest : public ::testing::Test
 {
-protected:
-    
-    CMolecularGridTest() {};
-    
-    virtual ~CMolecularGridTest() {};
+   protected:
+    CMolecularGridTest(){};
+
+    virtual ~CMolecularGridTest(){};
 };
 
 #endif /* MolecularGridTest_hpp */

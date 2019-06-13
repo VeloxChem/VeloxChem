@@ -13,11 +13,10 @@
 
 class CFourIndexesTest : public ::testing::Test
 {
-protected:
-    
-    CFourIndexesTest() {};
-    
-    virtual ~CFourIndexesTest() {};
+   protected:
+    CFourIndexesTest(){};
+
+    virtual ~CFourIndexesTest(){};
 };
 
 #endif /* FourIndexesTest_hpp */

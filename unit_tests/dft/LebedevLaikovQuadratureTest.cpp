@@ -10,8 +10,8 @@
 
 #include <vector>
 
-#include "LebedevLaikovQuadrature.hpp"
 #include "CheckFunctions.hpp"
+#include "LebedevLaikovQuadrature.hpp"
 
 TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith6Points)
 {
@@ -22,11 +22,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith6Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(6, qpoints.size(0));
-    
+
     ASSERT_EQ(6, qpoints.size(1));
-    
+
     ASSERT_EQ(6, qpoints.size(2));
-    
+
     ASSERT_EQ(6, qpoints.size(3));
 
     std::vector<double> coordx({1.0, -1.0, 0.0, 0.0, 0.0, 0.0});
@@ -41,9 +41,8 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith6Points)
 
     vlxtest::compare(coordz, qpoints.data(2));
 
-    std::vector<double> weights({0.1666666666666667, 0.1666666666666667,
-                                 0.1666666666666667, 0.1666666666666667,
-                                 0.1666666666666667, 0.1666666666666667});
+    std::vector<double> weights(
+        {0.1666666666666667, 0.1666666666666667, 0.1666666666666667, 0.1666666666666667, 0.1666666666666667, 0.1666666666666667});
 
     vlxtest::compare(weights, qpoints.data(3));
 
@@ -59,11 +58,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith50Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(50, qpoints.size(0));
-    
+
     ASSERT_EQ(50, qpoints.size(1));
-    
+
     ASSERT_EQ(50, qpoints.size(2));
-    
+
     ASSERT_EQ(50, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 50);
@@ -78,11 +77,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith110Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(110, qpoints.size(0));
-    
+
     ASSERT_EQ(110, qpoints.size(1));
-    
+
     ASSERT_EQ(110, qpoints.size(2));
-    
+
     ASSERT_EQ(110, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 110);
@@ -97,13 +96,13 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith194Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(194, qpoints.size(0));
-    
+
     ASSERT_EQ(194, qpoints.size(1));
-    
+
     ASSERT_EQ(194, qpoints.size(2));
-    
+
     ASSERT_EQ(194, qpoints.size(3));
-    
+
     vlxtest::checkNorm(qpoints.data(3), 194);
 }
 
@@ -116,11 +115,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith302Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(302, qpoints.size(0));
-    
+
     ASSERT_EQ(302, qpoints.size(1));
-    
+
     ASSERT_EQ(302, qpoints.size(2));
-    
+
     ASSERT_EQ(302, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 302);
@@ -135,11 +134,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith434Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(434, qpoints.size(0));
-    
+
     ASSERT_EQ(434, qpoints.size(1));
-    
+
     ASSERT_EQ(434, qpoints.size(2));
-    
+
     ASSERT_EQ(434, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 434);
@@ -154,11 +153,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith590Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(590, qpoints.size(0));
-    
+
     ASSERT_EQ(590, qpoints.size(1));
-    
+
     ASSERT_EQ(590, qpoints.size(2));
-    
+
     ASSERT_EQ(590, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 590);
@@ -173,11 +172,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith770Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(770, qpoints.size(0));
-    
+
     ASSERT_EQ(770, qpoints.size(1));
-    
+
     ASSERT_EQ(770, qpoints.size(2));
-    
+
     ASSERT_EQ(770, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 770);
@@ -192,11 +191,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith974Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(974, qpoints.size(0));
-    
+
     ASSERT_EQ(974, qpoints.size(1));
-    
+
     ASSERT_EQ(974, qpoints.size(2));
-    
+
     ASSERT_EQ(974, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 974);
@@ -211,11 +210,11 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith2030Points)
     ASSERT_EQ(4, qpoints.blocks());
 
     ASSERT_EQ(2030, qpoints.size(0));
-    
+
     ASSERT_EQ(2030, qpoints.size(1));
-    
+
     ASSERT_EQ(2030, qpoints.size(2));
-    
+
     ASSERT_EQ(2030, qpoints.size(3));
 
     vlxtest::checkNorm(qpoints.data(3), 2030);
@@ -230,14 +229,10 @@ TEST_F(CLebedevLaikovQuadratureTest, ConstructorWith100Points)
     ASSERT_EQ(0, qpoints.blocks());
 
     ASSERT_EQ(0, qpoints.size(0));
-    
+
     ASSERT_EQ(0, qpoints.size(1));
-    
+
     ASSERT_EQ(0, qpoints.size(2));
-    
+
     ASSERT_EQ(0, qpoints.size(3));
 }
-
-
-
-

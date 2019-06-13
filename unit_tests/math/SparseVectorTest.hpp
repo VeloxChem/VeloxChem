@@ -13,11 +13,10 @@
 
 class CSparseVectorTest : public ::testing::Test
 {
-protected:
-    
-    CSparseVectorTest() {};
-    
-    virtual ~CSparseVectorTest() {};
+   protected:
+    CSparseVectorTest(){};
+
+    virtual ~CSparseVectorTest(){};
 };
 
 #endif /* SparseVectorTest_hpp */

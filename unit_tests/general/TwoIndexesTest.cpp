@@ -55,7 +55,6 @@ TEST_F(CTwoIndexesTest, MoveAssignment)
     ASSERT_EQ(ida, idb);
 }
 
-
 TEST_F(CTwoIndexesTest, First)
 {
     CTwoIndexes ida(2, 7);
@@ -81,18 +80,18 @@ TEST_F(CTwoIndexesTest, Second)
 TEST_F(CTwoIndexesTest, IsValidPair)
 {
     CTwoIndexes ida(2, 7);
-    
+
     ASSERT_TRUE(ida.isValidPair());
-    
+
     CTwoIndexes idb(3, -3);
-    
+
     ASSERT_FALSE(idb.isValidPair());
-    
+
     CTwoIndexes idc(-3, 0);
-    
+
     ASSERT_FALSE(idc.isValidPair());
-    
+
     CTwoIndexes idd(0, 0);
-    
+
     ASSERT_TRUE(idd.isValidPair());
 }

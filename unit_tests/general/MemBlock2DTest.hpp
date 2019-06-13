@@ -13,11 +13,10 @@
 
 class CMemBlock2DTest : public ::testing::Test
 {
-protected:
+   protected:
+    CMemBlock2DTest(){};
 
-    CMemBlock2DTest() {};
-
-    virtual ~CMemBlock2DTest() {};
+    virtual ~CMemBlock2DTest(){};
 };
 
 #endif /* MemBlock2DTest_hpp */

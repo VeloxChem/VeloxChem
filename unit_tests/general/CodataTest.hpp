@@ -13,11 +13,10 @@
 
 class CCodataTest : public ::testing::Test
 {
-protected:
+   protected:
+    CCodataTest(){};
 
-    CCodataTest() {};
-
-    virtual ~CCodataTest() {};
+    virtual ~CCodataTest(){};
 };
 
 #endif /* CodataTest_hpp */
