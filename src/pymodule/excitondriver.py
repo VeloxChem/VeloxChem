@@ -662,17 +662,17 @@ class ExcitonModelDriver:
             self.ostream.print_blank()
 
             for i, e in enumerate(eigvals):
-                enestr = 'E[{}]='.format(i + 1)
+                enestr = 'S{}'.format(i + 1)
                 dip_strength = np.sum(adia_trans_dipoles[i, :]**2)
                 osc_strength = 2.0 / 3.0 * dip_strength * e
 
                 rot_strength = -np.dot(adia_velo_trans_dipoles[i, :],
                                        adia_magn_trans_dipoles[i, :]) / e
 
-                valstr = '{:<9s} {:12.6f} a.u. {:11.5f} eV'.format(
+                valstr = '{:<6s} {:12.6f} a.u. {:11.5f} eV'.format(
                     enestr, e, e * hartree_in_ev())
-                valstr += '    osc.str. {:10.4f}'.format(osc_strength)
-                valstr += '    rot.str. {:12.6f}'.format(rot_strength)
+                valstr += '    osc.str.{:10.4f}'.format(osc_strength)
+                valstr += '    rot.str.{:12.6f} a.u.'.format(rot_strength)
                 self.ostream.print_header(valstr.ljust(92))
 
             self.ostream.print_blank()

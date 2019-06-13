@@ -40,7 +40,7 @@ class Absorption(ResponseProperty):
             output_abs += '{:15.8f} a.u. '.format(e)
             output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
             f = self.rsp_property['oscillator_strengths'][s]
-            output_abs += '    osc.str.{:12.5f}'.format(f)
+            output_abs += '    osc.str.{:10.4f}'.format(f)
             ostream.print_header(output_abs.ljust(92))
         ostream.print_blank()
 
@@ -52,6 +52,6 @@ class Absorption(ResponseProperty):
             output_abs += '{:15.8f} a.u. '.format(e)
             output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
             r = self.rsp_property['rotatory_strengths'][s]
-            output_abs += '    rot.str.{:12.5f}'.format(r)
+            output_abs += '    rot.str.{:12.6f} a.u.'.format(r)
             ostream.print_header(output_abs.ljust(92))
         ostream.print_blank()
