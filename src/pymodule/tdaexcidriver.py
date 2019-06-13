@@ -19,7 +19,7 @@ from .molecularorbitals import MolecularOrbitals
 class TDAExciDriver:
     """Implements TDA excited states computation driver.
 
-    Implements TDA excited states computation schheme for Hatree-Fock/Kohn-Sham
+    Implements TDA excited states computation schheme for Hartree-Fock/Kohn-Sham
     level of theory.
 
     Attributes

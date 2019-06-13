@@ -19,11 +19,11 @@ namespace units {  // units namespace
 double getBohrValueInAngstroms();
 
 /**
- Gets a Hatree value in electronvolts.
+ Gets a Hartree value in electronvolts.
 
  @return the conversion factor.
  */
-double getHatreeValueInElectronVolts();
+double getHartreeValueInElectronVolts();
 
 }  // namespace units
 

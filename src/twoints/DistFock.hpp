@@ -20,7 +20,7 @@ namespace distfock { // distfock namespace
     
     /**
      Distributes vector of spherical integrals into spin restricted closed shell
-     Hatree-Fock matrix (2J + K)
+     Hartree-Fock matrix (2J + K)
 
      @param fockContainer the Fock container.
      @param iFockMatrix the index of Fock submatrix in Fock container.
@@ -44,7 +44,7 @@ namespace distfock { // distfock namespace
     
     /**
      Distributes vector of spherical integrals into spin restricted closed shell
-     Hatree-Fock matrix (J)
+     Hartree-Fock matrix (J)
      
      @param fockContainer the Fock container.
      @param iFockMatrix the index of Fock submatrix in Fock container.
@@ -68,7 +68,7 @@ namespace distfock { // distfock namespace
     
     /**
      Distributes vector of spherical integrals into spin restricted closed shell
-     Hatree-Fock matrix (K)
+     Hartree-Fock matrix (K)
      
      @param fockContainer the Fock container.
      @param iFockMatrix the index of Fock submatrix in Fock container.
@@ -164,7 +164,7 @@ namespace distfock { // distfock namespace
     
     /**
      Distributes vector of spherical integrals into spin unrestricted open shell
-     Hatree-Fock matrix (2J + K)
+     Hartree-Fock matrix (2J + K)
 
      @param fockContainer the Fock container.
      @param iFockMatrix the index of Fock submatrix in Fock container.

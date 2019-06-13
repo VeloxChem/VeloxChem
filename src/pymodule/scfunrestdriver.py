@@ -369,7 +369,7 @@ class ScfUnrestrictedDriver(ScfDriver):
             The molecule.
         """
 
-        self.ostream.print_header("Spin-Unrestricted Hatree-Fock:".ljust(92))
+        self.ostream.print_header("Spin-Unrestricted Hartree-Fock:".ljust(92))
         self.ostream.print_header("------------------------------".ljust(92))
         self.print_energy_components()
 
@@ -386,4 +386,4 @@ class ScfUnrestrictedDriver(ScfDriver):
             The string for spin unrestricted open shell SCF calculation.
         """
 
-        return "Spin-Unrestricted Hatree-Fock"
+        return "Spin-Unrestricted Hartree-Fock"

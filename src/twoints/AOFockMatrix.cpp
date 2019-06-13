@@ -45,7 +45,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
         
         auto ncol = aoDensityMatrix.getNumberOfColumns(i);
         
-        // spin restricted closed-shell Hatree-Fock
+        // spin restricted closed-shell Hartree-Fock
         
         if (dmtyp == denmat::rest)
         {
@@ -84,7 +84,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
             _idDensityMatrices.push_back(i);
         }
         
-        // spin unrestricted open-shell Hatree-Fock
+        // spin unrestricted open-shell Hartree-Fock
         
         if (dmtyp == denmat::unrest)
         {
@@ -105,7 +105,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
             _idDensityMatrices.push_back(i);
         }
         
-        // FIX ME: Add unrestricted open-shell Hatree-Fock
+        // FIX ME: Add unrestricted open-shell Hartree-Fock
     }
 }
 

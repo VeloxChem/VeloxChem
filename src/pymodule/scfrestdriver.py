@@ -314,7 +314,7 @@ class ScfRestrictedDriver(ScfDriver):
             The molecule.
         """
 
-        self.ostream.print_header("Spin-Restricted Hatree-Fock:".ljust(92))
+        self.ostream.print_header("Spin-Restricted Hartree-Fock:".ljust(92))
         self.ostream.print_header("----------------------------".ljust(92))
         self.print_energy_components()
 
@@ -331,4 +331,4 @@ class ScfRestrictedDriver(ScfDriver):
             The string for spin restricted closed shell SCF calculation.
         """
 
-        return "Spin-Restricted Hatree-Fock"
+        return "Spin-Restricted Hartree-Fock"

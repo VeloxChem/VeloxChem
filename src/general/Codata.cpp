@@ -17,7 +17,7 @@ getBohrValueInAngstroms()
 }
 
 double
-getHatreeValueInElectronVolts()
+getHartreeValueInElectronVolts()
 {
     return 27.21138505;
 }

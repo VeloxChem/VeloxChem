@@ -241,7 +241,7 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
         
         auto idden = _aoFock->getDensityIdentifier(i);
         
-        // closed shell restricted Hatree-Fock: 2J + K
+        // closed shell restricted Hartree-Fock: 2J + K
         
         if (fcktyp == fockmat::restjk)
         {
@@ -252,7 +252,7 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                         nKetContrPairs, iContrPair);
         }
         
-        // closed shell restricted Hatree-Fock: J
+        // closed shell restricted Hartree-Fock: J
         
         if (fcktyp == fockmat::restj)
         {
@@ -263,7 +263,7 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                        nKetContrPairs, iContrPair);
         }
         
-        // closed shell restricted Hatree-Fock: K
+        // closed shell restricted Hartree-Fock: K
         
         if (fcktyp == fockmat::restk)
         {
@@ -307,7 +307,7 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                            nKetContrPairs, iContrPair);
         }
 
-        // open shell unrestricted Hatree-Fock: 2J + K
+        // open shell unrestricted Hartree-Fock: 2J + K
         
         if (fcktyp == fockmat::unrestjk)
         {
@@ -420,7 +420,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
         
         auto idden = _aoFock->getDensityIdentifier(i);
         
-        // closed shell restricted Hatree-Fock: 2J + K
+        // closed shell restricted Hartree-Fock: 2J + K
         
         if (fcktyp == fockmat::restjk)
         {
@@ -431,7 +431,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                  nKetContrPairs, iContrPair);
         }
         
-        // closed shell restricted Hatree-Fock: J
+        // closed shell restricted Hartree-Fock: J
         
         if (fcktyp == fockmat::restj)
         {
@@ -442,7 +442,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                 nKetContrPairs, iContrPair);
         }
         
-        // closed shell restricted Hatree-Fock: K
+        // closed shell restricted Hartree-Fock: K
         
         if (fcktyp == fockmat::restk)
         {
@@ -486,7 +486,7 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                     nKetContrPairs, iContrPair);
         }
 
-        // open shell unrestricted Hatree-Fock: 2J + K
+        // open shell unrestricted Hartree-Fock: 2J + K
         
         if (fcktyp == fockmat::unrestjk)
         {

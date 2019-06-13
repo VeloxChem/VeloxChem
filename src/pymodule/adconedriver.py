@@ -19,7 +19,7 @@ from .molecularorbitals import MolecularOrbitals
 class AdcOneDriver:
     """Implements ADC(1) computation driver.
 
-    Implements ADC(1) computation schheme for Hatree-Fock reference.
+    Implements ADC(1) computation schheme for Hartree-Fock reference.
 
     Attributes
     ----------

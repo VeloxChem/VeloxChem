@@ -10,7 +10,7 @@ class ResponseDriver:
     """Implements response driver.
 
     Implements response driver for molecular property calculations using
-    conventional Hatree-Fock/Kohn-Sham response theory.
+    conventional Hartree-Fock/Kohn-Sham response theory.
 
     rank
         The rank of MPI process.
