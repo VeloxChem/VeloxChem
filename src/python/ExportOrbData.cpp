@@ -26,6 +26,7 @@
 #include "MolecularBasis.hpp"
 #include "MolecularOrbitals.hpp"
 #include "MolecularOrbitalsType.hpp"
+#include "SADGuessDriver.hpp"
 #include "StringFormat.hpp"
 
 namespace py = pybind11;
@@ -178,6 +179,16 @@ CMolecularOrbitals_broadcast(CMolecularOrbitals& self, int32_t rank, py::object 
     self.broadcast(rank, *comm_ptr);
 }
 
+// Helper function for CSADGuessDriver constructor
+
+static std::shared_ptr<CSADGuessDriver>
+CSADGuessDriver_create(py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CSADGuessDriver>(new CSADGuessDriver(*comm_ptr));
+}
+
 // Exports classes/functions in src/orbdata to python
 
 void
@@ -271,6 +282,12 @@ export_orbdata(py::module& m)
                  CMolecularOrbitals::betaOrbitals)
         .def("broadcast", &CMolecularOrbitals_broadcast)
         .def(py::self == py::self);
+
+    // CSADGuessDriver class
+
+    py::class_<CSADGuessDriver, std::shared_ptr<CSADGuessDriver>>(m, "SADGuessDriver")
+        .def(py::init(&CSADGuessDriver_create))
+        .def("compute", &CSADGuessDriver::compute);
 
     // exposing functions
 
