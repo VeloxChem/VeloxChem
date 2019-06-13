@@ -68,16 +68,17 @@ class ExcitonModelDriver:
     def update_settings(self, exciton_dict):
 
         assert_msg_critical('fragments' in exciton_dict,
-                            'ExcitonModelDriver: fragments not defined')
+                            'ExcitonModel: fragments not defined')
+
+        assert_msg_critical('atoms_per_fragment' in exciton_dict,
+                            'ExcitonModel: atoms_per_fragment not defined')
+
+        fragments = exciton_dict['fragments'].split(',')
+        atoms_per_fragment = exciton_dict['atoms_per_fragment'].split(',')
 
         self.natoms = []
-        natoms_list = exciton_dict['fragments'].replace(' ', '').split(',')
-        for x in natoms_list:
-            if '*' in x:
-                content = x.split('*')
-                self.natoms += [int(content[0])] * int(content[1])
-            elif x:
-                self.natoms.append(int(x))
+        for n, x in zip(fragments, atoms_per_fragment):
+            self.natoms += [int(x)] * int(n)
 
         if 'nstates' in exciton_dict:
             self.nstates = int(exciton_dict['nstates'])
