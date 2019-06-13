@@ -26,3 +26,5 @@ api: links
 	PYTHONPATH=$(PYTHONPATH) sphinx-apidoc -o api $(VLX_SOURCE)
 links:
 	cd ../src/pymodule && ln -sf ../../docs/mocks/veloxchemlib.py .
+serve:
+	python3 -c 'import webbrowser; webbrowser.open_new_tab("http://localhost:5000")' && python3 server.py
