@@ -10,8 +10,8 @@
 
 #include "AtomBasisSetter.hpp"
 
-namespace vlxbas { // vlxbas namespace
-    
+namespace vlxbas {  // vlxbas namespace
+
 CMolecularBasis
 getMolecularBasisEmpty()
 {
@@ -40,13 +40,13 @@ CMolecularBasis
 getMolecularBasisForLiHX()
 {
     CMolecularBasis mbas;
-        
+
     mbas.setLabel({"def2-SVP-X"});
-        
+
     mbas.addAtomBasis(getAtomBasisForLiX());
-        
+
     mbas.addAtomBasis(getAtomBasisForH());
-        
+
     return mbas;
 }
 
@@ -61,16 +61,16 @@ getMolecularBasisForHeAtom()
 
     return mbas;
 }
-    
+
 CMolecularBasis
 getMolecularBasisSPDForHeAtom()
 {
     CMolecularBasis mbas;
-        
+
     mbas.setLabel({"XTEST-SPD"});
-        
+
     mbas.addAtomBasis(getAtomBasisSPDForHe());
-        
+
     return mbas;
 }
 
@@ -143,34 +143,33 @@ getMinimalBasisForNH3CH4()
 
     return mbas;
 }
-    
+
 CMolecularBasis
 getTestBasisForLiH()
 {
     CMolecularBasis mbas;
-    
+
     mbas.setLabel({"Test-Basis"});
-    
+
     mbas.addAtomBasis(getTestBasisForLi());
-    
+
     mbas.addAtomBasis(getTestBasisForH());
-    
+
     return mbas;
 }
-    
+
 CMolecularBasis
 getReducedTestBasisForLiH()
 {
     CMolecularBasis mbas;
-    
+
     mbas.setLabel({"Reduced-Basis"});
-    
+
     mbas.addAtomBasis(getAtomBasisForLi());
-    
+
     mbas.addAtomBasis(getTestBasisForH());
-    
+
     return mbas;
 }
-    
-} // vlxbas namespace
 
+}  // namespace vlxbas

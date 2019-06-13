@@ -13,11 +13,10 @@
 
 class CGtoBlockTest : public ::testing::Test
 {
-protected:
+   protected:
+    CGtoBlockTest(){};
 
-    CGtoBlockTest() {};
-
-    virtual ~CGtoBlockTest() {};
+    virtual ~CGtoBlockTest(){};
 };
 
 #endif /* GtoBlockTest_hpp */

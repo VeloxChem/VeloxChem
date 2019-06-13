@@ -13,11 +13,10 @@
 
 class CExcitationVectorTest : public ::testing::Test
 {
-protected:
-    
-    CExcitationVectorTest() {};
-    
-    virtual ~CExcitationVectorTest() {};
+   protected:
+    CExcitationVectorTest(){};
+
+    virtual ~CExcitationVectorTest(){};
 };
 
 #endif /* ExcitationVectorTest_hpp */

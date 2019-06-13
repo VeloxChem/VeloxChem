@@ -13,11 +13,10 @@
 
 class CGenFuncTest : public ::testing::Test
 {
-protected:
-    
-    CGenFuncTest() {};
-    
-    virtual ~CGenFuncTest() {};
+   protected:
+    CGenFuncTest(){};
+
+    virtual ~CGenFuncTest(){};
 };
 
 #endif /* GenFuncTest_hpp */

@@ -13,11 +13,10 @@
 
 class CSphericalMomentumTest : public ::testing::Test
 {
-protected:
+   protected:
+    CSphericalMomentumTest(){};
 
-    CSphericalMomentumTest() {};
-
-    virtual ~CSphericalMomentumTest() {};
+    virtual ~CSphericalMomentumTest(){};
 };
 
 #endif /* SphericalMomentumTest_hpp */

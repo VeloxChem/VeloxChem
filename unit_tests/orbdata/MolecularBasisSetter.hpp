@@ -11,16 +11,16 @@
 
 #include "MolecularBasis.hpp"
 
-namespace vlxbas { // vlxbas namespace
-    
+namespace vlxbas {  // vlxbas namespace
+
 CMolecularBasis getMolecularBasisEmpty();
 
 CMolecularBasis getMolecularBasisForLiH();
-    
+
 CMolecularBasis getMolecularBasisForLiHX();
-    
+
 CMolecularBasis getMolecularBasisForHeAtom();
-    
+
 CMolecularBasis getMolecularBasisSPDForHeAtom();
 
 CMolecularBasis getMolecularBasisForH2O();
@@ -32,11 +32,11 @@ CMolecularBasis getMinimalBasisForHeAtom();
 CMolecularBasis getMinimalBasisForH2O();
 
 CMolecularBasis getMinimalBasisForNH3CH4();
-    
+
 CMolecularBasis getTestBasisForLiH();
-    
+
 CMolecularBasis getReducedTestBasisForLiH();
 
-} // vlxbas namespace
+}  // namespace vlxbas
 
 #endif /* MolecularBasisSetter_hpp */

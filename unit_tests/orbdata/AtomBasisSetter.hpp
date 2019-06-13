@@ -13,20 +13,20 @@
 
 #include "AtomBasis.hpp"
 
-namespace vlxbas { // vlxbas namespace
-    
+namespace vlxbas {  // vlxbas namespace
+
 CAtomBasis getAtomBasisEmpty();
 
 CAtomBasis getAtomBasisForH();
 
 CAtomBasis getAtomBasisForLi();
-    
+
 CAtomBasis getAtomBasisForLiX();
 
 CAtomBasis getNormalizedAtomBasisForH();
 
 CAtomBasis getNormalizedAtomBasisForHe();
-    
+
 CAtomBasis getAtomBasisSPDForHe();
 
 CAtomBasis getNormalizedAtomBasisForO();
@@ -42,11 +42,11 @@ CAtomBasis getMinimalBasisForC();
 CAtomBasis getMinimalBasisForN();
 
 CAtomBasis getMinimalBasisForO();
-    
+
 CAtomBasis getTestBasisForH();
-    
+
 CAtomBasis getTestBasisForLi();
 
-} // vlxbas namespace
+}  // namespace vlxbas
 
 #endif /* AtomBasisSetter_hpp */

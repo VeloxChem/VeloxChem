@@ -13,11 +13,10 @@
 
 class CSADGuessDriverTest : public ::testing::Test
 {
-protected:
-    
-    CSADGuessDriverTest() {};
-    
-    virtual ~CSADGuessDriverTest() {};
+   protected:
+    CSADGuessDriverTest(){};
+
+    virtual ~CSADGuessDriverTest(){};
 };
 
 #endif /* SADGuessDriverTest_hpp */

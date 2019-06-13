@@ -13,11 +13,10 @@
 
 class CAtomBasisTest : public ::testing::Test
 {
-protected:
+   protected:
+    CAtomBasisTest(){};
 
-    CAtomBasisTest() {};
-
-    virtual ~CAtomBasisTest() {};
+    virtual ~CAtomBasisTest(){};
 };
 
 #endif /* AtomBasisTest_hpp */
