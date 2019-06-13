@@ -13,11 +13,10 @@
 
 class CLinearMomentumMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CLinearMomentumMatrixTest() {};
-    
-    virtual ~CLinearMomentumMatrixTest() {};
+   protected:
+    CLinearMomentumMatrixTest(){};
+
+    virtual ~CLinearMomentumMatrixTest(){};
 };
 
 #endif /* LinearMomentumMatrixTest_hpp */

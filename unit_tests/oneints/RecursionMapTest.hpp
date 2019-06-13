@@ -13,11 +13,10 @@
 
 class CRecursionMapTest : public ::testing::Test
 {
-protected:
-    
-    CRecursionMapTest() {};
-    
-    virtual ~CRecursionMapTest() {};
+   protected:
+    CRecursionMapTest(){};
+
+    virtual ~CRecursionMapTest(){};
 };
 
 #endif /* RecursionMapTest_hpp */

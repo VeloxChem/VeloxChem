@@ -13,11 +13,10 @@
 
 class CElectricDipoleIntegralsDriverTest : public ::testing::Test
 {
-protected:
-    
-    CElectricDipoleIntegralsDriverTest() {};
-    
-    virtual ~CElectricDipoleIntegralsDriverTest() {};
+   protected:
+    CElectricDipoleIntegralsDriverTest(){};
+
+    virtual ~CElectricDipoleIntegralsDriverTest(){};
 };
 
 #endif /* ElectricDipoleIntegralsDriverTest_hpp */

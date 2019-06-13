@@ -13,11 +13,10 @@
 
 class CLinearMomentumIntegralsDriverTest : public ::testing::Test
 {
-protected:
-    
-    CLinearMomentumIntegralsDriverTest() {};
-    
-    virtual ~CLinearMomentumIntegralsDriverTest() {};
+   protected:
+    CLinearMomentumIntegralsDriverTest(){};
+
+    virtual ~CLinearMomentumIntegralsDriverTest(){};
 };
 
 #endif /* LinearMomentumIntegralsDriverTest_hpp */

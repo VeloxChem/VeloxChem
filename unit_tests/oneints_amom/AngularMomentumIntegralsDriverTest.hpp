@@ -13,11 +13,10 @@
 
 class CAngularMomentumIntegralsDriverTest : public ::testing::Test
 {
-protected:
-    
-    CAngularMomentumIntegralsDriverTest() {};
-    
-    virtual ~CAngularMomentumIntegralsDriverTest() {};
+   protected:
+    CAngularMomentumIntegralsDriverTest(){};
+
+    virtual ~CAngularMomentumIntegralsDriverTest(){};
 };
 
 #endif /* AngularMomentumIntegralsDriverTest_hpp */

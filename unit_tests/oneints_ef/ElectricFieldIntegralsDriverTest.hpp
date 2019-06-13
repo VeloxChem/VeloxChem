@@ -13,11 +13,10 @@
 
 class CElectricFieldIntegralsDriverTest : public ::testing::Test
 {
-protected:
-    
-    CElectricFieldIntegralsDriverTest() {};
-    
-    virtual ~CElectricFieldIntegralsDriverTest() {};
+   protected:
+    CElectricFieldIntegralsDriverTest(){};
+
+    virtual ~CElectricFieldIntegralsDriverTest(){};
 };
 
 #endif /* ElectricFieldIntegralsDriverTest_hpp */

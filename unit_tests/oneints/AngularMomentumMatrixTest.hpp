@@ -13,11 +13,10 @@
 
 class CAngularMomentumMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CAngularMomentumMatrixTest() {};
-    
-    virtual ~CAngularMomentumMatrixTest() {};
+   protected:
+    CAngularMomentumMatrixTest(){};
+
+    virtual ~CAngularMomentumMatrixTest(){};
 };
 
 #endif /* AngularMomentumMatrixTest_hpp */

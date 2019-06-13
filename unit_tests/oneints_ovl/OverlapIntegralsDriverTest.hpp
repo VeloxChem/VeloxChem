@@ -13,11 +13,10 @@
 
 class COverlapIntegralsDriverTest : public ::testing::Test
 {
-protected:
-    
-    COverlapIntegralsDriverTest() {};
-    
-    virtual ~COverlapIntegralsDriverTest() {};
+   protected:
+    COverlapIntegralsDriverTest(){};
+
+    virtual ~COverlapIntegralsDriverTest(){};
 };
 
 #endif /* OverlapIntegralsDriverTest_hpp */

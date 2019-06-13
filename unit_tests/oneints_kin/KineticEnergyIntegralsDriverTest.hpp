@@ -13,11 +13,10 @@
 
 class CKineticEnergyIntegralsDriverTest : public ::testing::Test
 {
-protected:
-    
-    CKineticEnergyIntegralsDriverTest() {};
-    
-    virtual ~CKineticEnergyIntegralsDriverTest() {};
+   protected:
+    CKineticEnergyIntegralsDriverTest(){};
+
+    virtual ~CKineticEnergyIntegralsDriverTest(){};
 };
 
 #endif /* KineticEnergyIntegralsDriverTest_hpp */

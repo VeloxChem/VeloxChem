@@ -13,11 +13,10 @@
 
 class COneIntsDistTypeTest : public ::testing::Test
 {
-protected:
-    
-    COneIntsDistTypeTest() {};
-    
-    virtual ~COneIntsDistTypeTest() {};
+   protected:
+    COneIntsDistTypeTest(){};
+
+    virtual ~COneIntsDistTypeTest(){};
 };
 
 #endif /* OneIntsDistTypeTest_hpp */

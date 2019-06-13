@@ -13,12 +13,10 @@
 
 class COneIntsDistributionTest : public ::testing::Test
 {
-protected:
-    
-    COneIntsDistributionTest() {};
-    
-    virtual ~COneIntsDistributionTest() {};
-};
+   protected:
+    COneIntsDistributionTest(){};
 
+    virtual ~COneIntsDistributionTest(){};
+};
 
 #endif /* OneIntsDistributionTest_hpp */

@@ -13,11 +13,10 @@
 
 class CNuclearPotentialIntegralsDriverTest : public ::testing::Test
 {
-protected:
-    
-    CNuclearPotentialIntegralsDriverTest() {};
-    
-    virtual ~CNuclearPotentialIntegralsDriverTest() {};
+   protected:
+    CNuclearPotentialIntegralsDriverTest(){};
+
+    virtual ~CNuclearPotentialIntegralsDriverTest(){};
 };
 
 #endif /* NuclearPotentialIntegralsDriverTest_hpp */

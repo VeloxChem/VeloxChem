@@ -13,11 +13,10 @@
 
 class CRecursionFunctionTest : public ::testing::Test
 {
-protected:
-    
-    CRecursionFunctionTest() {};
-    
-    virtual ~CRecursionFunctionTest() {};
+   protected:
+    CRecursionFunctionTest(){};
+
+    virtual ~CRecursionFunctionTest(){};
 };
 
 #endif /* RecursionFunctionTest_hpp */

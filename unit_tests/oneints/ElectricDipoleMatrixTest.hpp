@@ -13,11 +13,10 @@
 
 class CElectricDipoleMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CElectricDipoleMatrixTest() {};
-    
-    virtual ~CElectricDipoleMatrixTest() {};
+   protected:
+    CElectricDipoleMatrixTest(){};
+
+    virtual ~CElectricDipoleMatrixTest(){};
 };
 
 #endif /* ElectricDipoleMatrixTest_hpp */
