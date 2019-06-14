@@ -221,8 +221,9 @@ CThreeCenterElectronRepulsionIntegralsDriver::compElectronRepulsionForGtoBlocks(
         
         // contract primitive electron repulsion integrals
         
-        genfunc::contract(cbuffer, pbuffer, t0vec, t0idx, vrrvec, vrridx,
-                          bragtos, ketpairs, i);
+        // FIX ME!!!
+        //genfunc::contract(cbuffer, pbuffer, t0vec, t0idx, vrrvec, vrridx,
+        //                  bragtos, ketpairs, i);
         
         // transform bra side to spherical form
         

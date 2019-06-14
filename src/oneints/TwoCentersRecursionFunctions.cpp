@@ -550,5 +550,65 @@ obRecursionForElectricFieldGradient(const CRecursionTerm& recursionTerm)
 
     return obvec;
 }
+    
+std::vector<CRecursionTerm>
+obRecursionForElectronRepulsion(const CRecursionTerm& recursionTerm)
+{
+    std::vector<CRecursionTerm> obvec;
+    
+    auto rterm = recursionTerm;
+    
+    if (recursionTerm.isBraOfZeroOrder())
+    {
+        auto k1term = rterm.ketShift(-1, 0);
+        
+        if (k1term.isValid())
+        {
+            obvec.push_back(k1term);
+            
+            obvec.push_back(k1term.orderShift(1));
+            
+            auto k2term = k1term.ketShift(-1, 0);
+            
+            if (k2term.isValid())
+            {
+                obvec.push_back(k2term);
+                
+                obvec.push_back(k2term.orderShift(1));
+            }
+        }
+    }
+    else
+    {
+        auto b1term = rterm.braShift(-1, 0);
+        
+        if (b1term.isValid())
+        {
+            obvec.push_back(b1term);
+            
+            obvec.push_back(b1term.orderShift(1));
+            
+            auto b2term = b1term.braShift(-1, 0);
+            
+            if (b2term.isValid())
+            {
+                obvec.push_back(b2term);
+                
+                obvec.push_back(b2term.orderShift(1));
+            }
+            
+            auto k1term = b1term.ketShift(-1, 0);
+            
+            if (k1term.isValid())
+            {
+                obvec.push_back(k1term);
+                
+                obvec.push_back(k1term.orderShift(1));
+            }
+        }
+    }
+    
+    return obvec;
+}
 
 }  // namespace t2crecfunc
