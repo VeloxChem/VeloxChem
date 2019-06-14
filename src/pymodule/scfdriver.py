@@ -550,7 +550,21 @@ class ScfDriver:
             energy).
         """
 
-        return (0.0, 0.0, 0.0)
+        if self.rank == mpi_master():
+            # electronic, kinetic, nuclear energy
+            e_ee = fock_mat.get_energy(0, den_mat, 0)
+            e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
+            e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
+        else:
+            e_ee = 0.0
+            e_kin = 0.0
+            e_en = 0.0
+
+        e_ee = self.comm.bcast(e_ee, root=mpi_master())
+        e_kin = self.comm.bcast(e_kin, root=mpi_master())
+        e_en = self.comm.bcast(e_en, root=mpi_master())
+
+        return (e_ee, e_kin, e_en)
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
         """Computes full Fock/Kohn-Sham matrix.
@@ -569,7 +583,8 @@ class ScfDriver:
             The nuclear potential matrix.
         """
 
-        return
+        if self.rank == mpi_master():
+            fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """Computes electronic gradient.
@@ -661,6 +676,7 @@ class ScfDriver:
         -------
             The molecular orbitals.
         """
+
         return MolecularOrbitals()
 
     def gen_new_density(self, molecule):
@@ -676,6 +692,10 @@ class ScfDriver:
         -------
             The density matrix.
         """
+
+        if self.rank == mpi_master():
+            return self.mol_orbs.get_density(molecule)
+
         return AODensityMatrix()
 
     def get_dyn_threshold(self, e_grad):
@@ -775,7 +795,10 @@ class ScfDriver:
             The molecule.
         """
 
-        return
+        valstr = self.get_scf_type() + ':'
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        self.print_energy_components()
 
     def print_header(self):
         """Prints SCF setup header to output stream.

@@ -3,7 +3,6 @@ import numpy as np
 from .veloxchemlib import mpi_master
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
-from .aodensitymatrix import AODensityMatrix
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
 
@@ -26,65 +25,6 @@ class ScfRestrictedDriver(ScfDriver):
         super().__init__(comm, ostream)
 
         self.restricted = True
-
-    def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
-        """Computes spin restricted closed shell SCF energy components.
-
-        Computes spin restricted closed shell SCF energy components: electronic
-        energy, kinetic energy, and nuclear potential energy. Overloaded base
-        class method.
-
-        Parameters
-        ----------
-        fock_mat
-            The Fock/Kohn-Sham matrix (only 2e-part).
-        kin_mat
-            The kinetic energy matrix.
-        npot_mat
-            The nuclear potential matrix.
-        den_mat
-            The density matrix.
-        Returns
-        -------
-            The tuple (electronic energy, kinetic energy, nuclear potential
-            energy).
-        """
-
-        if self.rank == mpi_master():
-            # electronic, kinetic, nuclear energy
-            e_ee = fock_mat.get_energy(0, den_mat, 0)
-            e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
-            e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
-        else:
-            e_ee = 0.0
-            e_kin = 0.0
-            e_en = 0.0
-
-        e_ee = self.comm.bcast(e_ee, root=mpi_master())
-        e_kin = self.comm.bcast(e_kin, root=mpi_master())
-        e_en = self.comm.bcast(e_en, root=mpi_master())
-
-        return (e_ee, e_kin, e_en)
-
-    def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
-        """Computes full spin restricted closed shell Fock/Kohn-Sham matrix.
-
-        Computes full spin restricted closed shell Fock/Kohn-Sham matrix by
-        adding to 2e-part of Fock/Kohn-Sham matrix the kinetic energy and
-        nuclear potential matrices. Overloaded base class method.
-
-        Parameters
-        ----------
-        fock_mat
-            The Fock/Kohn-Sham matrix (2e-part).
-        kin_mat
-            The kinetic energy matrix.
-        npot_mat
-            The nuclear potential matrix.
-        """
-
-        if self.rank == mpi_master():
-            fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """Computes spin restricted closed shell electronic gradient.
@@ -109,17 +49,15 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             smat = ovl_mat.to_numpy()
-            dmat = den_mat.alpha_to_numpy(0)
-            fmat = fock_mat.to_numpy(0)
             tmat = oao_mat.to_numpy()
 
-            fa = np.matmul(fmat, np.matmul(dmat, smat))
-            fb = np.matmul(smat, np.matmul(dmat, fmat))
+            dmat = den_mat.alpha_to_numpy(0)
+            fmat = fock_mat.to_numpy(0)
 
-            # fx = np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat))
+            fds = np.matmul(fmat, np.matmul(dmat, smat))
 
             e_grad = 2.0 * np.linalg.norm(
-                np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat)))
+                np.matmul(tmat.T, np.matmul(fds - fds.T, tmat)))
         else:
             e_grad = 0.0
 
@@ -281,44 +219,6 @@ class ScfRestrictedDriver(ScfDriver):
             return MolecularOrbitals([orb_coefs], [eigs], molorb.rest)
 
         return MolecularOrbitals()
-
-    def gen_new_density(self, molecule):
-        """Generates spin restricted closed shell density matrix.
-
-        Generates spin restricted closed shell density matrix from current
-        spin restricted molecular orbitals. Overloaded base class method.
-
-        Parameters
-        ----------
-        molecule
-            The molecule.
-        Returns
-        -------
-            The density matrix.
-        """
-
-        if self.rank == mpi_master():
-
-            return self.mol_orbs.get_density(molecule)
-
-        return AODensityMatrix()
-
-    def print_scf_energy(self):
-        """Prints SCF energy information to output stream.
-
-        Prints SCF energy information to output stream.
-
-        Parameters
-        ----------
-        molecule
-            The molecule.
-        """
-
-        self.ostream.print_header("Spin-Restricted Hartree-Fock:".ljust(92))
-        self.ostream.print_header("----------------------------".ljust(92))
-        self.print_energy_components()
-
-        return
 
     def get_scf_type(self):
         """Gets string for spin restricted closed shell SCF calculation.
