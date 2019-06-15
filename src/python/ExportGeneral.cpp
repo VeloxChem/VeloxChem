@@ -178,6 +178,8 @@ export_general(py::module& m)
 
     m.def("hartree_in_ev", &units::getHartreeValueInElectronVolts);
 
+    m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS);
+
     m.def("to_angular_momentum", &string_to_angular_momentum);
 
     m.def("to_angular_momentum", &integer_to_angular_momentum);

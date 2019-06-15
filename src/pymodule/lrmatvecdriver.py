@@ -187,7 +187,6 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
     if operator == 'dipole':
         xc, yc, zc = molecule.center_of_nuclear_charge()
         dipole_drv = ElectricDipoleIntegralsDriver(comm)
-        dipole_drv.set_origin(xc, yc, zc)
         dipole_mats = dipole_drv.compute(molecule, basis)
 
         if rank == mpi_master():
@@ -209,7 +208,6 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
     elif operator in ['angular_momentum', 'angular momentum']:
         xc, yc, zc = molecule.center_of_nuclear_charge()
         angmom_drv = AngularMomentumIntegralsDriver(comm)
-        angmom_drv.set_origin(xc, yc, zc)
         angmom_mats = angmom_drv.compute(molecule, basis)
 
         if rank == mpi_master():

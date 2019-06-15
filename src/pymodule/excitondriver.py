@@ -13,6 +13,7 @@ from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import get_dimer_ao_indices
 from .molecule import Molecule
 from .aodensitymatrix import AODensityMatrix
@@ -171,14 +172,12 @@ class ExcitonModelDriver:
 
             # 1e integral
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_drv.set_origin(*self.nuc_chg_center)
             dipole_mats = dipole_drv.compute(monomer, basis)
 
             linmom_drv = LinearMomentumIntegralsDriver(self.comm)
             linmom_mats = linmom_drv.compute(monomer, basis)
 
             angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_drv.set_origin(*self.nuc_chg_center)
             angmom_mats = angmom_drv.compute(monomer, basis)
 
             if self.rank == mpi_master():
@@ -289,14 +288,12 @@ class ExcitonModelDriver:
                 npot_mat = npot_drv.compute(dimer, basis)
 
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                dipole_drv.set_origin(*self.nuc_chg_center)
                 dipole_mats = dipole_drv.compute(dimer, basis)
 
                 linmom_drv = LinearMomentumIntegralsDriver(self.comm)
                 linmom_mats = linmom_drv.compute(dimer, basis)
 
                 angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-                angmom_drv.set_origin(*self.nuc_chg_center)
                 angmom_mats = angmom_drv.compute(dimer, basis)
 
                 if self.rank == mpi_master():
@@ -658,25 +655,29 @@ class ExcitonModelDriver:
             adia_magn_trans_dipoles = np.matmul(eigvecs.T,
                                                 self.magn_trans_dipoles)
 
+            for s in range(adia_velo_trans_dipoles.shape[0]):
+                adia_velo_trans_dipoles[s, :] /= -eigvals[s]
+                adia_magn_trans_dipoles[s, :] *= 0.5
+
             valstr = 'Adiabatic excited states:'
             self.ostream.print_header(valstr.ljust(92))
             self.ostream.print_blank()
 
+            osc_str = []
+            rot_str = []
+
             for i, e in enumerate(eigvals):
-                enestr = 'S{}'.format(i + 1)
                 dip_strength = np.sum(adia_trans_dipoles[i, :]**2)
-                osc_strength = 2.0 / 3.0 * dip_strength * e
+                f = 2.0 / 3.0 * dip_strength * e
+                osc_str.append(f)
 
-                rot_strength = -np.dot(adia_velo_trans_dipoles[i, :],
-                                       adia_magn_trans_dipoles[i, :]) / e
+                R = np.vdot(adia_velo_trans_dipoles[i, :],
+                            adia_magn_trans_dipoles[i, :])
+                R *= rotatory_strength_in_cgs()
+                rot_str.append(R)
 
-                valstr = '{:<6s} {:12.6f} a.u. {:11.5f} eV'.format(
-                    enestr, e, e * hartree_in_ev())
-                valstr += '    osc.str.{:10.4f}'.format(osc_strength)
-                valstr += '    rot.str.{:12.6f} a.u.'.format(rot_strength)
-                self.ostream.print_header(valstr.ljust(92))
-
-            self.ostream.print_blank()
+            self.print_absorption('One-Photon Absorption', eigvals, osc_str)
+            self.print_ecd('Electronic Circular Dichroism', rot_str)
 
             valstr = 'Characters of excited states:'
             self.ostream.print_header(valstr.ljust(92))
@@ -713,13 +714,13 @@ class ExcitonModelDriver:
 
         hf = h5py.File(self.checkpoint_file, 'w')
         hf.create_dataset('hamiltonian', data=self.H, compression='gzip')
-        hf.create_dataset('transition_dipoles',
+        hf.create_dataset('electric_transition_dipoles',
                           data=self.trans_dipoles,
                           compression='gzip')
-        hf.create_dataset('transition_velocity_dipoles',
+        hf.create_dataset('velocity_transition_dipoles',
                           data=self.velo_trans_dipoles,
                           compression='gzip')
-        hf.create_dataset('transition_magnetic_dipoles',
+        hf.create_dataset('magnetic_transition_dipoles',
                           data=self.magn_trans_dipoles,
                           compression='gzip')
         hf.create_dataset('eigenvalues', data=eigenvalues, compression='gzip')
@@ -760,4 +761,29 @@ class ExcitonModelDriver:
         for i, n in enumerate(self.natoms):
             valstr = 'Monomer  {}  has  {}  atoms'.format(i + 1, n)
             self.ostream.print_header(valstr.ljust(72))
+        self.ostream.print_blank()
+
+    def print_absorption(self, title, eigvals, osc_str):
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, (e, f) in enumerate(zip(eigvals, osc_str)):
+            valstr = 'Excited State {:>5s}: '.format('S' + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
+            valstr += '    Osc.Str. {:9.4f}'.format(f)
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def print_ecd(self, title, rot_str):
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, R in enumerate(rot_str):
+            valstr = 'Excited State {:>5s}: '.format('S' + str(s + 1))
+            valstr += '    Rot.Str. {:11.4f}'.format(R)
+            valstr += '    [10**(-40) (esu**2)*(cm**2)]'
+            self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()

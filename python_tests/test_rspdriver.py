@@ -44,7 +44,7 @@ class TestRspDriver(unittest.TestCase):
 
             reigs = tda_results['eigenvalues']
             osc_strs = tda_results['oscillator_strengths']
-            trans_dipoles = tda_results['transition_dipoles']
+            trans_dipoles = tda_results['electric_transition_dipoles']
 
             ref_eigs = np.array([0.207436, 0.257474, 0.368358])
             ref_osc_strs = np.array([0.0000, 0.0003, 0.2797])

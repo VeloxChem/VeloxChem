@@ -6,6 +6,7 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
+from .veloxchemlib import rotatory_strength_in_cgs
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
@@ -217,37 +218,51 @@ class LinearResponseEigenSolver:
             V_linmom = {op: V for op, V in zip('xyz', linmom_rhs)}
             V_angmom = {op: V for op, V in zip('xyz', angmom_rhs)}
 
-            tms = {}
+            elec_tms = {}
             velo_tms = {}
             magn_tms = {}
 
-            eigvals = [s[0] for s in excitations]
+            eigvals = np.array([s[0] for s in excitations])
             eigvecs = [s[1] for s in excitations]
 
             for comp in 'xyz':
-                tms[comp] = np.array(
+                elec_tms[comp] = np.array(
                     [np.dot(V_dipole[comp], vec) for vec in eigvecs])
-                velo_tms[comp] = np.array(
+                velo_tms[comp] = -1.0 / eigvals * np.array(
                     [np.dot(V_linmom[comp], vec) for vec in eigvecs])
-                magn_tms[comp] = np.array(
+                magn_tms[comp] = 0.5 * np.array(
                     [np.dot(V_angmom[comp], vec) for vec in eigvecs])
 
-            trans_dipoles = [
-                np.array([tms['x'][s], tms['y'][s], tms['z'][s]])
+            elec_trans_dipoles = [
+                np.array([elec_tms['x'][s], elec_tms['y'][s], elec_tms['z'][s]])
                 for s in range(self.nstates)
             ]
 
-            osc = 2.0 / 3.0 * np.array(eigvals) * (tms['x']**2 + tms['y']**2 +
-                                                   tms['z']**2)
+            velo_trans_dipoles = [
+                np.array([velo_tms['x'][s], velo_tms['y'][s], velo_tms['z'][s]])
+                for s in range(self.nstates)
+            ]
 
-            rot_vel = -(velo_tms['x'] * magn_tms['x'] +
-                        velo_tms['y'] * magn_tms['y'] +
-                        velo_tms['z'] * magn_tms['z']) / np.array(eigvals)
+            magn_trans_dipoles = [
+                np.array([magn_tms['x'][s], magn_tms['y'][s], magn_tms['z'][s]])
+                for s in range(self.nstates)
+            ]
+
+            osc = 2.0 / 3.0 * eigvals * (elec_tms['x']**2 + elec_tms['y']**2 +
+                                         elec_tms['z']**2)
+
+            rot_vel = (velo_tms['x'] * magn_tms['x'] +
+                       velo_tms['y'] * magn_tms['y'] +
+                       velo_tms['z'] * magn_tms['z'])
+
+            rot_vel *= rotatory_strength_in_cgs()
 
             return {
-                'eigenvalues': np.array(eigvals),
+                'eigenvalues': eigvals,
                 'eigenvectors': np.array(eigvecs).T,
-                'transition_dipoles': trans_dipoles,
+                'electric_transition_dipoles': elec_trans_dipoles,
+                'velocity_transition_dipoles': velo_trans_dipoles,
+                'magnetic_transition_dipoles': magn_trans_dipoles,
                 'oscillator_strengths': osc,
                 'rotatory_strengths': rot_vel,
             }

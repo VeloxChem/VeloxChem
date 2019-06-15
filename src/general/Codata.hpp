@@ -25,6 +25,13 @@ double getBohrValueInAngstroms();
  */
 double getHartreeValueInElectronVolts();
 
+/**
+ Gets convertion factor for rotatory strength (a.u.->cgs)
+
+ @return the conversion factor.
+ */
+double getRotatoryStrengthInCGS();
+
 }  // namespace units
 
 #endif /* Codata_hpp */
