@@ -118,8 +118,7 @@ contract(CMemBlock2D<double>&        contrData,
          CMemBlock2D<double>&        primData,
          const CVecThreeIndexes&     contrPattern,
          const std::vector<int32_t>& contrIndexes,
-         const CVecThreeIndexes&     primPattern,
-         const std::vector<int32_t>& primIndexes,
+         const CRecursionMap&        recursionMap,
          const CGtoBlock&            braGtoBlock,
          const CGtoPairsBlock&       ketGtoPairsBlock,
          const int32_t               iContrGto)
@@ -152,7 +151,8 @@ contract(CMemBlock2D<double>&        contrData,
 
         auto cidx = genfunc::findTripleIndex(contrIndexes, contrPattern, tidx);
 
-        auto pidx = genfunc::findTripleIndex(primIndexes, primPattern, tidx);
+        auto pidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, {tidx.first(), -1, -1, -1},
+                                                {tidx.second(), -1, -1, -1}, 1, 1, 0));
 
         // set up number angular components
 
@@ -195,8 +195,7 @@ contract(CMemBlock2D<double>&        contrData,
          CMemBlock2D<double>&        primData,
          const CVecThreeIndexes&     contrPattern,
          const std::vector<int32_t>& contrIndexes,
-         const CVecThreeIndexes&     primPattern,
-         const std::vector<int32_t>& primIndexes,
+         const CRecursionMap&        recursionMap,
          const CGtoPairsBlock&       braGtoPairsBlock,
          const CGtoPairsBlock&       ketGtoPairsBlock,
          const int32_t               nKetPrimPairs,
@@ -231,7 +230,8 @@ contract(CMemBlock2D<double>&        contrData,
 
         auto cidx = genfunc::findTripleIndex(contrIndexes, contrPattern, tidx);
 
-        auto pidx = genfunc::findTripleIndex(primIndexes, primPattern, {tidx.first(), tidx.third(), 0});
+        auto pidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, {tidx.first(), -1, -1, -1},
+                                                               {tidx.third(), -1, -1, -1}, 1, 1, 0));
 
         // set up number angular components
 

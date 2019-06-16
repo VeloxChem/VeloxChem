@@ -79,6 +79,14 @@ std::vector<CRecursionTerm> obRecursionForElectricField(const CRecursionTerm& re
  @return the vector of recursion term objects.
  */
 std::vector<CRecursionTerm> obRecursionForElectricFieldGradient(const CRecursionTerm& recursionTerm);
+    
+/**
+ Applies Obara-Saika vertical electron repulsion recursion to recursion term object.
+     
+ @param recursionTerm the recursion term object.
+ @return the vector of recursion term objects.
+*/
+std::vector<CRecursionTerm> obRecursionForElectronRepulsion(const CRecursionTerm& recursionTerm);
 
 }  // namespace t2crecfunc
 

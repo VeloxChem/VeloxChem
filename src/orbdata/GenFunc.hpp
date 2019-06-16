@@ -20,6 +20,7 @@
 #include "SparseMatrix.hpp"
 #include "SphericalMomentum.hpp"
 #include "VecIndexes.hpp"
+#include "RecursionMap.hpp"
 
 namespace genfunc {  // genfunc namespace
 
@@ -72,8 +73,7 @@ void contract(CMemBlock2D<double>& contrData,
  @param primData the primitive data vectors.
  @param contrPattern the contracted data vectors distribution pattern.
  @param contrIndexes the contracted data vectors indexing pattern.
- @param primPattern the primitive data vectors distribution pattern.
- @param primIndexes the primitive data vectors indexing pattern,
+ @param recursionMap the recursion map for primitive integrals.
  @param braGtoBlock the GTOs block on bra side.
  @param ketGtoPairsBlock the GTOs pairs block on ket side.
  @param iContrGto the index of contracted GTO on bra side.
@@ -82,8 +82,7 @@ void contract(CMemBlock2D<double>&        contrData,
               CMemBlock2D<double>&        primData,
               const CVecThreeIndexes&     contrPattern,
               const std::vector<int32_t>& contrIndexes,
-              const CVecThreeIndexes&     primPattern,
-              const std::vector<int32_t>& primIndexes,
+              const CRecursionMap&        recursionMap,
               const CGtoBlock&            braGtoBlock,
               const CGtoPairsBlock&       ketGtoPairsBlock,
               const int32_t               iContrGto);
@@ -97,8 +96,7 @@ void contract(CMemBlock2D<double>&        contrData,
  @param primData the primitive data vectors.
  @param contrPattern the contracted data vectors distribution pattern.
  @param contrIndexes the contracted data vectors indexing pattern.
- @param primPattern the primitive data vectors distribution pattern.
- @param primIndexes the primitive data vectors indexing pattern,
+ @param recursionMap the recursion map for primitive integrals.
  @param braGtoPairsBlock the GTOs pairs block on bra side.
  @param ketGtoPairsBlock the GTOs pairs block on ket side.
  @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
@@ -109,8 +107,7 @@ void contract(CMemBlock2D<double>&        contrData,
               CMemBlock2D<double>&        primData,
               const CVecThreeIndexes&     contrPattern,
               const std::vector<int32_t>& contrIndexes,
-              const CVecThreeIndexes&     primPattern,
-              const std::vector<int32_t>& primIndexes,
+              const CRecursionMap&        recursionMap,
               const CGtoPairsBlock&       braGtoPairsBlock,
               const CGtoPairsBlock&       ketGtoPairsBlock,
               const int32_t               nKetPrimPairs,
