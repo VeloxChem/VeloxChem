@@ -201,10 +201,10 @@ class TDAExciDriver:
                 dipole_ints, eigvecs, mo_occ, mo_vir)
 
             velo_trans_dipoles = self.comp_velo_trans_dipoles(
-                dipole_ints, eigvals, eigvecs, mo_occ, mo_vir)
+                linmom_ints, eigvals, eigvecs, mo_occ, mo_vir)
 
             magn_trans_dipoles = self.comp_magn_trans_dipoles(
-                dipole_ints, eigvecs, mo_occ, mo_vir)
+                angmom_ints, eigvecs, mo_occ, mo_vir)
 
             oscillator_strengths = self.comp_oscillator_strengths(
                 elec_trans_dipoles, eigvals)
