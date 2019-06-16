@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 from .veloxchemlib import Molecule
 
@@ -9,7 +10,7 @@ def _Molecule_read_str(xyzstr, units='angs'):
     labels = []
     coords = []
 
-    for line in xyzstr.strip().split('\n'):
+    for line in xyzstr.strip().split(os.linesep):
         if line:
             content = line.split()
             labels.append(content[0])
@@ -27,7 +28,7 @@ def _Molecule_read_xyz(xyzfile):
         natoms = int(f_xyz.readline().split()[0])
         f_xyz.readline()
         for a in range(natoms):
-            xyzstr += f_xyz.readline().strip() + '\n'
+            xyzstr += f_xyz.readline().strip() + os.linesep
 
     return Molecule.read_str(xyzstr, 'angs')
 
