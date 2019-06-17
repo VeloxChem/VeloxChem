@@ -225,6 +225,16 @@ CMolecule_elem_ids_to_numpy(const CMolecule& self)
     return vlx_general::pointer_to_numpy(self.getIdsElemental(), self.getNumberOfAtoms());
 }
 
+// Helper function for getting masses for molecule
+
+static py::array_t<double>
+CMolecule_masses_to_numpy(const CMolecule& self)
+{
+    auto masses = self.getMasses();
+
+    return vlx_general::pointer_to_numpy(masses.data(), masses.size());
+}
+
 // Helper function for getting elemental composition
 
 static py::list
@@ -318,6 +328,7 @@ export_moldata(py::module& m)
         .def("z_to_numpy", &CMolecule_z_to_numpy)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
+        .def("masses_to_numpy", &CMolecule_masses_to_numpy)
         .def("get_elemental_composition", &CMolecule_get_elem_comp)
         .def("broadcast", &CMolecule_broadcast)
         .def(py::self == py::self);

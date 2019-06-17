@@ -436,6 +436,12 @@ CMolecule::getCharges() const
 }
 
 CMemBlock<double>
+CMolecule::getMasses() const
+{
+    return _atomMasses;
+}
+
+CMemBlock<double>
 CMolecule::getMinDistances() const
 {
     // allocate and initialize distances

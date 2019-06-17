@@ -32,7 +32,7 @@ class ExcitonModelDriver:
         self.trans_dipoles = None
         self.velo_trans_dipoles = None
         self.magn_trans_dipoles = None
-        self.nuc_chg_center = None
+        self.center_of_mass = None
 
         self.state_info = None
 
@@ -120,7 +120,7 @@ class ExcitonModelDriver:
         self.trans_dipoles = np.zeros((total_num_states, 3))
         self.velo_trans_dipoles = np.zeros((total_num_states, 3))
         self.magn_trans_dipoles = np.zeros((total_num_states, 3))
-        self.nuc_chg_center = molecule.center_of_nuclear_charge()
+        self.center_of_mass = molecule.center_of_mass()
 
         self.state_info = [{} for s in range(total_num_states)]
 
@@ -172,12 +172,14 @@ class ExcitonModelDriver:
 
             # 1e integral
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+            dipole_drv.set_origin(*self.center_of_mass)
             dipole_mats = dipole_drv.compute(monomer, basis)
 
             linmom_drv = LinearMomentumIntegralsDriver(self.comm)
             linmom_mats = linmom_drv.compute(monomer, basis)
 
             angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+            angmom_drv.set_origin(*self.center_of_mass)
             angmom_mats = angmom_drv.compute(monomer, basis)
 
             if self.rank == mpi_master():
@@ -288,12 +290,14 @@ class ExcitonModelDriver:
                 npot_mat = npot_drv.compute(dimer, basis)
 
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                dipole_drv.set_origin(*self.center_of_mass)
                 dipole_mats = dipole_drv.compute(dimer, basis)
 
                 linmom_drv = LinearMomentumIntegralsDriver(self.comm)
                 linmom_mats = linmom_drv.compute(dimer, basis)
 
                 angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+                angmom_drv.set_origin(*self.center_of_mass)
                 angmom_mats = angmom_drv.compute(dimer, basis)
 
                 if self.rank == mpi_master():

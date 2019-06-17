@@ -185,7 +185,6 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
         ], 'get_rhs: unsupported operator {}'.format(operator))
 
     if operator == 'dipole':
-        xc, yc, zc = molecule.center_of_nuclear_charge()
         dipole_drv = ElectricDipoleIntegralsDriver(comm)
         dipole_mats = dipole_drv.compute(molecule, basis)
 
@@ -206,7 +205,6 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
             integrals = tuple()
 
     elif operator in ['angular_momentum', 'angular momentum']:
-        xc, yc, zc = molecule.center_of_nuclear_charge()
         angmom_drv = AngularMomentumIntegralsDriver(comm)
         angmom_mats = angmom_drv.compute(molecule, basis)
 

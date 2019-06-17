@@ -271,6 +271,13 @@ class CMolecule
     CMemBlock<double> getCharges() const;
 
     /**
+     Gets masses of all atoms in molecule.
+
+     @return the memory block object (all masses).
+     */
+    CMemBlock<double> getMasses() const;
+
+    /**
      Computes vector of distances to closest neighbouring atom for each atom.
 
      @return the vector of distances.
