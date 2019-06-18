@@ -300,7 +300,7 @@ class ComplexResponse:
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
 
-            new_ger = rm_lin_depend(new_ger, self.small_thresh)
+            new_ger = rm_lin_depend(new_ger)
             new_ger = self.orthogonalize_gram_schmidt(new_ger)
             new_ger = self.normalize(new_ger)
 
@@ -309,7 +309,7 @@ class ComplexResponse:
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
 
-            new_ung = rm_lin_depend(new_ung, self.small_thresh)
+            new_ung = rm_lin_depend(new_ung)
             new_ung = self.orthogonalize_gram_schmidt(new_ung)
             new_ung = self.normalize(new_ung)
 
@@ -654,7 +654,7 @@ class ComplexResponse:
                 new_trials_ger, new_trials_ung = self.setup_trials(residuals,
                                                                    pre=precond,
                                                                    bger=bger,
-                                                                   bung=bung
+                                                                   bung=bung,
                                                                    res_norm=
                                                         relative_residual_norm)
 
