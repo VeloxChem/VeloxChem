@@ -8,12 +8,9 @@
 
 #include<cstdint>
 
-#include <cstdint>
-#include <vector>
-
 #include "MemBlock2D.hpp"
-#include "BoysFunction.hpp"
 #include "GtoPairsBlock.hpp"
+#include "BoysFunction.hpp"
 #include "RecursionMap.hpp"
 
 namespace erirecfunc { // erirecfunc namespace
@@ -47,8 +44,8 @@ namespace erirecfunc { // erirecfunc namespace
                                       const CGtoPairsBlock&      ketGtoPairsBlock,
                                       const int32_t              nKetPrimPairs,
                                       const int32_t              iContrPair);
-    
-     /**
+
+    /**
     Computes batch of primitive (SS|G|SP) electron repulsion integrals and stores
     results in primitives buffer.
 
@@ -87,8 +84,8 @@ namespace erirecfunc { // erirecfunc namespace
                                       const CGtoPairsBlock&      ketGtoPairsBlock,
                                       const int32_t              nKetPrimPairs,
                                       const int32_t              iContrPair);
-    
-     /**
+
+    /**
     Computes batch of primitive (SS|G|SD) electron repulsion integrals and stores
     results in primitives buffer.
 
@@ -395,6 +392,7 @@ namespace erirecfunc { // erirecfunc namespace
                                       const CGtoPairsBlock&      ketGtoPairsBlock,
                                       const int32_t              nKetPrimPairs,
                                       const int32_t              iContrPair);
+
 
 } // erirecfunc namespace
 

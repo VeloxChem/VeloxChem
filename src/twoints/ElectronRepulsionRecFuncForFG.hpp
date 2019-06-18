@@ -37,7 +37,7 @@ namespace erirecfunc { // erirecfunc namespace
                                       const int32_t              iContrPair);
 
     /**
-    Computes sub-batch (0,50) of primitive (SF|G|SG) electron repulsion integrals and stores
+    Computes sub-batch (0,75) of primitive (SF|G|SG) electron repulsion integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -49,7 +49,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSFSG_0_50(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSFSG_0_75(      CMemBlock2D<double>& primBuffer,
                                            const CRecursionMap&       recursionMap,
                                            const CMemBlock2D<double>& osFactors,
                                            const CMemBlock2D<double>& wpDistances,
@@ -59,7 +59,7 @@ namespace erirecfunc { // erirecfunc namespace
                                            const int32_t              iContrPair);
 
     /**
-    Computes sub-batch (50,100) of primitive (SF|G|SG) electron repulsion integrals and stores
+    Computes sub-batch (75,150) of primitive (SF|G|SG) electron repulsion integrals and stores
     results in primitives buffer.
 
     @param primBuffer the primitives buffer.
@@ -71,7 +71,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSFSG_50_100(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSFSG_75_150(      CMemBlock2D<double>& primBuffer,
                                              const CRecursionMap&       recursionMap,
                                              const CMemBlock2D<double>& osFactors,
                                              const CMemBlock2D<double>& wpDistances,
@@ -79,28 +79,6 @@ namespace erirecfunc { // erirecfunc namespace
                                              const CGtoPairsBlock&      ketGtoPairsBlock,
                                              const int32_t              nKetPrimPairs,
                                              const int32_t              iContrPair);
-
-    /**
-    Computes sub-batch (100,150) of primitive (SF|G|SG) electron repulsion integrals and stores
-    results in primitives buffer.
-
-    @param primBuffer the primitives buffer.
-    @param recursionMap the recursion map object.
-    @param osFactors the Obara-Saika recursion factors.
-    @param wpDistances the vector of distances R(WP) = W - P.
-    @param braGtoPairsBlock the GTOs psirs block on bra side.
-    @param ketGtoPairsBlock the GTOs pairs block on ket side.
-    @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
-    @param iContrPair the index of contracted GTOs apir on bra side.
-    */
-    void compElectronRepulsionForSFSG_100_150(      CMemBlock2D<double>& primBuffer,
-                                              const CRecursionMap&       recursionMap,
-                                              const CMemBlock2D<double>& osFactors,
-                                              const CMemBlock2D<double>& wpDistances,
-                                              const CGtoPairsBlock&      braGtoPairsBlock,
-                                              const CGtoPairsBlock&      ketGtoPairsBlock,
-                                              const int32_t              nKetPrimPairs,
-                                              const int32_t              iContrPair);
 
 
 } // erirecfunc namespace
