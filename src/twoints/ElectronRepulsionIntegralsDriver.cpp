@@ -753,24 +753,114 @@ CElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBloc
                                                                   const int32_t               nKetPrimPairs,
                                                                   const int32_t               iContrPair) const
 {
+    // set up angular momentum
+    
+    auto bang = braGtoPairsBlock.getBraAngularMomentum() + braGtoPairsBlock.getKetAngularMomentum();
+    
+    auto kang = ketGtoPairsBlock.getBraAngularMomentum() + ketGtoPairsBlock.getKetAngularMomentum();
+ 
+    // primitive integrals
+    
     erirecfunc::compElectronRepulsionForSSSS(primBuffer, recursionMap, bfTable, bfArguments, bfValues, bfOrder, osFactors, pqDistances,
                                              braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
+    if ((bang == 0) && (kang == 0)) return;
+    
     erirecfunc::compElectronRepulsionForSSSP(primBuffer, recursionMap, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 0) && (kang == 1)) return;
     
     erirecfunc::compElectronRepulsionForSPSS(primBuffer, recursionMap, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
-    erirecfunc::compElectronRepulsionForSSSD(primBuffer, recursionMap, osFactors, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    if ((bang == 1) && (kang == 0)) return;
+    
+    erirecfunc::compElectronRepulsionForSPSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 1) && (kang == 1)) return;
     
     erirecfunc::compElectronRepulsionForSDSS(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
-    erirecfunc::compElectronRepulsionForSSSF(primBuffer, recursionMap, osFactors, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    if ((bang == 2) && (kang == 0)) return;
+    
+    erirecfunc::compElectronRepulsionForSDSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 2) && (kang == 1)) return;
     
     erirecfunc::compElectronRepulsionForSFSS(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
-    erirecfunc::compElectronRepulsionForSSSG(primBuffer, recursionMap, osFactors, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    if ((bang == 3) && (kang == 0)) return;
+    
+    erirecfunc::compElectronRepulsionForSFSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 3) && (kang == 1)) return;
     
     erirecfunc::compElectronRepulsionForSGSS(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 4) && (kang == 0)) return;
+    
+    erirecfunc::compElectronRepulsionForSGSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 4) && (kang == 1)) return;
+    
+    erirecfunc::compElectronRepulsionForSSSD(primBuffer, recursionMap, osFactors, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 0) && (kang == 2)) return;
+    
+    erirecfunc::compElectronRepulsionForSPSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 1) && (kang == 2)) return;
+    
+    erirecfunc::compElectronRepulsionForSDSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 2) && (kang == 2)) return;
+   
+    erirecfunc::compElectronRepulsionForSSSF(primBuffer, recursionMap, osFactors, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 0) && (kang == 3)) return;
+    
+    erirecfunc::compElectronRepulsionForSPSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 1) && (kang == 3)) return;
+    
+    erirecfunc::compElectronRepulsionForSDSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 2) && (kang == 3)) return;
+    
+    erirecfunc::compElectronRepulsionForSFSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 3) && (kang == 2)) return;
+    
+    erirecfunc::compElectronRepulsionForSFSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 3) && (kang == 3)) return;
+    
+    erirecfunc::compElectronRepulsionForSSSG(primBuffer, recursionMap, osFactors, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 0) && (kang == 4)) return;
+    
+    erirecfunc::compElectronRepulsionForSPSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 1) && (kang == 4)) return;
+    
+    erirecfunc::compElectronRepulsionForSDSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 2) && (kang == 4)) return;
+    
+    erirecfunc::compElectronRepulsionForSGSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 4) && (kang == 2)) return;
+    
+    erirecfunc::compElectronRepulsionForSFSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 3) && (kang == 4)) return;
+    
+    erirecfunc::compElectronRepulsionForSGSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+    if ((bang == 4) && (kang == 3)) return;
+    
+    erirecfunc::compElectronRepulsionForSGSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
+    
+     if ((bang == 4) && (kang == 4)) return;
     
     erirecfunc::compElectronRepulsionForSSSH(primBuffer, recursionMap, osFactors, wqDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
@@ -788,20 +878,6 @@ CElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBloc
     
     erirecfunc::compElectronRepulsionForSLSS(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
-    erirecfunc::compElectronRepulsionForSPSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSPSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSDSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSPSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSFSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSPSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSGSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
     erirecfunc::compElectronRepulsionForSPSH(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
     erirecfunc::compElectronRepulsionForSHSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
@@ -817,16 +893,6 @@ CElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBloc
     erirecfunc::compElectronRepulsionForSPSL(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
     erirecfunc::compElectronRepulsionForSLSP(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSDSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSDSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSFSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSDSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSGSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
     erirecfunc::compElectronRepulsionForSDSH(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
@@ -844,12 +910,6 @@ CElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBloc
     
     erirecfunc::compElectronRepulsionForSLSD(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
-    erirecfunc::compElectronRepulsionForSFSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSFSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSGSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
     erirecfunc::compElectronRepulsionForSFSH(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
     erirecfunc::compElectronRepulsionForSHSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
@@ -865,8 +925,6 @@ CElectronRepulsionIntegralsDriver::_compPrimElectronRepulsionInts(      CMemBloc
     erirecfunc::compElectronRepulsionForSFSL(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
     erirecfunc::compElectronRepulsionForSLSF(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
-    
-    erirecfunc::compElectronRepulsionForSGSG(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
     erirecfunc::compElectronRepulsionForSGSH(primBuffer, recursionMap, osFactors, wpDistances, braGtoPairsBlock, ketGtoPairsBlock, nKetPrimPairs, iContrPair);
     
