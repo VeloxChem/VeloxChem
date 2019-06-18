@@ -13,11 +13,10 @@
 
 class CNuclearPotentialMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CNuclearPotentialMatrixTest() {};
-    
-    virtual ~CNuclearPotentialMatrixTest() {};
+   protected:
+    CNuclearPotentialMatrixTest(){};
+
+    virtual ~CNuclearPotentialMatrixTest(){};
 };
 
 #endif /* NuclearPotentialMatrixTest_hpp */

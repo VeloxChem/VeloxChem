@@ -8,11 +8,11 @@
 
 #include "CubicGrid.hpp"
 
-#include <vector>
 #include <string>
+#include <vector>
 
-#include "MemBlock.hpp"
 #include "ErrorHandler.hpp"
+#include "MemBlock.hpp"
 
 CCubicGrid::CCubicGrid()
 
@@ -24,12 +24,9 @@ CCubicGrid::CCubicGrid()
 
     , _values(CMemBlock<double>())
 {
-    
 }
 
-CCubicGrid::CCubicGrid(const std::vector<double>&  origin,
-                       const std::vector<double>&  stepSize,
-                       const std::vector<int32_t>& numPoints)
+CCubicGrid::CCubicGrid(const std::vector<double>& origin, const std::vector<double>& stepSize, const std::vector<int32_t>& numPoints)
 
     : _origin(origin)
 
@@ -58,7 +55,6 @@ CCubicGrid::CCubicGrid(const CCubicGrid& source)
 
     , _values(source._values)
 {
-    
 }
 
 CCubicGrid::CCubicGrid(CCubicGrid&& source) noexcept
@@ -71,27 +67,25 @@ CCubicGrid::CCubicGrid(CCubicGrid&& source) noexcept
 
     , _values(std::move(source._values))
 {
-    
 }
 
 CCubicGrid::~CCubicGrid()
 {
-    
 }
 
 CCubicGrid&
 CCubicGrid::operator=(const CCubicGrid& source)
 {
     if (this == &source) return *this;
-    
+
     _origin = source._origin;
-    
+
     _stepSize = source._stepSize;
-    
+
     _numPoints = source._numPoints;
-    
+
     _values = source._values;
-    
+
     return *this;
 }
 
@@ -99,15 +93,15 @@ CCubicGrid&
 CCubicGrid::operator=(CCubicGrid&& source) noexcept
 {
     if (this == &source) return *this;
-    
+
     _origin = std::move(source._origin);
-  
+
     _stepSize = std::move(source._stepSize);
-  
+
     _numPoints = std::move(source._numPoints);
-  
+
     _values = std::move(source._values);
-  
+
     return *this;
 }
 
@@ -115,13 +109,13 @@ bool
 CCubicGrid::operator==(const CCubicGrid& other) const
 {
     if (_origin != other._origin) return false;
-    
+
     if (_stepSize != other._stepSize) return false;
-    
+
     if (_numPoints != other._numPoints) return false;
-    
+
     if (_values != other._values) return false;
-    
+
     return true;
 }
 

@@ -1,4 +1,6 @@
+import numpy as np
 import re
+import os
 
 from .errorhandler import assert_msg_critical
 
@@ -44,7 +46,7 @@ class InputParser:
 
         except SyntaxError:
             errmsg = 'input parser: bad syntax in file '
-            errmsg += self.filename + '\n     '
+            errmsg += self.filename + os.linesep + '     '
             errmsg += 'You may check for incorrect, '
             errmsg += 'incomplete or empty groups.'
             self.success_monitor = False
@@ -92,9 +94,9 @@ class InputParser:
                 if line.lower()[:4] == '@end':
                     line = line.lower()
 
-                # add trailing '\n'
+                # add trailing os.linesep
                 if line:
-                    self.content += line + '\n'
+                    self.content += line + os.linesep
 
     def incomplete_group_check(self):
         """ Checking for any incomplete groups. """
@@ -110,13 +112,15 @@ class InputParser:
     def empty_group_check(self):
         """ Checking for any empty groups. """
 
-        if re.findall(r'@\w[\w ]*\n\s*@end', self.content) != []:
+        if re.findall(r'@\w[\w ]*' + os.linesep + r'\s*@end',
+                      self.content) != []:
             raise SyntaxError
 
     def clear_interspace(self):
         """ Deleting content, that's not within a group. """
 
-        self.content = re.sub(r'@end[^@]*@', '@end\n@', self.content)
+        self.content = re.sub(r'@end[^@]*@', '@end' + os.linesep + '@',
+                              self.content)
 
     def groupsplit(self):
         """ Creating a list in which every element is a list itself containing
@@ -125,7 +129,7 @@ class InputParser:
         self.grouplist = re.findall(r'@(?!end)[^@]*@end', self.content)
         for i in range(len(self.grouplist)):
             self.grouplist[i] = self.grouplist[i].strip().replace('@', '')
-            self.grouplist[i] = self.grouplist[i].split('\n')[:-1]
+            self.grouplist[i] = self.grouplist[i].split(os.linesep)[:-1]
 
     def convert_dict(self):
         """ Converting the list of lists into a dictionary with groupnames as
@@ -161,7 +165,7 @@ class InputParser:
                 self.input_dict[group_key.lower()] = local_dict
                 if group_key.lower() == 'molecule':
                     # local_list contains xyz strings of the molecule
-                    xyzstr = '\n'.join(local_list)
+                    xyzstr = os.linesep.join(local_list)
                     self.input_dict['molecule']['xyzstr'] = xyzstr
                     # also set the default value for units
                     if 'units' not in self.input_dict['molecule']:
@@ -190,3 +194,15 @@ class InputParser:
             if "exciton" not in self.input_dict:
                 self.input_dict["exciton"] = {}
             self.input_dict["exciton"]["checkpoint_file"] = fexciton
+
+
+def parse_frequencies(input_frequencies):
+
+    frequencies = []
+    for w in input_frequencies.replace(' ', '').split(','):
+        if '-' in w:
+            seq = [float(x) for x in w.split('-')[:3]]
+            frequencies += list(np.arange(*seq))
+        elif w:
+            frequencies.append(float(w))
+    return frequencies

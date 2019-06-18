@@ -13,11 +13,10 @@
 
 class CGtoPairsContainerTest : public ::testing::Test
 {
-protected:
-    
-    CGtoPairsContainerTest() {};
-    
-    virtual ~CGtoPairsContainerTest() {};
+   protected:
+    CGtoPairsContainerTest(){};
+
+    virtual ~CGtoPairsContainerTest(){};
 };
 
 #endif /* GtoPairsContainerTest_hpp */

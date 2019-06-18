@@ -8,8 +8,8 @@
 
 #include "BoysFunction.hpp"
 
-#include <cmath> 
 #include <array>
+#include <cmath>
 
 #include "MathConst.hpp"
 
@@ -17,29 +17,25 @@ CBoysFunction::CBoysFunction()
 
     : _order(-1)
 {
-
 }
 
 CBoysFunction::CBoysFunction(const int32_t order)
 
     : _order(order)
 {
-    _table = CMemBlock2D<double>(7, 121 * (_order + 1)); 
-    
-    _setTable(); 
+    _table = CMemBlock2D<double>(7, 121 * (_order + 1));
+
+    _setTable();
 }
 
-void CBoysFunction::compute(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              iOrder) const
+void
+CBoysFunction::compute(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t iOrder) const
 {
     compute(values, arguments, arguments.size(), iOrder);
 }
 
-void CBoysFunction::compute(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments,
-                            const int32_t              iOrder) const
+void
+CBoysFunction::compute(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments, const int32_t iOrder) const
 {
     if (iOrder < 0) return;
 
@@ -251,13 +247,12 @@ void CBoysFunction::compute(      CMemBlock2D<double>& values,
 
 CBoysFunction::~CBoysFunction()
 {
-
 }
 
 void
 CBoysFunction::_setTable()
 {
-    if (_order < 0 ) return;
+    if (_order < 0) return;
 
     if (_order > 28) return;
 
@@ -362,24 +357,22 @@ CBoysFunction::_setTable()
     if (_order == 24) return;
 
     _generateTable25();
-    
+
     if (_order == 25) return;
-    
+
     _generateTable26();
-    
+
     if (_order == 26) return;
-    
+
     _generateTable27();
-    
+
     if (_order == 27) return;
-    
+
     _generateTable28();
 }
 
 void
-CBoysFunction::_computeBF00(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF00(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -393,17 +386,17 @@ CBoysFunction::_computeBF00(      CMemBlock2D<double>& values,
 
         if (pnt < 121)
         {
-            double w  = argv[i] - 0.1 * pnt;
+            double w = argv[i] - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(pnt);
 
-            val00[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val00[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
         }
         else
         {
@@ -417,7 +410,7 @@ CBoysFunction::_computeBF00(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 val00[i] -= f * std::exp(-argv[i]);
             }
@@ -426,9 +419,7 @@ CBoysFunction::_computeBF00(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF01(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -446,17 +437,17 @@ CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(121 + pnt);
 
-            val01[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val01[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
             val00[i] = 2.0 * fa * val01[i] + std::exp(-fa);
         }
@@ -474,7 +465,7 @@ CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -491,9 +482,7 @@ CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF02(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -515,19 +504,19 @@ CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(242 + pnt);
 
-            val02[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val02[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -549,7 +538,7 @@ CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -576,13 +565,11 @@ CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF03(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 3> ft{1.0, 1.0 / 3.0, 1.0 / 5.0 };
+    std::array<double, 3> ft{1.0, 1.0 / 3.0, 1.0 / 5.0};
 
     auto argv = arguments.data();
 
@@ -602,19 +589,19 @@ CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(363 + pnt);
 
-            val03[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val03[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -638,7 +625,7 @@ CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -647,22 +634,21 @@ CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
                 double rterm = pf * fx;
 
                 val01[i] = pf * val00[i] - rterm;
-                
+
                 pf += fia;
-                
+
                 val02[i] = pf * val01[i] - rterm;
 
                 pf += fia;
 
                 val03[i] = pf * val02[i] - rterm;
-
             }
             else
             {
                 val01[i] = pf * val00[i];
-                
+
                 pf += fia;
-                
+
                 val02[i] = pf * val01[i];
 
                 pf += fia;
@@ -674,9 +660,7 @@ CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF04(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -702,19 +686,19 @@ CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(484 + pnt);
 
-            val04[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val04[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -740,7 +724,7 @@ CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -761,18 +745,17 @@ CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val04[i] = pf * val03[i] - rterm;
-                
             }
             else
             {
                 val01[i] = pf * val00[i];
-                
+
                 pf += fia;
-                
+
                 val02[i] = pf * val01[i];
-                
+
                 pf += fia;
-                
+
                 val03[i] = pf * val02[i];
 
                 pf += fia;
@@ -784,9 +767,7 @@ CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF05(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -814,19 +795,19 @@ CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(605 + pnt);
 
-            val05[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val05[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -854,7 +835,7 @@ CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -879,22 +860,21 @@ CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val05[i] = pf * val04[i] - rterm;
-
             }
             else
             {
                 val01[i] = pf * val00[i];
-                
+
                 pf += fia;
-                
+
                 val02[i] = pf * val01[i];
-                
+
                 pf += fia;
-                
+
                 val03[i] = pf * val02[i];
-                
+
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
 
                 pf += fia;
@@ -906,14 +886,11 @@ CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF06(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 6> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                             1.0 / 11.0};
+    std::array<double, 6> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0};
 
     auto argv = arguments.data();
 
@@ -939,19 +916,19 @@ CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(726 + pnt);
 
-            val06[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val06[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -981,7 +958,7 @@ CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -1010,26 +987,25 @@ CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val06[i] = pf * val05[i] - rterm;
-
             }
             else
             {
                 val01[i] = pf * val00[i];
-                
+
                 pf += fia;
-                
+
                 val02[i] = pf * val01[i];
-                
+
                 pf += fia;
-                
+
                 val03[i] = pf * val02[i];
-                
+
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
 
                 pf += fia;
@@ -1041,14 +1017,11 @@ CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF07(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 7> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                             1.0 / 11.0, 1.0 / 13.0};
+    std::array<double, 7> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0};
 
     auto argv = arguments.data();
 
@@ -1076,19 +1049,19 @@ CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(847 + pnt);
 
-            val07[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val07[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -1120,7 +1093,7 @@ CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -1153,30 +1126,29 @@ CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val07[i] = pf * val06[i] - rterm;
-
             }
             else
             {
                 val01[i] = pf * val00[i];
 
                 pf += fia;
-                
+
                 val02[i] = pf * val01[i];
-                
+
                 pf += fia;
-                
+
                 val03[i] = pf * val02[i];
-                
+
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
 
                 pf += fia;
@@ -1188,14 +1160,11 @@ CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF08(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 8> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                             1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0};
+    std::array<double, 8> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0};
 
     auto argv = arguments.data();
 
@@ -1225,19 +1194,19 @@ CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(968 + pnt);
 
-            val08[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val08[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -1271,7 +1240,7 @@ CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -1308,34 +1277,33 @@ CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val08[i] = pf * val07[i] - rterm;
-
             }
             else
             {
                 val01[i] = pf * val00[i];
 
                 pf += fia;
-                
+
                 val02[i] = pf * val01[i];
-                
+
                 pf += fia;
-                
+
                 val03[i] = pf * val02[i];
-                
+
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
 
                 pf += fia;
@@ -1347,14 +1315,11 @@ CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF09(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 9> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                             1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0};
+    std::array<double, 9> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0};
 
     auto argv = arguments.data();
 
@@ -1386,19 +1351,19 @@ CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1089 + pnt);
 
-            val09[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val09[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -1434,7 +1399,7 @@ CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -1475,7 +1440,6 @@ CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val09[i] = pf * val08[i] - rterm;
-
             }
             else
             {
@@ -1484,29 +1448,29 @@ CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val02[i] = pf * val01[i];
-                
+
                 pf += fia;
-                
+
                 val03[i] = pf * val02[i];
-                
+
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
 
                 pf += fia;
@@ -1518,15 +1482,11 @@ CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF10(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 10> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0};
+    std::array<double, 10> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0};
 
     auto argv = arguments.data();
 
@@ -1560,19 +1520,19 @@ CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1210 + pnt);
 
-            val10[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val10[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -1610,7 +1570,7 @@ CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -1655,7 +1615,6 @@ CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val10[i] = pf * val09[i] - rterm;
-
             }
             else
             {
@@ -1668,29 +1627,29 @@ CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val03[i] = pf * val02[i];
-                
+
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
 
                 pf += fia;
@@ -1702,15 +1661,12 @@ CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF11(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 11> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0};
+    std::array<double, 11> ft{
+        1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0};
 
     auto argv = arguments.data();
 
@@ -1746,19 +1702,19 @@ CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1331 + pnt);
 
-            val11[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val11[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -1798,7 +1754,7 @@ CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -1847,7 +1803,6 @@ CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val11[i] = pf * val10[i] - rterm;
-
             }
             else
             {
@@ -1860,33 +1815,33 @@ CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val03[i] = pf * val02[i];
-                
+
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
 
                 pf += fia;
@@ -1898,15 +1853,12 @@ CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF12(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 12> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0};
+    std::array<double, 12> ft{
+        1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0};
 
     auto argv = arguments.data();
 
@@ -1944,19 +1896,19 @@ CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1452 + pnt);
 
-            val12[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val12[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -1998,7 +1950,7 @@ CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -2051,7 +2003,6 @@ CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val12[i] = pf * val11[i] - rterm;
-
             }
             else
             {
@@ -2066,35 +2017,35 @@ CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
                 val03[i] = pf * val02[i];
 
                 pf += fia;
-                
+
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
 
                 pf += fia;
@@ -2106,15 +2057,23 @@ CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF13(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 13> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0};
+    std::array<double, 13> ft{1.0,
+                              1.0 / 3.0,
+                              1.0 / 5.0,
+                              1.0 / 7.0,
+                              1.0 / 9.0,
+                              1.0 / 11.0,
+                              1.0 / 13.0,
+                              1.0 / 15.0,
+                              1.0 / 17.0,
+                              1.0 / 19.0,
+                              1.0 / 21.0,
+                              1.0 / 23.0,
+                              1.0 / 25.0};
 
     auto argv = arguments.data();
 
@@ -2154,19 +2113,19 @@ CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1573 + pnt);
 
-            val13[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val13[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -2210,7 +2169,7 @@ CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -2267,7 +2226,6 @@ CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val13[i] = pf * val12[i] - rterm;
-
             }
             else
             {
@@ -2284,37 +2242,37 @@ CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
 
                 pf += fia;
@@ -2326,15 +2284,23 @@ CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF14(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 14> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
+    std::array<double, 14> ft{1.0,
+                              1.0 / 3.0,
+                              1.0 / 5.0,
+                              1.0 / 7.0,
+                              1.0 / 9.0,
+                              1.0 / 11.0,
+                              1.0 / 13.0,
+                              1.0 / 15.0,
+                              1.0 / 17.0,
+                              1.0 / 19.0,
+                              1.0 / 21.0,
+                              1.0 / 23.0,
+                              1.0 / 25.0,
                               1.0 / 27.0};
 
     auto argv = arguments.data();
@@ -2377,19 +2343,19 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1694 + pnt);
 
-            val14[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val14[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -2435,7 +2401,7 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -2496,7 +2462,6 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val14[i] = pf * val13[i] - rterm;
-
             }
             else
             {
@@ -2513,41 +2478,41 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val04[i] = pf * val03[i];
-                
+
                 pf += fia;
-                
+
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
 
                 pf += fia;
@@ -2559,16 +2524,25 @@ CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF15(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 15> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0};
+    std::array<double, 15> ft{1.0,
+                              1.0 / 3.0,
+                              1.0 / 5.0,
+                              1.0 / 7.0,
+                              1.0 / 9.0,
+                              1.0 / 11.0,
+                              1.0 / 13.0,
+                              1.0 / 15.0,
+                              1.0 / 17.0,
+                              1.0 / 19.0,
+                              1.0 / 21.0,
+                              1.0 / 23.0,
+                              1.0 / 25.0,
+                              1.0 / 27.0,
+                              1.0 / 29.0};
 
     auto argv = arguments.data();
 
@@ -2612,19 +2586,19 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1815 + pnt);
 
-            val15[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val15[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -2672,7 +2646,7 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -2737,7 +2711,6 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val15[i] = pf * val14[i] - rterm;
-
             }
             else
             {
@@ -2758,41 +2731,41 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
 
                 pf += fia;
@@ -2804,16 +2777,26 @@ CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF16(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 16> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0};
+    std::array<double, 16> ft{1.0,
+                              1.0 / 3.0,
+                              1.0 / 5.0,
+                              1.0 / 7.0,
+                              1.0 / 9.0,
+                              1.0 / 11.0,
+                              1.0 / 13.0,
+                              1.0 / 15.0,
+                              1.0 / 17.0,
+                              1.0 / 19.0,
+                              1.0 / 21.0,
+                              1.0 / 23.0,
+                              1.0 / 25.0,
+                              1.0 / 27.0,
+                              1.0 / 29.0,
+                              1.0 / 31.0};
 
     auto argv = arguments.data();
 
@@ -2859,19 +2842,19 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(1936 + pnt);
 
-            val16[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val16[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -2921,7 +2904,7 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -2990,7 +2973,6 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val16[i] = pf * val15[i] - rterm;
-
             }
             else
             {
@@ -3011,45 +2993,45 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val05[i] = pf * val04[i];
-                
+
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
 
                 pf += fia;
@@ -3061,16 +3043,27 @@ CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF17(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 17> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0};
+    std::array<double, 17> ft{1.0,
+                              1.0 / 3.0,
+                              1.0 / 5.0,
+                              1.0 / 7.0,
+                              1.0 / 9.0,
+                              1.0 / 11.0,
+                              1.0 / 13.0,
+                              1.0 / 15.0,
+                              1.0 / 17.0,
+                              1.0 / 19.0,
+                              1.0 / 21.0,
+                              1.0 / 23.0,
+                              1.0 / 25.0,
+                              1.0 / 27.0,
+                              1.0 / 29.0,
+                              1.0 / 31.0,
+                              1.0 / 33.0};
 
     auto argv = arguments.data();
 
@@ -3118,19 +3111,19 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2057 + pnt);
 
-            val17[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val17[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -3182,7 +3175,7 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -3255,7 +3248,6 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val17[i] = pf * val16[i] - rterm;
-
             }
             else
             {
@@ -3278,47 +3270,47 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
                 val05[i] = pf * val04[i];
 
                 pf += fia;
-                
+
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
 
                 pf += fia;
@@ -3330,16 +3322,27 @@ CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF18(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 18> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
+    std::array<double, 18> ft{1.0,
+                              1.0 / 3.0,
+                              1.0 / 5.0,
+                              1.0 / 7.0,
+                              1.0 / 9.0,
+                              1.0 / 11.0,
+                              1.0 / 13.0,
+                              1.0 / 15.0,
+                              1.0 / 17.0,
+                              1.0 / 19.0,
+                              1.0 / 21.0,
+                              1.0 / 23.0,
+                              1.0 / 25.0,
+                              1.0 / 27.0,
+                              1.0 / 29.0,
+                              1.0 / 31.0,
+                              1.0 / 33.0,
                               1.0 / 35.0};
 
     auto argv = arguments.data();
@@ -3390,19 +3393,19 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2178 + pnt);
 
-            val18[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val18[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -3456,7 +3459,7 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -3533,7 +3536,6 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val18[i] = pf * val17[i] - rterm;
-
             }
             else
             {
@@ -3558,49 +3560,49 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val06[i] = pf * val05[i];
-                
+
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
 
                 pf += fia;
@@ -3612,17 +3614,29 @@ CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF19(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 19> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0};
+    std::array<double, 19> ft{1.0,
+                              1.0 / 3.0,
+                              1.0 / 5.0,
+                              1.0 / 7.0,
+                              1.0 / 9.0,
+                              1.0 / 11.0,
+                              1.0 / 13.0,
+                              1.0 / 15.0,
+                              1.0 / 17.0,
+                              1.0 / 19.0,
+                              1.0 / 21.0,
+                              1.0 / 23.0,
+                              1.0 / 25.0,
+                              1.0 / 27.0,
+                              1.0 / 29.0,
+                              1.0 / 31.0,
+                              1.0 / 33.0,
+                              1.0 / 35.0,
+                              1.0 / 37.0};
 
     auto argv = arguments.data();
 
@@ -3674,19 +3688,19 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2299 + pnt);
 
-            val19[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val19[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -3742,7 +3756,7 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -3823,7 +3837,6 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val19[i] = pf * val18[i] - rterm;
-
             }
             else
             {
@@ -3850,51 +3863,51 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
                 val06[i] = pf * val05[i];
 
                 pf += fia;
-                
+
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
 
                 pf += fia;
@@ -3906,17 +3919,12 @@ CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF20(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 20> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0};
+    std::array<double, 20> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0,
+                              1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0};
 
     auto argv = arguments.data();
 
@@ -3970,19 +3978,19 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2420 + pnt);
 
-            val20[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val20[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -4040,7 +4048,7 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -4125,7 +4133,6 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val20[i] = pf * val19[i] - rterm;
-
             }
             else
             {
@@ -4154,53 +4161,53 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
 
                 pf += fia;
@@ -4212,17 +4219,13 @@ CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF21(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 21> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0};
+    std::array<double, 21> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
+                              1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0,
+                              1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0};
 
     auto argv = arguments.data();
 
@@ -4278,19 +4281,19 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2541 + pnt);
 
-            val21[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val21[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -4350,7 +4353,7 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -4439,7 +4442,6 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val21[i] = pf * val20[i] - rterm;
-
             }
             else
             {
@@ -4468,57 +4470,57 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val07[i] = pf * val06[i];
-                
+
                 pf += fia;
-                
+
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
 
                 pf += fia;
@@ -4530,18 +4532,13 @@ CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF22(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 22> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                              1.0 / 43.0};
+    std::array<double, 22> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0,
+                              1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0,
+                              1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0, 1.0 / 43.0};
 
     auto argv = arguments.data();
 
@@ -4599,19 +4596,19 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2662 + pnt);
 
-            val22[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val22[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -4673,7 +4670,7 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -4766,7 +4763,6 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val22[i] = pf * val21[i] - rterm;
-
             }
             else
             {
@@ -4799,57 +4795,57 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
-                
+
                 pf += fia;
-                
+
                 val21[i] = pf * val20[i];
 
                 pf += fia;
@@ -4861,18 +4857,13 @@ CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF23(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 23> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                              1.0 / 43.0, 1.0 / 45.0};
+    std::array<double, 23> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0,
+                              1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0,
+                              1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0, 1.0 / 43.0, 1.0 / 45.0};
 
     auto argv = arguments.data();
 
@@ -4932,19 +4923,19 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2783 + pnt);
 
-            val23[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val23[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -5008,7 +4999,7 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -5105,7 +5096,6 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val23[i] = pf * val22[i] - rterm;
-
             }
             else
             {
@@ -5138,61 +5128,61 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val08[i] = pf * val07[i];
-                
+
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
-                
+
                 pf += fia;
-                
+
                 val21[i] = pf * val20[i];
-                
+
                 pf += fia;
-                
+
                 val22[i] = pf * val21[i];
 
                 pf += fia;
@@ -5204,18 +5194,13 @@ CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF24(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 24> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                              1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0};
+    std::array<double, 24> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0,
+                              1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0,
+                              1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0, 1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0};
 
     auto argv = arguments.data();
 
@@ -5277,19 +5262,19 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(2904 + pnt);
 
-            val24[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val24[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -5355,7 +5340,7 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -5456,7 +5441,6 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val24[i] = pf * val23[i] - rterm;
-
             }
             else
             {
@@ -5491,63 +5475,63 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
                 val08[i] = pf * val07[i];
 
                 pf += fia;
-                
+
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
-                
+
                 pf += fia;
-                
+
                 val21[i] = pf * val20[i];
-                
+
                 pf += fia;
-                
+
                 val22[i] = pf * val21[i];
-                
+
                 pf += fia;
-                
+
                 val23[i] = pf * val22[i];
 
                 pf += fia;
@@ -5559,18 +5543,13 @@ CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF25(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 25> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                              1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0};
+    std::array<double, 25> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
+                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0,
+                              1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0, 1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0};
 
     auto argv = arguments.data();
 
@@ -5634,19 +5613,19 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(3025 + pnt);
 
-            val25[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val25[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -5714,7 +5693,7 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -5819,7 +5798,6 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val25[i] = pf * val24[i] - rterm;
-
             }
             else
             {
@@ -5856,65 +5834,65 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val09[i] = pf * val08[i];
-                
+
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
-                
+
                 pf += fia;
-                
+
                 val21[i] = pf * val20[i];
-                
+
                 pf += fia;
-                
+
                 val22[i] = pf * val21[i];
-                
+
                 pf += fia;
-                
+
                 val23[i] = pf * val22[i];
-                
+
                 pf += fia;
-                
+
                 val24[i] = pf * val23[i];
 
                 pf += fia;
@@ -5926,19 +5904,13 @@ CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF26(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 26> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                              1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0,
-                              1.0 / 51.0};
+    std::array<double, 26> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
+                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0,
+                              1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0, 1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0};
 
     auto argv = arguments.data();
 
@@ -6004,19 +5976,19 @@ CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(3146 + pnt);
 
-            val26[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val26[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -6086,7 +6058,7 @@ CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -6233,67 +6205,67 @@ CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
                 val09[i] = pf * val08[i];
 
                 pf += fia;
-                
+
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
-                
+
                 pf += fia;
-                
+
                 val21[i] = pf * val20[i];
-                
+
                 pf += fia;
-                
+
                 val22[i] = pf * val21[i];
-                
+
                 pf += fia;
-                
+
                 val23[i] = pf * val22[i];
-                
+
                 pf += fia;
-                
+
                 val24[i] = pf * val23[i];
-                
+
                 pf += fia;
-                
+
                 val25[i] = pf * val24[i];
 
                 pf += fia;
@@ -6305,19 +6277,13 @@ CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF27(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 27> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                              1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0,
-                              1.0 / 51.0, 1.0 / 53.0};
+    std::array<double, 27> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
+                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0,
+                              1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0, 1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0};
 
     auto argv = arguments.data();
 
@@ -6385,19 +6351,19 @@ CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(3267 + pnt);
 
-            val27[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val27[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -6469,7 +6435,7 @@ CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -6622,69 +6588,69 @@ CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
-                
+
                 pf += fia;
-                
+
                 val21[i] = pf * val20[i];
-                
+
                 pf += fia;
-                
+
                 val22[i] = pf * val21[i];
-                
+
                 pf += fia;
-                
+
                 val23[i] = pf * val22[i];
-                
+
                 pf += fia;
-                
+
                 val24[i] = pf * val23[i];
-                
+
                 pf += fia;
-                
+
                 val25[i] = pf * val24[i];
-                
+
                 pf += fia;
-                
+
                 val26[i] = pf * val25[i];
 
                 pf += fia;
@@ -6696,19 +6662,13 @@ CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
-                            const CMemBlock<double>&   arguments,
-                            const int32_t              nArguments) const
+CBoysFunction::_computeBF28(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-    std::array<double, 28> ft{1.0, 1.0 / 3.0, 1.0 / 5.0, 1.0 / 7.0, 1.0 / 9.0,
-                              1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0,
-                              1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
-                              1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0,
-                              1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                              1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0,
-                              1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
+    std::array<double, 28> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0,
+                              1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0,
+                              1.0 / 41.0, 1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
 
     auto argv = arguments.data();
 
@@ -6778,19 +6738,19 @@ CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
         {
             double fa = argv[i];
 
-            double w  = fa - 0.1 * pnt;
+            double w = fa - 0.1 * pnt;
 
-            double w2 = w *  w;
+            double w2 = w * w;
 
             double w4 = w2 * w2;
 
             auto tbvec = _table.data(3388 + pnt);
 
-            val28[i]  = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
+            val28[i] = tbvec[0] + tbvec[1] * w + tbvec[2] * w2 + tbvec[3] * w2 * w
 
-                      + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
+                       + tbvec[4] * w4 + tbvec[5] * w4 * w + tbvec[6] * w4 * w2;
 
-            double f2a  = fa + fa;
+            double f2a = fa + fa;
 
             double fx = std::exp(-fa);
 
@@ -6864,7 +6824,7 @@ CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
 
                 double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                         + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                           + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 double fx = std::exp(-argv[i]);
 
@@ -7021,73 +6981,73 @@ CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
                 pf += fia;
 
                 val10[i] = pf * val09[i];
-                
+
                 pf += fia;
-                
+
                 val11[i] = pf * val10[i];
-                
+
                 pf += fia;
-                
+
                 val12[i] = pf * val11[i];
-                
+
                 pf += fia;
-                
+
                 val13[i] = pf * val12[i];
-                
+
                 pf += fia;
-                
+
                 val14[i] = pf * val13[i];
-                
+
                 pf += fia;
-                
+
                 val15[i] = pf * val14[i];
-                
+
                 pf += fia;
-                
+
                 val16[i] = pf * val15[i];
-                
+
                 pf += fia;
-                
+
                 val17[i] = pf * val16[i];
-                
+
                 pf += fia;
-                
+
                 val18[i] = pf * val17[i];
-                
+
                 pf += fia;
-                
+
                 val19[i] = pf * val18[i];
-                
+
                 pf += fia;
-                
+
                 val20[i] = pf * val19[i];
-                
+
                 pf += fia;
-                
+
                 val21[i] = pf * val20[i];
-                
+
                 pf += fia;
-                
+
                 val22[i] = pf * val21[i];
-                
+
                 pf += fia;
-                
+
                 val23[i] = pf * val22[i];
-                
+
                 pf += fia;
-                
+
                 val24[i] = pf * val23[i];
-                
+
                 pf += fia;
-                
+
                 val25[i] = pf * val24[i];
-                
+
                 pf += fia;
-                
+
                 val26[i] = pf * val25[i];
-                
+
                 pf += fia;
-                
+
                 val27[i] = pf * val26[i];
 
                 pf += fia;
@@ -7099,14 +7059,14 @@ CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
 }
 
 void
-CBoysFunction::_loadTable(const CBFTable& bfData,
-                          const int32_t   identifier)
+CBoysFunction::_loadTable(const CBFTable& bfData, const int32_t identifier)
 {
     for (int32_t i = 0; i < 121; i++)
     {
         auto mat = _table.data(121 * identifier + i);
-        
-        for (int32_t j = 0; j < 7; j++) mat[j] = bfData[i][j];
+
+        for (int32_t j = 0; j < 7; j++)
+            mat[j] = bfData[i][j];
     }
 }
 
@@ -7341,16 +7301,3 @@ CBoysFunction::_generateTable28()
 
     _loadTable(BFTable, 28);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

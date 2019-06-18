@@ -13,11 +13,10 @@
 
 class CKineticEnergyMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CKineticEnergyMatrixTest() {};
-    
-    virtual ~CKineticEnergyMatrixTest() {};
+   protected:
+    CKineticEnergyMatrixTest(){};
+
+    virtual ~CKineticEnergyMatrixTest(){};
 };
 
 #endif /* KineticEnergyMatrixTest_hpp */

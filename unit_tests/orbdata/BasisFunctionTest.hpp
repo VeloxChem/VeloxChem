@@ -13,11 +13,10 @@
 
 class CBasisFunctionTest : public ::testing::Test
 {
-protected:
+   protected:
+    CBasisFunctionTest(){};
 
-    CBasisFunctionTest() {};
-
-    virtual ~CBasisFunctionTest() {};
+    virtual ~CBasisFunctionTest(){};
 };
 
 #endif /* BasisFunctionTest_hpp */

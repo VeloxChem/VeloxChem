@@ -11,8 +11,8 @@
 #include <cstring>
 #include <vector>
 
-#include "CubicGrid.hpp"
 #include "CheckFunctions.hpp"
+#include "CubicGrid.hpp"
 
 TEST_F(CCubicGridTest, Getters)
 {

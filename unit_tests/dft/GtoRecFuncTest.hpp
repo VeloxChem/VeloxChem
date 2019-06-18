@@ -13,11 +13,10 @@
 
 class CGtoRecFuncTest : public ::testing::Test
 {
-protected:
+   protected:
+    CGtoRecFuncTest(){};
 
-    CGtoRecFuncTest() {};
-
-    virtual ~CGtoRecFuncTest() {};
+    virtual ~CGtoRecFuncTest(){};
 };
 
 #endif /* GtoRecFuncTest_hpp */

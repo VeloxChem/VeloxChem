@@ -13,11 +13,10 @@
 
 class CLebedevLaikovQuadratureTest : public ::testing::Test
 {
-protected:
+   protected:
+    CLebedevLaikovQuadratureTest(){};
 
-    CLebedevLaikovQuadratureTest() {};
-
-    virtual ~CLebedevLaikovQuadratureTest() {};
+    virtual ~CLebedevLaikovQuadratureTest(){};
 };
 
 #endif /* LebedevLaikovQuadratureTest_hpp */

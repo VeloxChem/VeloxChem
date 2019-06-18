@@ -13,11 +13,10 @@
 
 class CRecursionTermTest : public ::testing::Test
 {
-protected:
-    
-    CRecursionTermTest() {};
-    
-    virtual ~CRecursionTermTest() {};
+   protected:
+    CRecursionTermTest(){};
+
+    virtual ~CRecursionTermTest(){};
 };
 
 #endif /* RecursionTermTest_hpp */

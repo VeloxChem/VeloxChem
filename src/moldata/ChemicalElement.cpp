@@ -18,13 +18,9 @@ CChemicalElement::CChemicalElement()
 
     , _atomicNumber(-1)
 {
-
 }
 
-CChemicalElement::CChemicalElement(const std::string& atomicLabel,
-                                   const double       atomicCharge,
-                                   const double       atomicMass,
-                                   const int32_t      atomicNumber)
+CChemicalElement::CChemicalElement(const std::string& atomicLabel, const double atomicCharge, const double atomicMass, const int32_t atomicNumber)
 
     : _atomicLabel(atomicLabel)
 
@@ -34,12 +30,10 @@ CChemicalElement::CChemicalElement(const std::string& atomicLabel,
 
     , _atomicNumber(atomicNumber)
 {
-
 }
 
 CChemicalElement::~CChemicalElement()
 {
-
 }
 
 bool
@@ -1212,13 +1206,9 @@ CChemicalElement::setAtomType(const int32_t idElemental)
 bool
 CChemicalElement::setIsotope(const int32_t isotopeLabel)
 {
-    if (_atomicNumber < 0)
+    if (_atomicNumber < 0) return false;
 
-        return false;
-
-    if (_atomicNumber == 0)
-
-        return true;
+    if (_atomicNumber == 0) return true;
 
     if (_atomicNumber == 1)
     {
@@ -1255,8 +1245,8 @@ CChemicalElement::setIsotope(const int32_t isotopeLabel)
         return flg;
     }
 
-    if (_atomicNumber == 6) {
-
+    if (_atomicNumber == 6)
+    {
         bool flg = _selectCarbonIsotopeMass(isotopeLabel);
 
         return flg;
@@ -1269,8 +1259,8 @@ CChemicalElement::setIsotope(const int32_t isotopeLabel)
         return flg;
     }
 
-    if (_atomicNumber == 8) {
-
+    if (_atomicNumber == 8)
+    {
         bool flg = _selectOxygenIsotopeMass(isotopeLabel);
 
         return flg;
@@ -1851,14 +1841,14 @@ CChemicalElement::getAtomicMass() const
 int32_t
 CChemicalElement::getMaxAngularMomentum() const
 {
-    if ((_atomicNumber > 0) && (_atomicNumber< 5)) return 0;
-    
-    if ((_atomicNumber> 4) && (_atomicNumber < 21)) return 1;
-    
+    if ((_atomicNumber > 0) && (_atomicNumber < 5)) return 0;
+
+    if ((_atomicNumber > 4) && (_atomicNumber < 21)) return 1;
+
     if ((_atomicNumber > 20) && (_atomicNumber < 57)) return 2;
-    
+
     if ((_atomicNumber > 56) && (_atomicNumber < 87)) return 3;
-    
+
     return -1;
 }
 
@@ -1903,9 +1893,9 @@ CChemicalElement::_selectLithiumAtom()
 {
     _atomicLabel.assign("Li");
 
-    _atomicNumber  = 3;
+    _atomicNumber = 3;
 
-    _atomicCharge  = 3.0;
+    _atomicCharge = 3.0;
 
     _atomicMass = 7.016005;
 }
@@ -2539,9 +2529,9 @@ CChemicalElement::_selectBariumAtom()
 {
     _atomicLabel.assign("Ba");
 
-    _atomicNumber  = 56;
+    _atomicNumber = 56;
 
-    _atomicCharge  = 56.0;
+    _atomicCharge = 56.0;
 
     _atomicMass = 137.905247;
 }
@@ -2683,9 +2673,9 @@ CChemicalElement::_selectErbiumAtom()
 {
     _atomicLabel.assign("Er");
 
-    _atomicNumber  = 68;
+    _atomicNumber = 68;
 
-    _atomicCharge  = 68.0;
+    _atomicCharge = 68.0;
 
     _atomicMass = 165.930293;
 }
@@ -2887,9 +2877,9 @@ CChemicalElement::_selectAstatineAtom()
 {
     _atomicLabel.assign("At");
 
-    _atomicNumber  = 85;
+    _atomicNumber = 85;
 
-    _atomicCharge  = 85.0;
+    _atomicCharge = 85.0;
 
     _atomicMass = 209.987148;
 }
@@ -3096,7 +3086,7 @@ CChemicalElement::_selectCarbonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-        case  0:
+        case 0:
 
             _atomicMass = 12.000000;
 
@@ -3975,7 +3965,6 @@ CChemicalElement::_selectCobaltIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 58.933195;
@@ -4005,7 +3994,6 @@ CChemicalElement::_selectNickelIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 57.935343;
@@ -4067,7 +4055,6 @@ CChemicalElement::_selectCopperIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 62.929598;
@@ -4105,7 +4092,6 @@ CChemicalElement::_selectZincIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 63.929142;
@@ -4204,7 +4190,6 @@ CChemicalElement::_selectGermaniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 73.921178;
@@ -4295,7 +4280,6 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 79.916521;
@@ -4561,7 +4545,6 @@ CChemicalElement::_selectYttriumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 88.905848;
@@ -4652,7 +4635,6 @@ CChemicalElement::_selectNiobiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 92.906378;
@@ -4682,7 +4664,6 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 97.905408;
@@ -4760,7 +4741,6 @@ CChemicalElement::_selectTechnetiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 97.907216;
@@ -4790,7 +4770,6 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 101.904349;
@@ -4868,7 +4847,6 @@ CChemicalElement::_selectRhodiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 102.905504;
@@ -4898,7 +4876,6 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 105.903486;
@@ -4968,7 +4945,6 @@ CChemicalElement::_selectSilverIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 106.905097;
@@ -5006,7 +4982,6 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 113.903359;
@@ -5092,7 +5067,6 @@ CChemicalElement::_selectIndiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 114.903878;
@@ -5130,7 +5104,6 @@ CChemicalElement::_selectTinIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 119.902195;
@@ -5232,7 +5205,6 @@ CChemicalElement::_selectAntimonyIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 120.903816;
@@ -5270,7 +5242,6 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 129.906224;
@@ -5356,7 +5327,6 @@ CChemicalElement::_selectIodineIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 126.904473;
@@ -5386,7 +5356,6 @@ CChemicalElement::_selectXenonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 131.904153;
@@ -5480,7 +5449,6 @@ CChemicalElement::_selectCesiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 132.905452;
@@ -5510,7 +5478,6 @@ CChemicalElement::_selectBariumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 137.905247;
@@ -5588,7 +5555,6 @@ CChemicalElement::_selectLanthanumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 138.906353;
@@ -5626,7 +5592,6 @@ CChemicalElement::_selectCeriumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 139.905439;
@@ -5680,7 +5645,6 @@ CChemicalElement::_selectPraseodymiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 140.907653;
@@ -5710,7 +5674,6 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 141.907723;
@@ -5788,7 +5751,6 @@ CChemicalElement::_selectPromethiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 146.915139;
@@ -5818,7 +5780,6 @@ CChemicalElement::_selectSamariumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 151.919732;
@@ -5896,7 +5857,6 @@ CChemicalElement::_selectEuropiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 152.921230;
@@ -5934,7 +5894,6 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 157.924104;
@@ -6012,7 +5971,6 @@ CChemicalElement::_selectTerbiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 158.925347;
@@ -6042,7 +6000,6 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 163.929175;
@@ -6120,7 +6077,6 @@ CChemicalElement::_selectHolmiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 164.930322;
@@ -6150,7 +6106,6 @@ CChemicalElement::_selectErbiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 165.930293;
@@ -6220,7 +6175,6 @@ CChemicalElement::_selectThuliumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 168.934213;
@@ -6250,7 +6204,6 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 173.938862;
@@ -6328,7 +6281,6 @@ CChemicalElement::_selectLutheniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 174.940772;
@@ -6366,7 +6318,6 @@ CChemicalElement::_selectHafniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 179.946550;
@@ -6436,7 +6387,6 @@ CChemicalElement::_selectTantalumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 180.947996;
@@ -6474,7 +6424,6 @@ CChemicalElement::_selectTungstenIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 183.950931;
@@ -6536,7 +6485,6 @@ CChemicalElement::_selectRheniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 186.955753;
@@ -6574,7 +6522,6 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 191.961481;
@@ -6652,7 +6599,6 @@ CChemicalElement::_selectIridiumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 192.962926;
@@ -6690,7 +6636,6 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 194.964791;
@@ -6903,7 +6848,6 @@ CChemicalElement::_selectLeadIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 207.976652;
@@ -6957,7 +6901,6 @@ CChemicalElement::_selectBismuthIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 208.980399;
@@ -6987,7 +6930,6 @@ CChemicalElement::_selectPoloniumIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 208.982430;
@@ -7017,7 +6959,6 @@ CChemicalElement::_selectAstatineIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 209.987148;
@@ -7047,7 +6988,6 @@ CChemicalElement::_selectRadonIsotopeMass(const int32_t isotopeLabel)
 {
     switch (isotopeLabel)
     {
-
         case 0:
 
             _atomicMass = 222.017578;
@@ -7073,20 +7013,19 @@ CChemicalElement::_selectRadonIsotopeMass(const int32_t isotopeLabel)
 }
 
 std::ostream&
-operator<<(      std::ostream&     output,
-           const CChemicalElement& source)
+operator<<(std::ostream& output, const CChemicalElement& source)
 {
     output << std::endl;
 
     output << "[CChemicalElement (Object):" << &source << "]" << std::endl;
 
-    output << "_atomicLabel: " << source._atomicLabel <<  std::endl;
+    output << "_atomicLabel: " << source._atomicLabel << std::endl;
 
-    output << "_atomicCharge: " << source._atomicCharge <<  std::endl;
+    output << "_atomicCharge: " << source._atomicCharge << std::endl;
 
-    output << "_atomicMass: " << source._atomicMass <<  std::endl;
+    output << "_atomicMass: " << source._atomicMass << std::endl;
 
-    output << "_atomicNumber: " << source._atomicNumber <<  std::endl;
+    output << "_atomicNumber: " << source._atomicNumber << std::endl;
 
     return output;
 }

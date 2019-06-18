@@ -9,7 +9,7 @@
 #ifndef Codata_hpp
 #define Codata_hpp
 
-namespace units { // units namespace
+namespace units {  // units namespace
 
 /**
  Gets a Bohr value in Angstroms.
@@ -19,12 +19,19 @@ namespace units { // units namespace
 double getBohrValueInAngstroms();
 
 /**
- Gets a Hatree value in electronvolts.
+ Gets a Hartree value in electronvolts.
 
  @return the conversion factor.
  */
-double getHatreeValueInElectronVolts();
+double getHartreeValueInElectronVolts();
 
-} // units namespace
+/**
+ Gets convertion factor for rotatory strength (a.u.->cgs)
+
+ @return the conversion factor.
+ */
+double getRotatoryStrengthInCGS();
+
+}  // namespace units
 
 #endif /* Codata_hpp */

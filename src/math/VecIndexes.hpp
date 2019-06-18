@@ -11,9 +11,9 @@
 
 #include <vector>
 
-#include "TwoIndexes.hpp"
-#include "ThreeIndexes.hpp"
 #include "FourIndexes.hpp"
+#include "ThreeIndexes.hpp"
+#include "TwoIndexes.hpp"
 
 /**
  Defines alias to STL vector of two indexes objects.

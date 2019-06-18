@@ -6,11 +6,11 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
-from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import rotatory_strength_in_cgs
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import truncate_and_normalize
 from .lrmatvecdriver import construct_ed_sd
-from .lrmatvecdriver import lrmat2vec
+from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import swap_xy
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -206,28 +206,66 @@ class LinearResponseEigenSolver:
                 self.is_converged,
                 'LinearResponseEigenSolver.compute: failed to converge')
 
+        dipole_rhs = get_rhs('dipole', 'xyz', molecule, basis, scf_tensors,
+                             self.rank, self.comm)
+        linmom_rhs = get_rhs('linear_momentum', 'xyz', molecule, basis,
+                             scf_tensors, self.rank, self.comm)
+        angmom_rhs = get_rhs('angular_momentum', 'xyz', molecule, basis,
+                             scf_tensors, self.rank, self.comm)
+
         if self.rank == mpi_master():
-            ops = 'xyz'
-            rhs = self.get_rhs(ops, scf_tensors, nocc)
-            V1 = {op: V for op, V in zip(ops, rhs)}
+            V_dipole = {op: V for op, V in zip('xyz', dipole_rhs)}
+            V_linmom = {op: V for op, V in zip('xyz', linmom_rhs)}
+            V_angmom = {op: V for op, V in zip('xyz', angmom_rhs)}
 
-            tms = {}
-            tms['w'] = np.array([s[0] for s in excitations])
+            elec_tms = {}
+            velo_tms = {}
+            magn_tms = {}
 
+            eigvals = np.array([s[0] for s in excitations])
             eigvecs = [s[1] for s in excitations]
-            for op in ops:
-                tms[op] = np.array([np.dot(V1[op], vec) for vec in eigvecs])
 
-            osc = 2.0 / 3.0 * tms['w'] * (tms['x']**2 + tms['y']**2 +
-                                          tms['z']**2)
+            for comp in 'xyz':
+                elec_tms[comp] = np.array(
+                    [np.dot(V_dipole[comp], vec) for vec in eigvecs])
+                velo_tms[comp] = -1.0 / eigvals * np.array(
+                    [np.dot(V_linmom[comp], vec) for vec in eigvecs])
+                magn_tms[comp] = 0.5 * np.array(
+                    [np.dot(V_angmom[comp], vec) for vec in eigvecs])
 
-            results = {
-                'excitation_energies': tms['w'],
+            elec_trans_dipoles = [
+                np.array([elec_tms['x'][s], elec_tms['y'][s], elec_tms['z'][s]])
+                for s in range(self.nstates)
+            ]
+
+            velo_trans_dipoles = [
+                np.array([velo_tms['x'][s], velo_tms['y'][s], velo_tms['z'][s]])
+                for s in range(self.nstates)
+            ]
+
+            magn_trans_dipoles = [
+                np.array([magn_tms['x'][s], magn_tms['y'][s], magn_tms['z'][s]])
+                for s in range(self.nstates)
+            ]
+
+            osc = 2.0 / 3.0 * eigvals * (elec_tms['x']**2 + elec_tms['y']**2 +
+                                         elec_tms['z']**2)
+
+            rot_vel = (velo_tms['x'] * magn_tms['x'] +
+                       velo_tms['y'] * magn_tms['y'] +
+                       velo_tms['z'] * magn_tms['z'])
+
+            rot_vel *= rotatory_strength_in_cgs()
+
+            return {
+                'eigenvalues': eigvals,
+                'eigenvectors': np.array(eigvecs).T,
+                'electric_transition_dipoles': elec_trans_dipoles,
+                'velocity_transition_dipoles': velo_trans_dipoles,
+                'magnetic_transition_dipoles': magn_trans_dipoles,
                 'oscillator_strengths': osc,
+                'rotatory_strengths': rot_vel,
             }
-
-            self.print_summary(results)
-            return results
         else:
             return {}
 
@@ -294,22 +332,6 @@ class LinearResponseEigenSolver:
         self.ostream.print_header(output_conv.ljust(68))
         self.ostream.print_blank()
 
-    def print_summary(self, results):
-        """Prints summary to output stream"""
-
-        self.ostream.print_blank()
-        self.ostream.print_header('Linear Response EigenSolver'.ljust(92))
-        self.ostream.print_header('---------------------------'.ljust(92))
-        for s, (e, f) in enumerate(
-                zip(results['excitation_energies'],
-                    results['oscillator_strengths'])):
-            output_abs = 'Excitation {:>5s}: '.format(str(s + 1))
-            output_abs += '{:15.8f} a.u. '.format(e)
-            output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
-            output_abs += '    osc.str.{:12.5f}'.format(f)
-            self.ostream.print_header(output_abs.ljust(92))
-        self.ostream.print_blank()
-
     def check_convergence(self, relative_residual_norm):
         """Checks convergence"""
 
@@ -320,25 +342,6 @@ class LinearResponseEigenSolver:
 
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
-
-    def get_rhs(self, ops, scf_tensors, nocc):
-        """Create right-hand sides of linear response equations"""
-
-        mo = scf_tensors['C']
-        S = scf_tensors['S']
-        D = scf_tensors['D'][0] + scf_tensors['D'][1]
-        dipoles = scf_tensors['Mu']
-
-        norb = mo.shape[1]
-
-        if 'x' in ops or 'y' in ops or 'z' in ops:
-            props = {k: v for k, v in zip('xyz', dipoles)}
-
-        matrices = tuple(
-            mo.T @ (S @ D @ props[p].T - props[p].T @ D @ S) @ mo for p in ops)
-
-        gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
-        return gradients
 
     def initial_excitations(self, nstates, ea, nocc, norb):
 

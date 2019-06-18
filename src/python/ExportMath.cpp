@@ -6,23 +6,23 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 
-#include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
+#include <pybind11/pybind11.h>
 
 #include <memory>
 #include <vector>
 
 #include "DenseMatrix.hpp"
-#include "MathConst.hpp"
-#include "TwoIndexes.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
+#include "MathConst.hpp"
+#include "TwoIndexes.hpp"
 
 namespace py = pybind11;
 
-namespace vlx_math { // vlx_math namespace
+namespace vlx_math {  // vlx_math namespace
 
 // Helper function for printing CDenseMatrix
 
@@ -37,9 +37,7 @@ CDenseMatrix_str(const CDenseMatrix& self)
 static py::array_t<double>
 CDenseMatrix_to_numpy(const CDenseMatrix& self)
 {
-    return vlx_general::pointer_to_numpy(self.values(),
-                                         self.getNumberOfRows(),
-                                         self.getNumberOfColumns());
+    return vlx_general::pointer_to_numpy(self.values(), self.getNumberOfRows(), self.getNumberOfColumns());
 }
 
 // Helper function for CDenseMatrix constructor
@@ -97,14 +95,12 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 
 // Exports classes/functions in src/math to python
 
-void export_math(py::module& m)
+void
+export_math(py::module& m)
 {
     // CDenseMatrix class
 
-    py::class_< CDenseMatrix, std::shared_ptr<CDenseMatrix> >
-        (
-            m, "DenseMatrix"
-        )
+    py::class_<CDenseMatrix, std::shared_ptr<CDenseMatrix>>(m, "DenseMatrix")
         .def(py::init<>())
         .def(py::init<const int32_t>())
         .def(py::init<const int32_t, const int32_t>())
@@ -116,24 +112,19 @@ void export_math(py::module& m)
         .def("number_of_columns", &CDenseMatrix::getNumberOfColumns)
         .def("symmetrize", &CDenseMatrix::symmetrize)
         .def("slice", &CDenseMatrix::slice)
-        .def(py::self == py::self)
-    ;
+        .def(py::self == py::self);
 
     // CTwoIndexes class
-    
-    py::class_< CTwoIndexes, std::shared_ptr<CTwoIndexes> >
-        (
-            m, "TwoIndexes"
-        )
+
+    py::class_<CTwoIndexes, std::shared_ptr<CTwoIndexes>>(m, "TwoIndexes")
         .def(py::init<>())
         .def(py::init<const int32_t, const int32_t>())
         .def("first", &CTwoIndexes::first)
-        .def("second", &CTwoIndexes::second)
-    ;
-    
+        .def("second", &CTwoIndexes::second);
+
     // exposing functions
 
     m.def("mathconst_pi", &mathconst::getPiValue);
 }
 
-} // vlx_math namespace
+}  // namespace vlx_math

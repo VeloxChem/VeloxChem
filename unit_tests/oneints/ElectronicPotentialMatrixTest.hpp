@@ -13,11 +13,10 @@
 
 class CElectronicPotentialMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CElectronicPotentialMatrixTest() {};
-    
-    virtual ~CElectronicPotentialMatrixTest() {};
+   protected:
+    CElectronicPotentialMatrixTest(){};
+
+    virtual ~CElectronicPotentialMatrixTest(){};
 };
 
 #endif /* ElectronicPotentialMatrixTest_hpp */

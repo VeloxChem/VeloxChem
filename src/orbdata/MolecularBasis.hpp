@@ -41,8 +41,7 @@ class CMolecularBasis
      */
     std::string _label;
 
-public:
-
+   public:
     /**
      Creates an empty molecular basis object.
      */
@@ -50,14 +49,14 @@ public:
 
     /**
      Creates a molecular basis object by copying other molecular basis object.
-     
+
      @param source the molecular basis object.
      */
     CMolecularBasis(const CMolecularBasis& source);
 
     /**
      Creates a molecular basis object by moving other molecular basis object.
-     
+
      @param source the molecular basis object.
      */
     CMolecularBasis(CMolecularBasis&& source) noexcept;
@@ -69,21 +68,21 @@ public:
 
     /**
      Assigns a molecular basis object by copying other molecular basis object.
-     
+
      @param source the molecular basis object.
      */
     CMolecularBasis& operator=(const CMolecularBasis& source);
 
     /**
      Assigns a molecular basis object by moving other molecular basis object.
-     
+
      @param source the molecular basis object.
      */
     CMolecularBasis& operator=(CMolecularBasis&& source) noexcept;
 
     /**
      Compares molecular basis object with other molecular basis object.
-     
+
      @param other the molecular basis object.
      @return true if molecular basis objects are equal, false otherwise.
      */
@@ -91,7 +90,7 @@ public:
 
     /**
      Compares molecular basis object with other molecular basis object.
-     
+
      @param other the molecular basis object.
      @return true if molecular basis objects are not equal, false otherwise.
      */
@@ -117,7 +116,7 @@ public:
      @param atomBasis the atom basis object.
      */
     void addAtomBasis(const CAtomBasis& atomBasis);
-    
+
     /**
      Reduces molecular basis to valence molecular basis.
 
@@ -164,8 +163,7 @@ public:
      @param angularMomentum the angular momentum.
      @return number of basis functions.
      */
-    int32_t getNumberOfBasisFunctions(const int32_t idElemental,
-                                      const int32_t angularMomentum) const;
+    int32_t getNumberOfBasisFunctions(const int32_t idElemental, const int32_t angularMomentum) const;
 
     /**
      Determines number of basis functions with specific angular momentum
@@ -175,24 +173,20 @@ public:
      @param angularMomentum the angular momentum.
      @return the number of basis functions.
      */
-    int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
-                                      const int32_t    angularMomentum) const;
-    
+    int32_t getNumberOfBasisFunctions(const CMolecule& molecule, const int32_t angularMomentum) const;
+
     /**
      Determines number of basis functions with specific angular momentum
      in molecular basis of list of atoms in selected molecule.
-     
+
      @param molecule the molecule.
      @param iAtom the index of first atom in list of atoms.
      @param nAtoms the number of atoms in list of atoms.
      @param angularMomentum the angular momentum.
      @return the number of basis functions.
      */
-    int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
-                                      const int32_t    iAtom,
-                                      const int32_t    nAtoms,
-                                      const int32_t    angularMomentum) const;
-    
+    int32_t getNumberOfBasisFunctions(const CMolecule& molecule, const int32_t iAtom, const int32_t nAtoms, const int32_t angularMomentum) const;
+
     /**
      Determines number of primitive Gaussian functions with specific angular
      momentum in molecular basis of selected molecule.
@@ -201,14 +195,12 @@ public:
      @param angularMomentum the angular momentum.
      @return the number of Gaussian functions.
      */
-    int32_t getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
-                                               const int32_t    angularMomentum) const;
-    
-    
+    int32_t getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule, const int32_t angularMomentum) const;
+
     /**
      Determines number of primitive Gaussian functions with specific angular
      momentum in molecular basis of list of atoms in selected molecule.
-     
+
      @param molecule the molecule.
      @param iAtom the index of first atom in list of atoms.
      @param nAtoms the number of atoms in list of atoms.
@@ -227,7 +219,7 @@ public:
      @return the size of contracted AO basis.
      */
     int32_t getDimensionsOfBasis(const CMolecule& molecule) const;
-    
+
     /**
      Determines partial size up to specific angular momentum of contracted AO
      basis for selected molecule.
@@ -236,8 +228,7 @@ public:
      @param angularMomentum the angular momentum.
      @return the partial size of contracted AO basis.
      */
-    int32_t getPartialDimensionsOfBasis(const CMolecule& molecule,
-                                        const int32_t    angularMomentum) const;
+    int32_t getPartialDimensionsOfBasis(const CMolecule& molecule, const int32_t angularMomentum) const;
 
     /**
      Determines size of primitive AO basis for selected molecule.
@@ -263,9 +254,8 @@ public:
      @param angularMomentum the angular momentum.
      @return  the vector of basis function objects.
      */
-    std::vector<CBasisFunction> getBasisFunctions(const int32_t idElemental,
-                                                  const int32_t angularMomentum) const;
-    
+    std::vector<CBasisFunction> getBasisFunctions(const int32_t idElemental, const int32_t angularMomentum) const;
+
     /**
      Creates string representation map of basis functions.
 
@@ -280,27 +270,24 @@ public:
      @param title the header line of AO basis output.
      @param molecule the molecule.
      */
-    std::string printBasis(const char*      title,
-                           const CMolecule& molecule) const;
-    
+    std::string printBasis(const char* title, const CMolecule& molecule) const;
+
     /**
      Broadcasts molecular basis object within domain of MPI communicator.
-     
+
      @param rank the rank of MPI process.
      @param comm the MPI communicator.
      */
-    void broadcast(int32_t  rank,
-                   MPI_Comm comm);
+    void broadcast(int32_t rank, MPI_Comm comm);
 
     /**
      Converts molecular basis object to text output and insert it into output
      text stream.
-     
+
      @param output the output text stream.
      @param source the molecular basis object.
      */
-    friend std::ostream& operator<<(      std::ostream&    output,
-                                    const CMolecularBasis& source);
+    friend std::ostream& operator<<(std::ostream& output, const CMolecularBasis& source);
 };
 
 #endif /* MolecularBasis_hpp */

@@ -13,11 +13,10 @@
 
 #include "MathFunc.hpp"
 
-namespace mpi { // mpi namespace
+namespace mpi {  // mpi namespace
 
 bool
-init(int    argc,
-     char** argv)
+init(int argc, char** argv)
 {
     if (ENABLE_MPI)
     {
@@ -28,13 +27,12 @@ init(int    argc,
 
         int32_t mlevel = 0;
 
-        auto merror = MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED,
-                                      &mlevel);
+        auto merror = MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &mlevel);
 
         if (merror != MPI_SUCCESS)
         {
             mpi::abort(merror, "mpi::init()");
-        
+
             return false;
         }
     }
@@ -50,7 +48,7 @@ initialized()
         int32_t minit = 0;
 
         MPI_Initialized(&minit);
-        
+
         if (minit == 1) return true;
     }
 
@@ -66,7 +64,7 @@ finalize()
 
         if (merror != MPI_SUCCESS)
         {
-            mpi::abort(merror, "mpi::finalize()"); 
+            mpi::abort(merror, "mpi::finalize()");
 
             return false;
         }
@@ -74,7 +72,7 @@ finalize()
 
     return true;
 }
-    
+
 int32_t
 rank(MPI_Comm comm)
 {
@@ -96,37 +94,35 @@ nodes(MPI_Comm comm)
 }
 
 void
-duplicate(MPI_Comm  comm1,
-          MPI_Comm* comm2)
+duplicate(MPI_Comm comm1, MPI_Comm* comm2)
 {
     if (ENABLE_MPI)
     {
         auto merror = MPI_Comm_dup(comm1, comm2);
-    
+
         if (merror != MPI_SUCCESS)
         {
             mpi::abort(merror, "mpi::duplicate");
         }
     }
 }
-    
+
 void
 destroy(MPI_Comm* comm)
 {
     if (ENABLE_MPI)
     {
         auto merror = MPI_Comm_free(comm);
-    
+
         if (merror != MPI_SUCCESS)
         {
             mpi::abort(merror, "mpi::destroy");
         }
     }
 }
-    
+
 bool
-compare(MPI_Comm comm1,
-        MPI_Comm comm2)
+compare(MPI_Comm comm1, MPI_Comm comm2)
 {
     if (ENABLE_MPI)
     {
@@ -148,10 +144,9 @@ compare(MPI_Comm comm1,
 
     return true;
 }
-    
+
 void
-bcast(int32_t& value,
-      MPI_Comm comm)
+bcast(int32_t& value, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -162,8 +157,7 @@ bcast(int32_t& value,
 }
 
 void
-bcast(double&  value,
-      MPI_Comm comm)
+bcast(double& value, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -174,25 +168,22 @@ bcast(double&  value,
 }
 
 void
-bcast(bool&    value,
-      int32_t  rank,
-      MPI_Comm comm)
+bcast(bool& value, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
         int32_t mvalue = 0;
-            
+
         if (rank == mpi::master()) mvalue = (value) ? 1 : 0;
-            
+
         mpi::bcast(mvalue, comm);
-            
+
         value = (mvalue == 1) ? true : false;
     }
 }
 
 void
-bcast(char&    value,
-      MPI_Comm comm)
+bcast(char& value, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -201,11 +192,9 @@ bcast(char&    value,
         if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcast(char)");
     }
 }
-    
+
 void
-bcast(std::vector<int32_t>& vector,
-      int32_t               rank,
-      MPI_Comm              comm)
+bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -214,7 +203,7 @@ bcast(std::vector<int32_t>& vector,
         if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
 
         mpi::bcast(veclen, comm);
-        
+
         if (rank != mpi::master()) vector.clear();
 
         for (int32_t i = 0; i < veclen; i++)
@@ -226,16 +215,14 @@ bcast(std::vector<int32_t>& vector,
             mpi::bcast(mvalue, comm);
 
             if (rank != mpi::master()) vector.push_back(mvalue);
-        
+
             MPI_Barrier(comm);
         }
     }
 }
-    
+
 void
-bcast(std::vector<double>& vector,
-      int32_t              rank,
-      MPI_Comm             comm)
+bcast(std::vector<double>& vector, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -244,7 +231,7 @@ bcast(std::vector<double>& vector,
         if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
 
         mpi::bcast(veclen, comm);
-        
+
         if (rank != mpi::master()) vector.clear();
 
         for (int32_t i = 0; i < veclen; i++)
@@ -256,16 +243,14 @@ bcast(std::vector<double>& vector,
             mpi::bcast(mvalue, comm);
 
             if (rank != mpi::master()) vector.push_back(mvalue);
-        
+
             MPI_Barrier(comm);
         }
     }
 }
- 
+
 void
-bcast(std::string& str,
-      int32_t      rank,
-      MPI_Comm     comm)
+bcast(std::string& str, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -276,7 +261,7 @@ bcast(std::string& str,
         mpi::bcast(strwidth, comm);
 
         if (rank != mpi::master()) str.clear();
-        
+
         for (int32_t i = 0; i < strwidth; i++)
         {
             char symbol;
@@ -286,16 +271,14 @@ bcast(std::string& str,
             mpi::bcast(symbol, comm);
 
             if (rank != mpi::master()) str.append(1, symbol);
-            
+
             MPI_Barrier(comm);
         }
     }
 }
-    
+
 void
-bcast(std::vector<std::string>& vector,
-      int32_t                   rank,
-      MPI_Comm                  comm)
+bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -304,8 +287,8 @@ bcast(std::vector<std::string>& vector,
         if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
 
         mpi::bcast(veclen, comm);
-        
-        if (rank != mpi::master()) vector.clear(); 
+
+        if (rank != mpi::master()) vector.clear();
 
         for (int32_t i = 0; i < veclen; i++)
         {
@@ -316,44 +299,38 @@ bcast(std::vector<std::string>& vector,
             mpi::bcast(mstr, rank, comm);
 
             if (rank != mpi::master()) vector.push_back(mstr);
-        
+
             MPI_Barrier(comm);
         }
     }
 }
 
 void
-send(      double&  value,
-     const int32_t  rank,
-           MPI_Comm comm)
+send(double& value, const int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
         auto merror = MPI_Send(&value, 1, MPI_DOUBLE, rank, 0, comm);
-            
+
         if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::send(double)");
     }
 }
-  
+
 void
-receive(      double&  value,
-        const int32_t  rank,
-              MPI_Comm comm)
+receive(double& value, const int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
         MPI_Status mstat;
-        
+
         auto merror = MPI_Recv(&value, 1, MPI_DOUBLE, rank, 0, comm, &mstat);
-        
+
         if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::receive(double)");
     }
 }
-    
+
 int32_t
-batch_size(const int32_t nElements,
-           const int32_t rank,
-           const int32_t nodes)
+batch_size(const int32_t nElements, const int32_t rank, const int32_t nodes)
 {
     int32_t numelem = nElements / nodes;
 
@@ -365,9 +342,7 @@ batch_size(const int32_t nElements,
 }
 
 int32_t
-batch_offset(const int32_t nElements,
-             const int32_t rank,
-             const int32_t nodes)
+batch_offset(const int32_t nElements, const int32_t rank, const int32_t nodes)
 {
     int32_t index = 0;
 
@@ -380,9 +355,7 @@ batch_offset(const int32_t nElements,
 }
 
 void
-batches_pattern(      int32_t* pattern,
-                const int32_t  nElements,
-                const int32_t  nodes)
+batches_pattern(int32_t* pattern, const int32_t nElements, const int32_t nodes)
 {
     for (int32_t i = 0; i < nodes; i++)
     {
@@ -391,35 +364,27 @@ batches_pattern(      int32_t* pattern,
 }
 
 void
-gather(int32_t* vector,
-       int32_t  value,
-       int32_t  rank,
-       MPI_Comm comm)
+gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
-        auto merror = MPI_Gather(&value, 1, MPI_INT32_T, vector, 1, MPI_INT32_T,
-                                 mpi::master(), comm);
+        auto merror = MPI_Gather(&value, 1, MPI_INT32_T, vector, 1, MPI_INT32_T, mpi::master(), comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::gather(integer)");
     }
     else
     {
-        vector[0] = value; 
+        vector[0] = value;
     }
 }
-    
+
 void
-gather(double*  vector,
-       double   value,
-       int32_t  rank,
-       MPI_Comm comm)
+gather(double* vector, double value, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
-        auto merror = MPI_Gather(&value, 1, MPI_DOUBLE, vector, 1, MPI_DOUBLE,
-                                 mpi::master(), comm);
-        
+        auto merror = MPI_Gather(&value, 1, MPI_DOUBLE, vector, 1, MPI_DOUBLE, mpi::master(), comm);
+
         if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::gather(double)");
     }
     else
@@ -427,18 +392,14 @@ gather(double*  vector,
         vector[0] = value;
     }
 }
-   
+
 void
-reduce_sum(const double*  source,
-                 double*  destination,
-           const int32_t  nElements,
-                 MPI_Comm comm)
+reduce_sum(const double* source, double* destination, const int32_t nElements, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
-        auto merror = MPI_Reduce(source, destination, nElements, MPI_DOUBLE,
-                                 MPI_SUM, mpi::master(), comm);
-        
+        auto merror = MPI_Reduce(source, destination, nElements, MPI_DOUBLE, MPI_SUM, mpi::master(), comm);
+
         if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::reduce_sum(double)");
     }
     else
@@ -446,23 +407,22 @@ reduce_sum(const double*  source,
         mathfunc::copy(destination, 0, source, 0, nElements);
     }
 }
-    
+
 // TODO: Add other MPI functions for generic types
-    
+
 void
-abort(const int   errorcode,
-      const char* label)
+abort(const int errorcode, const char* label)
 {
     if (ENABLE_MPI)
     {
         int32_t errclass = 0;
 
         MPI_Error_class(errorcode, &errclass);
-        
-        int32_t errlen =0;
-        
+
+        int32_t errlen = 0;
+
         char errstr[MPI_MAX_ERROR_STRING];
-        
+
         MPI_Error_string(errorcode, errstr, &errlen);
 
         std::stringstream sst;
@@ -476,5 +436,5 @@ abort(const int   errorcode,
         MPI_Abort(MPI_COMM_WORLD, errorcode);
     }
 }
-    
-} // mpi namespace
+
+}  // namespace mpi

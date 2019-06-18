@@ -11,13 +11,13 @@
 #include <cmath>
 #include <vector>
 
-#include "VisualizationDriver.hpp"
+#include "AODensityMatrix.hpp"
 #include "CubicGrid.hpp"
 #include "MathConst.hpp"
-#include "MoleculeSetter.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MolecularOrbitals.hpp"
-#include "AODensityMatrix.hpp"
+#include "MoleculeSetter.hpp"
+#include "VisualizationDriver.hpp"
 
 TEST_F(CVisualizationDriverTest, Helium)
 {
@@ -34,18 +34,16 @@ TEST_F(CVisualizationDriverTest, Helium)
     // molecular orbital
 
     CDenseMatrix ma({mocoef}, 1, 1);
-    
+
     std::vector<double> ea({0.1});
-    
+
     CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
 
     // psi from manual calculation
 
-    std::vector<double> expons ({3.836000000000e+01, 5.770000000000e+00,
-                                 1.240000000000e+00, 2.976000000000e-01});
+    std::vector<double> expons({3.836000000000e+01, 5.770000000000e+00, 1.240000000000e+00, 2.976000000000e-01});
 
-    std::vector<double> coefs  ({2.380900000000e-02, 1.548910000000e-01,
-                                 4.699870000000e-01, 5.130270000000e-01});
+    std::vector<double> coefs({2.380900000000e-02, 1.548910000000e-01, 4.699870000000e-01, 5.130270000000e-01});
 
     for (size_t i = 0; i < expons.size(); i++)
     {
@@ -93,7 +91,7 @@ TEST_F(CVisualizationDriverTest, Helium)
     // psi from getPsiMolecularOrbital
 
     auto mol = vlxmol::getMoleculeHeAtom();
-    
+
     auto basis = vlxbas::getMinimalBasisForHeAtom();
 
     CCubicGrid point({xp, yp, zp}, {0.0, 0.0, 0.0}, {1, 1, 1});
@@ -107,7 +105,7 @@ TEST_F(CVisualizationDriverTest, Helium)
     // density matrix
 
     CDenseMatrix da({mocoef * mocoef}, 1, 1);
-    
+
     CAODensityMatrix dena({da}, denmat::rest);
 
     visdrv.compute(point, mol, basis, dena, 0, "a");

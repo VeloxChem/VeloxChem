@@ -13,11 +13,12 @@ class Absorption(ResponseProperty):
         rsp_input['property'] = 'absorption'
         rsp_input['response'] = 'linear'
         rsp_input['residue'] = 'single'
-        # rsp_input['operators'] = ('xyz',)
 
-        if 'spin' in rsp_dict:
-            rsp_input['spin'] = rsp_dict['spin']
-        else:
+        if 'nstates' not in rsp_dict:
+            rsp_input['nstates'] = '3'
+        if 'tamm_dancoff' not in rsp_dict:
+            rsp_input['tamm_dancoff'] = 'no'
+        if 'spin' not in rsp_dict:
             rsp_input['spin'] = 'singlet'
 
         super().__init__(rsp_input)
@@ -31,14 +32,62 @@ class Absorption(ResponseProperty):
         """Prints absorption to output stream"""
 
         ostream.print_blank()
-        ostream.print_header('One-Photon Absorption'.ljust(92))
-        ostream.print_header('---------------------'.ljust(92))
         spin_str = 'T' if self.rsp_input['spin'][0].upper() == 'T' else 'S'
+
+        self.print_transition_dipoles(
+            ostream, spin_str,
+            'Electric Transition Dipole Moments (dipole length, a.u.)',
+            self.rsp_property['electric_transition_dipoles'])
+
+        self.print_transition_dipoles(
+            ostream, spin_str,
+            'Electric Transition Dipole Moments (dipole velocity, a.u.)',
+            self.rsp_property['velocity_transition_dipoles'])
+
+        self.print_transition_dipoles(
+            ostream, spin_str, 'Magnetic Transition Dipole Moments (a.u.)',
+            self.rsp_property['magnetic_transition_dipoles'])
+
+        self.print_absorption(ostream, spin_str, 'One-Photon Absorption')
+        self.print_ecd(ostream, spin_str, 'Electronic Circular Dichroism')
+
+    def print_transition_dipoles(self, ostream, spin_str, title, trans_dipoles):
+        """Prints transition dipole moments to output stream"""
+
+        valstr = title
+        ostream.print_header(valstr.ljust(92))
+        ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = '                     '
+        valstr += '{:>13s}{:>13s}{:>13s}'.format('X', 'Y', 'Z')
+        ostream.print_header(valstr.ljust(92))
+        for s, r in enumerate(trans_dipoles):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r[0], r[1], r[2])
+            ostream.print_header(valstr.ljust(92))
+        ostream.print_blank()
+
+    def print_absorption(self, ostream, spin_str, title):
+
+        valstr = title
+        ostream.print_header(valstr.ljust(92))
+        ostream.print_header(('-' * len(valstr)).ljust(92))
         for s, e in enumerate(self.rsp_property['eigenvalues']):
-            output_abs = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
-            output_abs += '{:15.8f} a.u. '.format(e)
-            output_abs += '{:12.5f} eV'.format(e * hartree_in_ev())
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
             f = self.rsp_property['oscillator_strengths'][s]
-            output_abs += '    osc.str.{:12.5f}'.format(f)
-            ostream.print_header(output_abs.ljust(92))
+            valstr += '    Osc.Str. {:9.4f}'.format(f)
+            ostream.print_header(valstr.ljust(92))
+        ostream.print_blank()
+
+    def print_ecd(self, ostream, spin_str, title):
+
+        valstr = title
+        ostream.print_header(valstr.ljust(92))
+        ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, R in enumerate(self.rsp_property['rotatory_strengths']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '    Rot.Str. {:11.4f}'.format(R)
+            valstr += '    [10**(-40) (esu**2)*(cm**2)]'
+            ostream.print_header(valstr.ljust(92))
         ostream.print_blank()

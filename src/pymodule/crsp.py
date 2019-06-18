@@ -4,13 +4,14 @@ import time as tm
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .lrmatvecdriver import truncate_and_normalize
+from .lrmatvecdriver import rm_lin_depend
 from .lrmatvecdriver import construct_ed_sd
-from .lrmatvecdriver import lrmat2vec
 from .lrmatvecdriver import lrvec2mat
+from .lrmatvecdriver import get_rhs
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
+from .inputparser import parse_frequencies
 
 
 class ComplexResponse:
@@ -19,7 +20,11 @@ class ComplexResponse:
 
     def __init__(self, comm, ostream):
 
-        self.operators = 'xyz'
+        self.a_operator = 'dipole'
+        self.a_components = 'xyz'
+        self.b_operator = 'dipole'
+        self.b_components = 'xyz'
+
         self.frequencies = (0.1,)
         self.damping = 0.004556335294880438
 
@@ -43,17 +48,8 @@ class ComplexResponse:
         """Updates settings in complex response solver.
         """
 
-        if 'operators' in settings:
-            self.operators = settings['operators'].replace(' ', '')
-            self.operators = self.operators.lower()
         if 'frequencies' in settings:
-            self.frequencies = []
-            for w in settings['frequencies'].replace(' ', '').split(','):
-                if '-' in w:
-                    seq = tuple([float(x) for x in w.split('-')])
-                    self.frequencies += list(np.arange(*seq))
-                elif w:
-                    self.frequencies.append(float(w))
+            self.frequencies = parse_frequencies(settings['frequencies'])
         if 'damping' in settings:
             self.damping = float(settings['damping'])
 
@@ -233,30 +229,6 @@ class ComplexResponse:
 
         return v_out
 
-    def get_rhs(self, molecule, scf_tensors, ops):
-        """Creates right-hand sides of complex linear response equations
-        enabled gradients: dipole length
-        """
-
-        mo = scf_tensors['C']
-        s = scf_tensors['S']
-        d = scf_tensors['D'][0] + scf_tensors['D'][1]
-        dipoles = scf_tensors['Mu']
-
-        nocc = molecule.number_of_alpha_electrons()
-        norb = mo.shape[1]
-
-        if 'x' in ops or 'y' in ops or 'z' in ops:
-            prop = {k: v for k, v in zip('xyz', dipoles)}
-
-        # creating mo gradient matrices and converting them into vectors
-
-        matrices = tuple(
-            [mo.T @ (s @ d @ prop[p].T - prop[p].T @ d @ s) @ mo for p in ops])
-        gradients = tuple([lrmat2vec(m, nocc, norb) for m in matrices])
-
-        return gradients
-
     def initial_guess(self, op_grads, d, freqs, precond):
         """Creating initial guess (un-orthonormalized trials) out of gradients.
         """
@@ -328,18 +300,22 @@ class ComplexResponse:
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
 
-            new_ger = truncate_and_normalize(new_ger, self.small_thresh)
+            new_ger = rm_lin_depend(new_ger, self.small_thresh)
+            new_ger = self.orthogonalize_gram_schmidt(new_ger)
+            new_ger = self.normalize(new_ger)
 
         if new_ung.any() and normalize:
 
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
 
-            new_ung = truncate_and_normalize(new_ung, self.small_thresh)
+            new_ung = rm_lin_depend(new_ung, self.small_thresh)
+            new_ung = self.orthogonalize_gram_schmidt(new_ung)
+            new_ung = self.normalize(new_ung)
 
         return new_ger, new_ung
 
-    def compute(self, molecule, basis, scf_tensors, rhs=None):
+    def compute(self, molecule, basis, scf_tensors, b_rhs=None):
         """Solves for the approximate response vector iteratively
         while checking the residuals for convergence.
 
@@ -361,7 +337,6 @@ class ComplexResponse:
             'ComplexResponseSolver: not implemented for unrestricted case')
 
         d = self.damping
-        ops = self.operators
         freqs = self.frequencies
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
@@ -377,19 +352,17 @@ class ComplexResponse:
         else:
             nocc = None
 
+        if b_rhs is None:
+            b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
+                            scf_tensors, self.rank, self.comm)
+
         if self.rank == mpi_master():
 
             trials_info = {'bger': False, 'bung': False}
 
             # calling the gradients
 
-            if rhs is None:
-                v1 = {
-                    op: v for op, v in zip(
-                        ops, self.get_rhs(molecule, scf_tensors, ops))
-                }
-            else:
-                v1 = rhs
+            v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
 
             # creating the preconditioner matrix
 
@@ -445,18 +418,18 @@ class ComplexResponse:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
-        nvs = {}
         kappas = {}
 
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
+            iter_start_time = tm.time()
 
             if self.rank == mpi_master():
+                nvs = []
 
                 for op, w in igs:
                     if iteration == 0 or (relative_residual_norm[(op, w)]
                                          > self.conv_thresh):
-
                         grad = v1[op]
 
                         gradger, gradung = self.decomp_sym(grad)
@@ -585,8 +558,8 @@ class ComplexResponse:
 
                         solutions[(op, w)] = x
 
-                        kappas[(op, w)] = (lrvec2mat(x.real,nocc,norb)
-                                          + 1j*lrvec2mat(x.imag,nocc,norb))
+                        kappas[(op, w)] = (lrvec2mat(x.real, nocc, norb) +
+                                           1j * lrvec2mat(x.imag, nocc, norb))
 
                         # composing E2 and S2 matrices projected onto solution
                         # subspace
@@ -613,7 +586,7 @@ class ComplexResponse:
                             e2realung = np.zeros(full_size)
                             e2imagung = np.zeros(full_size)
                             s2realung = np.zeros(full_size)
-                            s2imagung = np.zroes(full_size)
+                            s2imagung = np.zeros(full_size)
 
                         # calculating the residual components
 
@@ -643,7 +616,7 @@ class ComplexResponse:
                         # calculating relative residual norm for convergence check
 
                         nv = np.matmul(n, grad)
-                        nvs[(op, w)] = nv
+                        nvs.append((op, w, nv))
 
                         rn = np.linalg.norm(r)
                         nn = np.linalg.norm(n)
@@ -658,6 +631,10 @@ class ComplexResponse:
                     '{:d} gerade trial vectors'.format(ntrials_ger))
                 self.ostream.print_info(
                     '{:d} ungerade trial vectors'.format(ntrials_ung))
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Time for this iteration: {:.2f} sec'.format(
+                    tm.time() - iter_start_time))
                 self.ostream.print_blank()
                 self.print_iteration(relative_residual_norm, nvs)
 
@@ -677,7 +654,7 @@ class ComplexResponse:
                 new_trials_ger, new_trials_ung = self.setup_trials(residuals,
                                                                    pre=precond,
                                                                    bger=bger,
-                                                                   bung=bung,
+                                                                   bung=bung
                                                                    res_norm=
                                                         relative_residual_norm)
 
@@ -733,8 +710,19 @@ class ComplexResponse:
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
 
+        a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
+                        scf_tensors, self.rank, self.comm)
+
+        if self.rank == mpi_master():
+            va = {op: v for op, v in zip(self.a_components, a_rhs)}
+            props = {}
+            for aop in self.a_components:
+                for bop, w in solutions:
+                    props[(aop, bop, w)] = -np.dot(va[aop], solutions[(bop, w)])
+            self.print_properties(props)
+
             return {
-                'properties': nvs,
+                'properties': props,
                 'solutions': solutions,
                 'kappas': kappas,
             }
@@ -762,7 +750,13 @@ class ComplexResponse:
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(82))
         self.ostream.print_blank()
-        for (op, freq), nv in nvs.items():
+
+        output_header = 'Operator:  {} ({})'.format(self.b_operator,
+                                                    self.b_components)
+        self.ostream.print_header(output_header.ljust(82))
+        self.ostream.print_blank()
+
+        for op, freq, nv in nvs:
             ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
@@ -812,3 +806,18 @@ class ComplexResponse:
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(82))
         self.ostream.print_blank()
+
+    def print_properties(self, props):
+
+        for w in self.frequencies:
+            w_str = '{}, {}, w={:.4f}'.format(self.a_operator, self.b_operator,
+                                              w)
+            self.ostream.print_header(w_str.ljust(82))
+            self.ostream.print_header(('-' * len(w_str)).ljust(82))
+            for a in self.a_components:
+                for b in self.b_components:
+                    ops_label = '<<{};{}>>_{:.4f}'.format(a, b, w)
+                    output_alpha = '{:<15s} {:15.8f} {:15.8f}j'.format(
+                        ops_label, props[(a, b, w)].real, props[(a, b, w)].imag)
+                    self.ostream.print_header(output_alpha.ljust(82))
+            self.ostream.print_blank()

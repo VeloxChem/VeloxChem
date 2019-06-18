@@ -36,7 +36,7 @@ class TestSolvers(unittest.TestCase):
         # compute initial guess
 
         saddrv = SADGuessDriver(comm)
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, True)
 
         # matrix to numpy
 
@@ -67,7 +67,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge + 2)
         molecule.set_multiplicity(multiplicity)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, True)
 
         density_a = D.alpha_to_numpy(0)
 
@@ -84,7 +84,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge - 2)
         molecule.set_multiplicity(multiplicity)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, True)
 
         density_a = D.alpha_to_numpy(0)
 
@@ -101,7 +101,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge + 1)
         molecule.set_multiplicity(multiplicity + 1)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, False)
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
@@ -120,7 +120,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge - 1)
         molecule.set_multiplicity(multiplicity + 1)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, False)
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
@@ -139,7 +139,7 @@ class TestSolvers(unittest.TestCase):
         molecule.set_charge(charge)
         molecule.set_multiplicity(multiplicity + 2)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22)
+        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, False)
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)

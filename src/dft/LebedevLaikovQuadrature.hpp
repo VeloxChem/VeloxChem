@@ -29,7 +29,7 @@
 
 /**
  Class CLebedevLaikovQuadrature class generates Lebedev-Laikov quadrature.
- 
+
  @author Z. Rinkevicius
  */
 class CLebedevLaikovQuadrature
@@ -116,30 +116,24 @@ class CLebedevLaikovQuadrature
      @param offset the offset of grid points in quadrature points.
      @param weight the weight assigned to grid weights.
      */
-    void _generateCaseOne(      CMemBlock2D<double>& gridPoints,
-                          const int32_t              offset,
-                          const double               weight) const;
+    void _generateCaseOne(CMemBlock2D<double>& gridPoints, const int32_t offset, const double weight) const;
 
     /**
      Generates 12 points term of Lebedev-Laikov quadrature.
-     
+
      @param gridPoints the quadrature points.
      @param offset the offset of grid points in quadrature points.
      @param weight the weight assigned to grid weights.
      */
-    void _generateCaseTwo(      CMemBlock2D<double>& gridPoints,
-                          const int32_t              offset,
-                          const double               weight) const;
+    void _generateCaseTwo(CMemBlock2D<double>& gridPoints, const int32_t offset, const double weight) const;
     /**
      Generates 8 points term of Lebedev-Laikov quadrature.
-     
+
      @param gridPoints the quadrature points.
      @param offset the offset of grid points in quadrature points.
      @param weight the weight assigned to grid weights.
      */
-    void _generateCaseThree(      CMemBlock2D<double>& gridPoints,
-                            const int32_t              offset,
-                            const double               weight) const;
+    void _generateCaseThree(CMemBlock2D<double>& gridPoints, const int32_t offset, const double weight) const;
 
     /**
      Generates first 24 points term of Lebedev-Laikov quadrature.
@@ -149,23 +143,17 @@ class CLebedevLaikovQuadrature
      @param factor the scaling factor of grid coordinates.
      @param weight the weight assigned to grid weights.
      */
-    void _generateCaseFour(      CMemBlock2D<double>& gridPoints,
-                           const int32_t              offset,
-                           const double               factor,
-                           const double               weight) const;
-    
+    void _generateCaseFour(CMemBlock2D<double>& gridPoints, const int32_t offset, const double factor, const double weight) const;
+
     /**
      Generates second 24 points term of Lebedev-Laikov quadrature.
-     
+
      @param gridPoints the quadrature points.
      @param offset the offset of grid points in quadrature points.
      @param factor the scaling factor of grid coordinates.
      @param weight the weight assigned to grid weights.
      */
-    void _generateCaseFive(      CMemBlock2D<double>& gridPoints,
-                           const int32_t              offset,
-                           const double               factor,
-                           const double               weight) const;
+    void _generateCaseFive(CMemBlock2D<double>& gridPoints, const int32_t offset, const double factor, const double weight) const;
 
     /**
      Generates 48 points term of Lebedev-Laikov quadrature.
@@ -176,17 +164,16 @@ class CLebedevLaikovQuadrature
      @param factorB the second scaling factor of grid coordinates.
      @param weight the weight assigned to grid weights.
      */
-    void _generateCaseSix(      CMemBlock2D<double>& gridPoints,
-                          const int32_t              offset,
-                          const double               factorA,
-                          const double               factorB,
-                          const double               weight) const;
+    void _generateCaseSix(CMemBlock2D<double>& gridPoints,
+                          const int32_t        offset,
+                          const double         factorA,
+                          const double         factorB,
+                          const double         weight) const;
 
-public:
-
+   public:
     /**
      Creates a Lebedev-Laikov quadrature object.
-     
+
      @param nAngularPoints the number of angular points.
      */
     CLebedevLaikovQuadrature(const int32_t nAngularPoints);

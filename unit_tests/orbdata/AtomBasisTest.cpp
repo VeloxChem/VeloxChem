@@ -83,18 +83,12 @@ TEST_F(CAtomBasisTest, AddBasisFunction)
 
     abas.setIdElemental(1);
 
-    abas.addBasisFunction(CBasisFunction({1.301070100000e+01,
-                                          1.962257200000e+00,
-                                          4.445379600000e-01},
-                                          {1.968215800000e-02,
-                                           1.379652400000e-01,
-                                           4.783193500000e-01}, 0));
+    abas.addBasisFunction(CBasisFunction(
+        {1.301070100000e+01, 1.962257200000e+00, 4.445379600000e-01}, {1.968215800000e-02, 1.379652400000e-01, 4.783193500000e-01}, 0));
 
-    abas.addBasisFunction(CBasisFunction({1.219496200000e-01},
-                                         {1.000000000000e+00}, 0));
+    abas.addBasisFunction(CBasisFunction({1.219496200000e-01}, {1.000000000000e+00}, 0));
 
-    abas.addBasisFunction(CBasisFunction({8.000000000000e-01},
-                                         {1.000000000000e+00}, 1));
+    abas.addBasisFunction(CBasisFunction({8.000000000000e-01}, {1.000000000000e+00}, 1));
 
     ASSERT_EQ(abas, vlxbas::getAtomBasisForH());
 }
@@ -143,29 +137,22 @@ TEST_F(CAtomBasisTest, GetBasisFunctions)
 
     ASSERT_EQ(3u, sbfs.size());
 
-    ASSERT_EQ(sbfs[0], CBasisFunction({2.662778551600e+02, 4.006978344700e+01,
-                                       9.055994438900e+00, 2.450300905100e+00,
-                                       7.220957185500e-01},
-                                      {6.492015032500e-03, 4.774786321500e-02,
-                                       2.026879611100e-01, 4.860657481700e-01,
-                                       4.362697795500e-01}, 0));
+    ASSERT_EQ(sbfs[0],
+              CBasisFunction({2.662778551600e+02, 4.006978344700e+01, 9.055994438900e+00, 2.450300905100e+00, 7.220957185500e-01},
+                             {6.492015032500e-03, 4.774786321500e-02, 2.026879611100e-01, 4.860657481700e-01, 4.362697795500e-01},
+                             0));
 
-    ASSERT_EQ(sbfs[1], CBasisFunction({5.281088472100e-02},
-                                      {1.000000000000e+00}, 0));
+    ASSERT_EQ(sbfs[1], CBasisFunction({5.281088472100e-02}, {1.000000000000e+00}, 0));
 
-    ASSERT_EQ(sbfs[2], CBasisFunction({2.096094879800e-02},
-                                      {1.000000000000e+00}, 0));
+    ASSERT_EQ(sbfs[2], CBasisFunction({2.096094879800e-02}, {1.000000000000e+00}, 0));
 
     auto pbfs = abas.getBasisFunctions(1);
 
     ASSERT_EQ(2u, pbfs.size());
 
-    ASSERT_EQ(pbfs[0], CBasisFunction({1.450000000000e+00, 3.000000000000e-01},
-                                      {2.586000000000e-01, 1.000000000000e+00},
-                                      1));
+    ASSERT_EQ(pbfs[0], CBasisFunction({1.450000000000e+00, 3.000000000000e-01}, {2.586000000000e-01, 1.000000000000e+00}, 1));
 
-    ASSERT_EQ(pbfs[1], CBasisFunction({8.200000000000e-02},
-                                      {1.000000000000e+00}, 1));
+    ASSERT_EQ(pbfs[1], CBasisFunction({8.200000000000e-02}, {1.000000000000e+00}, 1));
 
     auto dbfs = abas.getBasisFunctions(2);
 
@@ -175,25 +162,20 @@ TEST_F(CAtomBasisTest, GetBasisFunctions)
 TEST_F(CAtomBasisTest, ReduceToValenceBasis)
 {
     CAtomBasis abas = vlxbas::getAtomBasisForLi();
-    
+
     CAtomBasis bbas = abas.reduceToValenceBasis();
-    
+
     CAtomBasis cbas;
-    
+
     cbas.setIdElemental(3);
-    
-    cbas.addBasisFunction(CBasisFunction({2.662778551600e+02, 4.006978344700e+01,
-                                          9.055994438900e+00, 2.450300905100e+00,
-                                          7.220957185500e-01},
-                                         {6.492015032500e-03, 4.774786321500e-02,
-                                          2.026879611100e-01, 4.860657481700e-01,
-                                          4.362697795500e-01}, 0));
-    
-    cbas.addBasisFunction(CBasisFunction({5.281088472100e-02},
-                                         {1.000000000000e+00}, 0));
-    
-    cbas.addBasisFunction(CBasisFunction({2.096094879800e-02},
-                                         {1.000000000000e+00}, 0));
-    
+
+    cbas.addBasisFunction(CBasisFunction({2.662778551600e+02, 4.006978344700e+01, 9.055994438900e+00, 2.450300905100e+00, 7.220957185500e-01},
+                                         {6.492015032500e-03, 4.774786321500e-02, 2.026879611100e-01, 4.860657481700e-01, 4.362697795500e-01},
+                                         0));
+
+    cbas.addBasisFunction(CBasisFunction({5.281088472100e-02}, {1.000000000000e+00}, 0));
+
+    cbas.addBasisFunction(CBasisFunction({2.096094879800e-02}, {1.000000000000e+00}, 0));
+
     ASSERT_EQ(bbas, cbas);
 }

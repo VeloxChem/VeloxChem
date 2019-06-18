@@ -13,11 +13,10 @@
 
 class CElectricFieldMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CElectricFieldMatrixTest() {};
-    
-    virtual ~CElectricFieldMatrixTest() {};
+   protected:
+    CElectricFieldMatrixTest(){};
+
+    virtual ~CElectricFieldMatrixTest(){};
 };
 
 #endif /* ElectricFieldMatrixTest_hpp */

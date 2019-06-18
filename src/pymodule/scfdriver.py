@@ -8,7 +8,6 @@ from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
@@ -16,6 +15,7 @@ from .molecularorbitals import MolecularOrbitals
 from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .errorhandler import assert_msg_critical
 
 
 class ScfDriver:
@@ -78,6 +78,8 @@ class ScfDriver:
         The number of MPI processes.
     restart
         The flag for restarting from checkpoint file
+    restricted
+        The flag for restricted SCF
     """
 
     def __init__(self, comm, ostream):
@@ -118,6 +120,9 @@ class ScfDriver:
         self.fock_matrices = deque()
         self.den_matrices = deque()
 
+        self.fock_matrices_beta = deque()
+        self.den_matrices_beta = deque()
+
         # density matrix
         self.density = AODensityMatrix()
 
@@ -138,6 +143,9 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+
+        # restricted?
+        self.restricted = True
 
     def update_settings(self, scf_dict):
 
@@ -224,9 +232,17 @@ class ScfDriver:
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
+        self.fock_matrices_beta.clear()
+        self.den_matrices_beta.clear()
+
         if self.rank == mpi_master():
             self.print_scf_energy()
-            self.print_ground_state(molecule)
+            if self.restricted:
+                s2 = 0.0
+            else:
+                s2 = self.compute_s2(molecule, self.scf_tensors['S'],
+                                     self.mol_orbs)
+            self.print_ground_state(molecule, s2)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False,
                                          self.ostream)
 
@@ -266,8 +282,10 @@ class ScfDriver:
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
-        ovl_mat, kin_mat, npot_mat, dipole_mats = self.comp_one_ints(
-            molecule, ao_basis)
+        self.fock_matrices_beta.clear()
+        self.den_matrices_beta.clear()
+
+        ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis)
 
         linear_dependency = False
 
@@ -372,8 +390,6 @@ class ScfDriver:
                 'C': self.mol_orbs.alpha_to_numpy(),
                 'E': self.mol_orbs.ea_to_numpy(),
                 'S': ovl_mat.to_numpy(),
-                'Mu': (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                       dipole_mats.z_to_numpy()),
                 'D': (self.density.alpha_to_numpy(0),
                       self.density.beta_to_numpy(0)),
                 'F': (fock_mat.to_numpy(0), fock_mat.to_numpy(0)),
@@ -383,13 +399,17 @@ class ScfDriver:
                 'C': None,
                 'E': None,
                 'S': None,
-                'Mu': None,
                 'D': None,
-                'F': None
+                'F': None,
             }
 
         if self.rank == mpi_master():
             self.print_scf_finish(start_time)
+
+        if self.rank == mpi_master():
+            if not self.first_step:
+                assert_msg_critical(self.is_converged,
+                                    'ScfDriver.compute: failed to converge')
 
     def comp_one_ints(self, molecule, basis):
         """Computes one-electron integrals required for SCF calculation.
@@ -422,9 +442,6 @@ class ScfDriver:
 
         t3 = tm.time()
 
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, basis)
-
         if self.rank == mpi_master():
 
             self.ostream.print_info("Overlap matrix computed in" +
@@ -441,7 +458,7 @@ class ScfDriver:
 
             self.ostream.flush()
 
-        return (ovl_mat, kin_mat, npot_mat, dipole_mats)
+        return ovl_mat, kin_mat, npot_mat
 
     def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
         """Computes initial density guess for SCF calculation.
@@ -471,7 +488,8 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.comm, self.ostream)
+                                              ovl_mat, self.restricted,
+                                              self.comm, self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
         if self.den_guess.guess_type == "PRCMO":
@@ -532,7 +550,21 @@ class ScfDriver:
             energy).
         """
 
-        return (0.0, 0.0, 0.0)
+        if self.rank == mpi_master():
+            # electronic, kinetic, nuclear energy
+            e_ee = fock_mat.get_energy(0, den_mat, 0)
+            e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
+            e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
+        else:
+            e_ee = 0.0
+            e_kin = 0.0
+            e_en = 0.0
+
+        e_ee = self.comm.bcast(e_ee, root=mpi_master())
+        e_kin = self.comm.bcast(e_kin, root=mpi_master())
+        e_en = self.comm.bcast(e_en, root=mpi_master())
+
+        return (e_ee, e_kin, e_en)
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
         """Computes full Fock/Kohn-Sham matrix.
@@ -551,7 +583,8 @@ class ScfDriver:
             The nuclear potential matrix.
         """
 
-        return
+        if self.rank == mpi_master():
+            fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """Computes electronic gradient.
@@ -643,6 +676,7 @@ class ScfDriver:
         -------
             The molecular orbitals.
         """
+
         return MolecularOrbitals()
 
     def gen_new_density(self, molecule):
@@ -658,6 +692,10 @@ class ScfDriver:
         -------
             The density matrix.
         """
+
+        if self.rank == mpi_master():
+            return self.mol_orbs.get_density(molecule)
+
         return AODensityMatrix()
 
     def get_dyn_threshold(self, e_grad):
@@ -757,7 +795,10 @@ class ScfDriver:
             The molecule.
         """
 
-        return
+        valstr = self.get_scf_type() + ':'
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        self.print_energy_components()
 
     def print_header(self):
         """Prints SCF setup header to output stream.
@@ -837,7 +878,7 @@ class ScfDriver:
             if self.is_converged:
                 valstr += "converged in "
             else:
-                valstr += "not converged in "
+                valstr += "NOT converged in "
             valstr += str(self.num_iter)
             valstr += " iterations. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
@@ -918,6 +959,9 @@ class ScfDriver:
 
         if self.den_guess.guess_type == "SAD":
             return "Superposition of Atomic Densities"
+
+        if self.den_guess.guess_type == "RESTART":
+            return "Restart from Checkpoint"
 
         return "Undefined"
 
@@ -1006,7 +1050,24 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
-    def print_ground_state(self, molecule):
+    def compute_s2(self, molecule, smat, mol_orbs):
+        """Computes expectation value <S**2>
+
+        Computes expectation value of the S**2 operator.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        smat
+            The overlap matrix (numpy array).
+        mol_orbs
+            The molecular orbitals.
+        """
+
+        return None
+
+    def print_ground_state(self, molecule, s2):
         """Prints ground state information to output stream.
 
         Prints ground state information to output stream.
@@ -1033,6 +1094,10 @@ class ScfDriver:
         sz = 0.5 * (mult - 1.0)
         valstr = "Magnetic Quantum Number (S_z) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
+
+        if not self.restricted:
+            valstr = "Expectation value of S**2     :{:8.4f}".format(s2)
+            self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
 

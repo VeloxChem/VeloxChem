@@ -106,6 +106,13 @@ class TestMolData(unittest.TestCase):
         self.assertTrue((y == y_arr).all())
         self.assertTrue((z == z_arr).all())
 
+    def test_center_of_mass(self):
+
+        mol = self.nh3_molecule()
+        mol_com = mol.center_of_mass()
+        ref_com = np.array([-3.831697, 3.070437, -0.031436])
+        self.assertTrue(np.max(np.abs(ref_com - mol_com)) < 1.0e-6)
+
     def test_setters_and_getters(self):
 
         mol = self.nh3_molecule()

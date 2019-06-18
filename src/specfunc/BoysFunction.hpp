@@ -9,11 +9,11 @@
 #ifndef BoysFunction_hpp
 #define BoysFunction_hpp
 
-#include <cstdint>
 #include <array>
+#include <cstdint>
 
-#include "MemBlock2D.hpp"
 #include "MemBlock.hpp"
+#include "MemBlock2D.hpp"
 
 /**
  Defines alias to STL 2D array used for storing Boys function recursion
@@ -23,7 +23,7 @@ using CBFTable = std::array<std::array<double, 7>, 121>;
 
 /**
  Class CBoysFunction implements computation of Boys function.
- 
+
  @author Z. Rinkevicius
  */
 class CBoysFunction
@@ -31,7 +31,7 @@ class CBoysFunction
     /**
      The order of Boys function.
      */
-    int32_t _order; 
+    int32_t _order;
 
     /**
      The vector of Boys function recursion parameters for arguments between
@@ -53,373 +53,315 @@ class CBoysFunction
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF00(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
-    
+    void _computeBF00(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
+
     /**
      Computes vector of 0..1 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF01(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF01(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..2 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF02(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF02(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..3 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF03(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF03(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..4 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF04(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF04(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..5 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF05(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF05(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..6 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF06(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF06(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..7 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF07(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF07(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..8 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF08(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF08(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..9 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF09(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF09(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..10 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF10(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF10(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..11 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF11(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF11(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..12 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF12(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF12(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..13 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF13(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF13(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..14 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF14(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF14(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..15 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF15(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF15(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..16 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF16(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF16(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..17 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF17(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF17(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..18 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF18(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF18(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..19 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF19(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF19(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..20 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF20(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF20(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..21 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF21(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF21(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..22 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF22(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF22(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..23 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF23(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF23(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..24 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF24(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF24(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..25 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF25(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF25(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..26 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF26(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF26(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..27 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF27(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF27(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Computes vector of 0..28 orders Boys function values for given vector of
      arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      */
-    void _computeBF28(      CMemBlock2D<double>& values,
-                      const CMemBlock<double>&   arguments,
-                      const int32_t              nArguments) const;
+    void _computeBF28(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const;
 
     /**
      Loads recursion paramaters table into specified part of recursion parameters
@@ -428,8 +370,7 @@ class CBoysFunction
      @param bfData the recursion parameters table.
      @param identifier the identifier of part of recursion parameters vector.
      */
-    void _loadTable(const CBFTable& bfData,
-                    const int32_t   identifier);
+    void _loadTable(const CBFTable& bfData, const int32_t identifier);
 
     /**
      Generates and loads recursion parameters for Boys function of 0-th order.
@@ -576,8 +517,7 @@ class CBoysFunction
      */
     void _generateTable28();
 
-public:
-
+   public:
     /**
      Creates an unitialized Boys function evaluator object.
      */
@@ -585,7 +525,7 @@ public:
 
     /**
      Creates a Boys function evaluator object.
-     
+
      @param order the max. order of Boys function.
      */
     CBoysFunction(const int32_t order);
@@ -594,7 +534,7 @@ public:
      Destroys a Boys function evaluator object.
      */
     ~CBoysFunction();
-    
+
     /**
      Computes Boys function values up to specified order (inclusively) for given
      vector of arguments.
@@ -603,24 +543,19 @@ public:
      @param arguments the vector of Boys function arguments.
      @param iOrder the order of Boys function.
      */
-    void compute(      CMemBlock2D<double>& values,
-                 const CMemBlock<double>&   arguments,
-                 const int32_t              iOrder) const;
-    
+    void compute(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t iOrder) const;
+
     /**
      Computes Boys function values up to specified order (inclusively) for given
      vector of arguments.
-     
+
      @param values the vector of Boys function values.
      @param arguments the vector of Boys function arguments.
      @param nArguments the number of Boys function arguments used in
             computations.
      @param iOrder the order of Boys function.
      */
-    void compute(      CMemBlock2D<double>& values,
-                 const CMemBlock<double>&   arguments,
-                 const int32_t              nArguments, 
-                 const int32_t              iOrder) const;
+    void compute(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments, const int32_t iOrder) const;
 };
 
 #endif /* BoysFunction_hpp */

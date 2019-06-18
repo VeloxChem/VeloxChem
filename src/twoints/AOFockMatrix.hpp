@@ -128,10 +128,12 @@ public:
      Sets type of specific fock matrix.
 
      @param fockType the type of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
      @param iFockMatrix the index of Fock matrix.
      */
     void setFockType(const fockmat& fockType,
-                     const int32_t  iFockMatrix); 
+                     const int32_t  iFockMatrix,
+                     const bool     beta=false); 
     
     /**
      Resets all elements of AO Fock matrix to zero.
@@ -184,6 +186,13 @@ public:
                     MPI_Comm comm);
     
     /**
+     Checks if the Fock matrices are restricted.
+     
+     @return true if the Fock matrices are restricted.
+     */
+    bool isRestricted() const;
+
+    /**
      Gets number of Fock matrices.
      
      @return the number of Fock matrices.
@@ -218,49 +227,55 @@ public:
      Gets constant pointer to first element of specific Fock matrix.
      
      @param iFockMatrix the index of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
      @return the constant pointer to first element of Fock matrix.
      */
-    const double* getFock(const int32_t iFockMatrix) const;
+    const double* getFock(const int32_t iFockMatrix, const bool beta=false) const;
     
     /**
      Gets pointer to first element of specific Fock matrix.
      
      @param iFockMatrix the index of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
      @return the pointer to first element of Fock matrix.
      */
-    double* getFock(const int32_t iFockMatrix);
+    double* getFock(const int32_t iFockMatrix, const bool beta=false);
     
     /**
      Gets constant reference to specific Fock matrix.
 
      @param iFockMatrix the index of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
      @return the constant reference to Fock matrix.
      */
-    const CDenseMatrix& getReferenceToFock(const int32_t iFockMatrix) const;
+    const CDenseMatrix& getReferenceToFock(const int32_t iFockMatrix, const bool beta=false) const;
     
     /**
      Gets type of specific Fock matrix.
 
      @param iFockMatrix the index of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
      @return the type of Fock matrix.
      */
-    fockmat getFockType(const int32_t iFockMatrix) const;
+    fockmat getFockType(const int32_t iFockMatrix, const bool beta=false) const;
     
     /**
      Gets scaling factor of exchange contribution for specific Fock matrix.
      
      @param iFockMatrix the index of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
      @return the scaling factor.
      */
-    double getScaleFactor(const int32_t iFockMatrix) const;
+    double getScaleFactor(const int32_t iFockMatrix, const bool beta=false) const;
     
     /**
      Gets identifier of AO density matrix used to construct specific Fock matrix.
 
      @param iFockMatrix the index of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
      @return the identifier of density matrix.
      */
-    int32_t getDensityIdentifier(const int32_t iFockMatrix) const;
+    int32_t getDensityIdentifier(const int32_t iFockMatrix, const bool beta=false) const;
     
     /**
      Checks if specific Fock matrix is symmetric.

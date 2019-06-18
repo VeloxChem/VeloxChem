@@ -11,28 +11,28 @@
 
 #include "Molecule.hpp"
 
-namespace vlxmol { // vlxmol namespace
-    
-    CMolecule getMoleculeEmpty();
-    
-    CMolecule getMoleculeLiH();
-    
-    CMolecule getTestLiH();
-    
-    CMolecule getMoleculeLiHCation();
+namespace vlxmol {  // vlxmol namespace
 
-    CMolecule getMoleculeHeAtom();
-    
-    CMolecule getMoleculeH2O();
+CMolecule getMoleculeEmpty();
 
-    CMolecule getMoleculeH2Se();
+CMolecule getMoleculeLiH();
 
-    CMolecule getMoleculeH2ODimer();
+CMolecule getTestLiH();
 
-    CMolecule getMoleculeNH3CH4();
-    
-    CMolecule getTestLiH2();
-    
-} // vlxmol namespace
+CMolecule getMoleculeLiHCation();
+
+CMolecule getMoleculeHeAtom();
+
+CMolecule getMoleculeH2O();
+
+CMolecule getMoleculeH2Se();
+
+CMolecule getMoleculeH2ODimer();
+
+CMolecule getMoleculeNH3CH4();
+
+CMolecule getTestLiH2();
+
+}  // namespace vlxmol
 
 #endif /* MoleculeSetter_hpp */

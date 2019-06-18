@@ -13,22 +13,15 @@
 
 #include "Molecule.hpp"
 
-namespace vdwradii { // vdwradii namespace
+namespace vdwradii {  // vdwradii namespace
 
 /**
  Creates VDW radii.
- 
- @return a vector with nuclear charge as index.
- */
-const std::vector<double> buildVdwRadii();
 
-/**
- Creates VDW radii for a molecule.
- 
- @return a vector indexed by atom.
+ @return a vector of VDW radii with nuclear charge as index.
  */
-const std::vector<double> getRadii(const CMolecule& mol);
+std::vector<double> buildVdwRadii();
 
-} // vdwradii namespace
+}  // namespace vdwradii
 
 #endif /* VdwRadii_hpp */

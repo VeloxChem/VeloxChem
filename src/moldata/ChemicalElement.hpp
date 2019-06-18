@@ -10,13 +10,13 @@
 #define ChemicalElement_hpp
 
 #include <cstdint>
-#include <string>
 #include <ostream>
+#include <string>
 
 /**
  Class CChemicalElement stores information about chemical elements H-Rn and
  provides methods for retrieving various properties of chemical elements H-Rn.
- 
+
  @author Z. Rinkevicius
  */
 class CChemicalElement
@@ -328,7 +328,7 @@ class CChemicalElement
      isotope.
      */
     void _selectSilverAtom();
-    
+
     /**
      Sets chemical element properties to properties of cadmium most abudant
      isotope.
@@ -593,7 +593,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -606,7 +606,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -619,7 +619,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -632,7 +632,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -645,7 +645,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -658,7 +658,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -671,7 +671,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -684,7 +684,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -697,7 +697,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -710,7 +710,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -723,7 +723,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -736,7 +736,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -749,7 +749,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -762,7 +762,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -775,7 +775,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -788,7 +788,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -801,7 +801,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -814,7 +814,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -827,7 +827,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -840,7 +840,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -853,7 +853,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -866,7 +866,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -879,7 +879,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -892,7 +892,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -905,7 +905,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -918,7 +918,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -931,7 +931,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -944,7 +944,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -957,7 +957,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -970,7 +970,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -983,7 +983,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -996,7 +996,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1009,7 +1009,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1022,7 +1022,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1035,7 +1035,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1048,7 +1048,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1061,7 +1061,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1074,7 +1074,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1087,7 +1087,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1100,11 +1100,11 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
-    
+
     bool _selectNiobiumIsotopeMass(const int32_t isotopeLabel);
 
     /**
@@ -1114,7 +1114,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1127,7 +1127,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1140,7 +1140,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1153,7 +1153,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1166,7 +1166,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1179,7 +1179,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1192,7 +1192,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1205,7 +1205,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1218,7 +1218,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1231,7 +1231,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1244,7 +1244,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1257,7 +1257,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1270,7 +1270,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1283,7 +1283,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1296,7 +1296,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1309,7 +1309,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1322,7 +1322,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1335,7 +1335,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1348,7 +1348,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1361,7 +1361,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1374,7 +1374,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1387,7 +1387,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1400,7 +1400,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1413,7 +1413,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1426,7 +1426,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1439,7 +1439,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1452,7 +1452,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1465,7 +1465,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1478,7 +1478,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1491,7 +1491,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1504,7 +1504,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1517,7 +1517,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1530,7 +1530,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1543,7 +1543,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1556,7 +1556,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1569,7 +1569,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1582,7 +1582,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1595,7 +1595,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1608,7 +1608,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1621,7 +1621,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1634,7 +1634,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1647,7 +1647,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1660,7 +1660,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1673,7 +1673,7 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
@@ -1686,14 +1686,13 @@ class CChemicalElement
      of chemical element.
      b) if unsupported isotope number is given, mass of chemical element is not
      updated and function returns false.
-     
+
      @param isotopeLabel the isotope number.
      @return true if success, false otherwise.
      */
     bool _selectRadonIsotopeMass(const int32_t isotopeLabel);
 
-public:
-
+   public:
     /**
      Creates an empty chemical element object.
      */
@@ -1701,16 +1700,13 @@ public:
 
     /**
      Constructs a chemical element with specific atomic properties.
-     
+
      @param atomicLabel the name of chemical element as string.
      @param atomicCharge the charge.
      @param atomicMass the mass.
      @paeam atomicNumber the chemical element number.
      */
-    CChemicalElement(const std::string& atomicLabel,
-                     const double       atomicCharge,
-                     const double       atomicMass,
-                     const int32_t      atomicNumber);
+    CChemicalElement(const std::string& atomicLabel, const double atomicCharge, const double atomicMass, const int32_t atomicNumber);
 
     /**
      Destroys a chemical element object.
@@ -1719,7 +1715,7 @@ public:
 
     /**
      Compares chemical element object with other chemical element object.
-     
+
      @param other the chemical element object.
      @return true if chemical element objects are equal, false otherwise.
      */
@@ -1727,7 +1723,7 @@ public:
 
     /**
      Compares chemical element object with other chemical element object.
-     
+
      @param other the chemical element object.
      @return true if chemical element objects are not equal, false otherwise.
      */
@@ -1799,7 +1795,7 @@ public:
      @return the charge of chemical element.
      */
     double getAtomicCharge() const;
-    
+
     /**
      Gets maximum angular momentum of occupied atomic shells in chemical
      element.
@@ -1811,12 +1807,11 @@ public:
     /**
      Converts chemical element object to text output and insert it into output
      text stream.
-     
+
      @param output the output text stream.
      @param source the chemical element object.
      */
-    friend std::ostream& operator<<(      std::ostream&     output,
-                                    const CChemicalElement& source);
+    friend std::ostream& operator<<(std::ostream& output, const CChemicalElement& source);
 };
 
 #endif /* ChemicalElement_hpp */

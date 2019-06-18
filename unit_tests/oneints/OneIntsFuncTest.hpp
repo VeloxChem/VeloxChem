@@ -13,11 +13,10 @@
 
 class COneIntsFuncTest : public ::testing::Test
 {
-protected:
-    
-    COneIntsFuncTest() {};
-    
-    virtual ~COneIntsFuncTest() {};
+   protected:
+    COneIntsFuncTest(){};
+
+    virtual ~COneIntsFuncTest(){};
 };
 
 #endif /* OneIntsFuncTest_hpp */

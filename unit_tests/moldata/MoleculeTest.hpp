@@ -13,11 +13,10 @@
 
 class CMoleculeTest : public ::testing::Test
 {
-protected:
+   protected:
+    CMoleculeTest(){};
 
-    CMoleculeTest() {};
-
-    virtual ~CMoleculeTest() {};
+    virtual ~CMoleculeTest(){};
 };
 
 #endif /* MoleculeTest_hpp */

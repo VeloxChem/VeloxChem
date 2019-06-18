@@ -13,11 +13,10 @@
 
 class CVisualizationDriverTest : public ::testing::Test
 {
-protected:
-    
-    CVisualizationDriverTest() {};
-    
-    virtual ~CVisualizationDriverTest() {};
+   protected:
+    CVisualizationDriverTest(){};
+
+    virtual ~CVisualizationDriverTest(){};
 };
 
 #endif /* VisualizationDriverTest_hpp */

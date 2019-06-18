@@ -13,11 +13,10 @@
 
 class CMolecularOrbitalsTest : public ::testing::Test
 {
-protected:
-    
-    CMolecularOrbitalsTest() {};
-    
-    virtual ~CMolecularOrbitalsTest() {};
+   protected:
+    CMolecularOrbitalsTest(){};
+
+    virtual ~CMolecularOrbitalsTest(){};
 };
 
 #endif /* MolecularOrbitalsTest_hpp */

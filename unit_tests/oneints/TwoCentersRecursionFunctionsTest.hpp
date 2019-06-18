@@ -13,11 +13,10 @@
 
 class CTwoCentersRecursionFunctionsTest : public ::testing::Test
 {
-protected:
-    
-    CTwoCentersRecursionFunctionsTest() {};
-    
-    virtual ~CTwoCentersRecursionFunctionsTest() {};
+   protected:
+    CTwoCentersRecursionFunctionsTest(){};
+
+    virtual ~CTwoCentersRecursionFunctionsTest(){};
 };
 
 #endif /* TwoCentersRecursionFunctionsTest_hpp */

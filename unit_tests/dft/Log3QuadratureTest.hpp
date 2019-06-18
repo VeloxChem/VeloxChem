@@ -13,11 +13,10 @@
 
 class CLog3QuadratureTest : public ::testing::Test
 {
-protected:
+   protected:
+    CLog3QuadratureTest(){};
 
-    CLog3QuadratureTest() {};
-
-    virtual ~CLog3QuadratureTest() {};
+    virtual ~CLog3QuadratureTest(){};
 };
 
 #endif /* Log3QuadratureTest_hpp */

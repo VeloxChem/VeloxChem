@@ -13,11 +13,10 @@
 
 class CStringFormatTest : public ::testing::Test
 {
-protected:
+   protected:
+    CStringFormatTest(){};
 
-    CStringFormatTest() {};
-
-    virtual ~CStringFormatTest() {};
+    virtual ~CStringFormatTest(){};
 };
 
 #endif /* StringFormatTest_hpp */

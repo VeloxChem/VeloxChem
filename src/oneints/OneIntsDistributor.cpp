@@ -20,13 +20,9 @@ COneIntsDistribution::COneIntsDistribution()
 
     , _intsData(nullptr)
 {
-    
 }
 
-COneIntsDistribution::COneIntsDistribution(      double* intsData,
-                                           const int32_t nRows,
-                                           const int32_t nColumns,
-                                           const dist1e  distPattern)
+COneIntsDistribution::COneIntsDistribution(double* intsData, const int32_t nRows, const int32_t nColumns, const dist1e distPattern)
 
     : _distPattern(distPattern)
 
@@ -36,7 +32,6 @@ COneIntsDistribution::COneIntsDistribution(      double* intsData,
 
     , _intsData(intsData)
 {
-    
 }
 
 COneIntsDistribution::COneIntsDistribution(const COneIntsDistribution& source)
@@ -47,27 +42,26 @@ COneIntsDistribution::COneIntsDistribution(const COneIntsDistribution& source)
 
     , _nColumns(source._nColumns)
 {
-    _intsData = source._intsData; 
+    _intsData = source._intsData;
 }
 
 COneIntsDistribution::~COneIntsDistribution()
 {
-    
 }
 
 COneIntsDistribution&
 COneIntsDistribution::operator=(const COneIntsDistribution& source)
 {
     if (this == &source) return *this;
-    
+
     _distPattern = source._distPattern;
-    
+
     _nRows = source._nRows;
-    
+
     _nColumns = source._nColumns;
-    
-    _intsData = source._intsData; 
-    
+
+    _intsData = source._intsData;
+
     return *this;
 }
 
@@ -75,13 +69,13 @@ bool
 COneIntsDistribution::operator==(const COneIntsDistribution& other) const
 {
     if (_distPattern != other._distPattern) return false;
-    
+
     if (_nRows != other._nRows) return false;
-    
+
     if (_nColumns != other._nColumns) return false;
-    
+
     if (_intsData != other._intsData) return false;
-    
+
     return true;
 }
 
@@ -99,41 +93,38 @@ COneIntsDistribution::distribute(const CMemBlock2D<double>& spherInts,
                                  const int32_t              iContrGto)
 {
     // distribute one electron integrals into data batch
-    
+
     if (_distPattern == dist1e::batch)
     {
         _distSpherIntsIntoBatch(spherInts, braGtoBlock, ketGtoBlock, iContrGto);
-        
+
         return;
     }
-    
+
     // distribute one electron integrals into symmetric square matrix
-    
+
     if (_distPattern == dist1e::symsq)
     {
-        _distSpherIntsIntoSymMatrix(spherInts, braGtoBlock, ketGtoBlock,
-                                    isBraEqualKet,  iContrGto);
-        
+        _distSpherIntsIntoSymMatrix(spherInts, braGtoBlock, ketGtoBlock, isBraEqualKet, iContrGto);
+
         return;
     }
-    
+
     // distribute one electron integrals into ant-symmetric square matrix
-    
+
     if (_distPattern == dist1e::antisq)
     {
-        _distSpherIntsIntoAntiSymMatrix(spherInts, braGtoBlock, ketGtoBlock,
-                                        isBraEqualKet,  iContrGto);
-        
+        _distSpherIntsIntoAntiSymMatrix(spherInts, braGtoBlock, ketGtoBlock, isBraEqualKet, iContrGto);
+
         return;
     }
-    
+
     // distribute one electron integrals into data batch
-    
+
     if (_distPattern == dist1e::rect)
     {
-        _distSpherIntsIntoRectMatrix(spherInts, braGtoBlock, ketGtoBlock,
-                                     iContrGto);
-        
+        _distSpherIntsIntoRectMatrix(spherInts, braGtoBlock, ketGtoBlock, iContrGto);
+
         return;
     }
 }
@@ -145,35 +136,35 @@ COneIntsDistribution::_distSpherIntsIntoBatch(const CMemBlock2D<double>& spherIn
                                               const int32_t              iContrGto)
 {
     // set up number of angular components on bra and ket sides
-    
+
     auto bcomp = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
-    
-    auto kcomp= angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
-    
+
+    auto kcomp = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
+
     // set up number contracted GTOs on bra and ket sides
-    
+
     auto nbgtos = braGtoBlock.getNumberOfContrGtos();
-    
+
     auto nkgtos = ketGtoBlock.getNumberOfContrGtos();
-    
+
     for (int32_t i = 0; i < bcomp; i++)
     {
         // offset in rows indexing space
-        
+
         auto ioff = (i * nbgtos + iContrGto) * _nColumns;
-        
+
         for (int32_t j = 0; j < kcomp; j++)
         {
             // set up pointer to one electron integrals
-            
+
             auto fvals = spherInts.data(i * kcomp + j);
-            
+
             // offset in full indexing space
-            
+
             auto ijoff = ioff + j * nkgtos;
-            
+
             // distribute integrals
-            
+
             for (int32_t k = 0; k < nkgtos; k++)
             {
                 _intsData[ijoff + k] = fvals[k];
@@ -190,31 +181,31 @@ COneIntsDistribution::_distSpherIntsIntoSymMatrix(const CMemBlock2D<double>& sph
                                                   const int32_t              iContrGto)
 {
     // set up angular momentum components on bra and ket sides
-    
+
     auto bcomp = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
-    
+
     auto kcomp = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
-    
+
     // set up number of contracted GTOs on ket side
-    
+
     auto kdim = ketGtoBlock.getNumberOfContrGtos();
-    
+
     for (int32_t i = 0; i < bcomp; i++)
     {
         auto bidx = (braGtoBlock.getIdentifiers(i))[iContrGto];
-        
+
         // loop over ket components
-        
+
         for (int32_t j = 0; j < kcomp; j++)
         {
             // set up pointer to integrals
-            
+
             auto fvals = spherInts.data(i * kcomp + j);
-            
+
             auto kidx = ketGtoBlock.getIdentifiers(j);
-            
+
             // loop over integrals
-            
+
             if (isBraEqualKet)
             {
                 for (int32_t k = 0; k < kdim; k++)
@@ -227,7 +218,7 @@ COneIntsDistribution::_distSpherIntsIntoSymMatrix(const CMemBlock2D<double>& sph
                 for (int32_t k = 0; k < kdim; k++)
                 {
                     _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
-                    
+
                     _intsData[kidx[k] * _nColumns + bidx] = fvals[k];
                 }
             }
@@ -243,31 +234,31 @@ COneIntsDistribution::_distSpherIntsIntoAntiSymMatrix(const CMemBlock2D<double>&
                                                       const int32_t              iContrGto)
 {
     // set up angular momentum components on bra and ket sides
-    
+
     auto bcomp = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
-    
+
     auto kcomp = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
-    
+
     // set up number of contracted GTOs on ket side
-    
+
     auto kdim = ketGtoBlock.getNumberOfContrGtos();
-    
+
     for (int32_t i = 0; i < bcomp; i++)
     {
         auto bidx = (braGtoBlock.getIdentifiers(i))[iContrGto];
-        
+
         // loop over ket components
-        
+
         for (int32_t j = 0; j < kcomp; j++)
         {
             // set up pointer to integrals
-            
+
             auto fvals = spherInts.data(i * kcomp + j);
-            
+
             auto kidx = ketGtoBlock.getIdentifiers(j);
-            
+
             // loop over integrals
-            
+
             if (isBraEqualKet)
             {
                 for (int32_t k = 0; k < kdim; k++)
@@ -279,12 +270,12 @@ COneIntsDistribution::_distSpherIntsIntoAntiSymMatrix(const CMemBlock2D<double>&
             {
                 // NOTE: assummes upper triangle computation in one-electron
                 //       integrals driver
-                
+
                 for (int32_t k = 0; k < kdim; k++)
                 {
-                    _intsData[bidx * _nColumns + kidx[k]] = -fvals[k];
-                    
-                    _intsData[kidx[k] * _nColumns + bidx] =  fvals[k];
+                    _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
+
+                    _intsData[kidx[k] * _nColumns + bidx] = -fvals[k];
                 }
             }
         }
@@ -298,31 +289,31 @@ COneIntsDistribution::_distSpherIntsIntoRectMatrix(const CMemBlock2D<double>& sp
                                                    const int32_t              iContrGto)
 {
     // set up angular momentum components on bra and ket sides
-    
+
     auto bcomp = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
-    
+
     auto kcomp = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
-    
+
     // set up number of contracted GTOs on ket side
-    
+
     auto kdim = ketGtoBlock.getNumberOfContrGtos();
-    
+
     for (int32_t i = 0; i < bcomp; i++)
     {
         auto bidx = (braGtoBlock.getIdentifiers(i))[iContrGto];
-        
+
         // loop over ket components
-        
+
         for (int32_t j = 0; j < kcomp; j++)
         {
             // set up pointer to integrals
-            
+
             auto fvals = spherInts.data(i * kcomp + j);
-            
+
             auto kidx = ketGtoBlock.getIdentifiers(j);
-            
+
             // loop over integrals
-            
+
             for (int32_t k = 0; k < kdim; k++)
             {
                 _intsData[bidx * _nColumns + kidx[k]] = fvals[k];
@@ -332,21 +323,19 @@ COneIntsDistribution::_distSpherIntsIntoRectMatrix(const CMemBlock2D<double>& sp
 }
 
 std::ostream&
-operator<<(      std::ostream&         output,
-           const COneIntsDistribution& source)
+operator<<(std::ostream& output, const COneIntsDistribution& source)
 {
     output << std::endl;
-    
+
     output << "[COneIntsDistribution (Object):" << &source << "]" << std::endl;
-    
+
     output << "_distPattern: " << to_string(source._distPattern) << std::endl;
-    
+
     output << "_nRows: " << source._nRows << std::endl;
-    
+
     output << "_nColumns: " << source._nColumns << std::endl;
-    
+
     output << "_intsData: " << source._intsData << std::endl;
-    
+
     return output;
 }
-

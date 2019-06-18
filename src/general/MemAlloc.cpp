@@ -15,16 +15,16 @@
 #include <cstdlib>
 #endif
 
-namespace mem { // mem namespace
+namespace mem {  // mem namespace
 
 void*
 malloc(const size_t size)
 {
-    #ifdef ENABLE_MKL
+#ifdef ENABLE_MKL
 
     return MKL_malloc(size, VLX_ALIGN);
 
-    #else
+#else
 
     void* ptr = nullptr;
 
@@ -34,21 +34,21 @@ malloc(const size_t size)
 
     return ptr;
 
-    #endif
+#endif
 }
 
 void
 free(void* pointer)
 {
-    #ifdef ENABLE_MKL
+#ifdef ENABLE_MKL
 
     if (pointer != nullptr) MKL_free(pointer);
 
-    #else
+#else
 
     if (pointer != nullptr) ::free(pointer);
 
-    #endif
+#endif
 }
 
-} // mem namespace
+}  // namespace mem

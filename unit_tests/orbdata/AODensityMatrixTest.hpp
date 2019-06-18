@@ -13,11 +13,10 @@
 
 class CAODensityMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CAODensityMatrixTest() {};
-    
-    virtual ~CAODensityMatrixTest() {};
+   protected:
+    CAODensityMatrixTest(){};
+
+    virtual ~CAODensityMatrixTest(){};
 };
 
 #endif /* AODensityMatrixTest_hpp */

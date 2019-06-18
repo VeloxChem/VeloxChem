@@ -9,15 +9,14 @@
 #include <pybind11/pybind11.h>
 
 #include "ExportGeneral.hpp"
-#include "ExportMolData.hpp"
-#include "ExportOrbData.hpp"
-#include "ExportOneInts.hpp"
-#include "ExportTwoInts.hpp"
-#include "ExportMath.hpp"
 #include "ExportGpu.hpp"
-#include "ExportSolvers.hpp"
-#include "ExportVisualization.hpp"
+#include "ExportMath.hpp"
+#include "ExportMolData.hpp"
+#include "ExportOneInts.hpp"
+#include "ExportOrbData.hpp"
 #include "ExportResponse.hpp"
+#include "ExportTwoInts.hpp"
+#include "ExportVisualization.hpp"
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
@@ -35,9 +34,7 @@ PYBIND11_MODULE(veloxchemlib, m)
 
     vlx_gpu::export_gpu(m);
 
-    vlx_solvers::export_solvers(m);
-
     vlx_visualization::export_visualization(m);
-    
-    vlx_response::export_response(m); 
+
+    vlx_response::export_response(m);
 }

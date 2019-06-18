@@ -9,18 +9,17 @@
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
 
-#include <string>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <string>
 
-namespace errors { // errors namespace
+namespace errors {  // errors namespace
 
 void
-assertMsgCritical(const bool         condition,
-                  const std::string& label)
+assertMsgCritical(const bool condition, const std::string& label)
 {
-    if (! condition)
+    if (!condition)
     {
         bool masternode = false;
 
@@ -47,4 +46,4 @@ assertMsgCritical(const bool         condition,
     }
 }
 
-} // errors namespace
+}  // namespace errors

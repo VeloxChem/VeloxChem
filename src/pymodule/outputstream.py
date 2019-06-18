@@ -1,5 +1,6 @@
 import time as tm
 import sys
+import os
 
 from .errorhandler import assert_msg_critical
 
@@ -81,32 +82,32 @@ class OutputStream:
     def print_line(self, line):
         if not self.state:
             return
-        self.buffer_lines.append(line + '\n')
+        self.buffer_lines.append(line + os.linesep)
 
     def print_blank(self):
         if not self.state:
             return
-        self.buffer_lines.append(' ' * self.width + '\n')
+        self.buffer_lines.append(' ' * self.width + os.linesep)
 
     def print_header(self, line):
         if not self.state:
             return
-        self.buffer_lines.append(self.header(line, self.width) + '\n')
+        self.buffer_lines.append(self.header(line, self.width) + os.linesep)
 
     def print_title(self, line):
         if not self.state:
             return
-        self.buffer_lines.append(self.title(line, self.width) + '\n')
+        self.buffer_lines.append(self.title(line, self.width) + os.linesep)
 
     def print_info(self, line):
         if not self.state:
             return
-        self.buffer_lines.append(self.info(line, self.width) + '\n')
+        self.buffer_lines.append(self.info(line, self.width) + os.linesep)
 
     def print_separator(self):
         if not self.state:
             return
-        self.buffer_lines.append(self.tsep(self.width) + '\n')
+        self.buffer_lines.append(self.tsep(self.width) + os.linesep)
 
     def print_block(self, block_lines):
         """
@@ -115,7 +116,7 @@ class OutputStream:
         if not self.state:
             return
 
-        lines = block_lines.split('\n')
+        lines = block_lines.split(os.linesep)
         for line in lines:
             self.print_header(line)
 

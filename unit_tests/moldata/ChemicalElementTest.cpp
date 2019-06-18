@@ -113,21 +113,20 @@ TEST_F(CChemicalElementTest, GetAtomicCharge)
 TEST_F(CChemicalElementTest, GetMaxAngularMomentum)
 {
     CChemicalElement achem;
-    
+
     ASSERT_TRUE(achem.setAtomType({"N"}));
-    
+
     ASSERT_EQ(1, achem.getMaxAngularMomentum());
-    
+
     ASSERT_TRUE(achem.setAtomType({"H"}));
-    
+
     ASSERT_EQ(0, achem.getMaxAngularMomentum());
-    
+
     ASSERT_TRUE(achem.setAtomType({"CU"}));
-    
+
     ASSERT_EQ(2, achem.getMaxAngularMomentum());
-    
+
     ASSERT_TRUE(achem.setAtomType({"AU"}));
-    
+
     ASSERT_EQ(3, achem.getMaxAngularMomentum());
 }
-

@@ -13,11 +13,10 @@
 
 class CCubicGridTest : public ::testing::Test
 {
-protected:
-    
-    CCubicGridTest() {};
-    
-    virtual ~CCubicGridTest() {};
+   protected:
+    CCubicGridTest(){};
+
+    virtual ~CCubicGridTest(){};
 };
 
 #endif /* CubicGridTest_hpp */

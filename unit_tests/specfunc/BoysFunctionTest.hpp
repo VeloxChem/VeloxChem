@@ -15,11 +15,10 @@
 
 class CBoysFunctionTest : public ::testing::Test
 {
-protected:
+   protected:
+    CBoysFunctionTest(){};
 
-    CBoysFunctionTest() {};
-
-    virtual ~CBoysFunctionTest() {};
+    virtual ~CBoysFunctionTest(){};
 
     CMemBlock<double> getSmallArguments() const;
 

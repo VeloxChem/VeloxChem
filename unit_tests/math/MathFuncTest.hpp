@@ -13,11 +13,10 @@
 
 class CMathFuncTest : public ::testing::Test
 {
-protected:
+   protected:
+    CMathFuncTest(){};
 
-    CMathFuncTest() {};
-
-    virtual ~CMathFuncTest() {};
+    virtual ~CMathFuncTest(){};
 };
 
 #endif /* MathFuncTest_hpp */

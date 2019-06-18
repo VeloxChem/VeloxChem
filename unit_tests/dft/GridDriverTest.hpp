@@ -13,11 +13,10 @@
 
 class CGridDriverTest : public ::testing::Test
 {
-protected:
-    
-    CGridDriverTest() {};
-    
-    virtual ~CGridDriverTest() {};
+   protected:
+    CGridDriverTest(){};
+
+    virtual ~CGridDriverTest(){};
 };
 
 #endif /* GridDriverTest_hpp */

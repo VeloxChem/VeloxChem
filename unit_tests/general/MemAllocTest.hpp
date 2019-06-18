@@ -13,11 +13,10 @@
 
 class CMemAllocTest : public ::testing::Test
 {
-protected:
+   protected:
+    CMemAllocTest(){};
 
-    CMemAllocTest() {};
-
-    virtual ~CMemAllocTest() {};
+    virtual ~CMemAllocTest(){};
 };
 
 #endif /* MemAllocTest_hpp */

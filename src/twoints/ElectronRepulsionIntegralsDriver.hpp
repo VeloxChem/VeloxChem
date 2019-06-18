@@ -30,6 +30,7 @@
 #include "VecMemBlocks.hpp"
 #include "AODensityMatrix.hpp"
 #include "AOFockMatrix.hpp"
+#include "RecursionMap.hpp"
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -87,29 +88,16 @@ class CElectronRepulsionIntegralsDriver
      */
     CVecThreeIndexes _getKetHorizontalRecursionPattern(const CVecThreeIndexes& leadTerms) const;
     
+    
     /**
-     Gets Obara-Saika vertical recursion pattern for given set of leading terms.
+     Sets Obara-Saika vertical recursion pattern for given set of leading terms.
      
      @param leadTerms the vector of leading terms in recursion pattern.
+     @param maxNumberOfPrimPairs the maximum number of primitive pairs.
      @return the vector of three indexes object with recursion pattern.
      */
-    CVecThreeIndexes _getVerticalRecursionPattern(const CVecThreeIndexes& leadTerms) const;
-    
-    
-    /**
-     Gets vector of unified indexes of primitive GTOs pairs buffer for vertical
-     Obara-Saika recursion pattern.
-     
-     @param recIndexes the vector of starting indexes of data blocks in recursion
-            pattern.
-     @param recPattern the recursion pattern.
-     @param maxPrimPairs the maximum number of primitive GTOs pairs in contracted
-            GTOs pair on bra side.
-     @return the total number of blocks in recursion pattern.
-     */
-    int32_t _getIndexesForVerticalRecursionPattern(      std::vector<int32_t>& recIndexes,
-                                                   const CVecThreeIndexes&     recPattern,
-                                                   const int32_t               maxPrimPairs) const;
+    CRecursionMap _setVerticalRecursionMap(const CVecThreeIndexes& leadTerms,
+                                           const int32_t           maxNumberOfPrimPairs) const;
     
     /**
      Gets vector of unified indexes of horizontal recursion buffer on ket side.
@@ -142,8 +130,6 @@ class CElectronRepulsionIntegralsDriver
                   pairs on ket side).
      
      @param primBuffer the primitives buffer.
-     @param recPattern the recursion pattern.
-     @param recIndexes the indexes of data blocks in recursion pattern.
      @param bfTable the Boys function evaluator.
      @param bfArguments the vector of Boys function arguments.
      @param bfValues the vector of Boys function values.
@@ -158,8 +144,7 @@ class CElectronRepulsionIntegralsDriver
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _compPrimElectronRepulsionInts(      CMemBlock2D<double>&  primBuffer,
-                                        const CVecThreeIndexes&     recPattern,
-                                        const std::vector<int32_t>& recIndexes,
+                                        const CRecursionMap&        recursionMap, 
                                         const CBoysFunction&        bfTable,
                                               CMemBlock<double>&    bfArguments,
                                               CMemBlock2D<double>&  bfValues,

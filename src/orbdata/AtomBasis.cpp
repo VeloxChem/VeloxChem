@@ -9,8 +9,8 @@
 #include "AtomBasis.hpp"
 
 #include "ChemicalElement.hpp"
-#include "StringFormat.hpp"
 #include "MpiFunc.hpp"
+#include "StringFormat.hpp"
 
 CAtomBasis::CAtomBasis()
 
@@ -18,7 +18,6 @@ CAtomBasis::CAtomBasis()
 
     , _maxAngularMomentum(-1)
 {
-
 }
 
 CAtomBasis::CAtomBasis(const CAtomBasis& source)
@@ -29,7 +28,6 @@ CAtomBasis::CAtomBasis(const CAtomBasis& source)
 
     , _maxAngularMomentum(source._maxAngularMomentum)
 {
-
 }
 
 CAtomBasis::CAtomBasis(CAtomBasis&& source) noexcept
@@ -40,12 +38,10 @@ CAtomBasis::CAtomBasis(CAtomBasis&& source) noexcept
 
     , _maxAngularMomentum(std::move(source._maxAngularMomentum))
 {
-
 }
 
 CAtomBasis::~CAtomBasis()
 {
-
 }
 
 CAtomBasis&
@@ -120,8 +116,8 @@ CAtomBasis::addBasisFunction(const CBasisFunction& basisFunction)
 
     if (bAngularMomentum > _maxAngularMomentum)
     {
-         _maxAngularMomentum = bAngularMomentum;
-     }
+        _maxAngularMomentum = bAngularMomentum;
+    }
 }
 
 int32_t
@@ -147,7 +143,7 @@ CAtomBasis::getNumberOfBasisFunctions(const int32_t angularMomentum) const
     {
         if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
         {
-            nbfuncs++; 
+            nbfuncs++;
         }
     }
 
@@ -163,10 +159,10 @@ CAtomBasis::getNumberOfPrimitiveFunctions(const int32_t angularMomentum) const
 
     for (size_t i = 0; i < _basisFunctions.size(); i++)
     {
-         if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
-         {
-             npfuncs += _basisFunctions[i].getNumberOfPrimitiveFunctions();
-         }
+        if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
+        {
+            npfuncs += _basisFunctions[i].getNumberOfPrimitiveFunctions();
+        }
     }
 
     return npfuncs;
@@ -230,19 +226,19 @@ CAtomBasis
 CAtomBasis::reduceToValenceBasis() const
 {
     // set atomic shell max. angular momentum
-    
+
     CChemicalElement chemele;
-    
+
     chemele.setAtomType(_idElemental);
-    
+
     auto mang = chemele.getMaxAngularMomentum();
-    
+
     // generate valence basis
-    
+
     CAtomBasis valbas;
-    
+
     valbas.setIdElemental(_idElemental);
-    
+
     for (size_t i = 0; i < _basisFunctions.size(); i++)
     {
         if (_basisFunctions[i].getAngularMomentum() <= mang)
@@ -250,13 +246,12 @@ CAtomBasis::reduceToValenceBasis() const
             valbas.addBasisFunction(_basisFunctions[i]);
         }
     }
-    
+
     return valbas;
 }
 
 void
-CAtomBasis::broadcast(int32_t  rank,
-                      MPI_Comm comm)
+CAtomBasis::broadcast(int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
@@ -277,15 +272,14 @@ CAtomBasis::broadcast(int32_t  rank,
             bfunc.broadcast(rank, comm);
 
             if (rank != mpi::master()) addBasisFunction(bfunc);
-            
-            MPI_Barrier(comm); 
+
+            MPI_Barrier(comm);
         }
     }
 }
 
 std::ostream&
-operator<<(      std::ostream& output,
-           const CAtomBasis&   source)
+operator<<(std::ostream& output, const CAtomBasis& source)
 {
     output << std::endl;
 
@@ -301,7 +295,7 @@ operator<<(      std::ostream& output,
 
     for (size_t i = 0; i < source._basisFunctions.size(); i++)
     {
-        output << "_basisFunctions[" << i << "]: "<< std::endl;
+        output << "_basisFunctions[" << i << "]: " << std::endl;
 
         output << source._basisFunctions[i] << std::endl;
     }

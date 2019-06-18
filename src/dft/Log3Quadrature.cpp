@@ -13,19 +13,16 @@
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 
-CLog3Quadrature::CLog3Quadrature(const int32_t nRadialPoints,
-                                 const int32_t idElemental)
+CLog3Quadrature::CLog3Quadrature(const int32_t nRadialPoints, const int32_t idElemental)
 
     : _nRadialPoints(nRadialPoints)
 
     , _idElemental(idElemental)
 {
-
 }
 
 CLog3Quadrature::~CLog3Quadrature()
 {
-
 }
 
 CMemBlock2D<double>
@@ -34,13 +31,13 @@ CLog3Quadrature::generate() const
     if (_nRadialPoints > 0)
     {
         CMemBlock2D<double> qpoints(_nRadialPoints, 2);
-        
+
         // set up aliases to grid points data
-        
-        auto rcoords  = qpoints.data(0);
-        
+
+        auto rcoords = qpoints.data(0);
+
         auto rweights = qpoints.data(1);
-        
+
         // compute Chebyshev quadrature of second kind
 
         mathfunc::quadChebyshevOfKindTwo(rcoords, rweights, _nRadialPoints);
@@ -54,15 +51,15 @@ CLog3Quadrature::generate() const
         {
             // set up parameters
 
-            auto x  = rcoords[i];
+            auto x = rcoords[i];
 
             auto mx = 1.0 - x;
 
             auto px = 1.0 + x;
 
-            // compute auxilary functions 
+            // compute auxilary functions
 
-            auto fone = std::pow(px, 0.6) ;
+            auto fone = std::pow(px, 0.6);
 
             auto ftwo = std::log(2.0 / mx);
 

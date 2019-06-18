@@ -25,6 +25,7 @@
  fockmat::rgenj   - the restricted general Coulomb matrix
  fockmat::rgenk   - the restricted general exchange matrix
  fockmat::rgenkx  - the restricted scaled general exchange matrix
+ fockmat::unrestjk  - the unrestricted Fock matrix (Coulomb + exchange)
  
  */
 enum class fockmat
@@ -38,7 +39,8 @@ enum class fockmat
     rgenjkx,
     rgenj,
     rgenk,
-    rgenkx
+    rgenkx,
+    unrestjk,
 };
 
 /**
@@ -97,6 +99,11 @@ inline std::string to_string(const fockmat fockMatrix)
     if (fockMatrix == fockmat::rgenkx)
     {
         return std::string("Restricted general xK Matrix");
+    }
+
+    if (fockMatrix == fockmat::unrestjk)
+    {
+        return std::string("Unrestricted 2J + K Matrix");
     }
     
     return std::string("UNKNOWN");

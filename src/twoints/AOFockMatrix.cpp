@@ -45,7 +45,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
         
         auto ncol = aoDensityMatrix.getNumberOfColumns(i);
         
-        // spin restricted closed-shell Hatree-Fock
+        // spin restricted closed-shell Hartree-Fock
         
         if (dmtyp == denmat::rest)
         {
@@ -84,7 +84,28 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
             _idDensityMatrices.push_back(i);
         }
         
-        // FIX ME: Add unrestricted open-shell Hatree-Fock
+        // spin unrestricted open-shell Hartree-Fock
+        
+        if (dmtyp == denmat::unrest)
+        {
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
+            
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
+            
+            _fockTypes.push_back(fockmat::unrestjk);
+            
+            _fockTypes.push_back(fockmat::unrestjk);
+            
+            _scaleFactors.push_back(1.0);
+            
+            _scaleFactors.push_back(1.0);
+            
+            _idDensityMatrices.push_back(i);
+
+            _idDensityMatrices.push_back(i);
+        }
+        
+        // FIX ME: Add unrestricted open-shell Hartree-Fock
     }
 }
 
@@ -193,9 +214,21 @@ CAOFockMatrix::operator!=(const CAOFockMatrix& other) const
 
 void
 CAOFockMatrix::setFockType(const fockmat& fockType,
-                           const int32_t  iFockMatrix)
+                           const int32_t  iFockMatrix,
+                           const bool     beta)
 {
-    _fockTypes[iFockMatrix] = fockType;
+    if (isRestricted())
+    {
+        _fockTypes[iFockMatrix] = fockType;
+    }
+    else if (!beta)
+    {
+        _fockTypes[2 * iFockMatrix] = fockType;
+    }
+    else
+    {
+        _fockTypes[2 * iFockMatrix + 1] = fockType;
+    }
 }
 
 void
@@ -210,21 +243,53 @@ CAOFockMatrix::zero()
 void
 CAOFockMatrix::symmetrize()
 {
-    for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+    if (isRestricted())
     {
-        if (isSymmetric(i)) _fockMatrices[i].symmetrize();
-        
-        // FIX ME: Add antisymmetric matrices
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            if (isSymmetric(i))
+            {
+                _fockMatrices[i].symmetrize();
+            }
+        }
     }
+    else
+    {
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            if (isSymmetric(i))
+            {
+                _fockMatrices[2 * i].symmetrize();
+
+                _fockMatrices[2 * i + 1].symmetrize();
+            }
+        }
+    }
+
+    // FIX ME: Add antisymmetric matrices
 }
 
 void
 CAOFockMatrix::add(const CAOFockMatrix& source)
 {
-    for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+    if (isRestricted())
     {
-        _fockMatrices[i] = denblas::addAB(_fockMatrices[i],
-                                          source._fockMatrices[i], 1.0);
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            _fockMatrices[i] = denblas::addAB(_fockMatrices[i],
+                                              source._fockMatrices[i], 1.0);
+        }
+    }
+    else
+    {
+        for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
+        {
+            _fockMatrices[2 * i] = denblas::addAB(_fockMatrices[2 * i],
+                                                  source._fockMatrices[2 * i], 1.0);
+
+            _fockMatrices[2 * i + 1] = denblas::addAB(_fockMatrices[2 * i + 1],
+                                                      source._fockMatrices[2 * i + 1], 1.0);
+        }
     }
 }
 
@@ -240,19 +305,42 @@ CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMa
     // set up pointer to nuclear potential matrix
     
     auto pnucpot = nuclearPotentialMatrix.values();
-    
-    // set up pointer to Fock matrix
-    
-    auto pfock = _fockMatrices[iFockMatrix].values();
-    
-    // add core Hamiltonian contributions
-    
-    auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
-    
-    #pragma omp simd aligned(pfock, pkin, pnucpot: VLX_ALIGN)
-    for (int32_t i = 0; i < ndim; i++)
+
+    if (isRestricted())
     {
-        pfock[i] += pkin[i] - pnucpot[i];
+        // set up pointer to Fock matrix
+        
+        auto pfock = _fockMatrices[iFockMatrix].values();
+        
+        // add core Hamiltonian contributions
+        
+        auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
+        
+        #pragma omp simd aligned(pfock, pkin, pnucpot: VLX_ALIGN)
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            pfock[i] += pkin[i] - pnucpot[i];
+        }
+    }
+    else
+    {
+        // set up pointer to Fock matrix
+        
+        auto pfock_a = _fockMatrices[2 * iFockMatrix].values();
+
+        auto pfock_b = _fockMatrices[2 * iFockMatrix + 1].values();
+        
+        // add core Hamiltonian contributions
+        
+        auto ndim = _fockMatrices[2 * iFockMatrix].getNumberOfElements();
+        
+        #pragma omp simd aligned(pfock_a, pfock_b, pkin, pnucpot: VLX_ALIGN)
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            pfock_a[i] += pkin[i] - pnucpot[i];
+
+            pfock_b[i] += pkin[i] - pnucpot[i];
+        }
     }
 }
 
@@ -292,10 +380,38 @@ CAOFockMatrix::reduce_sum(int32_t  rank,
     }
 }
 
+bool
+CAOFockMatrix::isRestricted() const
+{
+    for (size_t i = 0; i < _fockMatrices.size(); i++)
+    {
+        auto focktype_str = to_string(_fockTypes[i]);
+
+        if (focktype_str.find(std::string("Restricted")) != std::string::npos)
+        {
+            return true;
+        }
+
+        if (focktype_str.find(std::string("Unrestricted")) != std::string::npos)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int32_t
 CAOFockMatrix::getNumberOfFockMatrices() const
 {
-    return static_cast<int32_t>(_fockMatrices.size());
+    if (isRestricted())
+    {
+        return static_cast<int32_t>(_fockMatrices.size());
+    }
+    else
+    {
+        return static_cast<int32_t>(_fockMatrices.size()) / 2;
+    }
 }
 
 
@@ -304,7 +420,14 @@ CAOFockMatrix::getNumberOfRows(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        return _fockMatrices[iFockMatrix].getNumberOfRows();
+        if (isRestricted())
+        {
+            return _fockMatrices[iFockMatrix].getNumberOfRows();
+        }
+        else
+        {
+            return _fockMatrices[2 * iFockMatrix].getNumberOfRows();
+        }
     }
     
     return 0;
@@ -315,7 +438,14 @@ CAOFockMatrix::getNumberOfColumns(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        return _fockMatrices[iFockMatrix].getNumberOfColumns();
+        if (isRestricted())
+        {
+            return _fockMatrices[iFockMatrix].getNumberOfColumns();
+        }
+        else
+        {
+            return _fockMatrices[2 * iFockMatrix].getNumberOfColumns();
+        }
     }
     
     return 0;
@@ -326,63 +456,136 @@ CAOFockMatrix::getNumberOfElements(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        return _fockMatrices[iFockMatrix].getNumberOfElements();
+        if (isRestricted())
+        {
+            return _fockMatrices[iFockMatrix].getNumberOfElements();
+        }
+        else
+        {
+            return _fockMatrices[2 * iFockMatrix].getNumberOfElements();
+        }
     }
     
     return 0;
 }
 
 const double*
-CAOFockMatrix::getFock(const int32_t iFockMatrix) const
+CAOFockMatrix::getFock(const int32_t iFockMatrix, const bool beta) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        return _fockMatrices[iFockMatrix].values();
+        if (isRestricted())
+        {
+            return _fockMatrices[iFockMatrix].values();
+        }
+        else if (!beta)
+        {
+            return _fockMatrices[2 * iFockMatrix].values();
+        }
+        else
+        {
+            return _fockMatrices[2 * iFockMatrix + 1].values();
+        }
     }
     
     return nullptr;
 }
 
 double*
-CAOFockMatrix::getFock(const int32_t iFockMatrix)
+CAOFockMatrix::getFock(const int32_t iFockMatrix, const bool beta)
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        return _fockMatrices[iFockMatrix].values();
+        if (isRestricted())
+        {
+            return _fockMatrices[iFockMatrix].values();
+        }
+        else if (!beta)
+        {
+            return _fockMatrices[2 * iFockMatrix].values();
+        }
+        else
+        {
+            return _fockMatrices[2 * iFockMatrix + 1].values();
+        }
     }
     
     return nullptr;
 }
 
 const CDenseMatrix&
-CAOFockMatrix::getReferenceToFock(const int32_t iFockMatrix) const
+CAOFockMatrix::getReferenceToFock(const int32_t iFockMatrix, const bool beta) const
 {
-    return _fockMatrices[iFockMatrix];
+    if (isRestricted())
+    {
+        return _fockMatrices[iFockMatrix];
+    }
+    else if (!beta)
+    {
+        return _fockMatrices[2 * iFockMatrix];
+    }
+    else
+    {
+        return _fockMatrices[2 * iFockMatrix + 1];
+    }
 }
 
 fockmat
-CAOFockMatrix::getFockType(const int32_t iFockMatrix) const
+CAOFockMatrix::getFockType(const int32_t iFockMatrix, const bool beta) const
 {
-    return _fockTypes[iFockMatrix];
+    if (isRestricted())
+    {
+        return _fockTypes[iFockMatrix];
+    }
+    else if (!beta)
+    {
+        return _fockTypes[2 * iFockMatrix];
+    }
+    else
+    {
+        return _fockTypes[2 * iFockMatrix + 1];
+    }
 }
 
 double
-CAOFockMatrix::getScaleFactor(const int32_t iFockMatrix) const
+CAOFockMatrix::getScaleFactor(const int32_t iFockMatrix, const bool beta) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        return _scaleFactors[iFockMatrix];
+        if (isRestricted())
+        {
+            return _scaleFactors[iFockMatrix];
+        }
+        else if (!beta)
+        {
+            return _scaleFactors[2 * iFockMatrix];
+        }
+        else
+        {
+            return _scaleFactors[2 * iFockMatrix + 1];
+        }
     }
     
     return 0.0;
 }
 
 int32_t
-CAOFockMatrix::getDensityIdentifier(const int32_t iFockMatrix) const
+CAOFockMatrix::getDensityIdentifier(const int32_t iFockMatrix, const bool beta) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        return _idDensityMatrices[iFockMatrix];
+        if (isRestricted())
+        {
+            return _idDensityMatrices[iFockMatrix];
+        }
+        else if (!beta)
+        {
+            return _idDensityMatrices[2 * iFockMatrix];
+        }
+        else
+        {
+            return _idDensityMatrices[2 * iFockMatrix + 1];
+        }
     }
     
     return -1;
@@ -393,16 +596,23 @@ CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
+        auto fockindex = iFockMatrix;
+
+        if (!isRestricted())
+        {
+            fockindex = 2 * iFockMatrix;
+        }
+
         // check if Fock matrix is square
         
-        if (_fockMatrices[iFockMatrix].getNumberOfRows() != _fockMatrices[iFockMatrix].getNumberOfColumns())
+        if (_fockMatrices[fockindex].getNumberOfRows() != _fockMatrices[fockindex].getNumberOfColumns())
         {
             return false;
         }
     
         // determine symmetry by Fock matrix type 
         
-        auto fcktyp = _fockTypes[iFockMatrix];
+        auto fcktyp = _fockTypes[fockindex];
     
         if (fcktyp == fockmat::restjk) return true;
     
@@ -413,6 +623,8 @@ CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
         if (fcktyp == fockmat::restk) return true;
     
         if (fcktyp == fockmat::restkx) return true;
+
+        if (fcktyp == fockmat::unrestjk) return true;
     }
     
     return false;
@@ -425,7 +637,26 @@ CAOFockMatrix::getElectronicEnergy(const int32_t           iFockMatrix,
 {
     if ((iFockMatrix < getNumberOfFockMatrices()) && (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices()))
     {
-        return denblas::trace(_fockMatrices[iFockMatrix], aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
+        if (isRestricted())
+        {
+            return denblas::trace(_fockMatrices[iFockMatrix], aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
+        }
+        else
+        {
+            auto ifock_a = 2 * iFockMatrix;
+
+            auto ifock_b = 2 * iFockMatrix + 1;
+
+            auto idensity_a = 2 * iDensityMatrix;
+
+            auto idensity_b = 2 * iDensityMatrix + 1;
+
+            auto e_a = 0.5 * denblas::trace(_fockMatrices[ifock_a], aoDensityMatrix.getReferenceToDensity(idensity_a));
+
+            auto e_b = 0.5 * denblas::trace(_fockMatrices[ifock_b], aoDensityMatrix.getReferenceToDensity(idensity_b));
+
+            return e_a + e_b;
+        }
     }
     
     return 0.0; 

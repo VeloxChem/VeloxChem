@@ -44,7 +44,7 @@ class TestRspDriver(unittest.TestCase):
 
             reigs = tda_results['eigenvalues']
             osc_strs = tda_results['oscillator_strengths']
-            trans_dipoles = tda_results['transition_dipoles']
+            trans_dipoles = tda_results['electric_transition_dipoles']
 
             ref_eigs = np.array([0.207436, 0.257474, 0.368358])
             ref_osc_strs = np.array([0.0000, 0.0003, 0.2797])
@@ -67,11 +67,11 @@ class TestRspDriver(unittest.TestCase):
         lr_solver.update_settings({
             'a_ops': 'xyz',
             'b_ops': 'xyz',
-            'frequencies': (0,),
-            'eri_thresh': 1.0e-12,
+            'frequencies': '0,',
+            'eri_thresh': '1.0e-12',
             'qq_type': 'QQ_DEN',
-            'conv_thresh': 1.0e-5,
-            'max_iter': 50,
+            'conv_thresh': '1.0e-5',
+            'max_iter': '50',
         })
 
         lr_prop = lr_solver.compute(task.molecule, task.ao_basis, scf_tensors)

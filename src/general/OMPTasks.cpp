@@ -14,8 +14,8 @@
 #include "omp.h"
 #endif
 
-#include "MpiFunc.hpp"
 #include "MathFunc.hpp"
+#include "MpiFunc.hpp"
 
 COMPTasks::COMPTasks(const int32_t nTasksPerThread)
 
@@ -23,37 +23,36 @@ COMPTasks::COMPTasks(const int32_t nTasksPerThread)
 
     , _nTasksPerThread(nTasksPerThread)
 {
-    if (_nOMPThreads < 1)  _nOMPThreads = 1;
-    
+    if (_nOMPThreads < 1) _nOMPThreads = 1;
+
     if (_nTasksPerThread < 1) _nTasksPerThread = 1;
-    
+
     // set up tasks data
-    
+
     _taskSizes = CMemBlock<int32_t>(_nTasksPerThread * _nOMPThreads);
-    
+
     _taskPositions = CMemBlock<int32_t>(_nTasksPerThread * _nOMPThreads);
 }
 
 COMPTasks::~COMPTasks()
 {
-
 }
 
 void
 COMPTasks::set(const int32_t nElements)
 {
     auto ndim = _nTasksPerThread * _nOMPThreads;
-    
+
     // determine tasks sizes
-    
+
     for (int32_t i = 0; i < ndim; i++)
     {
         _taskSizes.at(i) = mpi::batch_size(nElements, i, ndim);
     }
-    
+
     // determining tasks start positions
-    
-    mathfunc::indexes(_taskPositions.data(), _taskSizes.data(), ndim); 
+
+    mathfunc::indexes(_taskPositions.data(), _taskSizes.data(), ndim);
 }
 
 int32_t
@@ -71,5 +70,5 @@ COMPTasks::getTaskSizes() const
 const int32_t*
 COMPTasks::getTaskPositions() const
 {
-    return _taskPositions.data(); 
+    return _taskPositions.data();
 }

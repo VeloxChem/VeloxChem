@@ -105,8 +105,8 @@ class DensityGuess:
 
         return den_mat
 
-    def sad_density(self, molecule, ao_basis, min_basis, overlap_matrix, comm,
-                    ostream):
+    def sad_density(self, molecule, ao_basis, min_basis, overlap_matrix,
+                    restricted, comm, ostream):
         """Generates initial AO density using SAD scheme.
 
         Computes initial AO density using superposition of atomic densities
@@ -122,6 +122,8 @@ class DensityGuess:
             The minimal AO basis for generation of atomic densities.
         overlap_matrix
             The AO overlap matrix.
+        restricted
+            The flag for generating restricted initial guess.
         comm
             The local MPI communicator.
         ostream
@@ -139,7 +141,7 @@ class DensityGuess:
             sad_drv = SADGuessDriver(comm)
 
             den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
-                                      overlap_matrix)
+                                      overlap_matrix, restricted)
 
             if comm.Get_rank() == mpi_master():
 

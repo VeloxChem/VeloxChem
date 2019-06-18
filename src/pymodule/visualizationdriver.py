@@ -50,38 +50,41 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
     dx, dy, dz = grid.x_step_size(), grid.y_step_size(), grid.z_step_size()
     nx, ny, nz = grid.x_num_points(), grid.y_num_points(), grid.z_num_points()
 
-    f_cube.write('VeloxChem Cube File\n')
+    print('VeloxChem Cube File', file=f_cube)
 
     if flag == 'mo':
-        f_cube.write('MO {:d}, {:s} spin\n'.format(index + 1, spin))
-        f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}\n'.format(
-            -natoms, x0, y0, z0, 1))
+        print('MO {:d}, {:s} spin'.format(index + 1, spin), file=f_cube)
+        print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
+            -natoms, x0, y0, z0, 1),
+              file=f_cube)
 
     elif flag == 'density':
-        f_cube.write('Electron density, {:s} spin\n'.format(spin))
-        f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}\n'.format(
-            natoms, x0, y0, z0, 1))
+        print('Electron density, {:s} spin'.format(spin), file=f_cube)
+        print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
+            natoms, x0, y0, z0, 1),
+              file=f_cube)
 
-    f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(nx, dx, 0, 0))
-    f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(ny, 0, dy, 0))
-    f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(nz, 0, 0, dz))
+    print('{:5d}{:12.6f}{:12.6f}{:12.6f}'.format(nx, dx, 0, 0), file=f_cube)
+    print('{:5d}{:12.6f}{:12.6f}{:12.6f}'.format(ny, 0, dy, 0), file=f_cube)
+    print('{:5d}{:12.6f}{:12.6f}{:12.6f}'.format(nz, 0, 0, dz), file=f_cube)
 
     for a in range(natoms):
-        f_cube.write('{:5d}{:12.6f}{:12.6f}{:12.6f}{:12.6f}\n'.format(
-            elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]))
+        print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:12.6f}'.format(
+            elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]),
+              file=f_cube)
 
     if flag == 'mo':
-        f_cube.write('{:5d}{:5d}\n'.format(1, index + 1))
+        print('{:5d}{:5d}'.format(1, index + 1), file=f_cube)
 
     data = grid.values_to_numpy()
 
     for ix in range(nx):
         for iy in range(ny):
             for iz in range(nz):
-                f_cube.write(' {:12.5E}'.format(data[ix, iy, iz]))
+                print(' {:12.5E}'.format(data[ix, iy, iz]), end='', file=f_cube)
                 if iz % 6 == 5:
-                    f_cube.write("\n")
-            f_cube.write("\n")
+                    print('', file=f_cube)
+            print('', file=f_cube)
 
     f_cube.close()
 

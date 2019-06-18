@@ -10,22 +10,20 @@
 
 #include <cmath>
 
-#include "SphericalMomentum.hpp"
 #include "BasisFunction.hpp"
-#include "MolecularBasis.hpp"
-#include "ErrorHandler.hpp"
-#include "StringFormat.hpp"
 #include "CubicGrid.hpp"
+#include "ErrorHandler.hpp"
 #include "MemBlock.hpp"
+#include "MolecularBasis.hpp"
+#include "SphericalMomentum.hpp"
+#include "StringFormat.hpp"
 
 CVisualizationDriver::CVisualizationDriver()
 {
-
 }
 
 CVisualizationDriver::~CVisualizationDriver()
 {
-
 }
 
 std::vector<std::vector<int32_t>>
@@ -73,7 +71,7 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
 
     for (int32_t aoidx = 0, angl = 0; angl <= max_angl; angl++)
     {
-        CSphericalMomentum sphmom (angl);
+        CSphericalMomentum sphmom(angl);
 
         auto nsph = sphmom.getNumberOfComponents();
 
@@ -88,7 +86,7 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
             std::vector<double> fcarts, lx, ly, lz;
 
             auto ncomp = sphmom.getNumberOfFactors(isph);
-            
+
             for (int32_t icomp = 0; icomp < ncomp; icomp++)
             {
                 fcarts.push_back(sphmom.getFactors(isph)[icomp]);
@@ -148,9 +146,7 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
                         {
                             double coef2 = coef1 * fcarts[icomp];
 
-                            double powxyz = std::pow(rx, lx[icomp])
-                                          * std::pow(ry, ly[icomp])
-                                          * std::pow(rz, lz[icomp]);
+                            double powxyz = std::pow(rx, lx[icomp]) * std::pow(ry, ly[icomp]) * std::pow(rz, lz[icomp]);
 
                             phiao += coef2 * powxyz * expon;
                         }
@@ -166,7 +162,7 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
 }
 
 void
-CVisualizationDriver::compute(      CCubicGrid&         grid,
+CVisualizationDriver::compute(CCubicGrid&               grid,
                               const CMolecule&          molecule,
                               const CMolecularBasis&    basis,
                               const CMolecularOrbitals& mo,
@@ -195,13 +191,11 @@ CVisualizationDriver::compute(      CCubicGrid&         grid,
 
     errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
 
-    bool alphaspin = fstr::upcase(mospin) == std::string("ALPHA") |
-                     fstr::upcase(mospin) == std::string("A");
+    bool alphaspin = fstr::upcase(mospin) == std::string("ALPHA") || fstr::upcase(mospin) == std::string("A");
 
-    bool betaspin  = fstr::upcase(mospin) == std::string("BETA") |
-                     fstr::upcase(mospin) == std::string("B");
+    bool betaspin = fstr::upcase(mospin) == std::string("BETA") || fstr::upcase(mospin) == std::string("B");
 
-    errors::assertMsgCritical(alphaspin | betaspin, errspin);
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
     auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
 
@@ -254,7 +248,7 @@ CVisualizationDriver::compute(      CCubicGrid&         grid,
 }
 
 void
-CVisualizationDriver::compute(      CCubicGrid&       grid,
+CVisualizationDriver::compute(CCubicGrid&             grid,
                               const CMolecule&        molecule,
                               const CMolecularBasis&  basis,
                               const CAODensityMatrix& density,
@@ -281,13 +275,11 @@ CVisualizationDriver::compute(      CCubicGrid&       grid,
 
     errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
 
-    bool alphaspin = fstr::upcase(denspin) == std::string("ALPHA") |
-                     fstr::upcase(denspin) == std::string("A");
+    bool alphaspin = fstr::upcase(denspin) == std::string("ALPHA") || fstr::upcase(denspin) == std::string("A");
 
-    bool betaspin  = fstr::upcase(denspin) == std::string("BETA") |
-                     fstr::upcase(denspin) == std::string("B");
+    bool betaspin = fstr::upcase(denspin) == std::string("BETA") || fstr::upcase(denspin) == std::string("B");
 
-    errors::assertMsgCritical(alphaspin | betaspin, errspin);
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
     auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
 
@@ -297,7 +289,7 @@ CVisualizationDriver::compute(      CCubicGrid&       grid,
 
     auto dencols = density.getNumberOfColumns(denidx);
 
-    errors::assertMsgCritical(denrows == nao & dencols == nao, errnao);
+    errors::assertMsgCritical(denrows == nao && dencols == nao, errnao);
 
     // target density
 

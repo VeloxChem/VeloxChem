@@ -13,11 +13,10 @@
 
 class COverlapMatrixTest : public ::testing::Test
 {
-protected:
-    
-    COverlapMatrixTest() {};
-    
-    virtual ~COverlapMatrixTest() {};
+   protected:
+    COverlapMatrixTest(){};
+
+    virtual ~COverlapMatrixTest(){};
 };
 
 #endif /* OverlapMatrixTest_hpp */

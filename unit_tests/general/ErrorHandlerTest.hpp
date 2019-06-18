@@ -13,11 +13,10 @@
 
 class CErrorHandlerTest : public ::testing::Test
 {
-protected:
+   protected:
+    CErrorHandlerTest(){};
 
-    CErrorHandlerTest() {};
-
-    virtual ~CErrorHandlerTest() {};
+    virtual ~CErrorHandlerTest(){};
 };
 
 #endif /* ErrorHandlerTest_hpp */

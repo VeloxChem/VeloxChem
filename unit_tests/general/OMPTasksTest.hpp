@@ -13,12 +13,10 @@
 
 class COMPTasksTest : public ::testing::Test
 {
-protected:
-    
-    COMPTasksTest() {};
-    
-    virtual ~COMPTasksTest() {};
-};
+   protected:
+    COMPTasksTest(){};
 
+    virtual ~COMPTasksTest(){};
+};
 
 #endif /* OMPTasksTest_hpp */

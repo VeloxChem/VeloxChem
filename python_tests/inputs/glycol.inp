@@ -1,0 +1,29 @@
+@jobs
+task: response
+@end
+
+@method settings
+basis: sto-3g
+@end
+
+@response
+property: absorption
+nstates: 10
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+units: au
+xyz:  
+C    -5.14663     0.73397    -0.06055
+C    -2.26501     0.55256    -0.00370
+H    -5.97431     0.00406     1.73252
+H    -5.88336    -0.47160    -1.61196
+O    -5.91711     3.23056    -0.50121
+H    -1.66302    -1.44978     0.23531
+O    -1.26657     2.04852     1.94120
+H    -1.48472     1.21997    -1.83424
+H    -1.55201     1.11020     3.54065
+H    -5.88106     4.10897     1.15610
+@end 

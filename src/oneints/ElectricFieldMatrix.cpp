@@ -10,12 +10,9 @@
 
 CElectricFieldMatrix::CElectricFieldMatrix()
 {
-    
 }
 
-CElectricFieldMatrix::CElectricFieldMatrix(const CDenseMatrix& xMatrix,
-                                           const CDenseMatrix& yMatrix,
-                                           const CDenseMatrix& zMatrix)
+CElectricFieldMatrix::CElectricFieldMatrix(const CDenseMatrix& xMatrix, const CDenseMatrix& yMatrix, const CDenseMatrix& zMatrix)
 
     : _xMatrix(xMatrix)
 
@@ -23,7 +20,6 @@ CElectricFieldMatrix::CElectricFieldMatrix(const CDenseMatrix& xMatrix,
 
     , _zMatrix(zMatrix)
 {
-    
 }
 
 CElectricFieldMatrix::CElectricFieldMatrix(const CElectricFieldMatrix& source)
@@ -34,7 +30,6 @@ CElectricFieldMatrix::CElectricFieldMatrix(const CElectricFieldMatrix& source)
 
     , _zMatrix(source._zMatrix)
 {
-    
 }
 
 CElectricFieldMatrix::CElectricFieldMatrix(CElectricFieldMatrix&& source) noexcept
@@ -45,25 +40,23 @@ CElectricFieldMatrix::CElectricFieldMatrix(CElectricFieldMatrix&& source) noexce
 
     , _zMatrix(std::move(source._zMatrix))
 {
-    
 }
 
 CElectricFieldMatrix::~CElectricFieldMatrix()
 {
-    
 }
 
 CElectricFieldMatrix&
 CElectricFieldMatrix::operator=(const CElectricFieldMatrix& source)
 {
     if (this == &source) return *this;
-    
+
     _xMatrix = source._xMatrix;
-    
+
     _yMatrix = source._yMatrix;
-    
+
     _zMatrix = source._zMatrix;
-    
+
     return *this;
 }
 
@@ -71,13 +64,13 @@ CElectricFieldMatrix&
 CElectricFieldMatrix::operator=(CElectricFieldMatrix&& source) noexcept
 {
     if (this == &source) return *this;
-    
+
     _xMatrix = std::move(source._xMatrix);
-    
+
     _yMatrix = std::move(source._yMatrix);
-    
+
     _zMatrix = std::move(source._zMatrix);
-    
+
     return *this;
 }
 
@@ -85,11 +78,11 @@ bool
 CElectricFieldMatrix::operator==(const CElectricFieldMatrix& other) const
 {
     if (_xMatrix != other._xMatrix) return false;
-    
+
     if (_yMatrix != other._yMatrix) return false;
-    
+
     if (_zMatrix != other._zMatrix) return false;
-    
+
     return true;
 }
 
@@ -154,18 +147,17 @@ CElectricFieldMatrix::zvalues() const
 }
 
 std::ostream&
-operator<<(      std::ostream&  output,
-           const CElectricFieldMatrix& source)
+operator<<(std::ostream& output, const CElectricFieldMatrix& source)
 {
     output << std::endl;
-    
+
     output << "[CElectricFieldMatrix (Object):" << &source << "]" << std::endl;
-    
+
     output << "_xMatrix: " << source._xMatrix << std::endl;
-    
+
     output << "_yMatrix: " << source._yMatrix << std::endl;
-    
+
     output << "_zMatrix: " << source._zMatrix << std::endl;
-    
+
     return output;
 }

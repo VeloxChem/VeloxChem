@@ -7,7 +7,8 @@ basis: cc-pvdz
 @end
 
 @exciton
-fragments: 3 * 3
+fragments: 3
+atoms_per_fragment: 3
 nstates: 2
 ct_nocc: 1
 ct_nvir: 1

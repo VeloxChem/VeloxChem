@@ -4,11 +4,14 @@ import math
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import LinearMomentumIntegralsDriver
+from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import molorb
+from .veloxchemlib import rotatory_strength_in_cgs
 from .qqscheme import get_qq_scheme
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
@@ -17,7 +20,7 @@ from .molecularorbitals import MolecularOrbitals
 class TDAExciDriver:
     """Implements TDA excited states computation driver.
 
-    Implements TDA excited states computation schheme for Hatree-Fock/Kohn-Sham
+    Implements TDA excited states computation schheme for Hartree-Fock/Kohn-Sham
     level of theory.
 
     Attributes
@@ -183,6 +186,8 @@ class TDAExciDriver:
         # compute 1e dipole integrals
 
         dipole_ints = self.comp_dipole_ints(molecule, basis)
+        linmom_ints = self.comp_linear_momentum_ints(molecule, basis)
+        angmom_ints = self.comp_angular_momentum_ints(molecule, basis)
 
         # print converged excited states
 
@@ -192,17 +197,29 @@ class TDAExciDriver:
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
 
-            transition_dipoles = self.comp_transition_dipoles(
+            elec_trans_dipoles = self.comp_elec_trans_dipoles(
                 dipole_ints, eigvecs, mo_occ, mo_vir)
 
+            velo_trans_dipoles = self.comp_velo_trans_dipoles(
+                linmom_ints, eigvals, eigvecs, mo_occ, mo_vir)
+
+            magn_trans_dipoles = self.comp_magn_trans_dipoles(
+                angmom_ints, eigvecs, mo_occ, mo_vir)
+
             oscillator_strengths = self.comp_oscillator_strengths(
-                transition_dipoles, eigvals)
+                elec_trans_dipoles, eigvals)
+
+            rotatory_strengths = self.comp_rotatory_strengths(
+                velo_trans_dipoles, magn_trans_dipoles)
 
             return {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
+                'electric_transition_dipoles': elec_trans_dipoles,
+                'velocity_transition_dipoles': velo_trans_dipoles,
+                'magnetic_transition_dipoles': magn_trans_dipoles,
                 'oscillator_strengths': oscillator_strengths,
-                'transition_dipoles': transition_dipoles,
+                'rotatory_strengths': rotatory_strengths,
             }
         else:
             return {}
@@ -344,10 +361,7 @@ class TDAExciDriver:
 
     def comp_dipole_ints(self, molecule, basis):
 
-        xc, yc, zc = molecule.center_of_nuclear_charge()
-
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_drv.set_origin(xc, yc, zc)
         dipole_mats = dipole_drv.compute(molecule, basis)
 
         if self.rank == mpi_master():
@@ -356,7 +370,29 @@ class TDAExciDriver:
         else:
             return ()
 
-    def comp_transition_dipoles(self, dipole_ints, eigvecs, mo_occ, mo_vir):
+    def comp_linear_momentum_ints(self, molecule, basis):
+
+        linmom_drv = LinearMomentumIntegralsDriver(self.comm)
+        linmom_mats = linmom_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
+            return (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
+                    linmom_mats.z_to_numpy())
+        else:
+            return ()
+
+    def comp_angular_momentum_ints(self, molecule, basis):
+
+        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+        angmom_mats = angmom_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
+            return (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
+                    angmom_mats.z_to_numpy())
+        else:
+            return ()
+
+    def comp_elec_trans_dipoles(self, dipole_ints, eigvecs, mo_occ, mo_vir):
 
         transition_dipoles = []
 
@@ -365,9 +401,40 @@ class TDAExciDriver:
             trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
             trans_dens *= math.sqrt(2.0)
 
-            transition_dipoles.append(
-                np.array(
-                    [np.sum(trans_dens * dipole_ints[d]) for d in range(3)]))
+            trans_dipole = np.array(
+                [np.vdot(trans_dens, dipole_ints[d]) for d in range(3)])
+            transition_dipoles.append(trans_dipole)
+
+        return transition_dipoles
+
+    def comp_velo_trans_dipoles(self, linmom_ints, eigvals, eigvecs, mo_occ,
+                                mo_vir):
+
+        transition_dipoles = []
+
+        for s in range(self.nstates):
+            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
+            trans_dens *= math.sqrt(2.0)
+
+            trans_dipole = -1.0 / eigvals[s] * np.array(
+                [np.vdot(trans_dens, linmom_ints[d]) for d in range(3)])
+            transition_dipoles.append(trans_dipole)
+
+        return transition_dipoles
+
+    def comp_magn_trans_dipoles(self, angmom_ints, eigvecs, mo_occ, mo_vir):
+
+        transition_dipoles = []
+
+        for s in range(self.nstates):
+            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
+            trans_dens *= math.sqrt(2.0)
+
+            trans_dipole = 0.5 * np.array(
+                [np.vdot(trans_dens, angmom_ints[d]) for d in range(3)])
+            transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
 
@@ -381,6 +448,17 @@ class TDAExciDriver:
             oscillator_strengths[s] = 2.0 / 3.0 * dipole_strength * exc_ene
 
         return oscillator_strengths
+
+    def comp_rotatory_strengths(self, velo_trans_dipoles, magn_trans_dipoles):
+
+        rotatory_strengths = np.zeros((self.nstates,))
+
+        for s in range(self.nstates):
+            rotatory_strengths[s] = np.dot(velo_trans_dipoles[s],
+                                           magn_trans_dipoles[s])
+            rotatory_strengths[s] *= rotatory_strength_in_cgs()
+
+        return rotatory_strengths
 
     def print_iter_data(self, iter):
         """Prints excited states solver iteration data to output stream.
