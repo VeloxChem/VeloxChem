@@ -1455,17 +1455,17 @@ CGtoPairsBlock::_getBlockDimensions() const
 {
     auto angab = _braAngularMomentum + _ketAngularMomentum;
 
-    int32_t ndim = 300;
+    int32_t ndim = 600;
 
-    if (angab > 4) ndim = 50;
+    if (angab > 4) ndim = 100;
 
-    if (angab == 4) ndim = 100;
+    if (angab == 4) ndim = 200;
 
-    if (angab == 3) ndim = 150;
+    if (angab == 3) ndim = 300;
 
-    if (angab == 2) ndim = 200;
+    if (angab == 2) ndim = 400;
 
-    if (angab == 1) ndim = 250;
+    if (angab == 1) ndim = 500;
 
     return ndim;
 }

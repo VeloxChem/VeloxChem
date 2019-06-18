@@ -20,7 +20,7 @@ namespace erirecfunc { // erirecfunc namespace
                                  const int32_t              nKetPrimPairs,
                                  const int32_t              iContrPair)
     {
-        erirecfunc::compElectronRepulsionForSFSG_0_50(primBuffer,
+        erirecfunc::compElectronRepulsionForSFSG_0_75(primBuffer,
                                                       recursionMap,
                                                       osFactors,
                                                       wpDistances, 
@@ -29,7 +29,7 @@ namespace erirecfunc { // erirecfunc namespace
                                                       nKetPrimPairs,
                                                       iContrPair); 
 
-        erirecfunc::compElectronRepulsionForSFSG_50_100(primBuffer,
+        erirecfunc::compElectronRepulsionForSFSG_75_150(primBuffer,
                                                         recursionMap,
                                                         osFactors,
                                                         wpDistances, 
@@ -37,19 +37,10 @@ namespace erirecfunc { // erirecfunc namespace
                                                         ketGtoPairsBlock,
                                                         nKetPrimPairs,
                                                         iContrPair); 
-
-        erirecfunc::compElectronRepulsionForSFSG_100_150(primBuffer,
-                                                         recursionMap,
-                                                         osFactors,
-                                                         wpDistances, 
-                                                         braGtoPairsBlock,
-                                                         ketGtoPairsBlock,
-                                                         nKetPrimPairs,
-                                                         iContrPair); 
     }
 
     void
-    compElectronRepulsionForSFSG_0_50(      CMemBlock2D<double>& primBuffer,
+    compElectronRepulsionForSFSG_0_75(      CMemBlock2D<double>& primBuffer,
                                       const CRecursionMap&       recursionMap,
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& wpDistances,
@@ -58,7 +49,7 @@ namespace erirecfunc { // erirecfunc namespace
                                       const int32_t              nKetPrimPairs,
                                       const int32_t              iContrPair)
     {
-        // Batch of Integrals (0,50)
+        // Batch of Integrals (0,75)
 
         // set up pointers to primitives data on bra side
 
@@ -239,6 +230,56 @@ namespace erirecfunc { // erirecfunc namespace
 
                 auto tg_yy_xxyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 49); 
 
+                auto tg_yy_xxzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 50); 
+
+                auto tg_yy_xyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 51); 
+
+                auto tg_yy_xyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 52); 
+
+                auto tg_yy_xyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 53); 
+
+                auto tg_yy_xzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 54); 
+
+                auto tg_yy_yyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 55); 
+
+                auto tg_yy_yyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 56); 
+
+                auto tg_yy_yyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 57); 
+
+                auto tg_yy_yzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 58); 
+
+                auto tg_yy_zzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 59); 
+
+                auto tg_yz_xxxx_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 60); 
+
+                auto tg_yz_xxxy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 61); 
+
+                auto tg_yz_xxxz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 62); 
+
+                auto tg_yz_xxyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 63); 
+
+                auto tg_yz_xxyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 64); 
+
+                auto tg_yz_xxzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 65); 
+
+                auto tg_yz_xyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 66); 
+
+                auto tg_yz_xyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 67); 
+
+                auto tg_yz_xyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 68); 
+
+                auto tg_yz_xzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 69); 
+
+                auto tg_yz_yyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 70); 
+
+                auto tg_yz_yyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 71); 
+
+                auto tg_yz_yyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 72); 
+
+                auto tg_yz_yzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 73); 
+
+                auto tg_yz_zzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 74); 
+
                 auto tg_xx_xxxx_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx); 
 
                 auto tg_xx_xxxy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 1); 
@@ -338,6 +379,56 @@ namespace erirecfunc { // erirecfunc namespace
                 auto tg_yy_xxyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 48); 
 
                 auto tg_yy_xxyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 49); 
+
+                auto tg_yy_xxzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 50); 
+
+                auto tg_yy_xyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 51); 
+
+                auto tg_yy_xyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 52); 
+
+                auto tg_yy_xyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 53); 
+
+                auto tg_yy_xzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 54); 
+
+                auto tg_yy_yyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 55); 
+
+                auto tg_yy_yyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 56); 
+
+                auto tg_yy_yyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 57); 
+
+                auto tg_yy_yzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 58); 
+
+                auto tg_yy_zzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 59); 
+
+                auto tg_yz_xxxx_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 60); 
+
+                auto tg_yz_xxxy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 61); 
+
+                auto tg_yz_xxxz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 62); 
+
+                auto tg_yz_xxyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 63); 
+
+                auto tg_yz_xxyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 64); 
+
+                auto tg_yz_xxzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 65); 
+
+                auto tg_yz_xyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 66); 
+
+                auto tg_yz_xyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 67); 
+
+                auto tg_yz_xyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 68); 
+
+                auto tg_yz_xzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 69); 
+
+                auto tg_yz_yyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 70); 
+
+                auto tg_yz_yyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 71); 
+
+                auto tg_yz_yyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 72); 
+
+                auto tg_yz_yzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 73); 
+
+                auto tg_yz_zzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 74); 
 
                 auto tg_x_xxxx_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx); 
 
@@ -589,6 +680,36 @@ namespace erirecfunc { // erirecfunc namespace
 
                 auto tg_yy_xyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 34); 
 
+                auto tg_yy_xzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 35); 
+
+                auto tg_yy_yyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 36); 
+
+                auto tg_yy_yyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 37); 
+
+                auto tg_yy_yzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 38); 
+
+                auto tg_yy_zzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 39); 
+
+                auto tg_yz_xxx_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 40); 
+
+                auto tg_yz_xxy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 41); 
+
+                auto tg_yz_xxz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 42); 
+
+                auto tg_yz_xyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 43); 
+
+                auto tg_yz_xyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 44); 
+
+                auto tg_yz_xzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 45); 
+
+                auto tg_yz_yyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 46); 
+
+                auto tg_yz_yyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 47); 
+
+                auto tg_yz_yzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 48); 
+
+                auto tg_yz_zzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 49); 
+
                 // set up pointers to integrals
 
                 auto tg_xxx_xxxx_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx); 
@@ -691,7 +812,57 @@ namespace erirecfunc { // erirecfunc namespace
 
                 auto tg_xyy_xxyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 49); 
 
-                // Batch of Integrals (0,50)
+                auto tg_xyy_xxzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 50); 
+
+                auto tg_xyy_xyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 51); 
+
+                auto tg_xyy_xyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 52); 
+
+                auto tg_xyy_xyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 53); 
+
+                auto tg_xyy_xzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 54); 
+
+                auto tg_xyy_yyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 55); 
+
+                auto tg_xyy_yyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 56); 
+
+                auto tg_xyy_yyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 57); 
+
+                auto tg_xyy_yzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 58); 
+
+                auto tg_xyy_zzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 59); 
+
+                auto tg_xyz_xxxx_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 60); 
+
+                auto tg_xyz_xxxy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 61); 
+
+                auto tg_xyz_xxxz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 62); 
+
+                auto tg_xyz_xxyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 63); 
+
+                auto tg_xyz_xxyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 64); 
+
+                auto tg_xyz_xxzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 65); 
+
+                auto tg_xyz_xyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 66); 
+
+                auto tg_xyz_xyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 67); 
+
+                auto tg_xyz_xyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 68); 
+
+                auto tg_xyz_xzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 69); 
+
+                auto tg_xyz_yyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 70); 
+
+                auto tg_xyz_yyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 71); 
+
+                auto tg_xyz_yyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 72); 
+
+                auto tg_xyz_yzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 73); 
+
+                auto tg_xyz_zzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 74); 
+
+                // Batch of Integrals (0,75)
 
                 #pragma omp simd aligned(fxn, fza, tg_x_xxxx_0, tg_x_xxxx_1, tg_x_xxxy_0, tg_x_xxxy_1, \
                                          tg_x_xxxz_0, tg_x_xxxz_1, tg_x_xxyy_0, tg_x_xxyy_1, tg_x_xxyz_0, tg_x_xxyz_1, \
@@ -721,7 +892,12 @@ namespace erirecfunc { // erirecfunc namespace
                                          tg_xy_xzzz_0, tg_xy_xzzz_1, tg_xy_yyy_1, tg_xy_yyyy_0, tg_xy_yyyy_1, tg_xy_yyyz_0, \
                                          tg_xy_yyyz_1, tg_xy_yyz_1, tg_xy_yyzz_0, tg_xy_yyzz_1, tg_xy_yzz_1, tg_xy_yzzz_0, \
                                          tg_xy_yzzz_1, tg_xy_zzz_1, tg_xy_zzzz_0, tg_xy_zzzz_1, tg_xyy_xxxx_0, \
-                                         tg_xyy_xxxy_0, tg_xyy_xxxz_0, tg_xyy_xxyy_0, tg_xyy_xxyz_0, tg_xz_xxx_1, \
+                                         tg_xyy_xxxy_0, tg_xyy_xxxz_0, tg_xyy_xxyy_0, tg_xyy_xxyz_0, tg_xyy_xxzz_0, \
+                                         tg_xyy_xyyy_0, tg_xyy_xyyz_0, tg_xyy_xyzz_0, tg_xyy_xzzz_0, tg_xyy_yyyy_0, \
+                                         tg_xyy_yyyz_0, tg_xyy_yyzz_0, tg_xyy_yzzz_0, tg_xyy_zzzz_0, tg_xyz_xxxx_0, \
+                                         tg_xyz_xxxy_0, tg_xyz_xxxz_0, tg_xyz_xxyy_0, tg_xyz_xxyz_0, tg_xyz_xxzz_0, \
+                                         tg_xyz_xyyy_0, tg_xyz_xyyz_0, tg_xyz_xyzz_0, tg_xyz_xzzz_0, tg_xyz_yyyy_0, \
+                                         tg_xyz_yyyz_0, tg_xyz_yyzz_0, tg_xyz_yzzz_0, tg_xyz_zzzz_0, tg_xz_xxx_1, \
                                          tg_xz_xxxx_0, tg_xz_xxxx_1, tg_xz_xxxy_0, tg_xz_xxxy_1, tg_xz_xxxz_0, tg_xz_xxxz_1, \
                                          tg_xz_xxy_1, tg_xz_xxyy_0, tg_xz_xxyy_1, tg_xz_xxyz_0, tg_xz_xxyz_1, tg_xz_xxz_1, \
                                          tg_xz_xxzz_0, tg_xz_xxzz_1, tg_xz_xyy_1, tg_xz_xyyy_0, tg_xz_xyyy_1, tg_xz_xyyz_0, \
@@ -735,12 +911,23 @@ namespace erirecfunc { // erirecfunc namespace
                                          tg_y_yyyy_1, tg_y_yyyz_0, tg_y_yyyz_1, tg_y_yyzz_0, tg_y_yyzz_1, tg_y_yzzz_0, \
                                          tg_y_yzzz_1, tg_y_zzzz_0, tg_y_zzzz_1, tg_yy_xxx_1, tg_yy_xxxx_0, tg_yy_xxxx_1, \
                                          tg_yy_xxxy_0, tg_yy_xxxy_1, tg_yy_xxxz_0, tg_yy_xxxz_1, tg_yy_xxy_1, tg_yy_xxyy_0, \
-                                         tg_yy_xxyy_1, tg_yy_xxyz_0, tg_yy_xxyz_1, tg_yy_xxz_1, tg_yy_xyy_1, tg_yy_xyz_1, \
-                                         tg_z_xxxx_0, tg_z_xxxx_1, tg_z_xxxy_0, tg_z_xxxy_1, tg_z_xxxz_0, tg_z_xxxz_1, \
-                                         tg_z_xxyy_0, tg_z_xxyy_1, tg_z_xxyz_0, tg_z_xxyz_1, tg_z_xxzz_0, tg_z_xxzz_1, \
-                                         tg_z_xyyy_0, tg_z_xyyy_1, tg_z_xyyz_0, tg_z_xyyz_1, tg_z_xyzz_0, tg_z_xyzz_1, \
-                                         tg_z_xzzz_0, tg_z_xzzz_1, tg_z_yyyy_0, tg_z_yyyy_1, tg_z_yyyz_0, tg_z_yyyz_1, \
-                                         tg_z_yyzz_0, tg_z_yyzz_1, tg_z_yzzz_0, tg_z_yzzz_1, tg_z_zzzz_0, tg_z_zzzz_1, wp_x: VLX_ALIGN)
+                                         tg_yy_xxyy_1, tg_yy_xxyz_0, tg_yy_xxyz_1, tg_yy_xxz_1, tg_yy_xxzz_0, tg_yy_xxzz_1, \
+                                         tg_yy_xyy_1, tg_yy_xyyy_0, tg_yy_xyyy_1, tg_yy_xyyz_0, tg_yy_xyyz_1, tg_yy_xyz_1, \
+                                         tg_yy_xyzz_0, tg_yy_xyzz_1, tg_yy_xzz_1, tg_yy_xzzz_0, tg_yy_xzzz_1, tg_yy_yyy_1, \
+                                         tg_yy_yyyy_0, tg_yy_yyyy_1, tg_yy_yyyz_0, tg_yy_yyyz_1, tg_yy_yyz_1, tg_yy_yyzz_0, \
+                                         tg_yy_yyzz_1, tg_yy_yzz_1, tg_yy_yzzz_0, tg_yy_yzzz_1, tg_yy_zzz_1, tg_yy_zzzz_0, \
+                                         tg_yy_zzzz_1, tg_yz_xxx_1, tg_yz_xxxx_0, tg_yz_xxxx_1, tg_yz_xxxy_0, tg_yz_xxxy_1, \
+                                         tg_yz_xxxz_0, tg_yz_xxxz_1, tg_yz_xxy_1, tg_yz_xxyy_0, tg_yz_xxyy_1, tg_yz_xxyz_0, \
+                                         tg_yz_xxyz_1, tg_yz_xxz_1, tg_yz_xxzz_0, tg_yz_xxzz_1, tg_yz_xyy_1, tg_yz_xyyy_0, \
+                                         tg_yz_xyyy_1, tg_yz_xyyz_0, tg_yz_xyyz_1, tg_yz_xyz_1, tg_yz_xyzz_0, tg_yz_xyzz_1, \
+                                         tg_yz_xzz_1, tg_yz_xzzz_0, tg_yz_xzzz_1, tg_yz_yyy_1, tg_yz_yyyy_0, tg_yz_yyyy_1, \
+                                         tg_yz_yyyz_0, tg_yz_yyyz_1, tg_yz_yyz_1, tg_yz_yyzz_0, tg_yz_yyzz_1, tg_yz_yzz_1, \
+                                         tg_yz_yzzz_0, tg_yz_yzzz_1, tg_yz_zzz_1, tg_yz_zzzz_0, tg_yz_zzzz_1, tg_z_xxxx_0, \
+                                         tg_z_xxxx_1, tg_z_xxxy_0, tg_z_xxxy_1, tg_z_xxxz_0, tg_z_xxxz_1, tg_z_xxyy_0, \
+                                         tg_z_xxyy_1, tg_z_xxyz_0, tg_z_xxyz_1, tg_z_xxzz_0, tg_z_xxzz_1, tg_z_xyyy_0, \
+                                         tg_z_xyyy_1, tg_z_xyyz_0, tg_z_xyyz_1, tg_z_xyzz_0, tg_z_xyzz_1, tg_z_xzzz_0, \
+                                         tg_z_xzzz_1, tg_z_yyyy_0, tg_z_yyyy_1, tg_z_yyyz_0, tg_z_yyyz_1, tg_z_yyzz_0, \
+                                         tg_z_yyzz_1, tg_z_yzzz_0, tg_z_yzzz_1, tg_z_zzzz_0, tg_z_zzzz_1, wp_x: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
                     double fl1_fx = fx;
@@ -848,6 +1035,56 @@ namespace erirecfunc { // erirecfunc namespace
                     tg_xyy_xxyy_0[j] = pb_x * tg_yy_xxyy_0[j] + wp_x[j] * tg_yy_xxyy_1[j] + fl1_fxn * tg_yy_xyy_1[j];
 
                     tg_xyy_xxyz_0[j] = pb_x * tg_yy_xxyz_0[j] + wp_x[j] * tg_yy_xxyz_1[j] + fl1_fxn * tg_yy_xyz_1[j];
+
+                    tg_xyy_xxzz_0[j] = pb_x * tg_yy_xxzz_0[j] + wp_x[j] * tg_yy_xxzz_1[j] + fl1_fxn * tg_yy_xzz_1[j];
+
+                    tg_xyy_xyyy_0[j] = pb_x * tg_yy_xyyy_0[j] + wp_x[j] * tg_yy_xyyy_1[j] + 0.5 * fl1_fxn * tg_yy_yyy_1[j];
+
+                    tg_xyy_xyyz_0[j] = pb_x * tg_yy_xyyz_0[j] + wp_x[j] * tg_yy_xyyz_1[j] + 0.5 * fl1_fxn * tg_yy_yyz_1[j];
+
+                    tg_xyy_xyzz_0[j] = pb_x * tg_yy_xyzz_0[j] + wp_x[j] * tg_yy_xyzz_1[j] + 0.5 * fl1_fxn * tg_yy_yzz_1[j];
+
+                    tg_xyy_xzzz_0[j] = pb_x * tg_yy_xzzz_0[j] + wp_x[j] * tg_yy_xzzz_1[j] + 0.5 * fl1_fxn * tg_yy_zzz_1[j];
+
+                    tg_xyy_yyyy_0[j] = pb_x * tg_yy_yyyy_0[j] + wp_x[j] * tg_yy_yyyy_1[j];
+
+                    tg_xyy_yyyz_0[j] = pb_x * tg_yy_yyyz_0[j] + wp_x[j] * tg_yy_yyyz_1[j];
+
+                    tg_xyy_yyzz_0[j] = pb_x * tg_yy_yyzz_0[j] + wp_x[j] * tg_yy_yyzz_1[j];
+
+                    tg_xyy_yzzz_0[j] = pb_x * tg_yy_yzzz_0[j] + wp_x[j] * tg_yy_yzzz_1[j];
+
+                    tg_xyy_zzzz_0[j] = pb_x * tg_yy_zzzz_0[j] + wp_x[j] * tg_yy_zzzz_1[j];
+
+                    tg_xyz_xxxx_0[j] = pb_x * tg_yz_xxxx_0[j] + wp_x[j] * tg_yz_xxxx_1[j] + 2.0 * fl1_fxn * tg_yz_xxx_1[j];
+
+                    tg_xyz_xxxy_0[j] = pb_x * tg_yz_xxxy_0[j] + wp_x[j] * tg_yz_xxxy_1[j] + 1.5 * fl1_fxn * tg_yz_xxy_1[j];
+
+                    tg_xyz_xxxz_0[j] = pb_x * tg_yz_xxxz_0[j] + wp_x[j] * tg_yz_xxxz_1[j] + 1.5 * fl1_fxn * tg_yz_xxz_1[j];
+
+                    tg_xyz_xxyy_0[j] = pb_x * tg_yz_xxyy_0[j] + wp_x[j] * tg_yz_xxyy_1[j] + fl1_fxn * tg_yz_xyy_1[j];
+
+                    tg_xyz_xxyz_0[j] = pb_x * tg_yz_xxyz_0[j] + wp_x[j] * tg_yz_xxyz_1[j] + fl1_fxn * tg_yz_xyz_1[j];
+
+                    tg_xyz_xxzz_0[j] = pb_x * tg_yz_xxzz_0[j] + wp_x[j] * tg_yz_xxzz_1[j] + fl1_fxn * tg_yz_xzz_1[j];
+
+                    tg_xyz_xyyy_0[j] = pb_x * tg_yz_xyyy_0[j] + wp_x[j] * tg_yz_xyyy_1[j] + 0.5 * fl1_fxn * tg_yz_yyy_1[j];
+
+                    tg_xyz_xyyz_0[j] = pb_x * tg_yz_xyyz_0[j] + wp_x[j] * tg_yz_xyyz_1[j] + 0.5 * fl1_fxn * tg_yz_yyz_1[j];
+
+                    tg_xyz_xyzz_0[j] = pb_x * tg_yz_xyzz_0[j] + wp_x[j] * tg_yz_xyzz_1[j] + 0.5 * fl1_fxn * tg_yz_yzz_1[j];
+
+                    tg_xyz_xzzz_0[j] = pb_x * tg_yz_xzzz_0[j] + wp_x[j] * tg_yz_xzzz_1[j] + 0.5 * fl1_fxn * tg_yz_zzz_1[j];
+
+                    tg_xyz_yyyy_0[j] = pb_x * tg_yz_yyyy_0[j] + wp_x[j] * tg_yz_yyyy_1[j];
+
+                    tg_xyz_yyyz_0[j] = pb_x * tg_yz_yyyz_0[j] + wp_x[j] * tg_yz_yyyz_1[j];
+
+                    tg_xyz_yyzz_0[j] = pb_x * tg_yz_yyzz_0[j] + wp_x[j] * tg_yz_yyzz_1[j];
+
+                    tg_xyz_yzzz_0[j] = pb_x * tg_yz_yzzz_0[j] + wp_x[j] * tg_yz_yzzz_1[j];
+
+                    tg_xyz_zzzz_0[j] = pb_x * tg_yz_zzzz_0[j] + wp_x[j] * tg_yz_zzzz_1[j];
                 }
 
                 idx++;
@@ -856,7 +1093,7 @@ namespace erirecfunc { // erirecfunc namespace
     }
 
     void
-    compElectronRepulsionForSFSG_50_100(      CMemBlock2D<double>& primBuffer,
+    compElectronRepulsionForSFSG_75_150(      CMemBlock2D<double>& primBuffer,
                                         const CRecursionMap&       recursionMap,
                                         const CMemBlock2D<double>& osFactors,
                                         const CMemBlock2D<double>& wpDistances,
@@ -865,7 +1102,7 @@ namespace erirecfunc { // erirecfunc namespace
                                         const int32_t              nKetPrimPairs,
                                         const int32_t              iContrPair)
     {
-        // Batch of Integrals (50,100)
+        // Batch of Integrals (75,150)
 
         // set up pointers to primitives data on bra side
 
@@ -878,6 +1115,8 @@ namespace erirecfunc { // erirecfunc namespace
         auto r_pb_x = braGtoPairsBlock.getDistancesPBX();
 
         auto r_pb_y = braGtoPairsBlock.getDistancesPBY();
+
+        auto r_pb_z = braGtoPairsBlock.getDistancesPBZ();
 
         // set up pointers to common Obara-Saika factors
 
@@ -944,11 +1183,15 @@ namespace erirecfunc { // erirecfunc namespace
 
                 auto pb_y = r_pb_y[i];
 
+                auto pb_z = r_pb_z[i];
+
                 // set up pointers to tensors product of distances R(WP) = W - P
 
                 auto wp_x = wpDistances.data(3 * idx);
 
                 auto wp_y = wpDistances.data(3 * idx + 1);
+
+                auto wp_z = wpDistances.data(3 * idx + 2);
 
                 // set up pointers to auxilary integrals
 
@@ -1152,6 +1395,46 @@ namespace erirecfunc { // erirecfunc namespace
 
                 auto tg_y_xzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 24); 
 
+                auto tg_y_yyyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 25); 
+
+                auto tg_y_yyyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 26); 
+
+                auto tg_y_yyzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 27); 
+
+                auto tg_y_yzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 28); 
+
+                auto tg_y_zzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 29); 
+
+                auto tg_z_xxxx_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 30); 
+
+                auto tg_z_xxxy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 31); 
+
+                auto tg_z_xxxz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 32); 
+
+                auto tg_z_xxyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 33); 
+
+                auto tg_z_xxyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 34); 
+
+                auto tg_z_xxzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 35); 
+
+                auto tg_z_xyyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 36); 
+
+                auto tg_z_xyyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 37); 
+
+                auto tg_z_xyzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 38); 
+
+                auto tg_z_xzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 39); 
+
+                auto tg_z_yyyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 40); 
+
+                auto tg_z_yyyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 41); 
+
+                auto tg_z_yyzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 42); 
+
+                auto tg_z_yzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 43); 
+
+                auto tg_z_zzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 44); 
+
                 auto tg_y_xxxx_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 15); 
 
                 auto tg_y_xxxy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 16); 
@@ -1171,6 +1454,46 @@ namespace erirecfunc { // erirecfunc namespace
                 auto tg_y_xyzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 23); 
 
                 auto tg_y_xzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 24); 
+
+                auto tg_y_yyyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 25); 
+
+                auto tg_y_yyyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 26); 
+
+                auto tg_y_yyzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 27); 
+
+                auto tg_y_yzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 28); 
+
+                auto tg_y_zzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 29); 
+
+                auto tg_z_xxxx_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 30); 
+
+                auto tg_z_xxxy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 31); 
+
+                auto tg_z_xxxz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 32); 
+
+                auto tg_z_xxyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 33); 
+
+                auto tg_z_xxyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 34); 
+
+                auto tg_z_xxzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 35); 
+
+                auto tg_z_xyyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 36); 
+
+                auto tg_z_xyyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 37); 
+
+                auto tg_z_xyzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 38); 
+
+                auto tg_z_xzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 39); 
+
+                auto tg_z_yyyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 40); 
+
+                auto tg_z_yyyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 41); 
+
+                auto tg_z_yyzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 42); 
+
+                auto tg_z_yzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 43); 
+
+                auto tg_z_zzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 44); 
 
                 auto tg_yy_xxx_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 30); 
 
@@ -1234,56 +1557,6 @@ namespace erirecfunc { // erirecfunc namespace
 
                 // set up pointers to integrals
 
-                auto tg_xyy_xxzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 50); 
-
-                auto tg_xyy_xyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 51); 
-
-                auto tg_xyy_xyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 52); 
-
-                auto tg_xyy_xyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 53); 
-
-                auto tg_xyy_xzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 54); 
-
-                auto tg_xyy_yyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 55); 
-
-                auto tg_xyy_yyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 56); 
-
-                auto tg_xyy_yyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 57); 
-
-                auto tg_xyy_yzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 58); 
-
-                auto tg_xyy_zzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 59); 
-
-                auto tg_xyz_xxxx_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 60); 
-
-                auto tg_xyz_xxxy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 61); 
-
-                auto tg_xyz_xxxz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 62); 
-
-                auto tg_xyz_xxyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 63); 
-
-                auto tg_xyz_xxyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 64); 
-
-                auto tg_xyz_xxzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 65); 
-
-                auto tg_xyz_xyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 66); 
-
-                auto tg_xyz_xyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 67); 
-
-                auto tg_xyz_xyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 68); 
-
-                auto tg_xyz_xzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 69); 
-
-                auto tg_xyz_yyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 70); 
-
-                auto tg_xyz_yyyz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 71); 
-
-                auto tg_xyz_yyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 72); 
-
-                auto tg_xyz_yzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 73); 
-
-                auto tg_xyz_zzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 74); 
-
                 auto tg_xzz_xxxx_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 75); 
 
                 auto tg_xzz_xxxy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 76); 
@@ -1333,523 +1606,6 @@ namespace erirecfunc { // erirecfunc namespace
                 auto tg_yyy_xyzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 98); 
 
                 auto tg_yyy_xzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 99); 
-
-                // Batch of Integrals (50,100)
-
-                #pragma omp simd aligned(fxn, fza, tg_xyy_xxzz_0, tg_xyy_xyyy_0, tg_xyy_xyyz_0, tg_xyy_xyzz_0, \
-                                         tg_xyy_xzzz_0, tg_xyy_yyyy_0, tg_xyy_yyyz_0, tg_xyy_yyzz_0, tg_xyy_yzzz_0, \
-                                         tg_xyy_zzzz_0, tg_xyz_xxxx_0, tg_xyz_xxxy_0, tg_xyz_xxxz_0, tg_xyz_xxyy_0, \
-                                         tg_xyz_xxyz_0, tg_xyz_xxzz_0, tg_xyz_xyyy_0, tg_xyz_xyyz_0, tg_xyz_xyzz_0, \
-                                         tg_xyz_xzzz_0, tg_xyz_yyyy_0, tg_xyz_yyyz_0, tg_xyz_yyzz_0, tg_xyz_yzzz_0, \
-                                         tg_xyz_zzzz_0, tg_xzz_xxxx_0, tg_xzz_xxxy_0, tg_xzz_xxxz_0, tg_xzz_xxyy_0, \
-                                         tg_xzz_xxyz_0, tg_xzz_xxzz_0, tg_xzz_xyyy_0, tg_xzz_xyyz_0, tg_xzz_xyzz_0, \
-                                         tg_xzz_xzzz_0, tg_xzz_yyyy_0, tg_xzz_yyyz_0, tg_xzz_yyzz_0, tg_xzz_yzzz_0, \
-                                         tg_xzz_zzzz_0, tg_y_xxxx_0, tg_y_xxxx_1, tg_y_xxxy_0, tg_y_xxxy_1, tg_y_xxxz_0, \
-                                         tg_y_xxxz_1, tg_y_xxyy_0, tg_y_xxyy_1, tg_y_xxyz_0, tg_y_xxyz_1, tg_y_xxzz_0, \
-                                         tg_y_xxzz_1, tg_y_xyyy_0, tg_y_xyyy_1, tg_y_xyyz_0, tg_y_xyyz_1, tg_y_xyzz_0, \
-                                         tg_y_xyzz_1, tg_y_xzzz_0, tg_y_xzzz_1, tg_yy_xxx_1, tg_yy_xxxx_0, tg_yy_xxxx_1, \
-                                         tg_yy_xxxy_0, tg_yy_xxxy_1, tg_yy_xxxz_0, tg_yy_xxxz_1, tg_yy_xxy_1, tg_yy_xxyy_0, \
-                                         tg_yy_xxyy_1, tg_yy_xxyz_0, tg_yy_xxyz_1, tg_yy_xxz_1, tg_yy_xxzz_0, tg_yy_xxzz_1, \
-                                         tg_yy_xyy_1, tg_yy_xyyy_0, tg_yy_xyyy_1, tg_yy_xyyz_0, tg_yy_xyyz_1, tg_yy_xyz_1, \
-                                         tg_yy_xyzz_0, tg_yy_xyzz_1, tg_yy_xzz_1, tg_yy_xzzz_0, tg_yy_xzzz_1, tg_yy_yyy_1, \
-                                         tg_yy_yyyy_0, tg_yy_yyyy_1, tg_yy_yyyz_0, tg_yy_yyyz_1, tg_yy_yyz_1, tg_yy_yyzz_0, \
-                                         tg_yy_yyzz_1, tg_yy_yzz_1, tg_yy_yzzz_0, tg_yy_yzzz_1, tg_yy_zzz_1, tg_yy_zzzz_0, \
-                                         tg_yy_zzzz_1, tg_yyy_xxxx_0, tg_yyy_xxxy_0, tg_yyy_xxxz_0, tg_yyy_xxyy_0, \
-                                         tg_yyy_xxyz_0, tg_yyy_xxzz_0, tg_yyy_xyyy_0, tg_yyy_xyyz_0, tg_yyy_xyzz_0, \
-                                         tg_yyy_xzzz_0, tg_yz_xxx_1, tg_yz_xxxx_0, tg_yz_xxxx_1, tg_yz_xxxy_0, tg_yz_xxxy_1, \
-                                         tg_yz_xxxz_0, tg_yz_xxxz_1, tg_yz_xxy_1, tg_yz_xxyy_0, tg_yz_xxyy_1, tg_yz_xxyz_0, \
-                                         tg_yz_xxyz_1, tg_yz_xxz_1, tg_yz_xxzz_0, tg_yz_xxzz_1, tg_yz_xyy_1, tg_yz_xyyy_0, \
-                                         tg_yz_xyyy_1, tg_yz_xyyz_0, tg_yz_xyyz_1, tg_yz_xyz_1, tg_yz_xyzz_0, tg_yz_xyzz_1, \
-                                         tg_yz_xzz_1, tg_yz_xzzz_0, tg_yz_xzzz_1, tg_yz_yyy_1, tg_yz_yyyy_0, tg_yz_yyyy_1, \
-                                         tg_yz_yyyz_0, tg_yz_yyyz_1, tg_yz_yyz_1, tg_yz_yyzz_0, tg_yz_yyzz_1, tg_yz_yzz_1, \
-                                         tg_yz_yzzz_0, tg_yz_yzzz_1, tg_yz_zzz_1, tg_yz_zzzz_0, tg_yz_zzzz_1, tg_zz_xxx_1, \
-                                         tg_zz_xxxx_0, tg_zz_xxxx_1, tg_zz_xxxy_0, tg_zz_xxxy_1, tg_zz_xxxz_0, tg_zz_xxxz_1, \
-                                         tg_zz_xxy_1, tg_zz_xxyy_0, tg_zz_xxyy_1, tg_zz_xxyz_0, tg_zz_xxyz_1, tg_zz_xxz_1, \
-                                         tg_zz_xxzz_0, tg_zz_xxzz_1, tg_zz_xyy_1, tg_zz_xyyy_0, tg_zz_xyyy_1, tg_zz_xyyz_0, \
-                                         tg_zz_xyyz_1, tg_zz_xyz_1, tg_zz_xyzz_0, tg_zz_xyzz_1, tg_zz_xzz_1, tg_zz_xzzz_0, \
-                                         tg_zz_xzzz_1, tg_zz_yyy_1, tg_zz_yyyy_0, tg_zz_yyyy_1, tg_zz_yyyz_0, tg_zz_yyyz_1, \
-                                         tg_zz_yyz_1, tg_zz_yyzz_0, tg_zz_yyzz_1, tg_zz_yzz_1, tg_zz_yzzz_0, tg_zz_yzzz_1, \
-                                         tg_zz_zzz_1, tg_zz_zzzz_0, tg_zz_zzzz_1, wp_x, wp_y: VLX_ALIGN)
-                for (int32_t j = 0; j < nKetPrimPairs; j++)
-                {
-                    double fl1_fx = fx;
-
-                    double fl1_fxn = fxn[j];
-
-                    double fl1_fza = fza[j];
-
-                    tg_xyy_xxzz_0[j] = pb_x * tg_yy_xxzz_0[j] + wp_x[j] * tg_yy_xxzz_1[j] + fl1_fxn * tg_yy_xzz_1[j];
-
-                    tg_xyy_xyyy_0[j] = pb_x * tg_yy_xyyy_0[j] + wp_x[j] * tg_yy_xyyy_1[j] + 0.5 * fl1_fxn * tg_yy_yyy_1[j];
-
-                    tg_xyy_xyyz_0[j] = pb_x * tg_yy_xyyz_0[j] + wp_x[j] * tg_yy_xyyz_1[j] + 0.5 * fl1_fxn * tg_yy_yyz_1[j];
-
-                    tg_xyy_xyzz_0[j] = pb_x * tg_yy_xyzz_0[j] + wp_x[j] * tg_yy_xyzz_1[j] + 0.5 * fl1_fxn * tg_yy_yzz_1[j];
-
-                    tg_xyy_xzzz_0[j] = pb_x * tg_yy_xzzz_0[j] + wp_x[j] * tg_yy_xzzz_1[j] + 0.5 * fl1_fxn * tg_yy_zzz_1[j];
-
-                    tg_xyy_yyyy_0[j] = pb_x * tg_yy_yyyy_0[j] + wp_x[j] * tg_yy_yyyy_1[j];
-
-                    tg_xyy_yyyz_0[j] = pb_x * tg_yy_yyyz_0[j] + wp_x[j] * tg_yy_yyyz_1[j];
-
-                    tg_xyy_yyzz_0[j] = pb_x * tg_yy_yyzz_0[j] + wp_x[j] * tg_yy_yyzz_1[j];
-
-                    tg_xyy_yzzz_0[j] = pb_x * tg_yy_yzzz_0[j] + wp_x[j] * tg_yy_yzzz_1[j];
-
-                    tg_xyy_zzzz_0[j] = pb_x * tg_yy_zzzz_0[j] + wp_x[j] * tg_yy_zzzz_1[j];
-
-                    tg_xyz_xxxx_0[j] = pb_x * tg_yz_xxxx_0[j] + wp_x[j] * tg_yz_xxxx_1[j] + 2.0 * fl1_fxn * tg_yz_xxx_1[j];
-
-                    tg_xyz_xxxy_0[j] = pb_x * tg_yz_xxxy_0[j] + wp_x[j] * tg_yz_xxxy_1[j] + 1.5 * fl1_fxn * tg_yz_xxy_1[j];
-
-                    tg_xyz_xxxz_0[j] = pb_x * tg_yz_xxxz_0[j] + wp_x[j] * tg_yz_xxxz_1[j] + 1.5 * fl1_fxn * tg_yz_xxz_1[j];
-
-                    tg_xyz_xxyy_0[j] = pb_x * tg_yz_xxyy_0[j] + wp_x[j] * tg_yz_xxyy_1[j] + fl1_fxn * tg_yz_xyy_1[j];
-
-                    tg_xyz_xxyz_0[j] = pb_x * tg_yz_xxyz_0[j] + wp_x[j] * tg_yz_xxyz_1[j] + fl1_fxn * tg_yz_xyz_1[j];
-
-                    tg_xyz_xxzz_0[j] = pb_x * tg_yz_xxzz_0[j] + wp_x[j] * tg_yz_xxzz_1[j] + fl1_fxn * tg_yz_xzz_1[j];
-
-                    tg_xyz_xyyy_0[j] = pb_x * tg_yz_xyyy_0[j] + wp_x[j] * tg_yz_xyyy_1[j] + 0.5 * fl1_fxn * tg_yz_yyy_1[j];
-
-                    tg_xyz_xyyz_0[j] = pb_x * tg_yz_xyyz_0[j] + wp_x[j] * tg_yz_xyyz_1[j] + 0.5 * fl1_fxn * tg_yz_yyz_1[j];
-
-                    tg_xyz_xyzz_0[j] = pb_x * tg_yz_xyzz_0[j] + wp_x[j] * tg_yz_xyzz_1[j] + 0.5 * fl1_fxn * tg_yz_yzz_1[j];
-
-                    tg_xyz_xzzz_0[j] = pb_x * tg_yz_xzzz_0[j] + wp_x[j] * tg_yz_xzzz_1[j] + 0.5 * fl1_fxn * tg_yz_zzz_1[j];
-
-                    tg_xyz_yyyy_0[j] = pb_x * tg_yz_yyyy_0[j] + wp_x[j] * tg_yz_yyyy_1[j];
-
-                    tg_xyz_yyyz_0[j] = pb_x * tg_yz_yyyz_0[j] + wp_x[j] * tg_yz_yyyz_1[j];
-
-                    tg_xyz_yyzz_0[j] = pb_x * tg_yz_yyzz_0[j] + wp_x[j] * tg_yz_yyzz_1[j];
-
-                    tg_xyz_yzzz_0[j] = pb_x * tg_yz_yzzz_0[j] + wp_x[j] * tg_yz_yzzz_1[j];
-
-                    tg_xyz_zzzz_0[j] = pb_x * tg_yz_zzzz_0[j] + wp_x[j] * tg_yz_zzzz_1[j];
-
-                    tg_xzz_xxxx_0[j] = pb_x * tg_zz_xxxx_0[j] + wp_x[j] * tg_zz_xxxx_1[j] + 2.0 * fl1_fxn * tg_zz_xxx_1[j];
-
-                    tg_xzz_xxxy_0[j] = pb_x * tg_zz_xxxy_0[j] + wp_x[j] * tg_zz_xxxy_1[j] + 1.5 * fl1_fxn * tg_zz_xxy_1[j];
-
-                    tg_xzz_xxxz_0[j] = pb_x * tg_zz_xxxz_0[j] + wp_x[j] * tg_zz_xxxz_1[j] + 1.5 * fl1_fxn * tg_zz_xxz_1[j];
-
-                    tg_xzz_xxyy_0[j] = pb_x * tg_zz_xxyy_0[j] + wp_x[j] * tg_zz_xxyy_1[j] + fl1_fxn * tg_zz_xyy_1[j];
-
-                    tg_xzz_xxyz_0[j] = pb_x * tg_zz_xxyz_0[j] + wp_x[j] * tg_zz_xxyz_1[j] + fl1_fxn * tg_zz_xyz_1[j];
-
-                    tg_xzz_xxzz_0[j] = pb_x * tg_zz_xxzz_0[j] + wp_x[j] * tg_zz_xxzz_1[j] + fl1_fxn * tg_zz_xzz_1[j];
-
-                    tg_xzz_xyyy_0[j] = pb_x * tg_zz_xyyy_0[j] + wp_x[j] * tg_zz_xyyy_1[j] + 0.5 * fl1_fxn * tg_zz_yyy_1[j];
-
-                    tg_xzz_xyyz_0[j] = pb_x * tg_zz_xyyz_0[j] + wp_x[j] * tg_zz_xyyz_1[j] + 0.5 * fl1_fxn * tg_zz_yyz_1[j];
-
-                    tg_xzz_xyzz_0[j] = pb_x * tg_zz_xyzz_0[j] + wp_x[j] * tg_zz_xyzz_1[j] + 0.5 * fl1_fxn * tg_zz_yzz_1[j];
-
-                    tg_xzz_xzzz_0[j] = pb_x * tg_zz_xzzz_0[j] + wp_x[j] * tg_zz_xzzz_1[j] + 0.5 * fl1_fxn * tg_zz_zzz_1[j];
-
-                    tg_xzz_yyyy_0[j] = pb_x * tg_zz_yyyy_0[j] + wp_x[j] * tg_zz_yyyy_1[j];
-
-                    tg_xzz_yyyz_0[j] = pb_x * tg_zz_yyyz_0[j] + wp_x[j] * tg_zz_yyyz_1[j];
-
-                    tg_xzz_yyzz_0[j] = pb_x * tg_zz_yyzz_0[j] + wp_x[j] * tg_zz_yyzz_1[j];
-
-                    tg_xzz_yzzz_0[j] = pb_x * tg_zz_yzzz_0[j] + wp_x[j] * tg_zz_yzzz_1[j];
-
-                    tg_xzz_zzzz_0[j] = pb_x * tg_zz_zzzz_0[j] + wp_x[j] * tg_zz_zzzz_1[j];
-
-                    tg_yyy_xxxx_0[j] = pb_y * tg_yy_xxxx_0[j] + wp_y[j] * tg_yy_xxxx_1[j] + fl1_fx * tg_y_xxxx_0[j] - fl1_fx * fl1_fza * tg_y_xxxx_1[j];
-
-                    tg_yyy_xxxy_0[j] = pb_y * tg_yy_xxxy_0[j] + wp_y[j] * tg_yy_xxxy_1[j] + fl1_fx * tg_y_xxxy_0[j] - fl1_fx * fl1_fza * tg_y_xxxy_1[j] + 0.5 * fl1_fxn * tg_yy_xxx_1[j];
-
-                    tg_yyy_xxxz_0[j] = pb_y * tg_yy_xxxz_0[j] + wp_y[j] * tg_yy_xxxz_1[j] + fl1_fx * tg_y_xxxz_0[j] - fl1_fx * fl1_fza * tg_y_xxxz_1[j];
-
-                    tg_yyy_xxyy_0[j] = pb_y * tg_yy_xxyy_0[j] + wp_y[j] * tg_yy_xxyy_1[j] + fl1_fx * tg_y_xxyy_0[j] - fl1_fx * fl1_fza * tg_y_xxyy_1[j] + fl1_fxn * tg_yy_xxy_1[j];
-
-                    tg_yyy_xxyz_0[j] = pb_y * tg_yy_xxyz_0[j] + wp_y[j] * tg_yy_xxyz_1[j] + fl1_fx * tg_y_xxyz_0[j] - fl1_fx * fl1_fza * tg_y_xxyz_1[j] + 0.5 * fl1_fxn * tg_yy_xxz_1[j];
-
-                    tg_yyy_xxzz_0[j] = pb_y * tg_yy_xxzz_0[j] + wp_y[j] * tg_yy_xxzz_1[j] + fl1_fx * tg_y_xxzz_0[j] - fl1_fx * fl1_fza * tg_y_xxzz_1[j];
-
-                    tg_yyy_xyyy_0[j] = pb_y * tg_yy_xyyy_0[j] + wp_y[j] * tg_yy_xyyy_1[j] + fl1_fx * tg_y_xyyy_0[j] - fl1_fx * fl1_fza * tg_y_xyyy_1[j] + 1.5 * fl1_fxn * tg_yy_xyy_1[j];
-
-                    tg_yyy_xyyz_0[j] = pb_y * tg_yy_xyyz_0[j] + wp_y[j] * tg_yy_xyyz_1[j] + fl1_fx * tg_y_xyyz_0[j] - fl1_fx * fl1_fza * tg_y_xyyz_1[j] + fl1_fxn * tg_yy_xyz_1[j];
-
-                    tg_yyy_xyzz_0[j] = pb_y * tg_yy_xyzz_0[j] + wp_y[j] * tg_yy_xyzz_1[j] + fl1_fx * tg_y_xyzz_0[j] - fl1_fx * fl1_fza * tg_y_xyzz_1[j] + 0.5 * fl1_fxn * tg_yy_xzz_1[j];
-
-                    tg_yyy_xzzz_0[j] = pb_y * tg_yy_xzzz_0[j] + wp_y[j] * tg_yy_xzzz_1[j] + fl1_fx * tg_y_xzzz_0[j] - fl1_fx * fl1_fza * tg_y_xzzz_1[j];
-                }
-
-                idx++;
-            }
-        }
-    }
-
-    void
-    compElectronRepulsionForSFSG_100_150(      CMemBlock2D<double>& primBuffer,
-                                         const CRecursionMap&       recursionMap,
-                                         const CMemBlock2D<double>& osFactors,
-                                         const CMemBlock2D<double>& wpDistances,
-                                         const CGtoPairsBlock&      braGtoPairsBlock,
-                                         const CGtoPairsBlock&      ketGtoPairsBlock,
-                                         const int32_t              nKetPrimPairs,
-                                         const int32_t              iContrPair)
-    {
-        // Batch of Integrals (100,150)
-
-        // set up pointers to primitives data on bra side
-
-        auto spos = braGtoPairsBlock.getStartPositions();
-
-        auto epos = braGtoPairsBlock.getEndPositions();
-
-        // set up pointers to tensor of distance R(PB) = P - B
-
-        auto r_pb_y = braGtoPairsBlock.getDistancesPBY();
-
-        auto r_pb_z = braGtoPairsBlock.getDistancesPBZ();
-
-        // set up pointers to common Obara-Saika factors
-
-        auto b_fx = braGtoPairsBlock.getFactorsOneOverXi();
-
-        // set up maximum order of integral
-
-        auto mord = recursionMap.getMaxOrder({"Electron Repulsion"},
-                                             {3, -1, -1, -1},
-                                             {4, -1, -1, -1},
-                                             1, 1);
-
-        for (int32_t iord = 0; iord <= mord; iord++)
-        {
-            // set up index of integral
-
-            auto pidx_g_3_4_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, 
-                                                             {3, -1, -1, -1}, {4, -1, -1, -1}, 
-                                                             1, 1, iord));
-
-            // check if integral is needed in recursion expansion
-
-            if (pidx_g_3_4_m0 == -1) continue;
-
-            // set up indexes of auxilary integral
-
-            auto pidx_g_2_4_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, 
-                                                             {2, -1, -1, -1}, {4, -1, -1, -1}, 
-                                                             1, 1, iord));
-
-            auto pidx_g_2_4_m1 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, 
-                                                             {2, -1, -1, -1}, {4, -1, -1, -1}, 
-                                                             1, 1, iord + 1));
-
-            auto pidx_g_1_4_m0 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, 
-                                                             {1, -1, -1, -1}, {4, -1, -1, -1}, 
-                                                             1, 1, iord));
-
-            auto pidx_g_1_4_m1 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, 
-                                                             {1, -1, -1, -1}, {4, -1, -1, -1}, 
-                                                             1, 1, iord + 1));
-
-            auto pidx_g_2_3_m1 = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, 
-                                                             {2, -1, -1, -1}, {3, -1, -1, -1}, 
-                                                             1, 1, iord + 1));
-
-            // loop over contracted GTO on bra side
-
-            int32_t idx = 0;
-
-            for (int32_t i = spos[iContrPair]; i < epos[iContrPair]; i++)
-            {
-                // set up pointers to Obara-Saika factors
-
-                double fx = b_fx[i];
-
-                auto fza = osFactors.data(4 * idx + 2);
-
-                auto fxn = osFactors.data(4 * idx);
-
-                // set up distances R(PB) = P - B
-
-                auto pb_y = r_pb_y[i];
-
-                auto pb_z = r_pb_z[i];
-
-                // set up pointers to tensors product of distances R(WP) = W - P
-
-                auto wp_y = wpDistances.data(3 * idx + 1);
-
-                auto wp_z = wpDistances.data(3 * idx + 2);
-
-                // set up pointers to auxilary integrals
-
-                auto tg_yy_yyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 55); 
-
-                auto tg_yy_yyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 56); 
-
-                auto tg_yy_yyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 57); 
-
-                auto tg_yy_yzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 58); 
-
-                auto tg_yy_zzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 59); 
-
-                auto tg_yz_xxxx_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 60); 
-
-                auto tg_yz_xxxy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 61); 
-
-                auto tg_yz_xxxz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 62); 
-
-                auto tg_yz_xxyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 63); 
-
-                auto tg_yz_xxyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 64); 
-
-                auto tg_yz_xxzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 65); 
-
-                auto tg_yz_xyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 66); 
-
-                auto tg_yz_xyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 67); 
-
-                auto tg_yz_xyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 68); 
-
-                auto tg_yz_xzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 69); 
-
-                auto tg_yz_yyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 70); 
-
-                auto tg_yz_yyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 71); 
-
-                auto tg_yz_yyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 72); 
-
-                auto tg_yz_yzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 73); 
-
-                auto tg_yz_zzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 74); 
-
-                auto tg_zz_xxxx_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 75); 
-
-                auto tg_zz_xxxy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 76); 
-
-                auto tg_zz_xxxz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 77); 
-
-                auto tg_zz_xxyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 78); 
-
-                auto tg_zz_xxyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 79); 
-
-                auto tg_zz_xxzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 80); 
-
-                auto tg_zz_xyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 81); 
-
-                auto tg_zz_xyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 82); 
-
-                auto tg_zz_xyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 83); 
-
-                auto tg_zz_xzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 84); 
-
-                auto tg_zz_yyyy_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 85); 
-
-                auto tg_zz_yyyz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 86); 
-
-                auto tg_zz_yyzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 87); 
-
-                auto tg_zz_yzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 88); 
-
-                auto tg_zz_zzzz_0 = primBuffer.data(pidx_g_2_4_m0 + 90 * idx + 89); 
-
-                auto tg_yy_yyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 55); 
-
-                auto tg_yy_yyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 56); 
-
-                auto tg_yy_yyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 57); 
-
-                auto tg_yy_yzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 58); 
-
-                auto tg_yy_zzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 59); 
-
-                auto tg_yz_xxxx_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 60); 
-
-                auto tg_yz_xxxy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 61); 
-
-                auto tg_yz_xxxz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 62); 
-
-                auto tg_yz_xxyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 63); 
-
-                auto tg_yz_xxyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 64); 
-
-                auto tg_yz_xxzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 65); 
-
-                auto tg_yz_xyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 66); 
-
-                auto tg_yz_xyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 67); 
-
-                auto tg_yz_xyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 68); 
-
-                auto tg_yz_xzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 69); 
-
-                auto tg_yz_yyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 70); 
-
-                auto tg_yz_yyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 71); 
-
-                auto tg_yz_yyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 72); 
-
-                auto tg_yz_yzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 73); 
-
-                auto tg_yz_zzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 74); 
-
-                auto tg_zz_xxxx_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 75); 
-
-                auto tg_zz_xxxy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 76); 
-
-                auto tg_zz_xxxz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 77); 
-
-                auto tg_zz_xxyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 78); 
-
-                auto tg_zz_xxyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 79); 
-
-                auto tg_zz_xxzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 80); 
-
-                auto tg_zz_xyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 81); 
-
-                auto tg_zz_xyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 82); 
-
-                auto tg_zz_xyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 83); 
-
-                auto tg_zz_xzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 84); 
-
-                auto tg_zz_yyyy_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 85); 
-
-                auto tg_zz_yyyz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 86); 
-
-                auto tg_zz_yyzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 87); 
-
-                auto tg_zz_yzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 88); 
-
-                auto tg_zz_zzzz_1 = primBuffer.data(pidx_g_2_4_m1 + 90 * idx + 89); 
-
-                auto tg_y_yyyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 25); 
-
-                auto tg_y_yyyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 26); 
-
-                auto tg_y_yyzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 27); 
-
-                auto tg_y_yzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 28); 
-
-                auto tg_y_zzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 29); 
-
-                auto tg_z_xxxx_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 30); 
-
-                auto tg_z_xxxy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 31); 
-
-                auto tg_z_xxxz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 32); 
-
-                auto tg_z_xxyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 33); 
-
-                auto tg_z_xxyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 34); 
-
-                auto tg_z_xxzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 35); 
-
-                auto tg_z_xyyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 36); 
-
-                auto tg_z_xyyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 37); 
-
-                auto tg_z_xyzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 38); 
-
-                auto tg_z_xzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 39); 
-
-                auto tg_z_yyyy_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 40); 
-
-                auto tg_z_yyyz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 41); 
-
-                auto tg_z_yyzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 42); 
-
-                auto tg_z_yzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 43); 
-
-                auto tg_z_zzzz_0 = primBuffer.data(pidx_g_1_4_m0 + 45 * idx + 44); 
-
-                auto tg_y_yyyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 25); 
-
-                auto tg_y_yyyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 26); 
-
-                auto tg_y_yyzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 27); 
-
-                auto tg_y_yzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 28); 
-
-                auto tg_y_zzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 29); 
-
-                auto tg_z_xxxx_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 30); 
-
-                auto tg_z_xxxy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 31); 
-
-                auto tg_z_xxxz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 32); 
-
-                auto tg_z_xxyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 33); 
-
-                auto tg_z_xxyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 34); 
-
-                auto tg_z_xxzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 35); 
-
-                auto tg_z_xyyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 36); 
-
-                auto tg_z_xyyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 37); 
-
-                auto tg_z_xyzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 38); 
-
-                auto tg_z_xzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 39); 
-
-                auto tg_z_yyyy_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 40); 
-
-                auto tg_z_yyyz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 41); 
-
-                auto tg_z_yyzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 42); 
-
-                auto tg_z_yzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 43); 
-
-                auto tg_z_zzzz_1 = primBuffer.data(pidx_g_1_4_m1 + 45 * idx + 44); 
-
-                auto tg_yy_yyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 36); 
-
-                auto tg_yy_yyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 37); 
-
-                auto tg_yy_yzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 38); 
-
-                auto tg_yy_zzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 39); 
-
-                auto tg_yz_xxx_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 40); 
-
-                auto tg_yz_xxy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 41); 
-
-                auto tg_yz_xxz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 42); 
-
-                auto tg_yz_xyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 43); 
-
-                auto tg_yz_xyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 44); 
-
-                auto tg_yz_xzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 45); 
-
-                auto tg_yz_yyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 46); 
-
-                auto tg_yz_yyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 47); 
-
-                auto tg_yz_yzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 48); 
-
-                auto tg_yz_zzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 49); 
-
-                auto tg_zz_xxx_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 50); 
-
-                auto tg_zz_xxy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 51); 
-
-                auto tg_zz_xxz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 52); 
-
-                auto tg_zz_xyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 53); 
-
-                auto tg_zz_xyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 54); 
-
-                auto tg_zz_xzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 55); 
-
-                auto tg_zz_yyy_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 56); 
-
-                auto tg_zz_yyz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 57); 
-
-                auto tg_zz_yzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 58); 
-
-                auto tg_zz_zzz_1 = primBuffer.data(pidx_g_2_3_m1 + 60 * idx + 59); 
-
-                // set up pointers to integrals
 
                 auto tg_yyy_yyyy_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 100); 
 
@@ -1951,41 +1707,54 @@ namespace erirecfunc { // erirecfunc namespace
 
                 auto tg_zzz_zzzz_0 = primBuffer.data(pidx_g_3_4_m0 + 150 * idx + 149); 
 
-                // Batch of Integrals (100,150)
+                // Batch of Integrals (75,150)
 
-                #pragma omp simd aligned(fxn, fza, tg_y_yyyy_0, tg_y_yyyy_1, tg_y_yyyz_0, tg_y_yyyz_1, \
-                                         tg_y_yyzz_0, tg_y_yyzz_1, tg_y_yzzz_0, tg_y_yzzz_1, tg_y_zzzz_0, tg_y_zzzz_1, \
-                                         tg_yy_yyy_1, tg_yy_yyyy_0, tg_yy_yyyy_1, tg_yy_yyyz_0, tg_yy_yyyz_1, tg_yy_yyz_1, \
-                                         tg_yy_yyzz_0, tg_yy_yyzz_1, tg_yy_yzz_1, tg_yy_yzzz_0, tg_yy_yzzz_1, tg_yy_zzz_1, \
-                                         tg_yy_zzzz_0, tg_yy_zzzz_1, tg_yyy_yyyy_0, tg_yyy_yyyz_0, tg_yyy_yyzz_0, \
-                                         tg_yyy_yzzz_0, tg_yyy_zzzz_0, tg_yyz_xxxx_0, tg_yyz_xxxy_0, tg_yyz_xxxz_0, \
-                                         tg_yyz_xxyy_0, tg_yyz_xxyz_0, tg_yyz_xxzz_0, tg_yyz_xyyy_0, tg_yyz_xyyz_0, \
-                                         tg_yyz_xyzz_0, tg_yyz_xzzz_0, tg_yyz_yyyy_0, tg_yyz_yyyz_0, tg_yyz_yyzz_0, \
-                                         tg_yyz_yzzz_0, tg_yyz_zzzz_0, tg_yz_xxx_1, tg_yz_xxxx_0, tg_yz_xxxx_1, tg_yz_xxxy_0, \
-                                         tg_yz_xxxy_1, tg_yz_xxxz_0, tg_yz_xxxz_1, tg_yz_xxy_1, tg_yz_xxyy_0, tg_yz_xxyy_1, \
-                                         tg_yz_xxyz_0, tg_yz_xxyz_1, tg_yz_xxz_1, tg_yz_xxzz_0, tg_yz_xxzz_1, tg_yz_xyy_1, \
-                                         tg_yz_xyyy_0, tg_yz_xyyy_1, tg_yz_xyyz_0, tg_yz_xyyz_1, tg_yz_xyz_1, tg_yz_xyzz_0, \
-                                         tg_yz_xyzz_1, tg_yz_xzz_1, tg_yz_xzzz_0, tg_yz_xzzz_1, tg_yz_yyy_1, tg_yz_yyyy_0, \
-                                         tg_yz_yyyy_1, tg_yz_yyyz_0, tg_yz_yyyz_1, tg_yz_yyz_1, tg_yz_yyzz_0, tg_yz_yyzz_1, \
-                                         tg_yz_yzz_1, tg_yz_yzzz_0, tg_yz_yzzz_1, tg_yz_zzz_1, tg_yz_zzzz_0, tg_yz_zzzz_1, \
-                                         tg_yzz_xxxx_0, tg_yzz_xxxy_0, tg_yzz_xxxz_0, tg_yzz_xxyy_0, tg_yzz_xxyz_0, \
-                                         tg_yzz_xxzz_0, tg_yzz_xyyy_0, tg_yzz_xyyz_0, tg_yzz_xyzz_0, tg_yzz_xzzz_0, \
-                                         tg_yzz_yyyy_0, tg_yzz_yyyz_0, tg_yzz_yyzz_0, tg_yzz_yzzz_0, tg_yzz_zzzz_0, \
-                                         tg_z_xxxx_0, tg_z_xxxx_1, tg_z_xxxy_0, tg_z_xxxy_1, tg_z_xxxz_0, tg_z_xxxz_1, \
-                                         tg_z_xxyy_0, tg_z_xxyy_1, tg_z_xxyz_0, tg_z_xxyz_1, tg_z_xxzz_0, tg_z_xxzz_1, \
-                                         tg_z_xyyy_0, tg_z_xyyy_1, tg_z_xyyz_0, tg_z_xyyz_1, tg_z_xyzz_0, tg_z_xyzz_1, \
-                                         tg_z_xzzz_0, tg_z_xzzz_1, tg_z_yyyy_0, tg_z_yyyy_1, tg_z_yyyz_0, tg_z_yyyz_1, \
-                                         tg_z_yyzz_0, tg_z_yyzz_1, tg_z_yzzz_0, tg_z_yzzz_1, tg_z_zzzz_0, tg_z_zzzz_1, \
-                                         tg_zz_xxx_1, tg_zz_xxxx_0, tg_zz_xxxx_1, tg_zz_xxxy_0, tg_zz_xxxy_1, tg_zz_xxxz_0, \
-                                         tg_zz_xxxz_1, tg_zz_xxy_1, tg_zz_xxyy_0, tg_zz_xxyy_1, tg_zz_xxyz_0, tg_zz_xxyz_1, \
-                                         tg_zz_xxz_1, tg_zz_xxzz_0, tg_zz_xxzz_1, tg_zz_xyy_1, tg_zz_xyyy_0, tg_zz_xyyy_1, \
-                                         tg_zz_xyyz_0, tg_zz_xyyz_1, tg_zz_xyz_1, tg_zz_xyzz_0, tg_zz_xyzz_1, tg_zz_xzz_1, \
-                                         tg_zz_xzzz_0, tg_zz_xzzz_1, tg_zz_yyy_1, tg_zz_yyyy_0, tg_zz_yyyy_1, tg_zz_yyyz_0, \
-                                         tg_zz_yyyz_1, tg_zz_yyz_1, tg_zz_yyzz_0, tg_zz_yyzz_1, tg_zz_yzz_1, tg_zz_yzzz_0, \
-                                         tg_zz_yzzz_1, tg_zz_zzz_1, tg_zz_zzzz_0, tg_zz_zzzz_1, tg_zzz_xxxx_0, \
-                                         tg_zzz_xxxy_0, tg_zzz_xxxz_0, tg_zzz_xxyy_0, tg_zzz_xxyz_0, tg_zzz_xxzz_0, \
-                                         tg_zzz_xyyy_0, tg_zzz_xyyz_0, tg_zzz_xyzz_0, tg_zzz_xzzz_0, tg_zzz_yyyy_0, \
-                                         tg_zzz_yyyz_0, tg_zzz_yyzz_0, tg_zzz_yzzz_0, tg_zzz_zzzz_0, wp_y, wp_z: VLX_ALIGN)
+                #pragma omp simd aligned(fxn, fza, tg_xzz_xxxx_0, tg_xzz_xxxy_0, tg_xzz_xxxz_0, tg_xzz_xxyy_0, \
+                                         tg_xzz_xxyz_0, tg_xzz_xxzz_0, tg_xzz_xyyy_0, tg_xzz_xyyz_0, tg_xzz_xyzz_0, \
+                                         tg_xzz_xzzz_0, tg_xzz_yyyy_0, tg_xzz_yyyz_0, tg_xzz_yyzz_0, tg_xzz_yzzz_0, \
+                                         tg_xzz_zzzz_0, tg_y_xxxx_0, tg_y_xxxx_1, tg_y_xxxy_0, tg_y_xxxy_1, tg_y_xxxz_0, \
+                                         tg_y_xxxz_1, tg_y_xxyy_0, tg_y_xxyy_1, tg_y_xxyz_0, tg_y_xxyz_1, tg_y_xxzz_0, \
+                                         tg_y_xxzz_1, tg_y_xyyy_0, tg_y_xyyy_1, tg_y_xyyz_0, tg_y_xyyz_1, tg_y_xyzz_0, \
+                                         tg_y_xyzz_1, tg_y_xzzz_0, tg_y_xzzz_1, tg_y_yyyy_0, tg_y_yyyy_1, tg_y_yyyz_0, \
+                                         tg_y_yyyz_1, tg_y_yyzz_0, tg_y_yyzz_1, tg_y_yzzz_0, tg_y_yzzz_1, tg_y_zzzz_0, \
+                                         tg_y_zzzz_1, tg_yy_xxx_1, tg_yy_xxxx_0, tg_yy_xxxx_1, tg_yy_xxxy_0, tg_yy_xxxy_1, \
+                                         tg_yy_xxxz_0, tg_yy_xxxz_1, tg_yy_xxy_1, tg_yy_xxyy_0, tg_yy_xxyy_1, tg_yy_xxyz_0, \
+                                         tg_yy_xxyz_1, tg_yy_xxz_1, tg_yy_xxzz_0, tg_yy_xxzz_1, tg_yy_xyy_1, tg_yy_xyyy_0, \
+                                         tg_yy_xyyy_1, tg_yy_xyyz_0, tg_yy_xyyz_1, tg_yy_xyz_1, tg_yy_xyzz_0, tg_yy_xyzz_1, \
+                                         tg_yy_xzz_1, tg_yy_xzzz_0, tg_yy_xzzz_1, tg_yy_yyy_1, tg_yy_yyyy_0, tg_yy_yyyy_1, \
+                                         tg_yy_yyyz_0, tg_yy_yyyz_1, tg_yy_yyz_1, tg_yy_yyzz_0, tg_yy_yyzz_1, tg_yy_yzz_1, \
+                                         tg_yy_yzzz_0, tg_yy_yzzz_1, tg_yy_zzz_1, tg_yy_zzzz_0, tg_yy_zzzz_1, tg_yyy_xxxx_0, \
+                                         tg_yyy_xxxy_0, tg_yyy_xxxz_0, tg_yyy_xxyy_0, tg_yyy_xxyz_0, tg_yyy_xxzz_0, \
+                                         tg_yyy_xyyy_0, tg_yyy_xyyz_0, tg_yyy_xyzz_0, tg_yyy_xzzz_0, tg_yyy_yyyy_0, \
+                                         tg_yyy_yyyz_0, tg_yyy_yyzz_0, tg_yyy_yzzz_0, tg_yyy_zzzz_0, tg_yyz_xxxx_0, \
+                                         tg_yyz_xxxy_0, tg_yyz_xxxz_0, tg_yyz_xxyy_0, tg_yyz_xxyz_0, tg_yyz_xxzz_0, \
+                                         tg_yyz_xyyy_0, tg_yyz_xyyz_0, tg_yyz_xyzz_0, tg_yyz_xzzz_0, tg_yyz_yyyy_0, \
+                                         tg_yyz_yyyz_0, tg_yyz_yyzz_0, tg_yyz_yzzz_0, tg_yyz_zzzz_0, tg_yz_xxx_1, \
+                                         tg_yz_xxxx_0, tg_yz_xxxx_1, tg_yz_xxxy_0, tg_yz_xxxy_1, tg_yz_xxxz_0, tg_yz_xxxz_1, \
+                                         tg_yz_xxy_1, tg_yz_xxyy_0, tg_yz_xxyy_1, tg_yz_xxyz_0, tg_yz_xxyz_1, tg_yz_xxz_1, \
+                                         tg_yz_xxzz_0, tg_yz_xxzz_1, tg_yz_xyy_1, tg_yz_xyyy_0, tg_yz_xyyy_1, tg_yz_xyyz_0, \
+                                         tg_yz_xyyz_1, tg_yz_xyz_1, tg_yz_xyzz_0, tg_yz_xyzz_1, tg_yz_xzz_1, tg_yz_xzzz_0, \
+                                         tg_yz_xzzz_1, tg_yz_yyy_1, tg_yz_yyyy_0, tg_yz_yyyy_1, tg_yz_yyyz_0, tg_yz_yyyz_1, \
+                                         tg_yz_yyz_1, tg_yz_yyzz_0, tg_yz_yyzz_1, tg_yz_yzz_1, tg_yz_yzzz_0, tg_yz_yzzz_1, \
+                                         tg_yz_zzz_1, tg_yz_zzzz_0, tg_yz_zzzz_1, tg_yzz_xxxx_0, tg_yzz_xxxy_0, \
+                                         tg_yzz_xxxz_0, tg_yzz_xxyy_0, tg_yzz_xxyz_0, tg_yzz_xxzz_0, tg_yzz_xyyy_0, \
+                                         tg_yzz_xyyz_0, tg_yzz_xyzz_0, tg_yzz_xzzz_0, tg_yzz_yyyy_0, tg_yzz_yyyz_0, \
+                                         tg_yzz_yyzz_0, tg_yzz_yzzz_0, tg_yzz_zzzz_0, tg_z_xxxx_0, tg_z_xxxx_1, tg_z_xxxy_0, \
+                                         tg_z_xxxy_1, tg_z_xxxz_0, tg_z_xxxz_1, tg_z_xxyy_0, tg_z_xxyy_1, tg_z_xxyz_0, \
+                                         tg_z_xxyz_1, tg_z_xxzz_0, tg_z_xxzz_1, tg_z_xyyy_0, tg_z_xyyy_1, tg_z_xyyz_0, \
+                                         tg_z_xyyz_1, tg_z_xyzz_0, tg_z_xyzz_1, tg_z_xzzz_0, tg_z_xzzz_1, tg_z_yyyy_0, \
+                                         tg_z_yyyy_1, tg_z_yyyz_0, tg_z_yyyz_1, tg_z_yyzz_0, tg_z_yyzz_1, tg_z_yzzz_0, \
+                                         tg_z_yzzz_1, tg_z_zzzz_0, tg_z_zzzz_1, tg_zz_xxx_1, tg_zz_xxxx_0, tg_zz_xxxx_1, \
+                                         tg_zz_xxxy_0, tg_zz_xxxy_1, tg_zz_xxxz_0, tg_zz_xxxz_1, tg_zz_xxy_1, tg_zz_xxyy_0, \
+                                         tg_zz_xxyy_1, tg_zz_xxyz_0, tg_zz_xxyz_1, tg_zz_xxz_1, tg_zz_xxzz_0, tg_zz_xxzz_1, \
+                                         tg_zz_xyy_1, tg_zz_xyyy_0, tg_zz_xyyy_1, tg_zz_xyyz_0, tg_zz_xyyz_1, tg_zz_xyz_1, \
+                                         tg_zz_xyzz_0, tg_zz_xyzz_1, tg_zz_xzz_1, tg_zz_xzzz_0, tg_zz_xzzz_1, tg_zz_yyy_1, \
+                                         tg_zz_yyyy_0, tg_zz_yyyy_1, tg_zz_yyyz_0, tg_zz_yyyz_1, tg_zz_yyz_1, tg_zz_yyzz_0, \
+                                         tg_zz_yyzz_1, tg_zz_yzz_1, tg_zz_yzzz_0, tg_zz_yzzz_1, tg_zz_zzz_1, tg_zz_zzzz_0, \
+                                         tg_zz_zzzz_1, tg_zzz_xxxx_0, tg_zzz_xxxy_0, tg_zzz_xxxz_0, tg_zzz_xxyy_0, \
+                                         tg_zzz_xxyz_0, tg_zzz_xxzz_0, tg_zzz_xyyy_0, tg_zzz_xyyz_0, tg_zzz_xyzz_0, \
+                                         tg_zzz_xzzz_0, tg_zzz_yyyy_0, tg_zzz_yyyz_0, tg_zzz_yyzz_0, tg_zzz_yzzz_0, \
+                                         tg_zzz_zzzz_0, wp_x, wp_y, wp_z: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
                     double fl1_fx = fx;
@@ -1993,6 +1762,56 @@ namespace erirecfunc { // erirecfunc namespace
                     double fl1_fxn = fxn[j];
 
                     double fl1_fza = fza[j];
+
+                    tg_xzz_xxxx_0[j] = pb_x * tg_zz_xxxx_0[j] + wp_x[j] * tg_zz_xxxx_1[j] + 2.0 * fl1_fxn * tg_zz_xxx_1[j];
+
+                    tg_xzz_xxxy_0[j] = pb_x * tg_zz_xxxy_0[j] + wp_x[j] * tg_zz_xxxy_1[j] + 1.5 * fl1_fxn * tg_zz_xxy_1[j];
+
+                    tg_xzz_xxxz_0[j] = pb_x * tg_zz_xxxz_0[j] + wp_x[j] * tg_zz_xxxz_1[j] + 1.5 * fl1_fxn * tg_zz_xxz_1[j];
+
+                    tg_xzz_xxyy_0[j] = pb_x * tg_zz_xxyy_0[j] + wp_x[j] * tg_zz_xxyy_1[j] + fl1_fxn * tg_zz_xyy_1[j];
+
+                    tg_xzz_xxyz_0[j] = pb_x * tg_zz_xxyz_0[j] + wp_x[j] * tg_zz_xxyz_1[j] + fl1_fxn * tg_zz_xyz_1[j];
+
+                    tg_xzz_xxzz_0[j] = pb_x * tg_zz_xxzz_0[j] + wp_x[j] * tg_zz_xxzz_1[j] + fl1_fxn * tg_zz_xzz_1[j];
+
+                    tg_xzz_xyyy_0[j] = pb_x * tg_zz_xyyy_0[j] + wp_x[j] * tg_zz_xyyy_1[j] + 0.5 * fl1_fxn * tg_zz_yyy_1[j];
+
+                    tg_xzz_xyyz_0[j] = pb_x * tg_zz_xyyz_0[j] + wp_x[j] * tg_zz_xyyz_1[j] + 0.5 * fl1_fxn * tg_zz_yyz_1[j];
+
+                    tg_xzz_xyzz_0[j] = pb_x * tg_zz_xyzz_0[j] + wp_x[j] * tg_zz_xyzz_1[j] + 0.5 * fl1_fxn * tg_zz_yzz_1[j];
+
+                    tg_xzz_xzzz_0[j] = pb_x * tg_zz_xzzz_0[j] + wp_x[j] * tg_zz_xzzz_1[j] + 0.5 * fl1_fxn * tg_zz_zzz_1[j];
+
+                    tg_xzz_yyyy_0[j] = pb_x * tg_zz_yyyy_0[j] + wp_x[j] * tg_zz_yyyy_1[j];
+
+                    tg_xzz_yyyz_0[j] = pb_x * tg_zz_yyyz_0[j] + wp_x[j] * tg_zz_yyyz_1[j];
+
+                    tg_xzz_yyzz_0[j] = pb_x * tg_zz_yyzz_0[j] + wp_x[j] * tg_zz_yyzz_1[j];
+
+                    tg_xzz_yzzz_0[j] = pb_x * tg_zz_yzzz_0[j] + wp_x[j] * tg_zz_yzzz_1[j];
+
+                    tg_xzz_zzzz_0[j] = pb_x * tg_zz_zzzz_0[j] + wp_x[j] * tg_zz_zzzz_1[j];
+
+                    tg_yyy_xxxx_0[j] = pb_y * tg_yy_xxxx_0[j] + wp_y[j] * tg_yy_xxxx_1[j] + fl1_fx * tg_y_xxxx_0[j] - fl1_fx * fl1_fza * tg_y_xxxx_1[j];
+
+                    tg_yyy_xxxy_0[j] = pb_y * tg_yy_xxxy_0[j] + wp_y[j] * tg_yy_xxxy_1[j] + fl1_fx * tg_y_xxxy_0[j] - fl1_fx * fl1_fza * tg_y_xxxy_1[j] + 0.5 * fl1_fxn * tg_yy_xxx_1[j];
+
+                    tg_yyy_xxxz_0[j] = pb_y * tg_yy_xxxz_0[j] + wp_y[j] * tg_yy_xxxz_1[j] + fl1_fx * tg_y_xxxz_0[j] - fl1_fx * fl1_fza * tg_y_xxxz_1[j];
+
+                    tg_yyy_xxyy_0[j] = pb_y * tg_yy_xxyy_0[j] + wp_y[j] * tg_yy_xxyy_1[j] + fl1_fx * tg_y_xxyy_0[j] - fl1_fx * fl1_fza * tg_y_xxyy_1[j] + fl1_fxn * tg_yy_xxy_1[j];
+
+                    tg_yyy_xxyz_0[j] = pb_y * tg_yy_xxyz_0[j] + wp_y[j] * tg_yy_xxyz_1[j] + fl1_fx * tg_y_xxyz_0[j] - fl1_fx * fl1_fza * tg_y_xxyz_1[j] + 0.5 * fl1_fxn * tg_yy_xxz_1[j];
+
+                    tg_yyy_xxzz_0[j] = pb_y * tg_yy_xxzz_0[j] + wp_y[j] * tg_yy_xxzz_1[j] + fl1_fx * tg_y_xxzz_0[j] - fl1_fx * fl1_fza * tg_y_xxzz_1[j];
+
+                    tg_yyy_xyyy_0[j] = pb_y * tg_yy_xyyy_0[j] + wp_y[j] * tg_yy_xyyy_1[j] + fl1_fx * tg_y_xyyy_0[j] - fl1_fx * fl1_fza * tg_y_xyyy_1[j] + 1.5 * fl1_fxn * tg_yy_xyy_1[j];
+
+                    tg_yyy_xyyz_0[j] = pb_y * tg_yy_xyyz_0[j] + wp_y[j] * tg_yy_xyyz_1[j] + fl1_fx * tg_y_xyyz_0[j] - fl1_fx * fl1_fza * tg_y_xyyz_1[j] + fl1_fxn * tg_yy_xyz_1[j];
+
+                    tg_yyy_xyzz_0[j] = pb_y * tg_yy_xyzz_0[j] + wp_y[j] * tg_yy_xyzz_1[j] + fl1_fx * tg_y_xyzz_0[j] - fl1_fx * fl1_fza * tg_y_xyzz_1[j] + 0.5 * fl1_fxn * tg_yy_xzz_1[j];
+
+                    tg_yyy_xzzz_0[j] = pb_y * tg_yy_xzzz_0[j] + wp_y[j] * tg_yy_xzzz_1[j] + fl1_fx * tg_y_xzzz_0[j] - fl1_fx * fl1_fza * tg_y_xzzz_1[j];
 
                     tg_yyy_yyyy_0[j] = pb_y * tg_yy_yyyy_0[j] + wp_y[j] * tg_yy_yyyy_1[j] + fl1_fx * tg_y_yyyy_0[j] - fl1_fx * fl1_fza * tg_y_yyyy_1[j] + 2.0 * fl1_fxn * tg_yy_yyy_1[j];
 
