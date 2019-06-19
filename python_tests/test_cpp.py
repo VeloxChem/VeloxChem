@@ -33,6 +33,7 @@ class TestCppDriver(unittest.TestCase):
             'b_components': 'xyz',
             'frequencies': '0, 0.5',
             'damping': '1.0',
+            'lindep_thresh': '1.0e-8',
             'eri_thresh': '1.0e-12',
             'qq_type': 'QQ_DEN',
             'conv_thresh': '1.0e-6',

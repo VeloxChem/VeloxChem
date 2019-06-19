@@ -37,6 +37,7 @@ class ComplexResponse:
         self.cur_iter = 0
         self.is_converged = False
         self.small_thresh = 1.0e-10
+        self.lindep_thresh = 1.0e-6
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -52,6 +53,9 @@ class ComplexResponse:
             self.frequencies = parse_frequencies(settings['frequencies'])
         if 'damping' in settings:
             self.damping = float(settings['damping'])
+
+        if 'lindep_thresh' in settings:
+            self.lindep_thresh = float(settings['lindep_thresh'])
 
         if 'conv_thresh' in settings:
             self.conv_thresh = float(settings['conv_thresh'])
@@ -262,7 +266,7 @@ class ComplexResponse:
 
         trials = []
         for (op, w) in vectors:
-            if res_norm == None or res_norm[(op, w)] > self.conv_thresh:
+            if res_norm is None or res_norm[(op, w)] > self.conv_thresh:
                 vec = np.array(vectors[(op, w)])
 
                 # preconditioning trials:
@@ -300,7 +304,7 @@ class ComplexResponse:
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
 
-            new_ger = rm_lin_depend(new_ger)
+            new_ger = rm_lin_depend(new_ger, self.lindep_thresh)
             new_ger = self.orthogonalize_gram_schmidt(new_ger)
             new_ger = self.normalize(new_ger)
 
@@ -309,7 +313,7 @@ class ComplexResponse:
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
 
-            new_ung = rm_lin_depend(new_ung)
+            new_ung = rm_lin_depend(new_ung, self.lindep_thresh)
             new_ung = self.orthogonalize_gram_schmidt(new_ung)
             new_ung = self.normalize(new_ung)
 
@@ -428,8 +432,8 @@ class ComplexResponse:
                 nvs = []
 
                 for op, w in igs:
-                    if iteration == 0 or (relative_residual_norm[(op, w)]
-                                         > self.conv_thresh):
+                    if iteration == 0 or (relative_residual_norm[(op, w)] >
+                                          self.conv_thresh):
                         grad = v1[op]
 
                         gradger, gradung = self.decomp_sym(grad)
@@ -470,13 +474,12 @@ class ComplexResponse:
 
                         g = np.zeros(size)
 
-                        for pos in range(ntrials_ger):
-                            g[pos] = g_realger[pos]
-                            g[-pos - 1] = -g_imagger[-pos - 1]
+                        g[:ntrials_ger] = g_realger[:]
+                        g[-ntrials_ger:] = -g_imagger[:]
 
-                        for pos in range(ntrials_ung):
-                            g[pos + ntrials_ger] = g_realung[pos]
-                            g[-(pos + ntrials_ger) - 1] = -g_imagung[-pos - 1]
+                        g[ntrials_ger:ntrials_ger + ntrials_ung] = g_realung[:]
+                        g[-ntrials_ger -
+                          ntrials_ung:-ntrials_ger] = g_imagung[:]
 
                         # matrix
 
@@ -484,42 +487,47 @@ class ComplexResponse:
 
                         # filling E2gg
 
-                        for row in range(ntrials_ger):
-                            for col in range(ntrials_ger):
-                                mat[row, col] = e2gg[row, col]
-                                mat[-row - 1, -col - 1] = -e2gg[-row - 1, -col - 1]
+                        mat[:ntrials_ger, :ntrials_ger] = e2gg[:, :]
+
+                        mat[-ntrials_ger:, -ntrials_ger:] = -e2gg[:, :]
 
                         # filling E2uu
 
-                        for row in range(ntrials_ung):
-                            for col in range(ntrials_ung):
-                                mat[(row + ntrials_ger),
-                                    (col + ntrials_ger)] = e2uu[row, col]
-                                mat[-(row + ntrials_ger) - 1, -(col + ntrials_ger) -
-                                    1] = -e2uu[-row - 1, -col - 1]
+                        mat[ntrials_ger:ntrials_ger +
+                            ntrials_ung, ntrials_ger:ntrials_ger +
+                            ntrials_ung] = e2uu[:, :]
 
-                        for row in range(ntrials_ung):
-                            for col in range(ntrials_ger):
+                        mat[-ntrials_ger -
+                            ntrials_ung:-ntrials_ger, -ntrials_ger -
+                            ntrials_ung:-ntrials_ger] = -e2uu[:, :]
 
-                                # filling S2ug
+                        # filling S2ug
 
-                                mat[(row + ntrials_ger), col] = -w * s2ug[row, col]
-                                mat[-(row + ntrials_ger) -
-                                    1, col] = d * s2ug[-row - 1, col]
-                                mat[(row + ntrials_ger), -col -
-                                    1] = d * s2ug[row, -col - 1]
-                                mat[-(row + ntrials_ger) - 1, -col -
-                                    1] = w * s2ug[-row - 1, -col - 1]
+                        mat[ntrials_ger:ntrials_ger +
+                            ntrials_ung, :ntrials_ger] = -w * s2ug[:, :]
 
-                                # filling S2ug.T (interchanging of row and col)
+                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger, :
+                            ntrials_ger] = d * s2ug[:, :]
 
-                                mat[col, (row + ntrials_ger)] = -w * s2ug[row, col]
-                                mat[col, -(row + ntrials_ger) -
-                                    1] = d * s2ug[-row - 1, col]
-                                mat[-col - 1,
-                                    (row + ntrials_ger)] = d * s2ug[row, -col - 1]
-                                mat[-col - 1, -(row + ntrials_ger) -
-                                    1] = w * s2ug[-row - 1, -col - 1]
+                        mat[ntrials_ger:ntrials_ger +
+                            ntrials_ung, -ntrials_ger:] = d * s2ug[:, :]
+
+                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger,
+                            -ntrials_ger:] = w * s2ug[:, :]
+
+                        # filling S2ug.T (interchanging of row and col)
+
+                        mat[:ntrials_ger, ntrials_ger:ntrials_ger +
+                            ntrials_ung] = -w * s2ug.T[:, :]
+
+                        mat[:ntrials_ger, -ntrials_ger -
+                            ntrials_ung:-ntrials_ger] = d * s2ug.T[:, :]
+
+                        mat[-ntrials_ger:, ntrials_ger:ntrials_ger +
+                            ntrials_ung] = d * s2ug.T[:, :]
+
+                        mat[-ntrials_ger:, -ntrials_ger -
+                            ntrials_ung:-ntrials_ger] = w * s2ug.T[:, :]
 
                         # solving matrix equation
 
@@ -532,13 +540,12 @@ class ComplexResponse:
                         c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
                             ntrials_ung)
 
-                        for pos in range(ntrials_ger):
-                            c_realger[pos] = c[pos]
-                            c_imagger[-pos - 1] = c[-pos - 1]
+                        c_realger[:] = c[:ntrials_ger]
+                        c_imagger[:] = c[-ntrials_ger:]
 
-                        for pos in range(ntrials_ung):
-                            c_realung[pos] = c[pos + ntrials_ger]
-                            c_imagung[-pos - 1] = c[-(pos + ntrials_ger) - 1]
+                        c_realung[:] = c[ntrials_ger:ntrials_ger + ntrials_ung]
+                        c_imagung[:] = c[-ntrials_ger -
+                                         ntrials_ung:-ntrials_ger]
 
                         # ...and projecting them onto respective subspace
 
@@ -594,10 +601,10 @@ class ComplexResponse:
                                      gradger.real)
                         r_realung = (e2realung - w * s2realger + d * s2imagger -
                                      gradung.real)
-                        r_imagung = (-e2imagung + w * s2imagger + d * s2realger +
-                                     gradung.imag)
-                        r_imagger = (-e2imagger + w * s2imagung + d * s2realung +
-                                     gradger.imag)
+                        r_imagung = (-e2imagung + w * s2imagger +
+                                     d * s2realger + gradung.imag)
+                        r_imagger = (-e2imagger + w * s2imagung +
+                                     d * s2realung + gradger.imag)
 
                         # composing total residual
 
@@ -609,11 +616,13 @@ class ComplexResponse:
                             r[pos] = complex(r_real[pos], r_imag[pos])
 
                         residuals[(op, w)] = np.array(
-                            [r_realger, r_realung, r_imagung, r_imagger]).flatten()
+                            [r_realger, r_realung, r_imagung,
+                             r_imagger]).flatten()
 
                         n = solutions[(op, w)]
 
-                        # calculating relative residual norm for convergence check
+                        # calculating relative residual norm
+                        # for convergence check
 
                         nv = np.matmul(n, grad)
                         nvs.append((op, w, nv))
@@ -632,10 +641,12 @@ class ComplexResponse:
                 self.ostream.print_info(
                     '{:d} ungerade trial vectors'.format(ntrials_ung))
                 self.ostream.print_blank()
-                self.ostream.print_info(
-                    'Time for this iteration: {:.2f} sec'.format(
-                    tm.time() - iter_start_time))
-                self.ostream.print_blank()
+
+                #self.ostream.print_info(
+                #    'Time for this iteration: {:.2f} sec'.format(
+                #        tm.time() - iter_start_time))
+                #self.ostream.print_blank()
+
                 self.print_iteration(relative_residual_norm, nvs)
 
             # check convergence
@@ -651,12 +662,12 @@ class ComplexResponse:
 
                 trials_info = {'new_trials_ger': False, 'new_trials_ung': False}
 
-                new_trials_ger, new_trials_ung = self.setup_trials(residuals,
-                                                                   pre=precond,
-                                                                   bger=bger,
-                                                                   bung=bung,
-                                                                   res_norm=
-                                                        relative_residual_norm)
+                new_trials_ger, new_trials_ung = self.setup_trials(
+                    residuals,
+                    pre=precond,
+                    bger=bger,
+                    bung=bung,
+                    res_norm=relative_residual_norm)
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),

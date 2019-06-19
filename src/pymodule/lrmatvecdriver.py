@@ -282,13 +282,15 @@ def truncate_and_normalize(basis, small_threshold):
     inverse_sqrt = np.matmul(T * np.sqrt(1.0 / l), T.T)
     return np.matmul(truncated, inverse_sqrt)
 
-def rm_lin_depend(basis):
+
+def rm_lin_depend(basis, threshold):
 
     Sb = np.matmul(basis.T, basis)
     l, T = np.linalg.eigh(Sb)
     b_norm = np.sqrt(Sb.diagonal())
-    mask = l > b_norm * 1.0e-6
-    return np.matmul(basis, T[:,mask])
+    mask = l > b_norm * threshold
+    return np.matmul(basis, T[:, mask])
+
 
 def construct_ed_sd(orb_ene, nocc, norb):
     """Returns the E0 and S0 diagonal elements as arrays.
