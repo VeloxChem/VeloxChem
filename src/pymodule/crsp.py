@@ -45,6 +45,9 @@ class ComplexResponse:
 
         self.ostream = ostream
 
+        self.timing = False
+        self.profiling = False
+
     def update_settings(self, settings):
         """Updates settings in complex response solver.
         """
@@ -66,6 +69,13 @@ class ComplexResponse:
             self.eri_thresh = float(settings['eri_thresh'])
         if 'qq_type' in settings:
             self.qq_type = settings['qq_type'].upper()
+
+        if 'timing' in settings:
+            key = settings['timing'].lower()
+            self.timing = True if key in ['yes', 'y'] else False
+        if 'profiling' in settings:
+            key = settings['profiling'].lower()
+            self.profiling = True if key in ['yes', 'y'] else False
 
     def paired(self, v_xy):
         """Returns paired trial vector.
@@ -328,6 +338,18 @@ class ComplexResponse:
         convergence threshold.
         """
 
+        if self.profiling:
+            import cProfile
+            import pstats
+            import io
+            import os
+            pr = cProfile.Profile()
+            pr.enable()
+
+        if self.timing:
+            prep_t0 = tm.time()
+            self.timing_dict = {}
+
         if self.rank == mpi_master():
             self.print_header()
 
@@ -424,9 +446,16 @@ class ComplexResponse:
         relative_residual_norm = {}
         kappas = {}
 
+        if self.timing:
+            self.timing_dict['initial_guess'] = tm.time() - prep_t0
+            self.timing_dict['reduced_space'] = []
+            self.timing_dict['new_trials'] = []
+
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
-            iter_start_time = tm.time()
+
+            if self.timing:
+                red_space_t0 = tm.time()
 
             if self.rank == mpi_master():
                 nvs = []
@@ -642,12 +671,11 @@ class ComplexResponse:
                     '{:d} ungerade trial vectors'.format(ntrials_ung))
                 self.ostream.print_blank()
 
-                #self.ostream.print_info(
-                #    'Time for this iteration: {:.2f} sec'.format(
-                #        tm.time() - iter_start_time))
-                #self.ostream.print_blank()
-
                 self.print_iteration(relative_residual_norm, nvs)
+
+            if self.timing:
+                self.timing_dict['reduced_space'].append(tm.time() -
+                                                         red_space_t0)
 
             # check convergence
 
@@ -655,6 +683,9 @@ class ComplexResponse:
 
             if self.is_converged:
                 break
+
+            if self.timing:
+                new_trials_t0 = tm.time()
 
             # spawning new trial vectors from residuals
 
@@ -714,12 +745,28 @@ class ComplexResponse:
                     e2bung = np.append(e2bung, new_e2bung, axis=1)
                     s2bger = np.append(s2bger, new_s2bger, axis=1)
 
+            if self.timing:
+                self.timing_dict['new_trials'].append(tm.time() - new_trials_t0)
+
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
 
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
+
+            if self.timing:
+                self.print_timing()
+
+        if self.profiling:
+            pr.disable()
+            s = io.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats(20)
+            if self.rank == mpi_master():
+                for line in s.getvalue().split(os.linesep):
+                    self.ostream.print_info(line)
 
         a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
                         scf_tensors, self.rank, self.comm)
@@ -832,3 +879,25 @@ class ComplexResponse:
                         ops_label, props[(a, b, w)].real, props[(a, b, w)].imag)
                     self.ostream.print_header(output_alpha.ljust(82))
             self.ostream.print_blank()
+
+    def print_timing(self):
+
+        valstr = 'Timing:'
+        self.ostream.print_header(valstr.ljust(82))
+        self.ostream.print_header(('-' * len(valstr)).ljust(82))
+
+        valstr = '{:<22s}: {:12.2f} sec'.format(
+            'Initial guess', self.timing_dict['initial_guess'])
+        self.ostream.print_header(valstr.ljust(82))
+
+        for i, (a, b) in enumerate(
+                zip(self.timing_dict['reduced_space'],
+                    self.timing_dict['new_trials'])):
+            valstr = '{:<22s}: {:12.2f} sec'.format(
+                'Iteration {:d}'.format(i + 1), a + b)
+            self.ostream.print_header(valstr.ljust(82))
+
+        valstr = '{:<22s}: {:12.2f} sec'.format(
+            'Last iteration', self.timing_dict['reduced_space'][-1])
+        self.ostream.print_header(valstr.ljust(82))
+        self.ostream.print_blank()
