@@ -199,10 +199,21 @@ class InputParser:
 def parse_frequencies(input_frequencies):
 
     frequencies = []
-    for w in input_frequencies.replace(' ', '').split(','):
+    for w in input_frequencies.split(','):
         if '-' in w:
-            seq = [float(x) for x in w.split('-')[:3]]
-            frequencies += list(np.arange(*seq))
+            m = re.search(r'^(.*)-(.*)\((.*)\)$', w)
+            if m is None:
+                m = re.search(r'^(.*)-(.*)-(.*)$', w)
+
+            assert_msg_critical(m is not None,
+                                'InputParser: failed to read frequencies')
+
+            frequencies += list(
+                np.arange(
+                    float(m.group(1)),
+                    float(m.group(2)),
+                    float(m.group(3)),
+                ))
         elif w:
             frequencies.append(float(w))
     return frequencies
