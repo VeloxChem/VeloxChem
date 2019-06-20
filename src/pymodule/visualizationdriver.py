@@ -1,4 +1,5 @@
 import numpy as np
+import re
 
 from .veloxchemlib import VisualizationDriver
 from .veloxchemlib import CubicGrid
@@ -107,6 +108,57 @@ def _VisualizationDriver_write_cube(self, cubefile, grid, molecule, basis,
     self.write_data(cubefile, grid, molecule, flag, index, spin)
 
 
+def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
+                                   density):
+
+    if 'grid' in cube_dict:
+        grid = [int(x) for x in cube_dict['grid'].split(',')]
+    else:
+        grid = [80, 80, 80]
+
+    cubic_grid = self.gen_cubic_grid(molecule, *grid[:3])
+
+    cubes = cube_dict['cubes'].split(',')
+    files = cube_dict['files'].split(',')
+
+    for cube, fname in zip(cubes, files):
+
+        m = re.search(r'^(.*)\((.*)\)$', cube)
+
+        assert_msg_critical(m is not None,
+                            'VisualizationDriver: failed to read cube inputs')
+
+        cube_type = m.group(1).strip().lower()
+        cube_value = m.group(2).strip().lower()
+
+        if cube_type in ['mo', 'amo', 'bmo']:
+
+            if cube_type in ['mo', 'amo']:
+                spin = 'alpha'
+                nelec = molecule.number_of_alpha_electrons()
+            else:
+                spin = 'beta'
+                nelec = molecule.number_of_beta_electrons()
+
+            homo = nelec - 1
+            lumo = nelec
+
+            cube_value = cube_value.replace('homo', str(homo))
+            cube_value = cube_value.replace('lumo', str(lumo))
+            orb_id = eval(cube_value)
+
+            self.write_cube(fname.strip(), cubic_grid, molecule, basis,
+                            mol_orbs, orb_id, spin)
+
+        elif cube_type == 'density':
+
+            spin = cube_value
+
+            self.write_cube(fname.strip(), cubic_grid, molecule, basis, density,
+                            0, spin)
+
+
 VisualizationDriver.gen_cubic_grid = _VisualizationDriver_gen_cubic_grid
 VisualizationDriver.write_data = _VisualizationDriver_write_data
 VisualizationDriver.write_cube = _VisualizationDriver_write_cube
+VisualizationDriver.gen_cubes = _VisualizationDriver_gen_cubes

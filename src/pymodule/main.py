@@ -12,7 +12,6 @@ from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .crsp import ComplexResponse
-from .lreigensolver import LinearResponseEigenSolver
 from .mp2driver import Mp2Driver
 from .adconedriver import AdcOneDriver
 from .excitondriver import ExcitonModelDriver
@@ -187,23 +186,19 @@ def main():
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
-    # Cube
+    # Cube file
 
     if task_type == 'cube':
 
-        # generate cube file
+        if 'cube' in task.input_dict:
+            cube_dict = task.input_dict['cube']
+        else:
+            cube_dict = {}
 
         if task.mpi_rank == mpi_master():
             vis_drv = VisualizationDriver()
-
-            nelec = task.molecule.number_of_electrons()
-            homo = nelec // 2 - 1
-
-            cubic_grid = vis_drv.gen_cubic_grid(task.molecule)
-            vis_drv.write_cube('homo.cube', cubic_grid, task.molecule,
-                               task.ao_basis, mol_orbs, homo, "alpha")
-            vis_drv.write_cube('density.cube', cubic_grid, task.molecule,
-                               task.ao_basis, density, 0, "alpha")
+            vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
+                              density)
 
     # all done, print finish header to output stream
 
