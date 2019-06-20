@@ -58,9 +58,7 @@ def main():
 
     # Hartree-Fock
 
-    if task_type in [
-            'hf', 'mp2', 'cube', 'response', 'cpp', 'adc1', 'excitation'
-    ]:
+    if task_type in ['hf', 'mp2', 'cube', 'response', 'cpp', 'adc1']:
 
         # initialize scf driver and run scf
 
@@ -155,19 +153,6 @@ def main():
             rsp_drv = ResponseDriver(task.mpi_comm, task.ostream)
             rsp_drv.update_settings({'property': 'absorption'})
             rsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
-
-    # LR Excitation
-
-    if task_type == 'excitation':
-
-        if 'excitation' in task.input_dict:
-            lreigsolver_dict = task.input_dict['excitation']
-        else:
-            lreigsolver_dict = {}
-
-        lreigsolver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        lreigsolver.update_settings(lreigsolver_dict)
-        lreigsolver.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # Complex Response
 
