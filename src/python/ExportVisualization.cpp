@@ -19,6 +19,18 @@ namespace py = pybind11;
 
 namespace vlx_visualization {  // vlx_visualization namespace
 
+// Helper function for CVisualizationDriver constructor
+
+static std::shared_ptr<CVisualizationDriver>
+CVisualizationDriver_create(py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CVisualizationDriver>(
+        new CVisualizationDriver(*comm_ptr)
+    );
+}
+
 // Helper function for converting cubic grid values to 3d numpy array
 
 static py::array_t<double>
@@ -57,7 +69,8 @@ export_visualization(py::module& m)
     // CVisualizationDriver class
 
     py::class_<CVisualizationDriver, std::shared_ptr<CVisualizationDriver>>(m, "VisualizationDriver")
-        .def(py::init<>())
+        .def(py::init(&CVisualizationDriver_create))
+        .def("get_rank", &CVisualizationDriver::getRank)
         .def("compute",
              (void (CVisualizationDriver::*)(CCubicGrid&,
                                              const CMolecule&,

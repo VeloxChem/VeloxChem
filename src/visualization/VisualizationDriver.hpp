@@ -26,6 +26,21 @@
 class CVisualizationDriver
 {
     /**
+     The rank of associated local MPI process.
+     */
+    int32_t _locRank;
+
+    /**
+     The total number of local MPI processes.
+     */
+    int32_t _locNodes;
+
+    /**
+     The MPI communicator.
+     */
+    MPI_Comm _locComm;
+
+    /**
      Builds the components of Cartesian angular momentum for a shell.
 
      @param angl the angular momentum of the shell.
@@ -52,8 +67,10 @@ class CVisualizationDriver
    public:
     /**
      Creates a visualization driver object.
+
+     @param comm the MPI communicator.
      */
-    CVisualizationDriver();
+    CVisualizationDriver(MPI_Comm comm);
 
     /**
      Destroys a visualization driver object.
@@ -61,7 +78,22 @@ class CVisualizationDriver
     ~CVisualizationDriver();
 
     /**
-     Computes molecular orbital values at cubic grid points.
+     Gets rank of the MPI process.
+
+     @return rank of the MPI process.
+     */
+    int32_t getRank() const;
+
+    /**
+     Computes counts and displacements for distributing workloads to MPI processes.
+
+     @param nx number of tasks.
+     @return a vector of vector containing counts and displacements.
+     */
+    std::vector<std::vector<int32_t>> getCountsAndDisplacements(const int32_t nx) const;
+
+    /**
+     Computes molecular orbital values at cubic grid points (MPI).
 
      @param grid the cubic grid.
      @param molecule the molecule.
@@ -78,7 +110,41 @@ class CVisualizationDriver
                  const std::string&        mospin) const;
 
     /**
-     Computes electronic densities at cubic grid points.
+     Computes molecular orbital values at cubic grid points (MPI).
+
+     @param grid the cubic grid.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param molorb the molecular orbitals of the molecule.
+     @param moidx the index of the molecular orbital (0-based).
+     @param mospin the spin of the molecular orbital ('a' or 'b').
+     */
+    void compute(CCubicGrid&             grid,
+                 const CMolecule&        molecule,
+                 const CMolecularBasis&  basis,
+                 const CAODensityMatrix& density,
+                 const int32_t           denidx,
+                 const std::string&      denspin) const;
+
+    /**
+     Computes molecular orbital values at cubic grid points (OpenMP).
+
+     @param grid the cubic grid.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param molorb the molecular orbitals of the molecule.
+     @param moidx the index of the molecular orbital (0-based).
+     @param mospin the spin of the molecular orbital ('a' or 'b').
+     */
+    void compute_omp(CCubicGrid&               grid,
+                     const CMolecule&          molecule,
+                     const CMolecularBasis&    basis,
+                     const CMolecularOrbitals& molorb,
+                     const int32_t             moidx,
+                     const std::string&        mospin) const;
+
+    /**
+     Computes electronic densities at cubic grid points (OpenMP).
 
      @param grid the cubic grid.
      @param molecule the molecule.
@@ -87,12 +153,12 @@ class CVisualizationDriver
      @param densityIndex the index of the density matrix (0-based).
      @param densitySpin the spin of the density matrix ('a' or 'b').
      */
-    void compute(CCubicGrid&             grid,
-                 const CMolecule&        molecule,
-                 const CMolecularBasis&  basis,
-                 const CAODensityMatrix& density,
-                 const int32_t           densityIndex,
-                 const std::string&      densitySpin) const;
+    void compute_omp(CCubicGrid&             grid,
+                     const CMolecule&        molecule,
+                     const CMolecularBasis&  basis,
+                     const CAODensityMatrix& density,
+                     const int32_t           densityIndex,
+                     const std::string&      densitySpin) const;
 };
 
 #endif /* VisualizationDriver_hpp */

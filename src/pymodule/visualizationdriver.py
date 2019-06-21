@@ -3,6 +3,7 @@ import re
 
 from .veloxchemlib import VisualizationDriver
 from .veloxchemlib import CubicGrid
+from .veloxchemlib import mpi_master
 from .molecularorbitals import MolecularOrbitals
 from .aodensitymatrix import AODensityMatrix
 from .errorhandler import assert_msg_critical
@@ -90,24 +91,6 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
     f_cube.close()
 
 
-def _VisualizationDriver_write_cube(self, cubefile, grid, molecule, basis,
-                                    mo_or_density, index, spin):
-
-    if isinstance(mo_or_density, MolecularOrbitals):
-        flag = 'mo'
-
-    elif isinstance(mo_or_density, AODensityMatrix):
-        flag = 'density'
-
-    else:
-        errmsg = 'VisualizationDriver.write_cube: invalide argument'
-        assert_msg_critical(False, errmsg)
-
-    self.compute(grid, molecule, basis, mo_or_density, index, spin)
-
-    self.write_data(cubefile, grid, molecule, flag, index, spin)
-
-
 def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
                                    density):
 
@@ -118,8 +101,8 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
 
     cubic_grid = self.gen_cubic_grid(molecule, *grid[:3])
 
-    cubes = cube_dict['cubes'].split(',')
-    files = cube_dict['files'].split(',')
+    cubes = [x.strip() for x in cube_dict['cubes'].split(',')]
+    files = [x.strip() for x in cube_dict['files'].split(',')]
 
     for cube, fname in zip(cubes, files):
 
@@ -147,18 +130,21 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
             cube_value = cube_value.replace('lumo', str(lumo))
             orb_id = eval(cube_value)
 
-            self.write_cube(fname.strip(), cubic_grid, molecule, basis,
-                            mol_orbs, orb_id, spin)
+            self.compute(cubic_grid, molecule, basis, mol_orbs, orb_id, spin)
+
+            if self.get_rank() == mpi_master():
+                self.write_data(fname, cubic_grid, molecule, 'mo', orb_id, spin)
 
         elif cube_type == 'density':
 
             spin = cube_value
 
-            self.write_cube(fname.strip(), cubic_grid, molecule, basis, density,
-                            0, spin)
+            self.compute(cubic_grid, molecule, basis, density, 0, spin)
+
+            if self.get_rank() == mpi_master():
+                self.write_data(fname, cubic_grid, molecule, 'density', 0, spin)
 
 
 VisualizationDriver.gen_cubic_grid = _VisualizationDriver_gen_cubic_grid
 VisualizationDriver.write_data = _VisualizationDriver_write_data
-VisualizationDriver.write_cube = _VisualizationDriver_write_cube
 VisualizationDriver.gen_cubes = _VisualizationDriver_gen_cubes

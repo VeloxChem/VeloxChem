@@ -18,12 +18,18 @@
 #include "SphericalMomentum.hpp"
 #include "StringFormat.hpp"
 
-CVisualizationDriver::CVisualizationDriver()
+CVisualizationDriver::CVisualizationDriver(MPI_Comm comm)
 {
+    _locRank = mpi::rank(comm);
+
+    _locNodes = mpi::nodes(comm);
+
+    mpi::duplicate(comm, &_locComm);
 }
 
 CVisualizationDriver::~CVisualizationDriver()
 {
+    mpi::destroy(&_locComm);
 }
 
 std::vector<std::vector<int32_t>>
@@ -161,6 +167,45 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
     return phi;
 }
 
+int32_t
+CVisualizationDriver::getRank() const
+{
+    return mpi::rank(_locComm);
+}
+
+std::vector<std::vector<int32_t>>
+CVisualizationDriver::getCountsAndDisplacements(int32_t nx) const
+{
+    int32_t ave = nx / _locNodes;
+
+    int32_t res = nx % _locNodes;
+
+    std::vector<int32_t> counts;
+
+    for (int32_t i = 0; i < _locNodes; i++)
+    {
+        if (i < res)
+        {
+            counts.push_back(ave + 1);
+        }
+        else
+        {
+            counts.push_back(ave);
+        }
+    }
+
+    std::vector<int32_t> displs;
+
+    for (int32_t i = 0, disp = 0; i < _locNodes; i++)
+    {
+        displs.push_back(disp);
+
+        disp += counts[i];
+    }
+
+    return std::vector<std::vector<int32_t>>({counts, displs});
+}
+
 void
 CVisualizationDriver::compute(CCubicGrid&               grid,
                               const CMolecule&          molecule,
@@ -168,6 +213,106 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
                               const CMolecularOrbitals& mo,
                               const int32_t             moidx,
                               const std::string&        mospin) const
+{
+    // grid information
+
+    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
+
+    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
+
+    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
+
+    // compute local grid on this MPI process
+
+    auto xcntdsp = getCountsAndDisplacements(nx);
+
+    auto xcounts = xcntdsp[0];
+
+    auto xdispls = xcntdsp[1];
+
+    std::vector<double> origin({x0 + dx * xdispls[_locRank], y0, z0});
+
+    std::vector<double> stepsize({dx, dy, dz});
+
+    std::vector<int32_t> npoints({xcounts[_locRank], ny, nz});
+
+    CCubicGrid localgrid(origin, stepsize, npoints);
+
+    compute_omp(localgrid, molecule, basis, mo, moidx, mospin);
+
+    // gather local grids
+
+    std::vector<int32_t> yzcounts, yzdispls;
+
+    for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
+    {
+        yzcounts.push_back(xcounts[i] * ny * nz);
+
+        yzdispls.push_back(xdispls[i] * ny * nz);
+    }
+
+    MPI_Gatherv(localgrid.values(), yzcounts[_locRank], MPI_DOUBLE,
+                grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE,
+                mpi::master(), _locComm);
+}
+
+void
+CVisualizationDriver::compute(CCubicGrid&             grid,
+                              const CMolecule&        molecule,
+                              const CMolecularBasis&  basis,
+                              const CAODensityMatrix& density,
+                              const int32_t           denidx,
+                              const std::string&      denspin) const
+{
+    // grid information
+
+    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
+
+    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
+
+    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
+
+    // compute local grid on this MPI process
+
+    auto xcntdsp = getCountsAndDisplacements(nx);
+
+    auto xcounts = xcntdsp[0];
+
+    auto xdispls = xcntdsp[1];
+
+    std::vector<double> origin({x0 + dx * xdispls[_locRank], y0, z0});
+
+    std::vector<double> stepsize({dx, dy, dz});
+
+    std::vector<int32_t> npoints({xcounts[_locRank], ny, nz});
+
+    CCubicGrid localgrid(origin, stepsize, npoints);
+
+    compute_omp(localgrid, molecule, basis, density, denidx, denspin);
+
+    // gather local grids
+
+    std::vector<int32_t> yzcounts, yzdispls;
+
+    for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
+    {
+        yzcounts.push_back(xcounts[i] * ny * nz);
+
+        yzdispls.push_back(xdispls[i] * ny * nz);
+    }
+
+    MPI_Gatherv(localgrid.values(), yzcounts[_locRank], MPI_DOUBLE,
+                grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE,
+                mpi::master(), _locComm);
+}
+
+void
+CVisualizationDriver::compute_omp(CCubicGrid&               grid,
+                                  const CMolecule&          molecule,
+                                  const CMolecularBasis&    basis,
+                                  const CMolecularOrbitals& mo,
+                                  const int32_t             moidx,
+                                  const std::string&        mospin) const
 {
     // grid information
 
@@ -248,12 +393,12 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 }
 
 void
-CVisualizationDriver::compute(CCubicGrid&             grid,
-                              const CMolecule&        molecule,
-                              const CMolecularBasis&  basis,
-                              const CAODensityMatrix& density,
-                              const int32_t           denidx,
-                              const std::string&      denspin) const
+CVisualizationDriver::compute_omp(CCubicGrid&             grid,
+                                  const CMolecule&        molecule,
+                                  const CMolecularBasis&  basis,
+                                  const CAODensityMatrix& density,
+                                  const int32_t           denidx,
+                                  const std::string&      denspin) const
 {
     // grid information
 

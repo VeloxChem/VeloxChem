@@ -195,10 +195,12 @@ def main():
         else:
             cube_dict = {}
 
-        if task.mpi_rank == mpi_master():
-            vis_drv = VisualizationDriver()
-            vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
-                              density)
+        mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
+        density.broadcast(task.mpi_rank, task.mpi_comm)
+
+        vis_drv = VisualizationDriver(task.mpi_comm)
+        vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
+                          density)
 
     # all done, print finish header to output stream
 
