@@ -25,17 +25,17 @@ class TestVisualization(unittest.TestCase):
         mol_orbs = scf_drv.mol_orbs
         density = scf_drv.density
 
+        mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
+        density.broadcast(task.mpi_rank, task.mpi_comm)
+
+        grid = CubicGrid([0.3, 0.6, 0.9], [1.0, 1.0, 1.0], [2, 3, 3])
+        homo = task.molecule.number_of_alpha_electrons() - 1
+
+        vis_drv = VisualizationDriver(task.mpi_comm)
+        vis_drv.compute(grid, task.molecule, task.ao_basis, mol_orbs, homo,
+                        'alpha')
+
         if task.mpi_rank == mpi_master():
-
-            vis_drv = VisualizationDriver()
-
-            grid = CubicGrid([0.3, 0.6, 0.9], [1.0, 1.0, 1.0], [2, 3, 3])
-
-            homo = task.molecule.number_of_alpha_electrons() - 1
-
-            vis_drv.compute(grid, task.molecule, task.ao_basis, mol_orbs, homo,
-                            'alpha')
-
             homo_values = grid.values_to_numpy()
 
             homo_ref = np.array([
@@ -47,12 +47,11 @@ class TestVisualization(unittest.TestCase):
 
             homo_diff = np.abs(homo_values) - np.abs(homo_ref)
             homo_diff_rel = homo_diff / np.abs(homo_ref)
-
             self.assertTrue(np.max(homo_diff_rel) < 1.0e-5)
 
-            vis_drv.compute(grid, task.molecule, task.ao_basis, density, 0,
-                            'alpha')
+        vis_drv.compute(grid, task.molecule, task.ao_basis, density, 0, 'alpha')
 
+        if task.mpi_rank == mpi_master():
             dens_alpha = grid.values_to_numpy()
             dens_total = dens_alpha * 2.0
 
@@ -65,7 +64,6 @@ class TestVisualization(unittest.TestCase):
 
             dens_diff = dens_total - dens_ref
             dens_diff_rel = dens_diff / np.abs(dens_ref)
-
             self.assertTrue(np.max(dens_diff_rel) < 1.0e-5)
 
         task.finish()

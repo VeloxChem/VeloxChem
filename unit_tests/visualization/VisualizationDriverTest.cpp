@@ -96,9 +96,9 @@ TEST_F(CVisualizationDriverTest, Helium)
 
     CCubicGrid point({xp, yp, zp}, {0.0, 0.0, 0.0}, {1, 1, 1});
 
-    CVisualizationDriver visdrv;
+    CVisualizationDriver visdrv(MPI_COMM_WORLD);
 
-    visdrv.compute(point, mol, basis, moa, 0, "a");
+    visdrv.compute(point, mol, basis, moa, 0, "alpha");
 
     ASSERT_NEAR(refpsi, point.values()[0], 1.0e-13);
 
@@ -108,7 +108,7 @@ TEST_F(CVisualizationDriverTest, Helium)
 
     CAODensityMatrix dena({da}, denmat::rest);
 
-    visdrv.compute(point, mol, basis, dena, 0, "a");
+    visdrv.compute(point, mol, basis, dena, 0, "alpha");
 
     ASSERT_NEAR(refpsi * refpsi, point.values()[0], 1.0e-13);
 }

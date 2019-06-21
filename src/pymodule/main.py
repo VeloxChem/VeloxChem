@@ -76,11 +76,6 @@ def main():
         scf_drv.update_settings(scf_dict)
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        if not scf_drv.restricted:
-            # unrestricted calculation: wave function only
-            task.finish()
-            sys.exit(0)
-
         # molecular orbitals
 
         mol_orbs = scf_drv.mol_orbs
@@ -124,7 +119,7 @@ def main():
 
     # Response
 
-    if task_type == 'response':
+    if task_type == 'response' and scf_drv.restricted:
 
         if 'response' in task.input_dict:
 
@@ -155,7 +150,7 @@ def main():
 
     # Complex Response
 
-    if task_type == 'cpp':
+    if task_type == 'cpp' and scf_drv.restricted:
 
         if 'cpp' in task.input_dict:
             cpp_dict = task.input_dict['cpp']
@@ -168,7 +163,7 @@ def main():
 
     # ADC(1)
 
-    if task_type == 'adc1':
+    if task_type == 'adc1' and scf_drv.restricted:
 
         if 'adc' in task.input_dict:
             adc_dict = task.input_dict['adc']
@@ -181,7 +176,7 @@ def main():
 
     # MP2 perturbation theory
 
-    if task_type == 'mp2':
+    if task_type == 'mp2' and scf_drv.restricted:
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)

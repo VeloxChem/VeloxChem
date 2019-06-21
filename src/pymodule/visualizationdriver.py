@@ -55,13 +55,13 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
     print('VeloxChem Cube File', file=f_cube)
 
     if flag == 'mo':
-        print('MO {:d}, {:s} spin'.format(index + 1, spin), file=f_cube)
+        print('MO {:d} ({:s})'.format(index + 1, spin), file=f_cube)
         print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
             -natoms, x0, y0, z0, 1),
               file=f_cube)
 
     elif flag == 'density':
-        print('Electron density, {:s} spin'.format(spin), file=f_cube)
+        print('Electron density ({:s})'.format(spin), file=f_cube)
         print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
             natoms, x0, y0, z0, 1),
               file=f_cube)

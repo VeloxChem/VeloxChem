@@ -9,6 +9,7 @@
 #include "VisualizationDriver.hpp"
 
 #include <cmath>
+#include <cstring>
 
 #include "BasisFunction.hpp"
 #include "CubicGrid.hpp"
@@ -336,9 +337,9 @@ CVisualizationDriver::compute_omp(CCubicGrid&               grid,
 
     errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
 
-    bool alphaspin = fstr::upcase(mospin) == std::string("ALPHA") || fstr::upcase(mospin) == std::string("A");
+    bool alphaspin = (fstr::upcase(mospin) == std::string("ALPHA"));
 
-    bool betaspin = fstr::upcase(mospin) == std::string("BETA") || fstr::upcase(mospin) == std::string("B");
+    bool betaspin = (fstr::upcase(mospin) == std::string("BETA"));
 
     errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
@@ -420,11 +421,13 @@ CVisualizationDriver::compute_omp(CCubicGrid&             grid,
 
     errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
 
-    bool alphaspin = fstr::upcase(denspin) == std::string("ALPHA") || fstr::upcase(denspin) == std::string("A");
+    bool alphaspin = (fstr::upcase(denspin) == std::string("ALPHA"));
 
-    bool betaspin = fstr::upcase(denspin) == std::string("BETA") || fstr::upcase(denspin) == std::string("B");
+    bool betaspin = (fstr::upcase(denspin) == std::string("BETA"));
 
-    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+    bool diffspin = (fstr::upcase(denspin) == std::string("SPIN"));
+
+    errors::assertMsgCritical(alphaspin || betaspin || diffspin, errspin);
 
     auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
 
@@ -438,7 +441,29 @@ CVisualizationDriver::compute_omp(CCubicGrid&             grid,
 
     // target density
 
-    auto rho = alphaspin ? density.alphaDensity(denidx) : density.betaDensity(denidx);
+    CMemBlock<double> rho(nao * nao);
+
+    auto dens_alpha = density.alphaDensity(denidx);
+
+    auto dens_beta = density.betaDensity(denidx);
+
+    if (alphaspin)
+    {
+        std::memcpy(rho.data(), dens_alpha, nao * nao * sizeof(double));
+    }
+    else if (betaspin)
+    {
+        std::memcpy(rho.data(), dens_beta, nao * nao * sizeof(double));
+    }
+    else if (diffspin)
+    {
+        for (int32_t p = 0; p < nao * nao; p++)
+        {
+            rho.data()[p] = dens_alpha[p] - dens_beta[p];
+        }
+    }
+
+    auto rho_data = rho.data();
 
     // calculate densities on grid points
 
@@ -469,7 +494,7 @@ CVisualizationDriver::compute_omp(CCubicGrid&             grid,
                 {
                     for (int32_t jao = 0; jao < nao; jao++)
                     {
-                        psi += phi[iao] * rho[iao * nao + jao] * phi[jao];
+                        psi += phi[iao] * rho_data[iao * nao + jao] * phi[jao];
                     }
                 }
 
