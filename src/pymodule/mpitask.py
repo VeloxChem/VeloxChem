@@ -10,8 +10,44 @@ from .errorhandler import assert_msg_critical
 
 
 class MpiTask:
+    """Implements the MPI task.
+
+    Implements the MPI task.
+
+    Attributes
+    ----------
+    mpi_comm
+        The MPI communicator.
+    mpi_rank
+        The MPI rank.
+    mpi_size
+        Number of MPI processes.
+    molecule
+        The molecule.
+    ao_basis
+        The AO basis set.
+    min_basis
+        The minimal AO basis set for generating initial guess.
+    ostream
+        The output stream.
+    input_dict
+        The input dictionary.
+    start_time
+        The start time of the task.
+    """
 
     def __init__(self, fname_list, mpi_comm):
+        """Initializes the MPI task.
+
+        Initializes the MPI task.
+
+        Parameters
+        ----------
+        fname_list
+            List of the intput/output filenames.
+        mpi_comm
+            The MPI communicator.
+        """
 
         # mpi settings
 
@@ -113,6 +149,8 @@ class MpiTask:
         self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
 
     def finish(self):
+        """Finalizes the MPI task.
+        """
 
         if (self.mpi_rank == mpi_master()):
             self.ostream.print_finish_header(self.start_time)

@@ -3,10 +3,28 @@ from .inputparser import parse_frequencies
 
 
 class Polarizability(ResponseProperty):
-    """Polarizability class"""
+    """Implements the polarizability property.
+
+    Implements the polarizability property.
+
+    Attributes
+    ----------
+    rsp_input
+        The dictionary of response input.
+    rsp_property
+        The dictionary of response property.
+    """
 
     def __init__(self, rsp_dict):
-        """Initializes polarizability"""
+        """Initializes the polarizability property.
+
+        Initializes the polarizability property.
+
+        Parameters
+        ----------
+        rsp_dict
+            The dictionary of response input.
+        """
 
         rsp_input = dict(rsp_dict)
 
@@ -26,13 +44,33 @@ class Polarizability(ResponseProperty):
         super().__init__(rsp_input)
 
     def get_property(self, key):
-        """Gets polarizability component"""
+        """Gets component of polarizability.
+
+        Gets component of polarizability.
+
+        Parameters
+        ----------
+        key
+            The tuple of A component, B component, and frequency.
+
+        Returns
+        -------
+            The component of polarizability.
+        """
 
         # key example: ('x', 'y', 0.1)
         return self.rsp_property[key]
 
     def print_property(self, ostream):
-        """Prints polarizability to output stream"""
+        """Prints polarizability to output stream.
+
+        Prints polarizability to output stream.
+
+        Parameters
+        ----------
+        ostream
+            The output stream.
+        """
 
         for w in parse_frequencies(self.rsp_input['frequencies']):
             w_str = 'Polarizability (w={:.4f})'.format(w)

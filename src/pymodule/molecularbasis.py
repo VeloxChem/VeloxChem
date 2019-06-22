@@ -15,6 +15,25 @@ def _MolecularBasis_read(mol,
                          basis_name,
                          basis_path='.',
                          ostream=OutputStream()):
+    """Reads AO basis set from file.
+
+    Reads AO basis set from file.
+
+    Parameters
+    ----------
+    mol
+        The molecule.
+    basis_name
+        Name of the basis set.
+    basis_path
+        Path to the basis set.
+    ostream
+        The outputstream.
+
+    Returns
+    -------
+        The AO basis set.
+    """
 
     err_gc = "MolcularBasis.read_file: "
     err_gc += "General contraction currently is not supported"

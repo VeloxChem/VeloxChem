@@ -6,7 +6,16 @@ from .veloxchemlib import denmat
 from .errorhandler import assert_msg_critical
 
 
-def _write_hdf5(self, fname):
+def _AODensityMatrix_write_hdf5(self, fname):
+    """Writes AODensityMatrix to hdf5 file.
+
+    Writes AODensityMatrix to hdf5 file.
+
+    Parameters
+    ----------
+    fname
+        The name of the hdf5 file.
+    """
 
     hf = h5py.File(fname, 'w')
 
@@ -35,7 +44,20 @@ def _write_hdf5(self, fname):
 
 
 @staticmethod
-def _read_hdf5(fname):
+def _AODensityMatrix_read_hdf5(fname):
+    """Reads AODensityMatrix from hdf5 file.
+
+    Reads AODensityMatrix from hdf5 file.
+
+    Parameters
+    ----------
+    fname
+        The name of the hdf5 file.
+
+    Returns
+    -------
+        The AODensityMatrix.
+    """
 
     dentype = {
         "rest.alpha": denmat.rest,
@@ -71,5 +93,5 @@ def _read_hdf5(fname):
     return AODensityMatrix(dens, types[0])
 
 
-AODensityMatrix.write_hdf5 = _write_hdf5
-AODensityMatrix.read_hdf5 = _read_hdf5
+AODensityMatrix.write_hdf5 = _AODensityMatrix_write_hdf5
+AODensityMatrix.read_hdf5 = _AODensityMatrix_read_hdf5

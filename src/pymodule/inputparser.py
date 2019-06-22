@@ -6,11 +6,36 @@ from .errorhandler import assert_msg_critical
 
 
 class InputParser:
-    """ Provides functions for parsing VeloxChem input files into a format,
-    which passes the needed information to the rest of the program """
+    """Implements the input parser.
+
+    Implements the input parser and provides functions for parsing VeloxChem
+    input files into a format, which passes the needed information to the rest
+    of the program.
+
+    Attributes
+    ----------
+    input_dict
+        The input dictionary.
+    success_monitor
+        The monitor for successful parsing.
+    filename
+        The name of the input file.
+    is_basis_set
+        The flag for parsing a basis set file.
+    basis_set_name
+        The name of the basis set.
+    """
 
     def __init__(self, filename):
-        """ Initializes the parser and parses the input file """
+        """Initializes the parser and parses the input file.
+
+        Initializes the parser and parses the input file.
+
+        Parameters
+        ----------
+        filename
+            The name of the input file.
+        """
 
         self.input_dict = {}
         self.success_monitor = True
@@ -24,8 +49,11 @@ class InputParser:
     # defining main functions
 
     def parse(self):
-        """ Calls every function needed for the parsing process depending on
-        the success of the parsing in different stages """
+        """Parses the input file.
+
+        Calls every function needed for the parsing process depending on
+        the success of the parsing in different stages.
+        """
 
         errmsg = ''
 
@@ -65,15 +93,23 @@ class InputParser:
             self.convert_dict()
 
     def get_dict(self):
-        """ Gets the input dictonary """
+        """Gets the input dictonary.
+
+        Gets the input dictonary.
+
+        Returns
+        -------
+            A dictionary containing all information form the input file.
+        """
 
         return self.input_dict
 
-    # defining subordinated functions
-
     def read_file(self):
-        """ Storing content of selected file as a string type. Deleting
-        comments (marked by '!'). Deleting unnecassary whitespace. """
+        """Reads and stores content of selected file as a string type.
+
+        Reads and stores content of selected file as a string type. Deletes
+        comments (marked by '!') and unnecassary whitespace.
+        """
 
         self.content = ''
         with open(self.filename, 'r') as f_inp:
@@ -99,7 +135,8 @@ class InputParser:
                     self.content += line + os.linesep
 
     def incomplete_group_check(self):
-        """ Checking for any incomplete groups. """
+        """Checks for any incomplete groups.
+        """
 
         if re.findall(r'@(?!end)[^@]*@(?!end)|@end[^@]*@end',
                       self.content) != []:
@@ -110,21 +147,26 @@ class InputParser:
             raise SyntaxError
 
     def empty_group_check(self):
-        """ Checking for any empty groups. """
+        """Checks for any empty groups.
+        """
 
         if re.findall(r'@\w[\w ]*' + os.linesep + r'\s*@end',
                       self.content) != []:
             raise SyntaxError
 
     def clear_interspace(self):
-        """ Deleting content, that's not within a group. """
+        """Deletes content, that's not within a group.
+        """
 
         self.content = re.sub(r'@end[^@]*@', '@end' + os.linesep + '@',
                               self.content)
 
     def groupsplit(self):
-        """ Creating a list in which every element is a list itself containing
-        every line of a group, while deleting '@' and '@end' tags. """
+        """Creates a list of list for all groups.
+
+        Creates a list in which every element is a list itself containing
+        every line of a group, while deleting '@' and '@end' tags.
+        """
 
         self.grouplist = re.findall(r'@(?!end)[^@]*@end', self.content)
         for i in range(len(self.grouplist)):
@@ -132,10 +174,13 @@ class InputParser:
             self.grouplist[i] = self.grouplist[i].split(os.linesep)[:-1]
 
     def convert_dict(self):
-        """ Converting the list of lists into a dictionary with groupnames as
+        """Converting the list of lists into a dictionary.
+
+        Converting the list of lists into a dictionary with groupnames as
         keys and group content as a dictionary itself. The geometry definition
         of the molecule group is stored in a different dictionary. Converting
-        the molecular structure into the required format. """
+        the molecular structure into the required format.
+        """
 
         for group in self.grouplist:
             local_dict = {}
@@ -197,6 +242,16 @@ class InputParser:
 
 
 def parse_frequencies(input_frequencies):
+    """Parses frequencies input for response solver.
+
+    Parses frequencies input for response solver.
+    Input example: "0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0"
+
+    Parameters
+    ----------
+    input_frequencies
+        The string of input frequencies.
+    """
 
     frequencies = []
     for w in input_frequencies.split(','):

@@ -3,10 +3,28 @@ from .rspproperty import ResponseProperty
 
 
 class Absorption(ResponseProperty):
-    """Absorption class"""
+    """Implements the absorption property.
+
+    Implements the absorption property.
+
+    Attributes
+    ----------
+    rsp_input
+        The dictionary of response input.
+    rsp_property
+        The dictionary of response property.
+    """
 
     def __init__(self, rsp_dict):
-        """Initializes absorption"""
+        """Initializes the absorption property.
+
+        Initializes the absorption property.
+
+        Parameters
+        ----------
+        rsp_dict
+            The dictionary of response input.
+        """
 
         rsp_input = dict(rsp_dict)
 
@@ -24,12 +42,32 @@ class Absorption(ResponseProperty):
         super().__init__(rsp_input)
 
     def get_property(self, key):
-        """Gets excitation energies, CI vectors, or oscillator stengths"""
+        """Gets absorption property.
+
+        Gets excitation energies, CI vectors, or oscillator stengths.
+
+        Parameters
+        ----------
+        key
+            The keyword to the absorption property.
+
+        Returns
+        -------
+            The absorption property.
+        """
 
         return self.rsp_property[key]
 
     def print_property(self, ostream):
-        """Prints absorption to output stream"""
+        """Prints absorption to output stream.
+
+        Prints absorption to output stream.
+
+        Parameters
+        ----------
+        ostream
+            The output stream.
+        """
 
         ostream.print_blank()
         spin_str = 'T' if self.rsp_input['spin'][0].upper() == 'T' else 'S'
@@ -52,7 +90,21 @@ class Absorption(ResponseProperty):
         self.print_ecd(ostream, spin_str, 'Electronic Circular Dichroism')
 
     def print_transition_dipoles(self, ostream, spin_str, title, trans_dipoles):
-        """Prints transition dipole moments to output stream"""
+        """Prints transition dipole moments to output stream.
+
+        Prints transition dipole moments to output stream.
+
+        Parameters
+        ----------
+        ostream
+            The output stream.
+        spin_str
+            The string representation of spin.
+        title
+            The title to be printed to the output stream.
+        trans_dipoles
+            The transition dipole moments.
+        """
 
         valstr = title
         ostream.print_header(valstr.ljust(92))
@@ -67,6 +119,19 @@ class Absorption(ResponseProperty):
         ostream.print_blank()
 
     def print_absorption(self, ostream, spin_str, title):
+        """Prints absorption to output stream.
+
+        Prints absorption to output stream.
+
+        Parameters
+        ----------
+        ostream
+            The output stream.
+        spin_str
+            The string representation of spin.
+        title
+            The title to be printed to the output stream.
+        """
 
         valstr = title
         ostream.print_header(valstr.ljust(92))
@@ -81,6 +146,19 @@ class Absorption(ResponseProperty):
         ostream.print_blank()
 
     def print_ecd(self, ostream, spin_str, title):
+        """Prints electronic circular dichroism to output stream.
+
+        Prints electronic circular dichroism to output stream.
+
+        Parameters
+        ----------
+        ostream
+            The output stream.
+        spin_str
+            The string representation of spin.
+        title
+            The title to be printed to the output stream.
+        """
 
         valstr = title
         ostream.print_header(valstr.ljust(92))

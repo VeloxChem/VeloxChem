@@ -6,7 +6,16 @@ from .veloxchemlib import fockmat
 from .errorhandler import assert_msg_critical
 
 
-def _write_hdf5(self, fname):
+def _AOFockMatrix_write_hdf5(self, fname):
+    """Writes AOFockMatrix to hdf5 file.
+
+    Writes AOFockMatrix to hdf5 file.
+
+    Parameters
+    ----------
+    fname
+        The name of the hdf5 file.
+    """
 
     focktype = {
         fockmat.restjk: "restjk",
@@ -33,7 +42,20 @@ def _write_hdf5(self, fname):
 
 
 @staticmethod
-def _read_hdf5(fname):
+def _AOFockMatrix_read_hdf5(fname):
+    """Reads AOFockMatrix from hdf5 file.
+
+    Reads AOFockMatrix from hdf5 file.
+
+    Parameters
+    ----------
+    fname
+        The name of the hdf5 file.
+
+    Returns
+    -------
+        The AOFockMatrix.
+    """
 
     focktype = {
         "restjk": fockmat.restjk,
@@ -73,5 +95,5 @@ def _read_hdf5(fname):
     return AOFockMatrix(focks, types, factors, indices)
 
 
-AOFockMatrix.write_hdf5 = _write_hdf5
-AOFockMatrix.read_hdf5 = _read_hdf5
+AOFockMatrix.write_hdf5 = _AOFockMatrix_write_hdf5
+AOFockMatrix.read_hdf5 = _AOFockMatrix_read_hdf5

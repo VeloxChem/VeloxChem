@@ -45,6 +45,8 @@ class TDAExciDriver:
         The rank of MPI process.
     nodes
         The number of MPI processes.
+    ostream
+        The output stream.
     """
 
     def __init__(self, comm, ostream):
@@ -121,7 +123,12 @@ class TDAExciDriver:
         basis
             The AO basis set.
         scf_tensors
-            The tensors from converged SCF wavefunction.
+            The dictionary of tensors from converged SCF wavefunction.
+
+        Returns
+        -------
+            A dictionary containing eigenvalues, eigenvectors, transition
+            dipole moments, oscillator strengths and rotatory strengths.
         """
 
         if self.rank == mpi_master():
@@ -192,7 +199,7 @@ class TDAExciDriver:
         # print converged excited states
 
         if self.rank == mpi_master():
-            self.print_excited_states(trial_vecs, start_time)
+            self.print_excited_states(start_time)
 
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
@@ -237,6 +244,7 @@ class TDAExciDriver:
             The molecular orbitals.
         molecule
             The molecule.
+
         Returns
         -------
             The set of trial vectors.
@@ -280,7 +288,7 @@ class TDAExciDriver:
             for j in range(zvecs.shape[0]):
                 trial_vecs[i].set_zcoefficient(zvecs[j, i], j)
 
-    def check_convergence(self, iter):
+    def check_convergence(self, iteration):
         """Checks convergence of excitation energies and set convergence flag.
 
         Checks convergence of excitation energies and set convergence flag on
@@ -288,11 +296,11 @@ class TDAExciDriver:
 
         Parameters
         ----------
-        iter
+        iteration
             The current excited states solver iteration.
         """
 
-        self.cur_iter = iter
+        self.cur_iter = iteration
 
         if self.rank == mpi_master():
             self.is_converged = self.solver.check_convergence(self.conv_thresh)
@@ -313,6 +321,7 @@ class TDAExciDriver:
         ----------
         sig_vecs
             The sigma vectors as std::vector<CDenseMatrix>.
+
         Returns
         -------
             The 2D numpy array.
@@ -341,6 +350,7 @@ class TDAExciDriver:
         ----------
         trial_vecs
             The Z vectors as std::vector<CExcitationVector>.
+
         Returns
         -------
             The 2D numpy array.
@@ -360,6 +370,21 @@ class TDAExciDriver:
         return None
 
     def comp_dipole_ints(self, molecule, basis):
+        """Computes one-electron dipole integrals.
+
+        Computes one-electron dipole integrals.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        basis
+            The AO basis set.
+
+        Returns
+        -------
+            The Cartesian components of one-electron dipole integrals.
+        """
 
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, basis)
@@ -371,6 +396,21 @@ class TDAExciDriver:
             return ()
 
     def comp_linear_momentum_ints(self, molecule, basis):
+        """Computes one-electron linear momentum integrals.
+
+        Computes one-electron linear momentum integrals.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        basis
+            The AO basis set.
+
+        Returns
+        -------
+            The Cartesian components of one-electron linear momentum integrals.
+        """
 
         linmom_drv = LinearMomentumIntegralsDriver(self.comm)
         linmom_mats = linmom_drv.compute(molecule, basis)
@@ -382,6 +422,21 @@ class TDAExciDriver:
             return ()
 
     def comp_angular_momentum_ints(self, molecule, basis):
+        """Computes one-electron angular momentum integrals.
+
+        Computes one-electron angular momentum integrals.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        basis
+            The AO basis set.
+
+        Returns
+        -------
+            The Cartesian components of one-electron angular momentum integrals.
+        """
 
         angmom_drv = AngularMomentumIntegralsDriver(self.comm)
         angmom_mats = angmom_drv.compute(molecule, basis)
@@ -393,6 +448,25 @@ class TDAExciDriver:
             return ()
 
     def comp_elec_trans_dipoles(self, dipole_ints, eigvecs, mo_occ, mo_vir):
+        """Computes electric transition dipole moments in length form.
+
+        Computes electric transition dipole moments in length form.
+
+        Parameters
+        ----------
+        dipole_ints
+            One-electron dipole integrals.
+        eigvecs
+            The CI vectors.
+        mo_occ
+            The occupied MO coefficients.
+        mo_vir
+            The virtual MO coefficients.
+
+        Returns
+        -------
+            The electric transition dipole moments in length form.
+        """
 
         transition_dipoles = []
 
@@ -409,6 +483,27 @@ class TDAExciDriver:
 
     def comp_velo_trans_dipoles(self, linmom_ints, eigvals, eigvecs, mo_occ,
                                 mo_vir):
+        """Computes electric transition dipole moments in velocity form.
+
+        Computes electric transition dipole moments in velocity form.
+
+        Parameters
+        ----------
+        linmom_ints
+            One-electron linear momentum integrals.
+        eigvals
+            The excitation energies.
+        eigvecs
+            The CI vectors.
+        mo_occ
+            The occupied MO coefficients.
+        mo_vir
+            The virtual MO coefficients.
+
+        Returns
+        -------
+            The electric transition dipole moments in velocity form.
+        """
 
         transition_dipoles = []
 
@@ -424,6 +519,25 @@ class TDAExciDriver:
         return transition_dipoles
 
     def comp_magn_trans_dipoles(self, angmom_ints, eigvecs, mo_occ, mo_vir):
+        """Computes magnetic transition dipole moments.
+
+        Computes magnetic transition dipole moments.
+
+        Parameters
+        ----------
+        angmom_ints
+            One-electron angular momentum integrals.
+        eigvecs
+            The CI vectors.
+        mo_occ
+            The occupied MO coefficients.
+        mo_vir
+            The virtual MO coefficients.
+
+        Returns
+        -------
+            The magnetic transition dipole moments.
+        """
 
         transition_dipoles = []
 
@@ -439,6 +553,21 @@ class TDAExciDriver:
         return transition_dipoles
 
     def comp_oscillator_strengths(self, transition_dipoles, eigvals):
+        """Computes oscillator strengths.
+
+        Computes oscillator strengths.
+
+        Parameters
+        ----------
+        transition_dipoles
+            The electric transition dipole moments in length form.
+        eigvals
+            The excitation energies.
+
+        Returns
+        -------
+            The oscillator strengths.
+        """
 
         oscillator_strengths = np.zeros((self.nstates,))
 
@@ -450,6 +579,21 @@ class TDAExciDriver:
         return oscillator_strengths
 
     def comp_rotatory_strengths(self, velo_trans_dipoles, magn_trans_dipoles):
+        """Computes rotatory strengths.
+
+        Computes rotatory strengths in CGS unit.
+
+        Parameters
+        ----------
+        velo_trans_dipoles
+            The electric transition dipole moments in velocity form.
+        magn_trans_dipoles
+            The magnetic transition dipole moments.
+
+        Returns
+        -------
+            The rotatory strengths in CGS unit.
+        """
 
         rotatory_strengths = np.zeros((self.nstates,))
 
@@ -460,20 +604,20 @@ class TDAExciDriver:
 
         return rotatory_strengths
 
-    def print_iter_data(self, iter):
+    def print_iter_data(self, iteration):
         """Prints excited states solver iteration data to output stream.
 
         Prints excited states solver iteration data to output stream.
 
         Parameters
         ----------
-        iter
+        iteration
             The current excited states solver iteration.
         """
 
         # iteration header
 
-        exec_str = " *** Iteration: " + (str(iter + 1)).rjust(3)
+        exec_str = " *** Iteration: " + (str(iteration + 1)).rjust(3)
         exec_str += " * Reduced Space: "
         exec_str += (str(self.solver.reduced_space_size())).rjust(4)
         rmax, rmin = self.solver.max_min_residual_norms()
@@ -494,7 +638,7 @@ class TDAExciDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_excited_states(self, trial_vecs, start_time):
+    def print_excited_states(self, start_time):
         """Prints excited states information to output stream.
 
         Prints excited states information to output stream.
@@ -519,13 +663,26 @@ class TDAExciDriver:
         reigs, rnorms = self.solver.get_eigenvalues()
 
         for i in range(reigs.shape[0]):
-            self.print_state_information(i, reigs[i], trial_vecs[i], rnorms[i])
+            self.print_state_information(i, reigs[i], rnorms[i])
 
-    def print_state_information(self, iter, eval, evec, rnorm):
+    def print_state_information(self, iteration, eigval, rnorm):
+        """Prints excited state information to output stream.
+
+        Prints excited state information to output stream.
+
+        Parameters
+        ----------
+        iteration
+            The current excited states solver iteration.
+        eigval
+            The excitation energy.
+        rnorm
+            The residual norm.
+        """
 
         self.ostream.print_blank()
 
-        valstr = "Excited State No.{:3d}:".format(iter + 1)
+        valstr = "Excited State No.{:3d}:".format(iteration + 1)
         self.ostream.print_header(valstr.ljust(92))
         valstr = 21 * "-"
         self.ostream.print_header(valstr.ljust(92))
@@ -537,7 +694,7 @@ class TDAExciDriver:
             valstr += "Singlet"
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = "Excitation Energy : {:5.8f} au".format(eval)
+        valstr = "Excitation Energy : {:5.8f} au".format(eigval)
         self.ostream.print_header(valstr.ljust(92))
 
         valstr = "Residual Norm     : {:3.8f} au".format(rnorm)

@@ -6,8 +6,36 @@ from .subcommunicators import SubCommunicators
 
 
 class Mp2Driver:
+    """Implements MP2 driver.
+
+    Implements MP2 driver.
+
+    Attributes
+    ----------
+    e_mp2
+        The MP2 correlation energy.
+    comm
+        The MPI communicator.
+    rank
+        The MPI rank.
+    nodes
+        Number of MPI processes.
+    ostream
+        The output stream.
+    """
 
     def __init__(self, comm, ostream):
+        """Initializes MP2 driver.
+
+        Initializes MP2 driver.
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
 
         self.e_mp2 = None
 
@@ -20,6 +48,19 @@ class Mp2Driver:
         self.ostream = ostream
 
     def compute(self, molecule, ao_basis, mol_orbs):
+        """Performs MP2 calculation.
+
+        Performs MP2 calculation.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        ao_basis
+            The AO basis set.
+        mol_orbs
+            The molecular orbitals.
+        """
 
         # MO integrals
         moints_drv = MOIntegralsDriver(self.comm, self.ostream)

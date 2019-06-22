@@ -14,8 +14,42 @@ from .qqscheme import get_qq_scheme
 
 
 class MOIntegralsDriver:
+    """Implements MO integrals driver.
+
+    Implements MO integrals driver.
+
+    Attributes
+    ----------
+    qq_type
+        The electron repulsion integrals screening scheme.
+    eri_thresh
+        The electron repulsion integrals screening threshold.
+    num_matrices
+        Number of Fock matrices to be computed.
+    batch_size
+        Batch size for computing Fock matrices.
+    comm
+        The MPI communicator.
+    rank
+        The MPI rank.
+    nodes
+        Number of MPI processes.
+    ostream
+        The output stream.
+    """
 
     def __init__(self, comm, ostream):
+        """Initializes MO integrals driver.
+
+        Initializes MO integrals driver  to default setup.
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
 
         # screening scheme
         self.qq_type = "QQ_DEN"
@@ -34,6 +68,27 @@ class MOIntegralsDriver:
         self.ostream = ostream
 
     def compute(self, molecule, ao_basis, mol_orbs, mints_type, grps):
+        """Performs MO integrals calculation.
+
+        Performs MO integrals calculation for a molecule and a basis set.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        ao_basis
+            The AO basis set.
+        mol_orbs
+            The molecular orbitals.
+        mints_type
+            The type of MO integrals to be calculated.
+        grps
+            The color group for creating MPI subcommunicators.
+
+        Returns
+        -------
+            The computed MO integrals batch.
+        """
 
         # start timer
         start_time = tm.time()
@@ -131,6 +186,21 @@ class MOIntegralsDriver:
         return moints_batch
 
     def collect_moints_batches(self, moints_batch, grps):
+        """Collects MO integrals.
+
+        Collects MO integrals to the master node.
+
+        Parameters
+        ----------
+        moints_batch
+            The MO integrals batch.
+        grps
+            The color group for creating MPI subcommunicators.
+
+        Returns
+        -------
+            The collected MO integrals batch.
+        """
 
         subcomm = SubCommunicators(self.comm, grps)
         local_comm = subcomm.local_comm
@@ -151,6 +221,8 @@ class MOIntegralsDriver:
         return moints_batch
 
     def print_header(self):
+        """Prints header for the MO integrals driver.
+        """
 
         self.ostream.print_blank()
         self.ostream.print_header(
@@ -172,6 +244,15 @@ class MOIntegralsDriver:
         self.ostream.flush()
 
     def print_finish(self, start_time):
+        """Prints header for the MO integrals driver.
+
+        Prints header for the MO integrals driver.
+
+        Parameters
+        ----------
+        start_time
+            The starting time of the calculation.
+        """
 
         valstr = "*** Integrals transformation (AO->MO) done in "
         valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
@@ -180,6 +261,19 @@ class MOIntegralsDriver:
         self.ostream.print_blank()
 
     def get_batch_dimensions(self, vec_ids):
+        """Gets the dimension of the batches.
+
+        Gets the dimension of the batches.
+
+        Parameters
+        ----------
+        vec_ids
+            The list of vector id.
+
+        Returns
+        -------
+            The tuple containing the position and the dimension of the batch.
+        """
 
         vdim = len(vec_ids)
 
@@ -210,6 +304,21 @@ class MOIntegralsDriver:
         return (vec_pos, vec_dim)
 
     def get_num_orbitals(self, mol_orbs, molecule):
+        """Gets number of orbitals.
+
+        Gets number of occupied and virtual orbitals.
+
+        Parameters
+        ----------
+        mol_orbs
+            The molecular orbitals.
+        molecule
+            The molecule.
+
+        Returns
+        -------
+            The number of occupied and virtual orbitals.
+        """
 
         nocc = molecule.number_of_alpha_electrons()
         nvirt = mol_orbs.number_mos() - nocc
@@ -217,6 +326,23 @@ class MOIntegralsDriver:
         return (nocc, nvirt)
 
     def set_orbital_pairs(self, mints_type, mol_orbs, molecule):
+        """Sets up bra and ket orbitals list.
+
+        Sets up bra and ket orbitals list.
+
+        Parameters
+        ----------
+        mints_type
+            Type of MO integrals.
+        mol_orbs
+            The molecular orbitals.
+        molecule
+            The molecule.
+
+        Returns
+        -------
+            The tuple containing the lists of bra and ket ids.
+        """
 
         nocc, nvirt = self.get_num_orbitals(mol_orbs, molecule)
 
@@ -264,6 +390,23 @@ class MOIntegralsDriver:
         return (bra_ids, ket_ids)
 
     def get_transformation_vectors(self, mints_type, mol_orbs, molecule):
+        """Gets transformation matrices.
+
+        Gets transformation matrices.
+
+        Parameters
+        ----------
+        mints_type
+            Type of MO integrals.
+        mol_orbs
+            The molecular orbitals.
+        molecule
+            The molecule.
+
+        Returns
+        -------
+            The tuple containing transformation matrices.
+        """
 
         nocc, nvirt = self.get_num_orbitals(mol_orbs, molecule)
 
@@ -296,6 +439,17 @@ class MOIntegralsDriver:
         return (xmat, ymat)
 
     def set_fock_matrices_type(self, mints_type, fock_matrices):
+        """Sets Fock matrix types.
+
+        Sets Fock matrix types.
+
+        Parameters
+        ----------
+        mints_type
+            Type of MO integrals.
+        fock_matrices
+            The Fock matrices.
+        """
 
         if mints_type.startswith("ASYM"):
             nfock = fock_matrices.number_of_fock_matrices()
@@ -309,6 +463,19 @@ class MOIntegralsDriver:
                 fock_matrices.set_fock_type(fockmat.rgenj, i)
 
     def get_external_indexes(self, mints_type):
+        """Gets external indices.
+
+        Gets external indices.
+
+        Parameters
+        ----------
+        mints_type
+            Type of MO integrals.
+
+        Returns
+        -------
+            The external indices.
+        """
 
         if mints_type == "OOVV":
             return TwoIndexes(2, 3)
@@ -334,6 +501,19 @@ class MOIntegralsDriver:
         return TwoIndexes(1, 3)
 
     def get_moints_type(self, mints_type):
+        """Gets MO integrals type.
+
+        Gets MO integrals type.
+
+        Parameters
+        ----------
+        mints_type
+            Type of MO integrals.
+
+        Returns
+        -------
+            The MO integrals type.
+        """
 
         if mints_type == "OOOO":
             return moints.oooo
@@ -374,6 +554,19 @@ class MOIntegralsDriver:
         return None
 
     def use_symmetry(self, mints_type):
+        """Checks if symmetry is used.
+
+        Checks if symmetry is used.
+
+        Parameters
+        ----------
+        mints_type
+            Type of MO integrals.
+
+        Returns
+        -------
+            Whether symmetry is used.
+        """
 
         if mints_type == "ASYM_OOOO":
             return True

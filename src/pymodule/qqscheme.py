@@ -11,6 +11,7 @@ def get_qq_type(qq_type):
     ----------
     qq_type
         The label of electron repulsion integrals screening scheme.
+
     Returns
     -------
         The string with type of electron repulsion integrals screening
@@ -41,6 +42,7 @@ def get_qq_scheme(qq_type):
     ----------
     qq_type
         The label of electron repulsion integrals screening scheme.
+
     Returns
     -------
         The C++ enum with screening scheme.

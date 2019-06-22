@@ -14,7 +14,45 @@ from .inputparser import parse_frequencies
 
 
 class LinearResponseSolver:
-    """Implements linear response solver"""
+    """Implements linear response solver.
+
+    Implements linear response solver.
+
+    Attributes
+    ----------
+    a_operator
+        The A operator
+    a_components
+        Cartesian components of the A operator
+    b_operator
+        The B operator
+    b_components
+        Cartesian components of the B operator
+    frequencies
+        The frequencies.
+    eri_thresh
+        The electron repulsion integrals screening threshold.
+    qq_type
+        The electron repulsion integrals screening scheme.
+    conv_thresh
+        The convergence threshold for the solver.
+    max_iter
+        The maximum number of solver iterations.
+    cur_iter
+        Index of the current iteration.
+    small_thresh
+        The norm threshold for a vector to be considered a zero vector.
+    is_converged
+        The flag for convergence.
+    comm
+        The MPI communicator.
+    rank
+        The MPI rank.
+    nodes
+        Number of MPI processes.
+    ostream
+        The output stream.
+    """
 
     def __init__(self, comm, ostream):
         """Initializes linear response solver.
@@ -63,7 +101,7 @@ class LinearResponseSolver:
         Parameters
         ----------
         settings
-            The settings for the driver.
+            The settings dictionary.
         """
 
         if 'a_operator' in settings:
@@ -97,9 +135,13 @@ class LinearResponseSolver:
         molecule
             The molecule.
         basis
-            The basis set.
+            The AO basis set.
         scf_tensors
-            The tensors from converged SCF wavefunction.
+            The dictionary of tensors from converged SCF wavefunction.
+
+        Returns
+        -------
+            A dictionary containing properties.
         """
 
         self.start_time = tm.time()
@@ -223,7 +265,18 @@ class LinearResponseSolver:
             return None
 
     def print_iteration(self, relative_residual_norm, nvs):
-        """Prints information of the iteration"""
+        """Prints information of the iteration.
+
+        Prints information of the iteration.
+
+        Parameters
+        ----------
+        relative_residual_norm
+            Relative residual norms.
+        nvs
+            A list of tuples containing operator component, frequency, and
+            property.
+        """
 
         output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
@@ -242,7 +295,8 @@ class LinearResponseSolver:
         self.ostream.flush()
 
     def print_convergence(self):
-        """Prints information after convergence"""
+        """Prints information after convergence.
+        """
 
         output_conv = '*** '
         if self.is_converged:
@@ -255,7 +309,15 @@ class LinearResponseSolver:
         self.ostream.print_blank()
 
     def check_convergence(self, relative_residual_norm):
-        """Checks convergence"""
+        """Checks convergence.
+
+        Checks convergence.
+
+        Parameters
+        ----------
+        relative_residual_norm
+            Relative residual norms.
+        """
 
         if self.rank == mpi_master():
             max_residual = max(relative_residual_norm.values())
@@ -266,6 +328,28 @@ class LinearResponseSolver:
                                             root=mpi_master())
 
     def initial_guess(self, freqs, V1, od, sd, td):
+        """Creating initial guess.
+
+        Creating initial guess for the linear response solver.
+
+        Parameters
+        ----------
+        freq
+            The frequencies.
+        V1
+            The dictionary containing operator components (key) and right-hand
+            sides (values).
+        od
+            The array of E0 diagonal elements.
+        sd
+            The array of S0 diagonal elements.
+        td
+            The preconditioner.
+
+        Returns
+        -------
+            The initial guess.
+        """
 
         dim = od.shape[0]
 
@@ -280,6 +364,25 @@ class LinearResponseSolver:
         return ig
 
     def setup_trials(self, vectors, td=None, b=None, renormalize=True):
+        """Computes orthonormalized trial vectors.
+
+        Computes orthonormalized trial vectors.
+
+        Parameters
+        ----------
+        vectors
+            The set of vectors.
+        td
+            The preconditioner.
+        b
+            The subspace.
+        renormalize
+            The flag for normalization.
+
+        Returns
+        -------
+            The orthonormalized trial vectors.
+        """
 
         trials = []
 

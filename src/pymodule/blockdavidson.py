@@ -17,11 +17,11 @@ class BlockDavidsonSolver:
         Attributes
         ----------
         neigenpairs
-        The number of eigenpairs of A matrix determined by solver.
+            The number of eigenpairs of A matrix determined by solver.
         sigma_matrices
-        The sigma vectors A * X in matrix format {A * X_0, A * X_1,...}.
+            The sigma vectors A * X in matrix format {A * X_0, A * X_1,...}.
         trial_matrices
-        The trial vectors in matrix format {X_0, X_1,...}.
+            The trial vectors in matrix format {X_0, X_1,...}.
         """
 
         # excited states information
@@ -39,7 +39,7 @@ class BlockDavidsonSolver:
         # Ritz data
         self.ritz_vectors = None
 
-    def add_iteration_data(self, sig_mat, trial_mat, iter):
+    def add_iteration_data(self, sig_mat, trial_mat, iteration):
         """Adds sigma and trial vectors to sigma and trial matrices.
 
         Add sigma and trial vectors to sigma and trial matrices for specific
@@ -51,11 +51,11 @@ class BlockDavidsonSolver:
             The sigma vectors {A * X_i} i = 0..l.
         trial_mat
             The trial vectors {X_i} i = 0..l.
-        iter
+        iteration
             The index of block Davidson iteration.
         """
 
-        if iter == 0:
+        if iteration == 0:
             self.neigenpairs = sig_mat.shape[1]
             self.sigma_matrices = sig_mat
             self.trial_matrices = trial_mat
@@ -74,6 +74,7 @@ class BlockDavidsonSolver:
         ----------
         diag_mat
             The approximate diagonal of symmetric A matrix as column matrix.
+
         Returns
         -------
             The new set of trial vectors.
@@ -99,6 +100,7 @@ class BlockDavidsonSolver:
         ----------
         conv_thresh
             The approximate diagonal of symmetric A matrix as column matrix.
+
         Returns
         -------
             The true if residual norms are converged for all eigenpairs,
@@ -175,6 +177,11 @@ class BlockDavidsonSolver:
 
         Computes new trial vectors by applying Davidson preconditioner to
         residual vectors.
+
+        Parameters
+        ----------
+        diag_mat
+            The approximate diagonal of symmetric A matrix as column matrix.
 
         Returns
         -------

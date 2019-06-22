@@ -10,8 +10,8 @@ from .c2diis import CTwoDiis
 class ScfRestrictedDriver(ScfDriver):
     """Implements spin restricted closed shell SCF method (derrived class).
 
-        Implements spin restricted closed shell SCF method with C2-DIIS and
-        two-level C2-DIIS convergence accelerators.
+    Implements spin restricted closed shell SCF method with C2-DIIS and
+    two-level C2-DIIS convergence accelerators.
     """
 
     def __init__(self, comm, ostream):
@@ -20,6 +20,13 @@ class ScfRestrictedDriver(ScfDriver):
         Initializes spin restricted closed shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
         """
 
         super().__init__(comm, ostream)
@@ -42,6 +49,7 @@ class ScfRestrictedDriver(ScfDriver):
             The density matrix.
         oao_mat
             The orthogonalization matrix.
+
         Returns
         -------
             The electronic gradient.
@@ -77,6 +85,7 @@ class ScfRestrictedDriver(ScfDriver):
             The current density matrix.
         old_den_mat
             The previous density matrix.
+
         Returns
         -------
             The norm of change between two density matrices.
@@ -139,6 +148,10 @@ class ScfRestrictedDriver(ScfDriver):
             The overlap matrix.
         oao_mat
             The orthogonalization matrix.
+
+        Returns
+        -------
+            The effective Fock/Kohn-Sham matrix.
         """
 
         if self.rank == mpi_master():
@@ -173,6 +186,7 @@ class ScfRestrictedDriver(ScfDriver):
         ----------
         weights
             The weights of Fock/Kohn-Sham matrices.
+
         Returns
         -------
             The scaled Fock/Kohn-Sham matrix.
@@ -199,6 +213,7 @@ class ScfRestrictedDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         oao_mat
             The orthogonalization matrix.
+
         Returns
         -------
             The molecular orbitals.

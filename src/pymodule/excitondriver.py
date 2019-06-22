@@ -25,8 +25,72 @@ from .qqscheme import get_qq_scheme
 
 
 class ExcitonModelDriver:
+    """Implements the exciton model.
+
+    Implements the exciton model.
+
+    Attributes
+    ----------
+    H
+        The exciton model Hamiltonian matrix.
+    trans_dipoles
+        The diabatic electric transition dipole moments in length form.
+    velo_trans_dipoles
+        The diabatic electric transition dipole moments in velocity form.
+    magn_trans_dipoles
+        The diabatic magnetic transition dipole moments.
+    center_of_mass
+        The center of mass of the whole system.
+    state_info
+        Information of the diabatic excited states.
+    monomers
+        The monomer dictionaries.
+    natoms
+        The list containing number of atoms in each monomer.
+    qq_type
+        The electron repulsion integrals screening scheme.
+    eri_thresh
+        The electron repulsion integrals screening threshold.
+    scf_conv_thresh
+        The convergence threshold for the SCF driver.
+    scf_max_iter
+        The maximum number of SCF iterations.
+    nstates
+        The number of locally excited states for each monomer.
+    ct_nocc
+        The number of occupied orbitals to be involved in charge-transfer
+        excited states.
+    ct_nvir
+        The number of virtual orbitals to be involved in charge-transfer
+        excited states.
+    tda_conv_thresh
+        The convergence threshold for the TDA driver.
+    tda_max_iter
+        The maximum number of TDA iterations.
+    comm
+        The MPI communicator.
+    rank
+        The MPI rank.
+    nodes
+        Number of MPI processes.
+    ostream
+        The output stream.
+    checkpoint_file
+        Name of the exciton model checkpoint file.
+    """
 
     def __init__(self, comm, ostream):
+        """Initializes exciton model driver.
+
+        Initializes exciton model driver to default setup.
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
+        """
 
         self.H = None
         self.trans_dipoles = None
@@ -67,6 +131,15 @@ class ExcitonModelDriver:
         self.checkpoint_file = None
 
     def update_settings(self, exciton_dict):
+        """Updates settings in exciton model driver.
+
+        Updates settings in exciton model driver.
+
+        Parameters
+        ----------
+        exciton_dict
+            The settings dictionary.
+        """
 
         assert_msg_critical('fragments' in exciton_dict,
                             'ExcitonModel: fragments not defined')
@@ -93,6 +166,19 @@ class ExcitonModelDriver:
             self.checkpoint_file = exciton_dict['checkpoint_file']
 
     def compute(self, molecule, basis, min_basis):
+        """Executes exciton model calculation.
+
+        Executes exciton model calculation and writes checkpoint file.
+
+        Parameters
+        ----------
+        molecule
+            The molecule.
+        basis
+            The AO basis.
+        min_basis
+            The minimal AO basis for generating initial guess.
+        """
 
         # sanity check
         assert_msg_critical(
@@ -712,6 +798,20 @@ class ExcitonModelDriver:
             self.write_hdf5(eigvals, eigvecs, self.ostream)
 
     def write_hdf5(self, eigenvalues, eigenvectors, ostream):
+        """Writes exciton model hdf5 file.
+
+        Writes exciton model hdf5 file.
+
+        Parameters
+        ----------
+        eigenvalues
+            The eigenvalues (adiabatic excitation energies) of the exciton
+            model.
+        eigenvectors
+            The eigenvectors of the exciton model.
+        ostream
+            The output stream.
+        """
 
         if self.checkpoint_file is None:
             return
@@ -737,6 +837,15 @@ class ExcitonModelDriver:
         self.ostream.print_blank()
 
     def print_banner(self, title):
+        """Prints header.
+
+        Prints header.
+
+        Parameters
+        ----------
+        title
+            The text to be shown in the header.
+        """
 
         valstr = '|' + ' ' * 10 + title + ' ' * 10 + '|'
         line = '+' + '-' * (len(valstr) - 2) + '+'
@@ -746,6 +855,17 @@ class ExcitonModelDriver:
         self.ostream.print_blank()
 
     def print_title(self, num_LE, num_CT):
+        """Prints exciton model title.
+
+        Prints exciton model title.
+
+        Parameters
+        ----------
+        num_LE
+            The total number of locally excited states.
+        num_CT
+            The total number of charge-transfer excited states.
+        """
 
         self.print_banner('Exciton Model')
 
@@ -768,6 +888,19 @@ class ExcitonModelDriver:
         self.ostream.print_blank()
 
     def print_absorption(self, title, eigvals, osc_str):
+        """Prints absorption spectrum.
+
+        Prints absorption spectrum.
+
+        Parameters
+        ----------
+        title
+            The title.
+        eigvals
+            The eigenvalues (adiabatic excitation energies).
+        osc_str
+            The oscillator strengths.
+        """
 
         valstr = title
         self.ostream.print_header(valstr.ljust(92))
@@ -781,6 +914,17 @@ class ExcitonModelDriver:
         self.ostream.print_blank()
 
     def print_ecd(self, title, rot_str):
+        """Prints electronic circular dichroism spectrum.
+
+        Prints electronic circular dichroism spectrum.
+
+        Parameters
+        ----------
+        title
+            The title.
+        rot_str
+            The rotatory strengths in 10**(-40) (esu**2)*(cm**2).
+        """
 
         valstr = title
         self.ostream.print_header(valstr.ljust(92))

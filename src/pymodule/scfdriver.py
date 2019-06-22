@@ -87,6 +87,13 @@ class ScfDriver:
 
         Initializes SCF driver to default setup (convergence threshold, initial
         guess, etc).
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
         """
 
         # scf accelerator
@@ -148,6 +155,15 @@ class ScfDriver:
         self.restricted = True
 
     def update_settings(self, scf_dict):
+        """Updates settings in SCF driver.
+
+        Updates settings in SCF driver.
+
+        Parameters
+        ----------
+        scf_dict
+            The settings dictionary.
+        """
 
         if 'acc_type' in scf_dict:
             self.acc_type = scf_dict['acc_type'].upper()
@@ -168,7 +184,7 @@ class ScfDriver:
     def compute(self, molecule, ao_basis, min_basis):
         """Performs SCF calculation.
 
-        Performs SCF calculation using molecular data
+        Performs SCF calculation using molecular data.
 
         Parameters
         ----------
@@ -255,7 +271,17 @@ class ScfDriver:
                 self.ostream.print_blank()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
-        """Writes molecular orbitals to checkpoint file"""
+        """Writes molecular orbitals to checkpoint file.
+
+        Writes molecular orbitals to checkpoint file.
+
+        Parameters
+        ----------
+        nuclear_charges
+            The nuclear charges.
+        basis_set
+            Name of the basis set.
+        """
 
         if self.rank == mpi_master() and not self.first_step:
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
@@ -265,7 +291,7 @@ class ScfDriver:
     def comp_diis(self, molecule, ao_basis, min_basis):
         """Performs SCF calculation with C2-DIIS acceleration.
 
-        Performs SCF calculation using molecular data
+        Performs SCF calculation with C2-DIIS acceleration.
 
         Parameters
         ----------
@@ -423,6 +449,10 @@ class ScfDriver:
             The molecule.
         ao_basis
             The AO basis set.
+
+        Returns
+        -------
+            The one-electron integrals.
         """
 
         t0 = tm.time()
@@ -476,6 +506,9 @@ class ScfDriver:
             The minimal AO basis set.
         ovl_mat
             The overlap matrix between minimal and full AO basis.
+
+        Returns
+            The density matrix.
         """
 
         # guess: read from checkpoint file
@@ -531,8 +564,8 @@ class ScfDriver:
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         """Computes SCF energy components.
 
-            Computes SCF energy components: electronic energy, kinetic energy,
-            and nuclear potential energy.
+        Computes SCF energy components: electronic energy, kinetic energy, and
+        nuclear potential energy.
 
         Parameters
         ----------
@@ -544,6 +577,7 @@ class ScfDriver:
             The nuclear potential matrix.
         den_mat
             The density matrix.
+
         Returns
         -------
             The tuple (electronic energy, kinetic energy, nuclear potential
@@ -601,6 +635,7 @@ class ScfDriver:
             The density matrix.
         oao_mat
             The orthogonalization matrix.
+
         Returns
         -------
             The electronic gradient.
@@ -619,6 +654,7 @@ class ScfDriver:
             The current density matrix.
         old_den_mat
             The previous density matrix.
+
         Returns
         -------
         The norm of change between two density matrices.
@@ -657,6 +693,10 @@ class ScfDriver:
             The overlap matrix.
         oao_mat
             The orthogonalization matrix.
+
+        Returns
+        -------
+            The effective Fock/Kohn-Sham matrix.
         """
 
         return None
@@ -672,6 +712,7 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix.
         oao_mat
             The orthogonalization matrix.
+
         Returns
         -------
             The molecular orbitals.
@@ -688,6 +729,7 @@ class ScfDriver:
         ----------
         molecule
             The molecule.
+
         Returns
         -------
             The density matrix.
@@ -708,6 +750,7 @@ class ScfDriver:
         ----------
         e_grad
             The electronic gradient.
+
         Returns
         -------
             The screening threshold.
@@ -842,7 +885,7 @@ class ScfDriver:
     def print_scf_title(self):
         """Prints SCF cycles header to output stream.
 
-        Prints SCF cycles header to output stream,
+        Prints SCF cycles header to output stream.
         """
 
         if self.first_step:
@@ -944,6 +987,7 @@ class ScfDriver:
         -------
             The string with type of SCF calculation.
         """
+
         return "Undefined"
 
     def get_guess_type(self):
@@ -1034,6 +1078,7 @@ class ScfDriver:
             The molecular orbitals.
         mol_eigs
             The eigenvalues of molecular orbitals.
+
         Returns
         -------
             The tuple (trimmed molecular orbitals, eigenvalues).
@@ -1063,6 +1108,10 @@ class ScfDriver:
             The overlap matrix (numpy array).
         mol_orbs
             The molecular orbitals.
+
+        Returns
+        -------
+            Expectation value <S**2>.
         """
 
         return None

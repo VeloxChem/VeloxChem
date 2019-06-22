@@ -10,8 +10,8 @@ from .c2diis import CTwoDiis
 class ScfUnrestrictedDriver(ScfDriver):
     """Implements spin unrestricted open shell SCF method (derrived class).
 
-        Implements spin unrestricted open shell SCF method with C2-DIIS and
-        two-level C2-DIIS convergence accelerators.
+    Implements spin unrestricted open shell SCF method with C2-DIIS and
+    two-level C2-DIIS convergence accelerators.
     """
 
     def __init__(self, comm, ostream):
@@ -20,6 +20,13 @@ class ScfUnrestrictedDriver(ScfDriver):
         Initializes spin unrestricted open shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
+
+        Parameters
+        ----------
+        comm
+            The MPI communicator.
+        ostream
+            The output stream.
         """
 
         super().__init__(comm, ostream)
@@ -42,6 +49,7 @@ class ScfUnrestrictedDriver(ScfDriver):
             The density matrix.
         oao_mat
             The orthogonalization matrix.
+
         Returns
         -------
             The electronic gradient.
@@ -86,6 +94,7 @@ class ScfUnrestrictedDriver(ScfDriver):
             The current density matrix.
         old_den_mat
             The previous density matrix.
+
         Returns
         -------
             The norm of change between two density matrices.
@@ -158,6 +167,10 @@ class ScfUnrestrictedDriver(ScfDriver):
             The overlap matrix.
         oao_mat
             The orthogonalization matrix.
+
+        Returns
+        -------
+            The effective Fock/Kohn-Sham matrices.
         """
 
         if self.rank == mpi_master():
@@ -193,9 +206,10 @@ class ScfUnrestrictedDriver(ScfDriver):
         ----------
         weights
             The weights of Fock/Kohn-Sham matrices.
+
         Returns
         -------
-            The scaled Fock/Kohn-Sham matrix.
+            The scaled Fock/Kohn-Sham matrices.
         """
 
         effmat_a = np.zeros(self.fock_matrices[0].shape)
@@ -222,6 +236,7 @@ class ScfUnrestrictedDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         oao_mat
             The orthogonalization matrix.
+
         Returns
         -------
             The molecular orbitals.
@@ -261,6 +276,10 @@ class ScfUnrestrictedDriver(ScfDriver):
             The overlap matrix (numpy array).
         mol_orbs
             The molecular orbitals.
+
+        Returns
+        -------
+            Expectation value <S**2>.
         """
 
         nalpha = molecule.number_of_alpha_electrons()

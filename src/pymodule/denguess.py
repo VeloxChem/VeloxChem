@@ -18,6 +18,8 @@ class DensityGuess:
     ----------
     _guess_type
         The type of initial guess.
+    _checkpoint_file
+        The name of checkpoint file.
     """
 
     def __init__(self, guess_type='SAD', checkpoint_file=None):
@@ -25,6 +27,13 @@ class DensityGuess:
 
         Initializes initial guess generator by setting initial guess type.
         Default for initial guess type is a superposition of atomic densities.
+
+        Parameters
+        ----------
+        guess_type
+            The type of initial guess.
+        checkpoint_file
+            The name of checkpoint file.
         """
 
         self._guess_type = guess_type
@@ -63,6 +72,10 @@ class DensityGuess:
             Numpy array of the nuclear charges.
         basis_set
             Name of the AO basis.
+
+        Returns
+        -------
+            Validity of the checkpoint file.
         """
 
         if (self._checkpoint_file and isinstance(self._checkpoint_file, str) and
@@ -89,6 +102,10 @@ class DensityGuess:
             The rank of the MPI process.
         ostream
             The output stream.
+
+        Returns
+        -------
+            The AO density matrix to restart from.
         """
 
         if rank == mpi_master():
@@ -128,6 +145,10 @@ class DensityGuess:
             The local MPI communicator.
         ostream
             The output stream.
+
+        Returns
+        -------
+            The AO density matrix from SAD initial guess.
         """
 
         if self._guess_type == 'SAD':
@@ -173,6 +194,10 @@ class DensityGuess:
             The reduced AO basis for generation of molecular orbitals.
         red_orbs
             The molecular orbitals in reduced AO basis.
+
+        Returns
+        -------
+            The AO density matrix from PRCMO.
         """
 
         if self._guess_type == 'PRCMO':

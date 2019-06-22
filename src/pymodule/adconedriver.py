@@ -89,7 +89,7 @@ class AdcOneDriver:
         Parameters
         ----------
         settings
-            The settings for the driver.
+            The settings dictionary for the driver.
         """
 
         # calculation type
@@ -122,7 +122,11 @@ class AdcOneDriver:
         basis
             The AO basis set.
         scf_tensors
-            The tensors from converged SCF wavefunction.
+            The dictionary of tensors from converged SCF wavefunction.
+
+        Returns
+        -------
+            The excitation energies (eigenvalues).
         """
 
         if self.rank == mpi_master():
@@ -274,9 +278,10 @@ class AdcOneDriver:
             The molecular orbitals.
         molecule
             The molecule.
+
         Returns
         -------
-            The set of trial vectors.
+            The tuple (approximate diagonal of A and the set of trial vectors).
         """
 
         if self.rank == mpi_master():
@@ -317,7 +322,7 @@ class AdcOneDriver:
             for j in range(zvecs.shape[0]):
                 trial_vecs[i].set_zcoefficient(zvecs[j, i], j)
 
-    def check_convergence(self, iter):
+    def check_convergence(self, iteration):
         """Checks convergence of excitation energies and set convergence flag.
 
         Checks convergence of excitation energies and set convergence flag on
@@ -325,11 +330,11 @@ class AdcOneDriver:
 
         Parameters
         ----------
-        iter
+        iteration
             The current excited states solver iteration.
         """
 
-        self.cur_iter = iter
+        self.cur_iter = iteration
 
         if self.rank == mpi_master():
             self.is_converged = self.solver.check_convergence(self.conv_thresh)
@@ -339,20 +344,20 @@ class AdcOneDriver:
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def print_iter_data(self, iter):
+    def print_iter_data(self, iteration):
         """Prints excited states solver iteration data to output stream.
 
         Prints excited states solver iteration data to output stream.
 
         Parameters
         ----------
-        iter
+        iteration
             The current excited states solver iteration.
         """
 
         # iteration header
 
-        exec_str = " *** Iteration: " + (str(iter + 1)).rjust(3)
+        exec_str = " *** Iteration: " + (str(iteration + 1)).rjust(3)
         exec_str += " * Reduced Space: "
         exec_str += (str(self.solver.reduced_space_size())).rjust(4)
         rmax, rmin = self.solver.max_min_residual_norms()
@@ -373,7 +378,7 @@ class AdcOneDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_excited_states(self, trial_vecs, start_time):
+    def print_excited_states(self, start_time):
         """Prints excited states information to output stream.
 
         Prints excited states information to output stream.
@@ -398,13 +403,14 @@ class AdcOneDriver:
         reigs, rnorms = self.solver.get_eigenvalues()
 
         for i in range(reigs.shape[0]):
-            self.print_state_information(i, reigs[i], trial_vecs[i], rnorms[i])
+            self.print_state_information(i, reigs[i], rnorms[i])
 
-    def print_state_information(self, iter, eval, evec, rnorm):
+    def print_state_information(self, iteration, eigval, rnorm):
+        """Prints excited state information to output stream."""
 
         self.ostream.print_blank()
 
-        valstr = "Excited State No.{:3d}:".format(iter + 1)
+        valstr = "Excited State No.{:3d}:".format(iteration + 1)
         self.ostream.print_header(valstr.ljust(92))
         valstr = 21 * "-"
         self.ostream.print_header(valstr.ljust(92))
@@ -416,7 +422,7 @@ class AdcOneDriver:
             valstr += "Singlet"
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = "Excitation Energy : {:5.8f} au".format(eval)
+        valstr = "Excitation Energy : {:5.8f} au".format(eigval)
         self.ostream.print_header(valstr.ljust(92))
 
         valstr = "Residual Norm     : {:3.8f} au".format(rnorm)

@@ -4,13 +4,30 @@ import re
 from .veloxchemlib import VisualizationDriver
 from .veloxchemlib import CubicGrid
 from .veloxchemlib import mpi_master
-from .molecularorbitals import MolecularOrbitals
-from .aodensitymatrix import AODensityMatrix
 from .errorhandler import assert_msg_critical
 
 
 @staticmethod
 def _VisualizationDriver_gen_cubic_grid(molecule, n_x=80, n_y=80, n_z=80):
+    """Creates cubic grid.
+
+    Creates cubic grid for a molecule.
+
+    Parameters
+    ----------
+    molecule
+        The molecule.
+    n_x
+        Number of grid points in X direction.
+    n_y
+        Number of grid points in Y direction.
+    n_z
+        Number of grid points in Z direction.
+
+    Returns
+    -------
+        The cubic grid.
+    """
 
     x = molecule.x_to_numpy()
     y = molecule.y_to_numpy()
@@ -38,6 +55,25 @@ def _VisualizationDriver_gen_cubic_grid(molecule, n_x=80, n_y=80, n_z=80):
 @staticmethod
 def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
                                     spin):
+    """Writes cubic grid data to cube file.
+
+    Writes cubic grid data to cube file.
+
+    Parameters
+    ----------
+    cubefile
+        Name of the cube file.
+    grid
+        The cubic grid.
+    molecule
+        The molecule.
+    flag
+        The flag for molecular orbitals ('mo') or density ('density').
+    index
+        Index (0-based) of the molecular orbital or density matrix.
+    spin
+        Spin of the molecular orbital or density.
+    """
 
     f_cube = open(cubefile, 'w')
 
@@ -93,6 +129,23 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
 
 def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
                                    density):
+    """Computes and writes cube file.
+
+    Computes and writes cube file.
+
+    Parameters
+    ----------
+    cube_dict
+        The input dictionary of cube options.
+    molecule
+        The molecule.
+    basis
+        The AO basis set.
+    mol_orbs
+        The molecular orbitals.
+    density
+        The density matrix.
+    """
 
     if 'grid' in cube_dict:
         grid = [int(x) for x in cube_dict['grid'].split(',')]

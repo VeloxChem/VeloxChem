@@ -12,6 +12,8 @@ class ResponseDriver:
     Implements response driver for molecular property calculations using
     conventional Hartree-Fock/Kohn-Sham response theory.
 
+    Attributes
+    ----------
     rank
         The rank of MPI process.
     nodes
@@ -19,9 +21,9 @@ class ResponseDriver:
     """
 
     def __init__(self, comm, ostream):
-        """Initializes Response driver.
+        """Initializes response driver.
 
-        Initializes Response driver to default setup.
+        Initializes response driver to default setup.
 
         Parameters
         ----------
@@ -54,6 +56,15 @@ class ResponseDriver:
         self.ostream = ostream
 
     def update_settings(self, rsp_input):
+        """Updates settings in response solver.
+
+        Updates settings in response solver.
+
+        Parameters
+        ----------
+        rsp_input
+            The settings dictionary.
+        """
 
         # solver settings
         if 'conv_thresh' in rsp_input:
@@ -99,7 +110,11 @@ class ResponseDriver:
         ao_basis
             The AO basis set.
         scf_tensors
-            The tensors from converged SCF wavefunction.
+            The dictionary of tensors from converged SCF wavefunction.
+
+        Returns
+        -------
+            The results from the actual response solver.
         """
 
         if self.rank == mpi_master():
