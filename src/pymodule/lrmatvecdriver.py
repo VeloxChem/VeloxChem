@@ -66,6 +66,7 @@ class LinearResponseMatrixVectorDriver:
 
         Returns
         -------
+        numpy.ndarray
             The E2 b matrix vector product.
         """
 
@@ -141,6 +142,7 @@ class LinearResponseMatrixVectorDriver:
 
         Returns
         -------
+        tuple
             The tuple containing alpha and beta Fock matrices.
         """
 
@@ -215,6 +217,7 @@ class LinearResponseMatrixVectorDriver:
 
         Returns
         -------
+        numpy.ndarray
             The S2 b matrix vector product.
         """
 
@@ -266,6 +269,7 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
 
     Returns
     -------
+    tuple
         The right-hand sides (gradients).
     """
 
@@ -345,6 +349,8 @@ def lrvec2mat(vec, nocc, norb):
         Number of orbitals.
 
     Returns
+    -------
+    numpy.ndarray
         The matrices.
     """
 
@@ -382,6 +388,8 @@ def lrmat2vec(mat, nocc, norb):
         Number of orbitals.
 
     Returns
+    -------
+    numpy.ndarray
         The vectors.
     """
 
@@ -408,6 +416,7 @@ def truncate_and_normalize(basis, small_threshold):
 
     Returns
     -------
+    numpy.ndarray
         The new set of vectors.
     """
 
@@ -436,6 +445,8 @@ def remove_linear_dependence(basis, threshold):
         The threshold for removing linear dependence.
 
     Returns
+    -------
+    numpy.ndarray
         The new set of vectors.
     """
 
@@ -447,9 +458,9 @@ def remove_linear_dependence(basis, threshold):
 
 
 def construct_ed_sd(orb_ene, nocc, norb):
-    """Returns the E0 and S0 diagonal elements as arrays.
+    """Gets the E0 and S0 diagonal elements as arrays.
 
-    Returns the E0 and S0 diagonal elements as arrays.
+    Gets the E0 and S0 diagonal elements as arrays.
 
     Parameters
     ----------
@@ -462,6 +473,7 @@ def construct_ed_sd(orb_ene, nocc, norb):
 
     Returns
     -------
+    tuple
         The E0 and S0 diagonal elements as numpy arrays.
     """
 
@@ -491,6 +503,7 @@ def swap_xy(xy):
 
     Returns
     -------
+    numpy.ndarray
         The vector with X and Y parts swapped.
     """
 

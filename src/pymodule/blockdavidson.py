@@ -77,6 +77,7 @@ class BlockDavidsonSolver:
 
         Returns
         -------
+        numpy.ndarray
             The new set of trial vectors.
         """
 
@@ -103,6 +104,7 @@ class BlockDavidsonSolver:
 
         Returns
         -------
+        bool
             The true if residual norms are converged for all eigenpairs,
             false otherwise.
         """
@@ -120,6 +122,7 @@ class BlockDavidsonSolver:
 
         Returns
         -------
+        int
             The number of trial vectors in residual space.
         """
 
@@ -133,8 +136,10 @@ class BlockDavidsonSolver:
 
         Returns
         -------
-            The tuple (max. residual norm, min. residual norm).
+        tuple
+            tuple (max. residual norm, min. residual norm).
         """
+
         return (np.amax(self.residual_norms), np.amin(self.residual_norms))
 
     def get_eigenvalues(self):
@@ -146,8 +151,10 @@ class BlockDavidsonSolver:
 
         Returns
         -------
-            The tuple (eigenvalues, residual norms).
+        tuple
+            tuple (eigenvalues, residual norms).
         """
+
         return (self.residual_eigs, self.residual_norms)
 
     def comp_residual_vectors(self):
@@ -185,6 +192,7 @@ class BlockDavidsonSolver:
 
         Returns
         -------
+        numpy.ndarray
             The trial vectors.
         """
 

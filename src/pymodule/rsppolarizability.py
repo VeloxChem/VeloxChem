@@ -55,6 +55,7 @@ class Polarizability(ResponseProperty):
 
         Returns
         -------
+        dict_value
             The component of polarizability.
         """
 

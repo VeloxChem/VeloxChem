@@ -32,6 +32,7 @@ def _MolecularBasis_read(mol,
 
     Returns
     -------
+    MolecularBasis
         The AO basis set.
     """
 

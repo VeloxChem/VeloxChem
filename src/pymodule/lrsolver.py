@@ -141,6 +141,7 @@ class LinearResponseSolver:
 
         Returns
         -------
+        dict
             A dictionary containing properties.
         """
 
@@ -348,6 +349,7 @@ class LinearResponseSolver:
 
         Returns
         -------
+        dict
             The initial guess.
         """
 
@@ -381,6 +383,7 @@ class LinearResponseSolver:
 
         Returns
         -------
+        numpy.ndarray
             The orthonormalized trial vectors.
         """
 

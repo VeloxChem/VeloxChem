@@ -53,6 +53,7 @@ class Absorption(ResponseProperty):
 
         Returns
         -------
+        dict_value
             The absorption property.
         """
 

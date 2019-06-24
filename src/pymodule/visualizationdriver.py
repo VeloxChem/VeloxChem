@@ -26,6 +26,7 @@ def _VisualizationDriver_gen_cubic_grid(molecule, n_x=80, n_y=80, n_z=80):
 
     Returns
     -------
+    CubicGrid
         The cubic grid.
     """
 

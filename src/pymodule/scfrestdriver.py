@@ -52,6 +52,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         Returns
         -------
+        float
             The electronic gradient.
         """
 
@@ -88,6 +89,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         Returns
         -------
+        float
             The norm of change between two density matrices.
         """
 
@@ -151,6 +153,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         Returns
         -------
+        numpy.ndarray
             The effective Fock/Kohn-Sham matrix.
         """
 
@@ -189,6 +192,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         Returns
         -------
+        numpy.ndarray
             The scaled Fock/Kohn-Sham matrix.
         """
 
@@ -216,6 +220,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         Returns
         -------
+        MolecularOrbitals
             The molecular orbitals.
         """
 
@@ -243,6 +248,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         Returns
         -------
+        str
             The string for spin restricted closed shell SCF calculation.
         """
 

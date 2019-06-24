@@ -56,6 +56,7 @@ def _AODensityMatrix_read_hdf5(fname):
 
     Returns
     -------
+    AODensityMatrix
         The AODensityMatrix.
     """
 

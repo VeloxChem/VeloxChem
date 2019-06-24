@@ -19,6 +19,7 @@ def _Molecule_read_str(xyzstr, units='angs'):
 
     Returns
     -------
+    Molecule
         The molecule.
     """
 
@@ -47,6 +48,7 @@ def _Molecule_read_xyz(xyzfile):
 
     Returns
     -------
+    Molecule
         The molecule.
     """
 
@@ -74,6 +76,7 @@ def _Molecule_from_dict(mol_dict):
 
     Returns
     -------
+    Molecule
         The molecule.
     """
 
@@ -107,6 +110,7 @@ def _Molecule_center_of_mass(self):
 
     Returns
     -------
+    tuple
         The center of mass.
     """
 

@@ -73,6 +73,7 @@ class ResponseProperty:
 
         Returns
         -------
+        dict_value
             The property.
         """
 

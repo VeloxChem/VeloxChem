@@ -54,6 +54,7 @@ def _AOFockMatrix_read_hdf5(fname):
 
     Returns
     -------
+    AOFockMatrix
         The AOFockMatrix.
     """
 

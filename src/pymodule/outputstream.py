@@ -79,6 +79,7 @@ class OutputStream:
 
         Returns
         -------
+        bool
             State of the output stream.
         """
 
@@ -109,6 +110,7 @@ class OutputStream:
 
         Returns
         -------
+        str
             The header string.
         """
 
@@ -132,6 +134,7 @@ class OutputStream:
 
         Returns
         -------
+        str
             The title string.
         """
 
@@ -155,6 +158,7 @@ class OutputStream:
 
         Returns
         -------
+        str
             The information string.
         """
 
@@ -176,6 +180,7 @@ class OutputStream:
 
         Returns
         -------
+        str
             The separator string.
         """
 

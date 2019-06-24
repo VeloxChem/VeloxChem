@@ -126,6 +126,7 @@ class AdcOneDriver:
 
         Returns
         -------
+        numpy.ndarray
             The excitation energies (eigenvalues).
         """
 
@@ -281,7 +282,8 @@ class AdcOneDriver:
 
         Returns
         -------
-            The tuple (approximate diagonal of A and the set of trial vectors).
+        tuple
+            tuple (approximate diagonal of A, set of trial vectors).
         """
 
         if self.rank == mpi_master():

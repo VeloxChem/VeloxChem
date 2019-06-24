@@ -125,6 +125,7 @@ class LinearResponseEigenSolver:
 
         Returns
         -------
+        dict
             A dictionary containing eigenvalues, eigenvectors, transition
             dipole moments, oscillator strengths and rotatory strengths.
         """
@@ -368,7 +369,7 @@ class LinearResponseEigenSolver:
         """Prints information after convergence.
 
         Prints information after convergence.
-        """ 
+        """
 
         output_conv = '*** '
         if self.is_converged:
@@ -417,6 +418,7 @@ class LinearResponseEigenSolver:
 
         Returns
         -------
+        list
             A list of initial excitations (excitation energy and vector).
         """
 
@@ -455,6 +457,7 @@ class LinearResponseEigenSolver:
 
         Returns
         -------
+        numpy.ndarray
             The orthonormalized trial vectors.
         """
 

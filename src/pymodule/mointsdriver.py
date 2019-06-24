@@ -87,6 +87,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        MOIntegralsBatch
             The computed MO integrals batch.
         """
 
@@ -199,6 +200,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        MOIntegralsBatch
             The collected MO integrals batch.
         """
 
@@ -272,6 +274,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        tuple
             The tuple containing the position and the dimension of the batch.
         """
 
@@ -317,6 +320,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        tuple
             The number of occupied and virtual orbitals.
         """
 
@@ -341,6 +345,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        tuple
             The tuple containing the lists of bra and ket ids.
         """
 
@@ -405,6 +410,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        tuple
             The tuple containing transformation matrices.
         """
 
@@ -474,6 +480,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        TwoIndexes
             The external indices.
         """
 
@@ -512,6 +519,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        moints
             The MO integrals type.
         """
 
@@ -565,6 +573,7 @@ class MOIntegralsDriver:
 
         Returns
         -------
+        bool
             Whether symmetry is used.
         """
 

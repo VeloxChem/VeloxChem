@@ -99,6 +99,7 @@ class InputParser:
 
         Returns
         -------
+        dict
             A dictionary containing all information form the input file.
         """
 

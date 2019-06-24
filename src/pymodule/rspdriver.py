@@ -114,6 +114,7 @@ class ResponseDriver:
 
         Returns
         -------
+        dict
             The results from the actual response solver.
         """
 
@@ -206,7 +207,8 @@ class ResponseDriver:
 
         Returns
         -------
-        The string with type of molecular property calculation.
+        str
+            The string with type of molecular property calculation.
         """
 
         if self.prop_type == 'POLARIZABILITY':

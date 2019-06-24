@@ -185,6 +185,7 @@ def _MolecularOrbitals_get_density(self, molecule):
 
     Returns
     -------
+    AODensityMatrix
         The AO density matrix.
     """
 
@@ -270,6 +271,7 @@ def _MolecularOrbitals_read_hdf5(fname):
 
     Returns
     -------
+    MolecularOrbitals
         The molecular orbitals.
     """
 
@@ -320,6 +322,7 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
 
     Returns
     -------
+    bool
         Whether the hdf5 file matches the given nuclear charges and basis set.
     """
 

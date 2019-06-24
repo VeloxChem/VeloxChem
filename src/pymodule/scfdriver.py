@@ -452,6 +452,7 @@ class ScfDriver:
 
         Returns
         -------
+        tuple
             The one-electron integrals.
         """
 
@@ -508,6 +509,8 @@ class ScfDriver:
             The overlap matrix between minimal and full AO basis.
 
         Returns
+        -------
+        AODensityMatrix
             The density matrix.
         """
 
@@ -580,6 +583,7 @@ class ScfDriver:
 
         Returns
         -------
+        tuple
             The tuple (electronic energy, kinetic energy, nuclear potential
             energy).
         """
@@ -638,6 +642,7 @@ class ScfDriver:
 
         Returns
         -------
+        float
             The electronic gradient.
         """
 
@@ -657,7 +662,8 @@ class ScfDriver:
 
         Returns
         -------
-        The norm of change between two density matrices.
+        float
+            The norm of change between two density matrices.
         """
 
         return 0.0
@@ -696,6 +702,7 @@ class ScfDriver:
 
         Returns
         -------
+        numpy.ndarray
             The effective Fock/Kohn-Sham matrix.
         """
 
@@ -715,6 +722,7 @@ class ScfDriver:
 
         Returns
         -------
+        MolecularOrbitals
             The molecular orbitals.
         """
 
@@ -732,6 +740,7 @@ class ScfDriver:
 
         Returns
         -------
+        AODensityMatrix
             The density matrix.
         """
 
@@ -753,6 +762,7 @@ class ScfDriver:
 
         Returns
         -------
+        float
             The screening threshold.
         """
 
@@ -822,6 +832,7 @@ class ScfDriver:
 
         Returns
         -------
+        list
             The range of SCF iterations.
         """
 
@@ -973,7 +984,8 @@ class ScfDriver:
 
         Returns
         -------
-        The SCF energy.
+        float
+            The SCF energy.
         """
 
         return self.old_energy
@@ -985,6 +997,7 @@ class ScfDriver:
 
         Returns
         -------
+        str
             The string with type of SCF calculation.
         """
 
@@ -998,6 +1011,7 @@ class ScfDriver:
 
         Returns
         -------
+        str
             The string with type of initial guess.
         """
 
@@ -1017,7 +1031,8 @@ class ScfDriver:
 
         Returns
         -------
-        The string with type of SCF convergence accelerator.
+        str
+            The string with type of SCF convergence accelerator.
         """
 
         if self.acc_type == "DIIS":
@@ -1037,8 +1052,9 @@ class ScfDriver:
 
         Returns
         -------
-        The string with application method of electron repulsion integrals
-        screening.
+        str
+            The string with application method of electron repulsion integrals
+            screening.
         """
 
         if self.qq_dyn:
@@ -1055,7 +1071,8 @@ class ScfDriver:
 
         Returns
         -------
-        The flag for need of minimal AO basis.
+        bool
+            The flag for need of minimal AO basis.
         """
 
         if self.acc_type == "L2_DIIS":
@@ -1081,6 +1098,7 @@ class ScfDriver:
 
         Returns
         -------
+        tuple
             The tuple (trimmed molecular orbitals, eigenvalues).
         """
 
@@ -1111,6 +1129,7 @@ class ScfDriver:
 
         Returns
         -------
+        float
             Expectation value <S**2>.
         """
 

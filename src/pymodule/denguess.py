@@ -75,6 +75,7 @@ class DensityGuess:
 
         Returns
         -------
+        bool
             Validity of the checkpoint file.
         """
 
@@ -105,6 +106,7 @@ class DensityGuess:
 
         Returns
         -------
+        AODensityMatrix
             The AO density matrix to restart from.
         """
 
@@ -148,6 +150,7 @@ class DensityGuess:
 
         Returns
         -------
+        AODensityMatrix
             The AO density matrix from SAD initial guess.
         """
 
@@ -197,6 +200,7 @@ class DensityGuess:
 
         Returns
         -------
+        AODensityMatrix
             The AO density matrix from PRCMO.
         """
 

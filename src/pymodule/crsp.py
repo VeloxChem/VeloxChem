@@ -152,6 +152,7 @@ class ComplexResponse:
 
         Returns
         -------
+        numpy.ndarray
             The paired trial vector.
         """
 
@@ -175,6 +176,7 @@ class ComplexResponse:
 
         Returns
         -------
+        tuple
             A tuple containing respective parts of the trial vectors.
         """
 
@@ -216,6 +218,7 @@ class ComplexResponse:
 
         Returns
         -------
+        numpy.ndarray
             The assembled trial vectors.
         """
 
@@ -247,6 +250,7 @@ class ComplexResponse:
 
         Returns
         -------
+        tuple
             A tuple containing gerade and ungerade parts of vectors.
         """
 
@@ -276,6 +280,7 @@ class ComplexResponse:
 
         Returns
         -------
+        numpy.ndarray
             The orthogonalized trial vectors.
         """
 
@@ -337,6 +342,7 @@ class ComplexResponse:
 
         Returns
         -------
+        numpy.ndarray
             The preconditioner matrix.
         """
 
@@ -381,6 +387,7 @@ class ComplexResponse:
 
         Returns
         -------
+        numpy.ndarray
             The trail vectors after preconditioning.
         """
 
@@ -416,6 +423,7 @@ class ComplexResponse:
 
         Returns
         -------
+        dict
             The initial guess.
         """
 
@@ -464,7 +472,8 @@ class ComplexResponse:
 
         Returns
         -------
-            The orthonormalized trial vectors.
+        tuple
+            The orthonormalized gerade and ungerade trial vectors.
         """
 
         trials = []
@@ -542,6 +551,7 @@ class ComplexResponse:
 
         Returns
         -------
+        dict
             A dictionary containing properties, solutions, and kappas.
         """
 

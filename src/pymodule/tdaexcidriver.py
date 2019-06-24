@@ -127,6 +127,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        dict
             A dictionary containing eigenvalues, eigenvectors, transition
             dipole moments, oscillator strengths and rotatory strengths.
         """
@@ -247,7 +248,8 @@ class TDAExciDriver:
 
         Returns
         -------
-            The set of trial vectors.
+        tuple
+            tuple (approximate diagonal of symmetric A, set of trial vectors).
         """
 
         if self.rank == mpi_master():
@@ -324,6 +326,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        numpy.ndarray
             The 2D numpy array.
         """
 
@@ -353,6 +356,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        numpy.ndarray
             The 2D numpy array.
         """
 
@@ -383,6 +387,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        tuple
             The Cartesian components of one-electron dipole integrals.
         """
 
@@ -409,6 +414,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        tuple
             The Cartesian components of one-electron linear momentum integrals.
         """
 
@@ -435,6 +441,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        tuple
             The Cartesian components of one-electron angular momentum integrals.
         """
 
@@ -465,6 +472,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        list
             The electric transition dipole moments in length form.
         """
 
@@ -502,6 +510,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        list
             The electric transition dipole moments in velocity form.
         """
 
@@ -536,6 +545,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        list
             The magnetic transition dipole moments.
         """
 
@@ -566,6 +576,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        numpy.ndarray
             The oscillator strengths.
         """
 
@@ -592,6 +603,7 @@ class TDAExciDriver:
 
         Returns
         -------
+        numpy.ndarray
             The rotatory strengths in CGS unit.
         """
 
