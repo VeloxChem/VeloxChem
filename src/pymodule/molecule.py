@@ -6,20 +6,15 @@ from .veloxchemlib import Molecule
 
 @staticmethod
 def _Molecule_read_str(xyzstr, units='angs'):
-    """Reads molecule from xyz string.
-
+    """
     Reads molecule from xyz string.
 
-    Parameters
-    ----------
-    xyzstr
+    :param xyzstr:
         The xyz string.
-    units
+    :param units:
         The unit of coordinates.
 
-    Returns
-    -------
-    Molecule
+    :return:
         The molecule.
     """
 
@@ -37,18 +32,13 @@ def _Molecule_read_str(xyzstr, units='angs'):
 
 @staticmethod
 def _Molecule_read_xyz(xyzfile):
-    """Reads molecule from xyz file.
-
+    """
     Reads molecule from xyz file.
 
-    Parameters
-    ----------
-    xyzfile
+    :param xyzfile:
         The name of the xyz file.
 
-    Returns
-    -------
-    Molecule
+    :return:
         The molecule.
     """
 
@@ -65,18 +55,13 @@ def _Molecule_read_xyz(xyzfile):
 
 @staticmethod
 def _Molecule_from_dict(mol_dict):
-    """Reads molecule from a dictionary.
-
+    """
     Reads molecule from a dictionary.
 
-    Parameters
-    ----------
-    mol_dict
+    :param mol_dict:
         The molecule dictionary.
 
-    Returns
-    -------
-    Molecule
+    :return:
         The molecule.
     """
 
@@ -104,13 +89,10 @@ def _Molecule_from_dict(mol_dict):
 
 
 def _Molecule_center_of_mass(self):
-    """Computes center of mass of a molecule.
-
+    """
     Computes center of mass of a molecule.
 
-    Returns
-    -------
-    tuple
+    :return:
         The center of mass.
     """
 

@@ -2,43 +2,34 @@ from .rspdriver import ResponseDriver
 
 
 class ResponseProperty:
-    """Implements response property/spectroscopy class.
-
+    """
     Implements the base class for response property/spectroscopy.
 
-    Attributes
-    ----------
-    rsp_input
+    :param rsp_input:
         The dictionary of response input.
-    rsp_driver
+    :param rsp_driver:
         The response driver.
-    rsp_property
+    :param rsp_property:
         The dictionary of response property.
     """
 
     def __init__(self, rsp_input):
-        """Initializes response property/spectroscopy.
-
+        """
         Initializes response property/spectroscopy.
 
-        Parameters
-        ----------
-        rsp_input
+        :param rsp_input:
             The input dictionary that defines the property/spectroscopy.
         """
 
         self.rsp_input = rsp_input
 
     def init_driver(self, comm, ostream):
-        """Initializes response driver.
-
+        """
         Initializes response driver.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -46,15 +37,12 @@ class ResponseProperty:
         self.rsp_driver.update_settings(self.rsp_input)
 
     def compute(self, molecule, basis, scf_tensors):
-        """Performs response property/spectroscopy calculation.
-
-        Parameters
-        ----------
-        molecule
+        """
+        :param molecule:
             The molecule.
-        basis
+        :param basis:
             The AO basis set.
-        scf_tensors
+        :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
         """
 
@@ -62,31 +50,23 @@ class ResponseProperty:
                                                     scf_tensors)
 
     def get_property(self, key):
-        """Gets response property/spectroscopy.
-
+        """
         Gets response property/spectroscopy.
 
-        Parameters
-        ----------
-        key
+        :param key:
             The keyword for the property.
 
-        Returns
-        -------
-        dict_value
+        :return:
             The property.
         """
 
         return None
 
     def print_property(self, ostream):
-        """Prints response property/spectroscopy to output stream.
-
+        """
         Prints response property/spectroscopy to output stream.
 
-        Parameters
-        ----------
-        ostream
+        :param ostream:
             The output stream.
         """
 

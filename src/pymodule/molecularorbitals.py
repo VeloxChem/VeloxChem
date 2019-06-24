@@ -15,19 +15,16 @@ def _MolecularOrbitals_print_orbitals(self,
                                       ao_basis,
                                       all_orbs=False,
                                       ostream=OutputStream(sys.stdout)):
-    """Prints molecular orbitals.
-
+    """
     Prints molecular orbitals to output stream.
 
-    Parameters
-    ----------
-    molecule
+    :param molecule:
         The molecule.
-    ao_basis
+    :param ao_basis:
         The AO basis set.
-    all_orbs
+    :param all_orbs:
         The flag to print all orbitals.
-    ostream
+    :param ostream:
         The output stream.
     """
 
@@ -115,25 +112,22 @@ def _MolecularOrbitals_print_orbitals(self,
 
 def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
                                           thresh, ostream):
-    """Prints molecular orbital coefficients.
-
+    """
     Prints molecular orbital coefficients to output stream.
 
-    Parameters
-    ----------
-    eigval
+    :param eigval:
         The eigenvalue (orbital energy).
-    focc
+    :param focc:
         The occupation number of the orbital.
-    iorb
+    :param iorb:
         The index (0-based) of the orbital.
-    coeffs
+    :param coeffs:
         The AO coefficients of the orbital.
-    ao_map
+    :param ao_map:
         The string representation map of basis functions.
-    thresh
+    :param thresh:
         The threshold for priting AO coefficients.
-    ostream
+    :param ostream:
         The output stream.
     """
 
@@ -174,18 +168,13 @@ def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
 
 
 def _MolecularOrbitals_get_density(self, molecule):
-    """Gets AO density matrix from molecular orbitals.
-
+    """
     Gets AO density matrix from molecular orbitals.
 
-    Parameters
-    ----------
-    molecule
+    :param molecule:
         The molecule.
 
-    Returns
-    -------
-    AODensityMatrix
+    :return:
         The AO density matrix.
     """
 
@@ -211,17 +200,14 @@ def _MolecularOrbitals_write_hdf5(self,
                                   fname,
                                   nuclear_charges=None,
                                   basis_set=None):
-    """Writes molecular orbitals to hdf5 file.
-
+    """
     Writes molecular orbitals to hdf5 file.
 
-    Parameters
-    ----------
-    fname
+    :param fname:
         The name of the hdf5 file.
-    nuclear_charges
+    :param nuclear_charges:
         The nuclear charges.
-    basis_set
+    :param basis_set:
         Name of the basis set.
     """
 
@@ -260,18 +246,13 @@ def _MolecularOrbitals_write_hdf5(self,
 
 @staticmethod
 def _MolecularOrbitals_read_hdf5(fname):
-    """Reads molecular orbitals from hdf5 file.
-
+    """
     Reads molecular orbitals from hdf5 file.
 
-    Parameters
-    ----------
-    fname
+    :param fname:
         The name of the hdf5 file.
 
-    Returns
-    -------
-    MolecularOrbitals
+    :return:
         The molecular orbitals.
     """
 
@@ -307,22 +288,17 @@ def _MolecularOrbitals_read_hdf5(fname):
 
 @staticmethod
 def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
-    """Checks the hdf5 file by nuclear charges and basis set.
-
+    """
     Checks if the hdf5 file matches the given nuclear charges and basis set.
 
-    Parameters
-    ----------
-    fname
+    :param fname:
         The name of the hdf5 file.
-    nuclear_charges
+    :param nuclear_charges:
         The nuclear charges.
-    basis_set
+    :param basis_set:
         Name of the basis set.
 
-    Returns
-    -------
-    bool
+    :return:
         Whether the hdf5 file matches the given nuclear charges and basis set.
     """
 

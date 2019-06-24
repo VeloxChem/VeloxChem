@@ -3,26 +3,20 @@ from .inputparser import parse_frequencies
 
 
 class Polarizability(ResponseProperty):
-    """Implements the polarizability property.
-
+    """
     Implements the polarizability property.
 
-    Attributes
-    ----------
-    rsp_input
+    :param rsp_input:
         The dictionary of response input.
-    rsp_property
+    :param rsp_property:
         The dictionary of response property.
     """
 
     def __init__(self, rsp_dict):
-        """Initializes the polarizability property.
-
+        """
         Initializes the polarizability property.
 
-        Parameters
-        ----------
-        rsp_dict
+        :param rsp_dict:
             The dictionary of response input.
         """
 
@@ -44,18 +38,13 @@ class Polarizability(ResponseProperty):
         super().__init__(rsp_input)
 
     def get_property(self, key):
-        """Gets component of polarizability.
-
+        """
         Gets component of polarizability.
 
-        Parameters
-        ----------
-        key
+        :param key:
             The tuple of A component, B component, and frequency.
 
-        Returns
-        -------
-        dict_value
+        :return:
             The component of polarizability.
         """
 
@@ -63,13 +52,10 @@ class Polarizability(ResponseProperty):
         return self.rsp_property[key]
 
     def print_property(self, ostream):
-        """Prints polarizability to output stream.
-
+        """
         Prints polarizability to output stream.
 
-        Parameters
-        ----------
-        ostream
+        :param ostream:
             The output stream.
         """
 

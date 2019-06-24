@@ -7,13 +7,10 @@ from .errorhandler import assert_msg_critical
 
 
 def _AODensityMatrix_write_hdf5(self, fname):
-    """Writes AODensityMatrix to hdf5 file.
-
+    """
     Writes AODensityMatrix to hdf5 file.
 
-    Parameters
-    ----------
-    fname
+    :param fname:
         The name of the hdf5 file.
     """
 
@@ -45,18 +42,13 @@ def _AODensityMatrix_write_hdf5(self, fname):
 
 @staticmethod
 def _AODensityMatrix_read_hdf5(fname):
-    """Reads AODensityMatrix from hdf5 file.
-
+    """
     Reads AODensityMatrix from hdf5 file.
 
-    Parameters
-    ----------
-    fname
+    :param fname:
         The name of the hdf5 file.
 
-    Returns
-    -------
-    AODensityMatrix
+    :return:
         The AODensityMatrix.
     """
 

@@ -2,19 +2,14 @@ from .veloxchemlib import ericut
 
 
 def get_qq_type(qq_type):
-    """Gets string with type of electron repulsion integrals screening scheme.
-
+    """
     Gets string with type of electron repulsion integrals screening scheme
     (Cauchy Schwarz and it's variations).
 
-    Parameters
-    ----------
-    qq_type
+    :param qq_type:
         The label of electron repulsion integrals screening scheme.
 
-    Returns
-    -------
-    str
+    :return:
         The string with type of electron repulsion integrals screening
         scheme.
     """
@@ -35,18 +30,13 @@ def get_qq_type(qq_type):
 
 
 def get_qq_scheme(qq_type):
-    """Converts screening scheme string to C++ enum.
-
+    """
     Converts screening scheme string to C++ enum.
 
-    Parameters
-    ----------
-    qq_type
+    :param qq_type:
         The label of electron repulsion integrals screening scheme.
 
-    Returns
-    -------
-    ericut
+    :return:
         The C++ enum with screening scheme.
     """
 

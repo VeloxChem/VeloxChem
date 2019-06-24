@@ -2,20 +2,16 @@ import numpy as np
 
 
 class CTwoDiis:
-    """Implements direct inversion of the iterative subspace.
-
+    """
     Implements direct inversion of the iterative subspace in C2 form proposed
     by H. Seller.
 
-    Attributes
-    ----------
-    error_vectors
+    :param error_vectors:
         The list of error vectors.
     """
 
     def __init__(self):
-        """Initializes iterative subspace.
-
+        """
         Initializes iterative subspace by setting list of error vectors to
         empty list.
         """
@@ -24,20 +20,17 @@ class CTwoDiis:
 
     def compute_error_vectors(self, fock_matrices, density_matrices,
                               overlap_matrix, oao_matrix):
-        """Computes error vectors.
-
+        """
         Computes error vectors for list of AO Fock matrices using (FDS - SDF)
         in orthogonal AO basis.
 
-        Parameters
-        ----------
-        fock_matrices
+        :param fock_matrices:
             The list of AO Fock matrices.
-        density_matrices
+        :param density_matrices:
             The list of AO density matrices.
-        overlap_matrix
+        :param overlap_matrix:
             The overlap matrix.
-        oao_matrix
+        :param oao_matrix:
             The orthogonalization matrix.
         """
 
@@ -58,24 +51,21 @@ class CTwoDiis:
                                            fock_matrices_beta, density_matrices,
                                            density_matrices_beta,
                                            overlap_matrix, oao_matrix):
-        """Computes error vectors for unrestricted Fock.
-
+        """
         Computes error vectors for list of AO Fock matrices using (FDS - SDF)
         in orthogonal AO basis.
 
-        Parameters
-        ----------
-        fock_matrices
+        :param fock_matrices:
             The list of AO Fock matrices (alpha spin).
-        fock_matrices_beta
+        :param fock_matrices_beta:
             The list of AO Fock matrices (beta spin).
-        density_matrices
+        :param density_matrices:
             The list of AO density matrices (alpha spin).
-        density_matrices_beta
+        :param density_matrices_beta:
             The list of AO density matrices (beta spin).
-        overlap_matrix
+        :param overlap_matrix:
             The overlap matrix.
-        oao_matrix
+        :param oao_matrix:
             The orthogonalization matrix.
         """
 
@@ -99,14 +89,11 @@ class CTwoDiis:
             self.error_vectors.append(err_tot)
 
     def compute_weights(self):
-        """Computes C2-DIIS weights.
-
+        """
         Computes C2-DIIS weights from error vectors using H. Sellers method
         (Int. J. Quantum Chem., vol. 45, pp. 31-41, 1993.)
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The array of C2-DIIS weights with smallest residual error.
         """
 
@@ -119,13 +106,10 @@ class CTwoDiis:
         return weights
 
     def comp_bmatrix(self):
-        """Computes B-matrix.
-
+        """
         Computes B-matrix of C2-DIIS method using error vectors.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The B-matrix.
         """
 
@@ -144,18 +128,13 @@ class CTwoDiis:
         return bmat
 
     def norm_bvectors(self, bvectors):
-        """Normalizes B-matrix eigenvectors.
-
+        """
         Normalizes B-matrix eigenvectors by rescaling them to 1.0.
 
-        Parameters
-        ----------
-        bvectors
+        :param bvectors:
             The array of B-matrix eigenvectors.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The normalized B-matrix eigenvectors.
         """
 
@@ -171,19 +150,14 @@ class CTwoDiis:
         return norm_vecs
 
     def pick_weights(self, weights):
-        """Picks normalize B-matrix eigenvector with smallest residual error.
-
+        """
         Picks normalize B-matrix eigenvector with smallest residual error by
         computing residual error for all eigenvectors of B_matrix.
 
-        Parameters
-        ----------
-        bvectors
+        :param bvectors:
             The array of B-matrix eigenvectors.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The normalized B-matrix eigenvector.
         """
 

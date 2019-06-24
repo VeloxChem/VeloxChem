@@ -7,13 +7,10 @@ from .errorhandler import assert_msg_critical
 
 
 def _AOFockMatrix_write_hdf5(self, fname):
-    """Writes AOFockMatrix to hdf5 file.
-
+    """
     Writes AOFockMatrix to hdf5 file.
 
-    Parameters
-    ----------
-    fname
+    :param fname:
         The name of the hdf5 file.
     """
 
@@ -43,18 +40,13 @@ def _AOFockMatrix_write_hdf5(self, fname):
 
 @staticmethod
 def _AOFockMatrix_read_hdf5(fname):
-    """Reads AOFockMatrix from hdf5 file.
-
+    """
     Reads AOFockMatrix from hdf5 file.
 
-    Parameters
-    ----------
-    fname
+    :param fname:
         The name of the hdf5 file.
 
-    Returns
-    -------
-    AOFockMatrix
+    :return:
         The AOFockMatrix.
     """
 

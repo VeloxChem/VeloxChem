@@ -8,24 +8,20 @@ from .c2diis import CTwoDiis
 
 
 class ScfUnrestrictedDriver(ScfDriver):
-    """Implements spin unrestricted open shell SCF method (derrived class).
-
+    """
     Implements spin unrestricted open shell SCF method with C2-DIIS and
     two-level C2-DIIS convergence accelerators.
     """
 
     def __init__(self, comm, ostream):
-        """Initializes spin unrestricted open shell SCF driver.
-
+        """
         Initializes spin unrestricted open shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -34,25 +30,20 @@ class ScfUnrestrictedDriver(ScfDriver):
         self.restricted = False
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
-        """Computes spin unrestricted open shell electronic gradient.
-
+        """
         Computes spin unrestricted open shell electronic gradient using
         Fock/Kohn-Sham matrix. Overloaded base class method.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        ovl_mat
+        :param ovl_mat:
             The overlap matrix.
-        den_mat
+        :param den_mat:
             The density matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        float
+        :return:
             The electronic gradient.
         """
 
@@ -84,21 +75,16 @@ class ScfUnrestrictedDriver(ScfDriver):
         return e_grad
 
     def comp_density_change(self, den_mat, old_den_mat):
-        """Computes norm of spin unrestricted open shell density change.
-
+        """
         Computes norm of spin unrestricted open shell density change between
         two density matrices. Overloaded base class method.
 
-        Parameters
-        ----------
-        den_mat
+        :param den_mat:
             The current density matrix.
-        old_den_mat
+        :param old_den_mat:
             The previous density matrix.
 
-        Returns
-        -------
-        float
+        :return:
             The norm of change between two density matrices.
         """
 
@@ -119,19 +105,16 @@ class ScfUnrestrictedDriver(ScfDriver):
         return diff_den
 
     def store_diis_data(self, i, fock_mat, den_mat):
-        """Stores spin unrestricted open shell Fock/Kohn-Sham and density
-        matrices for current iteration.
+        """        matrices for current iteration.
 
         Stores spin unrestricted open shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
 
-        Parameters
-        ----------
-        i
+        :param i:
             The number of current SCF iteration.
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        den_mat
+        :param den_mat:
             The density matrix.
         """
 
@@ -154,25 +137,20 @@ class ScfUnrestrictedDriver(ScfDriver):
                 self.den_matrices_beta.append(den_mat.beta_to_numpy(0))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """Computes effective spin unrestricted open shell Fock/Kohn-Sham
-        matrix in OAO basis.
+        """        matrix in OAO basis.
 
         Computes effective spin unrestricted open shell Fock/Kohn-Sham matrix
         in OAO basis by applying Lowdin or canonical orthogonalization to AO
         Fock/Kohn-Sham matrix. Overloaded base class method.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        ovl_mat
+        :param ovl_mat:
             The overlap matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The effective Fock/Kohn-Sham matrices.
         """
 
@@ -200,19 +178,14 @@ class ScfUnrestrictedDriver(ScfDriver):
         return None, None
 
     def get_scaled_fock(self, weights):
-        """Computes scaled spin unrestricted open shell Fock/Kohn-Sham matrix.
-
+        """
         Computes effective spin unrestricted open shell Fock/Kohn-Sham matrix
         by summing Fock/Kohn-Sham matrices scalwd with weigths.
 
-        Parameters
-        ----------
-        weights
+        :param weights:
             The weights of Fock/Kohn-Sham matrices.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The scaled Fock/Kohn-Sham matrices.
         """
 
@@ -228,22 +201,17 @@ class ScfUnrestrictedDriver(ScfDriver):
         return effmat_a, effmat_b
 
     def gen_molecular_orbitals(self, fock_mat, oao_mat):
-        """Generates spin unrestricted molecular orbitals.
-
+        """
         Generates spin unrestricted molecular orbital by diagonalizing
         spin unrestricted open shell Fock/Kohn-Sham matrix. Overloaded base
         class method.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        MolecularOrbitals
+        :return:
             The molecular orbitals.
         """
 
@@ -269,22 +237,17 @@ class ScfUnrestrictedDriver(ScfDriver):
         return MolecularOrbitals()
 
     def compute_s2(self, molecule, smat, mol_orbs):
-        """Computes expectation value <S**2>
-
+        """
         Computes expectation value of the S**2 operator.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        smat
+        :param smat:
             The overlap matrix (numpy array).
-        mol_orbs
+        :param mol_orbs:
             The molecular orbitals.
 
-        Returns
-        -------
-        float
+        :return:
             Expectation value <S**2>.
         """
 
@@ -303,14 +266,11 @@ class ScfUnrestrictedDriver(ScfDriver):
         return s2
 
     def get_scf_type(self):
-        """Gets string for spin unrestricted open shell SCF calculation.
-
+        """
         Gets string for spin unrestricted open shell SCF calculation.
         Overloaded base class method.
 
-        Returns
-        -------
-        str
+        :return:
             The string for spin unrestricted open shell SCF calculation.
         """
 

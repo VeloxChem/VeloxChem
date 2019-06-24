@@ -15,24 +15,19 @@ def _MolecularBasis_read(mol,
                          basis_name,
                          basis_path='.',
                          ostream=OutputStream()):
-    """Reads AO basis set from file.
-
+    """
     Reads AO basis set from file.
 
-    Parameters
-    ----------
-    mol
+    :param mol:
         The molecule.
-    basis_name
+    :param basis_name:
         Name of the basis set.
-    basis_path
+    :param basis_path:
         Path to the basis set.
-    ostream
+    :param ostream:
         The outputstream.
 
-    Returns
-    -------
-    MolecularBasis
+    :return:
         The AO basis set.
     """
 

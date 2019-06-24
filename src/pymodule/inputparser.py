@@ -6,34 +6,28 @@ from .errorhandler import assert_msg_critical
 
 
 class InputParser:
-    """Implements the input parser.
-
+    """
     Implements the input parser and provides functions for parsing VeloxChem
     input files into a format, which passes the needed information to the rest
     of the program.
 
-    Attributes
-    ----------
-    input_dict
+    :param input_dict:
         The input dictionary.
-    success_monitor
+    :param success_monitor:
         The monitor for successful parsing.
-    filename
+    :param filename:
         The name of the input file.
-    is_basis_set
+    :param is_basis_set:
         The flag for parsing a basis set file.
-    basis_set_name
+    :param basis_set_name:
         The name of the basis set.
     """
 
     def __init__(self, filename):
-        """Initializes the parser and parses the input file.
-
+        """
         Initializes the parser and parses the input file.
 
-        Parameters
-        ----------
-        filename
+        :param filename:
             The name of the input file.
         """
 
@@ -49,8 +43,7 @@ class InputParser:
     # defining main functions
 
     def parse(self):
-        """Parses the input file.
-
+        """
         Calls every function needed for the parsing process depending on
         the success of the parsing in different stages.
         """
@@ -93,21 +86,17 @@ class InputParser:
             self.convert_dict()
 
     def get_dict(self):
-        """Gets the input dictonary.
-
+        """
         Gets the input dictonary.
 
-        Returns
-        -------
-        dict
+        :return:
             A dictionary containing all information form the input file.
         """
 
         return self.input_dict
 
     def read_file(self):
-        """Reads and stores content of selected file as a string type.
-
+        """
         Reads and stores content of selected file as a string type. Deletes
         comments (marked by '!') and unnecassary whitespace.
         """
@@ -136,8 +125,7 @@ class InputParser:
                     self.content += line + os.linesep
 
     def incomplete_group_check(self):
-        """Checks for any incomplete groups.
-
+        """
         Checks for any incomplete groups.
         """
 
@@ -150,8 +138,7 @@ class InputParser:
             raise SyntaxError
 
     def empty_group_check(self):
-        """Checks for any empty groups.
-
+        """
         Checks for any empty groups.
         """
 
@@ -160,8 +147,7 @@ class InputParser:
             raise SyntaxError
 
     def clear_interspace(self):
-        """Deletes content, that's not within a group.
-
+        """
         Deletes content that is not within a group.
         """
 
@@ -169,8 +155,7 @@ class InputParser:
                               self.content)
 
     def groupsplit(self):
-        """Creates a list of list for all groups.
-
+        """
         Creates a list in which every element is a list itself containing
         every line of a group, while deleting '@' and '@end' tags.
         """
@@ -181,8 +166,7 @@ class InputParser:
             self.grouplist[i] = self.grouplist[i].split(os.linesep)[:-1]
 
     def convert_dict(self):
-        """Converting the list of lists into a dictionary.
-
+        """
         Converting the list of lists into a dictionary with groupnames as
         keys and group content as a dictionary itself. The geometry definition
         of the molecule group is stored in a different dictionary. Converting
@@ -249,14 +233,11 @@ class InputParser:
 
 
 def parse_frequencies(input_frequencies):
-    """Parses frequencies input for response solver.
-
+    """
     Parses frequencies input for response solver.
     Input example: "0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0"
 
-    Parameters
-    ----------
-    input_frequencies
+    :param input_frequencies:
         The string of input frequencies.
     """
 

@@ -14,56 +14,50 @@ from .inputparser import parse_frequencies
 
 
 class LinearResponseSolver:
-    """Implements linear response solver.
-
+    """
     Implements linear response solver.
 
-    Attributes
-    ----------
-    a_operator
+    :param a_operator:
         The A operator
-    a_components
+    :param a_components:
         Cartesian components of the A operator
-    b_operator
+    :param b_operator:
         The B operator
-    b_components
+    :param b_components:
         Cartesian components of the B operator
-    frequencies
+    :param frequencies:
         The frequencies.
-    eri_thresh
+    :param eri_thresh:
         The electron repulsion integrals screening threshold.
-    qq_type
+    :param qq_type:
         The electron repulsion integrals screening scheme.
-    conv_thresh
+    :param conv_thresh:
         The convergence threshold for the solver.
-    max_iter
+    :param max_iter:
         The maximum number of solver iterations.
-    cur_iter
+    :param cur_iter:
         Index of the current iteration.
-    small_thresh
+    :param small_thresh:
         The norm threshold for a vector to be considered a zero vector.
-    is_converged
+    :param is_converged:
         The flag for convergence.
-    comm
+    :param comm:
         The MPI communicator.
-    rank
+    :param rank:
         The MPI rank.
-    nodes
+    :param nodes:
         Number of MPI processes.
-    ostream
+    :param ostream:
         The output stream.
     """
 
     def __init__(self, comm, ostream):
-        """Initializes linear response solver.
-
+        """
         Initializes linear response solver to default setup.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -94,13 +88,10 @@ class LinearResponseSolver:
         self.ostream = ostream
 
     def update_settings(self, settings):
-        """Updates settings in linear response solver.
-
+        """
         Updates settings in linear response solver.
 
-        Parameters
-        ----------
-        settings
+        :param settings:
             The settings dictionary.
         """
 
@@ -126,22 +117,17 @@ class LinearResponseSolver:
             self.max_iter = int(settings['max_iter'])
 
     def compute(self, molecule, basis, scf_tensors):
-        """Performs linear response calculation.
-
+        """
         Performs linear response calculation for a molecule and a basis set.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        basis
+        :param basis:
             The AO basis set.
-        scf_tensors
+        :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
 
-        Returns
-        -------
-        dict
+        :return:
             A dictionary containing properties.
         """
 
@@ -266,15 +252,12 @@ class LinearResponseSolver:
             return None
 
     def print_iteration(self, relative_residual_norm, nvs):
-        """Prints information of the iteration.
-
+        """
         Prints information of the iteration.
 
-        Parameters
-        ----------
-        relative_residual_norm
+        :param relative_residual_norm:
             Relative residual norms.
-        nvs
+        :param nvs:
             A list of tuples containing operator component, frequency, and
             property.
         """
@@ -296,8 +279,7 @@ class LinearResponseSolver:
         self.ostream.flush()
 
     def print_convergence(self):
-        """Prints information after convergence.
-
+        """
         Prints information after convergence.
         """
 
@@ -312,13 +294,10 @@ class LinearResponseSolver:
         self.ostream.print_blank()
 
     def check_convergence(self, relative_residual_norm):
-        """Checks convergence.
-
+        """
         Checks convergence.
 
-        Parameters
-        ----------
-        relative_residual_norm
+        :param relative_residual_norm:
             Relative residual norms.
         """
 
@@ -331,27 +310,22 @@ class LinearResponseSolver:
                                             root=mpi_master())
 
     def initial_guess(self, freqs, V1, od, sd, td):
-        """Creating initial guess.
-
+        """
         Creating initial guess for the linear response solver.
 
-        Parameters
-        ----------
-        freq
+        :param freq:
             The frequencies.
-        V1
+        :param V1:
             The dictionary containing operator components (key) and right-hand
             sides (values).
-        od
+        :param od:
             The array of E0 diagonal elements.
-        sd
+        :param sd:
             The array of S0 diagonal elements.
-        td
+        :param td:
             The preconditioner.
 
-        Returns
-        -------
-        dict
+        :return:
             The initial guess.
         """
 
@@ -368,24 +342,19 @@ class LinearResponseSolver:
         return ig
 
     def setup_trials(self, vectors, td=None, b=None, renormalize=True):
-        """Computes orthonormalized trial vectors.
-
+        """
         Computes orthonormalized trial vectors.
 
-        Parameters
-        ----------
-        vectors
+        :param vectors:
             The set of vectors.
-        td
+        :param td:
             The preconditioner.
-        b
+        :param b:
             The subspace.
-        renormalize
+        :param renormalize:
             The flag for normalization.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The orthonormalized trial vectors.
         """
 

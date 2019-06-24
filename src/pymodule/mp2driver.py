@@ -6,34 +6,28 @@ from .subcommunicators import SubCommunicators
 
 
 class Mp2Driver:
-    """Implements MP2 driver.
-
+    """
     Implements MP2 driver.
 
-    Attributes
-    ----------
-    e_mp2
+    :param e_mp2:
         The MP2 correlation energy.
-    comm
+    :param comm:
         The MPI communicator.
-    rank
+    :param rank:
         The MPI rank.
-    nodes
+    :param nodes:
         Number of MPI processes.
-    ostream
+    :param ostream:
         The output stream.
     """
 
     def __init__(self, comm, ostream):
-        """Initializes MP2 driver.
-
+        """
         Initializes MP2 driver.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -48,17 +42,14 @@ class Mp2Driver:
         self.ostream = ostream
 
     def compute(self, molecule, ao_basis, mol_orbs):
-        """Performs MP2 calculation.
-
+        """
         Performs MP2 calculation.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis set.
-        mol_orbs
+        :param mol_orbs:
             The molecular orbitals.
         """
 

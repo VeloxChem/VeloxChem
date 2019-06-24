@@ -8,24 +8,20 @@ from .c2diis import CTwoDiis
 
 
 class ScfRestrictedDriver(ScfDriver):
-    """Implements spin restricted closed shell SCF method (derrived class).
-
+    """
     Implements spin restricted closed shell SCF method with C2-DIIS and
     two-level C2-DIIS convergence accelerators.
     """
 
     def __init__(self, comm, ostream):
-        """Initializes spin restricted closed shell SCF driver.
-
+        """
         Initializes spin restricted closed shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -34,25 +30,20 @@ class ScfRestrictedDriver(ScfDriver):
         self.restricted = True
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
-        """Computes spin restricted closed shell electronic gradient.
-
+        """
         Computes spin restricted closed shell electronic gradient using
         Fock/Kohn-Sham matrix. Overloaded base class method.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        ovl_mat
+        :param ovl_mat:
             The overlap matrix.
-        den_mat
+        :param den_mat:
             The density matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        float
+        :return:
             The electronic gradient.
         """
 
@@ -75,21 +66,16 @@ class ScfRestrictedDriver(ScfDriver):
         return e_grad
 
     def comp_density_change(self, den_mat, old_den_mat):
-        """Computes norm of spin restricted closed shell density change.
-
+        """
         Computes norm of spin restricted closed shell density change between
         two density matrices. Overloaded base class method.
 
-        Parameters
-        ----------
-        den_mat
+        :param den_mat:
             The current density matrix.
-        old_den_mat
+        :param old_den_mat:
             The previous density matrix.
 
-        Returns
-        -------
-        float
+        :return:
             The norm of change between two density matrices.
         """
 
@@ -106,19 +92,16 @@ class ScfRestrictedDriver(ScfDriver):
         return diff_den
 
     def store_diis_data(self, i, fock_mat, den_mat):
-        """Stores spin restricted closed shell Fock/Kohn-Sham and density
-        matrices for current iteration.
+        """        matrices for current iteration.
 
         Stores spin restricted closed shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
 
-        Parameters
-        ----------
-        i
+        :param i:
             The number of current SCF iteration.
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        den_mat
+        :param den_mat:
             The density matrix.
         """
 
@@ -135,25 +118,20 @@ class ScfRestrictedDriver(ScfDriver):
                 self.den_matrices.append(den_mat.alpha_to_numpy(0))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """Computes effective spin restricted closed shell Fock/Kohn-Sham
-        matrix in OAO basis.
+        """        matrix in OAO basis.
 
         Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
         in OAO basis by applying Lowdin or canonical orthogonalization to AO
         Fock/Kohn-Sham matrix. Overloaded base class method.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        ovl_mat
+        :param ovl_mat:
             The overlap matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The effective Fock/Kohn-Sham matrix.
         """
 
@@ -180,19 +158,14 @@ class ScfRestrictedDriver(ScfDriver):
         return None
 
     def get_scaled_fock(self, weights):
-        """Computes scaled spin restricted closed shell Fock/Kohn-Sham matrix.
-
+        """
         Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
         by summing Fock/Kohn-Sham matrices scalwd with weigths.
 
-        Parameters
-        ----------
-        weights
+        :param weights:
             The weights of Fock/Kohn-Sham matrices.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The scaled Fock/Kohn-Sham matrix.
         """
 
@@ -205,22 +178,17 @@ class ScfRestrictedDriver(ScfDriver):
         return effmat
 
     def gen_molecular_orbitals(self, fock_mat, oao_mat):
-        """Generates spin restricted molecular orbitals.
-
+        """
         Generates spin restricted molecular orbital by diagonalizing
         spin restricted closed shell Fock/Kohn-Sham matrix. Overloaded base
         class method.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        MolecularOrbitals
+        :return:
             The molecular orbitals.
         """
 
@@ -241,14 +209,11 @@ class ScfRestrictedDriver(ScfDriver):
         return MolecularOrbitals()
 
     def get_scf_type(self):
-        """Gets string for spin restricted closed shell SCF calculation.
-
+        """
         Gets string for spin restricted closed shell SCF calculation.
         Overloaded base class method.
 
-        Returns
-        -------
-        str
+        :return:
             The string for spin restricted closed shell SCF calculation.
         """
 

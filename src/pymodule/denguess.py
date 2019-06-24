@@ -9,13 +9,10 @@ from .aodensitymatrix import AODensityMatrix
 
 
 class DensityGuess:
-    """Implements initial density guess generator.
-
+    """
     Implements initial density guess generator with set of different methods
     for generation of initial density.
 
-    Attributes
-    ----------
     _guess_type
         The type of initial guess.
     _checkpoint_file
@@ -23,16 +20,13 @@ class DensityGuess:
     """
 
     def __init__(self, guess_type='SAD', checkpoint_file=None):
-        """Initializes initial guess generator.
-
+        """
         Initializes initial guess generator by setting initial guess type.
         Default for initial guess type is a superposition of atomic densities.
 
-        Parameters
-        ----------
-        guess_type
+        :param guess_type:
             The type of initial guess.
-        checkpoint_file
+        :param checkpoint_file:
             The name of checkpoint file.
         """
 
@@ -40,54 +34,45 @@ class DensityGuess:
         self._checkpoint_file = checkpoint_file
 
     def __str__(self):
-        """Converts object to it's informal string.
-
+        """
         Converts object to it's informal string.
         """
         return self._guess_type
 
     def __repr__(self):
-        """Converts object to it's formal string.
-
+        """
         Converts object to it's formal string.
         """
         return self._guess_type
 
     @property
     def guess_type(self):
-        """Getter function for protected guess_type attribute.
-
+        """
         Getter function for protected guess_type attribute.
         """
         return self._guess_type
 
     @guess_type.setter
     def guess_type(self, value):
-        """Setter function for protected guess_type attribute.
-
+        """
         Setter function for protected guess_type attribute.
         """
         self._guess_type = value
 
     def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set):
-        """Validates the checkpoint file.
-
+        """
         Validates the checkpoint file by checking nuclear charges and basis set.
 
-        Parameters
-        ----------
-        rank
+        :param rank:
             The rank of the MPI process.
-        comm
+        :param comm:
             The MPI communicator.
-        nuclear_charges
+        :param nuclear_charges:
             Numpy array of the nuclear charges.
-        basis_set
+        :param basis_set:
             Name of the AO basis.
 
-        Returns
-        -------
-        bool
+        :return:
             Validity of the checkpoint file.
         """
 
@@ -103,22 +88,17 @@ class DensityGuess:
         return valid
 
     def restart_density(self, molecule, rank, ostream):
-        """Reads initial AO density from checkpoint file.
-
+        """
         Reads initial molecular orbitals and AO density from checkpoint file.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        rank
+        :param rank:
             The rank of the MPI process.
-        ostream
+        :param ostream:
             The output stream.
 
-        Returns
-        -------
-        AODensityMatrix
+        :return:
             The AO density matrix to restart from.
         """
 
@@ -138,31 +118,26 @@ class DensityGuess:
 
     def sad_density(self, molecule, ao_basis, min_basis, overlap_matrix,
                     restricted, comm, ostream):
-        """Generates initial AO density using SAD scheme.
-
+        """
         Computes initial AO density using superposition of atomic densities
         scheme.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis.
-        min_basis
+        :param min_basis:
             The minimal AO basis for generation of atomic densities.
-        overlap_matrix
+        :param overlap_matrix:
             The AO overlap matrix.
-        restricted
+        :param restricted:
             The flag for generating restricted initial guess.
-        comm
+        :param comm:
             The local MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
 
-        Returns
-        -------
-        AODensityMatrix
+        :return:
             The AO density matrix from SAD initial guess.
         """
 
@@ -193,26 +168,21 @@ class DensityGuess:
         return AODensityMatrix()
 
     def prcmo_density(self, molecule, ao_basis, red_basis, red_orbs):
-        """Generates initial AO density using PRCMO scheme.
-
+        """
         Computes initial AO density from molecular orbitals obtained by
         inserting molecular orbitals from reduced basis into molecular
         orbitals in full AO basis.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis.
-        red_basis
+        :param red_basis:
             The reduced AO basis for generation of molecular orbitals.
-        red_orbs
+        :param red_orbs:
             The molecular orbitals in reduced AO basis.
 
-        Returns
-        -------
-        AODensityMatrix
+        :return:
             The AO density matrix from PRCMO.
         """
 

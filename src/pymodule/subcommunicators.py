@@ -3,28 +3,22 @@ from .errorhandler import assert_msg_critical
 
 
 class SubCommunicators:
-    """Implements the MPI subcommunicator.
-
+    """
     Implements the MPI subcommunicator.
 
-    Attributes
-    ----------
-    local_comm
+    :param local_comm:
         The local subcommunicator.
-    cross_comm
+    :param cross_comm:
         The cross subcommunicator consisting of the local master nodes.
     """
 
     def __init__(self, global_comm, grps):
-        """Initializes the MPI subcommunicator.
-
+        """
         Initializes the MPI subcommunicator.
 
-        Parameters
-        ----------
-        global_comm
+        :param global_comm:
             The global communicator.
-        grps
+        :param grps:
             The color group for creating MPI subcommunicators.
         """
 
@@ -42,8 +36,7 @@ class SubCommunicators:
         self.cross_comm = global_comm.Split(cross_group, global_rank)
 
     def __del__(self):
-        """Deletes the MPI subcommunicator.
-
+        """
         Deletes the MPI subcommunicator.
         """
 

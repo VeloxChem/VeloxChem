@@ -2,25 +2,21 @@ import numpy as np
 
 
 class BlockDavidsonSolver:
-    """Implements block Davidson solver.
-
+    """
     Implements block Davidson solver for symmetric eigenvalues/eigenvectors
     problems i.e. A * X = e X.
     Reference: SIAM J. Sci. Comput. 15 (1994), 62-76.
     """
 
     def __init__(self):
-        """Initializes block Davidson solver.
-
+        """
         Initializes block Davidson sover to default setup.
 
-        Attributes
-        ----------
-        neigenpairs
+        :param neigenpairs:
             The number of eigenpairs of A matrix determined by solver.
-        sigma_matrices
+        :param sigma_matrices:
             The sigma vectors A * X in matrix format {A * X_0, A * X_1,...}.
-        trial_matrices
+        :param trial_matrices:
             The trial vectors in matrix format {X_0, X_1,...}.
         """
 
@@ -40,18 +36,15 @@ class BlockDavidsonSolver:
         self.ritz_vectors = None
 
     def add_iteration_data(self, sig_mat, trial_mat, iteration):
-        """Adds sigma and trial vectors to sigma and trial matrices.
-
+        """
         Add sigma and trial vectors to sigma and trial matrices for specific
         iteration.
 
-        Parameters
-        ----------
-        sig_mat
+        :param sig_mat:
             The sigma vectors {A * X_i} i = 0..l.
-        trial_mat
+        :param trial_mat:
             The trial vectors {X_i} i = 0..l.
-        iteration
+        :param iteration:
             The index of block Davidson iteration.
         """
 
@@ -64,20 +57,15 @@ class BlockDavidsonSolver:
             self.trial_matrices = np.hstack((self.trial_matrices, trial_mat))
 
     def compute(self, diag_mat):
-        """Computes new set of trial vectors by solving eigenvalues problem in
-        reduced space.
+        """        reduced space.
 
         Computes new set of trial vectors by solving eigenvalues problem by
         diagonalizing interaction matrix in reduced space.
 
-        Parameters
-        ----------
-        diag_mat
+        :param diag_mat:
             The approximate diagonal of symmetric A matrix as column matrix.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The new set of trial vectors.
         """
 
@@ -91,20 +79,15 @@ class BlockDavidsonSolver:
         return tvecs
 
     def check_convergence(self, conv_thresh):
-        """Checks if residual norm is bellow given convergence threshold for all
-            eigenpairs.
+        """            eigenpairs.
 
         Checks if residual norm is bellow given convergence threshold for all
         requested eigenpairs of symmetric A matrix.
 
-        Parameters
-        ----------
-        conv_thresh
+        :param conv_thresh:
             The approximate diagonal of symmetric A matrix as column matrix.
 
-        Returns
-        -------
-        bool
+        :return:
             The true if residual norms are converged for all eigenpairs,
             false otherwise.
         """
@@ -116,50 +99,40 @@ class BlockDavidsonSolver:
         return True
 
     def reduced_space_size(self):
-        """Gets number of trial vectors in residual space.
-
+        """
         Gets number of trial vectors in residual space.
 
-        Returns
-        -------
-        int
+        :return:
             The number of trial vectors in residual space.
         """
 
         return self.trial_matrices.shape[1]
 
     def max_min_residual_norms(self):
-        """Determines maximum and minumum residual norms.
-
+        """
         Determines maximum and minumum residual norms within set of requested
         eigenpairs.
 
-        Returns
-        -------
-        tuple
+        :return:
             tuple (max. residual norm, min. residual norm).
         """
 
         return (np.amax(self.residual_norms), np.amin(self.residual_norms))
 
     def get_eigenvalues(self):
-        """Gets smallest eigenvalues of symmetric A matrix and associated
-        residual norms.
+        """        residual norms.
 
         Gets smallest eigenvalues of symmetric A matrix and associated
         residual norms.
 
-        Returns
-        -------
-        tuple
+        :return:
             tuple (eigenvalues, residual norms).
         """
 
         return (self.residual_eigs, self.residual_norms)
 
     def comp_residual_vectors(self):
-        """Computes residual vectors and their norms.
-
+        """
         Computes residual vectors and their norms by diagonalizing interaction
         matrix in reduced space.
         """
@@ -180,19 +153,14 @@ class BlockDavidsonSolver:
         self.residual_norms = np.linalg.norm(self.residual_matrices, axis=0)
 
     def comp_trial_vectors(self, diag_mat):
-        """Computes new trial vectors.
-
+        """
         Computes new trial vectors by applying Davidson preconditioner to
         residual vectors.
 
-        Parameters
-        ----------
-        diag_mat
+        :param diag_mat:
             The approximate diagonal of symmetric A matrix as column matrix.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The trial vectors.
         """
 
@@ -207,15 +175,12 @@ class BlockDavidsonSolver:
         return tvecs
 
     def project_trial_vectors(self, tvecs):
-        """Projects out trial vector components already present in reduced
-        space expansion.
+        """        space expansion.
 
         Projects out trial vector components already present in reduced space
         expansion and renormalizes resulting trial vectors.
 
-        Parameters
-        ----------
-        tvecs
+        :param tvecs:
             The trial vectors.
         """
 
@@ -229,13 +194,10 @@ class BlockDavidsonSolver:
         self.norm_vectors(tvecs)
 
     def orthogonalize_gram_schmidt(self, tvecs):
-        """Applies modified Gram Schmidt orthogonalization to trial vectors.
-
+        """
         Applies modified Gram Schmidt orthogonalization to trial vectors.
 
-        Parameters
-        ----------
-        tvecs
+        :param tvecs:
             The trial vectors.
         """
 
@@ -253,13 +215,10 @@ class BlockDavidsonSolver:
                 tvecs[:, i] *= f
 
     def norm_vectors(self, tvecs):
-        """Normalizes to trial vectors.
-
+        """
         Normalizes set of tria vectors by inner product.
 
-        Parameters
-        ----------
-        tvecs
+        :param tvecs:
             The trial vectors.
         """
 

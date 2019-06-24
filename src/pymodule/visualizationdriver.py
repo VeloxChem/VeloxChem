@@ -9,24 +9,19 @@ from .errorhandler import assert_msg_critical
 
 @staticmethod
 def _VisualizationDriver_gen_cubic_grid(molecule, n_x=80, n_y=80, n_z=80):
-    """Creates cubic grid.
-
+    """
     Creates cubic grid for a molecule.
 
-    Parameters
-    ----------
-    molecule
+    :param molecule:
         The molecule.
-    n_x
+    :param n_x:
         Number of grid points in X direction.
-    n_y
+    :param n_y:
         Number of grid points in Y direction.
-    n_z
+    :param n_z:
         Number of grid points in Z direction.
 
-    Returns
-    -------
-    CubicGrid
+    :return:
         The cubic grid.
     """
 
@@ -56,23 +51,20 @@ def _VisualizationDriver_gen_cubic_grid(molecule, n_x=80, n_y=80, n_z=80):
 @staticmethod
 def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
                                     spin):
-    """Writes cubic grid data to cube file.
-
+    """
     Writes cubic grid data to cube file.
 
-    Parameters
-    ----------
-    cubefile
+    :param cubefile:
         Name of the cube file.
-    grid
+    :param grid:
         The cubic grid.
-    molecule
+    :param molecule:
         The molecule.
-    flag
+    :param flag:
         The flag for molecular orbitals ('mo') or density ('density').
-    index
+    :param index:
         Index (0-based) of the molecular orbital or density matrix.
-    spin
+    :param spin:
         Spin of the molecular orbital or density.
     """
 
@@ -130,21 +122,18 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
 
 def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
                                    density):
-    """Computes and writes cube file.
-
+    """
     Computes and writes cube file.
 
-    Parameters
-    ----------
-    cube_dict
+    :param cube_dict:
         The input dictionary of cube options.
-    molecule
+    :param molecule:
         The molecule.
-    basis
+    :param basis:
         The AO basis set.
-    mol_orbs
+    :param mol_orbs:
         The molecular orbitals.
-    density
+    :param density:
         The density matrix.
     """
 

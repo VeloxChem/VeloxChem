@@ -16,28 +16,22 @@ from .errorhandler import assert_msg_critical
 
 
 class LinearResponseMatrixVectorDriver:
-    """Implements linear response matrix-vector driver.
-
+    """
     Implements linear response matrix-vector driver.
 
-    Attributes
-    ----------
-    comm
+    :param comm:
         The MPI communicator.
-    rank
+    :param rank:
         The MPI rank.
-    nodes
+    :param nodes:
         Number of MPI processes.
     """
 
     def __init__(self, comm):
-        """Initializes linear response matrix vector driver.
-
+        """
         Initializes linear response matrix vector driver to default setup.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
         """
 
@@ -47,26 +41,21 @@ class LinearResponseMatrixVectorDriver:
         self.nodes = self.comm.Get_size()
 
     def e2n(self, vecs, tensors, screening, molecule, basis):
-        """Computes the E2 b matrix vector product.
-
+        """
         Computes the E2 b matrix vector product.
 
-        Parameters
-        ----------
-        vecs
+        :param vecs:
             The trial vectors.
-        tensors
+        :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        screening
+        :param screening:
             The electron repulsion integrals screening pattern.
-        molecule
+        :param molecule:
             The molecule.
-        basis
+        :param basis:
             The AO basis set.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The E2 b matrix vector product.
         """
 
@@ -125,24 +114,19 @@ class LinearResponseMatrixVectorDriver:
             return None
 
     def get_two_el_fock(self, dabs, screening, molecule, basis):
-        """Computes two electron contribution to Fock.
-
+        """
         Computes two electron contribution to Fock.
 
-        Parameters
-        ----------
-        dabs
+        :param dabs:
             The tuple containing alpha and beta density matrices.
-        screening
+        :param screening:
             The electron repulsion integrals screening pattern.
-        molecule
+        :param molecule:
             The molecule.
-        basis
+        :param basis:
             The AO basis set.
 
-        Returns
-        -------
-        tuple
+        :return:
             The tuple containing alpha and beta Fock matrices.
         """
 
@@ -202,22 +186,17 @@ class LinearResponseMatrixVectorDriver:
             return None
 
     def s2n(self, vecs, tensors, nocc):
-        """Computes the S2 b matrix vector product.
-
+        """
         Computes the S2 b matrix vector product.
 
-        Parameters
-        ----------
-        vecs
+        :param vecs:
             The trial vectors.
-        tensors
+        :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        nocc
+        :param nocc:
             Number of occupied orbitals.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The S2 b matrix vector product.
         """
 
@@ -246,30 +225,25 @@ class LinearResponseMatrixVectorDriver:
 
 
 def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
-    """Creates right-hand side of linear response equations.
-
+    """
     Creates right-hand side of linear response equations.
 
-    Parameters
-    ----------
-    operator
+    :param operator:
         The string for the operator.
-    components
+    :param components:
         The string for Cartesian components.
-    molecule
+    :param molecule:
         The molecule.
-    basis
+    :param basis:
         The AO basis set.
-    scf_tensors
+    :param scf_tensors:
         The dictionary of tensors from converged SCF wavefunction.
-    rank
+    :param rank:
         Rank of the MPI process.
-    comm
+    :param comm:
         The MPI communicator.
 
-    Returns
-    -------
-    tuple
+    :return:
         The right-hand sides (gradients).
     """
 
@@ -335,22 +309,17 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
 
 
 def lrvec2mat(vec, nocc, norb):
-    """Converts vectors to matrices.
-
+    """
     Converts vectors to matrices.
 
-    Parameters
-    ----------
-    vec
+    :param vec:
         The vectors.
-    nocc
+    :param nocc:
         Number of occupied orbitals.
-    norb
+    :param norb:
         Number of orbitals.
 
-    Returns
-    -------
-    numpy.ndarray
+    :return:
         The matrices.
     """
 
@@ -374,22 +343,17 @@ def lrvec2mat(vec, nocc, norb):
 
 
 def lrmat2vec(mat, nocc, norb):
-    """Converts matrices to vectors.
-
+    """
     Converts matrices to vectors.
 
-    Parameters
-    ----------
-    mat
+    :param mat:
         The matrices.
-    nocc
+    :param nocc:
         Number of occupied orbitals.
-    norb
+    :param norb:
         Number of orbitals.
 
-    Returns
-    -------
-    numpy.ndarray
+    :return:
         The vectors.
     """
 
@@ -403,20 +367,15 @@ def lrmat2vec(mat, nocc, norb):
 
 
 def truncate_and_normalize(basis, small_threshold):
-    """Removes linear dependence and normalizes the vectors.
-
+    """
     Removes linear dependence and normalizes the vectors.
 
-    Parameters
-    ----------
-    basis
+    :param basis:
         The set of vectors.
-    small_threshold
+    :param small_threshold:
         Threshold for adding vectors and removing linear dependence.
 
-    Returns
-    -------
-    numpy.ndarray
+    :return:
         The new set of vectors.
     """
 
@@ -433,20 +392,15 @@ def truncate_and_normalize(basis, small_threshold):
 
 
 def remove_linear_dependence(basis, threshold):
-    """Removes linear dependence in a set of vectors.
-
+    """
     Removes linear dependence in a set of vectors.
 
-    Parameters
-    ----------
-    basis
+    :param basis:
         The set of vectors.
-    threshold
+    :param threshold:
         The threshold for removing linear dependence.
 
-    Returns
-    -------
-    numpy.ndarray
+    :return:
         The new set of vectors.
     """
 
@@ -458,22 +412,17 @@ def remove_linear_dependence(basis, threshold):
 
 
 def construct_ed_sd(orb_ene, nocc, norb):
-    """Gets the E0 and S0 diagonal elements as arrays.
-
+    """
     Gets the E0 and S0 diagonal elements as arrays.
 
-    Parameters
-    ----------
-    orb_ene
+    :param orb_ene:
         Orbital energies.
-    nocc
+    :param nocc:
         Number of occupied orbitals.
-    norb
+    :param norb:
         Number of orbitals.
 
-    Returns
-    -------
-    tuple
+    :return:
         The E0 and S0 diagonal elements as numpy arrays.
     """
 
@@ -492,18 +441,13 @@ def construct_ed_sd(orb_ene, nocc, norb):
 
 
 def swap_xy(xy):
-    """Swaps X and Y parts of response vector.
-
+    """
     Swaps X and Y parts of response vector.
 
-    Parameters
-    ----------
-    xy
+    :param xy:
         The vector.
 
-    Returns
-    -------
-    numpy.ndarray
+    :return:
         The vector with X and Y parts swapped.
     """
 

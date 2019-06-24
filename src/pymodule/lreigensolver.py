@@ -18,48 +18,42 @@ from .errorhandler import assert_msg_critical
 
 
 class LinearResponseEigenSolver:
-    """Implements linear response eigensolver.
-
+    """
     Implements linear response eigensolver.
 
-    Attributes
-    ----------
-    nstates
+    :param nstates:
         Number of excited states.
-    eri_thresh
+    :param eri_thresh:
         The electron repulsion integrals screening threshold.
-    qq_type
+    :param qq_type:
         The electron repulsion integrals screening scheme.
-    conv_thresh
+    :param conv_thresh:
         The convergence threshold for the solver.
-    max_iter
+    :param max_iter:
         The maximum number of solver iterations.
-    cur_iter
+    :param cur_iter:
         Index of the current iteration.
-    small_thresh
+    :param small_thresh:
         The norm threshold for a vector to be considered a zero vector.
-    is_converged
+    :param is_converged:
         The flag for convergence.
-    comm
+    :param comm:
         The MPI communicator.
-    rank
+    :param rank:
         The MPI rank.
-    nodes
+    :param nodes:
         Number of MPI processes.
-    ostream
+    :param ostream:
         The output stream.
     """
 
     def __init__(self, comm, ostream):
-        """Initializes linear response eigensolver.
-
+        """
         Initializes linear response eigensolver to default setup.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -86,13 +80,10 @@ class LinearResponseEigenSolver:
         self.ostream = ostream
 
     def update_settings(self, settings):
-        """Updates settings in linear response eigensolver.
-
+        """
         Updates settings in linear response eigensolver.
 
-        Parameters
-        ----------
-        settings
+        :param settings:
             The settings dictionary.
         """
 
@@ -110,22 +101,17 @@ class LinearResponseEigenSolver:
             self.max_iter = int(settings['max_iter'])
 
     def compute(self, molecule, basis, scf_tensors):
-        """Performs linear response calculation.
-
+        """
         Performs linear response calculation for a molecule and a basis set.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        basis
+        :param basis:
             The AO basis set.
-        scf_tensors
+        :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
 
-        Returns
-        -------
-        dict
+        :return:
             A dictionary containing eigenvalues, eigenvectors, transition
             dipole moments, oscillator strengths and rotatory strengths.
         """
@@ -306,8 +292,7 @@ class LinearResponseEigenSolver:
             return {}
 
     def print_header(self):
-        """Prints linear response eigensolver setup header to output stream.
-
+        """
         Prints linear response eigensolver setup header to output stream.
         """
 
@@ -337,15 +322,12 @@ class LinearResponseEigenSolver:
         self.ostream.flush()
 
     def print_iteration(self, relative_residual_norm, ws):
-        """Prints information of the iteration.
-
+        """
         Prints information of the iteration.
 
-        Parameters
-        ----------
-        relative_residual_norm
+        :param relative_residual_norm:
             Relative residual norms.
-        ws
+        :param ws:
             Excitation energies.
         """
 
@@ -366,8 +348,7 @@ class LinearResponseEigenSolver:
         self.ostream.flush()
 
     def print_convergence(self):
-        """Prints information after convergence.
-
+        """
         Prints information after convergence.
         """
 
@@ -382,13 +363,10 @@ class LinearResponseEigenSolver:
         self.ostream.print_blank()
 
     def check_convergence(self, relative_residual_norm):
-        """Checks convergence.
-
+        """
         Checks convergence.
 
-        Parameters
-        ----------
-        relative_residual_norm
+        :param relative_residual_norm:
             Relative residual norms.
         """
 
@@ -401,24 +379,19 @@ class LinearResponseEigenSolver:
                                             root=mpi_master())
 
     def initial_excitations(self, nstates, ea, nocc, norb):
-        """Gets initial guess for excitations.
-
+        """
         Gets initial guess for excitations.
 
-        Parameters
-        ----------
-        nstates
+        :param nstates:
             Number of excited states.
-        ea
+        :param ea:
             Orbital energies.
-        nocc
+        :param nocc:
             Number of occupied orbitals.
-        norb
+        :param norb:
             Number of orbitals.
 
-        Returns
-        -------
-        list
+        :return:
             A list of initial excitations (excitation energy and vector).
         """
 
@@ -440,24 +413,19 @@ class LinearResponseEigenSolver:
         return final
 
     def setup_trials(self, excitations, tdx=None, b=None, renormalize=True):
-        """Computes orthonormalized trial vectors.
-
+        """
         Computes orthonormalized trial vectors.
 
-        Parameters
-        ----------
-        excitations
+        :param excitations:
             The set of excitations.
-        tdx
+        :param tdx:
             The preconditioner.
-        b
+        :param b:
             The subspace.
-        renormalize
+        :param renormalize:
             The flag for normalization.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The orthonormalized trial vectors.
         """
 

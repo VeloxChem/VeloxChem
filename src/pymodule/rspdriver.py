@@ -7,29 +7,23 @@ from .qqscheme import get_qq_type
 
 
 class ResponseDriver:
-    """Implements response driver.
-
+    """
     Implements response driver for molecular property calculations using
     conventional Hartree-Fock/Kohn-Sham response theory.
 
-    Attributes
-    ----------
-    rank
+    :param rank:
         The rank of MPI process.
-    nodes
+    :param nodes:
         The number of MPI processes.
     """
 
     def __init__(self, comm, ostream):
-        """Initializes response driver.
-
+        """
         Initializes response driver to default setup.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -56,13 +50,10 @@ class ResponseDriver:
         self.ostream = ostream
 
     def update_settings(self, rsp_input):
-        """Updates settings in response solver.
-
+        """
         Updates settings in response solver.
 
-        Parameters
-        ----------
-        rsp_input
+        :param rsp_input:
             The settings dictionary.
         """
 
@@ -99,22 +90,17 @@ class ResponseDriver:
             self.frequencies = rsp_input['frequencies']
 
     def compute(self, molecule, ao_basis, scf_tensors):
-        """Performs molecular property calculation.
-
+        """
         Performs molecular property calculation using molecular data
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis set.
-        scf_tensors
+        :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
 
-        Returns
-        -------
-        dict
+        :return:
             The results from the actual response solver.
         """
 
@@ -162,8 +148,7 @@ class ResponseDriver:
             return lr_solver.compute(molecule, ao_basis, scf_tensors)
 
     def print_header(self):
-        """Prints response driver setup header to output stream.
-
+        """
         Prints molecular property calculation setup details to output stream.
         """
 
@@ -200,14 +185,11 @@ class ResponseDriver:
         self.ostream.flush()
 
     def prop_str(self):
-        """Gets string with type of molecular property calculation.
-
+        """
         Gets string with type of molecular property calculation (Excited
         states, linear and non-linear spectroscopies).
 
-        Returns
-        -------
-        str
+        :return:
             The string with type of molecular property calculation.
         """
 

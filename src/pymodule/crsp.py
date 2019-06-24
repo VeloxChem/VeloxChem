@@ -15,64 +15,58 @@ from .inputparser import parse_frequencies
 
 
 class ComplexResponse:
-    """Implements the complex linear response solver.
-
+    """
     Implements the complex linear response solver.
 
-    Attributes
-    ----------
-    a_operator
+    :param a_operator:
         The A operator
-    a_components
+    :param a_components:
         Cartesian components of the A operator
-    b_operator
+    :param b_operator:
         The B operator
-    b_components
+    :param b_components:
         Cartesian components of the B operator
-    frequencies
+    :param frequencies:
         The frequencies.
-    damping
+    :param damping:
         The damping parameter.
-    qq_type
+    :param qq_type:
         The electron repulsion integrals screening scheme.
-    eri_thresh
+    :param eri_thresh:
         The electron repulsion integrals screening threshold.
-    max_iter
+    :param max_iter:
         The maximum number of solver iterations.
-    conv_thresh
+    :param conv_thresh:
         The convergence threshold for the solver.
-    cur_iter
+    :param cur_iter:
         Index of the current iteration.
-    is_converged
+    :param is_converged:
         The flag for convergence.
-    small_thresh
+    :param small_thresh:
         The norm threshold for a vector to be considered a zero vector.
-    lindep_thresh
+    :param lindep_thresh:
         The threshold for removing linear dependence in the trial vectors.
-    comm
+    :param comm:
         The MPI communicator.
-    rank
+    :param rank:
         The MPI rank.
-    nodes
+    :param nodes:
         Number of MPI processes.
-    ostream
+    :param ostream:
         The output stream.
-    timing
+    :param timing:
         The flag for printing timing information.
-    profiling
+    :param profiling:
         The flag for printing profiling information.
     """
 
     def __init__(self, comm, ostream):
-        """Initializes complex linear response solver.
-
+        """
         Initializes complex linear response solver to default setup.
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -105,13 +99,10 @@ class ComplexResponse:
         self.profiling = False
 
     def update_settings(self, settings):
-        """Updates settings in complex linear response solver.
-
+        """
         Updates settings in complex liner response solver.
 
-        Parameters
-        ----------
-        settings
+        :param settings:
             The settings dictionary.
         """
 
@@ -141,18 +132,13 @@ class ComplexResponse:
             self.profiling = True if key in ['yes', 'y'] else False
 
     def paired(self, v_xy):
-        """Computes paired trial vector.
-
+        """
         Computes paired trial vector.
 
-        Parameters
-        ----------
-        v_xy
+        :param v_xy:
             The trial vector.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The paired trial vector.
         """
 
@@ -164,19 +150,14 @@ class ComplexResponse:
         return v_yx
 
     def decomp_trials(self, vecs):
-        """Decomposes trial vectors into their 4 respective parts.
-
+        """
         Decomposes trial vectors into their 4 respective parts (real gerade,
         real ungerade, imaginary gerade, and imaginary ungerad).
 
-        Parameters
-        ----------
-        vecs
+        :param vecs:
             The trial vectors.
 
-        Returns
-        -------
-        tuple
+        :return:
             A tuple containing respective parts of the trial vectors.
         """
 
@@ -203,22 +184,17 @@ class ComplexResponse:
             imagung).T, np.array(imagger).T
 
     def assemble_subsp(self, realvec, imagvec):
-        """Assembles subspace out of real and imaginary parts of trials.
-
+        """
         Assembles subspace out of real and imaginary parts of trials,
         if their norm exceeds a certain threshold (zero vectors shouldn't
         be added).
 
-        Parameters
-        ----------
-        realvec
+        :param realvec:
             The real part of trial vectors.
-        imagvec
+        :param imagvec:
             The imaginary part of trial vectors.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The assembled trial vectors.
         """
 
@@ -239,18 +215,13 @@ class ComplexResponse:
         return np.array(space).T
 
     def decomp_sym(self, vecs):
-        """Decomposes gradient into gerade and ungerade parts.
-
+        """
         Decomposes gradient into gerade and ungerade parts.
 
-        Parameters
-        ----------
-        vecs
+        :param vecs:
             The trial vectors.
 
-        Returns
-        -------
-        tuple
+        :return:
             A tuple containing gerade and ungerade parts of vectors.
         """
 
@@ -269,18 +240,13 @@ class ComplexResponse:
         return np.array(ger).T, np.array(ung).T
 
     def orthogonalize_gram_schmidt(self, tvecs):
-        """Applies modified Gram Schmidt orthogonalization to trial vectors.
-
+        """
         Applies modified Gram Schmidt orthogonalization to trial vectors.
 
-        Parameters
-        ----------
-        tvecs
+        :param tvecs:
             The trial vectors.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The orthogonalized trial vectors.
         """
 
@@ -300,15 +266,11 @@ class ComplexResponse:
         return tvecs
 
     def normalize(self, vecs):
-        """Normalizes vectors.
-
+        """
         Normalizes vectors by dividing by vector norm.
 
-        Parameters
-        ----------
             The vectors.
-        Retruns
-        -------
+        :param Retruns:
             The normalized vectors.
         """
 
@@ -323,26 +285,21 @@ class ComplexResponse:
         return vecs
 
     def get_precond(self, orb_ene, nocc, norb, w, d):
-        """Constructs the preconditioner matrix.
-
+        """
         Constructs the preconditioner matrix.
 
-        Parameters
-        ----------
-        orb_ene
+        :param orb_ene:
             The orbital energies.
-        nocc
+        :param nocc:
             The number of doubly occupied orbitals.
-        norb
+        :param norb:
             The number of orbitals.
-        w
+        :param w:
             The frequency.
-        d
+        :param d:
             The damping parameter.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The preconditioner matrix.
         """
 
@@ -374,20 +331,15 @@ class ComplexResponse:
         return precond
 
     def preconditioning(self, precond, v_in):
-        """Creates trial vectors out of residuals and the preconditioner matrix.
-
+        """
         Creates trial vectors out of residuals and the preconditioner matrix.
 
-        Parameters
-        ----------
-        precond
+        :param precond:
             The preconditioner matrix.
-        v_in
+        :param v_in:
             The input trial vectors.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The trail vectors after preconditioning.
         """
 
@@ -405,25 +357,20 @@ class ComplexResponse:
         return v_out
 
     def initial_guess(self, op_grads, d, freqs, precond):
-        """Creating initial guess (un-orthonormalized trials) out of gradients.
-
+        """
         Creating initial guess (un-orthonormalized trials) out of gradients.
 
-        Parameters
-        ----------
-        op_grads
+        :param op_grads:
             The dictionary containing operator components (key) and right-hand
             sides (values).
-        d
+        :param d:
             The damping parameter.
-        freqs
+        :param freqs:
             The frequencies.
-        precond
+        :param precond:
             The preconditioner matrices.
 
-        Returns
-        -------
-        dict
+        :return:
             The initial guess.
         """
 
@@ -449,30 +396,25 @@ class ComplexResponse:
                      bung=np.array([]),
                      res_norm=None,
                      normalize=True):
-        """Computes orthonormalized trial vectors.
-
+        """
         Computes orthonormalized trial vectors. Takes set of vectors,
         preconditioner matrix, gerade and ungerade subspaces as input
         arguments.
 
-        Parameters
-        ----------
-        vectors
+        :param vectors:
             The set of vectors.
-        pre
+        :param pre:
             The preconditioner matrix.
-        bger
+        :param bger:
             The gerade subspace.
-        bung
+        :param bung:
             The ungerade subspace.
-        res_norm
+        :param res_norm:
             The relative residual norm.
-        normalize
+        :param normalize:
             The flag for normalization.
 
-        Returns
-        -------
-        tuple
+        :return:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
@@ -532,26 +474,21 @@ class ComplexResponse:
         return new_ger, new_ung
 
     def compute(self, molecule, basis, scf_tensors, b_rhs=None):
-        """Solves for the response vector.
-
+        """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        basis
+        :param basis:
             The AO basis.
-        scf_tensors
+        :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        b_rhs
+        :param b_rhs:
             The right-hand side. If not provided, b_rhs will be computed for
             the B operator.
 
-        Returns
-        -------
-        dict
+        :return:
             A dictionary containing properties, solutions, and kappas.
         """
 
@@ -1005,13 +942,10 @@ class ComplexResponse:
             return {}
 
     def check_convergence(self, relative_residual_norm):
-        """Checks convergence.
-
+        """
         Checks convergence.
 
-        Parameters
-        ----------
-        relative_residual_norm
+        :param relative_residual_norm:
             Relative residual norms.
         """
 
@@ -1024,15 +958,12 @@ class ComplexResponse:
                                             root=mpi_master())
 
     def print_iteration(self, relative_residual_norm, nvs):
-        """Prints information of the iteration.
-
+        """
         Prints information of the iteration.
 
-        Parameters
-        ----------
-        relative_residual_norm
+        :param relative_residual_norm:
             Relative residual norms.
-        nvs
+        :param nvs:
             A list of tuples containing operator component, frequency, and
             property.
         """
@@ -1061,8 +992,7 @@ class ComplexResponse:
         self.ostream.flush()
 
     def print_header(self):
-        """Prints complex linear response solver setup header.
-
+        """
         Prints complex linear response solver setup header to output stream.
         """
 
@@ -1089,8 +1019,7 @@ class ComplexResponse:
         self.ostream.flush()
 
     def print_convergence(self):
-        """Prints information after convergence.
-
+        """
         Prints information after convergence.
         """
 
@@ -1105,13 +1034,10 @@ class ComplexResponse:
         self.ostream.print_blank()
 
     def print_properties(self, props):
-        """Prints properties.
-
+        """
         Prints properties.
 
-        Parameters
-        ----------
-        props
+        :param props:
             The dictionary of properties.
         """
 
@@ -1129,8 +1055,7 @@ class ComplexResponse:
             self.ostream.print_blank()
 
     def print_timing(self):
-        """Prints timing.
-
+        """
         Prints timing for the complex linear response solver.
         """
 

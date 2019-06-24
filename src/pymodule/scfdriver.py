@@ -19,80 +19,74 @@ from .errorhandler import assert_msg_critical
 
 
 class ScfDriver:
-    """Implements SCF method (base class).
-
+    """
     Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
     accelerators.
 
-    Attributes
-    ----------
-    den_guess
+    :param den_guess:
         The initial density guess driver.
-    acc_type
+    :param acc_type:
         The type of SCF convergence accelerator.
-    max_err_vecs
+    :param max_err_vecs:
         The maximum number of error vectors.
-    max_iter
+    :param max_iter:
         The maximum number of SCF iterations.
-    first_step
+    :param first_step:
         The flag for first step in two-level C2-DIIS convergence acceleration.
-    qq_type
+    :param qq_type:
         The electron repulsion integrals screening scheme.
-    qq_dyn
+    :param qq_dyn:
         The flag for enabling dynamic thresholds in electron repulsion
         integrals screening scheme.
-    conv_thresh
+    :param conv_thresh:
         The SCF convergence threshold.
-    eri_thresh
+    :param eri_thresh:
         The electron repulsion integrals screening threshold.
-    ovl_thresh
+    :param ovl_thresh:
         The atomic orbitals linear dependency threshold.
-    diis_thresh
+    :param diis_thresh:
         The C2-DIIS switch on threshold.
-    use_level_shift
+    :param use_level_shift:
         The flag for usage of level shifting in SCF iterations.
-    iter_data
+    :param iter_data:
         The list of SCF iteration data (electronic energy, electronic energy
         change, gradient, density change).
-    is_converged
+    :param is_converged:
         The flag for SCF convergence.
-    skip_iter
+    :param skip_iter:
         The flag for SCF iteration data storage.
-    old_energy
+    :param old_energy:
         The electronic energy of previous SCF iteration.
-    num_iter
+    :param num_iter:
         The current number of SCF iterations.
-    fock_matrices
+    :param fock_matrices:
         The list of stored Fock/Kohn-Sham matrices.
-    den_matrices
+    :param den_matrices:
         The list of stored density matrices.
-    density
+    :param density:
         The current density matrix.
-    mol_orbs
+    :param mol_orbs:
         The current molecular orbitals.
-    nuc_energy
+    :param nuc_energy:
         The nuclear repulsion energy of molecule.
-    rank
+    :param rank:
         The rank of MPI process.
-    nodes
+    :param nodes:
         The number of MPI processes.
-    restart
+    :param restart:
         The flag for restarting from checkpoint file
-    restricted
+    :param restricted:
         The flag for restricted SCF
     """
 
     def __init__(self, comm, ostream):
-        """Initializes SCF driver.
-
+        """
         Initializes SCF driver to default setup (convergence threshold, initial
         guess, etc).
 
-        Parameters
-        ----------
-        comm
+        :param comm:
             The MPI communicator.
-        ostream
+        :param ostream:
             The output stream.
         """
 
@@ -155,13 +149,10 @@ class ScfDriver:
         self.restricted = True
 
     def update_settings(self, scf_dict):
-        """Updates settings in SCF driver.
-
+        """
         Updates settings in SCF driver.
 
-        Parameters
-        ----------
-        scf_dict
+        :param scf_dict:
             The settings dictionary.
         """
 
@@ -182,17 +173,14 @@ class ScfDriver:
             self.checkpoint_file = scf_dict['checkpoint_file']
 
     def compute(self, molecule, ao_basis, min_basis):
-        """Performs SCF calculation.
-
+        """
         Performs SCF calculation using molecular data.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis set.
-        min_basis
+        :param min_basis:
             The minimal AO basis set.
         """
 
@@ -271,15 +259,12 @@ class ScfDriver:
                 self.ostream.print_blank()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
-        """Writes molecular orbitals to checkpoint file.
-
+        """
         Writes molecular orbitals to checkpoint file.
 
-        Parameters
-        ----------
-        nuclear_charges
+        :param nuclear_charges:
             The nuclear charges.
-        basis_set
+        :param basis_set:
             Name of the basis set.
         """
 
@@ -289,17 +274,14 @@ class ScfDriver:
                                          basis_set)
 
     def comp_diis(self, molecule, ao_basis, min_basis):
-        """Performs SCF calculation with C2-DIIS acceleration.
-
+        """
         Performs SCF calculation with C2-DIIS acceleration.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis set.
-        min_basis
+        :param min_basis:
             The minimal AO basis set.
         """
 
@@ -438,21 +420,16 @@ class ScfDriver:
                                     'ScfDriver.compute: failed to converge')
 
     def comp_one_ints(self, molecule, basis):
-        """Computes one-electron integrals required for SCF calculation.
-
+        """
         Computes one-electron integrals (overlap, kinetic energy and nuclear
         potential) using molecular data.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis set.
 
-        Returns
-        -------
-        tuple
+        :return:
             The one-electron integrals.
         """
 
@@ -492,25 +469,20 @@ class ScfDriver:
         return ovl_mat, kin_mat, npot_mat
 
     def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
-        """Computes initial density guess for SCF calculation.
-
+        """
         Computes initial density guess for SCF using superposition of atomic
         densities or molecular orbitals projection methods.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        ao_basis
+        :param ao_basis:
             The AO basis set.
-        min_basis
+        :param min_basis:
             The minimal AO basis set.
-        ovl_mat
+        :param ovl_mat:
             The overlap matrix between minimal and full AO basis.
 
-        Returns
-        -------
-        AODensityMatrix
+        :return:
             The density matrix.
         """
 
@@ -539,16 +511,13 @@ class ScfDriver:
         return AODensityMatrix()
 
     def set_skip_iter_flag(self, i, e_grad):
-        """Sets SCF iteration skiping flag.
-
+        """
         Sets SCF iteration skiping flag based on iteration number and C2-DIIS
         switch on threshold.
 
-        Parameters
-        ----------
-        i
+        :param i:
             The number of current SCF iteration.
-        e_grad
+        :param e_grad:
             The electronic gradient at current SCF iteration.
         """
 
@@ -565,25 +534,20 @@ class ScfDriver:
                 self.skip_iter = True
 
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
-        """Computes SCF energy components.
-
+        """
         Computes SCF energy components: electronic energy, kinetic energy, and
         nuclear potential energy.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix (only 2e-part).
-        kin_mat
+        :param kin_mat:
             The kinetic energy matrix.
-        npot_mat
+        :param npot_mat:
             The nuclear potential matrix.
-        den_mat
+        :param den_mat:
             The density matrix.
 
-        Returns
-        -------
-        tuple
+        :return:
             The tuple (electronic energy, kinetic energy, nuclear potential
             energy).
         """
@@ -605,19 +569,16 @@ class ScfDriver:
         return (e_ee, e_kin, e_en)
 
     def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
-        """Computes full Fock/Kohn-Sham matrix.
-
+        """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
         Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
         matrices.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix (2e-part).
-        kin_mat
+        :param kin_mat:
             The kinetic energy matrix.
-        npot_mat
+        :param npot_mat:
             The nuclear potential matrix.
         """
 
@@ -625,122 +586,94 @@ class ScfDriver:
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
-        """Computes electronic gradient.
-
+        """
         Computes electronic gradient using Fock/Kohn-Sham matrix.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        ovl_mat
+        :param ovl_mat:
             The overlap matrix.
-        den_mat
+        :param den_mat:
             The density matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        float
+        :return:
             The electronic gradient.
         """
 
         return 0.0
 
     def comp_density_change(self, den_mat, old_den_mat):
-        """Computes norm of density change.
-
+        """
         Computes norm of density change between two density matrices.
 
-        Parameters
-        ----------
-        den_mat
+        :param den_mat:
             The current density matrix.
-        old_den_mat
+        :param old_den_mat:
             The previous density matrix.
 
-        Returns
-        -------
-        float
+        :return:
             The norm of change between two density matrices.
         """
 
         return 0.0
 
     def store_diis_data(self, i, fock_mat, den_mat):
-        """Stores Fock/Kohn-Sham and density matrices for current iteration.
-
+        """
         Stores Fock/Kohn-Sham and density matrices for current iteration.
 
-        Parameters
-        ----------
-        i
+        :param i:
             The number of current SCF iteration.
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        den_mat
+        :param den_mat:
             The density matrix.
         """
 
         return
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """Computes effective Fock/Kohn-Sham matrix in OAO basis.
-
+        """
         Computes effective Fock/Kohn-Sham matrix in OAO basis by applying
         Lowdin or canonical orthogonalization to AO Fock/Kohn-Sham matrix.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        ovl_mat
+        :param ovl_mat:
             The overlap matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        numpy.ndarray
+        :return:
             The effective Fock/Kohn-Sham matrix.
         """
 
         return None
 
     def gen_molecular_orbitals(self, fock_mat, oao_mat):
-        """Generates molecular orbitals.
-
+        """
         Generates molecular orbital by diagonalizing Fock/Kohn-Sham matrix.
 
-        Parameters
-        ----------
-        fock_mat
+        :param fock_mat:
             The Fock/Kohn-Sham matrix.
-        oao_mat
+        :param oao_mat:
             The orthogonalization matrix.
 
-        Returns
-        -------
-        MolecularOrbitals
+        :return:
             The molecular orbitals.
         """
 
         return MolecularOrbitals()
 
     def gen_new_density(self, molecule):
-        """Generates density matrix.
-
+        """
         Generates density matrix from current molecular orbitals.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
 
-        Returns
-        -------
-        AODensityMatrix
+        :return:
             The density matrix.
         """
 
@@ -750,19 +683,14 @@ class ScfDriver:
         return AODensityMatrix()
 
     def get_dyn_threshold(self, e_grad):
-        """Computes screening threshold for electron repulsion integrals.
-
+        """
         Computes screening threshold for electron repulsion integrals based on
         value of electronic gradient.
 
-        Parameters
-        ----------
-        e_grad
+        :param e_grad:
             The electronic gradient.
 
-        Returns
-        -------
-        float
+        :return:
             The screening threshold.
         """
 
@@ -782,22 +710,19 @@ class ScfDriver:
         return nteri
 
     def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
-        """Adds SCF iteration data to SCF iterations list.
-
+        """
         Adds SCF iteration data (electronic energy, electronic energy change,
         electronic gradient, density difference) to SCF iterations list
 
-        Parameters
-        ----------
-        e_ee
+        :param e_ee:
             The electronic energy.
-        e_kin
+        :param e_kin:
             The kinetic energy.
-        e_en
+        :param e_en:
             The nuclear potential energy.
-        e_grad
+        :param e_grad:
             The electronic energy gradient.
-        diff_den
+        :param diff_den:
             The density change with respect to previous SCF iteration.
         """
 
@@ -810,8 +735,7 @@ class ScfDriver:
         self.old_energy = e_elec
 
     def check_convergence(self):
-        """Sets SCF convergence flag.
-
+        """
         Sets SCF convergence flag by checking if convergence condition for
         electronic gradient is fullfiled.
         """
@@ -826,26 +750,20 @@ class ScfDriver:
                 self.is_converged = True
 
     def get_scf_range(self):
-        """Creates range of SCF iterations.
-
+        """
         Creates range of SCF iterations from maximum number of SCF iterations.
 
-        Returns
-        -------
-        list
+        :return:
             The range of SCF iterations.
         """
 
         return range(self.max_iter + 1)
 
     def print_scf_energy(self):
-        """Prints SCF energy information to output stream.
-
+        """
         Prints SCF energy information to output stream.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
         """
 
@@ -855,8 +773,7 @@ class ScfDriver:
         self.print_energy_components()
 
     def print_header(self):
-        """Prints SCF setup header to output stream.
-
+        """
         Prints SCF calculation setup details to output stream,
         """
 
@@ -894,8 +811,7 @@ class ScfDriver:
         self.ostream.print_blank()
 
     def print_scf_title(self):
-        """Prints SCF cycles header to output stream.
-
+        """
         Prints SCF cycles header to output stream.
         """
 
@@ -909,13 +825,10 @@ class ScfDriver:
             self.ostream.print_header(92 * "-")
 
     def print_scf_finish(self, start_time):
-        """Prints SCF calculation finish message to output stream.
-
+        """
         Prints SCF calculation finish message to output stream,
 
-        Parameters
-        ----------
-        start_time
+        :param start_time:
             The start time of SCF calculation.
         """
 
@@ -943,13 +856,10 @@ class ScfDriver:
         self.ostream.flush()
 
     def print_iter_data(self, i):
-        """Prints SCF iteration data to output stream.
-
+        """
         Prints SCF iteration data to output stream,
 
-        Parameters
-        ----------
-        i
+        :param i:
             The current SCF iteration.
         """
 
@@ -978,40 +888,31 @@ class ScfDriver:
                 self.ostream.flush()
 
     def get_scf_energy(self):
-        """Gets SCF energy from previous SCF iteration.
-
+        """
         Gets SCF energy from previous SCF iteration.
 
-        Returns
-        -------
-        float
+        :return:
             The SCF energy.
         """
 
         return self.old_energy
 
     def get_scf_type(self):
-        """Gets string with type of SCF calculation.
-
+        """
         Gets string with type of SCF calculation (defined in derrived classes).
 
-        Returns
-        -------
-        str
+        :return:
             The string with type of SCF calculation.
         """
 
         return "Undefined"
 
     def get_guess_type(self):
-        """Gets string with type of initial guess.
-
+        """
         Gets string with type of initial guess (superposition of atomic
         densities or projection of molecular orbitals).
 
-        Returns
-        -------
-        str
+        :return:
             The string with type of initial guess.
         """
 
@@ -1024,14 +925,11 @@ class ScfDriver:
         return "Undefined"
 
     def get_acc_type(self):
-        """Gets string type of SCF convergence accelerator.
-
+        """
         Gets string with type of SCF convergence accelerator (DIIS or two level
         DIIS).
 
-        Returns
-        -------
-        str
+        :return:
             The string with type of SCF convergence accelerator.
         """
 
@@ -1044,15 +942,12 @@ class ScfDriver:
         return "Undefined"
 
     def get_qq_dyn(self):
-        """Gets string with application method of electron repulsion integrals
-        screening.
+        """        screening.
 
         Gets string with application method (static or dynamic) of electron
         repulsion integrals screening.
 
-        Returns
-        -------
-        str
+        :return:
             The string with application method of electron repulsion integrals
             screening.
         """
@@ -1063,15 +958,12 @@ class ScfDriver:
         return "Static"
 
     def need_min_basis(self):
-        """Determines if minimal AO basis is needed in SCF calculation.
-
+        """
         Determines if minimal AO basis is needed in SCF calculation. Usage of
         two level DIIS accelerator or superposition of atomic densities initial
         guess requires minimal AO basis.
 
-        Returns
-        -------
-        bool
+        :return:
             The flag for need of minimal AO basis.
         """
 
@@ -1084,21 +976,16 @@ class ScfDriver:
         return False
 
     def delete_mos(self, mol_orbs, mol_eigs):
-        """Generates trimmed molecular orbitals.
-
+        """
         Generates trimmed molecular orbital by deleting MOs with coeficients
         exceeding 1.0 / sqrt(ovl_thresh).
 
-        Parameters
-        ----------
-        mol_orbs
+        :param mol_orbs:
             The molecular orbitals.
-        mol_eigs
+        :param mol_eigs:
             The eigenvalues of molecular orbitals.
 
-        Returns
-        -------
-        tuple
+        :return:
             The tuple (trimmed molecular orbitals, eigenvalues).
         """
 
@@ -1114,35 +1001,27 @@ class ScfDriver:
         return (mol_orbs[:, molist], mol_eigs[molist])
 
     def compute_s2(self, molecule, smat, mol_orbs):
-        """Computes expectation value <S**2>
-
+        """
         Computes expectation value of the S**2 operator.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
-        smat
+        :param smat:
             The overlap matrix (numpy array).
-        mol_orbs
+        :param mol_orbs:
             The molecular orbitals.
 
-        Returns
-        -------
-        float
+        :return:
             Expectation value <S**2>.
         """
 
         return None
 
     def print_ground_state(self, molecule, s2):
-        """Prints ground state information to output stream.
-
+        """
         Prints ground state information to output stream.
 
-        Parameters
-        ----------
-        molecule
+        :param molecule:
             The molecule.
         """
 
@@ -1170,8 +1049,7 @@ class ScfDriver:
         self.ostream.print_blank()
 
     def print_energy_components(self):
-        """Prints SCF energy components to output stream.
-
+        """
         Prints SCF energy components to output stream.
         """
 
