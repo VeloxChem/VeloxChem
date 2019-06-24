@@ -80,3 +80,18 @@ TEST_F(CGenIntsFuncTest, GenIntegral)
 
     ASSERT_EQ(rtl, gintsfunc::genIntegral({"Nuclear Potential"}, 2, 1, 0));
 }
+
+TEST_F(CGenIntsFuncTest, GenElectronRepulsionIntegralWithFourCenters)
+{
+    CRecursionTerm rta({"Electron Repulsion"}, 0, true, {2, 3, -1, -1}, {1, 4, -1, -1}, 2, 2, 0);
+    
+    ASSERT_EQ(rta, gintsfunc::genElectronRepulsionIntegral(2, 3, 1, 4));
+}
+
+TEST_F(CGenIntsFuncTest, GenElectronRepulsionIntegralWithThreeCenters)
+{
+    CRecursionTerm rta({"Electron Repulsion"}, 0, true, {2, -1, -1, -1}, {1, 4, -1, -1}, 1, 2, 0);
+    
+    ASSERT_EQ(rta, gintsfunc::genElectronRepulsionIntegral(2, 1, 4));
+}
+

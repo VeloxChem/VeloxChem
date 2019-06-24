@@ -44,6 +44,33 @@ CRecursionTerm genIntegral(const std::string& labelOfOperator,
                            const int32_t      braAngularMomentum,
                            const int32_t      ketAngularMomentum,
                            const int32_t      ordderOfOperator);
+    
+/**
+ Generates recursion term corresponding to two electron repulsion integral.
+
+ @param angularMomentumA the angular momentum of center A.
+ @param angularMomentumB the angular momentum of center B.
+ @param angularMomentumC the angular momentum of center C.
+ @param angularMomentumD the angular momentum of center D.
+ @return the recursion term object.
+ */
+CRecursionTerm genElectronRepulsionIntegral(const int32_t      angularMomentumA,
+                                            const int32_t      angularMomentumB,
+                                            const int32_t      angularMomentumC,
+                                            const int32_t      angularMomentumD);
+    
+
+/**
+ Generates recursion term corresponding to two electron repulsion integral.
+
+ @param angularMomentumB the angular momentum of center B.
+ @param angularMomentumC the angular momentum of center C.
+ @param angularMomentumD the angular momentum of center D.
+ @return the recursion term object.
+ */
+CRecursionTerm genElectronRepulsionIntegral(const int32_t      angularMomentumB,
+                                            const int32_t      angularMomentumC,
+                                            const int32_t      angularMomentumD);
 
 }  // namespace gintsfunc
 

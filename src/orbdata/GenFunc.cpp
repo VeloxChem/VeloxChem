@@ -13,7 +13,7 @@
 namespace genfunc {  // genfunc namespace
 
 void
-contract(CMemBlock2D<double>&       contrData,
+contract(      CMemBlock2D<double>& contrData,
          const CMemBlock2D<double>& primData,
          const int32_t              contrIndex,
          const int32_t              primIndex,
@@ -114,93 +114,15 @@ contract(CMemBlock2D<double>& contrData,
 }
 
 void
-contract(CMemBlock2D<double>&        contrData,
-         CMemBlock2D<double>&        primData,
-         const CVecThreeIndexes&     contrPattern,
-         const std::vector<int32_t>& contrIndexes,
-         const CRecursionMap&        recursionMap,
-         const CGtoBlock&            braGtoBlock,
-         const CGtoPairsBlock&       ketGtoPairsBlock,
-         const int32_t               iContrGto)
-{
-    // set up pointers to primitives data on bra side
-
-    auto spos = braGtoBlock.getStartPositions();
-
-    auto epos = braGtoBlock.getEndPositions();
-
-    auto bdim = epos[iContrGto] - spos[iContrGto];
-
-    // set up pointers to primitives data on ket side
-
-    auto kspos = ketGtoPairsBlock.getStartPositions();
-
-    auto kepos = ketGtoPairsBlock.getEndPositions();
-
-    auto kdim = ketGtoPairsBlock.getNumberOfScreenedContrPairs();
-
-    auto nprim = ketGtoPairsBlock.getNumberOfScreenedPrimPairs();
-
-    // loop over set of data vectors
-
-    for (size_t i = 0; i < contrPattern.size(); i++)
-    {
-        // determine positions of contracted and primitive vectors
-
-        auto tidx = contrPattern[i];
-
-        auto cidx = genfunc::findTripleIndex(contrIndexes, contrPattern, tidx);
-
-        auto pidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, {tidx.first(), -1, -1, -1},
-                                                {tidx.second(), -1, -1, -1}, 1, 1, 0));
-
-        // set up number angular components
-
-        auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.second());
-
-        // first step: vertical summation over bra GTO
-
-        for (int32_t j = 1; j < bdim; j++)
-        {
-            // accumulate summation over primitives on bra side
-
-            for (int32_t k = 0; k < ncomp; k++)
-            {
-                // summation buffer
-
-                auto sumbuf = primData.data(pidx + k);
-
-                // source buffer
-
-                auto srcbuf = primData.data(pidx + j * ncomp + k);
-
-                // loop over primitive GTOs on ket side
-
-                #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
-                for (int32_t l = 0; l < nprim; l++)
-                {
-                    sumbuf[l] += srcbuf[l];
-                }
-            }
-        }
-
-        // second step: direct contraction over ket side
-
-        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, kdim, ncomp);
-    }
-}
-
-void
-contract(CMemBlock2D<double>&        contrData,
-         CMemBlock2D<double>&        primData,
-         const CVecThreeIndexes&     contrPattern,
-         const std::vector<int32_t>& contrIndexes,
-         const CRecursionMap&        recursionMap,
-         const CGtoPairsBlock&       braGtoPairsBlock,
-         const CGtoPairsBlock&       ketGtoPairsBlock,
-         const int32_t               nKetPrimPairs,
-         const int32_t               nKetContrPairs,
-         const int32_t               iContrPair)
+contract(CMemBlock2D<double>&  contrData,
+         CMemBlock2D<double>&  primData,
+         const CRecursionMap&  contractionMap,
+         const CRecursionMap&  recursionMap,
+         const CGtoPairsBlock& braGtoPairsBlock,
+         const CGtoPairsBlock& ketGtoPairsBlock,
+         const int32_t         nKetPrimPairs,
+         const int32_t         nKetContrPairs,
+         const int32_t         iContrPair)
 {
     // set up pointers to primitives data on bra side
 
@@ -218,54 +140,55 @@ contract(CMemBlock2D<double>&        contrData,
 
     // loop over set of data vectors
 
-    for (size_t i = 0; i < contrPattern.size(); i++)
+    for (int32_t i = 0; i < contractionMap.getNumberOfTerms(); i++)
     {
-        // determine positions of contracted and primitive vectors
-
-        auto tidx = contrPattern[i];
-
-        // skip undesirable terms
-
-        if (tidx.second() != 0) continue;
-
-        auto cidx = genfunc::findTripleIndex(contrIndexes, contrPattern, tidx);
-
-        auto pidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true, {tidx.first(), -1, -1, -1},
-                                                               {tidx.third(), -1, -1, -1}, 1, 1, 0));
-
-        // set up number angular components
-
-        auto ncomp = angmom::to_CartesianComponents(tidx.first(), tidx.third());
-
-        // first step: vertical summation over bra GTO
-
-        for (int32_t j = 1; j < bdim; j++)
+        auto rterm = contractionMap.getTerm(i);
+        
+        if (rterm.getKetAngularMomentum(0) == 0)
         {
-            // accumulate summation over primitives on bra side
+            // determine positions of contracted and primitive vectors
 
-            for (int32_t k = 0; k < ncomp; k++)
+            auto cidx = contractionMap.getIndexOfTerm(rterm);
+
+            auto pidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true,
+                                                    {rterm.getBraAngularMomentum(0), -1, -1, -1},
+                                                    {rterm.getKetAngularMomentum(1), -1, -1, -1},
+                                                    1, 1, 0));
+
+            // set up number angular components
+
+            auto ncomp = angmom::to_CartesianComponents(rterm.getBraAngularMomentum(0), rterm.getKetAngularMomentum(1));
+
+            // first step: vertical summation over bra GTO
+
+            for (int32_t j = 1; j < bdim; j++)
             {
-                // summation buffer
+                // accumulate summation over primitives on bra side
 
-                auto sumbuf = primData.data(pidx + k);
-
-                // source buffer
-
-                auto srcbuf = primData.data(pidx + j * ncomp + k);
-
-                // loop over primitive GTOs on ket side
-
-                #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
-                for (int32_t l = 0; l < nKetPrimPairs; l++)
+                for (int32_t k = 0; k < ncomp; k++)
                 {
-                    sumbuf[l] += srcbuf[l];
+                    // summation buffer
+
+                    auto sumbuf = primData.data(pidx + k);
+
+                    // source buffer
+
+                    auto srcbuf = primData.data(pidx + j * ncomp + k);
+
+                    // loop over primitive GTOs on ket side
+
+                    #pragma omp simd aligned(sumbuf, srcbuf: VLX_ALIGN)
+                    for (int32_t l = 0; l < nKetPrimPairs; l++)
+                    {
+                        sumbuf[l] += srcbuf[l];
+                    }
                 }
             }
+            
+            // second step: direct contraction over ket side
+
+            genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, nKetContrPairs, ncomp);
         }
-
-        // second step: direct contraction over ket side
-
-        genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, nKetContrPairs, ncomp);
     }
 }
 
@@ -467,32 +390,33 @@ transform_ket(CMemBlock2D<double>&        spherData,
               const CMemBlock2D<double>&  cartData,
               const CSphericalMomentum&   ketMomentumC,
               const CSphericalMomentum&   ketMomentumD,
-              const CVecFourIndexes&      spherPattern,
-              const std::vector<int32_t>& spherIndexes,
-              const CVecThreeIndexes&     cartPattern,
-              const std::vector<int32_t>& cartIndexes,
+              const CRecursionMap&        spherPattern,
+              const CRecursionMap&        cartPattern,
               const CGtoPairsBlock&       ketGtoPairsBlock,
               const int32_t               nKetContrPairs,
               const int32_t               iContrPair)
 {
     // loop over set of data vectors
 
-    for (size_t i = 0; i < spherPattern.size(); i++)
+    for (int32_t i = 0; i < spherPattern.getNumberOfTerms(); i++)
     {
+        auto rterm = spherPattern.getTerm(i);
+        
         // skip terms not presented in Cartesian integrals buffer
 
-        if (spherPattern[i].first() != 0) continue;
-
+        if (rterm.getBraAngularMomentum(0) != 0) continue;
+ 
         // set up spherical and Cartesian data indexes
 
-        auto sidx = spherIndexes[i];
+        auto sidx = spherPattern.getIndexOfTerm(rterm);
 
-        auto cidx =
-            findTripleIndex(cartIndexes, cartPattern, CThreeIndexes(spherPattern[i].second(), spherPattern[i].third(), spherPattern[i].fourth()));
-
+        auto cidx = cartPattern.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true,
+                                                              {rterm.getBraAngularMomentum(1), -1, -1, -1},
+                                                              {rterm.getKetAngularMomentum(0), rterm.getKetAngularMomentum(1), -1, -1},
+                                                              1, 2, 0));
         // set up number of bra components
 
-        auto bcomp = angmom::to_CartesianComponents(spherPattern[i].second());
+        auto bcomp = angmom::to_CartesianComponents(rterm.getBraAngularMomentum(1));
 
         // transform ket side of integrals from Cartesian to spherical form
 
@@ -505,8 +429,7 @@ transform_bra(CMemBlock2D<double>&        spherData,
               const CMemBlock2D<double>&  cartData,
               const CSphericalMomentum&   braMomentumA,
               const CSphericalMomentum&   braMomentumB,
-              const CVecFourIndexes&      cartPattern,
-              const std::vector<int32_t>& cartIndexes,
+              const CRecursionMap&        cartPattern,
               const CGtoPairsBlock&       ketGtoPairsBlock,
               const int32_t               nKetContrPairs,
               const int32_t               iContrPair)
@@ -523,9 +446,12 @@ transform_bra(CMemBlock2D<double>&        spherData,
 
     auto bang = braMomentumB.getAngularMomentum();
 
-    // determine Cartisian index
+    // determine Cartesian index
 
-    auto cidx = findQuadrupleIndex(cartIndexes, cartPattern, CFourIndexes(aang, bang, cang, dang));
+    auto cidx = cartPattern.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true,
+                                                {aang, bang, -1, -1},
+                                                {cang, dang, -1, -1},
+                                                2, 2, 0));
 
     // set up angular momentum data
 
