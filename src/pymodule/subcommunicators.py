@@ -43,6 +43,8 @@ class SubCommunicators:
 
     def __del__(self):
         """Deletes the MPI subcommunicator.
+
+        Deletes the MPI subcommunicator.
         """
 
         self.local_comm.Disconnect()

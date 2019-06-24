@@ -66,6 +66,8 @@ class OutputStream:
 
     def __del__(self):
         """Deletes the output stream.
+
+        Deletes the output stream.
         """
 
         if self.state:
@@ -87,6 +89,8 @@ class OutputStream:
 
     def flush(self):
         """Flushes the buffered output to stream.
+
+        Flushes the buffered output to stream.
         """
 
         if self.state:
@@ -203,6 +207,8 @@ class OutputStream:
 
     def print_blank(self):
         """Prints a blank line to stream.
+
+        Prints a blank line to stream.
         """
 
         if not self.state:
@@ -256,6 +262,8 @@ class OutputStream:
 
     def print_separator(self):
         """Prints a separator line to stream.
+
+        Prints a separator line to stream.
         """
 
         if not self.state:

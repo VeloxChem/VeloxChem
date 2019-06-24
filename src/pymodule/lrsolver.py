@@ -297,6 +297,8 @@ class LinearResponseSolver:
 
     def print_convergence(self):
         """Prints information after convergence.
+
+        Prints information after convergence.
         """
 
         output_conv = '*** '

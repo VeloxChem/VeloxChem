@@ -40,21 +40,33 @@ class DensityGuess:
         self._checkpoint_file = checkpoint_file
 
     def __str__(self):
-        """Converts object to it's informal string"""
+        """Converts object to it's informal string.
+
+        Converts object to it's informal string.
+        """
         return self._guess_type
 
     def __repr__(self):
-        """Converts object to it's formal string"""
+        """Converts object to it's formal string.
+
+        Converts object to it's formal string.
+        """
         return self._guess_type
 
     @property
     def guess_type(self):
-        """Getter function for protected guess_type attribute."""
+        """Getter function for protected guess_type attribute.
+
+        Getter function for protected guess_type attribute.
+        """
         return self._guess_type
 
     @guess_type.setter
     def guess_type(self, value):
-        """Setter function for protected guess_type attribute."""
+        """Setter function for protected guess_type attribute.
+
+        Setter function for protected guess_type attribute.
+        """
         self._guess_type = value
 
     def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set):

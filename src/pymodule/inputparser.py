@@ -137,6 +137,8 @@ class InputParser:
 
     def incomplete_group_check(self):
         """Checks for any incomplete groups.
+
+        Checks for any incomplete groups.
         """
 
         if re.findall(r'@(?!end)[^@]*@(?!end)|@end[^@]*@end',
@@ -149,6 +151,8 @@ class InputParser:
 
     def empty_group_check(self):
         """Checks for any empty groups.
+
+        Checks for any empty groups.
         """
 
         if re.findall(r'@\w[\w ]*' + os.linesep + r'\s*@end',
@@ -157,6 +161,8 @@ class InputParser:
 
     def clear_interspace(self):
         """Deletes content, that's not within a group.
+
+        Deletes content that is not within a group.
         """
 
         self.content = re.sub(r'@end[^@]*@', '@end' + os.linesep + '@',

@@ -239,7 +239,10 @@ class AdcOneDriver:
             return None
 
     def print_header(self):
-        """Prints ADC(1) driver setup header to output stream"""
+        """Prints ADC(1) driver setup header to output stream.
+
+        Prints ADC(1) driver setup header to output stream.
+        """
 
         self.ostream.print_blank()
         self.ostream.print_header("ADC(1) Driver Setup")
@@ -408,7 +411,10 @@ class AdcOneDriver:
             self.print_state_information(i, reigs[i], rnorms[i])
 
     def print_state_information(self, iteration, eigval, rnorm):
-        """Prints excited state information to output stream."""
+        """Prints excited state information to output stream.
+
+        Prints excited state information to output stream.
+        """
 
         self.ostream.print_blank()
 

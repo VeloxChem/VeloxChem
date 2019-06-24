@@ -150,6 +150,8 @@ class MpiTask:
 
     def finish(self):
         """Finalizes the MPI task.
+
+        Finalizes the MPI task.
         """
 
         if (self.mpi_rank == mpi_master()):

@@ -224,6 +224,8 @@ class MOIntegralsDriver:
 
     def print_header(self):
         """Prints header for the MO integrals driver.
+
+        Prints header for the MO integrals driver.
         """
 
         self.ostream.print_blank()
