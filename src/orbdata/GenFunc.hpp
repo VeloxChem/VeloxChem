@@ -86,16 +86,15 @@ void contract(CMemBlock2D<double>&        contrData,
               const CGtoBlock&            braGtoBlock,
               const CGtoPairsBlock&       ketGtoPairsBlock,
               const int32_t               iContrGto);
-
+    
 /**
- Contracts set of primitive data vectoes to contracted data vectors using
+ Contracts set of primitive data vectors to contracted data vectors using
  two step procedure. NOTE: Primitive data is destroyed during contraction
  process.
 
  @param contrData the contracted data vectors.
  @param primData the primitive data vectors.
- @param contrPattern the contracted data vectors distribution pattern.
- @param contrIndexes the contracted data vectors indexing pattern.
+ @param contractionMap the contracted data vectors distribution pattern.
  @param recursionMap the recursion map for primitive integrals.
  @param braGtoPairsBlock the GTOs pairs block on bra side.
  @param ketGtoPairsBlock the GTOs pairs block on ket side.
@@ -103,16 +102,15 @@ void contract(CMemBlock2D<double>&        contrData,
  @param nKetContrPairs the number of contractes GTOs pairs on ket side.
  @param iContrPair the index of contracted GTOs pair on bra side.
  */
-void contract(CMemBlock2D<double>&        contrData,
-              CMemBlock2D<double>&        primData,
-              const CVecThreeIndexes&     contrPattern,
-              const std::vector<int32_t>& contrIndexes,
-              const CRecursionMap&        recursionMap,
-              const CGtoPairsBlock&       braGtoPairsBlock,
-              const CGtoPairsBlock&       ketGtoPairsBlock,
-              const int32_t               nKetPrimPairs,
-              const int32_t               nKetContrPairs,
-              const int32_t               iContrPair);
+void contract(CMemBlock2D<double>&  contrData,
+              CMemBlock2D<double>&  primData,
+              const CRecursionMap&  contractionMap,
+              const CRecursionMap&  recursionMap,
+              const CGtoPairsBlock& braGtoPairsBlock,
+              const CGtoPairsBlock& ketGtoPairsBlock,
+              const int32_t         nKetPrimPairs,
+              const int32_t         nKetContrPairs,
+              const int32_t         iContrPair);
 
 /**
  Transforms Cartesian data vectors to spherical data vectors.
@@ -205,24 +203,20 @@ void transform(CMemBlock2D<double>&       spherData,
  @param ketMomentumC the spherical momentum object for C center on ket side.
  @param ketMomentumD the spherical momentum object for D center on ket side.
  @param spherPattern the half-transformed data vectors distribution pattern.
- @param spherIndexes the half-transformend data vectors indexing pattern.
  @param cartPattern the Cartesian data vectors distribution pattern.
- @param cartIndexes the Cartesian data vectors indexing pattern.
  @param ketGtoPairsBlock the GTOs pairs block on ket side.
  @param nKetContrPairs the number of contractes GTOs pairs on ket side.
  @param iContrPair the index of contracted GTOs pair on bra side.
  */
-void transform_ket(CMemBlock2D<double>&        spherData,
-                   const CMemBlock2D<double>&  cartData,
-                   const CSphericalMomentum&   ketMomentumC,
-                   const CSphericalMomentum&   ketMomentumD,
-                   const CVecFourIndexes&      spherPattern,
-                   const std::vector<int32_t>& spherIndexes,
-                   const CVecThreeIndexes&     cartPattern,
-                   const std::vector<int32_t>& cartIndexes,
-                   const CGtoPairsBlock&       ketGtoPairsBlock,
-                   const int32_t               nKetContrPairs,
-                   const int32_t               iContrPair);
+void transform_ket(CMemBlock2D<double>&       spherData,
+                   const CMemBlock2D<double>& cartData,
+                   const CSphericalMomentum&  ketMomentumC,
+                   const CSphericalMomentum&  ketMomentumD,
+                   const CRecursionMap&       spherPattern,
+                   const CRecursionMap&       cartPattern,
+                   const CGtoPairsBlock&      ketGtoPairsBlock,
+                   const int32_t              nKetContrPairs,
+                   const int32_t              iContrPair);
 
 /**
  Transforms half-transformed integrals to spherical integrals by
@@ -233,7 +227,6 @@ void transform_ket(CMemBlock2D<double>&        spherData,
  @param ketMomentumA the spherical momentum object for A center on bra side.
  @param ketMomentumB the spherical momentum object for B center on bra side.
  @param cartPattern the Cartesian data vectors distribution pattern.
- @param cartIndexes the Cartesian data vectors indexing pattern.
  @param ketGtoPairsBlock the GTOs pairs block on ket side.
  @param nKetContrPairs the number of contractes GTOs pairs on ket side.
  @param iContrPair the index of contracted GTOs pair on bra side.
@@ -242,8 +235,7 @@ void transform_bra(CMemBlock2D<double>&        spherData,
                    const CMemBlock2D<double>&  cartData,
                    const CSphericalMomentum&   ketMomentumA,
                    const CSphericalMomentum&   ketMomentumB,
-                   const CVecFourIndexes&      cartPattern,
-                   const std::vector<int32_t>& cartIndexes,
+                   const CRecursionMap&        cartPattern,
                    const CGtoPairsBlock&       ketGtoPairsBlock,
                    const int32_t               nKetContrPairs,
                    const int32_t               iContrPair);

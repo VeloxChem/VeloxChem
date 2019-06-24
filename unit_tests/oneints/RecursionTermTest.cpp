@@ -305,6 +305,32 @@ TEST_F(CRecursionTermTest, GetNumberOfComponents)
     ASSERT_EQ(105, rta.getNumberOfComponents(recblock::ss));
 }
 
+TEST_F(CRecursionTermTest, GetBraAngularMomentum)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3}, 2, 1, 5);
+    
+    ASSERT_EQ(2, rta.getBraAngularMomentum(0));
+    
+    ASSERT_EQ(3, rta.getBraAngularMomentum(1));
+    
+    ASSERT_EQ(-1, rta.getBraAngularMomentum(2));
+    
+    ASSERT_EQ(-1, rta.getBraAngularMomentum(3));
+}
+
+TEST_F(CRecursionTermTest, GetKetAngularMomentum)
+{
+    CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3}, 2, 1, 5);
+    
+    ASSERT_EQ(1, rta.getKetAngularMomentum(0));
+    
+    ASSERT_EQ(-1, rta.getKetAngularMomentum(1));
+    
+    ASSERT_EQ(-1, rta.getKetAngularMomentum(2));
+    
+    ASSERT_EQ(-1, rta.getKetAngularMomentum(3));
+}
+
 TEST_F(CRecursionTermTest, IsIntegral)
 {
     CRecursionTerm rta({"Overlap"}, 0, true, {2, 3, 4, 5}, {1, 3, 2, 3}, 2, 1, 5);

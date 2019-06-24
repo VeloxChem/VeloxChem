@@ -371,6 +371,28 @@ CRecursionTerm::getNumberOfComponents(const recblock angularForm) const
     return 0;
 }
 
+int32_t
+CRecursionTerm::getBraAngularMomentum(const int32_t iCenter) const
+{
+    if (iCenter < _braCenters)
+    {
+        return _braAngularMomentum.value(iCenter);
+    }
+    
+    return -1;
+}
+
+int32_t
+CRecursionTerm::getKetAngularMomentum(const int32_t iCenter) const
+{
+    if (iCenter < _ketCenters)
+    {
+        return _ketAngularMomentum.value(iCenter);
+    }
+    
+    return -1;
+}
+
 bool
 CRecursionTerm::isIntegral(const std::string&  label,
                            const CFourIndexes& braAngularMomentum,

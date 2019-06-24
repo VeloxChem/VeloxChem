@@ -72,7 +72,32 @@ genIntegral(const std::string& labelOfOperator, const int32_t braAngularMomentum
     if (labelOfOperator == std::string("Electric Field Gradient")) opcomp = 2;
 
     return CRecursionTerm(labelOfOperator, opcomp, true, bang, kang, 1, 1, ordderOfOperator);
-    ;
 }
+    
+CRecursionTerm
+genElectronRepulsionIntegral(const int32_t      angularMomentumA,
+                             const int32_t      angularMomentumB,
+                             const int32_t      angularMomentumC,
+                             const int32_t      angularMomentumD)
+{
+    CFourIndexes bang(angularMomentumA, angularMomentumB, -1, -1);
+    
+    CFourIndexes kang(angularMomentumC, angularMomentumD, -1, -1);
+    
+    return CRecursionTerm(std::string("Electron Repulsion"), 0, true, bang, kang, 2, 2, 0);
+}
+    
+CRecursionTerm
+genElectronRepulsionIntegral(const int32_t      angularMomentumB,
+                             const int32_t      angularMomentumC,
+                             const int32_t      angularMomentumD)
+{
+    CFourIndexes bang(angularMomentumB, -1, -1, -1);
+    
+    CFourIndexes kang(angularMomentumC, angularMomentumD, -1, -1);
+    
+    return CRecursionTerm(std::string("Electron Repulsion"), 0, true, bang, kang, 1, 2, 0);
+}
+
 
 }  // namespace gintsfunc

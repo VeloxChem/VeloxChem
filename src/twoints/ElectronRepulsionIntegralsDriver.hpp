@@ -70,56 +70,42 @@ class CElectronRepulsionIntegralsDriver
                                                  const CGtoPairsBlock&         ketGtoPairsBlock) const;
     
     /**
-     Gets Obara-Saika bra side horizontal recursion pattern for specific
-     combination of GTOs pairs blocks on bra and ket sides.
+     Sets horrizontal recursion map for bra side.
      
-     @param braGtoPairsBlock the GTOs pairs block on bra side.
-     @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @return the vector of three indexes object with recursion pattern.
+     @param angularMomentumA the angular momentum of center A.
+     @param angularMomentumB the angular momentum of center B.
+     @param angularMomentumC the angular momentum of center C.
+     @param angularMomentumD the angular momentum od center D-
+     @return the recursion map.
      */
-    CVecFourIndexes _getBraHorizontalRecursionPattern(const CGtoPairsBlock& braGtoPairsBlock,
-                                                      const CGtoPairsBlock& ketGtoPairsBlock) const;
+    CRecursionMap _setBraHorizontalRecursionPattern(const int32_t angularMomentumA,
+                                                    const int32_t angularMomentumB,
+                                                    const int32_t angularMomentumC,
+                                                    const int32_t angularMomentumD) const;
     
     /**
-     Gets Obara-Saika ket side horizontal recursion pattern for given set of leading terms.
+     Sets horrizontal recursion map for ket side.
      
-     @param leadTerms the vector of leading terms in recursion pattern.
-     @return the vector of three indexes object with recursion pattern.
+     @param angularMomentumA the angular momentum of center A.
+     @param angularMomentumB the angular momentum of center B.
+     @param angularMomentumC the angular momentum of center C.
+     @param angularMomentumD the angular momentum od center D.
+     @return the recursion map.
      */
-    CVecThreeIndexes _getKetHorizontalRecursionPattern(const CVecThreeIndexes& leadTerms) const;
-    
+    CRecursionMap _setKetHorizontalRecursionPattern(const int32_t angularMomentumA,
+                                                    const int32_t angularMomentumB,
+                                                    const int32_t angularMomentumC,
+                                                    const int32_t angularMomentumD) const;
     
     /**
      Sets Obara-Saika vertical recursion pattern for given set of leading terms.
      
-     @param leadTerms the vector of leading terms in recursion pattern.
+     @param leadTerms the recursion map from horizontal recursion on bra and ket sides.
      @param maxNumberOfPrimPairs the maximum number of primitive pairs.
      @return the vector of three indexes object with recursion pattern.
      */
-    CRecursionMap _setVerticalRecursionMap(const CVecThreeIndexes& leadTerms,
-                                           const int32_t           maxNumberOfPrimPairs) const;
-    
-    /**
-     Gets vector of unified indexes of horizontal recursion buffer on ket side.
-     
-     @param intsIndexes the vector of starting indexes in horizontal recursion
-            buffer.
-     @param intsListing the ket horizontal recursion listing.
-     @return the total number of blocks in horizontal recursion buffer listing.
-     */
-    int32_t _getIndexesForKetHRRIntegrals(      std::vector<int32_t>& intsIndexes,
-                                          const CVecThreeIndexes&     intsListing) const;
-    
-    /**
-     Gets vector of unified indexes of horizontal recursion buffer on bra side.
-     
-     @param intsIndexes the vector of starting indexes in horizontal recursion
-            buffer.
-     @param intsListing the ket horizontal recursion listing.
-     @return the total number of blocks in horizontal recursion buffer listing.
-     */
-    int32_t _getIndexesForBraHRRIntegrals(      std::vector<int32_t>& intsIndexes,
-                                          const CVecFourIndexes&      intsListing) const;
+    CRecursionMap _setVerticalRecursionMap(const CRecursionMap& leadTerms,
+                                           const int32_t        maxNumberOfPrimPairs) const;
     
     /**
      Computes batch of primitive electron repulsion integrals using Obara-Saika
@@ -130,6 +116,7 @@ class CElectronRepulsionIntegralsDriver
                   pairs on ket side).
      
      @param primBuffer the primitives buffer.
+     @param recursionMap the vertical recursion map for bra and ket sides.
      @param bfTable the Boys function evaluator.
      @param bfArguments the vector of Boys function arguments.
      @param bfValues the vector of Boys function values.
@@ -162,18 +149,17 @@ class CElectronRepulsionIntegralsDriver
      Applies horizontal recursion on ket side of contracted integrals buffer.
      
      @param ketBuffer the horizontal recursion buffer.
-     @param recPattern the horizontal recursion pattern on ket side.
-     @param recIndexes the indexes of data blocks in horizontal recursion
-            pattern on ket side.
+     @param recursionMap the horizontal recursion map for ket side.
      @param cdDistances the vector of distances R(CD) = C - D.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _applyHRRonKet(      CMemBlock2D<double>&  ketBuffer,
-                        const CVecThreeIndexes&     recPattern,
-                        const std::vector<int32_t>& recIndexes,
+                        const CRecursionMap&        recursionMap,
                         const CMemBlock2D<double>&  cdDistances,
+                        const CGtoPairsBlock&       braGtoPairsBlock,
                         const CGtoPairsBlock&       ketGtoPairsBlock,
                         const int32_t               nKetContrPairs,
                         const int32_t               iContrPair) const;
@@ -182,18 +168,17 @@ class CElectronRepulsionIntegralsDriver
      Applies horizontal recursion on bra side of contracted integrals buffer.
      
      @param braBuffer the horizontal recursion buffer.
-     @param recPattern the horizontal recursion pattern on bra side.
-     @param recIndexes the indexes of data blocks in horizontal recursion
-            pattern on bra side.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param recursionMap the horizontal recursion map for ket side.
      @param abDistances the vector of distances R(AB) = A - B.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
      @param nKetContrPairs the number of contractes GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
     void _applyHRRonBra(      CMemBlock2D<double>&  braBuffer,
-                        const CVecFourIndexes&      recPattern,
-                        const std::vector<int32_t>& recIndexes,
+                        const CRecursionMap&        recursionMap,
                         const CMemBlock2D<double>&  abDistances,
+                        const CGtoPairsBlock&       braGtoPairsBlock,
                         const CGtoPairsBlock&       ketGtoPairsBlock,
                         const int32_t               nKetContrPairs,
                         const int32_t               iContrPair) const;

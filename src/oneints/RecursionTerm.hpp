@@ -288,6 +288,22 @@ class CRecursionTerm
      @return the number of components.
      */
     int32_t getNumberOfComponents(const recblock angularForm) const;
+    
+    /**
+     Gets angular momentum of specific center on bra side of integral.
+
+     @param iCenter the index of atomic center.
+     @return the angular momentum of atomic center.
+     */
+    int32_t getBraAngularMomentum(const int32_t iCenter) const;
+    
+    /**
+     Gets angular momentum of specific center on ket side of integral.
+     
+     @param iCenter the index of atomic center.
+     @return the angular momentum of atomic center.
+     */
+    int32_t getKetAngularMomentum(const int32_t iCenter) const;
 
     /**
      Checks if recursion term object is integral with specific label, bra and
