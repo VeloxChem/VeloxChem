@@ -14,6 +14,7 @@
 
 #include "RecursionBlock.hpp"
 #include "RecursionTerm.hpp"
+#include "MemBlock2D.hpp"
 
 /**
  Class CRecursionMap stores recursion map for primitiveintegral
@@ -144,6 +145,14 @@ class CRecursionMap
      @param recursionTerms the vector of recursion term objects.
      */
     void append(const std::vector<CRecursionTerm>& recursionTerms);
+    
+    /**
+     Gets raw index of specific recursion term object.
+
+     @param recursionTerm the recursion term object.
+     @return the raw index of recursion term.
+     */
+    int32_t index(const CRecursionTerm& recursionTerm) const;
 
     /**
      Gets total number of integral components overl all recursion term objects
@@ -203,6 +212,21 @@ class CRecursionMap
              false otherwise.
      */
     bool find(const CRecursionTerm& recursionTerm) const;
+    
+    /**
+     Allocates array of 2D memory blocks for storing recursion data.
+     
+     @param length the length of buffer.
+     @return the array of 2D memory blocks.
+     */
+    CMemBlock2D<double>* createBuffer(const int32_t length) const;
+    
+    /**
+     Deallocates array of 2D memory blocks for storing recursion data.
+
+     @param buffer the array of 2D memory blocks. 
+     */
+    void destroyBuffer(CMemBlock2D<double>* buffer) const;
 
     /**
      Converts recursion map object to text output and insert it into output

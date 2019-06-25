@@ -115,7 +115,7 @@ class CElectronRepulsionIntegralsDriver
      Batch size: (one contracted GTOs pair on bra side) x (all contracted GTOs
                   pairs on ket side).
      
-     @param primBuffer the primitives buffer.
+     @param primBuffer the pointer to array of primitive buffers.
      @param recursionMap the vertical recursion map for bra and ket sides.
      @param bfTable the Boys function evaluator.
      @param bfArguments the vector of Boys function arguments.
@@ -130,7 +130,7 @@ class CElectronRepulsionIntegralsDriver
      @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
      @param iContrPair the index of contracted GTO pair on bra side.
      */
-    void _compPrimElectronRepulsionInts(      CMemBlock2D<double>&  primBuffer,
+    void _compPrimElectronRepulsionInts(      CMemBlock2D<double>*  primBuffer,
                                         const CRecursionMap&        recursionMap, 
                                         const CBoysFunction&        bfTable,
                                               CMemBlock<double>&    bfArguments,

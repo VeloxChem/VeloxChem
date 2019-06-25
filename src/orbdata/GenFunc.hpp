@@ -102,15 +102,15 @@ void contract(CMemBlock2D<double>&        contrData,
  @param nKetContrPairs the number of contractes GTOs pairs on ket side.
  @param iContrPair the index of contracted GTOs pair on bra side.
  */
-void contract(CMemBlock2D<double>&  contrData,
-              CMemBlock2D<double>&  primData,
-              const CRecursionMap&  contractionMap,
-              const CRecursionMap&  recursionMap,
-              const CGtoPairsBlock& braGtoPairsBlock,
-              const CGtoPairsBlock& ketGtoPairsBlock,
-              const int32_t         nKetPrimPairs,
-              const int32_t         nKetContrPairs,
-              const int32_t         iContrPair);
+void contract(      CMemBlock2D<double>& contrData,
+                    CMemBlock2D<double>* primData,
+              const CRecursionMap&       contractionMap,
+              const CRecursionMap&       recursionMap,
+              const CGtoPairsBlock&      braGtoPairsBlock,
+              const CGtoPairsBlock&      ketGtoPairsBlock,
+              const int32_t              nKetPrimPairs,
+              const int32_t              nKetContrPairs,
+              const int32_t              iContrPair);
 
 /**
  Transforms Cartesian data vectors to spherical data vectors.

@@ -165,6 +165,20 @@ CRecursionMap::append(const std::vector<CRecursionTerm>& recursionTerms)
 }
 
 int32_t
+CRecursionMap::index(const CRecursionTerm& recursionTerm) const
+{
+    for (size_t i = 0; i < _recursionTerms.size(); i++)
+    {
+        if (recursionTerm == _recursionTerms[i])
+        {
+            return static_cast<int32_t>(i);
+        }
+    }
+    
+    return -1;
+}
+
+int32_t
 CRecursionMap::getNumberOfComponents() const
 {
     int32_t ncomps = 0;
@@ -239,6 +253,25 @@ CRecursionMap::find(const CRecursionTerm& recursionTerm) const
     }
 
     return false;
+}
+
+CMemBlock2D<double>*
+CRecursionMap::createBuffer(const int32_t length) const
+{
+    CMemBlock2D<double>* buffer = new CMemBlock2D<double>[_recursionTerms.size()];
+    
+    for (size_t i = 0; i < _recursionTerms.size(); i++)
+    {
+        buffer[i] = CMemBlock2D<double>(length, _recursionTerms[i].getNumberOfComponents(_angularForm) * _repeatUnits);
+    }
+    
+    return buffer;
+}
+
+void
+CRecursionMap::destroyBuffer(CMemBlock2D<double>* buffer) const
+{
+    delete [] buffer;
 }
 
 std::ostream&

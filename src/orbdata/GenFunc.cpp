@@ -114,15 +114,15 @@ contract(CMemBlock2D<double>& contrData,
 }
 
 void
-contract(CMemBlock2D<double>&  contrData,
-         CMemBlock2D<double>&  primData,
-         const CRecursionMap&  contractionMap,
-         const CRecursionMap&  recursionMap,
-         const CGtoPairsBlock& braGtoPairsBlock,
-         const CGtoPairsBlock& ketGtoPairsBlock,
-         const int32_t         nKetPrimPairs,
-         const int32_t         nKetContrPairs,
-         const int32_t         iContrPair)
+contract(      CMemBlock2D<double>& contrData,
+               CMemBlock2D<double>* primData,
+         const CRecursionMap&       contractionMap,
+         const CRecursionMap&       recursionMap,
+         const CGtoPairsBlock&      braGtoPairsBlock,
+         const CGtoPairsBlock&      ketGtoPairsBlock,
+         const int32_t              nKetPrimPairs,
+         const int32_t              nKetContrPairs,
+         const int32_t              iContrPair)
 {
     // set up pointers to primitives data on bra side
 
@@ -150,10 +150,10 @@ contract(CMemBlock2D<double>&  contrData,
 
             auto cidx = contractionMap.getIndexOfTerm(rterm);
 
-            auto pidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Electron Repulsion"}, 0, true,
-                                                    {rterm.getBraAngularMomentum(0), -1, -1, -1},
-                                                    {rterm.getKetAngularMomentum(1), -1, -1, -1},
-                                                    1, 1, 0));
+            auto pidx = recursionMap.index(CRecursionTerm({"Electron Repulsion"}, 0, true,
+                                                          {rterm.getBraAngularMomentum(0), -1, -1, -1},
+                                                          {rterm.getKetAngularMomentum(1), -1, -1, -1},
+                                                          1, 1, 0));
 
             // set up number angular components
 
@@ -169,11 +169,11 @@ contract(CMemBlock2D<double>&  contrData,
                 {
                     // summation buffer
 
-                    auto sumbuf = primData.data(pidx + k);
+                    auto sumbuf = primData[pidx].data(k);
 
                     // source buffer
 
-                    auto srcbuf = primData.data(pidx + j * ncomp + k);
+                    auto srcbuf = primData[pidx].data(j * ncomp + k);
 
                     // loop over primitive GTOs on ket side
 
@@ -187,7 +187,7 @@ contract(CMemBlock2D<double>&  contrData,
             
             // second step: direct contraction over ket side
 
-            genfunc::contract(contrData, primData, cidx, pidx, kspos, kepos, nKetContrPairs, ncomp);
+            genfunc::contract(contrData, primData[pidx], cidx, 0, kspos, kepos, nKetContrPairs, ncomp);
         }
     }
 }
