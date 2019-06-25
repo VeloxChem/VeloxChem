@@ -198,11 +198,13 @@ namespace erirecfunc { // erirecfunc namespace
                                          wq_z: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
-                    tg_0_x_0[j] = qd_x[j] * tg_0_0_0[j] + wq_x[j] * tg_0_0_1[j];
+                    double tgval = tg_0_0_1[j];
+                    
+                    tg_0_x_0[j] = qd_x[j] * tg_0_0_0[j] + wq_x[j] * tgval;
 
-                    tg_0_y_0[j] = qd_y[j] * tg_0_0_0[j] + wq_y[j] * tg_0_0_1[j];
+                    tg_0_y_0[j] = qd_y[j] * tg_0_0_0[j] + wq_y[j] * tgval;
 
-                    tg_0_z_0[j] = qd_z[j] * tg_0_0_0[j] + wq_z[j] * tg_0_0_1[j];
+                    tg_0_z_0[j] = qd_z[j] * tg_0_0_0[j] + wq_z[j] * tgval;
                 }
 
                 idx++;
@@ -301,11 +303,13 @@ namespace erirecfunc { // erirecfunc namespace
                 #pragma omp simd aligned(tg_0_0_0, tg_0_0_1, tg_x_0_0, tg_y_0_0, tg_z_0_0, wp_x, wp_y, wp_z: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
-                    tg_x_0_0[j] = pb_x * tg_0_0_0[j] + wp_x[j] * tg_0_0_1[j];
+                    double tgval = tg_0_0_1[j];
+                    
+                    tg_x_0_0[j] = pb_x * tg_0_0_0[j] + wp_x[j] * tgval;
 
-                    tg_y_0_0[j] = pb_y * tg_0_0_0[j] + wp_y[j] * tg_0_0_1[j];
+                    tg_y_0_0[j] = pb_y * tg_0_0_0[j] + wp_y[j] * tgval;
 
-                    tg_z_0_0[j] = pb_z * tg_0_0_0[j] + wp_z[j] * tg_0_0_1[j];
+                    tg_z_0_0[j] = pb_z * tg_0_0_0[j] + wp_z[j] * tgval;
                 }
 
                 idx++;
@@ -433,21 +437,23 @@ namespace erirecfunc { // erirecfunc namespace
                                          tg_0_zz_0, wq_x, wq_y, wq_z: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
-                    double fl1_fn = fn[j];
+                    double tgval =  0.5 * fn[j] * (tg_0_0_0[j] - fzb[j] * tg_0_0_1[j]);
 
-                    double fl1_fzb = fzb[j];
+                    double fr0 = qd_x[j]; double fr1 = wq_x[j];
+                    
+                    tg_0_xx_0[j] = fr0 * tg_0_x_0[j] + fr1 * tg_0_x_1[j] + tgval;
 
-                    tg_0_xx_0[j] = qd_x[j] * tg_0_x_0[j] + wq_x[j] * tg_0_x_1[j] + 0.5 * fl1_fn * tg_0_0_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_0_1[j];
+                    tg_0_xy_0[j] = fr0 * tg_0_y_0[j] + fr1 * tg_0_y_1[j];
 
-                    tg_0_xy_0[j] = qd_x[j] * tg_0_y_0[j] + wq_x[j] * tg_0_y_1[j];
+                    tg_0_xz_0[j] = fr0 * tg_0_z_0[j] + fr1 * tg_0_z_1[j];
+                    
+                    fr0 = qd_y[j]; fr1 = wq_y[j];
 
-                    tg_0_xz_0[j] = qd_x[j] * tg_0_z_0[j] + wq_x[j] * tg_0_z_1[j];
+                    tg_0_yy_0[j] = fr0 * tg_0_y_0[j] + fr1 * tg_0_y_1[j] + tgval;
 
-                    tg_0_yy_0[j] = qd_y[j] * tg_0_y_0[j] + wq_y[j] * tg_0_y_1[j] + 0.5 * fl1_fn * tg_0_0_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_0_1[j];
+                    tg_0_yz_0[j] = fr0 * tg_0_z_0[j] + fr1 * tg_0_z_1[j];
 
-                    tg_0_yz_0[j] = qd_y[j] * tg_0_z_0[j] + wq_y[j] * tg_0_z_1[j];
-
-                    tg_0_zz_0[j] = qd_z[j] * tg_0_z_0[j] + wq_z[j] * tg_0_z_1[j] + 0.5 * fl1_fn * tg_0_0_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_0_1[j];
+                    tg_0_zz_0[j] = qd_z[j] * tg_0_z_0[j] + wq_z[j] * tg_0_z_1[j] + tgval;
                 }
 
                 idx++;
@@ -585,21 +591,23 @@ namespace erirecfunc { // erirecfunc namespace
                                          wp_x, wp_y, wp_z: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetPrimPairs; j++)
                 {
-                    double fl1_fx = fx;
+                    double tgval =  0.5 * fx * (tg_0_0_0[j] - fza[j] * tg_0_0_1[j]);
+                    
+                    double fr1 = wp_x[j];
 
-                    double fl1_fza = fza[j];
+                    tg_xx_0_0[j] = pb_x * tg_x_0_0[j] + fr1 * tg_x_0_1[j] + tgval;
 
-                    tg_xx_0_0[j] = pb_x * tg_x_0_0[j] + wp_x[j] * tg_x_0_1[j] + 0.5 * fl1_fx * tg_0_0_0[j] - 0.5 * fl1_fx * fl1_fza * tg_0_0_1[j];
+                    tg_xy_0_0[j] = pb_x * tg_y_0_0[j] + fr1 * tg_y_0_1[j];
 
-                    tg_xy_0_0[j] = pb_x * tg_y_0_0[j] + wp_x[j] * tg_y_0_1[j];
+                    tg_xz_0_0[j] = pb_x * tg_z_0_0[j] + fr1 * tg_z_0_1[j];
+                    
+                    fr1 = wp_y[j];
 
-                    tg_xz_0_0[j] = pb_x * tg_z_0_0[j] + wp_x[j] * tg_z_0_1[j];
+                    tg_yy_0_0[j] = pb_y * tg_y_0_0[j] + fr1 * tg_y_0_1[j] + tgval;
 
-                    tg_yy_0_0[j] = pb_y * tg_y_0_0[j] + wp_y[j] * tg_y_0_1[j] + 0.5 * fl1_fx * tg_0_0_0[j] - 0.5 * fl1_fx * fl1_fza * tg_0_0_1[j];
+                    tg_yz_0_0[j] = pb_y * tg_z_0_0[j] + fr1 * tg_z_0_1[j];
 
-                    tg_yz_0_0[j] = pb_y * tg_z_0_0[j] + wp_y[j] * tg_z_0_1[j];
-
-                    tg_zz_0_0[j] = pb_z * tg_z_0_0[j] + wp_z[j] * tg_z_0_1[j] + 0.5 * fl1_fx * tg_0_0_0[j] - 0.5 * fl1_fx * fl1_fza * tg_0_0_1[j];
+                    tg_zz_0_0[j] = pb_z * tg_z_0_0[j] + wp_z[j] * tg_z_0_1[j] + tgval;
                 }
 
                 idx++;
@@ -760,26 +768,30 @@ namespace erirecfunc { // erirecfunc namespace
                     double fl1_fn = fn[j];
 
                     double fl1_fzb = fzb[j];
+                    
+                    double fr0 = qd_x[j]; double fr1 = wq_x[j];
 
-                    tg_0_xxx_0[j] = qd_x[j] * tg_0_xx_0[j] + wq_x[j] * tg_0_xx_1[j] + fl1_fn * tg_0_x_0[j] - fl1_fn * fl1_fzb * tg_0_x_1[j];
+                    tg_0_xxx_0[j] = fr0 * tg_0_xx_0[j] + fr1 * tg_0_xx_1[j] + fl1_fn * (tg_0_x_0[j] - fl1_fzb * tg_0_x_1[j]);
 
-                    tg_0_xxy_0[j] = qd_x[j] * tg_0_xy_0[j] + wq_x[j] * tg_0_xy_1[j] + 0.5 * fl1_fn * tg_0_y_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_y_1[j];
+                    tg_0_xxy_0[j] = fr0 * tg_0_xy_0[j] + fr1 * tg_0_xy_1[j] + 0.5 * fl1_fn * (tg_0_y_0[j] - fl1_fzb * tg_0_y_1[j]);
 
-                    tg_0_xxz_0[j] = qd_x[j] * tg_0_xz_0[j] + wq_x[j] * tg_0_xz_1[j] + 0.5 * fl1_fn * tg_0_z_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_z_1[j];
+                    tg_0_xxz_0[j] = fr0 * tg_0_xz_0[j] + fr1 * tg_0_xz_1[j] + 0.5 * fl1_fn * (tg_0_z_0[j] - fl1_fzb * tg_0_z_1[j]);
 
-                    tg_0_xyy_0[j] = qd_x[j] * tg_0_yy_0[j] + wq_x[j] * tg_0_yy_1[j];
+                    tg_0_xyy_0[j] = fr0 * tg_0_yy_0[j] + fr1 * tg_0_yy_1[j];
 
-                    tg_0_xyz_0[j] = qd_x[j] * tg_0_yz_0[j] + wq_x[j] * tg_0_yz_1[j];
+                    tg_0_xyz_0[j] = fr0 * tg_0_yz_0[j] + fr1 * tg_0_yz_1[j];
 
-                    tg_0_xzz_0[j] = qd_x[j] * tg_0_zz_0[j] + wq_x[j] * tg_0_zz_1[j];
+                    tg_0_xzz_0[j] = fr0 * tg_0_zz_0[j] + fr1 * tg_0_zz_1[j];
+                    
+                    fr0 = qd_y[j]; fr1 = wq_y[j];
 
-                    tg_0_yyy_0[j] = qd_y[j] * tg_0_yy_0[j] + wq_y[j] * tg_0_yy_1[j] + fl1_fn * tg_0_y_0[j] - fl1_fn * fl1_fzb * tg_0_y_1[j];
+                    tg_0_yyy_0[j] = fr0 * tg_0_yy_0[j] + fr1 * tg_0_yy_1[j] + fl1_fn * (tg_0_y_0[j] - fl1_fzb * tg_0_y_1[j]);
 
-                    tg_0_yyz_0[j] = qd_y[j] * tg_0_yz_0[j] + wq_y[j] * tg_0_yz_1[j] + 0.5 * fl1_fn * tg_0_z_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_z_1[j];
+                    tg_0_yyz_0[j] = fr0 * tg_0_yz_0[j] + fr1 * tg_0_yz_1[j] + 0.5 * fl1_fn * (tg_0_z_0[j] - fl1_fzb * tg_0_z_1[j]);
 
-                    tg_0_yzz_0[j] = qd_y[j] * tg_0_zz_0[j] + wq_y[j] * tg_0_zz_1[j];
+                    tg_0_yzz_0[j] = fr0 * tg_0_zz_0[j] + fr1 * tg_0_zz_1[j];
 
-                    tg_0_zzz_0[j] = qd_z[j] * tg_0_zz_0[j] + wq_z[j] * tg_0_zz_1[j] + fl1_fn * tg_0_z_0[j] - fl1_fn * fl1_fzb * tg_0_z_1[j];
+                    tg_0_zzz_0[j] = qd_z[j] * tg_0_zz_0[j] + wq_z[j] * tg_0_zz_1[j] + fl1_fn * (tg_0_z_0[j] - fl1_fzb * tg_0_z_1[j]);
                 }
 
                 idx++;
@@ -1171,36 +1183,40 @@ namespace erirecfunc { // erirecfunc namespace
                     double fl1_fn = fn[j];
 
                     double fl1_fzb = fzb[j];
+                    
+                    double fr0 = qd_x[j]; double fr1 = wq_x[j];
 
-                    tg_0_xxxx_0[j] = qd_x[j] * tg_0_xxx_0[j] + wq_x[j] * tg_0_xxx_1[j] + 1.5 * fl1_fn * tg_0_xx_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xx_1[j];
+                    tg_0_xxxx_0[j] = fr0 * tg_0_xxx_0[j] + fr1 * tg_0_xxx_1[j] + 1.5 * fl1_fn * (tg_0_xx_0[j] - fl1_fzb * tg_0_xx_1[j]);
 
-                    tg_0_xxxy_0[j] = qd_x[j] * tg_0_xxy_0[j] + wq_x[j] * tg_0_xxy_1[j] + fl1_fn * tg_0_xy_0[j] - fl1_fn * fl1_fzb * tg_0_xy_1[j];
+                    tg_0_xxxy_0[j] = fr0 * tg_0_xxy_0[j] + fr1 * tg_0_xxy_1[j] + fl1_fn * (tg_0_xy_0[j] - fl1_fzb * tg_0_xy_1[j]);
 
-                    tg_0_xxxz_0[j] = qd_x[j] * tg_0_xxz_0[j] + wq_x[j] * tg_0_xxz_1[j] + fl1_fn * tg_0_xz_0[j] - fl1_fn * fl1_fzb * tg_0_xz_1[j];
+                    tg_0_xxxz_0[j] = fr0 * tg_0_xxz_0[j] + fr1 * tg_0_xxz_1[j] + fl1_fn * (tg_0_xz_0[j] - fl1_fzb * tg_0_xz_1[j]);
 
-                    tg_0_xxyy_0[j] = qd_x[j] * tg_0_xyy_0[j] + wq_x[j] * tg_0_xyy_1[j] + 0.5 * fl1_fn * tg_0_yy_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yy_1[j];
+                    tg_0_xxyy_0[j] = fr0 * tg_0_xyy_0[j] + fr1 * tg_0_xyy_1[j] + 0.5 * fl1_fn * (tg_0_yy_0[j] - fl1_fzb * tg_0_yy_1[j]);
 
-                    tg_0_xxyz_0[j] = qd_x[j] * tg_0_xyz_0[j] + wq_x[j] * tg_0_xyz_1[j] + 0.5 * fl1_fn * tg_0_yz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yz_1[j];
+                    tg_0_xxyz_0[j] = fr0 * tg_0_xyz_0[j] + fr1 * tg_0_xyz_1[j] + 0.5 * fl1_fn * (tg_0_yz_0[j] - fl1_fzb * tg_0_yz_1[j]);
 
-                    tg_0_xxzz_0[j] = qd_x[j] * tg_0_xzz_0[j] + wq_x[j] * tg_0_xzz_1[j] + 0.5 * fl1_fn * tg_0_zz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zz_1[j];
+                    tg_0_xxzz_0[j] = fr0 * tg_0_xzz_0[j] + fr1 * tg_0_xzz_1[j] + 0.5 * fl1_fn * (tg_0_zz_0[j] - fl1_fzb * tg_0_zz_1[j]);
 
-                    tg_0_xyyy_0[j] = qd_x[j] * tg_0_yyy_0[j] + wq_x[j] * tg_0_yyy_1[j];
+                    tg_0_xyyy_0[j] = fr0 * tg_0_yyy_0[j] + fr1 * tg_0_yyy_1[j];
 
-                    tg_0_xyyz_0[j] = qd_x[j] * tg_0_yyz_0[j] + wq_x[j] * tg_0_yyz_1[j];
+                    tg_0_xyyz_0[j] = fr0 * tg_0_yyz_0[j] + fr1 * tg_0_yyz_1[j];
 
-                    tg_0_xyzz_0[j] = qd_x[j] * tg_0_yzz_0[j] + wq_x[j] * tg_0_yzz_1[j];
+                    tg_0_xyzz_0[j] = fr0 * tg_0_yzz_0[j] + fr1 * tg_0_yzz_1[j];
 
-                    tg_0_xzzz_0[j] = qd_x[j] * tg_0_zzz_0[j] + wq_x[j] * tg_0_zzz_1[j];
+                    tg_0_xzzz_0[j] = fr0 * tg_0_zzz_0[j] + fr1 * tg_0_zzz_1[j];
+                    
+                    fr0 = qd_y[j]; fr1 = wq_y[j];
 
-                    tg_0_yyyy_0[j] = qd_y[j] * tg_0_yyy_0[j] + wq_y[j] * tg_0_yyy_1[j] + 1.5 * fl1_fn * tg_0_yy_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_yy_1[j];
+                    tg_0_yyyy_0[j] = fr0 * tg_0_yyy_0[j] + fr1 * tg_0_yyy_1[j] + 1.5 * fl1_fn * (tg_0_yy_0[j] - fl1_fzb * tg_0_yy_1[j]);
 
-                    tg_0_yyyz_0[j] = qd_y[j] * tg_0_yyz_0[j] + wq_y[j] * tg_0_yyz_1[j] + fl1_fn * tg_0_yz_0[j] - fl1_fn * fl1_fzb * tg_0_yz_1[j];
+                    tg_0_yyyz_0[j] = fr0 * tg_0_yyz_0[j] + fr1 * tg_0_yyz_1[j] + fl1_fn * (tg_0_yz_0[j] - fl1_fzb * tg_0_yz_1[j]);
 
-                    tg_0_yyzz_0[j] = qd_y[j] * tg_0_yzz_0[j] + wq_y[j] * tg_0_yzz_1[j] + 0.5 * fl1_fn * tg_0_zz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zz_1[j];
+                    tg_0_yyzz_0[j] = fr0 * tg_0_yzz_0[j] + fr1 * tg_0_yzz_1[j] + 0.5 * fl1_fn * (tg_0_zz_0[j] - fl1_fzb * tg_0_zz_1[j]);
 
-                    tg_0_yzzz_0[j] = qd_y[j] * tg_0_zzz_0[j] + wq_y[j] * tg_0_zzz_1[j];
+                    tg_0_yzzz_0[j] = fr0 * tg_0_zzz_0[j] + fr1 * tg_0_zzz_1[j];
 
-                    tg_0_zzzz_0[j] = qd_z[j] * tg_0_zzz_0[j] + wq_z[j] * tg_0_zzz_1[j] + 1.5 * fl1_fn * tg_0_zz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_zz_1[j];
+                    tg_0_zzzz_0[j] = qd_z[j] * tg_0_zzz_0[j] + wq_z[j] * tg_0_zzz_1[j] + 1.5 * fl1_fn * (tg_0_zz_0[j] - fl1_fzb * tg_0_zz_1[j]);
                 }
 
                 idx++;
@@ -1696,48 +1712,52 @@ namespace erirecfunc { // erirecfunc namespace
                     double fl1_fn = fn[j];
 
                     double fl1_fzb = fzb[j];
+                    
+                    double fr0 = qd_x[j]; double fr1 = wq_x[j];
 
-                    tg_0_xxxxx_0[j] = qd_x[j] * tg_0_xxxx_0[j] + wq_x[j] * tg_0_xxxx_1[j] + 2.0 * fl1_fn * tg_0_xxx_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxx_1[j];
+                    tg_0_xxxxx_0[j] = fr0 * tg_0_xxxx_0[j] + fr1 * tg_0_xxxx_1[j] + 2.0 * fl1_fn * (tg_0_xxx_0[j] - fl1_fzb * tg_0_xxx_1[j]);
 
-                    tg_0_xxxxy_0[j] = qd_x[j] * tg_0_xxxy_0[j] + wq_x[j] * tg_0_xxxy_1[j] + 1.5 * fl1_fn * tg_0_xxy_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxy_1[j];
+                    tg_0_xxxxy_0[j] = fr0 * tg_0_xxxy_0[j] + fr1 * tg_0_xxxy_1[j] + 1.5 * fl1_fn * (tg_0_xxy_0[j] - fl1_fzb * tg_0_xxy_1[j]);
 
-                    tg_0_xxxxz_0[j] = qd_x[j] * tg_0_xxxz_0[j] + wq_x[j] * tg_0_xxxz_1[j] + 1.5 * fl1_fn * tg_0_xxz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxz_1[j];
+                    tg_0_xxxxz_0[j] = fr0 * tg_0_xxxz_0[j] + fr1 * tg_0_xxxz_1[j] + 1.5 * fl1_fn * (tg_0_xxz_0[j] - fl1_fzb * tg_0_xxz_1[j]);
 
-                    tg_0_xxxyy_0[j] = qd_x[j] * tg_0_xxyy_0[j] + wq_x[j] * tg_0_xxyy_1[j] + fl1_fn * tg_0_xyy_0[j] - fl1_fn * fl1_fzb * tg_0_xyy_1[j];
+                    tg_0_xxxyy_0[j] = fr0 * tg_0_xxyy_0[j] + fr1 * tg_0_xxyy_1[j] + fl1_fn * (tg_0_xyy_0[j] - fl1_fzb * tg_0_xyy_1[j]);
 
-                    tg_0_xxxyz_0[j] = qd_x[j] * tg_0_xxyz_0[j] + wq_x[j] * tg_0_xxyz_1[j] + fl1_fn * tg_0_xyz_0[j] - fl1_fn * fl1_fzb * tg_0_xyz_1[j];
+                    tg_0_xxxyz_0[j] = fr0 * tg_0_xxyz_0[j] + fr1 * tg_0_xxyz_1[j] + fl1_fn * (tg_0_xyz_0[j] - fl1_fzb * tg_0_xyz_1[j]);
 
-                    tg_0_xxxzz_0[j] = qd_x[j] * tg_0_xxzz_0[j] + wq_x[j] * tg_0_xxzz_1[j] + fl1_fn * tg_0_xzz_0[j] - fl1_fn * fl1_fzb * tg_0_xzz_1[j];
+                    tg_0_xxxzz_0[j] = fr0 * tg_0_xxzz_0[j] + fr1 * tg_0_xxzz_1[j] + fl1_fn * (tg_0_xzz_0[j] - fl1_fzb * tg_0_xzz_1[j]);
 
-                    tg_0_xxyyy_0[j] = qd_x[j] * tg_0_xyyy_0[j] + wq_x[j] * tg_0_xyyy_1[j] + 0.5 * fl1_fn * tg_0_yyy_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyy_1[j];
+                    tg_0_xxyyy_0[j] = fr0 * tg_0_xyyy_0[j] + fr1 * tg_0_xyyy_1[j] + 0.5 * fl1_fn * (tg_0_yyy_0[j] - fl1_fzb * tg_0_yyy_1[j]);
 
-                    tg_0_xxyyz_0[j] = qd_x[j] * tg_0_xyyz_0[j] + wq_x[j] * tg_0_xyyz_1[j] + 0.5 * fl1_fn * tg_0_yyz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyz_1[j];
+                    tg_0_xxyyz_0[j] = fr0 * tg_0_xyyz_0[j] + fr1 * tg_0_xyyz_1[j] + 0.5 * fl1_fn * (tg_0_yyz_0[j] - fl1_fzb * tg_0_yyz_1[j]);
 
-                    tg_0_xxyzz_0[j] = qd_x[j] * tg_0_xyzz_0[j] + wq_x[j] * tg_0_xyzz_1[j] + 0.5 * fl1_fn * tg_0_yzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yzz_1[j];
+                    tg_0_xxyzz_0[j] = fr0 * tg_0_xyzz_0[j] + fr1 * tg_0_xyzz_1[j] + 0.5 * fl1_fn * (tg_0_yzz_0[j] - fl1_fzb * tg_0_yzz_1[j]);
 
-                    tg_0_xxzzz_0[j] = qd_x[j] * tg_0_xzzz_0[j] + wq_x[j] * tg_0_xzzz_1[j] + 0.5 * fl1_fn * tg_0_zzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzz_1[j];
+                    tg_0_xxzzz_0[j] = fr0 * tg_0_xzzz_0[j] + fr1 * tg_0_xzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzz_0[j] - fl1_fzb * tg_0_zzz_1[j]);
 
-                    tg_0_xyyyy_0[j] = qd_x[j] * tg_0_yyyy_0[j] + wq_x[j] * tg_0_yyyy_1[j];
+                    tg_0_xyyyy_0[j] = fr0 * tg_0_yyyy_0[j] + fr1 * tg_0_yyyy_1[j];
 
-                    tg_0_xyyyz_0[j] = qd_x[j] * tg_0_yyyz_0[j] + wq_x[j] * tg_0_yyyz_1[j];
+                    tg_0_xyyyz_0[j] = fr0 * tg_0_yyyz_0[j] + fr1 * tg_0_yyyz_1[j];
 
-                    tg_0_xyyzz_0[j] = qd_x[j] * tg_0_yyzz_0[j] + wq_x[j] * tg_0_yyzz_1[j];
+                    tg_0_xyyzz_0[j] = fr0 * tg_0_yyzz_0[j] + fr1 * tg_0_yyzz_1[j];
 
-                    tg_0_xyzzz_0[j] = qd_x[j] * tg_0_yzzz_0[j] + wq_x[j] * tg_0_yzzz_1[j];
+                    tg_0_xyzzz_0[j] = fr0 * tg_0_yzzz_0[j] + fr1 * tg_0_yzzz_1[j];
 
-                    tg_0_xzzzz_0[j] = qd_x[j] * tg_0_zzzz_0[j] + wq_x[j] * tg_0_zzzz_1[j];
+                    tg_0_xzzzz_0[j] = fr0 * tg_0_zzzz_0[j] + fr1 * tg_0_zzzz_1[j];
+                    
+                    fr0 = qd_y[j]; fr1 = wq_y[j];
 
-                    tg_0_yyyyy_0[j] = qd_y[j] * tg_0_yyyy_0[j] + wq_y[j] * tg_0_yyyy_1[j] + 2.0 * fl1_fn * tg_0_yyy_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_yyy_1[j];
+                    tg_0_yyyyy_0[j] = fr0 * tg_0_yyyy_0[j] + fr1 * tg_0_yyyy_1[j] + 2.0 * fl1_fn * (tg_0_yyy_0[j] - fl1_fzb * tg_0_yyy_1[j]);
 
-                    tg_0_yyyyz_0[j] = qd_y[j] * tg_0_yyyz_0[j] + wq_y[j] * tg_0_yyyz_1[j] + 1.5 * fl1_fn * tg_0_yyz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_yyz_1[j];
+                    tg_0_yyyyz_0[j] = fr0 * tg_0_yyyz_0[j] + fr1 * tg_0_yyyz_1[j] + 1.5 * fl1_fn * (tg_0_yyz_0[j] - fl1_fzb * tg_0_yyz_1[j]);
 
-                    tg_0_yyyzz_0[j] = qd_y[j] * tg_0_yyzz_0[j] + wq_y[j] * tg_0_yyzz_1[j] + fl1_fn * tg_0_yzz_0[j] - fl1_fn * fl1_fzb * tg_0_yzz_1[j];
+                    tg_0_yyyzz_0[j] = fr0 * tg_0_yyzz_0[j] + fr1 * tg_0_yyzz_1[j] + fl1_fn * (tg_0_yzz_0[j] - fl1_fzb * tg_0_yzz_1[j]);
 
-                    tg_0_yyzzz_0[j] = qd_y[j] * tg_0_yzzz_0[j] + wq_y[j] * tg_0_yzzz_1[j] + 0.5 * fl1_fn * tg_0_zzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzz_1[j];
+                    tg_0_yyzzz_0[j] = fr0 * tg_0_yzzz_0[j] + fr1 * tg_0_yzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzz_0[j] - fl1_fzb * tg_0_zzz_1[j]);
 
-                    tg_0_yzzzz_0[j] = qd_y[j] * tg_0_zzzz_0[j] + wq_y[j] * tg_0_zzzz_1[j];
+                    tg_0_yzzzz_0[j] = fr0 * tg_0_zzzz_0[j] + fr1 * tg_0_zzzz_1[j];
 
-                    tg_0_zzzzz_0[j] = qd_z[j] * tg_0_zzzz_0[j] + wq_z[j] * tg_0_zzzz_1[j] + 2.0 * fl1_fn * tg_0_zzz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_zzz_1[j];
+                    tg_0_zzzzz_0[j] = qd_z[j] * tg_0_zzzz_0[j] + wq_z[j] * tg_0_zzzz_1[j] + 2.0 * fl1_fn * (tg_0_zzz_0[j] - fl1_fzb * tg_0_zzz_1[j]);
                 }
 
                 idx++;
@@ -2362,62 +2382,66 @@ namespace erirecfunc { // erirecfunc namespace
                     double fl1_fn = fn[j];
 
                     double fl1_fzb = fzb[j];
+                    
+                    double fr0 = qd_x[j]; double fr1 = wq_x[j];
 
-                    tg_0_xxxxxx_0[j] = qd_x[j] * tg_0_xxxxx_0[j] + wq_x[j] * tg_0_xxxxx_1[j] + 2.5 * fl1_fn * tg_0_xxxx_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_xxxx_1[j];
+                    tg_0_xxxxxx_0[j] = fr0 * tg_0_xxxxx_0[j] + fr1 * tg_0_xxxxx_1[j] + 2.5 * fl1_fn * (tg_0_xxxx_0[j] - fl1_fzb * tg_0_xxxx_1[j]);
 
-                    tg_0_xxxxxy_0[j] = qd_x[j] * tg_0_xxxxy_0[j] + wq_x[j] * tg_0_xxxxy_1[j] + 2.0 * fl1_fn * tg_0_xxxy_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxy_1[j];
+                    tg_0_xxxxxy_0[j] = fr0 * tg_0_xxxxy_0[j] + fr1 * tg_0_xxxxy_1[j] + 2.0 * fl1_fn * (tg_0_xxxy_0[j] - fl1_fzb * tg_0_xxxy_1[j]);
 
-                    tg_0_xxxxxz_0[j] = qd_x[j] * tg_0_xxxxz_0[j] + wq_x[j] * tg_0_xxxxz_1[j] + 2.0 * fl1_fn * tg_0_xxxz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxz_1[j];
+                    tg_0_xxxxxz_0[j] = fr0 * tg_0_xxxxz_0[j] + fr1 * tg_0_xxxxz_1[j] + 2.0 * fl1_fn * (tg_0_xxxz_0[j] - fl1_fzb * tg_0_xxxz_1[j]);
 
-                    tg_0_xxxxyy_0[j] = qd_x[j] * tg_0_xxxyy_0[j] + wq_x[j] * tg_0_xxxyy_1[j] + 1.5 * fl1_fn * tg_0_xxyy_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyy_1[j];
+                    tg_0_xxxxyy_0[j] = fr0 * tg_0_xxxyy_0[j] + fr1 * tg_0_xxxyy_1[j] + 1.5 * fl1_fn * (tg_0_xxyy_0[j] - fl1_fzb * tg_0_xxyy_1[j]);
 
-                    tg_0_xxxxyz_0[j] = qd_x[j] * tg_0_xxxyz_0[j] + wq_x[j] * tg_0_xxxyz_1[j] + 1.5 * fl1_fn * tg_0_xxyz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyz_1[j];
+                    tg_0_xxxxyz_0[j] = fr0 * tg_0_xxxyz_0[j] + fr1 * tg_0_xxxyz_1[j] + 1.5 * fl1_fn * (tg_0_xxyz_0[j] - fl1_fzb * tg_0_xxyz_1[j]);
 
-                    tg_0_xxxxzz_0[j] = qd_x[j] * tg_0_xxxzz_0[j] + wq_x[j] * tg_0_xxxzz_1[j] + 1.5 * fl1_fn * tg_0_xxzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxzz_1[j];
+                    tg_0_xxxxzz_0[j] = fr0 * tg_0_xxxzz_0[j] + fr1 * tg_0_xxxzz_1[j] + 1.5 * fl1_fn * (tg_0_xxzz_0[j] - fl1_fzb * tg_0_xxzz_1[j]);
 
-                    tg_0_xxxyyy_0[j] = qd_x[j] * tg_0_xxyyy_0[j] + wq_x[j] * tg_0_xxyyy_1[j] + fl1_fn * tg_0_xyyy_0[j] - fl1_fn * fl1_fzb * tg_0_xyyy_1[j];
+                    tg_0_xxxyyy_0[j] = fr0 * tg_0_xxyyy_0[j] + fr1 * tg_0_xxyyy_1[j] + fl1_fn * (tg_0_xyyy_0[j] - fl1_fzb * tg_0_xyyy_1[j]);
 
-                    tg_0_xxxyyz_0[j] = qd_x[j] * tg_0_xxyyz_0[j] + wq_x[j] * tg_0_xxyyz_1[j] + fl1_fn * tg_0_xyyz_0[j] - fl1_fn * fl1_fzb * tg_0_xyyz_1[j];
+                    tg_0_xxxyyz_0[j] = fr0 * tg_0_xxyyz_0[j] + fr1 * tg_0_xxyyz_1[j] + fl1_fn * (tg_0_xyyz_0[j] - fl1_fzb * tg_0_xyyz_1[j]);
 
-                    tg_0_xxxyzz_0[j] = qd_x[j] * tg_0_xxyzz_0[j] + wq_x[j] * tg_0_xxyzz_1[j] + fl1_fn * tg_0_xyzz_0[j] - fl1_fn * fl1_fzb * tg_0_xyzz_1[j];
+                    tg_0_xxxyzz_0[j] = fr0 * tg_0_xxyzz_0[j] + fr1 * tg_0_xxyzz_1[j] + fl1_fn * (tg_0_xyzz_0[j] - fl1_fzb * tg_0_xyzz_1[j]);
 
-                    tg_0_xxxzzz_0[j] = qd_x[j] * tg_0_xxzzz_0[j] + wq_x[j] * tg_0_xxzzz_1[j] + fl1_fn * tg_0_xzzz_0[j] - fl1_fn * fl1_fzb * tg_0_xzzz_1[j];
+                    tg_0_xxxzzz_0[j] = fr0 * tg_0_xxzzz_0[j] + fr1 * tg_0_xxzzz_1[j] + fl1_fn * (tg_0_xzzz_0[j] - fl1_fzb * tg_0_xzzz_1[j]);
 
-                    tg_0_xxyyyy_0[j] = qd_x[j] * tg_0_xyyyy_0[j] + wq_x[j] * tg_0_xyyyy_1[j] + 0.5 * fl1_fn * tg_0_yyyy_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyy_1[j];
+                    tg_0_xxyyyy_0[j] = fr0 * tg_0_xyyyy_0[j] + fr1 * tg_0_xyyyy_1[j] + 0.5 * fl1_fn * (tg_0_yyyy_0[j] - fl1_fzb * tg_0_yyyy_1[j]);
 
-                    tg_0_xxyyyz_0[j] = qd_x[j] * tg_0_xyyyz_0[j] + wq_x[j] * tg_0_xyyyz_1[j] + 0.5 * fl1_fn * tg_0_yyyz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyz_1[j];
+                    tg_0_xxyyyz_0[j] = fr0 * tg_0_xyyyz_0[j] + fr1 * tg_0_xyyyz_1[j] + 0.5 * fl1_fn * (tg_0_yyyz_0[j] - fl1_fzb * tg_0_yyyz_1[j]);
 
-                    tg_0_xxyyzz_0[j] = qd_x[j] * tg_0_xyyzz_0[j] + wq_x[j] * tg_0_xyyzz_1[j] + 0.5 * fl1_fn * tg_0_yyzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyzz_1[j];
+                    tg_0_xxyyzz_0[j] = fr0 * tg_0_xyyzz_0[j] + fr1 * tg_0_xyyzz_1[j] + 0.5 * fl1_fn * (tg_0_yyzz_0[j] - fl1_fzb * tg_0_yyzz_1[j]);
 
-                    tg_0_xxyzzz_0[j] = qd_x[j] * tg_0_xyzzz_0[j] + wq_x[j] * tg_0_xyzzz_1[j] + 0.5 * fl1_fn * tg_0_yzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yzzz_1[j];
+                    tg_0_xxyzzz_0[j] = fr0 * tg_0_xyzzz_0[j] + fr1 * tg_0_xyzzz_1[j] + 0.5 * fl1_fn * (tg_0_yzzz_0[j] - fl1_fzb * tg_0_yzzz_1[j]);
 
-                    tg_0_xxzzzz_0[j] = qd_x[j] * tg_0_xzzzz_0[j] + wq_x[j] * tg_0_xzzzz_1[j] + 0.5 * fl1_fn * tg_0_zzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzzz_1[j];
+                    tg_0_xxzzzz_0[j] = fr0 * tg_0_xzzzz_0[j] + fr1 * tg_0_xzzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzzz_0[j] -  fl1_fzb * tg_0_zzzz_1[j]);
 
-                    tg_0_xyyyyy_0[j] = qd_x[j] * tg_0_yyyyy_0[j] + wq_x[j] * tg_0_yyyyy_1[j];
+                    tg_0_xyyyyy_0[j] = fr0 * tg_0_yyyyy_0[j] + fr1 * tg_0_yyyyy_1[j];
 
-                    tg_0_xyyyyz_0[j] = qd_x[j] * tg_0_yyyyz_0[j] + wq_x[j] * tg_0_yyyyz_1[j];
+                    tg_0_xyyyyz_0[j] = fr0 * tg_0_yyyyz_0[j] + fr1 * tg_0_yyyyz_1[j];
 
-                    tg_0_xyyyzz_0[j] = qd_x[j] * tg_0_yyyzz_0[j] + wq_x[j] * tg_0_yyyzz_1[j];
+                    tg_0_xyyyzz_0[j] = fr0 * tg_0_yyyzz_0[j] + fr1 * tg_0_yyyzz_1[j];
 
-                    tg_0_xyyzzz_0[j] = qd_x[j] * tg_0_yyzzz_0[j] + wq_x[j] * tg_0_yyzzz_1[j];
+                    tg_0_xyyzzz_0[j] = fr0 * tg_0_yyzzz_0[j] + fr1 * tg_0_yyzzz_1[j];
 
-                    tg_0_xyzzzz_0[j] = qd_x[j] * tg_0_yzzzz_0[j] + wq_x[j] * tg_0_yzzzz_1[j];
+                    tg_0_xyzzzz_0[j] = fr0 * tg_0_yzzzz_0[j] + fr1 * tg_0_yzzzz_1[j];
 
-                    tg_0_xzzzzz_0[j] = qd_x[j] * tg_0_zzzzz_0[j] + wq_x[j] * tg_0_zzzzz_1[j];
+                    tg_0_xzzzzz_0[j] = fr0 * tg_0_zzzzz_0[j] + fr1 * tg_0_zzzzz_1[j];
+                    
+                    fr0 = qd_y[j]; fr1 = wq_y[j];
 
-                    tg_0_yyyyyy_0[j] = qd_y[j] * tg_0_yyyyy_0[j] + wq_y[j] * tg_0_yyyyy_1[j] + 2.5 * fl1_fn * tg_0_yyyy_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_yyyy_1[j];
+                    tg_0_yyyyyy_0[j] = fr0 * tg_0_yyyyy_0[j] + fr1 * tg_0_yyyyy_1[j] + 2.5 * fl1_fn * (tg_0_yyyy_0[j] - fl1_fzb * tg_0_yyyy_1[j]);
 
-                    tg_0_yyyyyz_0[j] = qd_y[j] * tg_0_yyyyz_0[j] + wq_y[j] * tg_0_yyyyz_1[j] + 2.0 * fl1_fn * tg_0_yyyz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_yyyz_1[j];
+                    tg_0_yyyyyz_0[j] = fr0 * tg_0_yyyyz_0[j] + fr1 * tg_0_yyyyz_1[j] + 2.0 * fl1_fn * (tg_0_yyyz_0[j] - fl1_fzb * tg_0_yyyz_1[j]);
 
-                    tg_0_yyyyzz_0[j] = qd_y[j] * tg_0_yyyzz_0[j] + wq_y[j] * tg_0_yyyzz_1[j] + 1.5 * fl1_fn * tg_0_yyzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_yyzz_1[j];
+                    tg_0_yyyyzz_0[j] = fr0 * tg_0_yyyzz_0[j] + fr1 * tg_0_yyyzz_1[j] + 1.5 * fl1_fn * (tg_0_yyzz_0[j] - fl1_fzb * tg_0_yyzz_1[j]);
 
-                    tg_0_yyyzzz_0[j] = qd_y[j] * tg_0_yyzzz_0[j] + wq_y[j] * tg_0_yyzzz_1[j] + fl1_fn * tg_0_yzzz_0[j] - fl1_fn * fl1_fzb * tg_0_yzzz_1[j];
+                    tg_0_yyyzzz_0[j] = fr0 * tg_0_yyzzz_0[j] + fr1 * tg_0_yyzzz_1[j] + fl1_fn * (tg_0_yzzz_0[j] - fl1_fzb * tg_0_yzzz_1[j]);
 
-                    tg_0_yyzzzz_0[j] = qd_y[j] * tg_0_yzzzz_0[j] + wq_y[j] * tg_0_yzzzz_1[j] + 0.5 * fl1_fn * tg_0_zzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzzz_1[j];
+                    tg_0_yyzzzz_0[j] = fr0 * tg_0_yzzzz_0[j] + fr1 * tg_0_yzzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzzz_0[j] - fl1_fzb * tg_0_zzzz_1[j]);
 
-                    tg_0_yzzzzz_0[j] = qd_y[j] * tg_0_zzzzz_0[j] + wq_y[j] * tg_0_zzzzz_1[j];
+                    tg_0_yzzzzz_0[j] = fr0 * tg_0_zzzzz_0[j] + fr1 * tg_0_zzzzz_1[j];
 
-                    tg_0_zzzzzz_0[j] = qd_z[j] * tg_0_zzzzz_0[j] + wq_z[j] * tg_0_zzzzz_1[j] + 2.5 * fl1_fn * tg_0_zzzz_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_zzzz_1[j];
+                    tg_0_zzzzzz_0[j] = qd_z[j] * tg_0_zzzzz_0[j] + wq_z[j] * tg_0_zzzzz_1[j] + 2.5 * fl1_fn * (tg_0_zzzz_0[j] - fl1_fzb * tg_0_zzzz_1[j]);
                 }
 
                 idx++;
@@ -3197,78 +3221,82 @@ namespace erirecfunc { // erirecfunc namespace
                     double fl1_fn = fn[j];
 
                     double fl1_fzb = fzb[j];
+                    
+                    double fr0 = qd_x[j]; double fr1 = wq_x[j];
 
-                    tg_0_xxxxxxx_0[j] = qd_x[j] * tg_0_xxxxxx_0[j] + wq_x[j] * tg_0_xxxxxx_1[j] + 3.0 * fl1_fn * tg_0_xxxxx_0[j] - 3.0 * fl1_fn * fl1_fzb * tg_0_xxxxx_1[j];
+                    tg_0_xxxxxxx_0[j] = fr0 * tg_0_xxxxxx_0[j] + fr1 * tg_0_xxxxxx_1[j] + 3.0 * fl1_fn * (tg_0_xxxxx_0[j] - fl1_fzb * tg_0_xxxxx_1[j]);
 
-                    tg_0_xxxxxxy_0[j] = qd_x[j] * tg_0_xxxxxy_0[j] + wq_x[j] * tg_0_xxxxxy_1[j] + 2.5 * fl1_fn * tg_0_xxxxy_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_xxxxy_1[j];
+                    tg_0_xxxxxxy_0[j] = fr0 * tg_0_xxxxxy_0[j] + fr1 * tg_0_xxxxxy_1[j] + 2.5 * fl1_fn * (tg_0_xxxxy_0[j] - fl1_fzb * tg_0_xxxxy_1[j]);
 
-                    tg_0_xxxxxxz_0[j] = qd_x[j] * tg_0_xxxxxz_0[j] + wq_x[j] * tg_0_xxxxxz_1[j] + 2.5 * fl1_fn * tg_0_xxxxz_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_xxxxz_1[j];
+                    tg_0_xxxxxxz_0[j] = fr0 * tg_0_xxxxxz_0[j] + fr1 * tg_0_xxxxxz_1[j] + 2.5 * fl1_fn * (tg_0_xxxxz_0[j] - fl1_fzb * tg_0_xxxxz_1[j]);
 
-                    tg_0_xxxxxyy_0[j] = qd_x[j] * tg_0_xxxxyy_0[j] + wq_x[j] * tg_0_xxxxyy_1[j] + 2.0 * fl1_fn * tg_0_xxxyy_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxyy_1[j];
+                    tg_0_xxxxxyy_0[j] = fr0 * tg_0_xxxxyy_0[j] + fr1 * tg_0_xxxxyy_1[j] + 2.0 * fl1_fn * (tg_0_xxxyy_0[j] - fl1_fzb * tg_0_xxxyy_1[j]);
 
-                    tg_0_xxxxxyz_0[j] = qd_x[j] * tg_0_xxxxyz_0[j] + wq_x[j] * tg_0_xxxxyz_1[j] + 2.0 * fl1_fn * tg_0_xxxyz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxyz_1[j];
+                    tg_0_xxxxxyz_0[j] = fr0 * tg_0_xxxxyz_0[j] + fr1 * tg_0_xxxxyz_1[j] + 2.0 * fl1_fn * (tg_0_xxxyz_0[j] - fl1_fzb * tg_0_xxxyz_1[j]);
 
-                    tg_0_xxxxxzz_0[j] = qd_x[j] * tg_0_xxxxzz_0[j] + wq_x[j] * tg_0_xxxxzz_1[j] + 2.0 * fl1_fn * tg_0_xxxzz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxzz_1[j];
+                    tg_0_xxxxxzz_0[j] = fr0 * tg_0_xxxxzz_0[j] + fr1 * tg_0_xxxxzz_1[j] + 2.0 * fl1_fn * (tg_0_xxxzz_0[j] - fl1_fzb * tg_0_xxxzz_1[j]);
 
-                    tg_0_xxxxyyy_0[j] = qd_x[j] * tg_0_xxxyyy_0[j] + wq_x[j] * tg_0_xxxyyy_1[j] + 1.5 * fl1_fn * tg_0_xxyyy_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyyy_1[j];
+                    tg_0_xxxxyyy_0[j] = fr0 * tg_0_xxxyyy_0[j] + fr1 * tg_0_xxxyyy_1[j] + 1.5 * fl1_fn * (tg_0_xxyyy_0[j] - fl1_fzb * tg_0_xxyyy_1[j]);
 
-                    tg_0_xxxxyyz_0[j] = qd_x[j] * tg_0_xxxyyz_0[j] + wq_x[j] * tg_0_xxxyyz_1[j] + 1.5 * fl1_fn * tg_0_xxyyz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyyz_1[j];
+                    tg_0_xxxxyyz_0[j] = fr0 * tg_0_xxxyyz_0[j] + fr1 * tg_0_xxxyyz_1[j] + 1.5 * fl1_fn * (tg_0_xxyyz_0[j] - fl1_fzb * tg_0_xxyyz_1[j]);
 
-                    tg_0_xxxxyzz_0[j] = qd_x[j] * tg_0_xxxyzz_0[j] + wq_x[j] * tg_0_xxxyzz_1[j] + 1.5 * fl1_fn * tg_0_xxyzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyzz_1[j];
+                    tg_0_xxxxyzz_0[j] = fr0 * tg_0_xxxyzz_0[j] + fr1 * tg_0_xxxyzz_1[j] + 1.5 * fl1_fn * (tg_0_xxyzz_0[j] - fl1_fzb * tg_0_xxyzz_1[j]);
 
-                    tg_0_xxxxzzz_0[j] = qd_x[j] * tg_0_xxxzzz_0[j] + wq_x[j] * tg_0_xxxzzz_1[j] + 1.5 * fl1_fn * tg_0_xxzzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxzzz_1[j];
+                    tg_0_xxxxzzz_0[j] = fr0 * tg_0_xxxzzz_0[j] + fr1 * tg_0_xxxzzz_1[j] + 1.5 * fl1_fn * (tg_0_xxzzz_0[j] - fl1_fzb * tg_0_xxzzz_1[j]);
 
-                    tg_0_xxxyyyy_0[j] = qd_x[j] * tg_0_xxyyyy_0[j] + wq_x[j] * tg_0_xxyyyy_1[j] + fl1_fn * tg_0_xyyyy_0[j] - fl1_fn * fl1_fzb * tg_0_xyyyy_1[j];
+                    tg_0_xxxyyyy_0[j] = fr0 * tg_0_xxyyyy_0[j] + fr1 * tg_0_xxyyyy_1[j] + fl1_fn * (tg_0_xyyyy_0[j] - fl1_fzb * tg_0_xyyyy_1[j]);
 
-                    tg_0_xxxyyyz_0[j] = qd_x[j] * tg_0_xxyyyz_0[j] + wq_x[j] * tg_0_xxyyyz_1[j] + fl1_fn * tg_0_xyyyz_0[j] - fl1_fn * fl1_fzb * tg_0_xyyyz_1[j];
+                    tg_0_xxxyyyz_0[j] = fr0 * tg_0_xxyyyz_0[j] + fr1 * tg_0_xxyyyz_1[j] + fl1_fn * (tg_0_xyyyz_0[j] - fl1_fzb * tg_0_xyyyz_1[j]);
 
-                    tg_0_xxxyyzz_0[j] = qd_x[j] * tg_0_xxyyzz_0[j] + wq_x[j] * tg_0_xxyyzz_1[j] + fl1_fn * tg_0_xyyzz_0[j] - fl1_fn * fl1_fzb * tg_0_xyyzz_1[j];
+                    tg_0_xxxyyzz_0[j] = fr0 * tg_0_xxyyzz_0[j] + fr1 * tg_0_xxyyzz_1[j] + fl1_fn * (tg_0_xyyzz_0[j] - fl1_fzb * tg_0_xyyzz_1[j]);
 
-                    tg_0_xxxyzzz_0[j] = qd_x[j] * tg_0_xxyzzz_0[j] + wq_x[j] * tg_0_xxyzzz_1[j] + fl1_fn * tg_0_xyzzz_0[j] - fl1_fn * fl1_fzb * tg_0_xyzzz_1[j];
+                    tg_0_xxxyzzz_0[j] = fr0 * tg_0_xxyzzz_0[j] + fr1 * tg_0_xxyzzz_1[j] + fl1_fn * (tg_0_xyzzz_0[j] - fl1_fzb * tg_0_xyzzz_1[j]);
 
-                    tg_0_xxxzzzz_0[j] = qd_x[j] * tg_0_xxzzzz_0[j] + wq_x[j] * tg_0_xxzzzz_1[j] + fl1_fn * tg_0_xzzzz_0[j] - fl1_fn * fl1_fzb * tg_0_xzzzz_1[j];
+                    tg_0_xxxzzzz_0[j] = fr0 * tg_0_xxzzzz_0[j] + fr1 * tg_0_xxzzzz_1[j] + fl1_fn * (tg_0_xzzzz_0[j] - fl1_fzb * tg_0_xzzzz_1[j]);
 
-                    tg_0_xxyyyyy_0[j] = qd_x[j] * tg_0_xyyyyy_0[j] + wq_x[j] * tg_0_xyyyyy_1[j] + 0.5 * fl1_fn * tg_0_yyyyy_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyyy_1[j];
+                    tg_0_xxyyyyy_0[j] = fr0 * tg_0_xyyyyy_0[j] + fr1 * tg_0_xyyyyy_1[j] + 0.5 * fl1_fn * (tg_0_yyyyy_0[j] - fl1_fzb * tg_0_yyyyy_1[j]);
 
-                    tg_0_xxyyyyz_0[j] = qd_x[j] * tg_0_xyyyyz_0[j] + wq_x[j] * tg_0_xyyyyz_1[j] + 0.5 * fl1_fn * tg_0_yyyyz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyyz_1[j];
+                    tg_0_xxyyyyz_0[j] = fr0 * tg_0_xyyyyz_0[j] + fr1 * tg_0_xyyyyz_1[j] + 0.5 * fl1_fn * (tg_0_yyyyz_0[j] - fl1_fzb * tg_0_yyyyz_1[j]);
 
-                    tg_0_xxyyyzz_0[j] = qd_x[j] * tg_0_xyyyzz_0[j] + wq_x[j] * tg_0_xyyyzz_1[j] + 0.5 * fl1_fn * tg_0_yyyzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyzz_1[j];
+                    tg_0_xxyyyzz_0[j] = fr0 * tg_0_xyyyzz_0[j] + fr1 * tg_0_xyyyzz_1[j] + 0.5 * fl1_fn * (tg_0_yyyzz_0[j] - fl1_fzb * tg_0_yyyzz_1[j]);
 
-                    tg_0_xxyyzzz_0[j] = qd_x[j] * tg_0_xyyzzz_0[j] + wq_x[j] * tg_0_xyyzzz_1[j] + 0.5 * fl1_fn * tg_0_yyzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyzzz_1[j];
+                    tg_0_xxyyzzz_0[j] = fr0 * tg_0_xyyzzz_0[j] + fr1 * tg_0_xyyzzz_1[j] + 0.5 * fl1_fn * (tg_0_yyzzz_0[j] - fl1_fzb * tg_0_yyzzz_1[j]);
 
-                    tg_0_xxyzzzz_0[j] = qd_x[j] * tg_0_xyzzzz_0[j] + wq_x[j] * tg_0_xyzzzz_1[j] + 0.5 * fl1_fn * tg_0_yzzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yzzzz_1[j];
+                    tg_0_xxyzzzz_0[j] = fr0 * tg_0_xyzzzz_0[j] + fr1 * tg_0_xyzzzz_1[j] + 0.5 * fl1_fn * (tg_0_yzzzz_0[j] - fl1_fzb * tg_0_yzzzz_1[j]);
 
-                    tg_0_xxzzzzz_0[j] = qd_x[j] * tg_0_xzzzzz_0[j] + wq_x[j] * tg_0_xzzzzz_1[j] + 0.5 * fl1_fn * tg_0_zzzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzzzz_1[j];
+                    tg_0_xxzzzzz_0[j] = fr0 * tg_0_xzzzzz_0[j] + fr1 * tg_0_xzzzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzzzz_0[j] - fl1_fzb * tg_0_zzzzz_1[j]);
 
-                    tg_0_xyyyyyy_0[j] = qd_x[j] * tg_0_yyyyyy_0[j] + wq_x[j] * tg_0_yyyyyy_1[j];
+                    tg_0_xyyyyyy_0[j] = fr0 * tg_0_yyyyyy_0[j] + fr1 * tg_0_yyyyyy_1[j];
 
-                    tg_0_xyyyyyz_0[j] = qd_x[j] * tg_0_yyyyyz_0[j] + wq_x[j] * tg_0_yyyyyz_1[j];
+                    tg_0_xyyyyyz_0[j] = fr0 * tg_0_yyyyyz_0[j] + fr1 * tg_0_yyyyyz_1[j];
 
-                    tg_0_xyyyyzz_0[j] = qd_x[j] * tg_0_yyyyzz_0[j] + wq_x[j] * tg_0_yyyyzz_1[j];
+                    tg_0_xyyyyzz_0[j] = fr0 * tg_0_yyyyzz_0[j] + fr1 * tg_0_yyyyzz_1[j];
 
-                    tg_0_xyyyzzz_0[j] = qd_x[j] * tg_0_yyyzzz_0[j] + wq_x[j] * tg_0_yyyzzz_1[j];
+                    tg_0_xyyyzzz_0[j] = fr0 * tg_0_yyyzzz_0[j] + fr1 * tg_0_yyyzzz_1[j];
 
-                    tg_0_xyyzzzz_0[j] = qd_x[j] * tg_0_yyzzzz_0[j] + wq_x[j] * tg_0_yyzzzz_1[j];
+                    tg_0_xyyzzzz_0[j] = fr0 * tg_0_yyzzzz_0[j] + fr1 * tg_0_yyzzzz_1[j];
 
-                    tg_0_xyzzzzz_0[j] = qd_x[j] * tg_0_yzzzzz_0[j] + wq_x[j] * tg_0_yzzzzz_1[j];
+                    tg_0_xyzzzzz_0[j] = fr0 * tg_0_yzzzzz_0[j] + fr1 * tg_0_yzzzzz_1[j];
 
-                    tg_0_xzzzzzz_0[j] = qd_x[j] * tg_0_zzzzzz_0[j] + wq_x[j] * tg_0_zzzzzz_1[j];
+                    tg_0_xzzzzzz_0[j] = fr0 * tg_0_zzzzzz_0[j] + fr1 * tg_0_zzzzzz_1[j];
+                    
+                    fr0 = qd_y[j]; fr1 = wq_y[j];
 
-                    tg_0_yyyyyyy_0[j] = qd_y[j] * tg_0_yyyyyy_0[j] + wq_y[j] * tg_0_yyyyyy_1[j] + 3.0 * fl1_fn * tg_0_yyyyy_0[j] - 3.0 * fl1_fn * fl1_fzb * tg_0_yyyyy_1[j];
+                    tg_0_yyyyyyy_0[j] = fr0 * tg_0_yyyyyy_0[j] + fr1 * tg_0_yyyyyy_1[j] + 3.0 * fl1_fn * (tg_0_yyyyy_0[j] - fl1_fzb * tg_0_yyyyy_1[j]);
 
-                    tg_0_yyyyyyz_0[j] = qd_y[j] * tg_0_yyyyyz_0[j] + wq_y[j] * tg_0_yyyyyz_1[j] + 2.5 * fl1_fn * tg_0_yyyyz_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_yyyyz_1[j];
+                    tg_0_yyyyyyz_0[j] = fr0 * tg_0_yyyyyz_0[j] + fr1 * tg_0_yyyyyz_1[j] + 2.5 * fl1_fn * (tg_0_yyyyz_0[j] - fl1_fzb * tg_0_yyyyz_1[j]);
 
-                    tg_0_yyyyyzz_0[j] = qd_y[j] * tg_0_yyyyzz_0[j] + wq_y[j] * tg_0_yyyyzz_1[j] + 2.0 * fl1_fn * tg_0_yyyzz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_yyyzz_1[j];
+                    tg_0_yyyyyzz_0[j] = fr0 * tg_0_yyyyzz_0[j] + fr1 * tg_0_yyyyzz_1[j] + 2.0 * fl1_fn * (tg_0_yyyzz_0[j] - fl1_fzb * tg_0_yyyzz_1[j]);
 
-                    tg_0_yyyyzzz_0[j] = qd_y[j] * tg_0_yyyzzz_0[j] + wq_y[j] * tg_0_yyyzzz_1[j] + 1.5 * fl1_fn * tg_0_yyzzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_yyzzz_1[j];
+                    tg_0_yyyyzzz_0[j] = fr0 * tg_0_yyyzzz_0[j] + fr1 * tg_0_yyyzzz_1[j] + 1.5 * fl1_fn * (tg_0_yyzzz_0[j] - fl1_fzb * tg_0_yyzzz_1[j]);
 
-                    tg_0_yyyzzzz_0[j] = qd_y[j] * tg_0_yyzzzz_0[j] + wq_y[j] * tg_0_yyzzzz_1[j] + fl1_fn * tg_0_yzzzz_0[j] - fl1_fn * fl1_fzb * tg_0_yzzzz_1[j];
+                    tg_0_yyyzzzz_0[j] = fr0 * tg_0_yyzzzz_0[j] + fr1 * tg_0_yyzzzz_1[j] + fl1_fn * (tg_0_yzzzz_0[j] - fl1_fzb * tg_0_yzzzz_1[j]);
 
-                    tg_0_yyzzzzz_0[j] = qd_y[j] * tg_0_yzzzzz_0[j] + wq_y[j] * tg_0_yzzzzz_1[j] + 0.5 * fl1_fn * tg_0_zzzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzzzz_1[j];
+                    tg_0_yyzzzzz_0[j] = fr0 * tg_0_yzzzzz_0[j] + fr1 * tg_0_yzzzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzzzz_0[j] - fl1_fzb * tg_0_zzzzz_1[j]);
 
-                    tg_0_yzzzzzz_0[j] = qd_y[j] * tg_0_zzzzzz_0[j] + wq_y[j] * tg_0_zzzzzz_1[j];
+                    tg_0_yzzzzzz_0[j] = fr0 * tg_0_zzzzzz_0[j] + fr1 * tg_0_zzzzzz_1[j];
 
-                    tg_0_zzzzzzz_0[j] = qd_z[j] * tg_0_zzzzzz_0[j] + wq_z[j] * tg_0_zzzzzz_1[j] + 3.0 * fl1_fn * tg_0_zzzzz_0[j] - 3.0 * fl1_fn * fl1_fzb * tg_0_zzzzz_1[j];
+                    tg_0_zzzzzzz_0[j] = qd_z[j] * tg_0_zzzzzz_0[j] + wq_z[j] * tg_0_zzzzzz_1[j] + 3.0 * fl1_fn * (tg_0_zzzzz_0[j] - fl1_fzb * tg_0_zzzzz_1[j]);
                 }
 
                 idx++;
@@ -4227,96 +4255,100 @@ namespace erirecfunc { // erirecfunc namespace
                     double fl1_fn = fn[j];
 
                     double fl1_fzb = fzb[j];
+                    
+                    double fr0 = qd_x[j]; double fr1 = wq_x[j];
 
-                    tg_0_xxxxxxxx_0[j] = qd_x[j] * tg_0_xxxxxxx_0[j] + wq_x[j] * tg_0_xxxxxxx_1[j] + 3.5 * fl1_fn * tg_0_xxxxxx_0[j] - 3.5 * fl1_fn * fl1_fzb * tg_0_xxxxxx_1[j];
+                    tg_0_xxxxxxxx_0[j] = fr0 * tg_0_xxxxxxx_0[j] + fr1 * tg_0_xxxxxxx_1[j] + 3.5 * fl1_fn * (tg_0_xxxxxx_0[j] - fl1_fzb * tg_0_xxxxxx_1[j]);
 
-                    tg_0_xxxxxxxy_0[j] = qd_x[j] * tg_0_xxxxxxy_0[j] + wq_x[j] * tg_0_xxxxxxy_1[j] + 3.0 * fl1_fn * tg_0_xxxxxy_0[j] - 3.0 * fl1_fn * fl1_fzb * tg_0_xxxxxy_1[j];
+                    tg_0_xxxxxxxy_0[j] = fr0 * tg_0_xxxxxxy_0[j] + fr1 * tg_0_xxxxxxy_1[j] + 3.0 * fl1_fn * (tg_0_xxxxxy_0[j] - fl1_fzb * tg_0_xxxxxy_1[j]);
 
-                    tg_0_xxxxxxxz_0[j] = qd_x[j] * tg_0_xxxxxxz_0[j] + wq_x[j] * tg_0_xxxxxxz_1[j] + 3.0 * fl1_fn * tg_0_xxxxxz_0[j] - 3.0 * fl1_fn * fl1_fzb * tg_0_xxxxxz_1[j];
+                    tg_0_xxxxxxxz_0[j] = fr0 * tg_0_xxxxxxz_0[j] + fr1 * tg_0_xxxxxxz_1[j] + 3.0 * fl1_fn * (tg_0_xxxxxz_0[j] - fl1_fzb * tg_0_xxxxxz_1[j]);
 
-                    tg_0_xxxxxxyy_0[j] = qd_x[j] * tg_0_xxxxxyy_0[j] + wq_x[j] * tg_0_xxxxxyy_1[j] + 2.5 * fl1_fn * tg_0_xxxxyy_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_xxxxyy_1[j];
+                    tg_0_xxxxxxyy_0[j] = fr0 * tg_0_xxxxxyy_0[j] + fr1 * tg_0_xxxxxyy_1[j] + 2.5 * fl1_fn * (tg_0_xxxxyy_0[j] - fl1_fzb * tg_0_xxxxyy_1[j]);
 
-                    tg_0_xxxxxxyz_0[j] = qd_x[j] * tg_0_xxxxxyz_0[j] + wq_x[j] * tg_0_xxxxxyz_1[j] + 2.5 * fl1_fn * tg_0_xxxxyz_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_xxxxyz_1[j];
+                    tg_0_xxxxxxyz_0[j] = fr0 * tg_0_xxxxxyz_0[j] + fr1 * tg_0_xxxxxyz_1[j] + 2.5 * fl1_fn * (tg_0_xxxxyz_0[j] - fl1_fzb * tg_0_xxxxyz_1[j]);
 
-                    tg_0_xxxxxxzz_0[j] = qd_x[j] * tg_0_xxxxxzz_0[j] + wq_x[j] * tg_0_xxxxxzz_1[j] + 2.5 * fl1_fn * tg_0_xxxxzz_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_xxxxzz_1[j];
+                    tg_0_xxxxxxzz_0[j] = fr0 * tg_0_xxxxxzz_0[j] + fr1 * tg_0_xxxxxzz_1[j] + 2.5 * fl1_fn * (tg_0_xxxxzz_0[j] - fl1_fzb * tg_0_xxxxzz_1[j]);
 
-                    tg_0_xxxxxyyy_0[j] = qd_x[j] * tg_0_xxxxyyy_0[j] + wq_x[j] * tg_0_xxxxyyy_1[j] + 2.0 * fl1_fn * tg_0_xxxyyy_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxyyy_1[j];
+                    tg_0_xxxxxyyy_0[j] = fr0 * tg_0_xxxxyyy_0[j] + fr1 * tg_0_xxxxyyy_1[j] + 2.0 * fl1_fn * (tg_0_xxxyyy_0[j] - fl1_fzb * tg_0_xxxyyy_1[j]);
 
-                    tg_0_xxxxxyyz_0[j] = qd_x[j] * tg_0_xxxxyyz_0[j] + wq_x[j] * tg_0_xxxxyyz_1[j] + 2.0 * fl1_fn * tg_0_xxxyyz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxyyz_1[j];
+                    tg_0_xxxxxyyz_0[j] = fr0 * tg_0_xxxxyyz_0[j] + fr1 * tg_0_xxxxyyz_1[j] + 2.0 * fl1_fn * (tg_0_xxxyyz_0[j] - fl1_fzb * tg_0_xxxyyz_1[j]);
 
-                    tg_0_xxxxxyzz_0[j] = qd_x[j] * tg_0_xxxxyzz_0[j] + wq_x[j] * tg_0_xxxxyzz_1[j] + 2.0 * fl1_fn * tg_0_xxxyzz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxyzz_1[j];
+                    tg_0_xxxxxyzz_0[j] = fr0 * tg_0_xxxxyzz_0[j] + fr1 * tg_0_xxxxyzz_1[j] + 2.0 * fl1_fn * (tg_0_xxxyzz_0[j] - fl1_fzb * tg_0_xxxyzz_1[j]);
 
-                    tg_0_xxxxxzzz_0[j] = qd_x[j] * tg_0_xxxxzzz_0[j] + wq_x[j] * tg_0_xxxxzzz_1[j] + 2.0 * fl1_fn * tg_0_xxxzzz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_xxxzzz_1[j];
+                    tg_0_xxxxxzzz_0[j] = fr0 * tg_0_xxxxzzz_0[j] + fr1 * tg_0_xxxxzzz_1[j] + 2.0 * fl1_fn * (tg_0_xxxzzz_0[j] - fl1_fzb * tg_0_xxxzzz_1[j]);
 
-                    tg_0_xxxxyyyy_0[j] = qd_x[j] * tg_0_xxxyyyy_0[j] + wq_x[j] * tg_0_xxxyyyy_1[j] + 1.5 * fl1_fn * tg_0_xxyyyy_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyyyy_1[j];
+                    tg_0_xxxxyyyy_0[j] = fr0 * tg_0_xxxyyyy_0[j] + fr1 * tg_0_xxxyyyy_1[j] + 1.5 * fl1_fn * (tg_0_xxyyyy_0[j] - fl1_fzb * tg_0_xxyyyy_1[j]);
 
-                    tg_0_xxxxyyyz_0[j] = qd_x[j] * tg_0_xxxyyyz_0[j] + wq_x[j] * tg_0_xxxyyyz_1[j] + 1.5 * fl1_fn * tg_0_xxyyyz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyyyz_1[j];
+                    tg_0_xxxxyyyz_0[j] = fr0 * tg_0_xxxyyyz_0[j] + fr1 * tg_0_xxxyyyz_1[j] + 1.5 * fl1_fn * (tg_0_xxyyyz_0[j] - fl1_fzb * tg_0_xxyyyz_1[j]);
 
-                    tg_0_xxxxyyzz_0[j] = qd_x[j] * tg_0_xxxyyzz_0[j] + wq_x[j] * tg_0_xxxyyzz_1[j] + 1.5 * fl1_fn * tg_0_xxyyzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyyzz_1[j];
+                    tg_0_xxxxyyzz_0[j] = fr0 * tg_0_xxxyyzz_0[j] + fr1 * tg_0_xxxyyzz_1[j] + 1.5 * fl1_fn * (tg_0_xxyyzz_0[j] - fl1_fzb * tg_0_xxyyzz_1[j]);
 
-                    tg_0_xxxxyzzz_0[j] = qd_x[j] * tg_0_xxxyzzz_0[j] + wq_x[j] * tg_0_xxxyzzz_1[j] + 1.5 * fl1_fn * tg_0_xxyzzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxyzzz_1[j];
+                    tg_0_xxxxyzzz_0[j] = fr0 * tg_0_xxxyzzz_0[j] + fr1 * tg_0_xxxyzzz_1[j] + 1.5 * fl1_fn * (tg_0_xxyzzz_0[j] - fl1_fzb * tg_0_xxyzzz_1[j]);
 
-                    tg_0_xxxxzzzz_0[j] = qd_x[j] * tg_0_xxxzzzz_0[j] + wq_x[j] * tg_0_xxxzzzz_1[j] + 1.5 * fl1_fn * tg_0_xxzzzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_xxzzzz_1[j];
+                    tg_0_xxxxzzzz_0[j] = fr0 * tg_0_xxxzzzz_0[j] + fr1 * tg_0_xxxzzzz_1[j] + 1.5 * fl1_fn * (tg_0_xxzzzz_0[j] - fl1_fzb * tg_0_xxzzzz_1[j]);
 
-                    tg_0_xxxyyyyy_0[j] = qd_x[j] * tg_0_xxyyyyy_0[j] + wq_x[j] * tg_0_xxyyyyy_1[j] + fl1_fn * tg_0_xyyyyy_0[j] - fl1_fn * fl1_fzb * tg_0_xyyyyy_1[j];
+                    tg_0_xxxyyyyy_0[j] = fr0 * tg_0_xxyyyyy_0[j] + fr1 * tg_0_xxyyyyy_1[j] + fl1_fn * (tg_0_xyyyyy_0[j] - fl1_fzb * tg_0_xyyyyy_1[j]);
 
-                    tg_0_xxxyyyyz_0[j] = qd_x[j] * tg_0_xxyyyyz_0[j] + wq_x[j] * tg_0_xxyyyyz_1[j] + fl1_fn * tg_0_xyyyyz_0[j] - fl1_fn * fl1_fzb * tg_0_xyyyyz_1[j];
+                    tg_0_xxxyyyyz_0[j] = fr0 * tg_0_xxyyyyz_0[j] + fr1 * tg_0_xxyyyyz_1[j] + fl1_fn * (tg_0_xyyyyz_0[j] - fl1_fzb * tg_0_xyyyyz_1[j]);
 
-                    tg_0_xxxyyyzz_0[j] = qd_x[j] * tg_0_xxyyyzz_0[j] + wq_x[j] * tg_0_xxyyyzz_1[j] + fl1_fn * tg_0_xyyyzz_0[j] - fl1_fn * fl1_fzb * tg_0_xyyyzz_1[j];
+                    tg_0_xxxyyyzz_0[j] = fr0 * tg_0_xxyyyzz_0[j] + fr1 * tg_0_xxyyyzz_1[j] + fl1_fn * (tg_0_xyyyzz_0[j] - fl1_fzb * tg_0_xyyyzz_1[j]);
 
-                    tg_0_xxxyyzzz_0[j] = qd_x[j] * tg_0_xxyyzzz_0[j] + wq_x[j] * tg_0_xxyyzzz_1[j] + fl1_fn * tg_0_xyyzzz_0[j] - fl1_fn * fl1_fzb * tg_0_xyyzzz_1[j];
+                    tg_0_xxxyyzzz_0[j] = fr0 * tg_0_xxyyzzz_0[j] + fr1 * tg_0_xxyyzzz_1[j] + fl1_fn * (tg_0_xyyzzz_0[j] - fl1_fzb * tg_0_xyyzzz_1[j]);
 
-                    tg_0_xxxyzzzz_0[j] = qd_x[j] * tg_0_xxyzzzz_0[j] + wq_x[j] * tg_0_xxyzzzz_1[j] + fl1_fn * tg_0_xyzzzz_0[j] - fl1_fn * fl1_fzb * tg_0_xyzzzz_1[j];
+                    tg_0_xxxyzzzz_0[j] = fr0 * tg_0_xxyzzzz_0[j] + fr1 * tg_0_xxyzzzz_1[j] + fl1_fn * (tg_0_xyzzzz_0[j] - fl1_fzb * tg_0_xyzzzz_1[j]);
 
-                    tg_0_xxxzzzzz_0[j] = qd_x[j] * tg_0_xxzzzzz_0[j] + wq_x[j] * tg_0_xxzzzzz_1[j] + fl1_fn * tg_0_xzzzzz_0[j] - fl1_fn * fl1_fzb * tg_0_xzzzzz_1[j];
+                    tg_0_xxxzzzzz_0[j] = fr0 * tg_0_xxzzzzz_0[j] + fr1 * tg_0_xxzzzzz_1[j] + fl1_fn * (tg_0_xzzzzz_0[j] - fl1_fzb * tg_0_xzzzzz_1[j]);
 
-                    tg_0_xxyyyyyy_0[j] = qd_x[j] * tg_0_xyyyyyy_0[j] + wq_x[j] * tg_0_xyyyyyy_1[j] + 0.5 * fl1_fn * tg_0_yyyyyy_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyyyy_1[j];
+                    tg_0_xxyyyyyy_0[j] = fr0 * tg_0_xyyyyyy_0[j] + fr1 * tg_0_xyyyyyy_1[j] + 0.5 * fl1_fn * (tg_0_yyyyyy_0[j] - fl1_fzb * tg_0_yyyyyy_1[j]);
 
-                    tg_0_xxyyyyyz_0[j] = qd_x[j] * tg_0_xyyyyyz_0[j] + wq_x[j] * tg_0_xyyyyyz_1[j] + 0.5 * fl1_fn * tg_0_yyyyyz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyyyz_1[j];
+                    tg_0_xxyyyyyz_0[j] = fr0 * tg_0_xyyyyyz_0[j] + fr1 * tg_0_xyyyyyz_1[j] + 0.5 * fl1_fn * (tg_0_yyyyyz_0[j] - fl1_fzb * tg_0_yyyyyz_1[j]);
 
-                    tg_0_xxyyyyzz_0[j] = qd_x[j] * tg_0_xyyyyzz_0[j] + wq_x[j] * tg_0_xyyyyzz_1[j] + 0.5 * fl1_fn * tg_0_yyyyzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyyzz_1[j];
+                    tg_0_xxyyyyzz_0[j] = fr0 * tg_0_xyyyyzz_0[j] + fr1 * tg_0_xyyyyzz_1[j] + 0.5 * fl1_fn * (tg_0_yyyyzz_0[j] - fl1_fzb * tg_0_yyyyzz_1[j]);
 
-                    tg_0_xxyyyzzz_0[j] = qd_x[j] * tg_0_xyyyzzz_0[j] + wq_x[j] * tg_0_xyyyzzz_1[j] + 0.5 * fl1_fn * tg_0_yyyzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyyzzz_1[j];
+                    tg_0_xxyyyzzz_0[j] = fr0 * tg_0_xyyyzzz_0[j] + fr1 * tg_0_xyyyzzz_1[j] + 0.5 * fl1_fn * (tg_0_yyyzzz_0[j] - fl1_fzb * tg_0_yyyzzz_1[j]);
 
-                    tg_0_xxyyzzzz_0[j] = qd_x[j] * tg_0_xyyzzzz_0[j] + wq_x[j] * tg_0_xyyzzzz_1[j] + 0.5 * fl1_fn * tg_0_yyzzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yyzzzz_1[j];
+                    tg_0_xxyyzzzz_0[j] = fr0 * tg_0_xyyzzzz_0[j] + fr1 * tg_0_xyyzzzz_1[j] + 0.5 * fl1_fn * (tg_0_yyzzzz_0[j] - fl1_fzb * tg_0_yyzzzz_1[j]);
 
-                    tg_0_xxyzzzzz_0[j] = qd_x[j] * tg_0_xyzzzzz_0[j] + wq_x[j] * tg_0_xyzzzzz_1[j] + 0.5 * fl1_fn * tg_0_yzzzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_yzzzzz_1[j];
+                    tg_0_xxyzzzzz_0[j] = fr0 * tg_0_xyzzzzz_0[j] + fr1 * tg_0_xyzzzzz_1[j] + 0.5 * fl1_fn * (tg_0_yzzzzz_0[j] - fl1_fzb * tg_0_yzzzzz_1[j]);
 
-                    tg_0_xxzzzzzz_0[j] = qd_x[j] * tg_0_xzzzzzz_0[j] + wq_x[j] * tg_0_xzzzzzz_1[j] + 0.5 * fl1_fn * tg_0_zzzzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzzzzz_1[j];
+                    tg_0_xxzzzzzz_0[j] = fr0 * tg_0_xzzzzzz_0[j] + fr1 * tg_0_xzzzzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzzzzz_0[j] - fl1_fzb * tg_0_zzzzzz_1[j]);
 
-                    tg_0_xyyyyyyy_0[j] = qd_x[j] * tg_0_yyyyyyy_0[j] + wq_x[j] * tg_0_yyyyyyy_1[j];
+                    tg_0_xyyyyyyy_0[j] = fr0 * tg_0_yyyyyyy_0[j] + fr1 * tg_0_yyyyyyy_1[j];
 
-                    tg_0_xyyyyyyz_0[j] = qd_x[j] * tg_0_yyyyyyz_0[j] + wq_x[j] * tg_0_yyyyyyz_1[j];
+                    tg_0_xyyyyyyz_0[j] = fr0 * tg_0_yyyyyyz_0[j] + fr1 * tg_0_yyyyyyz_1[j];
 
-                    tg_0_xyyyyyzz_0[j] = qd_x[j] * tg_0_yyyyyzz_0[j] + wq_x[j] * tg_0_yyyyyzz_1[j];
+                    tg_0_xyyyyyzz_0[j] = fr0 * tg_0_yyyyyzz_0[j] + fr1 * tg_0_yyyyyzz_1[j];
 
-                    tg_0_xyyyyzzz_0[j] = qd_x[j] * tg_0_yyyyzzz_0[j] + wq_x[j] * tg_0_yyyyzzz_1[j];
+                    tg_0_xyyyyzzz_0[j] = fr0 * tg_0_yyyyzzz_0[j] + fr1 * tg_0_yyyyzzz_1[j];
 
-                    tg_0_xyyyzzzz_0[j] = qd_x[j] * tg_0_yyyzzzz_0[j] + wq_x[j] * tg_0_yyyzzzz_1[j];
+                    tg_0_xyyyzzzz_0[j] = fr0 * tg_0_yyyzzzz_0[j] + fr1 * tg_0_yyyzzzz_1[j];
 
-                    tg_0_xyyzzzzz_0[j] = qd_x[j] * tg_0_yyzzzzz_0[j] + wq_x[j] * tg_0_yyzzzzz_1[j];
+                    tg_0_xyyzzzzz_0[j] = fr0 * tg_0_yyzzzzz_0[j] + fr1 * tg_0_yyzzzzz_1[j];
 
-                    tg_0_xyzzzzzz_0[j] = qd_x[j] * tg_0_yzzzzzz_0[j] + wq_x[j] * tg_0_yzzzzzz_1[j];
+                    tg_0_xyzzzzzz_0[j] = fr0 * tg_0_yzzzzzz_0[j] + fr1 * tg_0_yzzzzzz_1[j];
 
-                    tg_0_xzzzzzzz_0[j] = qd_x[j] * tg_0_zzzzzzz_0[j] + wq_x[j] * tg_0_zzzzzzz_1[j];
+                    tg_0_xzzzzzzz_0[j] = fr0 * tg_0_zzzzzzz_0[j] + fr1 * tg_0_zzzzzzz_1[j];
+                                                                                                                 
+                    fr0 = qd_y[j]; fr1 = wq_y[j];
 
-                    tg_0_yyyyyyyy_0[j] = qd_y[j] * tg_0_yyyyyyy_0[j] + wq_y[j] * tg_0_yyyyyyy_1[j] + 3.5 * fl1_fn * tg_0_yyyyyy_0[j] - 3.5 * fl1_fn * fl1_fzb * tg_0_yyyyyy_1[j];
+                    tg_0_yyyyyyyy_0[j] = fr0 * tg_0_yyyyyyy_0[j] + fr1 * tg_0_yyyyyyy_1[j] + 3.5 * fl1_fn * (tg_0_yyyyyy_0[j] - fl1_fzb * tg_0_yyyyyy_1[j]);
 
-                    tg_0_yyyyyyyz_0[j] = qd_y[j] * tg_0_yyyyyyz_0[j] + wq_y[j] * tg_0_yyyyyyz_1[j] + 3.0 * fl1_fn * tg_0_yyyyyz_0[j] - 3.0 * fl1_fn * fl1_fzb * tg_0_yyyyyz_1[j];
+                    tg_0_yyyyyyyz_0[j] = fr0 * tg_0_yyyyyyz_0[j] + fr1 * tg_0_yyyyyyz_1[j] + 3.0 * fl1_fn * (tg_0_yyyyyz_0[j] - fl1_fzb * tg_0_yyyyyz_1[j]);
 
-                    tg_0_yyyyyyzz_0[j] = qd_y[j] * tg_0_yyyyyzz_0[j] + wq_y[j] * tg_0_yyyyyzz_1[j] + 2.5 * fl1_fn * tg_0_yyyyzz_0[j] - 2.5 * fl1_fn * fl1_fzb * tg_0_yyyyzz_1[j];
+                    tg_0_yyyyyyzz_0[j] = fr0 * tg_0_yyyyyzz_0[j] + fr1 * tg_0_yyyyyzz_1[j] + 2.5 * fl1_fn * (tg_0_yyyyzz_0[j] - fl1_fzb * tg_0_yyyyzz_1[j]);
 
-                    tg_0_yyyyyzzz_0[j] = qd_y[j] * tg_0_yyyyzzz_0[j] + wq_y[j] * tg_0_yyyyzzz_1[j] + 2.0 * fl1_fn * tg_0_yyyzzz_0[j] - 2.0 * fl1_fn * fl1_fzb * tg_0_yyyzzz_1[j];
+                    tg_0_yyyyyzzz_0[j] = fr0 * tg_0_yyyyzzz_0[j] + fr1 * tg_0_yyyyzzz_1[j] + 2.0 * fl1_fn * (tg_0_yyyzzz_0[j] - fl1_fzb * tg_0_yyyzzz_1[j]);
 
-                    tg_0_yyyyzzzz_0[j] = qd_y[j] * tg_0_yyyzzzz_0[j] + wq_y[j] * tg_0_yyyzzzz_1[j] + 1.5 * fl1_fn * tg_0_yyzzzz_0[j] - 1.5 * fl1_fn * fl1_fzb * tg_0_yyzzzz_1[j];
+                    tg_0_yyyyzzzz_0[j] = fr0 * tg_0_yyyzzzz_0[j] + fr1 * tg_0_yyyzzzz_1[j] + 1.5 * fl1_fn * (tg_0_yyzzzz_0[j] - fl1_fzb * tg_0_yyzzzz_1[j]);
 
-                    tg_0_yyyzzzzz_0[j] = qd_y[j] * tg_0_yyzzzzz_0[j] + wq_y[j] * tg_0_yyzzzzz_1[j] + fl1_fn * tg_0_yzzzzz_0[j] - fl1_fn * fl1_fzb * tg_0_yzzzzz_1[j];
+                    tg_0_yyyzzzzz_0[j] = fr0 * tg_0_yyzzzzz_0[j] + fr1 * tg_0_yyzzzzz_1[j] + fl1_fn * (tg_0_yzzzzz_0[j] - fl1_fzb * tg_0_yzzzzz_1[j]);
 
-                    tg_0_yyzzzzzz_0[j] = qd_y[j] * tg_0_yzzzzzz_0[j] + wq_y[j] * tg_0_yzzzzzz_1[j] + 0.5 * fl1_fn * tg_0_zzzzzz_0[j] - 0.5 * fl1_fn * fl1_fzb * tg_0_zzzzzz_1[j];
+                    tg_0_yyzzzzzz_0[j] = fr0 * tg_0_yzzzzzz_0[j] + fr1 * tg_0_yzzzzzz_1[j] + 0.5 * fl1_fn * (tg_0_zzzzzz_0[j] - fl1_fzb * tg_0_zzzzzz_1[j]);
 
-                    tg_0_yzzzzzzz_0[j] = qd_y[j] * tg_0_zzzzzzz_0[j] + wq_y[j] * tg_0_zzzzzzz_1[j];
+                    tg_0_yzzzzzzz_0[j] = fr0 * tg_0_zzzzzzz_0[j] + fr1 * tg_0_zzzzzzz_1[j];
 
-                    tg_0_zzzzzzzz_0[j] = qd_z[j] * tg_0_zzzzzzz_0[j] + wq_z[j] * tg_0_zzzzzzz_1[j] + 3.5 * fl1_fn * tg_0_zzzzzz_0[j] - 3.5 * fl1_fn * fl1_fzb * tg_0_zzzzzz_1[j];
+                    tg_0_zzzzzzzz_0[j] = qd_z[j] * tg_0_zzzzzzz_0[j] + wq_z[j] * tg_0_zzzzzzz_1[j] + 3.5 * fl1_fn * (tg_0_zzzzzz_0[j] - fl1_fzb * tg_0_zzzzzz_1[j]);
                 }
 
                 idx++;
