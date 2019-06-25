@@ -8,7 +8,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import rotatory_strength_in_cgs
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .lrmatvecdriver import truncate_and_normalize
+from .lrmatvecdriver import remove_linear_dependence
+from .lrmatvecdriver import orthogonalize_gram_schmidt
+from .lrmatvecdriver import normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import swap_xy
@@ -35,6 +37,8 @@ class LinearResponseEigenSolver:
         Index of the current iteration.
     :param small_thresh:
         The norm threshold for a vector to be considered a zero vector.
+    :param lindep_thresh:
+        The threshold for removing linear dependence in the trial vectors.
     :param is_converged:
         The flag for convergence.
     :param comm:
@@ -69,6 +73,7 @@ class LinearResponseEigenSolver:
         self.max_iter = 50
         self.cur_iter = 0
         self.small_thresh = 1.0e-10
+        self.lindep_thresh = 1.0e-6
         self.is_converged = False
 
         # mpi information
@@ -99,6 +104,8 @@ class LinearResponseEigenSolver:
             self.conv_thresh = float(settings['conv_thresh'])
         if 'max_iter' in settings:
             self.max_iter = int(settings['max_iter'])
+        if 'lindep_thresh' in settings:
+            self.lindep_thresh = float(settings['lindep_thresh'])
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -444,6 +451,9 @@ class LinearResponseEigenSolver:
             new_trials = new_trials - np.matmul(b, np.matmul(b.T, new_trials))
 
         if trials and renormalize:
-            new_trials = truncate_and_normalize(new_trials, self.small_thresh)
+            new_trials = remove_linear_dependence(new_trials,
+                                                  self.lindep_thresh)
+            new_trials = orthogonalize_gram_schmidt(new_trials)
+            new_trials = normalize(new_trials)
 
         return new_trials

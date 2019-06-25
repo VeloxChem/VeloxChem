@@ -5,6 +5,8 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
+from .lrmatvecdriver import orthogonalize_gram_schmidt
+from .lrmatvecdriver import normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_rhs
@@ -239,51 +241,6 @@ class ComplexResponse:
 
         return np.array(ger).T, np.array(ung).T
 
-    def orthogonalize_gram_schmidt(self, tvecs):
-        """
-        Applies modified Gram Schmidt orthogonalization to trial vectors.
-
-        :param tvecs:
-            The trial vectors.
-
-        :return:
-            The orthogonalized trial vectors.
-        """
-
-        if tvecs.shape[1] > 0:
-
-            f = 1.0 / np.linalg.norm(tvecs[:, 0])
-            tvecs[:, 0] *= f
-
-            for i in range(1, tvecs.shape[1]):
-                for j in range(i):
-                    f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
-                        tvecs[:, j], tvecs[:, j])
-                    tvecs[:, i] -= f * tvecs[:, j]
-                f = 1.0 / np.linalg.norm(tvecs[:, i])
-                tvecs[:, i] *= f
-
-        return tvecs
-
-    def normalize(self, vecs):
-        """
-        Normalizes vectors by dividing by vector norm.
-
-            The vectors.
-        :param Retruns:
-            The normalized vectors.
-        """
-
-        if len(vecs.shape) != 1:
-            for vec in range(vecs.shape[1]):
-                invnorm = 1.0 / np.linalg.norm(vecs[:, vec])
-                vecs[:, vec] *= invnorm
-        else:
-            invnorm = 1.0 / np.linalg.norm(vecs)
-            vecs *= invnorm
-
-        return vecs
-
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """
         Constructs the preconditioner matrix.
@@ -395,7 +352,7 @@ class ComplexResponse:
                      bger=np.array([]),
                      bung=np.array([]),
                      res_norm=None,
-                     normalize=True):
+                     renormalize=True):
         """
         Computes orthonormalized trial vectors. Takes set of vectors,
         preconditioner matrix, gerade and ungerade subspaces as input
@@ -411,7 +368,7 @@ class ComplexResponse:
             The ungerade subspace.
         :param res_norm:
             The relative residual norm.
-        :param normalize:
+        :param renormalize:
             The flag for normalization.
 
         :return:
@@ -453,23 +410,23 @@ class ComplexResponse:
 
         # normalizing new trial vectors
 
-        if new_ger.any() and normalize:
+        if new_ger.any() and renormalize:
 
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
 
             new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
-            new_ger = self.orthogonalize_gram_schmidt(new_ger)
-            new_ger = self.normalize(new_ger)
+            new_ger = orthogonalize_gram_schmidt(new_ger)
+            new_ger = normalize(new_ger)
 
-        if new_ung.any() and normalize:
+        if new_ung.any() and renormalize:
 
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
 
             new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
-            new_ung = self.orthogonalize_gram_schmidt(new_ung)
-            new_ung = self.normalize(new_ung)
+            new_ung = orthogonalize_gram_schmidt(new_ung)
+            new_ung = normalize(new_ung)
 
         return new_ger, new_ung
 
@@ -570,13 +527,13 @@ class ComplexResponse:
 
             if bger.any():
                 trials_info['bger'] = True
-                bger = self.orthogonalize_gram_schmidt(bger)
-                bger = self.normalize(bger)
+                bger = orthogonalize_gram_schmidt(bger)
+                bger = normalize(bger)
 
             if bung.any():
                 trials_info['bung'] = True
-                bung = self.orthogonalize_gram_schmidt(bung)
-                bung = self.normalize(bung)
+                bung = orthogonalize_gram_schmidt(bung)
+                bung = normalize(bung)
 
         else:
             trials_info = {}
@@ -865,16 +822,16 @@ class ComplexResponse:
 
                     bger = np.append(bger, new_trials_ger, axis=1)
 
-                    bger = self.orthogonalize_gram_schmidt(bger)
-                    bger = self.normalize(bger)
+                    bger = orthogonalize_gram_schmidt(bger)
+                    bger = normalize(bger)
 
                 if new_trials_ung.any():
                     trials_info['new_trials_ung'] = True
 
                     bung = np.append(bung, new_trials_ung, axis=1)
 
-                    bung = self.orthogonalize_gram_schmidt(bung)
-                    bung = self.normalize(bung)
+                    bung = orthogonalize_gram_schmidt(bung)
+                    bung = normalize(bung)
 
             else:
                 trials_info = {}

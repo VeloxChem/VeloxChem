@@ -366,31 +366,6 @@ def lrmat2vec(mat, nocc, norb):
     return np.array(z + y)
 
 
-def truncate_and_normalize(basis, small_threshold):
-    """
-    Removes linear dependence and normalizes the vectors.
-
-    :param basis:
-        The set of vectors.
-    :param small_threshold:
-        Threshold for adding vectors and removing linear dependence.
-
-    :return:
-        The new set of vectors.
-    """
-
-    Sb = np.matmul(basis.T, basis)
-    l, T = np.linalg.eigh(Sb)
-    b_norm = np.sqrt(Sb.diagonal())
-    mask = l > b_norm * small_threshold
-    truncated = np.matmul(basis, T[:, mask])
-
-    Sb = np.matmul(truncated.T, truncated)
-    l, T = np.linalg.eigh(Sb)
-    inverse_sqrt = np.matmul(T * np.sqrt(1.0 / l), T.T)
-    return np.matmul(truncated, inverse_sqrt)
-
-
 def remove_linear_dependence(basis, threshold):
     """
     Removes linear dependence in a set of vectors.
@@ -409,6 +384,55 @@ def remove_linear_dependence(basis, threshold):
     b_norm = np.sqrt(Sb.diagonal())
     mask = l > b_norm * threshold
     return np.matmul(basis, T[:, mask])
+
+
+def orthogonalize_gram_schmidt(tvecs):
+    """
+    Applies modified Gram Schmidt orthogonalization to trial vectors.
+
+    :param tvecs:
+        The trial vectors.
+
+    :return:
+        The orthogonalized trial vectors.
+    """
+
+    if tvecs.shape[1] > 0:
+
+        f = 1.0 / np.linalg.norm(tvecs[:, 0])
+        tvecs[:, 0] *= f
+
+        for i in range(1, tvecs.shape[1]):
+            for j in range(i):
+                f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
+                    tvecs[:, j], tvecs[:, j])
+                tvecs[:, i] -= f * tvecs[:, j]
+            f = 1.0 / np.linalg.norm(tvecs[:, i])
+            tvecs[:, i] *= f
+
+    return tvecs
+
+
+def normalize(vecs):
+    """
+    Normalizes vectors by dividing by vector norm.
+
+    :param vecs:
+        The vectors.
+
+    :param Retruns:
+        The normalized vectors.
+    """
+
+    if len(vecs.shape) != 1:
+        for vec in range(vecs.shape[1]):
+            invnorm = 1.0 / np.linalg.norm(vecs[:, vec])
+            vecs[:, vec] *= invnorm
+    else:
+        invnorm = 1.0 / np.linalg.norm(vecs)
+        vecs *= invnorm
+
+    return vecs
 
 
 def construct_ed_sd(orb_ene, nocc, norb):
