@@ -92,8 +92,7 @@ class ScfRestrictedDriver(ScfDriver):
         return diff_den
 
     def store_diis_data(self, i, fock_mat, den_mat):
-        """        matrices for current iteration.
-
+        """
         Stores spin restricted closed shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
 
@@ -118,8 +117,7 @@ class ScfRestrictedDriver(ScfDriver):
                 self.den_matrices.append(den_mat.alpha_to_numpy(0))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """        matrix in OAO basis.
-
+        """
         Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
         in OAO basis by applying Lowdin or canonical orthogonalization to AO
         Fock/Kohn-Sham matrix. Overloaded base class method.

@@ -288,8 +288,7 @@ class TDAExciDriver:
                                             root=mpi_master())
 
     def convert_to_sigma_matrix(self, sig_vecs):
-        """        format.
-
+        """
         Converts set of sigma vectors from std::vector<CDenseMatrix> to numpy
         2D array.
 
@@ -313,8 +312,7 @@ class TDAExciDriver:
         return None
 
     def convert_to_trial_matrix(self, trial_vecs):
-        """        format.
-
+        """
         Converts set of Z vectors from std::vector<CExcitationVector> to numpy
         2D array.
 

@@ -942,8 +942,7 @@ class ScfDriver:
         return "Undefined"
 
     def get_qq_dyn(self):
-        """        screening.
-
+        """
         Gets string with application method (static or dynamic) of electron
         repulsion integrals screening.
 

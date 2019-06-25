@@ -57,8 +57,7 @@ class BlockDavidsonSolver:
             self.trial_matrices = np.hstack((self.trial_matrices, trial_mat))
 
     def compute(self, diag_mat):
-        """        reduced space.
-
+        """
         Computes new set of trial vectors by solving eigenvalues problem by
         diagonalizing interaction matrix in reduced space.
 
@@ -79,8 +78,7 @@ class BlockDavidsonSolver:
         return tvecs
 
     def check_convergence(self, conv_thresh):
-        """            eigenpairs.
-
+        """
         Checks if residual norm is bellow given convergence threshold for all
         requested eigenpairs of symmetric A matrix.
 
@@ -120,8 +118,7 @@ class BlockDavidsonSolver:
         return (np.amax(self.residual_norms), np.amin(self.residual_norms))
 
     def get_eigenvalues(self):
-        """        residual norms.
-
+        """
         Gets smallest eigenvalues of symmetric A matrix and associated
         residual norms.
 
@@ -175,8 +172,7 @@ class BlockDavidsonSolver:
         return tvecs
 
     def project_trial_vectors(self, tvecs):
-        """        space expansion.
-
+        """
         Projects out trial vector components already present in reduced space
         expansion and renormalizes resulting trial vectors.
 
