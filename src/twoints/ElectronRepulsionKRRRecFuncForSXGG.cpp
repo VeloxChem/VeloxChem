@@ -595,155 +595,157 @@ namespace erikrrfunc { // erikrrfunc namespace
                                          tg_xyz_zzzz_0: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetContrPairs; j++)
                 {
-                    tg_xxxx_xxxx_0[j] = -cd_x[j] * tg_xxx_xxxx_0[j] + tg_xxx_xxxxx_0[j];
+                    double fr = -cd_x[j]; 
 
-                    tg_xxxx_xxxy_0[j] = -cd_x[j] * tg_xxx_xxxy_0[j] + tg_xxx_xxxxy_0[j];
+                    tg_xxxx_xxxx_0[j] = fr * tg_xxx_xxxx_0[j] + tg_xxx_xxxxx_0[j];
 
-                    tg_xxxx_xxxz_0[j] = -cd_x[j] * tg_xxx_xxxz_0[j] + tg_xxx_xxxxz_0[j];
+                    tg_xxxx_xxxy_0[j] = fr * tg_xxx_xxxy_0[j] + tg_xxx_xxxxy_0[j];
 
-                    tg_xxxx_xxyy_0[j] = -cd_x[j] * tg_xxx_xxyy_0[j] + tg_xxx_xxxyy_0[j];
+                    tg_xxxx_xxxz_0[j] = fr * tg_xxx_xxxz_0[j] + tg_xxx_xxxxz_0[j];
 
-                    tg_xxxx_xxyz_0[j] = -cd_x[j] * tg_xxx_xxyz_0[j] + tg_xxx_xxxyz_0[j];
+                    tg_xxxx_xxyy_0[j] = fr * tg_xxx_xxyy_0[j] + tg_xxx_xxxyy_0[j];
 
-                    tg_xxxx_xxzz_0[j] = -cd_x[j] * tg_xxx_xxzz_0[j] + tg_xxx_xxxzz_0[j];
+                    tg_xxxx_xxyz_0[j] = fr * tg_xxx_xxyz_0[j] + tg_xxx_xxxyz_0[j];
 
-                    tg_xxxx_xyyy_0[j] = -cd_x[j] * tg_xxx_xyyy_0[j] + tg_xxx_xxyyy_0[j];
+                    tg_xxxx_xxzz_0[j] = fr * tg_xxx_xxzz_0[j] + tg_xxx_xxxzz_0[j];
 
-                    tg_xxxx_xyyz_0[j] = -cd_x[j] * tg_xxx_xyyz_0[j] + tg_xxx_xxyyz_0[j];
+                    tg_xxxx_xyyy_0[j] = fr * tg_xxx_xyyy_0[j] + tg_xxx_xxyyy_0[j];
 
-                    tg_xxxx_xyzz_0[j] = -cd_x[j] * tg_xxx_xyzz_0[j] + tg_xxx_xxyzz_0[j];
+                    tg_xxxx_xyyz_0[j] = fr * tg_xxx_xyyz_0[j] + tg_xxx_xxyyz_0[j];
 
-                    tg_xxxx_xzzz_0[j] = -cd_x[j] * tg_xxx_xzzz_0[j] + tg_xxx_xxzzz_0[j];
+                    tg_xxxx_xyzz_0[j] = fr * tg_xxx_xyzz_0[j] + tg_xxx_xxyzz_0[j];
 
-                    tg_xxxx_yyyy_0[j] = -cd_x[j] * tg_xxx_yyyy_0[j] + tg_xxx_xyyyy_0[j];
+                    tg_xxxx_xzzz_0[j] = fr * tg_xxx_xzzz_0[j] + tg_xxx_xxzzz_0[j];
 
-                    tg_xxxx_yyyz_0[j] = -cd_x[j] * tg_xxx_yyyz_0[j] + tg_xxx_xyyyz_0[j];
+                    tg_xxxx_yyyy_0[j] = fr * tg_xxx_yyyy_0[j] + tg_xxx_xyyyy_0[j];
 
-                    tg_xxxx_yyzz_0[j] = -cd_x[j] * tg_xxx_yyzz_0[j] + tg_xxx_xyyzz_0[j];
+                    tg_xxxx_yyyz_0[j] = fr * tg_xxx_yyyz_0[j] + tg_xxx_xyyyz_0[j];
 
-                    tg_xxxx_yzzz_0[j] = -cd_x[j] * tg_xxx_yzzz_0[j] + tg_xxx_xyzzz_0[j];
+                    tg_xxxx_yyzz_0[j] = fr * tg_xxx_yyzz_0[j] + tg_xxx_xyyzz_0[j];
 
-                    tg_xxxx_zzzz_0[j] = -cd_x[j] * tg_xxx_zzzz_0[j] + tg_xxx_xzzzz_0[j];
+                    tg_xxxx_yzzz_0[j] = fr * tg_xxx_yzzz_0[j] + tg_xxx_xyzzz_0[j];
 
-                    tg_xxxy_xxxx_0[j] = -cd_x[j] * tg_xxy_xxxx_0[j] + tg_xxy_xxxxx_0[j];
+                    tg_xxxx_zzzz_0[j] = fr * tg_xxx_zzzz_0[j] + tg_xxx_xzzzz_0[j];
 
-                    tg_xxxy_xxxy_0[j] = -cd_x[j] * tg_xxy_xxxy_0[j] + tg_xxy_xxxxy_0[j];
+                    tg_xxxy_xxxx_0[j] = fr * tg_xxy_xxxx_0[j] + tg_xxy_xxxxx_0[j];
 
-                    tg_xxxy_xxxz_0[j] = -cd_x[j] * tg_xxy_xxxz_0[j] + tg_xxy_xxxxz_0[j];
+                    tg_xxxy_xxxy_0[j] = fr * tg_xxy_xxxy_0[j] + tg_xxy_xxxxy_0[j];
 
-                    tg_xxxy_xxyy_0[j] = -cd_x[j] * tg_xxy_xxyy_0[j] + tg_xxy_xxxyy_0[j];
+                    tg_xxxy_xxxz_0[j] = fr * tg_xxy_xxxz_0[j] + tg_xxy_xxxxz_0[j];
 
-                    tg_xxxy_xxyz_0[j] = -cd_x[j] * tg_xxy_xxyz_0[j] + tg_xxy_xxxyz_0[j];
+                    tg_xxxy_xxyy_0[j] = fr * tg_xxy_xxyy_0[j] + tg_xxy_xxxyy_0[j];
 
-                    tg_xxxy_xxzz_0[j] = -cd_x[j] * tg_xxy_xxzz_0[j] + tg_xxy_xxxzz_0[j];
+                    tg_xxxy_xxyz_0[j] = fr * tg_xxy_xxyz_0[j] + tg_xxy_xxxyz_0[j];
 
-                    tg_xxxy_xyyy_0[j] = -cd_x[j] * tg_xxy_xyyy_0[j] + tg_xxy_xxyyy_0[j];
+                    tg_xxxy_xxzz_0[j] = fr * tg_xxy_xxzz_0[j] + tg_xxy_xxxzz_0[j];
 
-                    tg_xxxy_xyyz_0[j] = -cd_x[j] * tg_xxy_xyyz_0[j] + tg_xxy_xxyyz_0[j];
+                    tg_xxxy_xyyy_0[j] = fr * tg_xxy_xyyy_0[j] + tg_xxy_xxyyy_0[j];
 
-                    tg_xxxy_xyzz_0[j] = -cd_x[j] * tg_xxy_xyzz_0[j] + tg_xxy_xxyzz_0[j];
+                    tg_xxxy_xyyz_0[j] = fr * tg_xxy_xyyz_0[j] + tg_xxy_xxyyz_0[j];
 
-                    tg_xxxy_xzzz_0[j] = -cd_x[j] * tg_xxy_xzzz_0[j] + tg_xxy_xxzzz_0[j];
+                    tg_xxxy_xyzz_0[j] = fr * tg_xxy_xyzz_0[j] + tg_xxy_xxyzz_0[j];
 
-                    tg_xxxy_yyyy_0[j] = -cd_x[j] * tg_xxy_yyyy_0[j] + tg_xxy_xyyyy_0[j];
+                    tg_xxxy_xzzz_0[j] = fr * tg_xxy_xzzz_0[j] + tg_xxy_xxzzz_0[j];
 
-                    tg_xxxy_yyyz_0[j] = -cd_x[j] * tg_xxy_yyyz_0[j] + tg_xxy_xyyyz_0[j];
+                    tg_xxxy_yyyy_0[j] = fr * tg_xxy_yyyy_0[j] + tg_xxy_xyyyy_0[j];
 
-                    tg_xxxy_yyzz_0[j] = -cd_x[j] * tg_xxy_yyzz_0[j] + tg_xxy_xyyzz_0[j];
+                    tg_xxxy_yyyz_0[j] = fr * tg_xxy_yyyz_0[j] + tg_xxy_xyyyz_0[j];
 
-                    tg_xxxy_yzzz_0[j] = -cd_x[j] * tg_xxy_yzzz_0[j] + tg_xxy_xyzzz_0[j];
+                    tg_xxxy_yyzz_0[j] = fr * tg_xxy_yyzz_0[j] + tg_xxy_xyyzz_0[j];
 
-                    tg_xxxy_zzzz_0[j] = -cd_x[j] * tg_xxy_zzzz_0[j] + tg_xxy_xzzzz_0[j];
+                    tg_xxxy_yzzz_0[j] = fr * tg_xxy_yzzz_0[j] + tg_xxy_xyzzz_0[j];
 
-                    tg_xxxz_xxxx_0[j] = -cd_x[j] * tg_xxz_xxxx_0[j] + tg_xxz_xxxxx_0[j];
+                    tg_xxxy_zzzz_0[j] = fr * tg_xxy_zzzz_0[j] + tg_xxy_xzzzz_0[j];
 
-                    tg_xxxz_xxxy_0[j] = -cd_x[j] * tg_xxz_xxxy_0[j] + tg_xxz_xxxxy_0[j];
+                    tg_xxxz_xxxx_0[j] = fr * tg_xxz_xxxx_0[j] + tg_xxz_xxxxx_0[j];
 
-                    tg_xxxz_xxxz_0[j] = -cd_x[j] * tg_xxz_xxxz_0[j] + tg_xxz_xxxxz_0[j];
+                    tg_xxxz_xxxy_0[j] = fr * tg_xxz_xxxy_0[j] + tg_xxz_xxxxy_0[j];
 
-                    tg_xxxz_xxyy_0[j] = -cd_x[j] * tg_xxz_xxyy_0[j] + tg_xxz_xxxyy_0[j];
+                    tg_xxxz_xxxz_0[j] = fr * tg_xxz_xxxz_0[j] + tg_xxz_xxxxz_0[j];
 
-                    tg_xxxz_xxyz_0[j] = -cd_x[j] * tg_xxz_xxyz_0[j] + tg_xxz_xxxyz_0[j];
+                    tg_xxxz_xxyy_0[j] = fr * tg_xxz_xxyy_0[j] + tg_xxz_xxxyy_0[j];
 
-                    tg_xxxz_xxzz_0[j] = -cd_x[j] * tg_xxz_xxzz_0[j] + tg_xxz_xxxzz_0[j];
+                    tg_xxxz_xxyz_0[j] = fr * tg_xxz_xxyz_0[j] + tg_xxz_xxxyz_0[j];
 
-                    tg_xxxz_xyyy_0[j] = -cd_x[j] * tg_xxz_xyyy_0[j] + tg_xxz_xxyyy_0[j];
+                    tg_xxxz_xxzz_0[j] = fr * tg_xxz_xxzz_0[j] + tg_xxz_xxxzz_0[j];
 
-                    tg_xxxz_xyyz_0[j] = -cd_x[j] * tg_xxz_xyyz_0[j] + tg_xxz_xxyyz_0[j];
+                    tg_xxxz_xyyy_0[j] = fr * tg_xxz_xyyy_0[j] + tg_xxz_xxyyy_0[j];
 
-                    tg_xxxz_xyzz_0[j] = -cd_x[j] * tg_xxz_xyzz_0[j] + tg_xxz_xxyzz_0[j];
+                    tg_xxxz_xyyz_0[j] = fr * tg_xxz_xyyz_0[j] + tg_xxz_xxyyz_0[j];
 
-                    tg_xxxz_xzzz_0[j] = -cd_x[j] * tg_xxz_xzzz_0[j] + tg_xxz_xxzzz_0[j];
+                    tg_xxxz_xyzz_0[j] = fr * tg_xxz_xyzz_0[j] + tg_xxz_xxyzz_0[j];
 
-                    tg_xxxz_yyyy_0[j] = -cd_x[j] * tg_xxz_yyyy_0[j] + tg_xxz_xyyyy_0[j];
+                    tg_xxxz_xzzz_0[j] = fr * tg_xxz_xzzz_0[j] + tg_xxz_xxzzz_0[j];
 
-                    tg_xxxz_yyyz_0[j] = -cd_x[j] * tg_xxz_yyyz_0[j] + tg_xxz_xyyyz_0[j];
+                    tg_xxxz_yyyy_0[j] = fr * tg_xxz_yyyy_0[j] + tg_xxz_xyyyy_0[j];
 
-                    tg_xxxz_yyzz_0[j] = -cd_x[j] * tg_xxz_yyzz_0[j] + tg_xxz_xyyzz_0[j];
+                    tg_xxxz_yyyz_0[j] = fr * tg_xxz_yyyz_0[j] + tg_xxz_xyyyz_0[j];
 
-                    tg_xxxz_yzzz_0[j] = -cd_x[j] * tg_xxz_yzzz_0[j] + tg_xxz_xyzzz_0[j];
+                    tg_xxxz_yyzz_0[j] = fr * tg_xxz_yyzz_0[j] + tg_xxz_xyyzz_0[j];
 
-                    tg_xxxz_zzzz_0[j] = -cd_x[j] * tg_xxz_zzzz_0[j] + tg_xxz_xzzzz_0[j];
+                    tg_xxxz_yzzz_0[j] = fr * tg_xxz_yzzz_0[j] + tg_xxz_xyzzz_0[j];
 
-                    tg_xxyy_xxxx_0[j] = -cd_x[j] * tg_xyy_xxxx_0[j] + tg_xyy_xxxxx_0[j];
+                    tg_xxxz_zzzz_0[j] = fr * tg_xxz_zzzz_0[j] + tg_xxz_xzzzz_0[j];
 
-                    tg_xxyy_xxxy_0[j] = -cd_x[j] * tg_xyy_xxxy_0[j] + tg_xyy_xxxxy_0[j];
+                    tg_xxyy_xxxx_0[j] = fr * tg_xyy_xxxx_0[j] + tg_xyy_xxxxx_0[j];
 
-                    tg_xxyy_xxxz_0[j] = -cd_x[j] * tg_xyy_xxxz_0[j] + tg_xyy_xxxxz_0[j];
+                    tg_xxyy_xxxy_0[j] = fr * tg_xyy_xxxy_0[j] + tg_xyy_xxxxy_0[j];
 
-                    tg_xxyy_xxyy_0[j] = -cd_x[j] * tg_xyy_xxyy_0[j] + tg_xyy_xxxyy_0[j];
+                    tg_xxyy_xxxz_0[j] = fr * tg_xyy_xxxz_0[j] + tg_xyy_xxxxz_0[j];
 
-                    tg_xxyy_xxyz_0[j] = -cd_x[j] * tg_xyy_xxyz_0[j] + tg_xyy_xxxyz_0[j];
+                    tg_xxyy_xxyy_0[j] = fr * tg_xyy_xxyy_0[j] + tg_xyy_xxxyy_0[j];
 
-                    tg_xxyy_xxzz_0[j] = -cd_x[j] * tg_xyy_xxzz_0[j] + tg_xyy_xxxzz_0[j];
+                    tg_xxyy_xxyz_0[j] = fr * tg_xyy_xxyz_0[j] + tg_xyy_xxxyz_0[j];
 
-                    tg_xxyy_xyyy_0[j] = -cd_x[j] * tg_xyy_xyyy_0[j] + tg_xyy_xxyyy_0[j];
+                    tg_xxyy_xxzz_0[j] = fr * tg_xyy_xxzz_0[j] + tg_xyy_xxxzz_0[j];
 
-                    tg_xxyy_xyyz_0[j] = -cd_x[j] * tg_xyy_xyyz_0[j] + tg_xyy_xxyyz_0[j];
+                    tg_xxyy_xyyy_0[j] = fr * tg_xyy_xyyy_0[j] + tg_xyy_xxyyy_0[j];
 
-                    tg_xxyy_xyzz_0[j] = -cd_x[j] * tg_xyy_xyzz_0[j] + tg_xyy_xxyzz_0[j];
+                    tg_xxyy_xyyz_0[j] = fr * tg_xyy_xyyz_0[j] + tg_xyy_xxyyz_0[j];
 
-                    tg_xxyy_xzzz_0[j] = -cd_x[j] * tg_xyy_xzzz_0[j] + tg_xyy_xxzzz_0[j];
+                    tg_xxyy_xyzz_0[j] = fr * tg_xyy_xyzz_0[j] + tg_xyy_xxyzz_0[j];
 
-                    tg_xxyy_yyyy_0[j] = -cd_x[j] * tg_xyy_yyyy_0[j] + tg_xyy_xyyyy_0[j];
+                    tg_xxyy_xzzz_0[j] = fr * tg_xyy_xzzz_0[j] + tg_xyy_xxzzz_0[j];
 
-                    tg_xxyy_yyyz_0[j] = -cd_x[j] * tg_xyy_yyyz_0[j] + tg_xyy_xyyyz_0[j];
+                    tg_xxyy_yyyy_0[j] = fr * tg_xyy_yyyy_0[j] + tg_xyy_xyyyy_0[j];
 
-                    tg_xxyy_yyzz_0[j] = -cd_x[j] * tg_xyy_yyzz_0[j] + tg_xyy_xyyzz_0[j];
+                    tg_xxyy_yyyz_0[j] = fr * tg_xyy_yyyz_0[j] + tg_xyy_xyyyz_0[j];
 
-                    tg_xxyy_yzzz_0[j] = -cd_x[j] * tg_xyy_yzzz_0[j] + tg_xyy_xyzzz_0[j];
+                    tg_xxyy_yyzz_0[j] = fr * tg_xyy_yyzz_0[j] + tg_xyy_xyyzz_0[j];
 
-                    tg_xxyy_zzzz_0[j] = -cd_x[j] * tg_xyy_zzzz_0[j] + tg_xyy_xzzzz_0[j];
+                    tg_xxyy_yzzz_0[j] = fr * tg_xyy_yzzz_0[j] + tg_xyy_xyzzz_0[j];
 
-                    tg_xxyz_xxxx_0[j] = -cd_x[j] * tg_xyz_xxxx_0[j] + tg_xyz_xxxxx_0[j];
+                    tg_xxyy_zzzz_0[j] = fr * tg_xyy_zzzz_0[j] + tg_xyy_xzzzz_0[j];
 
-                    tg_xxyz_xxxy_0[j] = -cd_x[j] * tg_xyz_xxxy_0[j] + tg_xyz_xxxxy_0[j];
+                    tg_xxyz_xxxx_0[j] = fr * tg_xyz_xxxx_0[j] + tg_xyz_xxxxx_0[j];
 
-                    tg_xxyz_xxxz_0[j] = -cd_x[j] * tg_xyz_xxxz_0[j] + tg_xyz_xxxxz_0[j];
+                    tg_xxyz_xxxy_0[j] = fr * tg_xyz_xxxy_0[j] + tg_xyz_xxxxy_0[j];
 
-                    tg_xxyz_xxyy_0[j] = -cd_x[j] * tg_xyz_xxyy_0[j] + tg_xyz_xxxyy_0[j];
+                    tg_xxyz_xxxz_0[j] = fr * tg_xyz_xxxz_0[j] + tg_xyz_xxxxz_0[j];
 
-                    tg_xxyz_xxyz_0[j] = -cd_x[j] * tg_xyz_xxyz_0[j] + tg_xyz_xxxyz_0[j];
+                    tg_xxyz_xxyy_0[j] = fr * tg_xyz_xxyy_0[j] + tg_xyz_xxxyy_0[j];
 
-                    tg_xxyz_xxzz_0[j] = -cd_x[j] * tg_xyz_xxzz_0[j] + tg_xyz_xxxzz_0[j];
+                    tg_xxyz_xxyz_0[j] = fr * tg_xyz_xxyz_0[j] + tg_xyz_xxxyz_0[j];
 
-                    tg_xxyz_xyyy_0[j] = -cd_x[j] * tg_xyz_xyyy_0[j] + tg_xyz_xxyyy_0[j];
+                    tg_xxyz_xxzz_0[j] = fr * tg_xyz_xxzz_0[j] + tg_xyz_xxxzz_0[j];
 
-                    tg_xxyz_xyyz_0[j] = -cd_x[j] * tg_xyz_xyyz_0[j] + tg_xyz_xxyyz_0[j];
+                    tg_xxyz_xyyy_0[j] = fr * tg_xyz_xyyy_0[j] + tg_xyz_xxyyy_0[j];
 
-                    tg_xxyz_xyzz_0[j] = -cd_x[j] * tg_xyz_xyzz_0[j] + tg_xyz_xxyzz_0[j];
+                    tg_xxyz_xyyz_0[j] = fr * tg_xyz_xyyz_0[j] + tg_xyz_xxyyz_0[j];
 
-                    tg_xxyz_xzzz_0[j] = -cd_x[j] * tg_xyz_xzzz_0[j] + tg_xyz_xxzzz_0[j];
+                    tg_xxyz_xyzz_0[j] = fr * tg_xyz_xyzz_0[j] + tg_xyz_xxyzz_0[j];
 
-                    tg_xxyz_yyyy_0[j] = -cd_x[j] * tg_xyz_yyyy_0[j] + tg_xyz_xyyyy_0[j];
+                    tg_xxyz_xzzz_0[j] = fr * tg_xyz_xzzz_0[j] + tg_xyz_xxzzz_0[j];
 
-                    tg_xxyz_yyyz_0[j] = -cd_x[j] * tg_xyz_yyyz_0[j] + tg_xyz_xyyyz_0[j];
+                    tg_xxyz_yyyy_0[j] = fr * tg_xyz_yyyy_0[j] + tg_xyz_xyyyy_0[j];
 
-                    tg_xxyz_yyzz_0[j] = -cd_x[j] * tg_xyz_yyzz_0[j] + tg_xyz_xyyzz_0[j];
+                    tg_xxyz_yyyz_0[j] = fr * tg_xyz_yyyz_0[j] + tg_xyz_xyyyz_0[j];
 
-                    tg_xxyz_yzzz_0[j] = -cd_x[j] * tg_xyz_yzzz_0[j] + tg_xyz_xyzzz_0[j];
+                    tg_xxyz_yyzz_0[j] = fr * tg_xyz_yyzz_0[j] + tg_xyz_xyyzz_0[j];
 
-                    tg_xxyz_zzzz_0[j] = -cd_x[j] * tg_xyz_zzzz_0[j] + tg_xyz_xzzzz_0[j];
+                    tg_xxyz_yzzz_0[j] = fr * tg_xyz_yzzz_0[j] + tg_xyz_xyzzz_0[j];
+
+                    tg_xxyz_zzzz_0[j] = fr * tg_xyz_zzzz_0[j] + tg_xyz_xzzzz_0[j];
                 }
             }
         }
@@ -1298,155 +1300,157 @@ namespace erikrrfunc { // erikrrfunc namespace
                                          tg_zzz_zzzz_0: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetContrPairs; j++)
                 {
-                    tg_xxzz_xxxx_0[j] = -cd_x[j] * tg_xzz_xxxx_0[j] + tg_xzz_xxxxx_0[j];
+                    double fr = -cd_x[j]; 
 
-                    tg_xxzz_xxxy_0[j] = -cd_x[j] * tg_xzz_xxxy_0[j] + tg_xzz_xxxxy_0[j];
+                    tg_xxzz_xxxx_0[j] = fr * tg_xzz_xxxx_0[j] + tg_xzz_xxxxx_0[j];
 
-                    tg_xxzz_xxxz_0[j] = -cd_x[j] * tg_xzz_xxxz_0[j] + tg_xzz_xxxxz_0[j];
+                    tg_xxzz_xxxy_0[j] = fr * tg_xzz_xxxy_0[j] + tg_xzz_xxxxy_0[j];
 
-                    tg_xxzz_xxyy_0[j] = -cd_x[j] * tg_xzz_xxyy_0[j] + tg_xzz_xxxyy_0[j];
+                    tg_xxzz_xxxz_0[j] = fr * tg_xzz_xxxz_0[j] + tg_xzz_xxxxz_0[j];
 
-                    tg_xxzz_xxyz_0[j] = -cd_x[j] * tg_xzz_xxyz_0[j] + tg_xzz_xxxyz_0[j];
+                    tg_xxzz_xxyy_0[j] = fr * tg_xzz_xxyy_0[j] + tg_xzz_xxxyy_0[j];
 
-                    tg_xxzz_xxzz_0[j] = -cd_x[j] * tg_xzz_xxzz_0[j] + tg_xzz_xxxzz_0[j];
+                    tg_xxzz_xxyz_0[j] = fr * tg_xzz_xxyz_0[j] + tg_xzz_xxxyz_0[j];
 
-                    tg_xxzz_xyyy_0[j] = -cd_x[j] * tg_xzz_xyyy_0[j] + tg_xzz_xxyyy_0[j];
+                    tg_xxzz_xxzz_0[j] = fr * tg_xzz_xxzz_0[j] + tg_xzz_xxxzz_0[j];
 
-                    tg_xxzz_xyyz_0[j] = -cd_x[j] * tg_xzz_xyyz_0[j] + tg_xzz_xxyyz_0[j];
+                    tg_xxzz_xyyy_0[j] = fr * tg_xzz_xyyy_0[j] + tg_xzz_xxyyy_0[j];
 
-                    tg_xxzz_xyzz_0[j] = -cd_x[j] * tg_xzz_xyzz_0[j] + tg_xzz_xxyzz_0[j];
+                    tg_xxzz_xyyz_0[j] = fr * tg_xzz_xyyz_0[j] + tg_xzz_xxyyz_0[j];
 
-                    tg_xxzz_xzzz_0[j] = -cd_x[j] * tg_xzz_xzzz_0[j] + tg_xzz_xxzzz_0[j];
+                    tg_xxzz_xyzz_0[j] = fr * tg_xzz_xyzz_0[j] + tg_xzz_xxyzz_0[j];
 
-                    tg_xxzz_yyyy_0[j] = -cd_x[j] * tg_xzz_yyyy_0[j] + tg_xzz_xyyyy_0[j];
+                    tg_xxzz_xzzz_0[j] = fr * tg_xzz_xzzz_0[j] + tg_xzz_xxzzz_0[j];
 
-                    tg_xxzz_yyyz_0[j] = -cd_x[j] * tg_xzz_yyyz_0[j] + tg_xzz_xyyyz_0[j];
+                    tg_xxzz_yyyy_0[j] = fr * tg_xzz_yyyy_0[j] + tg_xzz_xyyyy_0[j];
 
-                    tg_xxzz_yyzz_0[j] = -cd_x[j] * tg_xzz_yyzz_0[j] + tg_xzz_xyyzz_0[j];
+                    tg_xxzz_yyyz_0[j] = fr * tg_xzz_yyyz_0[j] + tg_xzz_xyyyz_0[j];
 
-                    tg_xxzz_yzzz_0[j] = -cd_x[j] * tg_xzz_yzzz_0[j] + tg_xzz_xyzzz_0[j];
+                    tg_xxzz_yyzz_0[j] = fr * tg_xzz_yyzz_0[j] + tg_xzz_xyyzz_0[j];
 
-                    tg_xxzz_zzzz_0[j] = -cd_x[j] * tg_xzz_zzzz_0[j] + tg_xzz_xzzzz_0[j];
+                    tg_xxzz_yzzz_0[j] = fr * tg_xzz_yzzz_0[j] + tg_xzz_xyzzz_0[j];
 
-                    tg_xyyy_xxxx_0[j] = -cd_x[j] * tg_yyy_xxxx_0[j] + tg_yyy_xxxxx_0[j];
+                    tg_xxzz_zzzz_0[j] = fr * tg_xzz_zzzz_0[j] + tg_xzz_xzzzz_0[j];
 
-                    tg_xyyy_xxxy_0[j] = -cd_x[j] * tg_yyy_xxxy_0[j] + tg_yyy_xxxxy_0[j];
+                    tg_xyyy_xxxx_0[j] = fr * tg_yyy_xxxx_0[j] + tg_yyy_xxxxx_0[j];
 
-                    tg_xyyy_xxxz_0[j] = -cd_x[j] * tg_yyy_xxxz_0[j] + tg_yyy_xxxxz_0[j];
+                    tg_xyyy_xxxy_0[j] = fr * tg_yyy_xxxy_0[j] + tg_yyy_xxxxy_0[j];
 
-                    tg_xyyy_xxyy_0[j] = -cd_x[j] * tg_yyy_xxyy_0[j] + tg_yyy_xxxyy_0[j];
+                    tg_xyyy_xxxz_0[j] = fr * tg_yyy_xxxz_0[j] + tg_yyy_xxxxz_0[j];
 
-                    tg_xyyy_xxyz_0[j] = -cd_x[j] * tg_yyy_xxyz_0[j] + tg_yyy_xxxyz_0[j];
+                    tg_xyyy_xxyy_0[j] = fr * tg_yyy_xxyy_0[j] + tg_yyy_xxxyy_0[j];
 
-                    tg_xyyy_xxzz_0[j] = -cd_x[j] * tg_yyy_xxzz_0[j] + tg_yyy_xxxzz_0[j];
+                    tg_xyyy_xxyz_0[j] = fr * tg_yyy_xxyz_0[j] + tg_yyy_xxxyz_0[j];
 
-                    tg_xyyy_xyyy_0[j] = -cd_x[j] * tg_yyy_xyyy_0[j] + tg_yyy_xxyyy_0[j];
+                    tg_xyyy_xxzz_0[j] = fr * tg_yyy_xxzz_0[j] + tg_yyy_xxxzz_0[j];
 
-                    tg_xyyy_xyyz_0[j] = -cd_x[j] * tg_yyy_xyyz_0[j] + tg_yyy_xxyyz_0[j];
+                    tg_xyyy_xyyy_0[j] = fr * tg_yyy_xyyy_0[j] + tg_yyy_xxyyy_0[j];
 
-                    tg_xyyy_xyzz_0[j] = -cd_x[j] * tg_yyy_xyzz_0[j] + tg_yyy_xxyzz_0[j];
+                    tg_xyyy_xyyz_0[j] = fr * tg_yyy_xyyz_0[j] + tg_yyy_xxyyz_0[j];
 
-                    tg_xyyy_xzzz_0[j] = -cd_x[j] * tg_yyy_xzzz_0[j] + tg_yyy_xxzzz_0[j];
+                    tg_xyyy_xyzz_0[j] = fr * tg_yyy_xyzz_0[j] + tg_yyy_xxyzz_0[j];
 
-                    tg_xyyy_yyyy_0[j] = -cd_x[j] * tg_yyy_yyyy_0[j] + tg_yyy_xyyyy_0[j];
+                    tg_xyyy_xzzz_0[j] = fr * tg_yyy_xzzz_0[j] + tg_yyy_xxzzz_0[j];
 
-                    tg_xyyy_yyyz_0[j] = -cd_x[j] * tg_yyy_yyyz_0[j] + tg_yyy_xyyyz_0[j];
+                    tg_xyyy_yyyy_0[j] = fr * tg_yyy_yyyy_0[j] + tg_yyy_xyyyy_0[j];
 
-                    tg_xyyy_yyzz_0[j] = -cd_x[j] * tg_yyy_yyzz_0[j] + tg_yyy_xyyzz_0[j];
+                    tg_xyyy_yyyz_0[j] = fr * tg_yyy_yyyz_0[j] + tg_yyy_xyyyz_0[j];
 
-                    tg_xyyy_yzzz_0[j] = -cd_x[j] * tg_yyy_yzzz_0[j] + tg_yyy_xyzzz_0[j];
+                    tg_xyyy_yyzz_0[j] = fr * tg_yyy_yyzz_0[j] + tg_yyy_xyyzz_0[j];
 
-                    tg_xyyy_zzzz_0[j] = -cd_x[j] * tg_yyy_zzzz_0[j] + tg_yyy_xzzzz_0[j];
+                    tg_xyyy_yzzz_0[j] = fr * tg_yyy_yzzz_0[j] + tg_yyy_xyzzz_0[j];
 
-                    tg_xyyz_xxxx_0[j] = -cd_x[j] * tg_yyz_xxxx_0[j] + tg_yyz_xxxxx_0[j];
+                    tg_xyyy_zzzz_0[j] = fr * tg_yyy_zzzz_0[j] + tg_yyy_xzzzz_0[j];
 
-                    tg_xyyz_xxxy_0[j] = -cd_x[j] * tg_yyz_xxxy_0[j] + tg_yyz_xxxxy_0[j];
+                    tg_xyyz_xxxx_0[j] = fr * tg_yyz_xxxx_0[j] + tg_yyz_xxxxx_0[j];
 
-                    tg_xyyz_xxxz_0[j] = -cd_x[j] * tg_yyz_xxxz_0[j] + tg_yyz_xxxxz_0[j];
+                    tg_xyyz_xxxy_0[j] = fr * tg_yyz_xxxy_0[j] + tg_yyz_xxxxy_0[j];
 
-                    tg_xyyz_xxyy_0[j] = -cd_x[j] * tg_yyz_xxyy_0[j] + tg_yyz_xxxyy_0[j];
+                    tg_xyyz_xxxz_0[j] = fr * tg_yyz_xxxz_0[j] + tg_yyz_xxxxz_0[j];
 
-                    tg_xyyz_xxyz_0[j] = -cd_x[j] * tg_yyz_xxyz_0[j] + tg_yyz_xxxyz_0[j];
+                    tg_xyyz_xxyy_0[j] = fr * tg_yyz_xxyy_0[j] + tg_yyz_xxxyy_0[j];
 
-                    tg_xyyz_xxzz_0[j] = -cd_x[j] * tg_yyz_xxzz_0[j] + tg_yyz_xxxzz_0[j];
+                    tg_xyyz_xxyz_0[j] = fr * tg_yyz_xxyz_0[j] + tg_yyz_xxxyz_0[j];
 
-                    tg_xyyz_xyyy_0[j] = -cd_x[j] * tg_yyz_xyyy_0[j] + tg_yyz_xxyyy_0[j];
+                    tg_xyyz_xxzz_0[j] = fr * tg_yyz_xxzz_0[j] + tg_yyz_xxxzz_0[j];
 
-                    tg_xyyz_xyyz_0[j] = -cd_x[j] * tg_yyz_xyyz_0[j] + tg_yyz_xxyyz_0[j];
+                    tg_xyyz_xyyy_0[j] = fr * tg_yyz_xyyy_0[j] + tg_yyz_xxyyy_0[j];
 
-                    tg_xyyz_xyzz_0[j] = -cd_x[j] * tg_yyz_xyzz_0[j] + tg_yyz_xxyzz_0[j];
+                    tg_xyyz_xyyz_0[j] = fr * tg_yyz_xyyz_0[j] + tg_yyz_xxyyz_0[j];
 
-                    tg_xyyz_xzzz_0[j] = -cd_x[j] * tg_yyz_xzzz_0[j] + tg_yyz_xxzzz_0[j];
+                    tg_xyyz_xyzz_0[j] = fr * tg_yyz_xyzz_0[j] + tg_yyz_xxyzz_0[j];
 
-                    tg_xyyz_yyyy_0[j] = -cd_x[j] * tg_yyz_yyyy_0[j] + tg_yyz_xyyyy_0[j];
+                    tg_xyyz_xzzz_0[j] = fr * tg_yyz_xzzz_0[j] + tg_yyz_xxzzz_0[j];
 
-                    tg_xyyz_yyyz_0[j] = -cd_x[j] * tg_yyz_yyyz_0[j] + tg_yyz_xyyyz_0[j];
+                    tg_xyyz_yyyy_0[j] = fr * tg_yyz_yyyy_0[j] + tg_yyz_xyyyy_0[j];
 
-                    tg_xyyz_yyzz_0[j] = -cd_x[j] * tg_yyz_yyzz_0[j] + tg_yyz_xyyzz_0[j];
+                    tg_xyyz_yyyz_0[j] = fr * tg_yyz_yyyz_0[j] + tg_yyz_xyyyz_0[j];
 
-                    tg_xyyz_yzzz_0[j] = -cd_x[j] * tg_yyz_yzzz_0[j] + tg_yyz_xyzzz_0[j];
+                    tg_xyyz_yyzz_0[j] = fr * tg_yyz_yyzz_0[j] + tg_yyz_xyyzz_0[j];
 
-                    tg_xyyz_zzzz_0[j] = -cd_x[j] * tg_yyz_zzzz_0[j] + tg_yyz_xzzzz_0[j];
+                    tg_xyyz_yzzz_0[j] = fr * tg_yyz_yzzz_0[j] + tg_yyz_xyzzz_0[j];
 
-                    tg_xyzz_xxxx_0[j] = -cd_x[j] * tg_yzz_xxxx_0[j] + tg_yzz_xxxxx_0[j];
+                    tg_xyyz_zzzz_0[j] = fr * tg_yyz_zzzz_0[j] + tg_yyz_xzzzz_0[j];
 
-                    tg_xyzz_xxxy_0[j] = -cd_x[j] * tg_yzz_xxxy_0[j] + tg_yzz_xxxxy_0[j];
+                    tg_xyzz_xxxx_0[j] = fr * tg_yzz_xxxx_0[j] + tg_yzz_xxxxx_0[j];
 
-                    tg_xyzz_xxxz_0[j] = -cd_x[j] * tg_yzz_xxxz_0[j] + tg_yzz_xxxxz_0[j];
+                    tg_xyzz_xxxy_0[j] = fr * tg_yzz_xxxy_0[j] + tg_yzz_xxxxy_0[j];
 
-                    tg_xyzz_xxyy_0[j] = -cd_x[j] * tg_yzz_xxyy_0[j] + tg_yzz_xxxyy_0[j];
+                    tg_xyzz_xxxz_0[j] = fr * tg_yzz_xxxz_0[j] + tg_yzz_xxxxz_0[j];
 
-                    tg_xyzz_xxyz_0[j] = -cd_x[j] * tg_yzz_xxyz_0[j] + tg_yzz_xxxyz_0[j];
+                    tg_xyzz_xxyy_0[j] = fr * tg_yzz_xxyy_0[j] + tg_yzz_xxxyy_0[j];
 
-                    tg_xyzz_xxzz_0[j] = -cd_x[j] * tg_yzz_xxzz_0[j] + tg_yzz_xxxzz_0[j];
+                    tg_xyzz_xxyz_0[j] = fr * tg_yzz_xxyz_0[j] + tg_yzz_xxxyz_0[j];
 
-                    tg_xyzz_xyyy_0[j] = -cd_x[j] * tg_yzz_xyyy_0[j] + tg_yzz_xxyyy_0[j];
+                    tg_xyzz_xxzz_0[j] = fr * tg_yzz_xxzz_0[j] + tg_yzz_xxxzz_0[j];
 
-                    tg_xyzz_xyyz_0[j] = -cd_x[j] * tg_yzz_xyyz_0[j] + tg_yzz_xxyyz_0[j];
+                    tg_xyzz_xyyy_0[j] = fr * tg_yzz_xyyy_0[j] + tg_yzz_xxyyy_0[j];
 
-                    tg_xyzz_xyzz_0[j] = -cd_x[j] * tg_yzz_xyzz_0[j] + tg_yzz_xxyzz_0[j];
+                    tg_xyzz_xyyz_0[j] = fr * tg_yzz_xyyz_0[j] + tg_yzz_xxyyz_0[j];
 
-                    tg_xyzz_xzzz_0[j] = -cd_x[j] * tg_yzz_xzzz_0[j] + tg_yzz_xxzzz_0[j];
+                    tg_xyzz_xyzz_0[j] = fr * tg_yzz_xyzz_0[j] + tg_yzz_xxyzz_0[j];
 
-                    tg_xyzz_yyyy_0[j] = -cd_x[j] * tg_yzz_yyyy_0[j] + tg_yzz_xyyyy_0[j];
+                    tg_xyzz_xzzz_0[j] = fr * tg_yzz_xzzz_0[j] + tg_yzz_xxzzz_0[j];
 
-                    tg_xyzz_yyyz_0[j] = -cd_x[j] * tg_yzz_yyyz_0[j] + tg_yzz_xyyyz_0[j];
+                    tg_xyzz_yyyy_0[j] = fr * tg_yzz_yyyy_0[j] + tg_yzz_xyyyy_0[j];
 
-                    tg_xyzz_yyzz_0[j] = -cd_x[j] * tg_yzz_yyzz_0[j] + tg_yzz_xyyzz_0[j];
+                    tg_xyzz_yyyz_0[j] = fr * tg_yzz_yyyz_0[j] + tg_yzz_xyyyz_0[j];
 
-                    tg_xyzz_yzzz_0[j] = -cd_x[j] * tg_yzz_yzzz_0[j] + tg_yzz_xyzzz_0[j];
+                    tg_xyzz_yyzz_0[j] = fr * tg_yzz_yyzz_0[j] + tg_yzz_xyyzz_0[j];
 
-                    tg_xyzz_zzzz_0[j] = -cd_x[j] * tg_yzz_zzzz_0[j] + tg_yzz_xzzzz_0[j];
+                    tg_xyzz_yzzz_0[j] = fr * tg_yzz_yzzz_0[j] + tg_yzz_xyzzz_0[j];
 
-                    tg_xzzz_xxxx_0[j] = -cd_x[j] * tg_zzz_xxxx_0[j] + tg_zzz_xxxxx_0[j];
+                    tg_xyzz_zzzz_0[j] = fr * tg_yzz_zzzz_0[j] + tg_yzz_xzzzz_0[j];
 
-                    tg_xzzz_xxxy_0[j] = -cd_x[j] * tg_zzz_xxxy_0[j] + tg_zzz_xxxxy_0[j];
+                    tg_xzzz_xxxx_0[j] = fr * tg_zzz_xxxx_0[j] + tg_zzz_xxxxx_0[j];
 
-                    tg_xzzz_xxxz_0[j] = -cd_x[j] * tg_zzz_xxxz_0[j] + tg_zzz_xxxxz_0[j];
+                    tg_xzzz_xxxy_0[j] = fr * tg_zzz_xxxy_0[j] + tg_zzz_xxxxy_0[j];
 
-                    tg_xzzz_xxyy_0[j] = -cd_x[j] * tg_zzz_xxyy_0[j] + tg_zzz_xxxyy_0[j];
+                    tg_xzzz_xxxz_0[j] = fr * tg_zzz_xxxz_0[j] + tg_zzz_xxxxz_0[j];
 
-                    tg_xzzz_xxyz_0[j] = -cd_x[j] * tg_zzz_xxyz_0[j] + tg_zzz_xxxyz_0[j];
+                    tg_xzzz_xxyy_0[j] = fr * tg_zzz_xxyy_0[j] + tg_zzz_xxxyy_0[j];
 
-                    tg_xzzz_xxzz_0[j] = -cd_x[j] * tg_zzz_xxzz_0[j] + tg_zzz_xxxzz_0[j];
+                    tg_xzzz_xxyz_0[j] = fr * tg_zzz_xxyz_0[j] + tg_zzz_xxxyz_0[j];
 
-                    tg_xzzz_xyyy_0[j] = -cd_x[j] * tg_zzz_xyyy_0[j] + tg_zzz_xxyyy_0[j];
+                    tg_xzzz_xxzz_0[j] = fr * tg_zzz_xxzz_0[j] + tg_zzz_xxxzz_0[j];
 
-                    tg_xzzz_xyyz_0[j] = -cd_x[j] * tg_zzz_xyyz_0[j] + tg_zzz_xxyyz_0[j];
+                    tg_xzzz_xyyy_0[j] = fr * tg_zzz_xyyy_0[j] + tg_zzz_xxyyy_0[j];
 
-                    tg_xzzz_xyzz_0[j] = -cd_x[j] * tg_zzz_xyzz_0[j] + tg_zzz_xxyzz_0[j];
+                    tg_xzzz_xyyz_0[j] = fr * tg_zzz_xyyz_0[j] + tg_zzz_xxyyz_0[j];
 
-                    tg_xzzz_xzzz_0[j] = -cd_x[j] * tg_zzz_xzzz_0[j] + tg_zzz_xxzzz_0[j];
+                    tg_xzzz_xyzz_0[j] = fr * tg_zzz_xyzz_0[j] + tg_zzz_xxyzz_0[j];
 
-                    tg_xzzz_yyyy_0[j] = -cd_x[j] * tg_zzz_yyyy_0[j] + tg_zzz_xyyyy_0[j];
+                    tg_xzzz_xzzz_0[j] = fr * tg_zzz_xzzz_0[j] + tg_zzz_xxzzz_0[j];
 
-                    tg_xzzz_yyyz_0[j] = -cd_x[j] * tg_zzz_yyyz_0[j] + tg_zzz_xyyyz_0[j];
+                    tg_xzzz_yyyy_0[j] = fr * tg_zzz_yyyy_0[j] + tg_zzz_xyyyy_0[j];
 
-                    tg_xzzz_yyzz_0[j] = -cd_x[j] * tg_zzz_yyzz_0[j] + tg_zzz_xyyzz_0[j];
+                    tg_xzzz_yyyz_0[j] = fr * tg_zzz_yyyz_0[j] + tg_zzz_xyyyz_0[j];
 
-                    tg_xzzz_yzzz_0[j] = -cd_x[j] * tg_zzz_yzzz_0[j] + tg_zzz_xyzzz_0[j];
+                    tg_xzzz_yyzz_0[j] = fr * tg_zzz_yyzz_0[j] + tg_zzz_xyyzz_0[j];
 
-                    tg_xzzz_zzzz_0[j] = -cd_x[j] * tg_zzz_zzzz_0[j] + tg_zzz_xzzzz_0[j];
+                    tg_xzzz_yzzz_0[j] = fr * tg_zzz_yzzz_0[j] + tg_zzz_xyzzz_0[j];
+
+                    tg_xzzz_zzzz_0[j] = fr * tg_zzz_zzzz_0[j] + tg_zzz_xzzzz_0[j];
                 }
             }
         }
@@ -1948,155 +1952,159 @@ namespace erikrrfunc { // erikrrfunc namespace
                                          tg_zzzz_yzzz_0, tg_zzzz_zzzz_0: VLX_ALIGN)
                 for (int32_t j = 0; j < nKetContrPairs; j++)
                 {
-                    tg_yyyy_xxxx_0[j] = -cd_y[j] * tg_yyy_xxxx_0[j] + tg_yyy_xxxxy_0[j];
+                    double fr = -cd_y[j]; 
 
-                    tg_yyyy_xxxy_0[j] = -cd_y[j] * tg_yyy_xxxy_0[j] + tg_yyy_xxxyy_0[j];
+                    tg_yyyy_xxxx_0[j] = fr * tg_yyy_xxxx_0[j] + tg_yyy_xxxxy_0[j];
 
-                    tg_yyyy_xxxz_0[j] = -cd_y[j] * tg_yyy_xxxz_0[j] + tg_yyy_xxxyz_0[j];
+                    tg_yyyy_xxxy_0[j] = fr * tg_yyy_xxxy_0[j] + tg_yyy_xxxyy_0[j];
 
-                    tg_yyyy_xxyy_0[j] = -cd_y[j] * tg_yyy_xxyy_0[j] + tg_yyy_xxyyy_0[j];
+                    tg_yyyy_xxxz_0[j] = fr * tg_yyy_xxxz_0[j] + tg_yyy_xxxyz_0[j];
 
-                    tg_yyyy_xxyz_0[j] = -cd_y[j] * tg_yyy_xxyz_0[j] + tg_yyy_xxyyz_0[j];
+                    tg_yyyy_xxyy_0[j] = fr * tg_yyy_xxyy_0[j] + tg_yyy_xxyyy_0[j];
 
-                    tg_yyyy_xxzz_0[j] = -cd_y[j] * tg_yyy_xxzz_0[j] + tg_yyy_xxyzz_0[j];
+                    tg_yyyy_xxyz_0[j] = fr * tg_yyy_xxyz_0[j] + tg_yyy_xxyyz_0[j];
 
-                    tg_yyyy_xyyy_0[j] = -cd_y[j] * tg_yyy_xyyy_0[j] + tg_yyy_xyyyy_0[j];
+                    tg_yyyy_xxzz_0[j] = fr * tg_yyy_xxzz_0[j] + tg_yyy_xxyzz_0[j];
 
-                    tg_yyyy_xyyz_0[j] = -cd_y[j] * tg_yyy_xyyz_0[j] + tg_yyy_xyyyz_0[j];
+                    tg_yyyy_xyyy_0[j] = fr * tg_yyy_xyyy_0[j] + tg_yyy_xyyyy_0[j];
 
-                    tg_yyyy_xyzz_0[j] = -cd_y[j] * tg_yyy_xyzz_0[j] + tg_yyy_xyyzz_0[j];
+                    tg_yyyy_xyyz_0[j] = fr * tg_yyy_xyyz_0[j] + tg_yyy_xyyyz_0[j];
 
-                    tg_yyyy_xzzz_0[j] = -cd_y[j] * tg_yyy_xzzz_0[j] + tg_yyy_xyzzz_0[j];
+                    tg_yyyy_xyzz_0[j] = fr * tg_yyy_xyzz_0[j] + tg_yyy_xyyzz_0[j];
 
-                    tg_yyyy_yyyy_0[j] = -cd_y[j] * tg_yyy_yyyy_0[j] + tg_yyy_yyyyy_0[j];
+                    tg_yyyy_xzzz_0[j] = fr * tg_yyy_xzzz_0[j] + tg_yyy_xyzzz_0[j];
 
-                    tg_yyyy_yyyz_0[j] = -cd_y[j] * tg_yyy_yyyz_0[j] + tg_yyy_yyyyz_0[j];
+                    tg_yyyy_yyyy_0[j] = fr * tg_yyy_yyyy_0[j] + tg_yyy_yyyyy_0[j];
 
-                    tg_yyyy_yyzz_0[j] = -cd_y[j] * tg_yyy_yyzz_0[j] + tg_yyy_yyyzz_0[j];
+                    tg_yyyy_yyyz_0[j] = fr * tg_yyy_yyyz_0[j] + tg_yyy_yyyyz_0[j];
 
-                    tg_yyyy_yzzz_0[j] = -cd_y[j] * tg_yyy_yzzz_0[j] + tg_yyy_yyzzz_0[j];
+                    tg_yyyy_yyzz_0[j] = fr * tg_yyy_yyzz_0[j] + tg_yyy_yyyzz_0[j];
 
-                    tg_yyyy_zzzz_0[j] = -cd_y[j] * tg_yyy_zzzz_0[j] + tg_yyy_yzzzz_0[j];
+                    tg_yyyy_yzzz_0[j] = fr * tg_yyy_yzzz_0[j] + tg_yyy_yyzzz_0[j];
 
-                    tg_yyyz_xxxx_0[j] = -cd_y[j] * tg_yyz_xxxx_0[j] + tg_yyz_xxxxy_0[j];
+                    tg_yyyy_zzzz_0[j] = fr * tg_yyy_zzzz_0[j] + tg_yyy_yzzzz_0[j];
 
-                    tg_yyyz_xxxy_0[j] = -cd_y[j] * tg_yyz_xxxy_0[j] + tg_yyz_xxxyy_0[j];
+                    tg_yyyz_xxxx_0[j] = fr * tg_yyz_xxxx_0[j] + tg_yyz_xxxxy_0[j];
 
-                    tg_yyyz_xxxz_0[j] = -cd_y[j] * tg_yyz_xxxz_0[j] + tg_yyz_xxxyz_0[j];
+                    tg_yyyz_xxxy_0[j] = fr * tg_yyz_xxxy_0[j] + tg_yyz_xxxyy_0[j];
 
-                    tg_yyyz_xxyy_0[j] = -cd_y[j] * tg_yyz_xxyy_0[j] + tg_yyz_xxyyy_0[j];
+                    tg_yyyz_xxxz_0[j] = fr * tg_yyz_xxxz_0[j] + tg_yyz_xxxyz_0[j];
 
-                    tg_yyyz_xxyz_0[j] = -cd_y[j] * tg_yyz_xxyz_0[j] + tg_yyz_xxyyz_0[j];
+                    tg_yyyz_xxyy_0[j] = fr * tg_yyz_xxyy_0[j] + tg_yyz_xxyyy_0[j];
 
-                    tg_yyyz_xxzz_0[j] = -cd_y[j] * tg_yyz_xxzz_0[j] + tg_yyz_xxyzz_0[j];
+                    tg_yyyz_xxyz_0[j] = fr * tg_yyz_xxyz_0[j] + tg_yyz_xxyyz_0[j];
 
-                    tg_yyyz_xyyy_0[j] = -cd_y[j] * tg_yyz_xyyy_0[j] + tg_yyz_xyyyy_0[j];
+                    tg_yyyz_xxzz_0[j] = fr * tg_yyz_xxzz_0[j] + tg_yyz_xxyzz_0[j];
 
-                    tg_yyyz_xyyz_0[j] = -cd_y[j] * tg_yyz_xyyz_0[j] + tg_yyz_xyyyz_0[j];
+                    tg_yyyz_xyyy_0[j] = fr * tg_yyz_xyyy_0[j] + tg_yyz_xyyyy_0[j];
 
-                    tg_yyyz_xyzz_0[j] = -cd_y[j] * tg_yyz_xyzz_0[j] + tg_yyz_xyyzz_0[j];
+                    tg_yyyz_xyyz_0[j] = fr * tg_yyz_xyyz_0[j] + tg_yyz_xyyyz_0[j];
 
-                    tg_yyyz_xzzz_0[j] = -cd_y[j] * tg_yyz_xzzz_0[j] + tg_yyz_xyzzz_0[j];
+                    tg_yyyz_xyzz_0[j] = fr * tg_yyz_xyzz_0[j] + tg_yyz_xyyzz_0[j];
 
-                    tg_yyyz_yyyy_0[j] = -cd_y[j] * tg_yyz_yyyy_0[j] + tg_yyz_yyyyy_0[j];
+                    tg_yyyz_xzzz_0[j] = fr * tg_yyz_xzzz_0[j] + tg_yyz_xyzzz_0[j];
 
-                    tg_yyyz_yyyz_0[j] = -cd_y[j] * tg_yyz_yyyz_0[j] + tg_yyz_yyyyz_0[j];
+                    tg_yyyz_yyyy_0[j] = fr * tg_yyz_yyyy_0[j] + tg_yyz_yyyyy_0[j];
 
-                    tg_yyyz_yyzz_0[j] = -cd_y[j] * tg_yyz_yyzz_0[j] + tg_yyz_yyyzz_0[j];
+                    tg_yyyz_yyyz_0[j] = fr * tg_yyz_yyyz_0[j] + tg_yyz_yyyyz_0[j];
 
-                    tg_yyyz_yzzz_0[j] = -cd_y[j] * tg_yyz_yzzz_0[j] + tg_yyz_yyzzz_0[j];
+                    tg_yyyz_yyzz_0[j] = fr * tg_yyz_yyzz_0[j] + tg_yyz_yyyzz_0[j];
 
-                    tg_yyyz_zzzz_0[j] = -cd_y[j] * tg_yyz_zzzz_0[j] + tg_yyz_yzzzz_0[j];
+                    tg_yyyz_yzzz_0[j] = fr * tg_yyz_yzzz_0[j] + tg_yyz_yyzzz_0[j];
 
-                    tg_yyzz_xxxx_0[j] = -cd_y[j] * tg_yzz_xxxx_0[j] + tg_yzz_xxxxy_0[j];
+                    tg_yyyz_zzzz_0[j] = fr * tg_yyz_zzzz_0[j] + tg_yyz_yzzzz_0[j];
 
-                    tg_yyzz_xxxy_0[j] = -cd_y[j] * tg_yzz_xxxy_0[j] + tg_yzz_xxxyy_0[j];
+                    tg_yyzz_xxxx_0[j] = fr * tg_yzz_xxxx_0[j] + tg_yzz_xxxxy_0[j];
 
-                    tg_yyzz_xxxz_0[j] = -cd_y[j] * tg_yzz_xxxz_0[j] + tg_yzz_xxxyz_0[j];
+                    tg_yyzz_xxxy_0[j] = fr * tg_yzz_xxxy_0[j] + tg_yzz_xxxyy_0[j];
 
-                    tg_yyzz_xxyy_0[j] = -cd_y[j] * tg_yzz_xxyy_0[j] + tg_yzz_xxyyy_0[j];
+                    tg_yyzz_xxxz_0[j] = fr * tg_yzz_xxxz_0[j] + tg_yzz_xxxyz_0[j];
 
-                    tg_yyzz_xxyz_0[j] = -cd_y[j] * tg_yzz_xxyz_0[j] + tg_yzz_xxyyz_0[j];
+                    tg_yyzz_xxyy_0[j] = fr * tg_yzz_xxyy_0[j] + tg_yzz_xxyyy_0[j];
 
-                    tg_yyzz_xxzz_0[j] = -cd_y[j] * tg_yzz_xxzz_0[j] + tg_yzz_xxyzz_0[j];
+                    tg_yyzz_xxyz_0[j] = fr * tg_yzz_xxyz_0[j] + tg_yzz_xxyyz_0[j];
 
-                    tg_yyzz_xyyy_0[j] = -cd_y[j] * tg_yzz_xyyy_0[j] + tg_yzz_xyyyy_0[j];
+                    tg_yyzz_xxzz_0[j] = fr * tg_yzz_xxzz_0[j] + tg_yzz_xxyzz_0[j];
 
-                    tg_yyzz_xyyz_0[j] = -cd_y[j] * tg_yzz_xyyz_0[j] + tg_yzz_xyyyz_0[j];
+                    tg_yyzz_xyyy_0[j] = fr * tg_yzz_xyyy_0[j] + tg_yzz_xyyyy_0[j];
 
-                    tg_yyzz_xyzz_0[j] = -cd_y[j] * tg_yzz_xyzz_0[j] + tg_yzz_xyyzz_0[j];
+                    tg_yyzz_xyyz_0[j] = fr * tg_yzz_xyyz_0[j] + tg_yzz_xyyyz_0[j];
 
-                    tg_yyzz_xzzz_0[j] = -cd_y[j] * tg_yzz_xzzz_0[j] + tg_yzz_xyzzz_0[j];
+                    tg_yyzz_xyzz_0[j] = fr * tg_yzz_xyzz_0[j] + tg_yzz_xyyzz_0[j];
 
-                    tg_yyzz_yyyy_0[j] = -cd_y[j] * tg_yzz_yyyy_0[j] + tg_yzz_yyyyy_0[j];
+                    tg_yyzz_xzzz_0[j] = fr * tg_yzz_xzzz_0[j] + tg_yzz_xyzzz_0[j];
 
-                    tg_yyzz_yyyz_0[j] = -cd_y[j] * tg_yzz_yyyz_0[j] + tg_yzz_yyyyz_0[j];
+                    tg_yyzz_yyyy_0[j] = fr * tg_yzz_yyyy_0[j] + tg_yzz_yyyyy_0[j];
 
-                    tg_yyzz_yyzz_0[j] = -cd_y[j] * tg_yzz_yyzz_0[j] + tg_yzz_yyyzz_0[j];
+                    tg_yyzz_yyyz_0[j] = fr * tg_yzz_yyyz_0[j] + tg_yzz_yyyyz_0[j];
 
-                    tg_yyzz_yzzz_0[j] = -cd_y[j] * tg_yzz_yzzz_0[j] + tg_yzz_yyzzz_0[j];
+                    tg_yyzz_yyzz_0[j] = fr * tg_yzz_yyzz_0[j] + tg_yzz_yyyzz_0[j];
 
-                    tg_yyzz_zzzz_0[j] = -cd_y[j] * tg_yzz_zzzz_0[j] + tg_yzz_yzzzz_0[j];
+                    tg_yyzz_yzzz_0[j] = fr * tg_yzz_yzzz_0[j] + tg_yzz_yyzzz_0[j];
 
-                    tg_yzzz_xxxx_0[j] = -cd_y[j] * tg_zzz_xxxx_0[j] + tg_zzz_xxxxy_0[j];
+                    tg_yyzz_zzzz_0[j] = fr * tg_yzz_zzzz_0[j] + tg_yzz_yzzzz_0[j];
 
-                    tg_yzzz_xxxy_0[j] = -cd_y[j] * tg_zzz_xxxy_0[j] + tg_zzz_xxxyy_0[j];
+                    tg_yzzz_xxxx_0[j] = fr * tg_zzz_xxxx_0[j] + tg_zzz_xxxxy_0[j];
 
-                    tg_yzzz_xxxz_0[j] = -cd_y[j] * tg_zzz_xxxz_0[j] + tg_zzz_xxxyz_0[j];
+                    tg_yzzz_xxxy_0[j] = fr * tg_zzz_xxxy_0[j] + tg_zzz_xxxyy_0[j];
 
-                    tg_yzzz_xxyy_0[j] = -cd_y[j] * tg_zzz_xxyy_0[j] + tg_zzz_xxyyy_0[j];
+                    tg_yzzz_xxxz_0[j] = fr * tg_zzz_xxxz_0[j] + tg_zzz_xxxyz_0[j];
 
-                    tg_yzzz_xxyz_0[j] = -cd_y[j] * tg_zzz_xxyz_0[j] + tg_zzz_xxyyz_0[j];
+                    tg_yzzz_xxyy_0[j] = fr * tg_zzz_xxyy_0[j] + tg_zzz_xxyyy_0[j];
 
-                    tg_yzzz_xxzz_0[j] = -cd_y[j] * tg_zzz_xxzz_0[j] + tg_zzz_xxyzz_0[j];
+                    tg_yzzz_xxyz_0[j] = fr * tg_zzz_xxyz_0[j] + tg_zzz_xxyyz_0[j];
 
-                    tg_yzzz_xyyy_0[j] = -cd_y[j] * tg_zzz_xyyy_0[j] + tg_zzz_xyyyy_0[j];
+                    tg_yzzz_xxzz_0[j] = fr * tg_zzz_xxzz_0[j] + tg_zzz_xxyzz_0[j];
 
-                    tg_yzzz_xyyz_0[j] = -cd_y[j] * tg_zzz_xyyz_0[j] + tg_zzz_xyyyz_0[j];
+                    tg_yzzz_xyyy_0[j] = fr * tg_zzz_xyyy_0[j] + tg_zzz_xyyyy_0[j];
 
-                    tg_yzzz_xyzz_0[j] = -cd_y[j] * tg_zzz_xyzz_0[j] + tg_zzz_xyyzz_0[j];
+                    tg_yzzz_xyyz_0[j] = fr * tg_zzz_xyyz_0[j] + tg_zzz_xyyyz_0[j];
 
-                    tg_yzzz_xzzz_0[j] = -cd_y[j] * tg_zzz_xzzz_0[j] + tg_zzz_xyzzz_0[j];
+                    tg_yzzz_xyzz_0[j] = fr * tg_zzz_xyzz_0[j] + tg_zzz_xyyzz_0[j];
 
-                    tg_yzzz_yyyy_0[j] = -cd_y[j] * tg_zzz_yyyy_0[j] + tg_zzz_yyyyy_0[j];
+                    tg_yzzz_xzzz_0[j] = fr * tg_zzz_xzzz_0[j] + tg_zzz_xyzzz_0[j];
 
-                    tg_yzzz_yyyz_0[j] = -cd_y[j] * tg_zzz_yyyz_0[j] + tg_zzz_yyyyz_0[j];
+                    tg_yzzz_yyyy_0[j] = fr * tg_zzz_yyyy_0[j] + tg_zzz_yyyyy_0[j];
 
-                    tg_yzzz_yyzz_0[j] = -cd_y[j] * tg_zzz_yyzz_0[j] + tg_zzz_yyyzz_0[j];
+                    tg_yzzz_yyyz_0[j] = fr * tg_zzz_yyyz_0[j] + tg_zzz_yyyyz_0[j];
 
-                    tg_yzzz_yzzz_0[j] = -cd_y[j] * tg_zzz_yzzz_0[j] + tg_zzz_yyzzz_0[j];
+                    tg_yzzz_yyzz_0[j] = fr * tg_zzz_yyzz_0[j] + tg_zzz_yyyzz_0[j];
 
-                    tg_yzzz_zzzz_0[j] = -cd_y[j] * tg_zzz_zzzz_0[j] + tg_zzz_yzzzz_0[j];
+                    tg_yzzz_yzzz_0[j] = fr * tg_zzz_yzzz_0[j] + tg_zzz_yyzzz_0[j];
 
-                    tg_zzzz_xxxx_0[j] = -cd_z[j] * tg_zzz_xxxx_0[j] + tg_zzz_xxxxz_0[j];
+                    tg_yzzz_zzzz_0[j] = fr * tg_zzz_zzzz_0[j] + tg_zzz_yzzzz_0[j];
 
-                    tg_zzzz_xxxy_0[j] = -cd_z[j] * tg_zzz_xxxy_0[j] + tg_zzz_xxxyz_0[j];
+                    fr = -cd_z[j]; 
 
-                    tg_zzzz_xxxz_0[j] = -cd_z[j] * tg_zzz_xxxz_0[j] + tg_zzz_xxxzz_0[j];
+                    tg_zzzz_xxxx_0[j] = fr * tg_zzz_xxxx_0[j] + tg_zzz_xxxxz_0[j];
 
-                    tg_zzzz_xxyy_0[j] = -cd_z[j] * tg_zzz_xxyy_0[j] + tg_zzz_xxyyz_0[j];
+                    tg_zzzz_xxxy_0[j] = fr * tg_zzz_xxxy_0[j] + tg_zzz_xxxyz_0[j];
 
-                    tg_zzzz_xxyz_0[j] = -cd_z[j] * tg_zzz_xxyz_0[j] + tg_zzz_xxyzz_0[j];
+                    tg_zzzz_xxxz_0[j] = fr * tg_zzz_xxxz_0[j] + tg_zzz_xxxzz_0[j];
 
-                    tg_zzzz_xxzz_0[j] = -cd_z[j] * tg_zzz_xxzz_0[j] + tg_zzz_xxzzz_0[j];
+                    tg_zzzz_xxyy_0[j] = fr * tg_zzz_xxyy_0[j] + tg_zzz_xxyyz_0[j];
 
-                    tg_zzzz_xyyy_0[j] = -cd_z[j] * tg_zzz_xyyy_0[j] + tg_zzz_xyyyz_0[j];
+                    tg_zzzz_xxyz_0[j] = fr * tg_zzz_xxyz_0[j] + tg_zzz_xxyzz_0[j];
 
-                    tg_zzzz_xyyz_0[j] = -cd_z[j] * tg_zzz_xyyz_0[j] + tg_zzz_xyyzz_0[j];
+                    tg_zzzz_xxzz_0[j] = fr * tg_zzz_xxzz_0[j] + tg_zzz_xxzzz_0[j];
 
-                    tg_zzzz_xyzz_0[j] = -cd_z[j] * tg_zzz_xyzz_0[j] + tg_zzz_xyzzz_0[j];
+                    tg_zzzz_xyyy_0[j] = fr * tg_zzz_xyyy_0[j] + tg_zzz_xyyyz_0[j];
 
-                    tg_zzzz_xzzz_0[j] = -cd_z[j] * tg_zzz_xzzz_0[j] + tg_zzz_xzzzz_0[j];
+                    tg_zzzz_xyyz_0[j] = fr * tg_zzz_xyyz_0[j] + tg_zzz_xyyzz_0[j];
 
-                    tg_zzzz_yyyy_0[j] = -cd_z[j] * tg_zzz_yyyy_0[j] + tg_zzz_yyyyz_0[j];
+                    tg_zzzz_xyzz_0[j] = fr * tg_zzz_xyzz_0[j] + tg_zzz_xyzzz_0[j];
 
-                    tg_zzzz_yyyz_0[j] = -cd_z[j] * tg_zzz_yyyz_0[j] + tg_zzz_yyyzz_0[j];
+                    tg_zzzz_xzzz_0[j] = fr * tg_zzz_xzzz_0[j] + tg_zzz_xzzzz_0[j];
 
-                    tg_zzzz_yyzz_0[j] = -cd_z[j] * tg_zzz_yyzz_0[j] + tg_zzz_yyzzz_0[j];
+                    tg_zzzz_yyyy_0[j] = fr * tg_zzz_yyyy_0[j] + tg_zzz_yyyyz_0[j];
 
-                    tg_zzzz_yzzz_0[j] = -cd_z[j] * tg_zzz_yzzz_0[j] + tg_zzz_yzzzz_0[j];
+                    tg_zzzz_yyyz_0[j] = fr * tg_zzz_yyyz_0[j] + tg_zzz_yyyzz_0[j];
 
-                    tg_zzzz_zzzz_0[j] = -cd_z[j] * tg_zzz_zzzz_0[j] + tg_zzz_zzzzz_0[j];
+                    tg_zzzz_yyzz_0[j] = fr * tg_zzz_yyzz_0[j] + tg_zzz_yyzzz_0[j];
+
+                    tg_zzzz_yzzz_0[j] = fr * tg_zzz_yzzz_0[j] + tg_zzz_yzzzz_0[j];
+
+                    tg_zzzz_zzzz_0[j] = fr * tg_zzz_zzzz_0[j] + tg_zzz_zzzzz_0[j];
                 }
             }
         }
