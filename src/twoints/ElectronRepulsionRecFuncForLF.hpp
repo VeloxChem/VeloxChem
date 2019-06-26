@@ -27,7 +27,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSLSF(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSLSF(      CMemBlock2D<double>* primBuffer,
                                       const CRecursionMap&       recursionMap,
                                       const CMemBlock2D<double>& osFactors,
                                       const CMemBlock2D<double>& wpDistances,
@@ -49,7 +49,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSLSF_0_90(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSLSF_0_90(      CMemBlock2D<double>* primBuffer,
                                            const CRecursionMap&       recursionMap,
                                            const CMemBlock2D<double>& osFactors,
                                            const CMemBlock2D<double>& wpDistances,
@@ -71,7 +71,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSLSF_90_180(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSLSF_90_180(      CMemBlock2D<double>* primBuffer,
                                              const CRecursionMap&       recursionMap,
                                              const CMemBlock2D<double>& osFactors,
                                              const CMemBlock2D<double>& wpDistances,
@@ -93,7 +93,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSLSF_180_270(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSLSF_180_270(      CMemBlock2D<double>* primBuffer,
                                               const CRecursionMap&       recursionMap,
                                               const CMemBlock2D<double>& osFactors,
                                               const CMemBlock2D<double>& wpDistances,
@@ -115,7 +115,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSLSF_270_360(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSLSF_270_360(      CMemBlock2D<double>* primBuffer,
                                               const CRecursionMap&       recursionMap,
                                               const CMemBlock2D<double>& osFactors,
                                               const CMemBlock2D<double>& wpDistances,
@@ -137,7 +137,7 @@ namespace erirecfunc { // erirecfunc namespace
     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
     @param iContrPair the index of contracted GTOs apir on bra side.
     */
-    void compElectronRepulsionForSLSF_360_450(      CMemBlock2D<double>& primBuffer,
+    void compElectronRepulsionForSLSF_360_450(      CMemBlock2D<double>* primBuffer,
                                               const CRecursionMap&       recursionMap,
                                               const CMemBlock2D<double>& osFactors,
                                               const CMemBlock2D<double>& wpDistances,
