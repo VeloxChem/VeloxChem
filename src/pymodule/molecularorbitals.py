@@ -307,7 +307,9 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
     match_nuclear_charges = False
     if 'nuclear_charges' in hf:
         hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
-        match_nuclear_charges = (hf_nuclear_charges == nuclear_charges).all()
+        if hf_nuclear_charges.shape == nuclear_charges.shape:
+            match_nuclear_charges = (
+                hf_nuclear_charges == nuclear_charges).all()
 
     match_basis_set = False
     if 'basis_set' in hf:
