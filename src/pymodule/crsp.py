@@ -925,17 +925,19 @@ class ComplexResponse:
             property.
         """
 
+        width = 92
+
         output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm.values()),
             min(relative_residual_norm.values()))
-        self.ostream.print_header(output_header.ljust(82))
+        self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
         output_header = 'Operator:  {} ({})'.format(self.b_operator,
                                                     self.b_components)
-        self.ostream.print_header(output_header.ljust(82))
+        self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
         for op, freq, nv in nvs:
@@ -944,7 +946,7 @@ class ComplexResponse:
             output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
                 ops_label, -nv.real, -nv.imag)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-            self.ostream.print_header(output_iter.ljust(82))
+            self.ostream.print_header(output_iter.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -958,19 +960,19 @@ class ComplexResponse:
         self.ostream.print_header(31 * "=")
         self.ostream.print_blank()
 
-        str_width = 60
+        width = 60
 
         cur_str = "Max. Number of Iterations : " + str(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(width))
         cur_str = "Convergence Threshold     : " + \
             "{:.1e}".format(self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(width))
 
         cur_str = "ERI Screening Scheme      : " + get_qq_type(self.qq_type)
-        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(width))
         cur_str = "ERI Screening Threshold   : " + \
             "{:.1e}".format(self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_header(cur_str.ljust(width))
         self.ostream.print_blank()
 
         self.ostream.flush()
@@ -980,6 +982,7 @@ class ComplexResponse:
         Prints information after convergence.
         """
 
+        width = 92
         output_conv = '*** '
         if self.is_converged:
             output_conv += 'Complex response converged'
@@ -987,7 +990,7 @@ class ComplexResponse:
             output_conv += 'Complex response NOT converged'
         output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
-        self.ostream.print_header(output_conv.ljust(82))
+        self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
 
     def print_properties(self, props):
@@ -998,40 +1001,56 @@ class ComplexResponse:
             The dictionary of properties.
         """
 
+        width = 92
         for w in self.frequencies:
             w_str = '{}, {}, w={:.4f}'.format(self.a_operator, self.b_operator,
                                               w)
-            self.ostream.print_header(w_str.ljust(82))
-            self.ostream.print_header(('-' * len(w_str)).ljust(82))
+            self.ostream.print_header(w_str.ljust(width))
+            self.ostream.print_header(('-' * len(w_str)).ljust(width))
             for a in self.a_components:
                 for b in self.b_components:
                     ops_label = '<<{};{}>>_{:.4f}'.format(a, b, w)
                     output_alpha = '{:<15s} {:15.8f} {:15.8f}j'.format(
                         ops_label, props[(a, b, w)].real, props[(a, b, w)].imag)
-                    self.ostream.print_header(output_alpha.ljust(82))
+                    self.ostream.print_header(output_alpha.ljust(width))
             self.ostream.print_blank()
 
     def print_timing(self):
         """
-        Prints timing for the complex linear response solver.
+        Prints timing for the linear response eigensolver.
         """
 
-        valstr = 'Timing:'
-        self.ostream.print_header(valstr.ljust(82))
-        self.ostream.print_header(('-' * len(valstr)).ljust(82))
+        width = 92
 
-        valstr = '{:<22s}: {:12.2f} sec'.format(
-            'Initial guess', self.timing_dict['initial_guess'])
-        self.ostream.print_header(valstr.ljust(82))
+        valstr = 'Timing (in sec):'
+        self.ostream.print_header(valstr.ljust(width))
+        self.ostream.print_header(('-' * len(valstr)).ljust(width))
+
+        valstr = '{:<15s} {:>15s} {:>18s}'.format('', 'ReducedSpace',
+                                                  'NewTrialVectors')
+        self.ostream.print_header(valstr.ljust(width))
+
+        valstr = 'Iteration {:<5d} {:>15s} {:18.3f}'.format(
+            0, '---', self.timing_dict['initial_guess'])
+        self.ostream.print_header(valstr.ljust(width))
 
         for i, (a, b) in enumerate(
                 zip(self.timing_dict['reduced_space'],
                     self.timing_dict['new_trials'])):
-            valstr = '{:<22s}: {:12.2f} sec'.format(
-                'Iteration {:d}'.format(i + 1), a + b)
-            self.ostream.print_header(valstr.ljust(82))
+            valstr = 'Iteration {:<5d} {:15.3f} {:18.3f}'.format(i + 1, a, b)
+            self.ostream.print_header(valstr.ljust(width))
 
-        valstr = '{:<22s}: {:12.2f} sec'.format(
-            'Last iteration', self.timing_dict['reduced_space'][-1])
-        self.ostream.print_header(valstr.ljust(82))
+        valstr = 'Iteration {:<5d} {:15.3f} {:>18s}'.format(
+            len(self.timing_dict['reduced_space']),
+            self.timing_dict['reduced_space'][-1], '---')
+        self.ostream.print_header(valstr.ljust(width))
+
+        valstr = '---------'
+        self.ostream.print_header(valstr.ljust(width))
+
+        valstr = '{:<15s} {:15.3f} {:18.3f}'.format(
+            'Sum', sum(self.timing_dict['reduced_space']),
+            sum(self.timing_dict['new_trials']))
+        self.ostream.print_header(valstr.ljust(width))
+
         self.ostream.print_blank()
