@@ -38,18 +38,18 @@ CXXFLAGS += -I $(MATH_INC)
 
 # Default rule for linking library
 debug: $(LOCAL_OBJ)
-        @echo ====== Linking $(LOCAL_LIB)...
-        $(AR) $(ARFLAGS) $(LOCAL_LIB) $^
+	@echo ====== Linking $(LOCAL_LIB)...
+	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
 
 # Default rule for linking library
 release: $(LOCAL_OBJ)
-        @echo ====== Linking $(LOCAL_LIB)...
-        $(AR) $(ARFLAGS) $(LOCAL_LIB) $^
+	@echo ====== Linking $(LOCAL_LIB)...
+	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
 
 # Default rule for cleaning library directory
 clean:
-        @echo ====== Removing temporary files...
-        $(RM) $(LOCAL_LIB) $(LOCAL_DEP) $(LOCAL_OBJ) $(LOCAL_OPT)
+	@echo ====== Removing temporary files...
+	$(RM) $(LOCAL_LIB) $(LOCAL_DEP) $(LOCAL_OBJ) $(LOCAL_OPT)
 
 # Include dependency files
 ifneq "$(MAKECMDGOALS)" "clean"
@@ -58,11 +58,10 @@ endif
 
 # Default rule for compiling cpp files
 %.o: %.cpp
-        @echo ====== Compiling $@...
-        $(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $(LIB_INC) -o $@ $<
+	@echo ====== Compiling $@...
+	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $(LIB_INC) -o $@ $<
 
 # Default rule for generating dependencies
 %.d: %.cpp
-        @echo ====== Updating dependencies for $@
-        $(CXX) $(CXXFLAGS) $(CPPFLAGS) -M $< > $@
-        
+	@echo ====== Updating dependencies for $@
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -M $< > $@
