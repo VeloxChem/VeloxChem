@@ -790,17 +790,17 @@ class ScfDriver:
 
         cur_str = "Convergence Accelerator      : " + self.get_acc_type()
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Max. Number Of Iterations    : " + str(self.max_iter)
+        cur_str = "Max. Number of Iterations    : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Max. Number Of Error Vectors : " + str(self.max_err_vecs)
+        cur_str = "Max. Number of Error Vectors : " + str(self.max_err_vecs)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold        : " + \
             "{:.1e}".format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI screening scheme         : " + get_qq_type(self.qq_type)
+        cur_str = "ERI Screening Scheme         : " + get_qq_type(self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI screening mode           : " + self.get_qq_dyn()
+        cur_str = "ERI Screening Mode           : " + self.get_qq_dyn()
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI Screening Threshold      : " + \
             "{:.1e}".format(self.eri_thresh)

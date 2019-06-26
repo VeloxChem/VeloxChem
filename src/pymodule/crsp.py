@@ -960,13 +960,13 @@ class ComplexResponse:
 
         str_width = 60
 
-        cur_str = "Max. Number Of Iterations : " + str(self.max_iter)
+        cur_str = "Max. Number of Iterations : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "Convergence Threshold     : " + \
             "{:.1e}".format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI screening scheme      : " + get_qq_type(self.qq_type)
+        cur_str = "ERI Screening Scheme      : " + get_qq_type(self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = "ERI Screening Threshold   : " + \
             "{:.1e}".format(self.eri_thresh)
