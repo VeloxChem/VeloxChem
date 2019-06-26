@@ -81,10 +81,10 @@ class ComplexResponse:
         self.damping = 0.004556335294880438
 
         self.qq_type = 'QQ_DEN'
-        self.eri_thresh = 1.0e-12
+        self.eri_thresh = 1.0e-15
 
         self.max_iter = 150
-        self.conv_thresh = 1.0e-5
+        self.conv_thresh = 1.0e-4
 
         self.cur_iter = 0
         self.is_converged = False

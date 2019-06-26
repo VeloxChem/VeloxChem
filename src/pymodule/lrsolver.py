@@ -77,7 +77,7 @@ class LinearResponseSolver:
         self.qq_type = 'QQ_DEN'
 
         # solver setup
-        self.conv_thresh = 1.0e-5
+        self.conv_thresh = 1.0e-4
         self.max_iter = 50
         self.cur_iter = 0
         self.small_thresh = 1.0e-10
