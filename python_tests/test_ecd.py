@@ -31,9 +31,7 @@ class TestECD(unittest.TestCase):
         lreig_solver.update_settings({
             'nstates': '10',
             'eri_thresh': '1.0e-12',
-            'qq_type': 'QQ_DEN',
-            'conv_thresh': '1.0e-6',
-            'max_iter': '50',
+            'conv_thresh': '1.0e-4',
         })
 
         results = lreig_solver.compute(task.molecule, task.ao_basis,
