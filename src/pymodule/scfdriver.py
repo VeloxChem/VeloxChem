@@ -74,9 +74,11 @@ class ScfDriver:
     :param nodes:
         The number of MPI processes.
     :param restart:
-        The flag for restarting from checkpoint file
+        The flag for restarting from checkpoint file.
+    :param checkpoint_file:
+        The name of checkpoint file.
     :param restricted:
-        The flag for restricted SCF
+        The flag for restricted SCF.
     """
 
     def __init__(self, comm, ostream):

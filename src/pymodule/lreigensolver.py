@@ -1,6 +1,8 @@
+from os.path import isfile
 import itertools
 import numpy as np
 import time as tm
+import h5py
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
@@ -49,6 +51,10 @@ class LinearResponseEigenSolver:
         Number of MPI processes.
     :param ostream:
         The output stream.
+    :param restart:
+        The flag for restarting from checkpoint file.
+    :param checkpoint_file:
+        The name of checkpoint file.
     :param timing:
         The flag for printing timing information.
     :param profiling:
@@ -88,6 +94,10 @@ class LinearResponseEigenSolver:
         # output stream
         self.ostream = ostream
 
+        # restart information
+        self.restart = True
+        self.checkpoint_file = None
+
         self.timing = False
         self.profiling = False
 
@@ -113,6 +123,12 @@ class LinearResponseEigenSolver:
             self.max_iter = int(settings['max_iter'])
         if 'lindep_thresh' in settings:
             self.lindep_thresh = float(settings['lindep_thresh'])
+
+        if 'restart' in settings:
+            key = settings['restart'].lower()
+            self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in settings:
+            self.checkpoint_file = settings['checkpoint_file']
 
         if 'timing' in settings:
             key = settings['timing'].lower()
@@ -178,20 +194,34 @@ class LinearResponseEigenSolver:
 
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
-        # start linear response calculation
-        if self.rank == mpi_master():
-            igs = self.initial_excitations(self.nstates, ea, nocc, norb)
-            b = self.setup_trials(igs)
+        b = None
+        e2b = None
+        s2b = None
 
-            assert_msg_critical(
-                np.any(b),
-                'LinearResponseSolver.compute: trial vector is empty')
-        else:
-            b = None
+        # read initial guess from restart file
+        if self.restart:
+            if self.rank == mpi_master():
+                b, e2b, s2b = self.read_hdf5(self.checkpoint_file,
+                                             molecule.elem_ids_to_numpy(),
+                                             basis.get_label())
+                self.restart = (b is not None and e2b is not None and
+                                s2b is not None)
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
-        e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
-        if self.rank == mpi_master():
-            s2b = e2x_drv.s2n(b, scf_tensors, nocc)
+        # generate initial guess from scratch
+        if not self.restart:
+            if self.rank == mpi_master():
+                igs = self.initial_excitations(self.nstates, ea, nocc, norb)
+                b = self.setup_trials(igs)
+                assert_msg_critical(
+                    np.any(b),
+                    'LinearResponseSolver.compute: trial vector is empty')
+            else:
+                b = None
+
+            e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
+            if self.rank == mpi_master():
+                s2b = e2x_drv.s2n(b, scf_tensors, nocc)
 
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
@@ -275,6 +305,9 @@ class LinearResponseEigenSolver:
                 new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
+
+                self.write_hdf5(self.checkpoint_file, b, e2b, s2b,
+                                molecule.elem_ids_to_numpy(), basis.get_label())
 
             if self.timing:
                 self.timing_dict['new_trials'].append(tm.time() - new_trials_t0)
@@ -577,3 +610,76 @@ class LinearResponseEigenSolver:
         self.ostream.print_header(valstr.ljust(width))
 
         self.ostream.print_blank()
+
+    def write_hdf5(self, fname, b, e2b, s2b, nuclear_charges, basis_set):
+
+        valid_checkpoint = (self.checkpoint_file and
+                            isinstance(self.checkpoint_file, str))
+
+        if not valid_checkpoint:
+            return
+
+        hf = h5py.File(fname, 'w')
+
+        hf.create_dataset('LR_eigen_b', data=b, compression="gzip")
+        hf.create_dataset('LR_eigen_e2b', data=e2b, compression='gzip')
+        hf.create_dataset('LR_eigen_s2b', data=s2b, compression='gzip')
+
+        if nuclear_charges is not None:
+            hf.create_dataset('nuclear_charges',
+                              data=nuclear_charges,
+                              compression='gzip')
+
+        if basis_set is not None:
+            hf.create_dataset('basis_set',
+                              data=np.string_([basis_set]),
+                              compression='gzip')
+
+        hf.close()
+
+        checkpoint_text = 'Checkpoint written to file: '
+        checkpoint_text += self.checkpoint_file
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()
+
+    def read_hdf5(self, fname, nuclear_charges, basis_set):
+
+        valid_checkpoint = (self.checkpoint_file and
+                            isinstance(self.checkpoint_file, str) and
+                            isfile(self.checkpoint_file))
+
+        if not valid_checkpoint:
+            return None, None, None
+
+        hf = h5py.File(fname, 'r')
+
+        match_nuclear_charges = False
+        if 'nuclear_charges' in hf:
+            hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
+            if hf_nuclear_charges.shape == nuclear_charges.shape:
+                match_nuclear_charges = (
+                    hf_nuclear_charges == nuclear_charges).all()
+
+        match_basis_set = False
+        if 'basis_set' in hf:
+            hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
+            match_basis_set = (hf_basis_set.upper() == basis_set.upper())
+
+        if match_nuclear_charges and match_basis_set:
+            b = np.array(hf.get('LR_eigen_b'))
+            e2b = np.array(hf.get('LR_eigen_e2b'))
+            s2b = np.array(hf.get('LR_eigen_s2b'))
+        else:
+            b = None
+            e2b = None
+            s2b = None
+
+        hf.close()
+
+        if (b is not None and e2b is not None and s2b is not None):
+            checkpoint_text = 'Restarting from checkpoint file: '
+            checkpoint_text += self.checkpoint_file
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
+
+        return b, e2b, s2b

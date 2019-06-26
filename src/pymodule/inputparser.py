@@ -215,21 +215,27 @@ class InputParser:
             # for input file, save input file name and checkpoint file name
             if '.' in self.filename:
                 fname = '.'.join(self.filename.split('.')[:-1])
-                fchkp = fname + ".scf.h5"
-                fexciton = fname + ".exciton.h5"
+                fchkp = fname + '.scf.h5'
+                frsp = fname + '.rsp.h5'
+                fexciton = fname + '.exciton.h5'
             else:
-                fchkp = self.filename + ".scf.h5"
-                fexciton = self.filename + ".exciton.h5"
+                fchkp = self.filename + '.scf.h5'
+                frsp = self.filename + '.rsp.h5'
+                fexciton = self.filename + '.exciton.h5'
 
-            self.input_dict["input_file"] = self.filename
+            self.input_dict['input_file'] = self.filename
 
-            if "scf" not in self.input_dict:
-                self.input_dict["scf"] = {}
-            self.input_dict["scf"]["checkpoint_file"] = fchkp
+            if 'scf' not in self.input_dict:
+                self.input_dict['scf'] = {}
+            self.input_dict['scf']['checkpoint_file'] = fchkp
 
-            if "exciton" not in self.input_dict:
-                self.input_dict["exciton"] = {}
-            self.input_dict["exciton"]["checkpoint_file"] = fexciton
+            if 'response' not in self.input_dict:
+                self.input_dict['response'] = {}
+            self.input_dict['response']['checkpoint_file'] = frsp
+
+            if 'exciton' not in self.input_dict:
+                self.input_dict['exciton'] = {}
+            self.input_dict['exciton']['checkpoint_file'] = fexciton
 
 
 def parse_frequencies(input_frequencies):
