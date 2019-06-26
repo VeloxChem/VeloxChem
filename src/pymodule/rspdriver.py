@@ -15,6 +15,8 @@ class ResponseDriver:
         The rank of MPI process.
     :param nodes:
         The number of MPI processes.
+    :param rsp_input:
+        The settings dictionary.
     """
 
     def __init__(self, comm, ostream):
@@ -27,19 +29,11 @@ class ResponseDriver:
             The output stream.
         """
 
-        # calculation type
+        # default calculation type
         self.prop_type = 'ABSORPTION'
-        self.nstates = 3
         self.tamm_dancoff = False
         self.triplet = False
-
-        # solver settings
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
-
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
+        self.rsp_input = {}
 
         # mpi information
         self.comm = comm
@@ -57,23 +51,9 @@ class ResponseDriver:
             The settings dictionary.
         """
 
-        # solver settings
-        if 'conv_thresh' in rsp_input:
-            self.conv_thresh = float(rsp_input['conv_thresh'])
-        if 'max_iter' in rsp_input:
-            self.max_iter = int(rsp_input['max_iter'])
-
-        # ERI settings
-        if 'eri_thresh' in rsp_input:
-            self.eri_thresh = float(rsp_input['eri_thresh'])
-        if 'qq_type' in rsp_input:
-            self.qq_type = rsp_input['qq_type'].upper()
-
         # properties
         if rsp_input['property'].lower() == 'absorption':
             self.prop_type = 'ABSORPTION'
-            if 'nstates' in rsp_input:
-                self.nstates = int(rsp_input['nstates'])
             if 'tamm_dancoff' in rsp_input:
                 key = rsp_input['tamm_dancoff'].lower()
                 self.tamm_dancoff = True if key in ['yes', 'y'] else False
@@ -83,11 +63,8 @@ class ResponseDriver:
 
         elif rsp_input['property'].lower() == 'polarizability':
             self.prop_type = 'POLARIZABILITY'
-            self.a_operator = rsp_input['a_operator']
-            self.a_components = rsp_input['a_components']
-            self.b_operator = rsp_input['b_operator']
-            self.b_components = rsp_input['b_components']
-            self.frequencies = rsp_input['frequencies']
+
+        self.rsp_input = dict(rsp_input)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -104,8 +81,8 @@ class ResponseDriver:
             The results from the actual response solver.
         """
 
-        if self.rank == mpi_master():
-            self.print_header()
+        #if self.rank == mpi_master():
+        #    self.print_header()
 
         # Linear response eigensolver
 
@@ -118,13 +95,7 @@ class ResponseDriver:
             else:
                 eigensolver = TDAExciDriver(self.comm, self.ostream)
 
-            eigensolver.update_settings({
-                'nstates': self.nstates,
-                'eri_thresh': self.eri_thresh,
-                'qq_type': self.qq_type,
-                'conv_thresh': self.conv_thresh,
-                'max_iter': self.max_iter
-            })
+            eigensolver.update_settings(self.rsp_input)
 
             return eigensolver.compute(molecule, ao_basis, scf_tensors)
 
@@ -133,17 +104,7 @@ class ResponseDriver:
         if self.prop_type.upper() in ['POLARIZABILITY']:
             lr_solver = LinearResponseSolver(self.comm, self.ostream)
 
-            lr_solver.update_settings({
-                'a_operator': self.a_operator,
-                'a_components': self.a_components,
-                'b_operator': self.b_operator,
-                'b_components': self.b_components,
-                'frequencies': self.frequencies,
-                'eri_thresh': self.eri_thresh,
-                'qq_type': self.qq_type,
-                'conv_thresh': self.conv_thresh,
-                'max_iter': self.max_iter
-            })
+            lr_solver.update_settings(self.rsp_input)
 
             return lr_solver.compute(molecule, ao_basis, scf_tensors)
 

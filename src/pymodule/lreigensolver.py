@@ -49,6 +49,8 @@ class LinearResponseEigenSolver:
         Number of MPI processes.
     :param ostream:
         The output stream.
+    :param profiling:
+        The flag for printing profiling information.
     """
 
     def __init__(self, comm, ostream):
@@ -84,6 +86,8 @@ class LinearResponseEigenSolver:
         # output stream
         self.ostream = ostream
 
+        self.profiling = False
+
     def update_settings(self, settings):
         """
         Updates settings in linear response eigensolver.
@@ -107,6 +111,10 @@ class LinearResponseEigenSolver:
         if 'lindep_thresh' in settings:
             self.lindep_thresh = float(settings['lindep_thresh'])
 
+        if 'profiling' in settings:
+            key = settings['profiling'].lower()
+            self.profiling = True if key in ['yes', 'y'] else False
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs linear response calculation for a molecule and a basis set.
@@ -122,6 +130,14 @@ class LinearResponseEigenSolver:
             A dictionary containing eigenvalues, eigenvectors, transition
             dipole moments, oscillator strengths and rotatory strengths.
         """
+
+        if self.profiling:
+            import cProfile
+            import pstats
+            import io
+            import os
+            pr = cProfile.Profile()
+            pr.enable()
 
         if self.rank == mpi_master():
             self.print_header()
@@ -226,6 +242,16 @@ class LinearResponseEigenSolver:
                 new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
+
+        if self.profiling:
+            pr.disable()
+            s = io.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats(20)
+            if self.rank == mpi_master():
+                for line in s.getvalue().split(os.linesep):
+                    self.ostream.print_info(line)
 
         # converged?
         if self.rank == mpi_master():
