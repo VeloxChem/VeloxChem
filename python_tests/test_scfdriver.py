@@ -24,7 +24,7 @@ class TestScfDriver(unittest.TestCase):
 
         e_scf = scf_drv.get_scf_energy()
 
-        self.assertAlmostEqual(-2400.704613197391, e_scf, 10)
+        self.assertAlmostEqual(-2400.70461320, e_scf, 8)
 
         # unrestricted scf
 

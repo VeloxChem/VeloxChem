@@ -44,7 +44,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
 
         if task.mpi_rank == mpi_master():
             e_mp2 = mp2_drv.e_mp2
-            e_ref = -0.2852908836
+            e_ref = -0.28529088
             self.assertAlmostEqual(e_ref, e_mp2, 8)
 
         # extra test: collect moints batches to master node
