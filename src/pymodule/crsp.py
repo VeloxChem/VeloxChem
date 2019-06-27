@@ -458,8 +458,11 @@ class ComplexResponse:
             pr.enable()
 
         if self.timing:
-            prep_t0 = tm.time()
-            self.timing_dict = {}
+            self.timing_dict = {
+                'reduced_space': [0.0],
+                'new_trials': [0.0],
+            }
+            timing_t0 = tm.time()
 
         if self.rank == mpi_master():
             self.print_header()
@@ -540,6 +543,10 @@ class ComplexResponse:
             bger = None
             bung = None
 
+        if self.timing:
+            self.timing_dict['reduced_space'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
+
         trials_info = self.comm.bcast(trials_info, root=mpi_master())
 
         if trials_info['bger']:
@@ -558,15 +565,15 @@ class ComplexResponse:
         kappas = {}
 
         if self.timing:
-            self.timing_dict['initial_guess'] = tm.time() - prep_t0
-            self.timing_dict['reduced_space'] = []
-            self.timing_dict['new_trials'] = []
+            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
 
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
 
             if self.timing:
-                red_space_t0 = tm.time()
+                self.timing_dict['reduced_space'].append(0.0)
+                self.timing_dict['new_trials'].append(0.0)
 
             if self.rank == mpi_master():
                 nvs = []
@@ -785,8 +792,9 @@ class ComplexResponse:
                 self.print_iteration(relative_residual_norm, nvs)
 
             if self.timing:
-                self.timing_dict['reduced_space'].append(tm.time() -
-                                                         red_space_t0)
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
             # check convergence
 
@@ -794,9 +802,6 @@ class ComplexResponse:
 
             if self.is_converged:
                 break
-
-            if self.timing:
-                new_trials_t0 = tm.time()
 
             # spawning new trial vectors from residuals
 
@@ -838,6 +843,11 @@ class ComplexResponse:
                 new_trials_ger = None
                 new_trials_ung = None
 
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
+
             trials_info = self.comm.bcast(trials_info, root=mpi_master())
 
             if trials_info['new_trials_ger']:
@@ -857,7 +867,9 @@ class ComplexResponse:
                     s2bger = np.append(s2bger, new_s2bger, axis=1)
 
             if self.timing:
-                self.timing_dict['new_trials'].append(tm.time() - new_trials_t0)
+                tid = iteration + 1
+                self.timing_dict['new_trials'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
         # converged?
         if self.rank == mpi_master():
@@ -1030,20 +1042,15 @@ class ComplexResponse:
                                                   'NewTrialVectors')
         self.ostream.print_header(valstr.ljust(width))
 
-        valstr = 'Iteration {:<5d} {:>15s} {:18.3f}'.format(
-            0, '---', self.timing_dict['initial_guess'])
-        self.ostream.print_header(valstr.ljust(width))
-
         for i, (a, b) in enumerate(
                 zip(self.timing_dict['reduced_space'],
                     self.timing_dict['new_trials'])):
-            valstr = 'Iteration {:<5d} {:15.3f} {:18.3f}'.format(i + 1, a, b)
+            if i == 0:
+                title = 'Initial guess'
+            else:
+                title = 'Iteration {:<5d}'.format(i)
+            valstr = '{:<15s} {:15.3f} {:18.3f}'.format(title, a, b)
             self.ostream.print_header(valstr.ljust(width))
-
-        valstr = 'Iteration {:<5d} {:15.3f} {:>18s}'.format(
-            len(self.timing_dict['reduced_space']),
-            self.timing_dict['reduced_space'][-1], '---')
-        self.ostream.print_header(valstr.ljust(width))
 
         valstr = '---------'
         self.ostream.print_header(valstr.ljust(width))
