@@ -53,6 +53,10 @@ class LinearResponseSolver:
         Number of MPI processes.
     :param ostream:
         The output stream.
+    :param timing:
+        The flag for printing timing information.
+    :param profiling:
+        The flag for printing profiling information.
     """
 
     def __init__(self, comm, ostream):
@@ -92,6 +96,9 @@ class LinearResponseSolver:
         # output stream
         self.ostream = ostream
 
+        self.timing = False
+        self.profiling = False
+
     def update_settings(self, settings):
         """
         Updates settings in linear response solver.
@@ -123,6 +130,13 @@ class LinearResponseSolver:
         if 'lindep_thresh' in settings:
             self.lindep_thresh = float(settings['lindep_thresh'])
 
+        if 'timing' in settings:
+            key = settings['timing'].lower()
+            self.timing = True if key in ['yes', 'y'] else False
+        if 'profiling' in settings:
+            key = settings['profiling'].lower()
+            self.profiling = True if key in ['yes', 'y'] else False
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs linear response calculation for a molecule and a basis set.
@@ -137,6 +151,21 @@ class LinearResponseSolver:
         :return:
             A dictionary containing properties.
         """
+
+        if self.profiling:
+            import cProfile
+            import pstats
+            import io
+            import os
+            pr = cProfile.Profile()
+            pr.enable()
+
+        if self.timing:
+            self.timing_dict = {
+                'reduced_space': [0.0],
+                'new_trials': [0.0],
+            }
+            timing_t0 = tm.time()
 
         self.start_time = tm.time()
 
@@ -182,6 +211,10 @@ class LinearResponseSolver:
         else:
             b = None
 
+        if self.timing:
+            self.timing_dict['reduced_space'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
+
         e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
         if self.rank == mpi_master():
             s2b = e2x_drv.s2n(b, scf_tensors, nocc)
@@ -191,11 +224,19 @@ class LinearResponseSolver:
         relative_residual_norm = {}
         converged = {}
 
+        if self.timing:
+            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
+
         # start iterations
-        for i in range(self.max_iter):
+        for iteration in range(self.max_iter):
+
+            if self.timing:
+                self.timing_dict['reduced_space'].append(0.0)
+                self.timing_dict['new_trials'].append(0.0)
 
             if self.rank == mpi_master():
-                self.cur_iter = i
+                self.cur_iter = iteration
                 nvs = []
 
                 # next solution
@@ -221,6 +262,11 @@ class LinearResponseSolver:
                 # write to output
                 self.print_iteration(relative_residual_norm, converged, nvs)
 
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
+
             # check convergence
             self.check_convergence(relative_residual_norm)
 
@@ -234,12 +280,22 @@ class LinearResponseSolver:
             else:
                 new_trials = None
 
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
+
             new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
                                   basis)
             if self.rank == mpi_master():
                 new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
+
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['new_trials'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
         # converged?
         if self.rank == mpi_master():
@@ -248,6 +304,19 @@ class LinearResponseSolver:
             assert_msg_critical(
                 self.is_converged,
                 'LinearResponseSolver.compute: failed to converge')
+
+            if self.timing:
+                self.print_timing()
+
+        if self.profiling:
+            pr.disable()
+            s = io.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats(20)
+            if self.rank == mpi_master():
+                for line in s.getvalue().split(os.linesep):
+                    self.ostream.print_info(line)
 
         # calculate properties
         if self.rank == mpi_master():
@@ -410,3 +479,38 @@ class LinearResponseSolver:
             new_trials = normalize(new_trials)
 
         return new_trials
+
+    def print_timing(self):
+        """
+        Prints timing for the linear response eigensolver.
+        """
+
+        width = 92
+
+        valstr = 'Timing (in sec):'
+        self.ostream.print_header(valstr.ljust(width))
+        self.ostream.print_header(('-' * len(valstr)).ljust(width))
+
+        valstr = '{:<15s} {:>15s} {:>18s}'.format('', 'ReducedSpace',
+                                                  'NewTrialVectors')
+        self.ostream.print_header(valstr.ljust(width))
+
+        for i, (a, b) in enumerate(
+                zip(self.timing_dict['reduced_space'],
+                    self.timing_dict['new_trials'])):
+            if i == 0:
+                title = 'Initial guess'
+            else:
+                title = 'Iteration {:<5d}'.format(i)
+            valstr = '{:<15s} {:15.3f} {:18.3f}'.format(title, a, b)
+            self.ostream.print_header(valstr.ljust(width))
+
+        valstr = '---------'
+        self.ostream.print_header(valstr.ljust(width))
+
+        valstr = '{:<15s} {:15.3f} {:18.3f}'.format(
+            'Sum', sum(self.timing_dict['reduced_space']),
+            sum(self.timing_dict['new_trials']))
+        self.ostream.print_header(valstr.ljust(width))
+
+        self.ostream.print_blank()
