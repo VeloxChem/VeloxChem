@@ -14,6 +14,8 @@
 #include <memory>
 #include <string>
 
+#include "ElectricFieldIntegralsDriver.hpp"
+#include "ElectricFieldMatrix.hpp"
 #include "AngularMomentumIntegralsDriver.hpp"
 #include "AngularMomentumMatrix.hpp"
 #include "DenseMatrix.hpp"
@@ -258,6 +260,44 @@ CAngularMomentumMatrix_z_to_numpy(const CAngularMomentumMatrix& self)
 {
     return vlx_general::pointer_to_numpy(self.zvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
 }
+    
+// Helper function for CElectricFieldIntegralsDriver constructor
+
+static std::shared_ptr<CElectricFieldIntegralsDriver>
+CElectricFieldIntegralsDriver_create(py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CElectricFieldIntegralsDriver>(new CElectricFieldIntegralsDriver(*comm_ptr));
+}
+
+// Helper function for printing CElectricDipoleMatrix
+
+static std::string
+CElectricFieldMatrix_str(const CElectricFieldMatrix& self)
+{
+    return self.getStringForComponentX() + self.getStringForComponentY() + self.getStringForComponentZ();
+}
+
+// Helper function for converting CElectricDipoleMatrix to numpy array
+
+static py::array_t<double>
+CElectricFieldMatrix_x_to_numpy(const CElectricFieldMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.xvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CElectricFieldMatrix_y_to_numpy(const CElectricFieldMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.yvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
+}
+
+static py::array_t<double>
+CElectricFieldMatrix_z_to_numpy(const CElectricFieldMatrix& self)
+{
+    return vlx_general::pointer_to_numpy(self.zvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
+}
 
 // Exports classes/functions in src/oneints to python
 
@@ -481,6 +521,47 @@ export_oneints(py::module& m)
              (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(
                  const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
                  CAngularMomentumIntegralsDriver::compute);
+    
+    // CElectricFieldMatrix class
+
+    py::class_<CElectricFieldMatrix, std::shared_ptr<CElectricFieldMatrix>>(m, "ElectricFieldMatrix")
+        .def(py::init<>())
+        .def(py::init<const CDenseMatrix&,
+                      const CDenseMatrix&,
+                      const CDenseMatrix&>())
+        .def(py::init<const CElectricFieldMatrix&>())
+        .def("__str__", &CElectricFieldMatrix_str)
+        .def("x_to_numpy", &CElectricFieldMatrix_x_to_numpy)
+        .def("y_to_numpy", &CElectricFieldMatrix_y_to_numpy)
+        .def("z_to_numpy", &CElectricFieldMatrix_z_to_numpy)
+        .def(py::self == py::self);
+
+    // CElectricFieldIntegralsDriver class
+
+    py::class_<CElectricFieldIntegralsDriver, std::shared_ptr<CElectricFieldIntegralsDriver>>(
+        m, "ElectricFieldIntegralsDriver")
+        .def(py::init(&CElectricFieldIntegralsDriver_create))
+        .def(
+            "compute",
+             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
+                const CMolecule&, const CMolecularBasis&,
+                const double, const double, const double) const) &
+                CElectricFieldIntegralsDriver::compute)
+        .def("compute",
+             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
+                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&,
+                 const double, const double, const double) const) &
+                 CElectricFieldIntegralsDriver::compute)
+        .def("compute",
+             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
+                 const CMolecule&, const CMolecule&, const CMolecularBasis&,
+                 const double, const double, const double) const) &
+                 CElectricFieldIntegralsDriver::compute)
+        .def("compute",
+             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
+                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&,
+                 const double, const double, const double) const) &
+                 CElectricFieldIntegralsDriver::compute);
 }
 
 }  // namespace vlx_oneints

@@ -17,13 +17,13 @@
 
 TEST_F(CGridDriverTest, DefaultConstructor)
 {
-    CGridDriver gdrv(mpi::master(), mpi::nodes(MPI_COMM_WORLD), execmode::cpu, MPI_COMM_WORLD);
+    CGridDriver gdrv(MPI_COMM_WORLD);
 
-    gdrv.setLevel(6, MPI_COMM_WORLD);
+    gdrv.setLevel(6);
 
     auto mlih = vlxmol::getMoleculeLiH();
 
-    auto mgrid = gdrv.generate(mlih, MPI_COMM_WORLD);
+    auto mgrid = gdrv.generate(mlih);
 
     auto npnt = mgrid.getNumberOfGridPoints();
 

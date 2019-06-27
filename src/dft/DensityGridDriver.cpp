@@ -14,24 +14,19 @@
 #include "GtoRecFunc.hpp"
 #include "OMPTasks.hpp"
 
-CDensityGridDriver::CDensityGridDriver(const int32_t globRank, const int32_t globNodes, const execmode runMode, MPI_Comm comm)
-    : _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
-
-    , _thresholdOfDensity(1.0e-15)
-
-    , _thresholdOfPrimGTOs(1.0e-15)
-
-    , _runMode(runMode)
+CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
 {
     _locRank = mpi::rank(comm);
-
+    
     _locNodes = mpi::nodes(comm);
-
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+    
+    mpi::duplicate(comm, &_locComm);
+    
+    _thresholdOfDensity = 1.0e-15;
+    
+    _thresholdOfPrimGTOs = 1.0e-15;
+    
+    _runMode = execmode::cpu; 
 }
 
 CDensityGridDriver::~CDensityGridDriver()
@@ -42,14 +37,13 @@ void
 CDensityGridDriver::generate(const CMolecule&       molecule,
                              const CMolecularBasis& basis,
                              const CMolecularGrid&  molGrid,
-                             const xcfun            xcFunctional,
-                             MPI_Comm               comm)
+                             const xcfun            xcFunctional)
 {
     // execution mode: CPU
 
     if (_runMode == execmode::cpu)
     {
-        _genDensityGridOnCPU(molecule, basis, molGrid, xcFunctional, comm);
+        _genDensityGridOnCPU(molecule, basis, molGrid, xcFunctional);
     }
 
     // execution mode: CPU/GPU
@@ -67,8 +61,7 @@ void
 CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
                                          const CMolecularBasis& basis,
                                          const CMolecularGrid&  molGrid,
-                                         const xcfun            xcFunctional,
-                                         MPI_Comm               comm)
+                                         const xcfun            xcFunctional)
 {
     // set up OMP tasks
 
@@ -175,11 +168,11 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
     {
         // grid point coordinates
 
-        auto gx = gridCoordinatesX[i];
+        auto gx = gridCoordinatesX[gridOffset + i];
 
-        auto gy = gridCoordinatesY[i];
+        auto gy = gridCoordinatesY[gridOffset + i];
 
-        auto gz = gridCoordinatesZ[i];
+        auto gz = gridCoordinatesZ[gridOffset + i];
 
         // compute screening factors
 
@@ -214,8 +207,6 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContain
 
         // sparse V * M * V
     }
-
-    // printf("task: size: %i pos %i\n", nGridPoints, gridOffset);
 }
 
 void
