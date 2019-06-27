@@ -172,6 +172,11 @@ def main():
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
 
+    # LoProp
+
+    if task_type == 'loprop':
+        pass
+
     # All done
 
     task.finish()
