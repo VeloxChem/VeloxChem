@@ -59,14 +59,23 @@ class Polarizability(ResponseProperty):
             The output stream.
         """
 
+        width = 92
+
         for w in parse_frequencies(self.rsp_input['frequencies']):
             w_str = 'Polarizability (w={:.4f})'.format(w)
-            ostream.print_header(w_str.ljust(68))
-            ostream.print_header(('-' * len(w_str)).ljust(68))
+            ostream.print_header(w_str.ljust(width))
+            ostream.print_header(('-' * len(w_str)).ljust(width))
+
+            valstr = '{:<5s}'.format('')
+            for b in self.rsp_input['b_components']:
+                valstr += '{:>15s}'.format(b.upper())
+            ostream.print_header(valstr.ljust(width))
+
             for a in self.rsp_input['a_components']:
+                valstr = '{:<5s}'.format(a.upper())
                 for b in self.rsp_input['b_components']:
-                    ops_label = '<<{};{}>>_{:.4f}'.format(a, b, w)
-                    output_alpha = '{:<15s} {:15.8f}'.format(
-                        ops_label, self.rsp_property[(a, b, w)])
-                    ostream.print_header(output_alpha.ljust(68))
+                    prop = -self.rsp_property[(a, b, w)]
+                    valstr += '{:15.8f}'.format(prop)
+                ostream.print_header(valstr.ljust(width))
+
             ostream.print_blank()
