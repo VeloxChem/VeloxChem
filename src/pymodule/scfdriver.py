@@ -402,7 +402,7 @@ class ScfDriver:
                 'S': ovl_mat.to_numpy(),
                 'D': (self.density.alpha_to_numpy(0),
                       self.density.beta_to_numpy(0)),
-                'F': (fock_mat.to_numpy(0), fock_mat.to_numpy(0)),
+                'F': (fock_mat.alpha_to_numpy(0), fock_mat.beta_to_numpy(0)),
             }
         else:
             self.scf_tensors = {

@@ -313,7 +313,7 @@ class LinearResponseEigenSolver:
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
 
-                self.write_hdf5(self.checkpoint_file, b, e2b, s2b,
+                self.write_hdf5(self.checkpoint_file, b,
                                 molecule.elem_ids_to_numpy(), basis.get_label())
 
             if self.timing:
@@ -615,13 +615,15 @@ class LinearResponseEigenSolver:
 
         self.ostream.print_blank()
 
-    def write_hdf5(self, fname, b, e2b, s2b, nuclear_charges, basis_set):
+    def write_hdf5(self, fname, b, nuclear_charges, basis_set):
         """
         Writes response vectors to checkpoint file. Nuclear charges and basis
         set can also be written to the checkpoint file.
 
         :param fname:
             Name of the checkpoint file.
+        :param b:
+            The response vectors.
         :param nuclear_charges:
             Nuclear charges of the molecule.
         :param basis_set:

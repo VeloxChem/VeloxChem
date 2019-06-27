@@ -60,6 +60,12 @@ setup(
     scripts=[
         os.path.join('build', 'bin', 'VeloxChemMain.py'),
     ],
+    entry_points={
+        'console_scripts': [
+            'veloxchem=veloxchem.main:main',
+            'vlx=veloxchem.main:main',
+        ],
+    },
     python_requires='>=3.5',
     install_requires=[
         'mpi4py>=3.0',
