@@ -162,8 +162,11 @@ class LinearResponseEigenSolver:
             pr.enable()
 
         if self.timing:
-            prep_t0 = tm.time()
-            self.timing_dict = {}
+            self.timing_dict = {
+                'reduced_space': [0.0],
+                'new_trials': [0.0],
+            }
+            timing_t0 = tm.time()
 
         if self.rank == mpi_master():
             self.print_header()
@@ -201,11 +204,10 @@ class LinearResponseEigenSolver:
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
-                b, e2b, s2b = self.read_hdf5(self.checkpoint_file,
-                                             molecule.elem_ids_to_numpy(),
-                                             basis.get_label())
-                self.restart = (b is not None and e2b is not None and
-                                s2b is not None)
+                b = self.read_hdf5(self.checkpoint_file,
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label())
+                self.restart = (b is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # generate initial guess from scratch
@@ -215,13 +217,15 @@ class LinearResponseEigenSolver:
                 b = self.setup_trials(igs)
                 assert_msg_critical(
                     np.any(b),
-                    'LinearResponseSolver.compute: trial vector is empty')
-            else:
-                b = None
+                    'LinearResponseEigenSolver: trial vector is empty')
 
-            e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
-            if self.rank == mpi_master():
-                s2b = e2x_drv.s2n(b, scf_tensors, nocc)
+        if self.timing:
+            self.timing_dict['reduced_space'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
+
+        e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
+        if self.rank == mpi_master():
+            s2b = e2x_drv.s2n(b, scf_tensors, nocc)
 
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
@@ -229,18 +233,18 @@ class LinearResponseEigenSolver:
         converged = {}
 
         if self.timing:
-            self.timing_dict['initial_guess'] = tm.time() - prep_t0
-            self.timing_dict['reduced_space'] = []
-            self.timing_dict['new_trials'] = []
+            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
 
         # start iterations
-        for i in range(self.max_iter):
+        for iteration in range(self.max_iter):
 
             if self.timing:
-                red_space_t0 = tm.time()
+                self.timing_dict['reduced_space'].append(0.0)
+                self.timing_dict['new_trials'].append(0.0)
 
             if self.rank == mpi_master():
-                self.cur_iter = i
+                self.cur_iter = iteration
                 ws = []
 
                 # next solution
@@ -252,9 +256,9 @@ class LinearResponseEigenSolver:
                 p = list(reversed(wn.argsort()))
                 wn = wn[p]
                 Xn = Xn[:, p]
-                for i in range(self.nstates):
-                    norm = np.sqrt(Xn[:, i].T @ S2 @ Xn[:, i])
-                    Xn[:, i] /= norm
+                for s in range(self.nstates):
+                    norm = np.sqrt(Xn[:, s].T @ S2 @ Xn[:, s])
+                    Xn[:, s] /= norm
                 reduced_ev = zip(1.0 / wn[:self.nstates],
                                  Xn[:, :self.nstates].T)
 
@@ -276,17 +280,15 @@ class LinearResponseEigenSolver:
                 self.print_iteration(relative_residual_norm, converged, ws)
 
             if self.timing:
-                self.timing_dict['reduced_space'].append(tm.time() -
-                                                         red_space_t0)
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
             # check convergence
             self.check_convergence(relative_residual_norm)
 
             if self.is_converged:
                 break
-
-            if self.timing:
-                new_trials_t0 = tm.time()
 
             # update trial vectors
             if self.rank == mpi_master():
@@ -299,6 +301,11 @@ class LinearResponseEigenSolver:
             else:
                 new_trials = None
 
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
+
             new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
                                   basis)
             if self.rank == mpi_master():
@@ -310,7 +317,9 @@ class LinearResponseEigenSolver:
                                 molecule.elem_ids_to_numpy(), basis.get_label())
 
             if self.timing:
-                self.timing_dict['new_trials'].append(tm.time() - new_trials_t0)
+                tid = iteration + 1
+                self.timing_dict['new_trials'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
         # converged?
         if self.rank == mpi_master():
@@ -586,20 +595,15 @@ class LinearResponseEigenSolver:
                                                   'NewTrialVectors')
         self.ostream.print_header(valstr.ljust(width))
 
-        valstr = 'Iteration {:<5d} {:>15s} {:18.3f}'.format(
-            0, '---', self.timing_dict['initial_guess'])
-        self.ostream.print_header(valstr.ljust(width))
-
         for i, (a, b) in enumerate(
                 zip(self.timing_dict['reduced_space'],
                     self.timing_dict['new_trials'])):
-            valstr = 'Iteration {:<5d} {:15.3f} {:18.3f}'.format(i + 1, a, b)
+            if i == 0:
+                title = 'Initial guess'
+            else:
+                title = 'Iteration {:<5d}'.format(i)
+            valstr = '{:<15s} {:15.3f} {:18.3f}'.format(title, a, b)
             self.ostream.print_header(valstr.ljust(width))
-
-        valstr = 'Iteration {:<5d} {:15.3f} {:>18s}'.format(
-            len(self.timing_dict['reduced_space']),
-            self.timing_dict['reduced_space'][-1], '---')
-        self.ostream.print_header(valstr.ljust(width))
 
         valstr = '---------'
         self.ostream.print_header(valstr.ljust(width))
@@ -612,6 +616,17 @@ class LinearResponseEigenSolver:
         self.ostream.print_blank()
 
     def write_hdf5(self, fname, b, e2b, s2b, nuclear_charges, basis_set):
+        """
+        Writes response vectors to checkpoint file. Nuclear charges and basis
+        set can also be written to the checkpoint file.
+
+        :param fname:
+            Name of the checkpoint file.
+        :param nuclear_charges:
+            Nuclear charges of the molecule.
+        :param basis_set:
+            Name of the AO basis set.
+        """
 
         valid_checkpoint = (self.checkpoint_file and
                             isinstance(self.checkpoint_file, str))
@@ -622,8 +637,6 @@ class LinearResponseEigenSolver:
         hf = h5py.File(fname, 'w')
 
         hf.create_dataset('LR_eigen_b', data=b, compression="gzip")
-        hf.create_dataset('LR_eigen_e2b', data=e2b, compression='gzip')
-        hf.create_dataset('LR_eigen_s2b', data=s2b, compression='gzip')
 
         if nuclear_charges is not None:
             hf.create_dataset('nuclear_charges',
@@ -643,13 +656,27 @@ class LinearResponseEigenSolver:
         self.ostream.print_blank()
 
     def read_hdf5(self, fname, nuclear_charges, basis_set):
+        """
+        Reads response vectors from checkpoint file. Nuclear charges and basis
+        set will be used to validate the checkpoint file.
+
+        :param fname:
+            Name of the checkpoint file.
+        :param nuclear_charges:
+            Nuclear charges of the molecule.
+        :param basis_set:
+            Name of the AO basis set.
+
+        :return:
+            The response vectors.
+        """
 
         valid_checkpoint = (self.checkpoint_file and
                             isinstance(self.checkpoint_file, str) and
                             isfile(self.checkpoint_file))
 
         if not valid_checkpoint:
-            return None, None, None
+            return None
 
         hf = h5py.File(fname, 'r')
 
@@ -667,19 +694,15 @@ class LinearResponseEigenSolver:
 
         if match_nuclear_charges and match_basis_set:
             b = np.array(hf.get('LR_eigen_b'))
-            e2b = np.array(hf.get('LR_eigen_e2b'))
-            s2b = np.array(hf.get('LR_eigen_s2b'))
         else:
             b = None
-            e2b = None
-            s2b = None
 
         hf.close()
 
-        if (b is not None and e2b is not None and s2b is not None):
+        if b is not None:
             checkpoint_text = 'Restarting from checkpoint file: '
             checkpoint_text += self.checkpoint_file
             self.ostream.print_info(checkpoint_text)
             self.ostream.print_blank()
 
-        return b, e2b, s2b
+        return b
