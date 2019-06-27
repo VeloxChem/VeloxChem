@@ -349,8 +349,8 @@ class ComplexResponse:
     def setup_trials(self,
                      vectors,
                      pre=None,
-                     bger=np.array([]),
-                     bung=np.array([]),
+                     bger=None,
+                     bung=None,
                      res_norm=None,
                      renormalize=True):
         """
@@ -403,9 +403,9 @@ class ComplexResponse:
 
         # orthogonalizing new trial vectors against existing ones
 
-        if bger.any():
+        if bger is not None and bger.any():
             new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
-        if bung.any():
+        if bung is not None and bung.any():
             new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
 
         # normalizing new trial vectors
