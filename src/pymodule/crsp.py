@@ -460,7 +460,8 @@ class ComplexResponse:
         if self.timing:
             self.timing_dict = {
                 'reduced_space': [0.0],
-                'new_trials': [0.0],
+                'ortho_norm': [0.0],
+                'fock_build': [0.0],
             }
             timing_t0 = tm.time()
 
@@ -544,7 +545,7 @@ class ComplexResponse:
             bung = None
 
         if self.timing:
-            self.timing_dict['reduced_space'][0] += tm.time() - timing_t0
+            self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
             timing_t0 = tm.time()
 
         trials_info = self.comm.bcast(trials_info, root=mpi_master())
@@ -565,7 +566,7 @@ class ComplexResponse:
         kappas = {}
 
         if self.timing:
-            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
+            self.timing_dict['fock_build'][0] += tm.time() - timing_t0
             timing_t0 = tm.time()
 
         for iteration in range(self.max_iter):
@@ -573,7 +574,8 @@ class ComplexResponse:
 
             if self.timing:
                 self.timing_dict['reduced_space'].append(0.0)
-                self.timing_dict['new_trials'].append(0.0)
+                self.timing_dict['ortho_norm'].append(0.0)
+                self.timing_dict['fock_build'].append(0.0)
 
             if self.rank == mpi_master():
                 nvs = []
@@ -845,7 +847,7 @@ class ComplexResponse:
 
             if self.timing:
                 tid = iteration + 1
-                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
             trials_info = self.comm.bcast(trials_info, root=mpi_master())
@@ -868,7 +870,7 @@ class ComplexResponse:
 
             if self.timing:
                 tid = iteration + 1
-                self.timing_dict['new_trials'][tid] += tm.time() - timing_t0
+                self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
         # converged?
@@ -1029,7 +1031,7 @@ class ComplexResponse:
 
     def print_timing(self):
         """
-        Prints timing for the linear response eigensolver.
+        Prints timing for the complex response solver.
         """
 
         width = 92
@@ -1038,26 +1040,28 @@ class ComplexResponse:
         self.ostream.print_header(valstr.ljust(width))
         self.ostream.print_header(('-' * len(valstr)).ljust(width))
 
-        valstr = '{:<15s} {:>15s} {:>18s}'.format('', 'ReducedSpace',
-                                                  'NewTrialVectors')
+        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format(
+            '', 'ReducedSpace', 'Orthonorm.', 'FockBuild')
         self.ostream.print_header(valstr.ljust(width))
 
-        for i, (a, b) in enumerate(
+        for i, (a, b, c) in enumerate(
                 zip(self.timing_dict['reduced_space'],
-                    self.timing_dict['new_trials'])):
+                    self.timing_dict['ortho_norm'],
+                    self.timing_dict['fock_build'])):
             if i == 0:
                 title = 'Initial guess'
             else:
                 title = 'Iteration {:<5d}'.format(i)
-            valstr = '{:<15s} {:15.3f} {:18.3f}'.format(title, a, b)
+            valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
             self.ostream.print_header(valstr.ljust(width))
 
         valstr = '---------'
         self.ostream.print_header(valstr.ljust(width))
 
-        valstr = '{:<15s} {:15.3f} {:18.3f}'.format(
+        valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(
             'Sum', sum(self.timing_dict['reduced_space']),
-            sum(self.timing_dict['new_trials']))
+            sum(self.timing_dict['ortho_norm']),
+            sum(self.timing_dict['fock_build']))
         self.ostream.print_header(valstr.ljust(width))
 
         self.ostream.print_blank()
