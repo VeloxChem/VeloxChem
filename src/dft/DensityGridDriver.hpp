@@ -35,12 +35,12 @@ class CDensityGridDriver
      The rank of associated local MPI process.
      */
     int32_t _locRank;
-    
+
     /**
      The total number of local MPI processes.
      */
     int32_t _locNodes;
-    
+
     /**
      The MPI communicator.
      */
@@ -70,10 +70,7 @@ class CDensityGridDriver
      @param molGrid the distributed molecular grid.
      @param xcFunctional the exchange-correlation functional type.
      */
-    void _genDensityGridOnCPU(const CMolecule&       molecule,
-                              const CMolecularBasis& basis,
-                              const CMolecularGrid&  molGrid,
-                              const xcfun            xcFunctional);
+    void _genDensityGridOnCPU(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional);
 
     /**
      Generates batch of density grid points.

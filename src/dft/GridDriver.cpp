@@ -23,17 +23,16 @@
 CGridDriver::CGridDriver(MPI_Comm comm)
 {
     _gridLevel = 5;
-    
+
     _thresholdOfWeight = 1.0e-15;
-    
+
     _runMode = execmode::cpu;
-    
+
     _locRank = mpi::rank(comm);
-    
+
     _locNodes = mpi::nodes(comm);
-    
+
     mpi::duplicate(comm, &_locComm);
-    
 }
 
 CGridDriver::~CGridDriver()

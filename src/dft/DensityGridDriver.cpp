@@ -17,16 +17,16 @@
 CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
 {
     _locRank = mpi::rank(comm);
-    
+
     _locNodes = mpi::nodes(comm);
-    
+
     mpi::duplicate(comm, &_locComm);
-    
+
     _thresholdOfDensity = 1.0e-15;
-    
+
     _thresholdOfPrimGTOs = 1.0e-15;
-    
-    _runMode = execmode::cpu; 
+
+    _runMode = execmode::cpu;
 }
 
 CDensityGridDriver::~CDensityGridDriver()
@@ -34,10 +34,7 @@ CDensityGridDriver::~CDensityGridDriver()
 }
 
 void
-CDensityGridDriver::generate(const CMolecule&       molecule,
-                             const CMolecularBasis& basis,
-                             const CMolecularGrid&  molGrid,
-                             const xcfun            xcFunctional)
+CDensityGridDriver::generate(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional)
 {
     // execution mode: CPU
 

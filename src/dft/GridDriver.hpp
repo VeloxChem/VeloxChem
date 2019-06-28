@@ -39,7 +39,7 @@ class CGridDriver
      The total number of local MPI processes.
      */
     int32_t _locNodes;
-    
+
     /**
      The MPI communicator.
      */
