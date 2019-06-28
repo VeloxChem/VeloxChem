@@ -1,0 +1,21 @@
+@jobs
+task: cpp
+@end
+
+@method settings
+basis: aug-cc-pvdz
+@end
+
+@cpp
+frequencies: 0-0.25 (0.05)
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+units: au
+xyz:  
+O   0.0   0.0   0.0
+H   0.0   1.4   1.1
+H   0.0  -1.4   1.1
+@end 
