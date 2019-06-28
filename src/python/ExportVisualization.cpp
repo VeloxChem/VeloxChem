@@ -26,9 +26,7 @@ CVisualizationDriver_create(py::object py_comm)
 {
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CVisualizationDriver>(
-        new CVisualizationDriver(*comm_ptr)
-    );
+    return std::shared_ptr<CVisualizationDriver>(new CVisualizationDriver(*comm_ptr));
 }
 
 // Helper function for converting cubic grid values to 3d numpy array

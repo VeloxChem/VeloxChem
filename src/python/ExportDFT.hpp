@@ -14,12 +14,12 @@
 namespace py = pybind11;
 
 namespace vlx_dft {  // vlx_dft namespace
-    
-    /**
-     Exports classes/functions in src/dft to python.
-     */
-    void export_dft(py::module& m);
-    
+
+/**
+ Exports classes/functions in src/dft to python.
+ */
+void export_dft(py::module& m);
+
 }  // namespace vlx_dft
 
 #endif /* ExportDFT_hpp */

@@ -14,13 +14,14 @@
 #include <memory>
 #include <string>
 
-#include "ElectricFieldIntegralsDriver.hpp"
-#include "ElectricFieldMatrix.hpp"
 #include "AngularMomentumIntegralsDriver.hpp"
 #include "AngularMomentumMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "ElectricDipoleIntegralsDriver.hpp"
 #include "ElectricDipoleMatrix.hpp"
+#include "ElectricFieldIntegralsDriver.hpp"
+#include "ElectricFieldMatrix.hpp"
+#include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportOneInts.hpp"
@@ -34,7 +35,6 @@
 #include "NuclearPotentialMatrix.hpp"
 #include "OverlapIntegralsDriver.hpp"
 #include "OverlapMatrix.hpp"
-#include "ErrorHandler.hpp"
 
 namespace py = pybind11;
 
@@ -261,7 +261,7 @@ CAngularMomentumMatrix_z_to_numpy(const CAngularMomentumMatrix& self)
 {
     return vlx_general::pointer_to_numpy(self.zvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
 }
-    
+
 // Helper function for CElectricFieldIntegralsDriver constructor
 
 static std::shared_ptr<CElectricFieldIntegralsDriver>
@@ -299,7 +299,7 @@ CElectricFieldMatrix_z_to_numpy(const CElectricFieldMatrix& self)
 {
     return vlx_general::pointer_to_numpy(self.zvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
 }
-    
+
 CElectricFieldMatrix
 CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
                                       const CMolecule&                     molecule,
@@ -315,36 +315,38 @@ CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
 
     // sanity check
 
-    std::string errform("CElectricFieldIntegralsDirver_compute: py_dipoles and py_coords must have same data ordering C or Fortran");
+    std::string errform(
+        "CElectricFieldIntegralsDirver_compute: py_dipoles and py_coords must have same data ordering C or Fortran");
 
     auto c_style = py::detail::check_flags(py_coords.ptr(), py::array::c_style);
 
     auto f_style = py::detail::check_flags(py_coords.ptr(), py::array::f_style);
-    
+
     errors::assertMsgCritical(c_style == py::detail::check_flags(py_dipoles.ptr(), py::array::c_style), errform);
-    
+
     errors::assertMsgCritical(f_style == py::detail::check_flags(py_dipoles.ptr(), py::array::f_style), errform);
-    
+
     std::string errsrc("CElectricFieldIntegralsDirver_compute: need a contiguous numpy array");
 
     errors::assertMsgCritical(c_style ^ f_style, errsrc);
 
-    std::string errdims("CElectricFieldIntegralsDirver_compute:: Inconsistent size of dipoles and/or their coordinates");
-    
+    std::string errdims(
+        "CElectricFieldIntegralsDirver_compute:: Inconsistent size of dipoles and/or their coordinates");
+
     errors::assertMsgCritical(py_coords.shape(0) == py_dipoles.shape(0), errdims);
 
     errors::assertMsgCritical(py_coords.shape(0) > 0, errdims);
 
     errors::assertMsgCritical(py_coords.shape(1) == 3, errdims);
-    
+
     errors::assertMsgCritical(py_dipoles.shape(0) > 0, errdims);
-    
+
     errors::assertMsgCritical(py_dipoles.shape(1) == 3, errdims);
 
     // form coordinate vector
 
     std::vector<double> coords(py_coords.size());
-    
+
     std::vector<double> dipoles(py_dipoles.size());
 
     if (c_style)
@@ -354,9 +356,9 @@ CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
             for (ssize_t a = 0; a < py_coords.shape(0); a++)
             {
                 // need to transpose py_coords for the C++ Molecule contructor
-                
+
                 coords[d * py_coords.shape(0) + a] = py_coords.data()[a * 3 + d];
-                
+
                 dipoles[d * py_coords.shape(0) + a] = py_dipoles.data()[a * 3 + d];
             }
         }
@@ -364,17 +366,17 @@ CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
     else if (f_style)
     {
         // no need to transpose py_coords for fortran style numpy array
-        
+
         std::memcpy(coords.data(), py_coords.data(), py_coords.size() * sizeof(double));
-        
+
         std::memcpy(dipoles.data(), py_dipoles.data(), py_dipoles.size() * sizeof(double));
     }
 
     CMemBlock2D<double> dipdat(dipoles, static_cast<int32_t>(py_dipoles.shape(0)), 3);
-    
+
     CMemBlock2D<double> crddat(coords, static_cast<int32_t>(py_dipoles.shape(0)), 3);
-    
-    return self.compute(molecule, basis, &dipdat, &crddat); 
+
+    return self.compute(molecule, basis, &dipdat, &crddat);
 }
 
 // Exports classes/functions in src/oneints to python
@@ -599,14 +601,12 @@ export_oneints(py::module& m)
              (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(
                  const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
                  CAngularMomentumIntegralsDriver::compute);
-    
+
     // CElectricFieldMatrix class
 
     py::class_<CElectricFieldMatrix, std::shared_ptr<CElectricFieldMatrix>>(m, "ElectricFieldMatrix")
         .def(py::init<>())
-        .def(py::init<const CDenseMatrix&,
-                      const CDenseMatrix&,
-                      const CDenseMatrix&>())
+        .def(py::init<const CDenseMatrix&, const CDenseMatrix&, const CDenseMatrix&>())
         .def(py::init<const CElectricFieldMatrix&>())
         .def("__str__", &CElectricFieldMatrix_str)
         .def("x_to_numpy", &CElectricFieldMatrix_x_to_numpy)
@@ -619,26 +619,31 @@ export_oneints(py::module& m)
     py::class_<CElectricFieldIntegralsDriver, std::shared_ptr<CElectricFieldIntegralsDriver>>(
         m, "ElectricFieldIntegralsDriver")
         .def(py::init(&CElectricFieldIntegralsDriver_create))
-        .def(
-            "compute",
-             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
-                const CMolecule&, const CMolecularBasis&,
-                const double, const double, const double) const) &
-                CElectricFieldIntegralsDriver::compute)
         .def("compute",
              (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&,
-                 const double, const double, const double) const) &
+                 const CMolecule&, const CMolecularBasis&, const double, const double, const double) const) &
+                 CElectricFieldIntegralsDriver::compute)
+        .def("compute",
+             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(const CMolecule&,
+                                                                     const CMolecularBasis&,
+                                                                     const CMolecularBasis&,
+                                                                     const double,
+                                                                     const double,
+                                                                     const double) const) &
                  CElectricFieldIntegralsDriver::compute)
         .def("compute",
              (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&,
-                 const double, const double, const double) const) &
+                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const double, const double, const double)
+                  const) &
                  CElectricFieldIntegralsDriver::compute)
         .def("compute",
-             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&,
-                 const double, const double, const double) const) &
+             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(const CMolecule&,
+                                                                     const CMolecule&,
+                                                                     const CMolecularBasis&,
+                                                                     const CMolecularBasis&,
+                                                                     const double,
+                                                                     const double,
+                                                                     const double) const) &
                  CElectricFieldIntegralsDriver::compute)
         .def("compute", &CElectricFieldIntegralsDirver_compute);
 }
