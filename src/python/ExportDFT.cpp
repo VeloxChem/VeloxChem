@@ -115,6 +115,10 @@ export_dft(py::module& m)
     py::class_<CDensityGridDriver, std::shared_ptr<CDensityGridDriver>>(m, "DensityGridDriver")
         .def(py::init(&CDensityGridDriver_create))
         .def("generate", &CDensityGridDriver::generate);
+
+    // exposing functions
+
+    m.def("to_xcfun", &to_xcfun);
 }
 
 }  // namespace vlx_dft

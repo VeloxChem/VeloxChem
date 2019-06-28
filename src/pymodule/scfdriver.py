@@ -8,7 +8,11 @@ from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import GridDriver
+from .veloxchemlib import DensityGridDriver
 from .veloxchemlib import mpi_master
+from .veloxchemlib import to_xcfun
+from .veloxchemlib import xcfun
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
@@ -79,6 +83,10 @@ class ScfDriver:
         The name of checkpoint file.
     :param restricted:
         The flag for restricted SCF.
+    :param dft:
+        The flag for running DFT.
+    :param xcfun:
+        The XC functional.
     """
 
     def __init__(self, comm, ostream):
@@ -150,12 +158,17 @@ class ScfDriver:
         # restricted?
         self.restricted = True
 
-    def update_settings(self, scf_dict):
+        self.dft = False
+        self.xcfun = None
+
+    def update_settings(self, scf_dict, method_dict={}):
         """
         Updates settings in SCF driver.
 
         :param scf_dict:
-            The settings dictionary.
+            The input dictionary of scf group.
+        :param method_dict:
+            The input dicitonary of method settings group.
         """
 
         if 'acc_type' in scf_dict:
@@ -174,6 +187,13 @@ class ScfDriver:
         if 'checkpoint_file' in scf_dict:
             self.checkpoint_file = scf_dict['checkpoint_file']
 
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key == 'yes' else False
+        if 'xcfun' in method_dict:
+            key = method_dict['xcfun'].lower()
+            self.xcfun = to_xcfun(key)
+
     def compute(self, molecule, ao_basis, min_basis):
         """
         Performs SCF calculation using molecular data.
@@ -185,6 +205,23 @@ class ScfDriver:
         :param min_basis:
             The minimal AO basis set.
         """
+
+        if self.dft:
+            grid_t0 = tm.time()
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(3)
+            molgrid = grid_drv.generate(molecule)
+            self.ostream.print_info(
+                'Grid generated in {:.2f} sec.'.format(tm.time() - grid_t0))
+            self.ostream.print_blank()
+
+            grid_t0 = tm.time()
+            den_grid_drv = DensityGridDriver(self.comm)
+            dengrid = den_grid_drv.generate(molecule, ao_basis, molgrid,
+                                            self.xcfun)
+            self.ostream.print_info(
+                'Density grid generated in {:.2f} sec.'.format(tm.time() -
+                                                               grid_t0))
 
         # initial guess
         if self.restart:

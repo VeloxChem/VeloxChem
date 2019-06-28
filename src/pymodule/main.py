@@ -27,9 +27,8 @@ def main():
         info_txt = [
             '',
             '=================   VeloxChem   =================',
+            '',
             'Usage:',
-            '    VeloxChemMain.py input_file [output_file]',
-            '  or:',
             '    python3 -m veloxchem input_file [output_file]',
             '',
         ]
@@ -42,6 +41,11 @@ def main():
 
     task_types = task.input_dict['jobs']['task'].lower().split(',')
     task_types = [x.strip() for x in task_types]
+
+    if 'method_settings' in task.input_dict:
+        method_dict = task.input_dict['method_settings']
+    else:
+        method_dict = {}
 
     # Exciton model
 
@@ -58,14 +62,16 @@ def main():
 
     # Hartree-Fock
 
-    run_rhf = [
-        x in ['hf', 'mp2', 'visualization', 'response', 'cpp', 'adc1']
-        for x in task_types
+    run_scf = True in [
+        x in [
+            'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
+            'visualization', 'response', 'cpp', 'adc1'
+        ] for x in task_types
     ]
 
-    run_uhf = 'uhf' in task_types
+    run_unrestricted = 'uhf' in task_types
 
-    if run_rhf or run_uhf:
+    if run_scf:
 
         # initialize scf driver and run scf
 
@@ -77,11 +83,11 @@ def main():
         nalpha = task.molecule.number_of_alpha_electrons()
         nbeta = task.molecule.number_of_beta_electrons()
 
-        if nalpha == nbeta and run_rhf:
+        if nalpha == nbeta and not run_unrestricted:
             scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         else:
             scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(scf_dict)
+        scf_drv.update_settings(scf_dict, method_dict)
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         # molecular orbitals

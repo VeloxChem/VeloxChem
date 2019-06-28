@@ -10,6 +10,7 @@
 #define XCFuncType_hpp
 
 #include <string>
+#include "StringFormat.hpp"
 
 /**
  Enumerate class xcfun:
@@ -18,16 +19,18 @@
  xcfun::lda  - the local density approximation
  xcfun::gga  - the generalized gradient approximation
  xcfun::mgga - the meta-generalized gradient approximation
+ xcfun::undefined - undefined approximation
  */
 enum class xcfun
 {
     lda,
     gga,
-    mgga
+    mgga,
+    undefined
 };
 
 /**
- Converts enumerate class value to it's string label.
+ Converts enumerate class value to its string label.
 
  @param functional the enumerate class value.
  @return the label of enumerate class value.
@@ -42,6 +45,24 @@ to_string(const xcfun functional)
     if (functional == xcfun::mgga) return std::string("MGGA");
 
     return std::string("UNKNOWN");
+}
+
+/**
+ Converts string label to its enumerate class value.
+
+ @param the label of enumerate class value.
+ @return functional the enumerate class value.
+ */
+inline xcfun
+to_xcfun(const std::string label)
+{
+    if (fstr::upcase(label) == std::string("LDA"))  return xcfun::lda;
+
+    if (fstr::upcase(label) == std::string("GGA"))  return xcfun::gga;
+
+    if (fstr::upcase(label) == std::string("MGGA")) return xcfun::mgga;
+
+    return xcfun::undefined;
 }
 
 #endif /* XCFuncType_hpp */
