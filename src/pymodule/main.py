@@ -40,11 +40,12 @@ def main():
 
     task = MpiTask(sys.argv[1:], MPI.COMM_WORLD)
 
-    task_type = task.input_dict['jobs']['task'].lower()
+    task_types = task.input_dict['jobs']['task'].lower().split(',')
+    task_types = [x.strip() for x in task_types]
 
     # Exciton model
 
-    if task_type == 'exciton':
+    if 'exciton' in task_types:
 
         if 'exciton' in task.input_dict:
             exciton_dict = task.input_dict['exciton']
@@ -57,7 +58,14 @@ def main():
 
     # Hartree-Fock
 
-    if task_type in ['hf', 'mp2', 'cube', 'response', 'cpp', 'adc1']:
+    run_rhf = [
+        x in ['hf', 'mp2', 'visualization', 'response', 'cpp', 'adc1']
+        for x in task_types
+    ]
+
+    run_uhf = 'uhf' in task_types
+
+    if run_rhf or run_uhf:
 
         # initialize scf driver and run scf
 
@@ -69,7 +77,7 @@ def main():
         nalpha = task.molecule.number_of_alpha_electrons()
         nbeta = task.molecule.number_of_beta_electrons()
 
-        if nalpha == nbeta:
+        if nalpha == nbeta and run_rhf:
             scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         else:
             scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
@@ -83,7 +91,7 @@ def main():
         scf_tensors = scf_drv.scf_tensors
 
         # tranform integrals to MO basis
-        if 'ao2mo' in scf_dict:
+        if 'ao2mo' in scf_dict and scf_drv.restricted:
 
             moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
 
@@ -91,7 +99,8 @@ def main():
             moints = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
                                         scf_dict['ao2mo'].upper(), grps)
 
-            # sketch for transforming MO integrals batches to antisymmetrized integrals
+            # sketch for transforming MO integrals batches to antisymmetrized
+            # integrals
             # Indexing scheme: occupied orbitals from 0..nocc
             #                  virtual orbitals from nocc..ntot
             #
@@ -119,7 +128,7 @@ def main():
 
     # Response
 
-    if task_type == 'response' and scf_drv.restricted:
+    if 'response' in task_types and scf_drv.restricted:
 
         if 'response' in task.input_dict:
 
@@ -150,7 +159,7 @@ def main():
 
     # Complex Response
 
-    if task_type == 'cpp' and scf_drv.restricted:
+    if 'cpp' in task_types and scf_drv.restricted:
 
         if 'cpp' in task.input_dict:
             cpp_dict = task.input_dict['cpp']
@@ -163,7 +172,7 @@ def main():
 
     # ADC(1)
 
-    if task_type == 'adc1' and scf_drv.restricted:
+    if 'adc1' in task_types and scf_drv.restricted:
 
         if 'adc' in task.input_dict:
             adc_dict = task.input_dict['adc']
@@ -176,17 +185,17 @@ def main():
 
     # MP2 perturbation theory
 
-    if task_type == 'mp2' and scf_drv.restricted:
+    if 'mp2' in task_types and scf_drv.restricted:
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
     # Cube file
 
-    if task_type == 'cube':
+    if 'visualization' in task_types:
 
-        if 'cube' in task.input_dict:
-            cube_dict = task.input_dict['cube']
+        if 'visualization' in task.input_dict:
+            cube_dict = task.input_dict['visualization']
         else:
             cube_dict = {}
 

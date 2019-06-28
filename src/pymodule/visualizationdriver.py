@@ -141,11 +141,17 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
         grid = [int(x) for x in cube_dict['grid'].split(',')]
     else:
         grid = [80, 80, 80]
-
     cubic_grid = self.gen_cubic_grid(molecule, *grid[:3])
 
     cubes = [x.strip() for x in cube_dict['cubes'].split(',')]
-    files = [x.strip() for x in cube_dict['files'].split(',')]
+    if 'files' in cube_dict:
+        files = [x.strip() for x in cube_dict['files'].split(',')]
+    else:
+        files = ['cube_{:d}.cube'.format(i + 1) for i in range(len(cubes))]
+
+    assert_msg_critical(
+        len(cubes) == len(files),
+        'VisualizationDriver: inconsistent number of cubes')
 
     for cube, fname in zip(cubes, files):
 

@@ -1,12 +1,12 @@
 @jobs
-task: cube
+task: visualization
 @end
 
 @method settings
 basis: def2-svp
 @end
 
-@cube
+@visualization
 cubes: density(alpha), mo(homo)
 files: density.cube, homo.cube
 @end
