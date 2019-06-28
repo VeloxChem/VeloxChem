@@ -10,6 +10,7 @@ Sample input
    inputs/scf.rst
    inputs/rsp.rst
    inputs/mp2.rst
+   inputs/cube.rst
 
 Running
 -------
