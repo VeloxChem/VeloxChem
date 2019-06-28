@@ -31,16 +31,6 @@ class CGridDriver
     int32_t _gridLevel;
 
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -49,6 +39,11 @@ class CGridDriver
      The total number of local MPI processes.
      */
     int32_t _locNodes;
+    
+    /**
+     The MPI communicator.
+     */
+    MPI_Comm _locComm;
 
     /**
      The flag for local execution mode.
@@ -103,10 +98,9 @@ class CGridDriver
      are generated using only CPUs.
 
      @param molecule the molecule.
-     @param comm the MPI communicator.
      @return the molecular grid object.
      */
-    CMolecularGrid _genGridPointsOnCPU(const CMolecule& molecule, MPI_Comm comm) const;
+    CMolecularGrid _genGridPointsOnCPU(const CMolecule& molecule) const;
 
     /**
      Gets size of grid points batch.
@@ -154,12 +148,9 @@ class CGridDriver
     /**
      Creates a grid driver object using MPI info.
 
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
-     @param runMode the execution mode.
      @param comm the MPI communicator.
      */
-    CGridDriver(const int32_t globRank, const int32_t globNodes, const execmode runMode, MPI_Comm comm);
+    CGridDriver(MPI_Comm comm);
 
     /**
      Destroys a grid driver object.
@@ -171,19 +162,17 @@ class CGridDriver
      grid, 5 is ultrafine grid, 6 special benchmarking grid.
 
      @param gridLevel the accuracy level of generated grid.
-     @param comm the MPI communicator.
      */
-    void setLevel(const int32_t gridLevel, MPI_Comm comm);
+    void setLevel(const int32_t gridLevel);
 
     /**
      Generates molecular grid for molecule. Errors are printed to output stream.
      Grid generation is distributed within domain of MPI communicator.
 
      @param molecule the molecule.
-     @param comm the MPI communicator.
      @return the molecular grid object.
      */
-    CMolecularGrid generate(const CMolecule& molecule, MPI_Comm comm) const;
+    CMolecularGrid generate(const CMolecule& molecule) const;
 };
 
 #endif /* GridDriver_hpp */

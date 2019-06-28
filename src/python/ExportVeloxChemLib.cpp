@@ -17,6 +17,7 @@
 #include "ExportResponse.hpp"
 #include "ExportTwoInts.hpp"
 #include "ExportVisualization.hpp"
+#include "ExportDFT.hpp"
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
@@ -37,4 +38,6 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_visualization::export_visualization(m);
 
     vlx_response::export_response(m);
+    
+    vlx_dft::export_dft(m);
 }

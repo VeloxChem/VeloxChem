@@ -214,7 +214,7 @@ CMolecule_vdw_radii_to_numpy(const CMolecule& self)
 {
     auto atomradii = self.getVdwRadii();
 
-    return vlx_general::pointer_to_numpy(atomradii.data(), atomradii.size());
+    return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
 }
 
 // Helper function for getting nuclear charges for molecule

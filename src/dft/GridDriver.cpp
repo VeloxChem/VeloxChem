@@ -20,25 +20,20 @@
 #include "PartitionFunc.hpp"
 #include "StringFormat.hpp"
 
-CGridDriver::CGridDriver(const int32_t globRank, const int32_t globNodes, const execmode runMode, MPI_Comm comm)
-
-    : _gridLevel(5)
-
-    , _globRank(globRank)
-
-    , _globNodes(globNodes)
-
-    , _isLocalMode(false)
-
-    , _thresholdOfWeight(1.0e-15)
-
-    , _runMode(runMode)
+CGridDriver::CGridDriver(MPI_Comm comm)
 {
+    _gridLevel = 5;
+    
+    _thresholdOfWeight = 1.0e-15;
+    
+    _runMode = execmode::cpu;
+    
     _locRank = mpi::rank(comm);
-
+    
     _locNodes = mpi::nodes(comm);
-
-    _isLocalMode = !mpi::compare(comm, MPI_COMM_WORLD);
+    
+    mpi::duplicate(comm, &_locComm);
+    
 }
 
 CGridDriver::~CGridDriver()
@@ -46,23 +41,18 @@ CGridDriver::~CGridDriver()
 }
 
 void
-CGridDriver::setLevel(const int32_t gridLevel, MPI_Comm comm)
+CGridDriver::setLevel(const int32_t gridLevel)
 {
-    if (_globRank == mpi::master())
+    if (_locRank == mpi::master())
     {
         if ((gridLevel > 0) && (gridLevel < 7)) _gridLevel = gridLevel;
     }
 
-    if (_isLocalMode)
-    {
-        // FIX ME: global master to local master transfer.
-    }
-
-    mpi::bcast(_gridLevel, comm);
+    mpi::bcast(_gridLevel, _locComm);
 }
 
 CMolecularGrid
-CGridDriver::generate(const CMolecule& molecule, MPI_Comm comm) const
+CGridDriver::generate(const CMolecule& molecule) const
 {
     // initialize molecular grid
 
@@ -72,7 +62,7 @@ CGridDriver::generate(const CMolecule& molecule, MPI_Comm comm) const
 
     if (_runMode == execmode::cpu)
     {
-        molgrid = _genGridPointsOnCPU(molecule, comm);
+        molgrid = _genGridPointsOnCPU(molecule);
     }
 
     // execution mode: CPU/GPU
@@ -80,11 +70,6 @@ CGridDriver::generate(const CMolecule& molecule, MPI_Comm comm) const
     if (_runMode == execmode::cpu_gpu)
     {
         // TODO: implement CPU/GPU code
-    }
-
-    if (_isLocalMode)
-    {
-        // FIX ME: add tranfer from local master to global master
     }
 
     return molgrid;
@@ -269,7 +254,7 @@ CGridDriver::_finishHeader(const CMolecularGrid& molecularGrid) const
 }
 
 CMolecularGrid
-CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule, MPI_Comm comm) const
+CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule) const
 {
     // molecular data
 
@@ -338,7 +323,7 @@ CGridDriver::_genGridPointsOnCPU(const CMolecule& molecule, MPI_Comm comm) const
 
     // create molecular grid on master node
 
-    return CMolecularGrid(prngrid.gather(_locRank, _locNodes, comm));
+    return CMolecularGrid(prngrid.gather(_locRank, _locNodes, _locComm));
 }
 
 int32_t
@@ -350,9 +335,7 @@ CGridDriver::_getBatchSize(const int32_t* idsElemental, const int32_t offset, co
     {
         auto idx = idsElemental[offset + i];
 
-        npoints += _getNumberOfRadialPoints(idx)
-
-                   * _getNumberOfAngularPoints(idx);
+        npoints += _getNumberOfRadialPoints(idx) * _getNumberOfAngularPoints(idx);
     }
 
     return npoints;
