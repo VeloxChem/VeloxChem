@@ -32,16 +32,6 @@
 class CDensityGridDriver
 {
     /**
-     The rank of associated global MPI process.
-     */
-    int32_t _globRank;
-
-    /**
-     The total number of global MPI processes.
-     */
-    int32_t _globNodes;
-
-    /**
      The rank of associated local MPI process.
      */
     int32_t _locRank;
@@ -52,9 +42,9 @@ class CDensityGridDriver
     int32_t _locNodes;
 
     /**
-     The flag for local execution mode.
+     The MPI communicator.
      */
-    bool _isLocalMode;
+    MPI_Comm _locComm;
 
     /**
      The threshold of density screening.
@@ -79,13 +69,8 @@ class CDensityGridDriver
      @param basis the molecular basis.
      @param molGrid the distributed molecular grid.
      @param xcFunctional the exchange-correlation functional type.
-     @param comm the MPI communicator.
      */
-    void _genDensityGridOnCPU(const CMolecule&       molecule,
-                              const CMolecularBasis& basis,
-                              const CMolecularGrid&  molGrid,
-                              const xcfun            xcFunctional,
-                              MPI_Comm               comm);
+    void _genDensityGridOnCPU(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional);
 
     /**
      Generates batch of density grid points.
@@ -266,12 +251,9 @@ class CDensityGridDriver
     /**
      Creates a density grid driver object using MPI info.
 
-     @param globRank the the rank of MPI process.
-     @param globNodes the total number of MPI processes.
-     @param runMode the execution mode.
      @param comm the MPI communicator.
      */
-    CDensityGridDriver(const int32_t globRank, const int32_t globNodes, const execmode runMode, MPI_Comm comm);
+    CDensityGridDriver(MPI_Comm comm);
 
     /**
      Destroys a grid driver object.
@@ -287,9 +269,8 @@ class CDensityGridDriver
      @param basis the molecular basis.
      @param molGrid the molecular grid.
      @param xcFunctional the type of exchange-correlation functional.
-     @param comm the MPI communicator.
      */
-    void generate(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional, MPI_Comm comm);
+    void generate(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional);
 };
 
 #endif /* DensityGridDriver_hpp */

@@ -53,6 +53,10 @@ class LinearResponseSolver:
         Number of MPI processes.
     :param ostream:
         The output stream.
+    :param timing:
+        The flag for printing timing information.
+    :param profiling:
+        The flag for printing profiling information.
     """
 
     def __init__(self, comm, ostream):
@@ -92,6 +96,9 @@ class LinearResponseSolver:
         # output stream
         self.ostream = ostream
 
+        self.timing = False
+        self.profiling = False
+
     def update_settings(self, settings):
         """
         Updates settings in linear response solver.
@@ -123,6 +130,13 @@ class LinearResponseSolver:
         if 'lindep_thresh' in settings:
             self.lindep_thresh = float(settings['lindep_thresh'])
 
+        if 'timing' in settings:
+            key = settings['timing'].lower()
+            self.timing = True if key in ['yes', 'y'] else False
+        if 'profiling' in settings:
+            key = settings['profiling'].lower()
+            self.profiling = True if key in ['yes', 'y'] else False
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs linear response calculation for a molecule and a basis set.
@@ -137,6 +151,21 @@ class LinearResponseSolver:
         :return:
             A dictionary containing properties.
         """
+
+        if self.profiling:
+            import cProfile
+            import pstats
+            import io
+            import os
+            pr = cProfile.Profile()
+            pr.enable()
+
+        if self.timing:
+            self.timing_dict = {
+                'reduced_space': [0.0],
+                'new_trials': [0.0],
+            }
+            timing_t0 = tm.time()
 
         self.start_time = tm.time()
 
@@ -182,6 +211,10 @@ class LinearResponseSolver:
         else:
             b = None
 
+        if self.timing:
+            self.timing_dict['reduced_space'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
+
         e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
         if self.rank == mpi_master():
             s2b = e2x_drv.s2n(b, scf_tensors, nocc)
@@ -189,12 +222,21 @@ class LinearResponseSolver:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
+        converged = {}
+
+        if self.timing:
+            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
 
         # start iterations
-        for i in range(self.max_iter):
+        for iteration in range(self.max_iter):
+
+            if self.timing:
+                self.timing_dict['reduced_space'].append(0.0)
+                self.timing_dict['new_trials'].append(0.0)
 
             if self.rank == mpi_master():
-                self.cur_iter = i
+                self.cur_iter = iteration
                 nvs = []
 
                 # next solution
@@ -215,9 +257,15 @@ class LinearResponseSolver:
                     rn = np.linalg.norm(r)
                     nn = np.linalg.norm(n)
                     relative_residual_norm[(op, freq)] = rn / nn
+                    converged[(op, freq)] = (rn / nn < self.conv_thresh)
 
                 # write to output
-                self.print_iteration(relative_residual_norm, nvs)
+                self.print_iteration(relative_residual_norm, converged, nvs)
+
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -227,10 +275,15 @@ class LinearResponseSolver:
 
             # update trial vectors
             if self.rank == mpi_master():
-                new_trials = self.setup_trials(residuals, td=td, b=b)
+                new_trials = self.setup_trials(residuals, converged, td=td, b=b)
                 b = np.append(b, new_trials, axis=1)
             else:
                 new_trials = None
+
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
             new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
                                   basis)
@@ -239,6 +292,11 @@ class LinearResponseSolver:
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
 
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['new_trials'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
+
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
@@ -246,6 +304,19 @@ class LinearResponseSolver:
             assert_msg_critical(
                 self.is_converged,
                 'LinearResponseSolver.compute: failed to converge')
+
+            if self.timing:
+                self.print_timing()
+
+        if self.profiling:
+            pr.disable()
+            s = io.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats(20)
+            if self.rank == mpi_master():
+                for line in s.getvalue().split(os.linesep):
+                    self.ostream.print_info(line)
 
         # calculate properties
         if self.rank == mpi_master():
@@ -258,30 +329,35 @@ class LinearResponseSolver:
         else:
             return None
 
-    def print_iteration(self, relative_residual_norm, nvs):
+    def print_iteration(self, relative_residual_norm, converged, nvs):
         """
         Prints information of the iteration.
 
         :param relative_residual_norm:
             Relative residual norms.
+        :param converge:
+            Flags for converged vectors.
         :param nvs:
             A list of tuples containing operator component, frequency, and
             property.
         """
 
+        width = 92
         output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm.values()),
             min(relative_residual_norm.values()))
-        self.ostream.print_header(output_header.ljust(68))
+        self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
         for op, freq, nv in nvs:
             ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-            self.ostream.print_header(output_iter.ljust(68))
+            if converged[(op, freq)]:
+                output_iter += '   converged'
+            self.ostream.print_header(output_iter.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -290,6 +366,7 @@ class LinearResponseSolver:
         Prints information after convergence.
         """
 
+        width = 92
         output_conv = '*** '
         if self.is_converged:
             output_conv += 'Linear response converged'
@@ -297,7 +374,7 @@ class LinearResponseSolver:
             output_conv += 'Linear response NOT converged'
         output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
-        self.ostream.print_header(output_conv.ljust(68))
+        self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
 
     def check_convergence(self, relative_residual_norm):
@@ -348,12 +425,19 @@ class LinearResponseSolver:
                     ig[(op, w)] = grad / td[w]
         return ig
 
-    def setup_trials(self, vectors, td=None, b=None, renormalize=True):
+    def setup_trials(self,
+                     vectors,
+                     converged={},
+                     td=None,
+                     b=None,
+                     renormalize=True):
         """
         Computes orthonormalized trial vectors.
 
         :param vectors:
             The set of vectors.
+        :param converged:
+            The flags for converged vectors.
         :param td:
             The preconditioner.
         :param b:
@@ -368,6 +452,9 @@ class LinearResponseSolver:
         trials = []
 
         for (op, freq) in vectors:
+            if converged and converged[(op, freq)]:
+                continue
+
             vec = vectors[(op, freq)]
 
             if td is not None:
@@ -392,3 +479,38 @@ class LinearResponseSolver:
             new_trials = normalize(new_trials)
 
         return new_trials
+
+    def print_timing(self):
+        """
+        Prints timing for the linear response eigensolver.
+        """
+
+        width = 92
+
+        valstr = 'Timing (in sec):'
+        self.ostream.print_header(valstr.ljust(width))
+        self.ostream.print_header(('-' * len(valstr)).ljust(width))
+
+        valstr = '{:<15s} {:>15s} {:>18s}'.format('', 'ReducedSpace',
+                                                  'NewTrialVectors')
+        self.ostream.print_header(valstr.ljust(width))
+
+        for i, (a, b) in enumerate(
+                zip(self.timing_dict['reduced_space'],
+                    self.timing_dict['new_trials'])):
+            if i == 0:
+                title = 'Initial guess'
+            else:
+                title = 'Iteration {:<5d}'.format(i)
+            valstr = '{:<15s} {:15.3f} {:18.3f}'.format(title, a, b)
+            self.ostream.print_header(valstr.ljust(width))
+
+        valstr = '---------'
+        self.ostream.print_header(valstr.ljust(width))
+
+        valstr = '{:<15s} {:15.3f} {:18.3f}'.format(
+            'Sum', sum(self.timing_dict['reduced_space']),
+            sum(self.timing_dict['new_trials']))
+        self.ostream.print_header(valstr.ljust(width))
+
+        self.ostream.print_blank()

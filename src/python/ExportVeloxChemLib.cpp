@@ -8,6 +8,7 @@
 
 #include <pybind11/pybind11.h>
 
+#include "ExportDFT.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportGpu.hpp"
 #include "ExportMath.hpp"
@@ -37,4 +38,6 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_visualization::export_visualization(m);
 
     vlx_response::export_response(m);
+
+    vlx_dft::export_dft(m);
 }

@@ -349,8 +349,8 @@ class ComplexResponse:
     def setup_trials(self,
                      vectors,
                      pre=None,
-                     bger=np.array([]),
-                     bung=np.array([]),
+                     bger=None,
+                     bung=None,
                      res_norm=None,
                      renormalize=True):
         """
@@ -403,9 +403,9 @@ class ComplexResponse:
 
         # orthogonalizing new trial vectors against existing ones
 
-        if bger.any():
+        if bger is not None and bger.any():
             new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
-        if bung.any():
+        if bung is not None and bung.any():
             new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
 
         # normalizing new trial vectors
@@ -458,8 +458,12 @@ class ComplexResponse:
             pr.enable()
 
         if self.timing:
-            prep_t0 = tm.time()
-            self.timing_dict = {}
+            self.timing_dict = {
+                'reduced_space': [0.0],
+                'ortho_norm': [0.0],
+                'fock_build': [0.0],
+            }
+            timing_t0 = tm.time()
 
         if self.rank == mpi_master():
             self.print_header()
@@ -540,6 +544,10 @@ class ComplexResponse:
             bger = None
             bung = None
 
+        if self.timing:
+            self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
+
         trials_info = self.comm.bcast(trials_info, root=mpi_master())
 
         if trials_info['bger']:
@@ -558,15 +566,16 @@ class ComplexResponse:
         kappas = {}
 
         if self.timing:
-            self.timing_dict['initial_guess'] = tm.time() - prep_t0
-            self.timing_dict['reduced_space'] = []
-            self.timing_dict['new_trials'] = []
+            self.timing_dict['fock_build'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
 
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
 
             if self.timing:
-                red_space_t0 = tm.time()
+                self.timing_dict['reduced_space'].append(0.0)
+                self.timing_dict['ortho_norm'].append(0.0)
+                self.timing_dict['fock_build'].append(0.0)
 
             if self.rank == mpi_master():
                 nvs = []
@@ -785,8 +794,9 @@ class ComplexResponse:
                 self.print_iteration(relative_residual_norm, nvs)
 
             if self.timing:
-                self.timing_dict['reduced_space'].append(tm.time() -
-                                                         red_space_t0)
+                tid = iteration + 1
+                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
             # check convergence
 
@@ -794,9 +804,6 @@ class ComplexResponse:
 
             if self.is_converged:
                 break
-
-            if self.timing:
-                new_trials_t0 = tm.time()
 
             # spawning new trial vectors from residuals
 
@@ -838,6 +845,11 @@ class ComplexResponse:
                 new_trials_ger = None
                 new_trials_ung = None
 
+            if self.timing:
+                tid = iteration + 1
+                self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
+
             trials_info = self.comm.bcast(trials_info, root=mpi_master())
 
             if trials_info['new_trials_ger']:
@@ -857,7 +869,9 @@ class ComplexResponse:
                     s2bger = np.append(s2bger, new_s2bger, axis=1)
 
             if self.timing:
-                self.timing_dict['new_trials'].append(tm.time() - new_trials_t0)
+                tid = iteration + 1
+                self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
+                timing_t0 = tm.time()
 
         # converged?
         if self.rank == mpi_master():
@@ -1017,7 +1031,7 @@ class ComplexResponse:
 
     def print_timing(self):
         """
-        Prints timing for the linear response eigensolver.
+        Prints timing for the complex response solver.
         """
 
         width = 92
@@ -1026,31 +1040,28 @@ class ComplexResponse:
         self.ostream.print_header(valstr.ljust(width))
         self.ostream.print_header(('-' * len(valstr)).ljust(width))
 
-        valstr = '{:<15s} {:>15s} {:>18s}'.format('', 'ReducedSpace',
-                                                  'NewTrialVectors')
+        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format(
+            '', 'ReducedSpace', 'Orthonorm.', 'FockBuild')
         self.ostream.print_header(valstr.ljust(width))
 
-        valstr = 'Iteration {:<5d} {:>15s} {:18.3f}'.format(
-            0, '---', self.timing_dict['initial_guess'])
-        self.ostream.print_header(valstr.ljust(width))
-
-        for i, (a, b) in enumerate(
+        for i, (a, b, c) in enumerate(
                 zip(self.timing_dict['reduced_space'],
-                    self.timing_dict['new_trials'])):
-            valstr = 'Iteration {:<5d} {:15.3f} {:18.3f}'.format(i + 1, a, b)
+                    self.timing_dict['ortho_norm'],
+                    self.timing_dict['fock_build'])):
+            if i == 0:
+                title = 'Initial guess'
+            else:
+                title = 'Iteration {:<5d}'.format(i)
+            valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
             self.ostream.print_header(valstr.ljust(width))
-
-        valstr = 'Iteration {:<5d} {:15.3f} {:>18s}'.format(
-            len(self.timing_dict['reduced_space']),
-            self.timing_dict['reduced_space'][-1], '---')
-        self.ostream.print_header(valstr.ljust(width))
 
         valstr = '---------'
         self.ostream.print_header(valstr.ljust(width))
 
-        valstr = '{:<15s} {:15.3f} {:18.3f}'.format(
+        valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(
             'Sum', sum(self.timing_dict['reduced_space']),
-            sum(self.timing_dict['new_trials']))
+            sum(self.timing_dict['ortho_norm']),
+            sum(self.timing_dict['fock_build']))
         self.ostream.print_header(valstr.ljust(width))
 
         self.ostream.print_blank()
