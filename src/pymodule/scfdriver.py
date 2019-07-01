@@ -12,7 +12,6 @@ from .veloxchemlib import GridDriver
 from .veloxchemlib import DensityGridDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import to_xcfun
-from .veloxchemlib import xcfun
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
@@ -85,8 +84,12 @@ class ScfDriver:
         The flag for restricted SCF.
     :param dft:
         The flag for running DFT.
-    :param xcfun:
-        The XC functional.
+    :param grid_level:
+        The accuracy level of DFT grid.
+    :param xcfun_name:
+        The name of the XC functional.
+    :param xcfun_type:
+        The type of the XC functional.
     """
 
     def __init__(self, comm, ostream):
@@ -159,7 +162,9 @@ class ScfDriver:
         self.restricted = True
 
         self.dft = False
-        self.xcfun = None
+        self.grid_level = 3
+        self.xcfun_name = 'undefined'
+        self.xcfun_type = None
 
     def update_settings(self, scf_dict, method_dict={}):
         """
@@ -190,9 +195,32 @@ class ScfDriver:
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = True if key == 'yes' else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
-            key = method_dict['xcfun'].lower()
-            self.xcfun = to_xcfun(key)
+            self.xcfun_name = method_dict['xcfun'].lower()
+            self.xcfun_type = self.get_xcfun_type(self.xcfun_name)
+
+    def get_xcfun_type(self, label):
+        """
+        Gets the type of the XC funtional.
+
+        :param label:
+            The name of the XC functional.
+
+        :return:
+            The type of the XC functional.
+        """
+
+        xcfun_dict = {
+            'lda': [],
+            'gga': ['blyp', 'pbe'],
+            'mgga': [],
+        }
+        for xcfun_type in xcfun_dict:
+            if label.lower() in xcfun_dict[xcfun_type]:
+                return to_xcfun(xcfun_type)
+        return None
 
     def compute(self, molecule, ao_basis, min_basis):
         """
@@ -207,18 +235,28 @@ class ScfDriver:
         """
 
         if self.dft:
-            grid_t0 = tm.time()
+            assert_msg_critical(self.xcfun_type is not None,
+                                'SCF driver: undefined XC functional')
+
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(3)
-            molgrid = grid_drv.generate(molecule)
+            den_grid_drv = DensityGridDriver(self.comm)
+
+            grid_drv.set_level(self.grid_level)
             self.ostream.print_info(
-                'Grid generated in {:.2f} sec.'.format(tm.time() - grid_t0))
+                'DFT grid accuracy level set to {:d}.'.format(self.grid_level))
             self.ostream.print_blank()
 
             grid_t0 = tm.time()
-            den_grid_drv = DensityGridDriver(self.comm)
+            molgrid = grid_drv.generate(molecule)
+            molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid generated in {:.2f} sec.'.format(tm.time() -
+                                                                 grid_t0))
+            self.ostream.print_blank()
+
+            grid_t0 = tm.time()
             dengrid = den_grid_drv.generate(molecule, ao_basis, molgrid,
-                                            self.xcfun)
+                                            self.xcfun_type)
             self.ostream.print_info(
                 'Density grid generated in {:.2f} sec.'.format(tm.time() -
                                                                grid_t0))
