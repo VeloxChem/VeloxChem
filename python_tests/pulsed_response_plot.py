@@ -42,9 +42,9 @@ for i, (lw, directory) in enumerate(zip(linewidths, datadirs)):
 
     # Use zero padded numbers if available
     if 'properties_zeropad' in prop:
-	properties = prop['properties_zeropad']
+        properties = prop['properties_zeropad']
     else:
-	properties = prop['properties'] if 'properties' in prop else prop
+        properties = prop['properties'] if 'properties' in prop else prop
     
     xdata = []
     ydata = []
@@ -187,7 +187,7 @@ for i, (lw, directory) in enumerate(zip(linewidths, datadirs)):
     # Plot sticks from eigenvalues
     prop['rsp_results']['oscillator_strengths'] = [x/max_oscillator_strengths * max_field for x in prop['rsp_results']['oscillator_strengths']]
     for fre, osc in zip(prop['rsp_results']['eigenvalues'], prop['rsp_results']['oscillator_strengths']):
-	ax21.plot([fre, fre],[0, osc], color='k', lw=1)
+        ax21.plot([fre, fre],[0, osc], color='k', lw=1)
 
     # Set the plot limits
     x_alphamax = max(x_alphas) * 1.7
