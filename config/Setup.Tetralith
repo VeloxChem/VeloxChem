@@ -47,7 +47,7 @@ endif
 
 # MKL header and library
 
-MATH_INC := $(MKLROOT)/include
+MATH_INC := -I$(MKLROOT)/include
 
 LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_intel_lp64
 LIB_LIST += -lmkl_intel_thread -lmkl_core -lmkl_avx512 -liomp5 -lpthread -lm -ldl

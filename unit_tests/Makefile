@@ -36,7 +36,7 @@ CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
 vpath %.hpp $(VLX_INCLUDES)
 
 # Add MKL includes
-CXXFLAGS += -I $(MATH_INC)
+CXXFLAGS += $(MATH_INC)
 
 # Add Google Test includes
 CXXFLAGS += -I $(GST_ROOT)/include
