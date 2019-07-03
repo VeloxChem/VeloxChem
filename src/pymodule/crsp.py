@@ -108,6 +108,15 @@ class ComplexResponse:
             The settings dictionary.
         """
 
+        if 'a_operator' in settings:
+            self.a_operator = settings['a_operator'].lower()
+        if 'a_components' in settings:
+            self.a_components = settings['a_components'].lower()
+        if 'b_operator' in settings:
+            self.b_operator = settings['b_operator'].lower()
+        if 'b_components' in settings:
+            self.b_components = settings['b_components'].lower()
+
         if 'frequencies' in settings:
             self.frequencies = parse_frequencies(settings['frequencies'])
         if 'damping' in settings:
@@ -531,13 +540,9 @@ class ComplexResponse:
 
             if bger.any():
                 trials_info['bger'] = True
-                bger = orthogonalize_gram_schmidt(bger)
-                bger = normalize(bger)
 
             if bung.any():
                 trials_info['bung'] = True
-                bung = orthogonalize_gram_schmidt(bung)
-                bung = normalize(bung)
 
         else:
             trials_info = {}
@@ -829,16 +834,10 @@ class ComplexResponse:
 
                     bger = np.append(bger, new_trials_ger, axis=1)
 
-                    bger = orthogonalize_gram_schmidt(bger)
-                    bger = normalize(bger)
-
                 if new_trials_ung.any():
                     trials_info['new_trials_ung'] = True
 
                     bung = np.append(bung, new_trials_ung, axis=1)
-
-                    bung = orthogonalize_gram_schmidt(bung)
-                    bung = normalize(bung)
 
             else:
                 trials_info = {}
