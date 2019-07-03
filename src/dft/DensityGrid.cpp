@@ -11,28 +11,30 @@
 CDensityGrid::CDensityGrid()
 
     : _gridType(dengrid::undefined)
+
+    , _nDensityMatrices(0)
+
+    , _densityValues(CMemBlock2D<double>())
 {
+    
 }
 
 CDensityGrid::CDensityGrid(const CMemBlock2D<double>& densityValues, const dengrid gridType)
 
     : _gridType(gridType)
 
+    , _nDensityMatrices(1)
+
     , _densityValues(densityValues)
 {
+    
 }
 
-CDensityGrid::CDensityGrid(const CDensityGrid& source)
-
-    : _gridType(source._gridType)
-
-    , _densityValues(source._densityValues)
-{
-}
-
-CDensityGrid::CDensityGrid(const int32_t nGridPoints, const xcfun xcFuncType, const dengrid gridType)
+CDensityGrid::CDensityGrid(const int32_t nGridPoints, const int32_t nDensityMatrices, const xcfun xcFuncType, const dengrid gridType)
 {
     _gridType = gridType;
+    
+    _nDensityMatrices = nDensityMatrices;
     
     int32_t ncomp = 0;
     
@@ -42,13 +44,25 @@ CDensityGrid::CDensityGrid(const int32_t nGridPoints, const xcfun xcFuncType, co
     
     // NOTE: this needs to be checked with mgga functionals implementation
     if (xcFuncType == xcfun::mgga) ncomp = (_gridType == dengrid::ab) ? 7 : 3;
+    
+    _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
+}
 
-    _densityValues = CMemBlock2D<double>(nGridPoints, ncomp); 
+CDensityGrid::CDensityGrid(const CDensityGrid& source)
+
+    : _gridType(source._gridType)
+
+    , _nDensityMatrices(source._nDensityMatrices)
+
+    , _densityValues(source._densityValues)
+{
 }
 
 CDensityGrid::CDensityGrid(CDensityGrid&& source) noexcept
 
     : _gridType(std::move(source._gridType))
+
+    , _nDensityMatrices(std::move(source._nDensityMatrices))
 
     , _densityValues(std::move(source._densityValues))
 {
@@ -65,6 +79,8 @@ CDensityGrid::operator=(const CDensityGrid& source)
     
     _gridType = source._gridType;
     
+    _nDensityMatrices = source._nDensityMatrices;
+    
     _densityValues = source._densityValues;
     
     return *this;
@@ -77,6 +93,8 @@ CDensityGrid::operator=(CDensityGrid&& source) noexcept
     
     _gridType = std::move(source._gridType);
     
+    _nDensityMatrices = std::move(source._nDensityMatrices);
+    
     _densityValues = std::move(source._densityValues);
     
     return *this;
@@ -86,6 +104,8 @@ bool
 CDensityGrid::operator==(const CDensityGrid& other) const
 {
     if (_gridType != other._gridType) return false;
+    
+    if (_nDensityMatrices != other._nDensityMatrices) return false;
     
     if (_densityValues != other._densityValues) return false;
     
@@ -104,94 +124,100 @@ CDensityGrid::getNumberOfGridPoints() const
     return _densityValues.size(0);
 }
 
+int32_t
+CDensityGrid::getNumberOfDensityMatrices() const
+{
+    return _nDensityMatrices;
+}
+
 const double*
-CDensityGrid::alphaDensity() const
+CDensityGrid::alphaDensity(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::lima) return nullptr;
     
-    return _densityValues.data(0);
+    return _densityValues.data(iDensityMatrix);
 }
 
 double*
-CDensityGrid::alphaDensity()
+CDensityGrid::alphaDensity(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::lima) return nullptr;
     
-    return _densityValues.data(0);
+    return _densityValues.data(iDensityMatrix);
 }
 
 const double*
-CDensityGrid::betaDensity() const
+CDensityGrid::betaDensity(const int32_t iDensityMatrix) const
 {
-    if (_gridType == dengrid::ab) return _densityValues.data(1);
+    if (_gridType == dengrid::ab) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
     
-    if (_gridType == dengrid::lima) return _densityValues.data(0);
+    if (_gridType == dengrid::lima) return _densityValues.data(iDensityMatrix);
     
     return nullptr;
 }
 
 double*
-CDensityGrid::betaDensity()
+CDensityGrid::betaDensity(const int32_t iDensityMatrix)
 {
-    if (_gridType == dengrid::ab) return _densityValues.data(1);
+    if (_gridType == dengrid::ab) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
     
-    if (_gridType == dengrid::lima) return _densityValues.data(0);
+    if (_gridType == dengrid::lima) return _densityValues.data(iDensityMatrix);
     
     return nullptr;
 }
 
 const double*
-CDensityGrid::alphaDensityGradient() const
+CDensityGrid::alphaDensityGradient(const int32_t iDensityMatrix) const
 {
-    if (_gridType == dengrid::ab) return _densityValues.data(2);
+    if (_gridType == dengrid::ab) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
     
-    if (_gridType == dengrid::limb) return _densityValues.data(1);
+    if (_gridType == dengrid::limb) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
     
     return nullptr;
 }
 
 double*
-CDensityGrid::alphaDensityGradient()
+CDensityGrid::alphaDensityGradient(const int32_t iDensityMatrix)
 {
-    if (_gridType == dengrid::ab) return _densityValues.data(2);
+    if (_gridType == dengrid::ab) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
     
-    if (_gridType == dengrid::limb) return _densityValues.data(1);
+    if (_gridType == dengrid::limb) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
     
     return nullptr;
 }
 
 const double*
-CDensityGrid::betaDensityGradient() const
+CDensityGrid::betaDensityGradient(const int32_t iDensityMatrix) const
 {
-    if (_gridType == dengrid::ab) return _densityValues.data(3);
+    if (_gridType == dengrid::ab) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
+    
+    if (_gridType == dengrid::lima) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
+    
+    return nullptr;
+}
+
+double*
+CDensityGrid::betaDensityGradient(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
     
     if (_gridType == dengrid::lima) return _densityValues.data(1);
     
     return nullptr;
 }
 
-double*
-CDensityGrid::betaDensityGradient()
-{
-    if (_gridType == dengrid::ab) return _densityValues.data(3);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(1);
-    
-    return nullptr;
-}
-
 const double*
-CDensityGrid::mixedDensityGradient() const
+CDensityGrid::mixedDensityGradient(const int32_t iDensityMatrix) const
 {
-    if (_gridType == dengrid::ab) return _densityValues.data(4);
+    if (_gridType == dengrid::ab) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
     
     return nullptr;
 }
 
 double*
-CDensityGrid::mixedDensityGradient()
+CDensityGrid::mixedDensityGradient(const int32_t iDensityMatrix)
 {
-    if (_gridType == dengrid::ab) return _densityValues.data(4);
+    if (_gridType == dengrid::ab) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
     
     return nullptr;
 }

@@ -47,7 +47,7 @@ endif
 # Math library
 
 MATH_ROOT := /home/lxin/software/openblas
-MATH_INC := $(MATH_ROOT)/include
+MATH_INC := -I$(MATH_ROOT)/include
 
 LIB_LIST := -L$(MATH_ROOT)/lib -Wl,-rpath,$(MATH_ROOT)/lib -lopenblas
 LIB_LIST += -lgomp -lpthread -lm -ldl

@@ -13,6 +13,7 @@
 #include "GenFunc.hpp"
 #include "GtoRecFunc.hpp"
 #include "OMPTasks.hpp"
+#include "AngularMomentum.hpp"
 
 CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
 {
@@ -33,14 +34,20 @@ CDensityGridDriver::~CDensityGridDriver()
 {
 }
 
-void
-CDensityGridDriver::generate(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional)
+CDensityGrid
+CDensityGridDriver::generate(const CAODensityMatrix& density,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CMolecularGrid&   molGrid,
+                             const xcfun             xcFunctional)
 {
+    CDensityGrid dgrid(molGrid.getNumberOfGridPoints(), density.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab); 
+    
     // execution mode: CPU
 
     if (_runMode == execmode::cpu)
     {
-        _genDensityGridOnCPU(molecule, basis, molGrid, xcFunctional);
+        _genDensityGridOnCPU(density, molecule, basis, molGrid, xcFunctional);
     }
 
     // execution mode: CPU/GPU
@@ -52,13 +59,16 @@ CDensityGridDriver::generate(const CMolecule& molecule, const CMolecularBasis& b
 
     // printf("Density Grid: rank %i points: %i\n",
     //       _locRank, molGrid.getNumberOfGridPoints());
+    
+    return dgrid;
 }
 
 void
-CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
-                                         const CMolecularBasis& basis,
-                                         const CMolecularGrid&  molGrid,
-                                         const xcfun            xcFunctional)
+CDensityGridDriver::_genDensityGridOnCPU(const CAODensityMatrix& density,
+                                         const CMolecule&        molecule,
+                                         const CMolecularBasis&  basis,
+                                         const CMolecularGrid&   molGrid,
+                                         const xcfun             xcFunctional)
 {
     // set up OMP tasks
 
@@ -83,11 +93,14 @@ CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
     // create GTOs container
 
     CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+    
+    // set up pointer to density matrix
+    
+    auto denptr = &density;
 
     // generate density on grid points
 
-    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz,\
-                                gtovec)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr)
     {
         #pragma omp single nowait
         {
@@ -103,7 +116,7 @@ CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
 
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
-                    _genBatchOfDensityGridPoints(gtovec, mgx, mgy, mgz, tbposition, tbsize, xcFunctional);
+                    _genBatchOfDensityGridPoints(denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize, xcFunctional);
                 }
             }
         }
@@ -115,95 +128,100 @@ CDensityGridDriver::_genDensityGridOnCPU(const CMolecule&       molecule,
 }
 
 void
-CDensityGridDriver::_genBatchOfDensityGridPoints(const CGtoContainer* gtoContainer,
-                                                 const double*        gridCoordinatesX,
-                                                 const double*        gridCoordinatesY,
-                                                 const double*        gridCoordinatesZ,
-                                                 const int32_t        gridOffset,
-                                                 const int32_t        nGridPoints,
-                                                 const xcfun          xcFunctional)
+CDensityGridDriver::_genBatchOfDensityGridPoints(const CAODensityMatrix* aoDensityMatrix,
+                                                 const CGtoContainer*    gtoContainer,
+                                                 const double*           gridCoordinatesX,
+                                                 const double*           gridCoordinatesY,
+                                                 const double*           gridCoordinatesZ,
+                                                 const int32_t           gridOffset,
+                                                 const int32_t           nGridPoints,
+                                                 const xcfun             xcFunctional)
 {
     // local copy of GTOs containers
 
     auto gtovec = CGtoContainer(*gtoContainer);
-
-    auto cmpvec = gtovec;
-
-    // allocate vector reduced indexes
-
-    CMemBlock2D<int32_t> redidx(gtovec.getNumberOfGtoBlocks(), 2);
-
-    // allocate screening data
-
-    auto scrdata = gtovec.getPrimBuffer();
-
-    // set up distances vector
-
-    CMemBlock2D<double> rdist(gtovec.getMaxNumberOfPrimGtos(), 3);
-
-    // set up primitive recursion buffers
-
-    auto nvcomp = _getNumberOfXCComponents(xcFunctional);
-
-    auto pbuffers = gtovec.getPrimAngBuffer(nvcomp);
-
-    // set up contracted Cartesian GTOs buffers
-
-    auto cartbuffers = gtovec.getCartesianBuffer(nvcomp);
-
-    // set up contracted Spherical GTOs buffers
-
-    auto spherbuffer = gtovec.getSphericalBuffer(nvcomp);
-
-    // set up spherical momentum vectore
-
-    auto smomvec = gtovec.getSphericalMomentumVector();
-
-    // loop over batch of grid points
-
-    for (int32_t i = 0; i < nGridPoints; i++)
+    
+    // set up data for density matrices
+    
+    auto dmattyp = aoDensityMatrix->getDensityType();
+    
+    auto ndmat = aoDensityMatrix->getNumberOfDensityMatrices();
+    
+    // loop over GTOs container data
+    
+    for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
     {
-        // grid point coordinates
-
-        auto gx = gridCoordinatesX[gridOffset + i];
-
-        auto gy = gridCoordinatesY[gridOffset + i];
-
-        auto gz = gridCoordinatesZ[gridOffset + i];
-
-        // compute screening factors
-
-        _compScreeningFactors(scrdata, gtovec, gx, gy, gz);
-
-        // update screened GTOs container
-
-        cmpvec.compress(gtovec, redidx, scrdata, _thresholdOfPrimGTOs);
-
-        // loop over GTOs blocks in GTOs container
-
-        for (int32_t j = 0; j < gtovec.getNumberOfGtoBlocks(); j++)
+        auto bgtos = gtovec.getGtoBlock(i);
+        
+        for (int32_t j = i; j < gtovec.getNumberOfGtoBlocks(); j++)
         {
-            // compute distances
-
-            _compDistances(rdist, cmpvec, redidx, j, gx, gy, gz);
-
-            // compute primitive GTOs values at grid point
-
-            _compPrimGtoValues(pbuffers[j], rdist, cmpvec, redidx, j, xcFunctional);
-
-            // contract Cartesian GTOs values
-
-            _contrPrimGtoValues(cartbuffers[j], pbuffers[j], cmpvec, redidx, j);
-
-            // transform to spherical GTOs values
-
-            _transContrGtoValues(spherbuffer[j], cartbuffers[j], smomvec[j], redidx, j, xcFunctional);
+            auto kgtos = gtovec.getGtoBlock(j); 
         }
-
-        // set full size vectors of GTOs values
-
-        // sparse V * M * V
     }
+    
+    // set up primitive recursion buffers
+//
+//    auto nvcomp = _getNumberOfXCComponents(xcFunctional);
+//
+//    auto pbuffers = gtovec.getPrimAngBuffer(nvcomp);
+//
+//    // set up contracted Cartesian GTOs buffers
+//
+//    auto cartbuffers = gtovec.getCartesianBuffer(nvcomp);
+//
+//    // set up contracted Spherical GTOs buffers
+//
+//    auto spherbuffer = gtovec.getSphericalBuffer(nvcomp);
+//
+//    // set up spherical momentum vectors
+//
+//    auto smomvec = gtovec.getSphericalMomentumVector();
+//
+//    // loop over batch of grid points
+//
+//    for (int32_t i = 0; i < nGridPoints; i++)
+//    {
+//        // grid point coordinates
+//
+//        auto gx = gridCoordinatesX[gridOffset + i];
+//
+//        auto gy = gridCoordinatesY[gridOffset + i];
+//
+//        auto gz = gridCoordinatesZ[gridOffset + i];
+//
+//        // compute screening factors
+//
+//        _compScreeningFactors(scrdata, gtovec, gx, gy, gz);
+//
+//        // update screened GTOs container
+//
+//        cmpvec.compress(gtovec, redidx, scrdata, _thresholdOfPrimGTOs);
+//
+//        // loop over GTOs blocks in GTOs container
+//
+//        for (int32_t j = 0; j < gtovec.getNumberOfGtoBlocks(); j++)
+//        {
+//            // compute distances
+//
+//            _compDistances(rdist, cmpvec, redidx, j, gx, gy, gz);
+//
+//            // compute primitive GTOs values at grid point
+//
+//            _compPrimGtoValues(pbuffers[j], rdist, cmpvec, redidx, j, xcFunctional);
+//
+//            // contract Cartesian GTOs values
+//
+//            _contrPrimGtoValues(cartbuffers[j], pbuffers[j], cmpvec, redidx, j);
+//
+//            // transform to spherical GTOs values
+//
+//            _transContrGtoValues(spherbuffer[j], cartbuffers[j], smomvec[j], redidx, j, xcFunctional);
+//        }
+//
+//        // compute density values for grid point
+//
+//        _compDensityValues(spherbuffer, cmpvec, xcFunctional);
+//    }
 }
 
 void
@@ -546,4 +564,38 @@ CDensityGridDriver::_transContrGtoValues(CMemBlock2D<double>&        spherGtoVal
     // transform GTOs
 
     genfunc::transform(spherGtoValues, cartGtoValues, spherMomentum, 0, 0, ngto, nvcomp);
+}
+
+void
+CDensityGridDriver::_compDensityValues(const CVecMemBlock2D<double>& spherGtoValues,
+                                       const CGtoContainer&          gtoContainer,
+                                       const xcfun                   xcFunctional) const
+{
+    auto ngblk = gtoContainer.getNumberOfGtoBlocks();
+    
+    for (int32_t i = 0; i < ngblk; i++)
+    {
+        auto bcomp = angmom::to_SphericalComponents(gtoContainer.getAngularMomentum(i));
+        
+        auto bdim = gtoContainer.getNumberOfContrGtos(i);
+        
+        for (int32_t j = 0; j < ngblk; j++)
+        {
+            auto kcomp = angmom::to_SphericalComponents(gtoContainer.getAngularMomentum(j));
+            
+            auto kdim = gtoContainer.getNumberOfContrGtos(j);
+            
+            for (int32_t k = 0; k < bcomp; k++)
+            {
+                auto bidx = gtoContainer.getIdentifiers(i, k);
+                
+                for (int32_t l = 0; l < kcomp; l++)
+                {
+                    auto kidx = gtoContainer.getIdentifiers(j, l);
+                    
+                    
+                }
+            }
+        }
+    }
 }

@@ -29,6 +29,11 @@ class CDensityGrid
     dengrid _gridType;
     
     /**
+     The number of associated density matrices.
+     */
+    int32_t _nDensityMatrices;
+    
+    /**
      The density variables values at grid points.
      */
     CMemBlock2D<double> _densityValues;
@@ -51,10 +56,11 @@ public:
      Creates a density grid object.
      
      @param nGridPoints the number of grid points with density values.
+     @param nDensityMatrices the number of AO density matrices.
      @param xcFuncType the type of exchange-correlation functional.
      @param gridType the type of density grid.
      */
-    CDensityGrid(const int32_t nGridPoints, const xcfun xcFuncType, const dengrid gridType);
+    CDensityGrid(const int32_t nGridPoints, const int32_t nDensityMatrices, const xcfun xcFuncType, const dengrid gridType);
     
     /**
      Creates a density grid object by copying other density grid object.
@@ -113,74 +119,91 @@ public:
     int32_t getNumberOfGridPoints() const;
     
     /**
+     Gets number of densitu matrices associated with density grid.
+
+     @return the number of density matrices.
+     */
+    int32_t getNumberOfDensityMatrices() const;
+    
+    /**
      Gets constant pointer to alpha density values.
      
-     @return the pointer to alpha density values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density values.
      */
-    const double* alphaDensity() const;
+    const double* alphaDensity(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha density values.
      
-     @return the pointer to alpha density values .
+    @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density values.
      */
-    double* alphaDensity();
+    double* alphaDensity(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to beta density values.
      
-     @return the pointer to beta density values .
+    @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density values.
      */
-    const double* betaDensity() const;
+    const double* betaDensity(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to beta density values.
      
-     @return the pointer to beta density values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density values.
      */
-    double* betaDensity();
+    double* betaDensity(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha density gradient norm values.
      
-     @return the pointer to alpha density gradient norm values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient norm values.
      */
-    const double* alphaDensityGradient() const;
+    const double* alphaDensityGradient(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha density gradient norm values.
      
-     @return the pointer to alpha density gradient norm values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient norm values.
      */
-    double* alphaDensityGradient();
+    double* alphaDensityGradient(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to beta density gradient norm values.
      
-     @return the pointer to beta density gradient norm values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient norm values.
      */
-    const double* betaDensityGradient() const;
+    const double* betaDensityGradient(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to beta density gradient norm values.
      
-     @return the pointer to beta density gradient norm values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient norm values.
      */
-    double* betaDensityGradient();
+    double* betaDensityGradient(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha * beta density gradients product values.
      
-     @return the pointer to alpha * beta density gradients product values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha * beta density gradients product values.
      */
-    const double* mixedDensityGradient() const;
+    const double* mixedDensityGradient(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha * beta density gradients product values.
      
-     @return the pointer to alpha * beta density gradients product  values .
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha * beta density gradients product values.
      */
-    double* mixedDensityGradient();
+    double* mixedDensityGradient(const int32_t iDensityMatrix);
     
     /**
      Converts density grid object to text and insert it into output text

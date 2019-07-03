@@ -22,6 +22,8 @@
 #include "SphericalMomentum.hpp"
 #include "VecMemBlocks.hpp"
 #include "XCFuncType.hpp"
+#include "AODensityMatrix.hpp"
+#include "DensityGrid.hpp"
 
 /**
  Class CDensityGridDriver generates density grid for usage in numerical
@@ -65,16 +67,22 @@ class CDensityGridDriver
      Creates density grid on each MPI node within domain of MPI communicator.
      Density grid points are generated using only CPUs.
 
+     @param density the AO density matrices.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molGrid the distributed molecular grid.
      @param xcFunctional the exchange-correlation functional type.
      */
-    void _genDensityGridOnCPU(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional);
+    void _genDensityGridOnCPU(const CAODensityMatrix& density,
+                              const CMolecule&        molecule,
+                              const CMolecularBasis&  basis,
+                              const CMolecularGrid&   molGrid,
+                              const xcfun             xcFunctional);
 
     /**
      Generates batch of density grid points.
 
+     @param aoDensityMatrix the AO density matrix. 
      @param gtoContainer the GTOs container.
      @param gridCoordinatesX the vector of Cartesian X coordinates of grid
             points.
@@ -86,13 +94,14 @@ class CDensityGridDriver
      @param nGridPoints the number of grid points in batch.
      @param xcFunctional the exchange-correlation functional type.
      */
-    void _genBatchOfDensityGridPoints(const CGtoContainer* gtoContainer,
-                                      const double*        gridCoordinatesX,
-                                      const double*        gridCoordinatesY,
-                                      const double*        gridCoordinatesZ,
-                                      const int32_t        gridOffset,
-                                      const int32_t        nGridPoints,
-                                      const xcfun          xcFunctional);
+    void _genBatchOfDensityGridPoints(const CAODensityMatrix* aoDensityMatrix,
+                                      const CGtoContainer*    gtoContainer,
+                                      const double*           gridCoordinatesX,
+                                      const double*           gridCoordinatesY,
+                                      const double*           gridCoordinatesZ,
+                                      const int32_t           gridOffset,
+                                      const int32_t           nGridPoints,
+                                      const xcfun             xcFunctional);
 
     /**
      Computes screening factors  vector for primitive Gaussian functions for
@@ -240,12 +249,24 @@ class CDensityGridDriver
      @param iGtoBlock the index of GTOs block.
      @param xcFunctional the exchange-correlation functional type.
      */
-    void _transContrGtoValues(CMemBlock2D<double>&        spherGtoValues,
+    void _transContrGtoValues(      CMemBlock2D<double>&  spherGtoValues,
                               const CMemBlock2D<double>&  cartGtoValues,
                               const CSphericalMomentum&   spherMomentum,
                               const CMemBlock2D<int32_t>& redDimensions,
                               const int32_t               iGtoBlock,
                               const xcfun                 xcFunctional) const;
+    
+    
+    /**
+     Computes density values at given grid point for specific functional type.
+
+     @param spherGtoValues he spherical GTOs values.
+     @param gtoContainer the GTOs container.
+     @param xcFunctional the exchange-correlation functional type.
+     */
+    void _compDensityValues(const CVecMemBlock2D<double>& spherGtoValues,
+                            const CGtoContainer&          gtoContainer,
+                            const xcfun                   xcFunctional) const;
 
    public:
     /**
@@ -265,12 +286,18 @@ class CDensityGridDriver
      exchange-correlation functional. Density grid generation is distributed
      within domain of MPI communicator.
 
+     @param density the AO density matrix.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molGrid the molecular grid.
      @param xcFunctional the type of exchange-correlation functional.
+     @return the density grid object.
      */
-    void generate(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molGrid, const xcfun xcFunctional);
+    CDensityGrid generate(const CAODensityMatrix& density,
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CMolecularGrid&   molGrid,
+                          const xcfun             xcFunctional);
 };
 
 #endif /* DensityGridDriver_hpp */
