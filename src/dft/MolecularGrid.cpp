@@ -127,6 +127,8 @@ std::ostream&
 operator<<(std::ostream& output, const CMolecularGrid& source)
 {
     output << std::endl;
+    
+    output << "[CMolecularGrid (Object):" << &source << "]" << std::endl;
 
     output << "_isDistributed: " << source._isDistributed << std::endl;
 

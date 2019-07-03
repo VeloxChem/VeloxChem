@@ -50,7 +50,7 @@ to_string(const xcfun functional)
 /**
  Converts string label to its enumerate class value.
 
- @param the label of enumerate class value.
+ @param label the label of enumerate class value.
  @return functional the enumerate class value.
  */
 inline xcfun
