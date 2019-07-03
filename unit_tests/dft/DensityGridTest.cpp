@@ -17,46 +17,46 @@ TEST_F(CDensityGridTest, DefaultConstructor)
     
     CMemBlock2D<double> mblock;
     
-    CDensityGrid dgridb(mblock, dengrid::undefined);
+    CDensityGrid dgridb(0, 0, xcfun::lda, dengrid::undefined);
     
     ASSERT_EQ(dgrida, dgridb);
 }
 
 TEST_F(CDensityGridTest, ConstructorWithFunctionalType)
 {
-    CDensityGrid dgrida(5, xcfun::lda, dengrid::ab);
+    CDensityGrid dgrida(5, 1, xcfun::lda, dengrid::ab);
     
     ASSERT_EQ(dgrida, CDensityGrid(CMemBlock2D<double>(5, 2), dengrid::ab));
     
-    CDensityGrid dgridb(5, xcfun::lda, dengrid::lima);
+    CDensityGrid dgridb(5, 1, xcfun::lda, dengrid::lima);
     
     ASSERT_EQ(dgridb, CDensityGrid(CMemBlock2D<double>(5, 1), dengrid::lima));
     
-    CDensityGrid dgridc(5, xcfun::lda, dengrid::limb);
+    CDensityGrid dgridc(5, 1, xcfun::lda, dengrid::limb);
     
     ASSERT_EQ(dgridc, CDensityGrid(CMemBlock2D<double>(5, 1), dengrid::limb));
     
-    CDensityGrid dgride(5, xcfun::gga, dengrid::ab);
+    CDensityGrid dgride(5, 1, xcfun::gga, dengrid::ab);
     
     ASSERT_EQ(dgride, CDensityGrid(CMemBlock2D<double>(5, 5), dengrid::ab));
     
-    CDensityGrid dgridf(5, xcfun::gga, dengrid::lima);
+    CDensityGrid dgridf(5, 1, xcfun::gga, dengrid::lima);
     
     ASSERT_EQ(dgridf, CDensityGrid(CMemBlock2D<double>(5, 2), dengrid::lima));
     
-    CDensityGrid dgridg(5, xcfun::gga, dengrid::limb);
+    CDensityGrid dgridg(5, 1, xcfun::gga, dengrid::limb);
     
     ASSERT_EQ(dgridg, CDensityGrid(CMemBlock2D<double>(5, 2), dengrid::limb));
     
-    CDensityGrid dgridk(5, xcfun::mgga, dengrid::ab);
+    CDensityGrid dgridk(5, 1, xcfun::mgga, dengrid::ab);
     
     ASSERT_EQ(dgridk, CDensityGrid(CMemBlock2D<double>(5, 7), dengrid::ab));
     
-    CDensityGrid dgridl(5, xcfun::mgga, dengrid::lima);
+    CDensityGrid dgridl(5, 1, xcfun::mgga, dengrid::lima);
     
     ASSERT_EQ(dgridl, CDensityGrid(CMemBlock2D<double>(5, 3), dengrid::lima));
     
-    CDensityGrid dgridm(5, xcfun::mgga, dengrid::limb);
+    CDensityGrid dgridm(5, 1, xcfun::mgga, dengrid::limb);
     
     ASSERT_EQ(dgridm, CDensityGrid(CMemBlock2D<double>(5, 3), dengrid::limb));
 }
@@ -128,11 +128,11 @@ TEST_F(CDensityGridTest, AlphaDensityConstant)
     
     const CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    vlxtest::compare({1.0, 2.0}, dgridab.alphaDensity());
+    vlxtest::compare({1.0, 2.0}, dgridab.alphaDensity(0));
     
-    vlxtest::compare({3.0, 6.0}, dgridlb.alphaDensity());
+    vlxtest::compare({3.0, 6.0}, dgridlb.alphaDensity(0));
     
-    ASSERT_TRUE(dgridla.alphaDensity() == nullptr);
+    ASSERT_TRUE(dgridla.alphaDensity(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, AlphaDensity)
@@ -149,9 +149,9 @@ TEST_F(CDensityGridTest, AlphaDensity)
     
     CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    auto rhoa_ab = dgridab.alphaDensity();
+    auto rhoa_ab = dgridab.alphaDensity(0);
     
-    auto rhoa_lb = dgridlb.alphaDensity();
+    auto rhoa_lb = dgridlb.alphaDensity(0);
     
     vlxtest::compare({1.0, 2.0}, rhoa_ab);
     
@@ -165,7 +165,7 @@ TEST_F(CDensityGridTest, AlphaDensity)
     
     ASSERT_EQ(dgridlb, CDensityGrid(CMemBlock2D<double>({4.0, 6.0},  2, 1), dengrid::limb));
     
-    ASSERT_TRUE(dgridla.alphaDensity() == nullptr);
+    ASSERT_TRUE(dgridla.alphaDensity(0) == nullptr);
 }
 
 
@@ -183,11 +183,11 @@ TEST_F(CDensityGridTest, BetaDensityConstant)
     
     const CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    vlxtest::compare({3.0, 6.0}, dgridab.betaDensity());
+    vlxtest::compare({3.0, 6.0}, dgridab.betaDensity(0));
     
-    vlxtest::compare({1.0, 2.0}, dgridla.betaDensity());
+    vlxtest::compare({1.0, 2.0}, dgridla.betaDensity(0));
     
-    ASSERT_TRUE(dgridlb.betaDensity() == nullptr);
+    ASSERT_TRUE(dgridlb.betaDensity(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, BetaDensity)
@@ -204,9 +204,9 @@ TEST_F(CDensityGridTest, BetaDensity)
     
     CDensityGrid dgridlb(mblocka, dengrid::limb);
    
-    auto rhob_ab = dgridab.betaDensity();
+    auto rhob_ab = dgridab.betaDensity(0);
     
-    auto rhob_la = dgridla.betaDensity();
+    auto rhob_la = dgridla.betaDensity(0);
     
     vlxtest::compare({3.0, 6.0}, rhob_ab);
     
@@ -220,7 +220,7 @@ TEST_F(CDensityGridTest, BetaDensity)
     
     ASSERT_EQ(dgridla, CDensityGrid(CMemBlock2D<double>({9.0, 2.0},  2, 1), dengrid::lima));
     
-    ASSERT_TRUE(dgridlb.betaDensity() == nullptr);
+    ASSERT_TRUE(dgridlb.betaDensity(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, AlphaDensityGraddientConstant)
@@ -237,11 +237,11 @@ TEST_F(CDensityGridTest, AlphaDensityGraddientConstant)
     
     const CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    vlxtest::compare({4.0, 5.0}, dgridab.alphaDensityGradient());
+    vlxtest::compare({4.0, 5.0}, dgridab.alphaDensityGradient(0));
     
-    vlxtest::compare({7.0, 2.0}, dgridlb.alphaDensityGradient());
+    vlxtest::compare({7.0, 2.0}, dgridlb.alphaDensityGradient(0));
     
-    ASSERT_TRUE(dgridla.alphaDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridla.alphaDensityGradient(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, AlphaDensityGraddient)
@@ -258,9 +258,9 @@ TEST_F(CDensityGridTest, AlphaDensityGraddient)
     
     CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    auto grada_ab = dgridab.alphaDensityGradient();
+    auto grada_ab = dgridab.alphaDensityGradient(0);
     
-    auto grada_lb = dgridlb.alphaDensityGradient();
+    auto grada_lb = dgridlb.alphaDensityGradient(0);
     
     vlxtest::compare({4.0, 5.0}, grada_ab);
     
@@ -274,7 +274,7 @@ TEST_F(CDensityGridTest, AlphaDensityGraddient)
     
     ASSERT_EQ(dgridlb, CDensityGrid(CMemBlock2D<double>({3.0, 6.0, 3.0, 2.0}, 2, 2), dengrid::limb));
     
-    ASSERT_TRUE(dgridla.alphaDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridla.alphaDensityGradient(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, BetaDensityGraddientConstant)
@@ -291,11 +291,11 @@ TEST_F(CDensityGridTest, BetaDensityGraddientConstant)
     
     const CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    vlxtest::compare({7.0, 9.0}, dgridab.betaDensityGradient());
+    vlxtest::compare({7.0, 9.0}, dgridab.betaDensityGradient(0));
     
-    vlxtest::compare({3.0, 5.0}, dgridla.betaDensityGradient());
+    vlxtest::compare({3.0, 5.0}, dgridla.betaDensityGradient(0));
     
-    ASSERT_TRUE(dgridlb.betaDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridlb.betaDensityGradient(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, BetaDensityGraddient)
@@ -312,9 +312,9 @@ TEST_F(CDensityGridTest, BetaDensityGraddient)
     
     CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    auto gradb_ab = dgridab.betaDensityGradient();
+    auto gradb_ab = dgridab.betaDensityGradient(0);
     
-    auto gradb_la = dgridla.betaDensityGradient();
+    auto gradb_la = dgridla.betaDensityGradient(0);
     
     vlxtest::compare({7.0, 9.0}, gradb_ab);
     
@@ -328,7 +328,7 @@ TEST_F(CDensityGridTest, BetaDensityGraddient)
     
     ASSERT_EQ(dgridla, CDensityGrid(CMemBlock2D<double>({1.0, 2.0, 7.0, 5.0}, 2, 2), dengrid::lima));
     
-    ASSERT_TRUE(dgridlb.betaDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridlb.betaDensityGradient(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, MixedDensityGraddientConstant)
@@ -345,11 +345,11 @@ TEST_F(CDensityGridTest, MixedDensityGraddientConstant)
     
     const CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    vlxtest::compare({2.0, 4.0}, dgridab.mixedDensityGradient());
+    vlxtest::compare({2.0, 4.0}, dgridab.mixedDensityGradient(0));
     
-    ASSERT_TRUE(dgridla.mixedDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridla.mixedDensityGradient(0) == nullptr);
     
-    ASSERT_TRUE(dgridlb.mixedDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridlb.mixedDensityGradient(0) == nullptr);
 }
 
 TEST_F(CDensityGridTest, MixedDensityGraddient)
@@ -366,7 +366,7 @@ TEST_F(CDensityGridTest, MixedDensityGraddient)
     
     CDensityGrid dgridlb(mblocka, dengrid::limb);
     
-    auto gradab_ab = dgridab.mixedDensityGradient();
+    auto gradab_ab = dgridab.mixedDensityGradient(0);
     
     vlxtest::compare({2.0, 4.0}, gradab_ab);
     
@@ -376,7 +376,7 @@ TEST_F(CDensityGridTest, MixedDensityGraddient)
     
     ASSERT_EQ(dgridab, CDensityGrid(CMemBlock2D<double>({1.0, 2.0, 3.0, 6.0, 4.0, 5.0, 7.0, 9.0, 3.0, 9.0}, 2, 5), dengrid::ab));
     
-    ASSERT_TRUE(dgridla.mixedDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridla.mixedDensityGradient(0) == nullptr);
     
-    ASSERT_TRUE(dgridlb.mixedDensityGradient() == nullptr);
+    ASSERT_TRUE(dgridlb.mixedDensityGradient(0) == nullptr);
 }
