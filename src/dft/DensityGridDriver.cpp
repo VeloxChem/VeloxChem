@@ -41,13 +41,17 @@ CDensityGridDriver::generate(const CAODensityMatrix& density,
                              const CMolecularGrid&   molGrid,
                              const xcfun             xcFunctional)
 {
-    CDensityGrid dgrid(molGrid.getNumberOfGridPoints(), density.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab); 
+    // initialize density grid
+    
+    CDensityGrid dgrid(molGrid.getNumberOfGridPoints(), density.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab);
+    
+    dgrid.zero(); 
     
     // execution mode: CPU
 
     if (_runMode == execmode::cpu)
     {
-        _genDensityGridOnCPU(density, molecule, basis, molGrid, xcFunctional);
+        _genDensityGridOnCPU(dgrid, density, molecule, basis, molGrid, xcFunctional);
     }
 
     // execution mode: CPU/GPU
@@ -56,15 +60,13 @@ CDensityGridDriver::generate(const CAODensityMatrix& density,
     {
         // TODO: implement CPU/GPU code
     }
-
-    // printf("Density Grid: rank %i points: %i\n",
-    //       _locRank, molGrid.getNumberOfGridPoints());
     
     return dgrid;
 }
 
 void
-CDensityGridDriver::_genDensityGridOnCPU(const CAODensityMatrix& density,
+CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid, 
+                                         const CAODensityMatrix& density,
                                          const CMolecule&        molecule,
                                          const CMolecularBasis&  basis,
                                          const CMolecularGrid&   molGrid,
@@ -97,10 +99,14 @@ CDensityGridDriver::_genDensityGridOnCPU(const CAODensityMatrix& density,
     // set up pointer to density matrix
     
     auto denptr = &density;
+    
+    // set up poinet to density grid
+    
+    auto dgridptr = &denGrid;
 
     // generate density on grid points
 
-    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
         #pragma omp single nowait
         {
@@ -116,7 +122,7 @@ CDensityGridDriver::_genDensityGridOnCPU(const CAODensityMatrix& density,
 
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
-                    _genBatchOfDensityGridPoints(denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize, xcFunctional);
+                    _genBatchOfDensityGridPoints(dgridptr, denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize, xcFunctional);
                 }
             }
         }
@@ -128,7 +134,8 @@ CDensityGridDriver::_genDensityGridOnCPU(const CAODensityMatrix& density,
 }
 
 void
-CDensityGridDriver::_genBatchOfDensityGridPoints(const CAODensityMatrix* aoDensityMatrix,
+CDensityGridDriver::_genBatchOfDensityGridPoints(      CDensityGrid*     densityGrid, 
+                                                 const CAODensityMatrix* aoDensityMatrix,
                                                  const CGtoContainer*    gtoContainer,
                                                  const double*           gridCoordinatesX,
                                                  const double*           gridCoordinatesY,
@@ -141,12 +148,6 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CAODensityMatrix* aoDensi
 
     auto gtovec = CGtoContainer(*gtoContainer);
     
-    // set up data for density matrices
-    
-    auto dmattyp = aoDensityMatrix->getDensityType();
-    
-    auto ndmat = aoDensityMatrix->getNumberOfDensityMatrices();
-    
     // loop over GTOs container data
     
     for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
@@ -155,7 +156,9 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CAODensityMatrix* aoDensi
         
         for (int32_t j = i; j < gtovec.getNumberOfGtoBlocks(); j++)
         {
-            auto kgtos = gtovec.getGtoBlock(j); 
+            _compDensityForGtoBlocks(densityGrid, aoDensityMatrix, bgtos, gtovec.getGtoBlock(j),
+                                     gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                     gridOffset, nGridPoints, xcFunctional);
         }
     }
     
@@ -225,118 +228,68 @@ CDensityGridDriver::_genBatchOfDensityGridPoints(const CAODensityMatrix* aoDensi
 }
 
 void
-CDensityGridDriver::_compScreeningFactors(CVecMemBlock<double>& screenFactors,
-                                          const CGtoContainer&  gtoContainer,
-                                          const double          gridCoordinateX,
-                                          const double          gridCoordinateY,
-                                          const double          gridCoordinateZ)
+CDensityGridDriver::_compDensityForGtoBlocks(      CDensityGrid*     densityGrid,
+                                             const CAODensityMatrix* aoDensityMatrix,
+                                             const CGtoBlock&        braGtoBlock,
+                                             const CGtoBlock&        ketGtoBlock,
+                                             const double*           gridCoordinatesX,
+                                             const double*           gridCoordinatesY,
+                                             const double*           gridCoordinatesZ,
+                                             const int32_t           gridOffset,
+                                             const int32_t           nGridPoints,
+                                             const xcfun             xcFunctional)
 {
-    for (int32_t i = 0; i < gtoContainer.getNumberOfGtoBlocks(); i++)
+    // determine symmetry of bra and ket sides
+    
+    auto symbk = (braGtoBlock == ketGtoBlock);
+    
+    // set up max density matrix elements for (i,j) pair of density indexes
+    
+    auto ndmat = aoDensityMatrix->getNumberOfDensityMatrices();
+    
+    // angular momentum data for bra and ket
+    
+    auto bang = braGtoBlock.getAngularMomentum();
+    
+    auto kang = ketGtoBlock.getAngularMomentum();
+    
+    // set up Cartesian GTOs buffers
+    
+    auto nvcomp = _getNumberOfXCComponents(xcFunctional);
+    
+    auto bncart = angmom::to_CartesianComponents(bang);
+    
+    auto kncart = angmom::to_CartesianComponents(kang);
+    
+    CMemBlock2D<double> bcartbuff(nGridPoints, nvcomp * bncart);
+    
+    CMemBlock2D<double> kcartbuff(nGridPoints, nvcomp * kncart);
+    
+    // set up spherical GTOs buffers
+    
+    auto bnspher = angmom::to_SphericalComponents(bang);
+    
+    auto knspher = angmom::to_SphericalComponents(kang);
+    
+    CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+    
+    CMemBlock2D<double> kspherbuff(nGridPoints, nvcomp * knspher);
+    
+    CMemBlock<double> maxdq(ndmat);
+    
+    for (int32_t i = 0; i < braGtoBlock.getNumberOfContrGtos(); i++)
     {
-        // set up primitives GTOs data
-
-        auto bang = gtoContainer.getAngularMomentum(i);
-
-        auto pexps = gtoContainer.getExponents(i);
-
-        auto pfacts = gtoContainer.getNormFactors(i);
-
-        // set up primitive GTOs coordinates
-
-        auto coordsx = gtoContainer.getCoordinatesX(i);
-
-        auto coordsy = gtoContainer.getCoordinatesY(i);
-
-        auto coordsz = gtoContainer.getCoordinatesZ(i);
-
-        // set up screening factors
-
-        auto sfacts = screenFactors[i].data();
-
-        // loop over GTOs in GTOs block
-
-        for (int32_t j = 0; j < gtoContainer.getNumberOfPrimGtos(i); j++)
+        _compGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                             braGtoBlock, i, xcFunctional);
+        
+        auto jstart = symbk ? i : 0;
+        
+        for (int32_t j = jstart; j < ketGtoBlock.getNumberOfContrGtos(); j++)
         {
-            // compute distances
-
-            auto rx = gridCoordinateX - coordsx[j];
-
-            auto ry = gridCoordinateY - coordsy[j];
-
-            auto rz = gridCoordinateZ - coordsz[j];
-
-            // determine max distance
-
-            auto rmax = (rx > ry) ? rx : ry;
-
-            if (rz > rmax) rmax = rz;
-
-            // compute zero order overlap
-
-            sfacts[j] = pfacts[j] * std::exp(-pexps[j] * (rx * rx + ry * ry + rz * rz));
-
-            // compose screening factor
-
-            sfacts[j] *= _getScaleFactor(bang, rmax);
-
-            // absolute value of screening factor
-
-            sfacts[j] = std::fabs(sfacts[j]);
+            _compGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                                 ketGtoBlock, j, xcFunctional);
         }
     }
-}
-
-double
-CDensityGridDriver::_getScaleFactor(const int32_t angularMomentum, const double maxRadius) const
-{
-    if (angularMomentum == 0) return 1.0;
-
-    if (angularMomentum == 1) return maxRadius;
-
-    auto r2max = maxRadius * maxRadius;
-
-    if (angularMomentum == 2) return r2max;
-
-    if (angularMomentum == 3) return r2max * maxRadius;
-
-    auto r4max = r2max * r2max;
-
-    if (angularMomentum == 4) return r4max;
-
-    if (angularMomentum == 5) return r4max * maxRadius;
-
-    if (angularMomentum == 6) return r4max * r2max;
-
-    // TO DO: implement higher order if needed
-
-    return 0.0;
-}
-
-void
-CDensityGridDriver::_compDistances(CMemBlock2D<double>&        distances,
-                                   const CGtoContainer&        gtoContainer,
-                                   const CMemBlock2D<int32_t>& redDimensions,
-                                   const int32_t               iGtoBlock,
-                                   const double                gridCoordinateX,
-                                   const double                gridCoordinateY,
-                                   const double                gridCoordinateZ) const
-{
-    // set up pointer to reduced dimensions
-
-    auto reddim = redDimensions.data(0);
-
-    // compute distances
-
-    mathfunc::distances(distances.data(0),
-                        distances.data(1),
-                        distances.data(2),
-                        gridCoordinateX,
-                        gridCoordinateY,
-                        gridCoordinateZ,
-                        gtoContainer.getCoordinatesX(iGtoBlock),
-                        gtoContainer.getCoordinatesY(iGtoBlock),
-                        gtoContainer.getCoordinatesZ(iGtoBlock),
-                        reddim[iGtoBlock]);
 }
 
 int32_t
@@ -349,6 +302,21 @@ CDensityGridDriver::_getNumberOfXCComponents(const xcfun xcFunctional) const
     if (xcFunctional == xcfun::mgga) return 5;
 
     return 0;
+}
+
+
+void
+CDensityGridDriver::_compGtoValuesOnGrid(      CMemBlock2D<double>& cartGtoGridBuffer,
+                                               CMemBlock2D<double>& spherGtoGridBuffer,
+                                         const double*              gridCoordinatesX,
+                                         const double*              gridCoordinatesY,
+                                         const double*              gridCoordinatesZ,
+                                         const int32_t              gridOffset,
+                                         const CGtoBlock&           gtoBlock,
+                                         const int32_t              iContrGto,
+                                         const xcfun                xcFunctional) const
+{
+    
 }
 
 void
