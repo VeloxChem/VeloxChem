@@ -98,7 +98,7 @@ for i, (lw, directory) in enumerate(zip(linewidths, datadirs)):
     
     dxfreq = xfreqs[1] - xfreqs[0]
     dfreq = dxfreq * (len(x_alphas)-1)/2.
-    xfreqs = np.arange(-dfreq, dfreq+dxfreq, dxfreq)
+    xfreqs = np.linspace(-dfreq, dfreq, len(field_w), endpoint=True)
     
     field_w = np.array(field_w)
     x_alphas = np.array(x_alphas)
@@ -111,7 +111,8 @@ for i, (lw, directory) in enumerate(zip(linewidths, datadirs)):
     dw=w[1] - w[0]
     N = len(xfreqs)
     dt = 2.*np.pi / (N * dw)
-    t = np.arange(-N/2.*dt, N/2.*dt, dt)
+    t_end = ((N-1)/2) * dt
+    t = np.linspace(-t_end, t_end, len(xfreqs), endpoint=True)
 
     tshift = np.fft.ifftshift(t) # 0, positive ascending, negative ascending
     wshift = np.fft.ifftshift(w) # 0, positive ascending, negative ascending
