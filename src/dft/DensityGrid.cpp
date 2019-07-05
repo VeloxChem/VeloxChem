@@ -118,6 +118,12 @@ CDensityGrid::operator!=(const CDensityGrid& other) const
     return !(*this == other);
 }
 
+void
+CDensityGrid::zero()
+{
+    _densityValues.zero(); 
+}
+
 int32_t
 CDensityGrid::getNumberOfGridPoints() const
 {

@@ -105,6 +105,18 @@ TEST_F(CDensityGridTest, MoveAssignment)
     ASSERT_EQ(dgrida, dgridb);
 }
 
+TEST_F(CDensityGridTest, Zero)
+{
+    CMemBlock2D<double> mblock({1.0, 2.0, 3.0, 6.0, 2.0, 4.0, 5.0, 9.0}, 2, 4);
+    
+    CDensityGrid dgrida(mblock, dengrid::ab);
+    
+    dgrida.zero();
+    
+    ASSERT_EQ(dgrida, CDensityGrid(CMemBlock2D<double>({0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 2, 4), dengrid::ab));
+}
+
+
 TEST_F(CDensityGridTest, GetNumberOfGridPoints)
 {
     CMemBlock2D<double> mblock({1.0, 2.0, 3.0, 6.0, 2.0, 4.0, 5.0, 9.0}, 2, 4);
@@ -112,6 +124,19 @@ TEST_F(CDensityGridTest, GetNumberOfGridPoints)
     CDensityGrid dgrida(mblock, dengrid::ab);
     
     ASSERT_EQ(2, dgrida.getNumberOfGridPoints());
+}
+
+TEST_F(CDensityGridTest, GetNumberOfDensityMatrices)
+{
+    CMemBlock2D<double> mblock({1.0, 2.0, 3.0, 6.0, 2.0, 4.0, 5.0, 9.0}, 2, 4);
+    
+    CDensityGrid dgrida(mblock, dengrid::ab);
+    
+    ASSERT_EQ(1, dgrida.getNumberOfDensityMatrices());
+    
+    CDensityGrid dgridb(5, 3, xcfun::lda, dengrid::lima);
+    
+    ASSERT_EQ(3, dgridb.getNumberOfDensityMatrices()); 
 }
 
 TEST_F(CDensityGridTest, AlphaDensityConstant)

@@ -112,6 +112,11 @@ public:
     bool operator!=(const CDensityGrid& other) const;
     
     /**
+     Initialize density values at grid point to zero.
+     */
+    void zero();
+    
+    /**
      Gets number of grid points in density grid object.
      
      @return the number of grid points.
