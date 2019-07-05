@@ -30,5 +30,22 @@ TEST_F(CDensityGridDriverTest, Generate)
     
     CDensityGridDriver ddrv(MPI_COMM_WORLD);
     
-    ddrv.generate(dmat, mh2o, mbas, mgrid, xcfun::lda); 
+    auto dgrid = ddrv.generate(dmat, mh2o, mbas, mgrid, xcfun::lda);
+    
+    // compute number of electrons
+    
+    auto gw = mgrid.getWeights();
+    
+    auto rhoa = dgrid.alphaDensity(0);
+    
+    auto rhob = dgrid.betaDensity(0);
+    
+    double nelec = 0.0;
+    
+    for (int32_t i = 0; i < dgrid.getNumberOfGridPoints(); i++)
+    {
+        nelec += (rhoa[i] + rhob[i]) * gw[i]; 
+    }
+    
+    ASSERT_NEAR(nelec, 10.0, 1.0e-6); 
 }
