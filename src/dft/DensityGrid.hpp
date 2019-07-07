@@ -11,10 +11,12 @@
 
 #include <cstdint>
 #include <ostream>
+#include <vector>
 
 #include "MemBlock2D.hpp"
 #include "DensityGridType.hpp"
 #include "XCFuncType.hpp"
+#include "MolecularGrid.hpp"
 
 /**
  Class CDensityGrid class implements density grid.
@@ -117,6 +119,13 @@ public:
     void zero();
     
     /**
+     Reduces number of grid points by slicing off all grid points beoynd specific number of grid points.
+
+     @param nGridPoints the number of grid points. 
+     */
+    void slice(const int32_t nGridPoints);
+    
+    /**
      Gets number of grid points in density grid object.
      
      @return the number of grid points.
@@ -211,6 +220,20 @@ public:
     double* mixedDensityGradient(const int32_t iDensityMatrix);
     
     /**
+     Sets vectors of screened density and molecular grids for each density matrix in density grid object.
+     NOTE: This method is exclusive to dengrid::ab type.
+
+     @param densityGrids the vector of density grid objects.
+     @param molecularGrids the vector of molecular grid objects.
+     @param densityThreshold the screening threshold for density values.
+     @param xcFuncType the type of exchange-correlation functional.
+     */
+    void setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
+                                std::vector<CMolecularGrid>& molecularGrids,
+                          const double                       densityThreshold,
+                          const xcfun                        xcFuncType) const;
+    
+    /**
      Converts density grid object to text and insert it into output text
      stream.
      
@@ -219,6 +242,5 @@ public:
      */
     friend std::ostream& operator<<(std::ostream& output, const CDensityGrid& source);
 };
-
 
 #endif /* DensityGrid_hpp */

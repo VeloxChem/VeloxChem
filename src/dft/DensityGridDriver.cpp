@@ -12,6 +12,7 @@
 
 #include "GenFunc.hpp"
 #include "OMPTasks.hpp"
+#include "MpiFunc.hpp"
 #include "AngularMomentum.hpp"
 #include "GtoFuncForLDA.hpp"
 
@@ -26,8 +27,6 @@ CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
 
     _thresholdOfDensity = 1.0e-13;
 
-    _thresholdOfPrimGTOs = 1.0e-15;
-
     _runMode = execmode::cpu;
 }
 
@@ -36,15 +35,15 @@ CDensityGridDriver::~CDensityGridDriver()
 }
 
 CDensityGrid
-CDensityGridDriver::generate(const CAODensityMatrix& density,
+CDensityGridDriver::generate(const CAODensityMatrix& aoDensityMatrix,
                              const CMolecule&        molecule,
                              const CMolecularBasis&  basis,
-                             const CMolecularGrid&   molGrid,
+                             const CMolecularGrid&   molecularGrid,
                              const xcfun             xcFunctional)
 {
     // initialize density grid
     
-    CDensityGrid dgrid(molGrid.getNumberOfGridPoints(), density.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab);
+    CDensityGrid dgrid(molecularGrid.getNumberOfGridPoints(), aoDensityMatrix.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab);
     
     dgrid.zero(); 
     
@@ -52,7 +51,7 @@ CDensityGridDriver::generate(const CAODensityMatrix& density,
 
     if (_runMode == execmode::cpu)
     {
-        _genDensityGridOnCPU(dgrid, density, molecule, basis, molGrid, xcFunctional);
+        _genDensityGridOnCPU(dgrid, aoDensityMatrix, molecule, basis, molecularGrid, xcFunctional);
     }
 
     // execution mode: CPU/GPU
@@ -66,18 +65,18 @@ CDensityGridDriver::generate(const CAODensityMatrix& density,
 }
 
 void
-CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid, 
+CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
                                          const CAODensityMatrix& density,
                                          const CMolecule&        molecule,
                                          const CMolecularBasis&  basis,
-                                         const CMolecularGrid&   molGrid,
+                                         const CMolecularGrid&   molecularGrid,
                                          const xcfun             xcFunctional)
 {
     // set up OMP tasks
 
     COMPTasks omptaks(5);
 
-    omptaks.set(molGrid.getNumberOfGridPoints());
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
 
     auto ntasks = omptaks.getNumberOfTasks();
 
@@ -87,11 +86,11 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid,
 
     // set up molecular grid data
 
-    auto mgx = molGrid.getCoordinatesX();
+    auto mgx = molecularGrid.getCoordinatesX();
 
-    auto mgy = molGrid.getCoordinatesY();
+    auto mgy = molecularGrid.getCoordinatesY();
 
-    auto mgz = molGrid.getCoordinatesZ();
+    auto mgz = molecularGrid.getCoordinatesZ();
 
     // create GTOs container
 
@@ -103,7 +102,7 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid,
     
     // set up poinet to density grid
     
-    auto dgridptr = &denGrid;
+    auto dgridptr = &densityGrid;
 
     // generate density on grid points
 
@@ -218,7 +217,7 @@ CDensityGridDriver::_compDensityForGtoBlocks(      CDensityGrid*     densityGrid
     
     // density type: restricted or unrestricted
     
-    bool isrestden = (aoDensityMatrix->getDensityType() == denmat::unrest) ? false : true;
+    bool isrest = aoDensityMatrix->isRestricted();
     
     for (int32_t i = 0; i < braGtoBlock.getNumberOfContrGtos(); i++)
     {
@@ -232,7 +231,7 @@ CDensityGridDriver::_compDensityForGtoBlocks(      CDensityGrid*     densityGrid
                 _compGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
                                      ketGtoBlock, j, xcFunctional);
                 
-                _addGtosPairContribution(densityGrid, denpair, isrestden, bspherbuff, kspherbuff, gridOffset, xcFunctional);
+                _addGtosPairContribution(densityGrid, denpair, isrest, bspherbuff, kspherbuff, gridOffset, xcFunctional);
             }
         }
     }

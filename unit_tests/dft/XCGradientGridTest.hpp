@@ -6,17 +6,17 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#ifndef DensityGridDriverTest_hpp
-#define DensityGridDriverTest_hpp
+#ifndef XCGradientGridTest_hpp
+#define XCGradientGridTest_hpp
 
 #include "gtest/gtest.h"
 
-class CDensityGridDriverTest : public ::testing::Test
+class CXCGradientGridTest : public ::testing::Test
 {
 protected:
-    CDensityGridDriverTest() {};
+    CXCGradientGridTest() {};
     
-    virtual ~CDensityGridDriverTest() {};
+    virtual ~CXCGradientGridTest() {};
 };
 
-#endif /* DensityGridDriverTest_hpp */
+#endif /* XCGradientGridTest_hpp */

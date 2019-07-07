@@ -82,6 +82,15 @@ CMolecularGrid::operator!=(const CMolecularGrid& other) const
     return !(*this == other);
 }
 
+void
+CMolecularGrid::slice(const int32_t nGridPoints)
+{
+    if (nGridPoints < getNumberOfGridPoints())
+    {
+        _gridPoints = _gridPoints.slice(0, nGridPoints); 
+    }
+}
+
 int32_t
 CMolecularGrid::getNumberOfGridPoints() const
 {
@@ -94,8 +103,20 @@ CMolecularGrid::getCoordinatesX() const
     return _gridPoints.data(0);
 }
 
+double*
+CMolecularGrid::getCoordinatesX()
+{
+    return _gridPoints.data(0);
+}
+
 const double*
 CMolecularGrid::getCoordinatesY() const
+{
+    return _gridPoints.data(1);
+}
+
+double*
+CMolecularGrid::getCoordinatesY()
 {
     return _gridPoints.data(1);
 }
@@ -106,8 +127,20 @@ CMolecularGrid::getCoordinatesZ() const
     return _gridPoints.data(2);
 }
 
+double*
+CMolecularGrid::getCoordinatesZ()
+{
+    return _gridPoints.data(2);
+}
+
 const double*
 CMolecularGrid::getWeights() const
+{
+    return _gridPoints.data(3);
+}
+
+double*
+CMolecularGrid::getWeights()
 {
     return _gridPoints.data(3);
 }

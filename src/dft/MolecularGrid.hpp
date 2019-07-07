@@ -92,6 +92,14 @@ class CMolecularGrid
      @return true if molecular grid objects are not equal, false otherwise.
      */
     bool operator!=(const CMolecularGrid& other) const;
+    
+    
+    /**
+     Reduces size of molecular grid by slicing all grid points beoynd given number of grid points.
+
+     @param nGridPoints the number of grid points.
+     */
+    void slice(const int32_t nGridPoints);
 
     /**
      Gets number of grid points in molecular grid object.
@@ -103,30 +111,58 @@ class CMolecularGrid
     /**
      Gets Cartesian X coordinates of grid points in molecular grid object.
 
-     @return he pointer to Cartesian X coordinates of grid points.
+     @return the constant pointer to Cartesian X coordinates of grid points.
      */
     const double* getCoordinatesX() const;
+    
+    /**
+     Gets Cartesian X coordinates of grid points in molecular grid object.
+     
+     @return the pointer to Cartesian X coordinates of grid points.
+     */
+    double* getCoordinatesX();
 
     /**
      Gets Cartesian Y coordinates of grid points in molecular grid object.
 
-     @return the pointer to Cartesian Y coordinates of grid points.
+     @return the constant  pointer to Cartesian Y coordinates of grid points.
      */
     const double* getCoordinatesY() const;
+    
+    /**
+     Gets Cartesian Y coordinates of grid points in molecular grid object.
+     
+     @return the pointer to Cartesian Y coordinates of grid points.
+     */
+    double* getCoordinatesY();
 
     /**
      Gets Cartesian Z coordinates of grid points in molecular grid object.
 
-     @return the pointer to Cartesian Z coordinates of grid points.
+     @return the constant pointer to Cartesian Z coordinates of grid points.
      */
     const double* getCoordinatesZ() const;
+    
+    /**
+     Gets Cartesian Z coordinates of grid points in molecular grid object.
+     
+     @return the pointer to Cartesian Z coordinates of grid points.
+     */
+    double* getCoordinatesZ();
 
     /**
      Gets weights of grid points in molecular grid object.
 
-     @return the pointer to weights of grid points.
+     @return the constant pointer to weights of grid points.
      */
     const double* getWeights() const;
+    
+    /**
+     Gets weights of grid points in molecular grid object.
+     
+     @return the pointer to weights of grid points.
+     */
+    double* getWeights();
 
     /**
      Distributes grid points data across a molecular grid objects associated

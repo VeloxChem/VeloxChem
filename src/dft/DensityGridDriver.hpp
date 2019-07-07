@@ -54,11 +54,6 @@ class CDensityGridDriver
     double _thresholdOfDensity;
 
     /**
-     The threshold of primitive GTOs screening.
-     */
-    double _thresholdOfPrimGTOs;
-
-    /**
      The execution mode of grid driver object.
      */
     execmode _runMode;
@@ -67,18 +62,18 @@ class CDensityGridDriver
      Creates density grid on each MPI node within domain of MPI communicator.
      Density grid points are generated using only CPUs.
 
-     @param denGrid the density grid object. 
-     @param density the AO density matrices.
+     @param densityGrid the density grid object.
+     @param aoDensityMatrix the AO density matrices.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param molGrid the distributed molecular grid.
+     @param molecularGrid the distributed molecular grid.
      @param xcFunctional the exchange-correlation functional type.
      */
-    void _genDensityGridOnCPU(      CDensityGrid&     denGrid,
-                              const CAODensityMatrix& density,
+    void _genDensityGridOnCPU(      CDensityGrid&     densityGrid,
+                              const CAODensityMatrix& aoDensityMatrix,
                               const CMolecule&        molecule,
                               const CMolecularBasis&  basis,
-                              const CMolecularGrid&   molGrid,
+                              const CMolecularGrid&   molecularGrid,
                               const xcfun             xcFunctional);
 
     /**
@@ -230,17 +225,17 @@ class CDensityGridDriver
      exchange-correlation functional. Density grid generation is distributed
      within domain of MPI communicator.
 
-     @param density the AO density matrix.
+     @param aoDensityMatrix the AO density matrix.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param molGrid the molecular grid.
+     @param molecularGrid the molecular grid.
      @param xcFunctional the type of exchange-correlation functional.
      @return the density grid object.
      */
-    CDensityGrid generate(const CAODensityMatrix& density,
+    CDensityGrid generate(const CAODensityMatrix& aoDensityMatrix,
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
-                          const CMolecularGrid&   molGrid,
+                          const CMolecularGrid&   molecularGrid,
                           const xcfun             xcFunctional);
 };
 

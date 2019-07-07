@@ -124,6 +124,15 @@ CDensityGrid::zero()
     _densityValues.zero(); 
 }
 
+void
+CDensityGrid::slice(const int32_t nGridPoints)
+{
+    if (nGridPoints < getNumberOfGridPoints())
+    {
+        _densityValues = _densityValues.slice(0, nGridPoints);
+    }
+}
+
 int32_t
 CDensityGrid::getNumberOfGridPoints() const
 {
@@ -207,7 +216,7 @@ CDensityGrid::betaDensityGradient(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
     
-    if (_gridType == dengrid::lima) return _densityValues.data(1);
+    if (_gridType == dengrid::lima) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
     
     return nullptr;
 }
@@ -226,6 +235,85 @@ CDensityGrid::mixedDensityGradient(const int32_t iDensityMatrix)
     if (_gridType == dengrid::ab) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
     
     return nullptr;
+}
+
+void
+CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
+                                     std::vector<CMolecularGrid>& molecularGrids,
+                               const double                       densityThreshold,
+                               const xcfun                        xcFuncType) const
+{
+    // valid only for dengrid::ab
+    
+    if (_gridType != dengrid::ab) return;
+    
+    // set up number of grid points
+    
+    auto npoints = getNumberOfGridPoints();
+    
+    // local density approximation
+    
+    if (xcFuncType == xcfun::lda)
+    {
+        for (int32_t i = 0; i < _nDensityMatrices; i++)
+        {
+            // set up pointers to source density
+            
+            auto srhoa = alphaDensity(i);
+            
+            auto srhob = betaDensity(i);
+            
+            // set up pointers to destination density
+            
+            auto drhoa = densityGrids[i].alphaDensity(i);
+            
+            auto drhob = densityGrids[i].betaDensity(i);
+            
+            // set up pointers to molecular grid data
+            
+            auto gx = molecularGrids[i].getCoordinatesX();
+            
+            auto gy = molecularGrids[i].getCoordinatesY();
+            
+            auto gz = molecularGrids[i].getCoordinatesZ();
+            
+            auto gw = molecularGrids[i].getWeights();
+            
+            auto ipoint = 0;
+            
+            for (int32_t j = 0; j < npoints; j++)
+            {
+                if (std::fabs(srhoa[j] + srhob[i]) > densityThreshold)
+                {
+                    // density data
+                    
+                    drhoa[ipoint] = srhoa[j];
+                    
+                    drhob[ipoint] = srhob[j];
+                    
+                    // molecula grid data
+                    
+                    gx[ipoint] = gx[j];
+                    
+                    gy[ipoint] = gy[j];
+                    
+                    gz[ipoint] = gz[j];
+                    
+                    gw[ipoint] = gw[j];
+                    
+                    // update counter
+                    
+                    ipoint++;
+                }
+            }
+            
+            // slice grids
+            
+            densityGrids[i].slice(ipoint);
+            
+            molecularGrids[i].slice(ipoint);
+        }
+    }
 }
 
 std::ostream&
