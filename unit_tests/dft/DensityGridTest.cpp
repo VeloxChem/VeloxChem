@@ -149,6 +149,21 @@ TEST_F(CDensityGridTest, GetNumberOfDensityMatrices)
     ASSERT_EQ(3, dgridb.getNumberOfDensityMatrices()); 
 }
 
+TEST_F(CDensityGridTest, GetDensityGridType)
+{
+    CDensityGrid dgrida(5, 1, xcfun::lda, dengrid::ab);
+    
+    ASSERT_EQ(dgrida.getDensityGridType(), dengrid::ab);
+    
+    CDensityGrid dgridb(5, 1, xcfun::lda, dengrid::lima);
+    
+    ASSERT_EQ(dgridb.getDensityGridType(), dengrid::lima);
+    
+    CDensityGrid dgridc(5, 1, xcfun::lda, dengrid::limb);
+    
+    ASSERT_EQ(dgridc.getDensityGridType(), dengrid::limb);
+}
+
 TEST_F(CDensityGridTest, AlphaDensityConstant)
 {
     CMemBlock2D<double> mblockab({1.0, 2.0, 3.0, 6.0}, 2, 2);

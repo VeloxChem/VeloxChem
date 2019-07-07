@@ -145,6 +145,12 @@ CDensityGrid::getNumberOfDensityMatrices() const
     return _nDensityMatrices;
 }
 
+dengrid
+CDensityGrid::getDensityGridType() const
+{
+    return _gridType; 
+}
+
 const double*
 CDensityGrid::alphaDensity(const int32_t iDensityMatrix) const
 {

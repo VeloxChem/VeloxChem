@@ -140,6 +140,13 @@ public:
     int32_t getNumberOfDensityMatrices() const;
     
     /**
+     Gets type of density grid type object.
+
+     @return the type of density grid. 
+     */
+    dengrid getDensityGridType() const;
+    
+    /**
      Gets constant pointer to alpha density values.
      
      @param iDensityMatrix the index of density matrix.
