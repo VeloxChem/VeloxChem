@@ -69,13 +69,12 @@ public:
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
-     @return the tuple <number of electrons, exchange-correlation energy>.
      */
-    std::tuple<double, double> integrate(const CAODensityMatrix& aoDensityMatrix,
-                                         const CMolecule&        molecule,
-                                         const CMolecularBasis&  basis,
-                                         const CMolecularGrid&   molecularGrid,
-                                         const std::string&      xcFuncLabel) const;
+    void integrate(const CAODensityMatrix& aoDensityMatrix,
+                   const CMolecule&        molecule,
+                   const CMolecularBasis&  basis,
+                   const CMolecularGrid&   molecularGrid,
+                   const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCIntegrator_hpp */

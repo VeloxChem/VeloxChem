@@ -10,6 +10,7 @@
 
 #include "MpiFunc.hpp"
 #include "DensityGridDriver.hpp"
+#include "FunctionalParser.hpp"
 
 CXCIntegrator::CXCIntegrator(MPI_Comm comm)
 {
@@ -27,26 +28,22 @@ CXCIntegrator::~CXCIntegrator()
     
 }
 
-std::tuple<double, double>
+void 
 CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
                          const CMolecule&        molecule,
                          const CMolecularBasis&  basis,
                          const CMolecularGrid&   molecularGrid,
                          const std::string&      xcFuncLabel) const
 {
-    // initialize number of electrons
+    // parse exchange-correlation functional data
     
-    double felec = 0.0;
-    
-    // initialize exchange-correlation functional
-    
-    double xcene = 0.0;
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
     
     // generate reference density grid
     
     CDensityGridDriver dgdrv(_locComm);
     
-    auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, xcfun::lda); // FIX ME: generic functional
+    auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
     
     // set up number of density matrices
     
@@ -58,17 +55,28 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         
         std::vector<CMolecularGrid> mgrids(ndmat, molecularGrid);
         
-        std::vector<CDensityGrid> dgrids(ndmat, CDensityGrid(molecularGrid.getNumberOfGridPoints(), 1, xcfun::lda, dengrid::ab));
+        std::vector<CDensityGrid> dgrids(ndmat, CDensityGrid(molecularGrid.getNumberOfGridPoints(), 1,
+                                                             fvxc.getFunctionalType(), dengrid::ab));
         
         // generate screened density and molecular grids
         
-        refdengrid.setScreenedGrids(dgrids, mgrids, _thresholdOfDensity, xcfun::lda); 
+        refdengrid.setScreenedGrids(dgrids, mgrids, _thresholdOfDensity, fvxc.getFunctionalType());
         
         // perform integration for spin restricted densities
         
         for (int32_t i = 0; i < ndmat; i++)
         {
-            printf("Number of grid points in grid %i: %i -> %i", i, molecularGrid.getNumberOfGridPoints(), mgrids[i].getNumberOfGridPoints()); 
+            // allocate XC gradient grid
+            
+            CXCGradientGrid vxcgrid (mgrids[i].getNumberOfGridPoints(), dgrids[i].getDensityGridType(), fvxc.getFunctionalType());
+            
+            // compute exchange-correlation functional first derrivatives
+            
+            fvxc.compute(vxcgrid, dgrids[i]);
+            
+            // compute Kohn-Sham matrix
+            
+            
         }
     }
     else
@@ -77,8 +85,4 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         
         // FIX ME: implement partitioning and screening for density grid
     }
-    
-    // computes functional and it's first derrivates for density grid
-    
-    return std::make_tuple(felec, xcene);
 }
