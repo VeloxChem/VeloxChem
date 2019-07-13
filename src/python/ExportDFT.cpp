@@ -171,7 +171,7 @@ export_dft(py::module& m)
 
     // CXCIntegrator class
 
-    py::class_<CXCIntegrator, std::shared_ptr<CGridDriver>>(m, "XCIntegrator")
+    py::class_<CXCIntegrator, std::shared_ptr<CXCIntegrator>>(m, "XCIntegrator")
         .def(py::init(&CXCIntegrator_create))
         .def("integrate", &CXCIntegrator::integrate);
     
