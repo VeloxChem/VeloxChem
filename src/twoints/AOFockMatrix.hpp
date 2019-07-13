@@ -125,7 +125,7 @@ public:
     bool operator!=(const CAOFockMatrix& other) const;
     
     /**
-     Sets type of specific fock matrix.
+     Sets type of specific Fock matrix.
 
      @param fockType the type of Fock matrix.
      @param beta requires Fock matrix with beta spin.
@@ -133,7 +133,18 @@ public:
      */
     void setFockType(const fockmat& fockType,
                      const int32_t  iFockMatrix,
-                     const bool     beta=false); 
+                     const bool     beta=false);
+    
+    /**
+     Sets scaling factor of exact exchange of specific Fock matrix.
+
+     @param factor the scaling factor of exact exchange.
+     @param iFockMatrix the index of Fock matrix.
+     @param beta requires Fock matrix with beta spin.
+     */
+    void setFockScaleFactor(const double  factor,
+                            const int32_t iFockMatrix,
+                            const bool    beta=false);
     
     /**
      Resets all elements of AO Fock matrix to zero.

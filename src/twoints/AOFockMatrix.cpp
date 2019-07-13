@@ -232,6 +232,25 @@ CAOFockMatrix::setFockType(const fockmat& fockType,
 }
 
 void
+CAOFockMatrix::setFockScaleFactor(const double  factor,
+                                  const int32_t iFockMatrix,
+                                  const bool    beta)
+{
+    if (isRestricted())
+    {
+        _scaleFactors[iFockMatrix] = factor;
+    }
+    else if (!beta)
+    {
+        _scaleFactors[2 * iFockMatrix] = factor;
+    }
+    else
+    {
+        _scaleFactors[2 * iFockMatrix + 1] = factor;
+    }
+}
+
+void
 CAOFockMatrix::zero()
 {
     for (size_t i = 0; i < _fockMatrices.size(); i++)
