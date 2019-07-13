@@ -36,6 +36,21 @@ CAOKohnShamMatrix::CAOKohnShamMatrix(const std::vector<CDenseMatrix>& xcMatrices
     
 }
 
+CAOKohnShamMatrix::CAOKohnShamMatrix(const int32_t nRows,
+                                     const int32_t nColumns,
+                                     const bool    xcRestricted)
+{
+    _xcRestricted = xcRestricted;
+    
+    _xcElectrons = 0.0;
+    
+    _xcEnergy = 0.0;
+    
+    _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
+    
+    if (!_xcRestricted) _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
+}
+
 CAOKohnShamMatrix::CAOKohnShamMatrix(const CAOKohnShamMatrix& source)
 
     : _xcMatrices(source._xcMatrices)

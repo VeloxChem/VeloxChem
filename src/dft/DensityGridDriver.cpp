@@ -14,7 +14,7 @@
 #include "OMPTasks.hpp"
 #include "MpiFunc.hpp"
 #include "AngularMomentum.hpp"
-#include "GtoFuncForLDA.hpp"
+#include "GtoFunc.hpp"
 
 
 CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
@@ -191,7 +191,7 @@ CDensityGridDriver::_compDensityForGtoBlocks(      CDensityGrid*     densityGrid
     
     // set up Cartesian GTOs buffers
     
-    auto nvcomp = _getNumberOfXCComponents(xcFunctional);
+    auto nvcomp = xcfun_components(xcFunctional);
     
     auto bncart = angmom::to_CartesianComponents(bang);
     
@@ -221,101 +221,19 @@ CDensityGridDriver::_compDensityForGtoBlocks(      CDensityGrid*     densityGrid
     
     for (int32_t i = 0; i < braGtoBlock.getNumberOfContrGtos(); i++)
     {
-        _compGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                             braGtoBlock, i, xcFunctional);
+        gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                                       braGtoBlock, i, xcFunctional);
         
         for (int32_t j = 0; j < ketGtoBlock.getNumberOfContrGtos(); j++)
         {
             if (_setDensityPair(denpair, aoDensityMatrix, braGtoBlock, ketGtoBlock, symbk, i, j))
             {
-                _compGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                     ketGtoBlock, j, xcFunctional);
+                gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                                               ketGtoBlock, j, xcFunctional);
                 
                 _addGtosPairContribution(densityGrid, denpair, isrest, bspherbuff, kspherbuff, gridOffset, xcFunctional);
             }
         }
-    }
-}
-
-int32_t
-CDensityGridDriver::_getNumberOfXCComponents(const xcfun xcFunctional) const
-{
-    if (xcFunctional == xcfun::lda) return 1;
-
-    if (xcFunctional == xcfun::gga) return 4;
-
-    if (xcFunctional == xcfun::mgga) return 5;
-
-    return 0;
-}
-
-void
-CDensityGridDriver::_compGtoValuesOnGrid(      CMemBlock2D<double>& spherGtoGridBuffer,
-                                               CMemBlock2D<double>& cartGtoGridBuffer,
-                                         const double*              gridCoordinatesX,
-                                         const double*              gridCoordinatesY,
-                                         const double*              gridCoordinatesZ,
-                                         const int32_t              gridOffset,
-                                         const CGtoBlock&           gtoBlock,
-                                         const int32_t              iContrGto,
-                                         const xcfun                xcFunctional) const
-{
-    // set up angular momentum
-    
-    auto mang = gtoBlock.getAngularMomentum();
-    
-    // local density approximation
-    
-    if (xcFunctional == xcfun::lda)
-    {
-        switch (mang)
-        {
-            // s-type GTOs on grid
-                
-            case 0:
-                ldarec::compGtoValuesForS(spherGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                          gtoBlock, iContrGto);
-                break;
-                
-            // p-type GTOs on grid
-                
-            case 1:
-                ldarec::compGtoValuesForP(spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                          gtoBlock, iContrGto);
-                break;
-                
-            // d-type GTOs on grid
-                
-            case 2:
-                ldarec::compGtoValuesForD(spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                          gtoBlock, iContrGto);
-                break;
-                
-            // FIX ME: implement l > 2 cases
-                
-            default:
-                break;
-        }
-        
-        return;
-    }
-    
-    // generalized gradient approximation
-    
-    if (xcFunctional == xcfun::gga)
-    {
-        // FIX ME: GGA case
-        
-        return;
-    }
-    
-    // meta generalized gradient approximation
-    
-    if (xcFunctional == xcfun::mgga)
-    {
-        // FIX ME: MGGA case
-        
-        return;
     }
 }
 

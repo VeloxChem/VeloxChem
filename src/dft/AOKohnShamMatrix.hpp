@@ -65,6 +65,17 @@ public:
                       const double                     xcEnergy);
     
     /**
+    Creates a AO Kohn-Sham matrix object.
+    
+    @param nRows the number of rows in exchange-correlation matrices.
+    @param nColumns the numner of columns in exchange-correlation matrices.
+    @param xcRestricted the flag indicating restricted on unrestricted form of Kohn-Sham matrix.
+    */
+    CAOKohnShamMatrix(const int32_t nRows,
+                      const int32_t nColumns,
+                      const bool    xcRestricted);
+    
+    /**
      Creates a AO Kohn-Sham matrix object.
      
      @param aoDensityMatrix the AO density matrix.

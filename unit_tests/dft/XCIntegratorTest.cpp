@@ -11,8 +11,12 @@
 #include "GridDriver.hpp"
 #include "XCIntegrator.hpp"
 #include "MoleculeSetter.hpp"
+#include "AOFockMatrix.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "AODensityMatrixSetter.hpp"
+#include "DenseLinearAlgebra.hpp"
+
+
 
 TEST_F(CXCIntegratorTest, IntegrateKohnSham)
 {
@@ -30,5 +34,13 @@ TEST_F(CXCIntegratorTest, IntegrateKohnSham)
     
     CXCIntegrator xcdrv(MPI_COMM_WORLD);
     
-    xcdrv.integrate(dmat, mh2o, mbas, mgrid, std::string("LDA"));
+    auto ksmat = xcdrv.integrate(dmat, mh2o, mbas, mgrid, std::string("SLATER"));
+    
+    ASSERT_NEAR(ksmat.getNumberOfElectrons(), 10.0, 1.0e-6);
+    
+    //std::cout << ksmat << std::endl;
+    
+    //auto ksene = 2.0 * denblas::trace(ksmat.getReferenceToKohnSham(), dmat.getReferenceToDensity(0));
+    
+    //std::cout << ksene << std::endl;
 }

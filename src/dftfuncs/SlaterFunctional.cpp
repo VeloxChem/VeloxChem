@@ -33,9 +33,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
     {
         // functional prefactors
         
-        double frg = std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
+        double frg = -std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
         
-        double fre = -0.75 * frg;
+        double fre = 0.75 * frg;
         
         double fp = 1.0 / 3.0;
         
@@ -78,9 +78,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
     {
         // functional prefactors
         
-        double frg = std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
+        double frg = -std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
         
-        double fre = -0.75 * frg;
+        double fre = 0.75 * frg;
         
         double fp = 1.0 / 3.0;
         
@@ -115,9 +115,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
     {
         // functional prefactors
         
-        double frg = std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
+        double frg = -std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
         
-        double fre = -0.75 * frg;
+        double fre = 0.75 * frg;
         
         double fp = 1.0 / 3.0;
         
