@@ -125,7 +125,6 @@ export_dft(py::module& m)
 
     py::class_<CAOKohnShamMatrix, std::shared_ptr<CAOKohnShamMatrix>>(m, "AOKohnShamMatrix")
         .def(py::init<>())
-        .def(py::init<const CAODensityMatrix&>())
         .def(py::init<const int32_t, const int32_t, const bool>())
         .def("__str__", &CAOKohnShamMatrix_str)
         .def("get_reference", &CAOKohnShamMatrix::getReferenceToKohnSham, py::arg(), py::arg("beta") = false)
