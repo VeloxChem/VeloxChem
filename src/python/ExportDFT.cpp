@@ -30,6 +30,14 @@ namespace vlx_dft {  // vlx_dft namespace
 
 // Exports classes/functions in src/dft to python
 
+// Helper function for CAOKohnShamMatrix constructor
+
+static std::shared_ptr<CAOKohnShamMatrix>
+CAOKohnShamMatrix_from_dimensions(const int32_t nrows, const int32_t ncols, const bool is_rest)
+{
+    return std::shared_ptr<CAOKohnShamMatrix>(new CAOKohnShamMatrix(nrows, ncols, is_rest));
+}
+    
 // Helper function for printing CAOKohnShamkMatrix
 
 static std::string
@@ -125,7 +133,7 @@ export_dft(py::module& m)
 
     py::class_<CAOKohnShamMatrix, std::shared_ptr<CAOKohnShamMatrix>>(m, "AOKohnShamMatrix")
         .def(py::init<>())
-        .def(py::init<const int32_t, const int32_t, const bool>())
+        .def(py::init(&CAOKohnShamMatrix_from_dimensions))
         .def("__str__", &CAOKohnShamMatrix_str)
         .def("get_reference", &CAOKohnShamMatrix::getReferenceToKohnSham, py::arg(), py::arg("beta") = false)
         .def("reduce_sum", &CAOKohnShamMatrix_reduce_sum)
