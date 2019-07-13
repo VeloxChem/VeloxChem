@@ -184,6 +184,16 @@ public:
     void addOneElectronMatrix(const CDenseMatrix& oneElectronMatrix,
                               const int32_t       iFockMatrix);
     
+    
+    /**
+     Scales specific Fock matrix by factor.
+
+     @param factor the scaling factor.
+     @param iFockMatrix the index of Fock matrix.
+     */
+    void scale(const double  factor,
+               const int32_t iFockMatrix);
+    
     /**
      Reduces AO Fock matrix objects from all MPI process within domain of MPI
      communicator into AO Fock matrix object on master node by summing them.
