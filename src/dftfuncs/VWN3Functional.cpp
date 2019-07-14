@@ -40,7 +40,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         double pq = std::sqrt(4.0 * pc - pb * pb);
         
-        double pxf0 = px0 * px0 + pc * px0 + pc;
+        double pxf0 = px0 * px0 + pb * px0 + pc;
         
         double pyf0 = pq / (pb + 2.0 * px0);
         
