@@ -13,6 +13,7 @@ from .veloxchemlib import szblock
 from .veloxchemlib import molorb
 from .veloxchemlib import rotatory_strength_in_cgs
 from .qqscheme import get_qq_scheme
+from .qqscheme import get_qq_type
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
 
@@ -88,19 +89,19 @@ class TDAExciDriver:
         """
 
         if 'nstates' in settings:
-            self.nstates = settings['nstates']
+            self.nstates = int(settings['nstates'])
         if 'spin' in settings:
             self.triplet = (settings['spin'][0].upper() == 'T')
 
         if 'eri_thresh' in settings:
-            self.eri_thresh = settings['eri_thresh']
+            self.eri_thresh = float(settings['eri_thresh'])
         if 'qq_type' in settings:
-            self.qq_type = settings['qq_type']
+            self.qq_type = settings['qq_type'].upper()
 
         if 'conv_thresh' in settings:
-            self.conv_thresh = settings['conv_thresh']
+            self.conv_thresh = float(settings['conv_thresh'])
         if 'max_iter' in settings:
-            self.max_iter = settings['max_iter']
+            self.max_iter = int(settings['max_iter'])
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -126,6 +127,9 @@ class TDAExciDriver:
             mo_vir = scf_tensors['C'][:, nocc:]
         else:
             mol_orbs = MolecularOrbitals()
+
+        if self.rank == mpi_master():
+            self.print_header()
 
         # set start time
 
@@ -538,6 +542,36 @@ class TDAExciDriver:
             rotatory_strengths[s] *= rotatory_strength_in_cgs()
 
         return rotatory_strengths
+
+    def print_header(self):
+        """
+        Prints TDA driver setup header to output stream.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header("TDA Driver Setup")
+        self.ostream.print_header(18 * "=")
+        self.ostream.print_blank()
+
+        str_width = 60
+
+        cur_str = "Number of States          : " + str(self.nstates)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "Max. Number of Iterations : " + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "Convergence Threshold     : " + \
+            "{:.1e}".format(self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "ERI Screening Scheme      : " + get_qq_type(self.qq_type)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "ERI Screening Threshold   : " + \
+            "{:.1e}".format(self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
+        self.ostream.flush()
 
     def print_iter_data(self, iteration):
         """

@@ -11,6 +11,7 @@ from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import swap_xy
 from .qqscheme import get_qq_scheme
+from .qqscheme import get_qq_type
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_frequencies
 
@@ -166,6 +167,9 @@ class LinearResponseSolver:
                 'new_trials': [0.0],
             }
             timing_t0 = tm.time()
+
+        if self.rank == mpi_master():
+            self.print_header()
 
         self.start_time = tm.time()
 
@@ -328,6 +332,33 @@ class LinearResponseSolver:
             return lrs
         else:
             return None
+
+    def print_header(self):
+        """
+        Prints linear response solver setup header to output stream.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header("Linear Response Solver Setup")
+        self.ostream.print_header(30 * "=")
+        self.ostream.print_blank()
+
+        str_width = 60
+
+        cur_str = "Max. Number of Iterations : " + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "Convergence Threshold     : " + \
+            "{:.1e}".format(self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "ERI Screening Scheme      : " + get_qq_type(self.qq_type)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "ERI Screening Threshold   : " + \
+            "{:.1e}".format(self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
+        self.ostream.flush()
 
     def print_iteration(self, relative_residual_norm, converged, nvs):
         """
