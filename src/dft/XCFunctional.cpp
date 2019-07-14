@@ -19,6 +19,8 @@ CXCFunctional::CXCFunctional()
     , _fractionOfExactExchange(0.0)
 
     , _primitiveFunctionals(std::vector<CPrimitiveFunctional>())
+
+    , _weightsOfPrimitiveFunctionals(std::vector<double>())
 {
     
 }
@@ -26,7 +28,8 @@ CXCFunctional::CXCFunctional()
 CXCFunctional::CXCFunctional(const std::string&                       label,
                              const xcfun                              xcFuncType,
                              const double                             fractionOfExactExchange,
-                             const std::vector<CPrimitiveFunctional>& primitiveFunctionals)
+                             const std::vector<CPrimitiveFunctional>& primitiveFunctionals,
+                             const std::vector<double>&               weightsOfPrimitiveFunctionals)
 
     : _label(label)
 
@@ -35,6 +38,8 @@ CXCFunctional::CXCFunctional(const std::string&                       label,
     , _fractionOfExactExchange(fractionOfExactExchange)
 
     , _primitiveFunctionals(primitiveFunctionals)
+
+    , _weightsOfPrimitiveFunctionals(weightsOfPrimitiveFunctionals)
 {
     
 }
@@ -48,6 +53,8 @@ CXCFunctional::CXCFunctional(const CXCFunctional& source)
     , _fractionOfExactExchange(source._fractionOfExactExchange)
 
     , _primitiveFunctionals(source._primitiveFunctionals)
+
+    , _weightsOfPrimitiveFunctionals(source._weightsOfPrimitiveFunctionals)
 {
     
 }
@@ -61,6 +68,8 @@ CXCFunctional::CXCFunctional(CXCFunctional&& source) noexcept
     , _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
 
     , _primitiveFunctionals(std::move(source._primitiveFunctionals))
+
+    , _weightsOfPrimitiveFunctionals(std::move(source._weightsOfPrimitiveFunctionals))
 {
     
 }
@@ -81,6 +90,8 @@ CXCFunctional::operator=(const CXCFunctional& source)
     _fractionOfExactExchange = source._fractionOfExactExchange;
     
     _primitiveFunctionals = source._primitiveFunctionals;
+    
+    _weightsOfPrimitiveFunctionals = source._weightsOfPrimitiveFunctionals;
 
     return *this;
 }
@@ -97,6 +108,8 @@ CXCFunctional::operator=(CXCFunctional&& source) noexcept
     _fractionOfExactExchange = std::move(source._fractionOfExactExchange);
     
     _primitiveFunctionals = std::move(source._primitiveFunctionals);
+    
+    _weightsOfPrimitiveFunctionals = std::move(source._weightsOfPrimitiveFunctionals);
 
     return *this;
 }
@@ -118,6 +131,13 @@ CXCFunctional::operator==(const CXCFunctional& other) const
     {
         if (_primitiveFunctionals[i] != other._primitiveFunctionals[i]) return false;
     }
+    
+    if (_weightsOfPrimitiveFunctionals.size() != other._weightsOfPrimitiveFunctionals.size()) return false;
+    
+    for (size_t i = 0; i < _weightsOfPrimitiveFunctionals.size(); i++)
+    {
+        if (std::fabs(_weightsOfPrimitiveFunctionals[i] - other._weightsOfPrimitiveFunctionals[i]) > 1.0e-13) return false;
+    }
 
     return true;
 }
@@ -136,7 +156,7 @@ CXCFunctional::compute(      CXCGradientGrid& xcGradientGrid,
     
     for (size_t i = 0; i < _primitiveFunctionals.size(); i++)
     {
-        _primitiveFunctionals[i].compute(xcGradientGrid, densityGrid);
+        _primitiveFunctionals[i].compute(xcGradientGrid, _weightsOfPrimitiveFunctionals[i], densityGrid);
     }
 }
 
@@ -186,6 +206,15 @@ operator<<(std::ostream& output, const CXCFunctional& source)
         output << "_primitiveFunctionals[" << i << "]: " << std::endl;
         
         output << source._primitiveFunctionals[i] << std::endl;
+    }
+    
+    output << "_weightsOfPrimitiveFunctionals: " << std::endl;
+    
+    for (size_t i = 0; i < source._weightsOfPrimitiveFunctionals.size(); i++)
+    {
+        output << "_weightsOfPrimitiveFunctionals[" << i << "]: " << std::endl;
+        
+        output << source._weightsOfPrimitiveFunctionals[i] << std::endl;
     }
 
     return output;

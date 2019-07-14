@@ -131,13 +131,14 @@ CPrimitiveFunctional::operator!=(const CPrimitiveFunctional& other) const
 
 void
 CPrimitiveFunctional::compute(      CXCGradientGrid& xcGradientGrid,
+                              const double           factor,
                               const CDensityGrid&    densityGrid) const
 {
-    if (densityGrid.getDensityGridType() == dengrid::ab) _abFirstOrderFunction(xcGradientGrid, densityGrid);
+    if (densityGrid.getDensityGridType() == dengrid::ab) _abFirstOrderFunction(xcGradientGrid, factor, densityGrid);
     
-    if (densityGrid.getDensityGridType() == dengrid::lima) _aFirstOrderFunction(xcGradientGrid, densityGrid);
+    if (densityGrid.getDensityGridType() == dengrid::lima) _aFirstOrderFunction(xcGradientGrid, factor, densityGrid);
     
-    if (densityGrid.getDensityGridType() == dengrid::limb) _bFirstOrderFunction(xcGradientGrid, densityGrid);
+    if (densityGrid.getDensityGridType() == dengrid::limb) _bFirstOrderFunction(xcGradientGrid, factor, densityGrid);
 }
 
 std::string

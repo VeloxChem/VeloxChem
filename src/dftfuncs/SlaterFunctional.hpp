@@ -34,9 +34,11 @@ namespace vxcfuncs {  // vxcfuncs namespace
     dengrid::ab case.
 
     @param xcGradientGrid the exchange-correlation gradient grid.
+    @param factor the scale factor of functional contribution.
     @param densityGrid the density grid.
     */
    void SlaterFuncGradientAB(      CXCGradientGrid& xcGradientGrid,
+                             const double           factor,
                              const CDensityGrid&    densityGrid);
     
     
@@ -45,9 +47,11 @@ namespace vxcfuncs {  // vxcfuncs namespace
      dengrid::lima case.
      
      @param xcGradientGrid the exchange-correlation gradient grid.
+     @param factor the scale factor of functional contribution.
      @param densityGrid the density grid.
      */
     void SlaterFuncGradientA(      CXCGradientGrid& xcGradientGrid,
+                             const double           factor,
                              const CDensityGrid&    densityGrid);
     
     /**
@@ -55,9 +59,11 @@ namespace vxcfuncs {  // vxcfuncs namespace
      dengrid::lima case.
     
      @param xcGradientGrid the exchange-correlation gradient grid.
+     @param factor the scale factor of functional contribution. 
      @param densityGrid the density grid.
     */
     void SlaterFuncGradientB(      CXCGradientGrid& xcGradientGrid,
+                             const double           factor,
                              const CDensityGrid&    densityGrid);
     
 }  // namespace vxcfuncs

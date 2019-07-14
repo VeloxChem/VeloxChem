@@ -46,6 +46,11 @@ class CXCFunctional
      */
     std::vector<CPrimitiveFunctional> _primitiveFunctionals;
     
+    /**
+    The vector of weights of primitive exchange-correlation functionals.
+    */
+    std::vector<double> _weightsOfPrimitiveFunctionals;
+    
 public:
     /**
      Creates an empty exchange-correlation functional object.
@@ -58,12 +63,13 @@ public:
      @param label the label of primitive exchange-correlation functional.
      @param xcFuncType the type of primitive exchange-correlation functional.
      @param fractionOfExactExchange the fraction of exact Hatree-Fock exchange.
-     
+     @param weightsOfPrimitiveFunctionals the vector of weights of primitive functionals.
      */
     CXCFunctional(const std::string&                       label,
                   const xcfun                              xcFuncType,
                   const double                             fractionOfExactExchange,
-                  const std::vector<CPrimitiveFunctional>& primitiveFunctionals);
+                  const std::vector<CPrimitiveFunctional>& primitiveFunctionals,
+                  const std::vector<double>&               weightsOfPrimitiveFunctionals);
     
     /**
      Creates a exchange-correlation functional object by copying other exchange-correlation functional object.

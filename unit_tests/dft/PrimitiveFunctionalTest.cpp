@@ -78,7 +78,7 @@ TEST_F(CPrimitiveFunctionalTest, Compute)
     
     CPrimitiveFunctional rfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    rfa.compute(xcgrid, dgrid);
+    rfa.compute(xcgrid, 1.0, dgrid);
     
     ASSERT_EQ(xcgrid, CXCGradientGrid(CMemBlock2D<double>({0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 2, 3), dengrid::ab, xcfun::lda));
 }

@@ -15,7 +15,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
     CXCFunctional
     setSlaterFunctional()
     {
-        return CXCFunctional({"Slater"}, xcfun::lda, 0.0, {setPrimitiveSlaterFunctional()});
+        return CXCFunctional({"Slater"}, xcfun::lda, 0.0, {setPrimitiveSlaterFunctional()}, {1.0});
     }
     
     CPrimitiveFunctional
@@ -29,11 +29,12 @@ namespace vxcfuncs {  // vxcfuncs namespace
     
     void
     SlaterFuncGradientAB(      CXCGradientGrid& xcGradientGrid,
+                         const double           factor,
                          const CDensityGrid&    densityGrid)
     {
         // functional prefactors
         
-        double frg = -std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
+        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
         
         double fre = 0.75 * frg;
         
@@ -74,11 +75,12 @@ namespace vxcfuncs {  // vxcfuncs namespace
     
     void
     SlaterFuncGradientA(      CXCGradientGrid& xcGradientGrid,
+                        const double           factor,
                         const CDensityGrid&    densityGrid)
     {
         // functional prefactors
         
-        double frg = -std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
+        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
         
         double fre = 0.75 * frg;
         
@@ -111,11 +113,12 @@ namespace vxcfuncs {  // vxcfuncs namespace
     
     void
     SlaterFuncGradientB(      CXCGradientGrid& xcGradientGrid,
+                        const double           factor,
                         const CDensityGrid&    densityGrid)
     {
         // functional prefactors
         
-        double frg = -std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
+        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
         
         double fre = 0.75 * frg;
         

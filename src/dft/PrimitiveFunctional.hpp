@@ -18,7 +18,7 @@
 #include "XCGradientGrid.hpp"
 #include "DensityGrid.hpp"
 
-using def_vxc_func_typ = void(CXCGradientGrid&, const CDensityGrid&);
+using def_vxc_func_typ = void(CXCGradientGrid&, const double factor, const CDensityGrid&);
 
 // using def_vxc2_func_typ = void(CXCGradientGrid&, const CDensityGrid&);
 
@@ -151,9 +151,11 @@ public:
      Computes first derivative of exchange-correlation functional for given density grid.
 
      @param xcGradientGrid the exchange-correlation gradient grid object.
+     @param factor the scaling factor of functional contribution.
      @param densityGrid the density grid object.
      */
     void compute(      CXCGradientGrid& xcGradientGrid,
+                 const double           factor,
                  const CDensityGrid&    densityGrid) const;
     
     /**

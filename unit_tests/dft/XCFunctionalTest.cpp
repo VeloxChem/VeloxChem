@@ -13,7 +13,7 @@
 
 TEST_F(CXCFunctionalTest, DefaultConstructor)
 {
-    CXCFunctional rfa({}, xcfun::undefined, 0.0, {});
+    CXCFunctional rfa({}, xcfun::undefined, 0.0, {}, {});
     
     CXCFunctional rfb;
     
@@ -26,7 +26,7 @@ TEST_F(CXCFunctionalTest, CopyConstructor)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
     CXCFunctional rfb(rfa);
     
@@ -39,9 +39,9 @@ TEST_F(CXCFunctionalTest, MoveConstructor)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
-    CXCFunctional rfb(CXCFunctional({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}));
+    CXCFunctional rfb(CXCFunctional({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0}));
     
     ASSERT_EQ(rfa, rfb);
 }
@@ -52,7 +52,7 @@ TEST_F(CXCFunctionalTest, CopyAssignment)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
     CXCFunctional rfb = rfa;
     
@@ -65,9 +65,9 @@ TEST_F(CXCFunctionalTest, MoveAssignment)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
-    CXCFunctional rfb = CXCFunctional({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfb = CXCFunctional({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
     ASSERT_EQ(rfa, rfb);
 }
@@ -78,7 +78,7 @@ TEST_F(CXCFunctionalTest, GetLabel)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
     ASSERT_EQ(std::string("LDA"), rfa.getLabel());
 }
@@ -89,7 +89,7 @@ TEST_F(CXCFunctionalTest, GetFunctionalType)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
     ASSERT_EQ(xcfun::lda, rfa.getFunctionalType());
 }
@@ -100,7 +100,7 @@ TEST_F(CXCFunctionalTest, GetFractionOfExactExchange)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
     ASSERT_NEAR(1.0, rfa.getFractionOfExactExchange(), 1.0e-13);
 }
@@ -115,7 +115,7 @@ TEST_F(CXCFunctionalTest, Compute)
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b);
     
-    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb});
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
     rfa.compute(xcgrid, dgrid);
     

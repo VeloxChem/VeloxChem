@@ -10,17 +10,23 @@
 
 namespace vlxtest {
     
-    void dummy_fvxc_ab(CXCGradientGrid& xcGradientGrid, const CDensityGrid& densityGrid)
+    void dummy_fvxc_ab(      CXCGradientGrid& xcGradientGrid,
+                       const double           factor,
+                       const CDensityGrid&    densityGrid)
     {
         xcGradientGrid.zero(); 
     }
     
-    void dummy_fvxc_a(CXCGradientGrid& xcGradientGrid, const CDensityGrid& densityGrid)
+    void dummy_fvxc_a(      CXCGradientGrid& xcGradientGrid,
+                      const double           factor,
+                      const CDensityGrid&    densityGrid)
     {
         xcGradientGrid.zero();
     }
     
-    void dummy_fvxc_b(CXCGradientGrid& xcGradientGrid, const CDensityGrid& densityGrid)
+    void dummy_fvxc_b(      CXCGradientGrid& xcGradientGrid,
+                      const double           factor,
+                      const CDensityGrid&    densityGrid)
     {
         xcGradientGrid.zero();
     }
