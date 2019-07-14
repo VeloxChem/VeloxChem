@@ -185,6 +185,7 @@ class CXCIntegrator
      @param pairValues the vector of partial Kohn-Sham elements for contracted GTOs pairs.
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
+     @param isBraEqualKet the flag indicating equality between bra and ket sides. 
      @param iBraContrGto the index of contracted GTO on bra side.
      @param iKetContrGto the index of contracted GTO on ket side.
      */
@@ -192,6 +193,7 @@ class CXCIntegrator
                                   const CMemBlock<double>& pairValues,
                                   const CGtoBlock&         braGtoBlock,
                                   const CGtoBlock&         ketGtoBlock,
+                                  const bool               isBraEqualKet,
                                   const int32_t            iBraContrGto,
                                   const int32_t            iKetContrGto) const;
    

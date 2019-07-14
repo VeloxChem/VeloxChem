@@ -88,8 +88,6 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
             
             _compRestrictedContribution(ksmat, gtovec, vxcgrid, dgrids[0], mgrids[0], fvxc.getFunctionalType());
             
-            ksmat.symmetrize();
-            
             return ksmat;
         }
         else
@@ -318,9 +316,7 @@ CXCIntegrator::_compRestrictedVXCForGtoBlocks(      CAOKohnShamMatrix* aoKohnSha
         gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
                                        braGtoBlock, i, xcFunctional);
         
-        auto jstart = (symbk) ? i : 0;
-        
-        for (int32_t j = jstart; j < ketGtoBlock.getNumberOfContrGtos(); j++)
+        for (int32_t j = 0; j < ketGtoBlock.getNumberOfContrGtos(); j++)
         {
             gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
                                            ketGtoBlock, j, xcFunctional);
@@ -329,7 +325,7 @@ CXCIntegrator::_compRestrictedVXCForGtoBlocks(      CAOKohnShamMatrix* aoKohnSha
                                                gridWeights, gridOffset, xcFunctional);
             
             #pragma omp critical (ksmacc)
-            _distRestrictedVXCValues(aoKohnShamMatrix, ppvalues, braGtoBlock, ketGtoBlock, i, j);
+            _distRestrictedVXCValues(aoKohnShamMatrix, ppvalues, braGtoBlock, ketGtoBlock, symbk, i, j);
         }
     }
 }
@@ -399,6 +395,7 @@ CXCIntegrator::_distRestrictedVXCValues(      CAOKohnShamMatrix* aoKohnShamMatri
                                         const CMemBlock<double>& pairValues,
                                         const CGtoBlock&         braGtoBlock,
                                         const CGtoBlock&         ketGtoBlock,
+                                        const bool               isBraEqualKet,
                                         const int32_t            iBraContrGto,
                                         const int32_t            iKetContrGto) const
 {
@@ -424,7 +421,18 @@ CXCIntegrator::_distRestrictedVXCValues(      CAOKohnShamMatrix* aoKohnShamMatri
         {
             auto kidx = (ketGtoBlock.getIdentifiers(j))[iKetContrGto];
             
-            ksmat[bidx * nrows + kidx] += (bidx == kidx) ? 0.5 * pairValues.at(i * kcomps + j) : pairValues.at(i * kcomps + j);
+            auto fval = pairValues.at(i * kcomps + j);
+            
+            if (isBraEqualKet)
+            {
+                ksmat[bidx * nrows + kidx] += fval;
+            }
+            else
+            {
+                ksmat[bidx * nrows + kidx] += fval;
+                
+                ksmat[kidx * nrows + bidx] += fval;
+            }
         }
     }
     
