@@ -8,6 +8,8 @@
 
 #include "SlaterFunctional.hpp"
 
+#include <cmath>
+
 #include "MathConst.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
