@@ -9,6 +9,7 @@
 #include "GtoFunc.hpp"
 
 #include "GtoFuncForLDA.hpp"
+#include "GtoFuncForGGA.hpp"
 
 namespace gtorec {  // gtorec namespace
     
@@ -67,7 +68,34 @@ namespace gtorec {  // gtorec namespace
         
         if (xcFunctional == xcfun::gga)
         {
-            // FIX ME: GGA case
+            switch (mang)
+            {
+                    // s-type GTOs on grid
+                    
+                case 0:
+                    ggarec::compGtoValuesForS(spherGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, gtoBlock, iContrGto);
+                    
+                    break;
+                    
+                    // p-type GTOs on grid
+                    
+                case 1:
+                    ggarec::compGtoValuesForP(spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, gtoBlock, iContrGto);
+                    
+                    break;
+                    
+                    // d-type GTOs on grid
+                    
+                case 2:
+                    ggarec::compGtoValuesForD(spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, gtoBlock, iContrGto);
+                    
+                    break;
+                    
+                    // FIX ME: implement l > 2 cases
+                    
+                default:
+                    break;
+            }
             
             return;
         }

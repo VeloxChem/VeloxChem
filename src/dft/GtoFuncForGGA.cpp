@@ -6,13 +6,13 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "GtoFuncForLDA.hpp"
+#include "GtoFuncForGGA.hpp"
 
 #include <cmath>
 
 #include "GenFunc.hpp"
 
-namespace ldarec {  // ldarec namespace
+namespace ggarec {  // ggarec namespace
     
     void
     compGtoValuesForS(      CMemBlock2D<double>& spherGtoGridBuffer,
@@ -25,7 +25,7 @@ namespace ldarec {  // ldarec namespace
     {
         // initialize buffer to zero
         
-        spherGtoGridBuffer.zero(); 
+        spherGtoGridBuffer.zero();
         
         // set up number of grid points
         
@@ -53,7 +53,13 @@ namespace ldarec {  // ldarec namespace
         
         // set up pointer to spherical GTOs values
         
-        auto fs_0 = spherGtoGridBuffer.data(0);
+        auto f0_0 = spherGtoGridBuffer.data(0);
+        
+        auto fx_0 = spherGtoGridBuffer.data(1);
+        
+        auto fy_0 = spherGtoGridBuffer.data(2);
+        
+        auto fz_0 = spherGtoGridBuffer.data(3);
         
         // initialize Cartesian buffer to zero
         
@@ -84,7 +90,17 @@ namespace ldarec {  // ldarec namespace
                 
                 double dz = gridCoordinatesZ[gridOffset +  j] - rz;
                 
-                fs_0[j] += bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
+                double g0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
+                
+                double g1 = -2.0 * bexp * g0;
+                
+                f0_0[j] += g0;
+                
+                fx_0[j] += dx * g1;
+                
+                fy_0[j] += dy * g1;
+                
+                fz_0[j] += dz * g1;
             }
         }
     }
@@ -131,11 +147,29 @@ namespace ldarec {  // ldarec namespace
         
         // set up pointer to Cartesian GTOs values
         
-        auto fp_x = cartGtoGridBuffer.data(0);
+        auto f0_x = cartGtoGridBuffer.data(0);
         
-        auto fp_y = cartGtoGridBuffer.data(1);
+        auto fx_x = cartGtoGridBuffer.data(1);
         
-        auto fp_z = cartGtoGridBuffer.data(2);
+        auto fy_x = cartGtoGridBuffer.data(2);
+        
+        auto fz_x = cartGtoGridBuffer.data(3);
+        
+        auto f0_y = cartGtoGridBuffer.data(4);
+        
+        auto fx_y = cartGtoGridBuffer.data(5);
+        
+        auto fy_y = cartGtoGridBuffer.data(6);
+        
+        auto fz_y = cartGtoGridBuffer.data(7);
+        
+        auto f0_z = cartGtoGridBuffer.data(8);
+        
+        auto fx_z = cartGtoGridBuffer.data(9);
+        
+        auto fy_z = cartGtoGridBuffer.data(10);
+        
+        auto fz_z = cartGtoGridBuffer.data(11);
         
         // initialize Cartesian buffer to zero
         
@@ -166,17 +200,43 @@ namespace ldarec {  // ldarec namespace
                 
                 double dz = gridCoordinatesZ[gridOffset +  j] - rz;
                 
-                double fs_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
+                double f0_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
                 
-                fp_x[j] += fs_0 * dx;
+                double fg_0 = -2.0 * bexp;
                 
-                fp_y[j] += fs_0 * dy;
+                // leading p_x
                 
-                fp_z[j] += fs_0 * dz;
+                f0_x[j] += f0_0 * dx;
+                
+                fx_x[j] += f0_0 * (1.0 + dx * dx * fg_0);
+                
+                fy_x[j] += f0_0 * dx * dy * fg_0;
+                
+                fz_x[j] += f0_0 * dx * dz * fg_0;
+                
+                // leading p_y
+                
+                f0_y[j] += f0_0 * dy;
+                
+                fx_y[j] += f0_0 * dy * dx * fg_0;
+                
+                fy_y[j] += f0_0 * (1.0 + dy * dy * fg_0);
+                
+                fz_y[j] += f0_0 * dy * dz * fg_0;
+                
+                // leading p_z
+                
+                f0_z[j] += f0_0 * dz;
+                
+                fx_z[j] += f0_0 * dz * dx * fg_0;
+                
+                fy_z[j] += f0_0 * dz * dy * fg_0;
+                
+                fz_z[j] += f0_0 * (1.0 + dz * dz * fg_0);
             }
         }
         
-        genfunc::transform(spherGtoGridBuffer, cartGtoGridBuffer, CSphericalMomentum(1), 0, 0, ngpnts, 1);
+        genfunc::transform(spherGtoGridBuffer, cartGtoGridBuffer, CSphericalMomentum(1), 0, 0, ngpnts, 4);
     }
     
     void
@@ -221,17 +281,53 @@ namespace ldarec {  // ldarec namespace
         
         // set up pointer to spherical GTOs values
         
-        auto fd_xx = cartGtoGridBuffer.data(0);
+        auto f0_xx = cartGtoGridBuffer.data(0);
         
-        auto fd_xy = cartGtoGridBuffer.data(1);
+        auto fx_xx = cartGtoGridBuffer.data(1);
         
-        auto fd_xz = cartGtoGridBuffer.data(2);
+        auto fy_xx = cartGtoGridBuffer.data(2);
         
-        auto fd_yy = cartGtoGridBuffer.data(3);
+        auto fz_xx = cartGtoGridBuffer.data(3);
         
-        auto fd_yz = cartGtoGridBuffer.data(4);
+        auto f0_xy = cartGtoGridBuffer.data(4);
         
-        auto fd_zz = cartGtoGridBuffer.data(5);
+        auto fx_xy = cartGtoGridBuffer.data(5);
+        
+        auto fy_xy = cartGtoGridBuffer.data(6);
+        
+        auto fz_xy = cartGtoGridBuffer.data(7);
+        
+        auto f0_xz = cartGtoGridBuffer.data(8);
+        
+        auto fx_xz = cartGtoGridBuffer.data(9);
+        
+        auto fy_xz = cartGtoGridBuffer.data(10);
+        
+        auto fz_xz = cartGtoGridBuffer.data(11);
+        
+        auto f0_yy = cartGtoGridBuffer.data(12);
+        
+        auto fx_yy = cartGtoGridBuffer.data(13);
+        
+        auto fy_yy = cartGtoGridBuffer.data(14);
+        
+        auto fz_yy = cartGtoGridBuffer.data(15);
+        
+        auto f0_yz = cartGtoGridBuffer.data(16);
+        
+        auto fx_yz = cartGtoGridBuffer.data(17);
+        
+        auto fy_yz = cartGtoGridBuffer.data(18);
+        
+        auto fz_yz = cartGtoGridBuffer.data(19);
+        
+        auto f0_zz = cartGtoGridBuffer.data(20);
+        
+        auto fx_zz = cartGtoGridBuffer.data(21);
+        
+        auto fy_zz = cartGtoGridBuffer.data(22);
+        
+        auto fz_zz = cartGtoGridBuffer.data(23);
         
         // initialize Cartesian buffer to zero
         
@@ -262,33 +358,79 @@ namespace ldarec {  // ldarec namespace
                 
                 double dz = gridCoordinatesZ[gridOffset +  j] - rz;
                 
-                double fs_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
+                double f0_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
                 
-                // leading x component
+                double fg_0 = -2.0 * bexp;
                 
-                double fr = dx * fs_0;
+                // leading xx component
                 
-                fd_xx[j] += fr * dx;
+                double f0_x = dx * f0_0;
                 
-                fd_xy[j] += fr * dy;
+                f0_xx[j] += f0_x * dx;
                 
-                fd_xz[j] += fr * dz;
+                fx_xx[j] += f0_x * (2.0 + fg_0 * dx * dx);
                 
-                // leading y component
+                fy_xx[j] += f0_x * fg_0 * dx * dy;
                 
-                fr = dy * fs_0;
+                fz_xx[j] += f0_x * fg_0 * dx * dz;
                 
-                fd_yy[j] += fr * dy;
+                // leading xy component
                 
-                fd_yz[j] += fr * dz;
+                double f0_y = dy * f0_0;
                 
-                // leading z component
+                f0_xy[j] += f0_x * dy;
                 
-                fd_zz[j] += dz * fs_0 * dz;
+                fx_xy[j] += f0_y * (1.0 + fg_0 * dx * dx);
+                
+                fy_xy[j] += f0_x * (1.0 + fg_0 * dy * dy);
+                
+                fz_xy[j] += f0_x * fg_0 * dy * dz;
+                
+                // leading xz component
+                
+                double f0_z = dz * f0_0;
+                
+                f0_xz[j] += f0_x * dz;
+                
+                fx_xz[j] += f0_z * (1.0 + fg_0 * dx * dx);
+                
+                fy_xz[j] += f0_x * fg_0 * dz * dy;
+                
+                fz_xz[j] += f0_x * (1.0 + fg_0 * dz * dz);
+                
+                // leading yy component
+                
+                f0_yy[j] += f0_y * dy;
+                
+                fx_yy[j] += f0_y * fg_0 * dy * dx;
+                
+                fy_yy[j] += f0_y * (2.0 + fg_0 * dy * dy);
+                
+                fz_yy[j] += f0_y * fg_0 * dy * dz;
+                
+                // leading yz component
+                
+                f0_yz[j] += f0_y * dz;
+                
+                fx_yz[j] += f0_y * fg_0 * dz * dx;
+                
+                fy_yz[j] += f0_z * (1.0 + fg_0 * dy * dy);
+                
+                fz_yz[j] += f0_y * (1.0 + fg_0 * dz * dz);
+                
+                // leading zz component
+                
+                f0_zz[j] += f0_z * dz;
+                
+                fx_zz[j] += f0_z * fg_0 * dz * dx;
+                
+                fy_zz[j] += f0_z * fg_0 * dz * dy;
+                
+                fz_zz[j] += f0_z * (2.0 + fg_0 * dz * dz);
             }
         }
         
-        genfunc::transform(spherGtoGridBuffer, cartGtoGridBuffer, CSphericalMomentum(2), 0, 0, ngpnts, 1);
+        genfunc::transform(spherGtoGridBuffer, cartGtoGridBuffer, CSphericalMomentum(2), 0, 0, ngpnts, 4);
     }
     
-}  // namespace ldarec
+}  // namespace ggarec
