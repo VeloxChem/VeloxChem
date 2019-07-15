@@ -385,7 +385,40 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         return;
     }
     
-    // FIX ME: implement GGA case
+     // general gradient approximation
+    
+    if (xcFunctional == xcfun::gga)
+    {
+        auto ngpoints = braGtoGridBuffer.size(0);
+        
+        // set up pointers to gradient data
+        
+        auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+        
+        // NOTE: we compute F_a matrix, since F_a = F_b
+        
+        for (int32_t i = 0; i < braAngularComponents; i++)
+        {
+            auto bgto = braGtoGridBuffer.data(4 * i);
+            
+            for (int32_t j = 0; j < ketAngularComponents; j++)
+            {
+                auto kgto = ketGtoGridBuffer.data(4 * j);
+                
+                double psum = 0.0;
+                
+                #pragma omp simd
+                for (int32_t k = 0; k < ngpoints; k++)
+                {
+                    psum += gridWeights[gridOffset + k] * bgto[k] * kgto[k] * grhoa[gridOffset + k];
+                }
+                
+                ppvals[i * ketAngularComponents + j] = psum;
+            }
+        }
+        
+        return;
+    }
     
     // FIX ME: impelemnt MGGA case
 }

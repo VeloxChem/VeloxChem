@@ -11,6 +11,7 @@
 #include "StringFormat.hpp"
 #include "SlaterFunctional.hpp"
 #include "VWN3Functional.hpp"
+#include "Becke88Functional.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
     
@@ -25,12 +26,23 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         if (fstr::upcase(xcLabel) == "VWN3") return vxcfuncs::setVWN3Functional();
         
+        // pure spin-polarized Becke (1988) functional
+        
+        if (fstr::upcase(xcLabel) == "BECKE88") return vxcfuncs::setBecke88Functional();
+        
         // pure spin-polarized local density functional
         
         if (fstr::upcase(xcLabel) == "SLDA")
         {
             return CXCFunctional({"SLDA"}, xcfun::lda, 0.0, {setPrimitiveSlaterFunctional(),
                                  setPrimitiveVWN3Functional()}, {1.0, 1.0});
+        }
+        
+        // pure spin-polarized Becke exchange functional
+        
+        if (fstr::upcase(xcLabel) == "B88X")
+        {
+            return CXCFunctional({"B88X"}, xcfun::gga, 0.0, {setPrimitiveSlaterFunctional()}, {1.0});
         }
         
         // FIX ME: add other functionals here... 

@@ -320,6 +320,88 @@ CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
             molecularGrids[i].slice(ipoint);
         }
     }
+    
+    // general gradient density approximation
+    
+    if (xcFuncType == xcfun::gga)
+    {
+        for (int32_t i = 0; i < _nDensityMatrices; i++)
+        {
+            // set up pointers to source density
+            
+            auto srhoa = alphaDensity(i);
+            
+            auto srhob = betaDensity(i);
+            
+            auto sgrada = alphaDensityGradient(i);
+            
+            auto sgradb = betaDensityGradient(i);
+            
+            auto sgradab = mixedDensityGradient(i);
+            
+            // set up pointers to destination density
+            
+            auto drhoa = densityGrids[i].alphaDensity(i);
+            
+            auto drhob = densityGrids[i].betaDensity(i);
+            
+            auto dgrada = densityGrids[i].alphaDensityGradient(i);
+            
+            auto dgradb = densityGrids[i].betaDensityGradient(i);
+            
+            auto dgradab = densityGrids[i].mixedDensityGradient(i);
+            
+            // set up pointers to molecular grid data
+            
+            auto gx = molecularGrids[i].getCoordinatesX();
+            
+            auto gy = molecularGrids[i].getCoordinatesY();
+            
+            auto gz = molecularGrids[i].getCoordinatesZ();
+            
+            auto gw = molecularGrids[i].getWeights();
+            
+            auto ipoint = 0;
+            
+            for (int32_t j = 0; j < npoints; j++)
+            {
+                if (std::fabs(srhoa[j] + srhob[i]) > densityThreshold)
+                {
+                    // density data
+                    
+                    drhoa[ipoint] = srhoa[j];
+                    
+                    drhob[ipoint] = srhob[j];
+                    
+                    dgrada[ipoint] = sgrada[j];
+                    
+                    dgradb[ipoint] = sgradb[j];
+                    
+                    dgradab[ipoint] = sgradab[j];
+                    
+                    // molecula grid data
+                    
+                    gx[ipoint] = gx[j];
+                    
+                    gy[ipoint] = gy[j];
+                    
+                    gz[ipoint] = gz[j];
+                    
+                    gw[ipoint] = gw[j];
+                    
+                    // update counter
+                    
+                    ipoint++;
+                }
+            }
+            
+            // slice grids
+            
+            densityGrids[i].slice(ipoint);
+            
+            molecularGrids[i].slice(ipoint);
+        }
+    }
 }
 
 std::ostream&
