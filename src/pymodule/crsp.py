@@ -604,6 +604,11 @@ class ComplexResponse:
                             ntrials_ger = bger.shape[1]
 
                         else:
+                            g_realger = np.zeros(0)
+                            g_imagger = np.zeros(0)
+
+                            e2gg = np.zeros((0,0))
+
                             ntrials_ger = 0
 
                         if bung.any():
@@ -618,6 +623,14 @@ class ComplexResponse:
                             ntrials_ung = bung.shape[1]
 
                         else:
+                            g_realung = np.zeros(0)
+                            g_imagung = np.zeros(0)
+
+                            e2uu = np.zeros((0,0))
+
+                            if bger.any():
+                                s2ug = np.zeros((0,ntrials_ger))
+
                             ntrials_ung = 0
 
                         # creating gradient and matrix for linear equation
