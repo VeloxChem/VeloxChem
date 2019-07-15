@@ -401,9 +401,21 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         {
             auto bgto = braGtoGridBuffer.data(4 * i);
             
+            auto bgto_x = braGtoGridBuffer.data(4 * i + 1);
+            
+            auto bgto_y = braGtoGridBuffer.data(4 * i + 2);
+            
+            auto bgto_z = braGtoGridBuffer.data(4 * i + 3);
+            
             for (int32_t j = 0; j < ketAngularComponents; j++)
             {
                 auto kgto = ketGtoGridBuffer.data(4 * j);
+                
+                auto kgto_x = ketGtoGridBuffer.data(4 * j + 1);
+                
+                auto kgto_y = ketGtoGridBuffer.data(4 * j + 2);
+                
+                auto kgto_z = ketGtoGridBuffer.data(4 * j + 3);
                 
                 double psum = 0.0;
                 
