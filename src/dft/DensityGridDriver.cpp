@@ -320,8 +320,6 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
             {
                 auto rhoa = densityGrid->alphaDensity(i);
                 
-                auto rhob = densityGrid->betaDensity(i);
-                
                 // loop over density pair components
                 
                 for (int32_t j = 0; j < braComponents; j++)
@@ -339,11 +337,7 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
                             #pragma omp simd
                             for (int32_t l = 0; l < ngpoints; l++)
                             {
-                                double fact = fden * bgto[l] * kgto[l];
-                                
-                                rhoa[gridOffset + l] += fact;
-                                
-                                rhob[gridOffset + l] += fact;
+                                rhoa[gridOffset + l] += fden * bgto[l] * kgto[l];
                             }
                         }
                     }
