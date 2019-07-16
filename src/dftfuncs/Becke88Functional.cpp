@@ -40,7 +40,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         double fp = 4.0 / 3.0;
         
-        double fre = factor * fb;
+        double fre = -factor * fb;
         
         // determine number of grid points
         
