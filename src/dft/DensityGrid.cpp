@@ -134,6 +134,108 @@ CDensityGrid::slice(const int32_t nGridPoints)
     }
 }
 
+ void
+CDensityGrid::updateBetaDensities()
+{
+    if (_gridType != dengrid::ab) return;
+    
+    auto ngpoints = getNumberOfGridPoints();
+    
+    if ((2 * _nDensityMatrices) == _densityValues.blocks())
+    {
+        for (int32_t i = 0; i < _nDensityMatrices; i++)
+        {
+            auto rhoa = alphaDensity(i);
+            
+            auto rhob = betaDensity(i);
+            
+            #pragma omp simd aligned(rhoa, rhob: VLX_ALIGN)
+            for (int32_t j = 0; j < ngpoints; j++)
+            {
+                rhob[j] = rhoa[j];
+            }
+        }
+    }
+    
+    if ((11 * _nDensityMatrices) == _densityValues.blocks())
+    {
+        for (int32_t i = 0; i < _nDensityMatrices; i++)
+        {
+            auto rhoa = alphaDensity(i);
+            
+            auto rhob = betaDensity(i);
+            
+            auto grada_x = alphaDensityGradientX(i);
+            
+            auto gradb_x = betaDensityGradientX(i);
+            
+            auto grada_y = alphaDensityGradientY(i);
+            
+            auto gradb_y = betaDensityGradientY(i);
+            
+            auto grada_z = alphaDensityGradientZ(i);
+            
+            auto gradb_z = betaDensityGradientZ(i);
+            
+            #pragma omp simd aligned(rhoa, rhob, grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z: VLX_ALIGN)
+            for (int32_t j = 0; j < ngpoints; j++)
+            {
+                rhob[j] = rhoa[j];
+                
+                gradb_x[j] = grada_x[j];
+                
+                gradb_y[j] = grada_y[j];
+                
+                gradb_z[j] = grada_z[j];
+            }
+        }
+    }
+}
+
+
+void
+CDensityGrid::computeDensityNorms()
+{
+    auto ngpoints = getNumberOfGridPoints();
+    
+    if (_gridType == dengrid::ab)
+    {
+        if ((11 * _nDensityMatrices) == _densityValues.blocks())
+        {
+            for (int32_t i = 0; i < _nDensityMatrices; i++)
+            {
+                auto grada_x = alphaDensityGradientX(i);
+                
+                auto gradb_x = betaDensityGradientX(i);
+                
+                auto grada_y = alphaDensityGradientY(i);
+                
+                auto gradb_y = betaDensityGradientY(i);
+                
+                auto grada_z = alphaDensityGradientZ(i);
+                
+                auto gradb_z = betaDensityGradientZ(i);
+                
+                auto grada = alphaDensityGradient(i);
+                
+                auto gradb = betaDensityGradient(i);
+                
+                auto gradab = mixedDensityGradient(i);
+                
+                #pragma omp simd aligned(grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z: VLX_ALIGN)
+                for (int32_t j = 0; j < ngpoints; j++)
+                {
+                    grada[j] = std::sqrt(grada_x[j] * grada_x[j] + grada_y[j] * grada_y[j] + grada_z[j] * grada_z[j]);
+                    
+                    gradb[j] = std::sqrt(gradb_x[j] * gradb_x[j] + gradb_y[j] * gradb_y[j] + gradb_z[j] * gradb_z[j]);
+            
+                    gradab[j] = grada_x[j] * gradb_x[j] + grada_y[j] * gradb_y[j] + grada_z[j] * gradb_z[j];
+                }
+            }
+        }
+    }
+}
+
 int32_t
 CDensityGrid::getNumberOfGridPoints() const
 {

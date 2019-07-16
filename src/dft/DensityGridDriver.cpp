@@ -128,6 +128,12 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
         }
     }
 
+    // finalize density grid
+    
+    if (density.isRestricted()) densityGrid.updateBetaDensities(); 
+
+    densityGrid.computeDensityNorms(); 
+    
     // delete GTOs container
 
     delete gtovec;
@@ -364,13 +370,11 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
             {
                 auto rhoa = densityGrid->alphaDensity(i);
                 
-                auto rhob = densityGrid->betaDensity(i);
+                auto grada_x = densityGrid->alphaDensityGradientX(i);
                 
-                auto grada = densityGrid->alphaDensityGradient(i);
+                auto grada_y = densityGrid->alphaDensityGradientY(i);
                 
-                auto gradb = densityGrid->betaDensityGradient(i);
-                
-                auto gradab = densityGrid->mixedDensityGradient(i);
+                auto grada_z = densityGrid->alphaDensityGradientZ(i);
                 
                 // loop over density pair components
                 
@@ -401,27 +405,13 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
                             #pragma omp simd
                             for (int32_t l = 0; l < ngpoints; l++)
                             {
-                                double f0_0 = fden * bgto[l] * kgto[l];
+                                rhoa[gridOffset + l] += fden * bgto[l] * kgto[l];
                                 
-                                double fx_0 = fden * (bgto_x[l] * kgto[l] + bgto[l] * kgto_x[l]);
+                                grada_x[gridOffset + l] += fden * (bgto_x[l] * kgto[l] + bgto[l] * kgto_x[l]);
                                 
-                                double fy_0 = fden * (bgto_y[l] * kgto[l] + bgto[l] * kgto_y[l]);
+                                grada_y[gridOffset + l] += fden * (bgto_y[l] * kgto[l] + bgto[l] * kgto_y[l]);
                                 
-                                double fz_0 = fden * (bgto_z[l] * kgto[l] + bgto[l] * kgto_z[l]);
-                                
-                                double fg_0 = std::sqrt(fx_0 * fx_0 + fy_0 * fy_0 + fz_0 * fz_0);
-                                
-                                double fm_0 = fg_0 * fg_0;
-                                
-                                rhoa[gridOffset + l] += f0_0;
-                                
-                                rhob[gridOffset + l] += f0_0;
-                                
-                                grada[gridOffset + l] += fg_0;
-                                
-                                gradb[gridOffset + l] += fg_0;
-                                
-                                gradab[gridOffset + l] += fm_0;
+                                grada_z[gridOffset + l] += fden * (bgto_z[l] * kgto[l] + bgto[l] * kgto_z[l]);
                             }
                         }
                     }

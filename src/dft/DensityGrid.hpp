@@ -126,6 +126,16 @@ public:
     void slice(const int32_t nGridPoints);
     
     /**
+     Updates beta densites (density, it's gradient components) by assigning alpha density values.
+     */
+    void updateBetaDensities();
+    
+    /**
+     Computes density norms.
+     */
+    void computeDensityNorms();
+    
+    /**
      Gets number of grid points in density grid object.
      
      @return the number of grid points.
