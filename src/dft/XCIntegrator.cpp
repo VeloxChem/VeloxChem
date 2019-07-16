@@ -413,11 +413,11 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         {
             auto bgto = braGtoGridBuffer.data(4 * i);
             
-            //auto bgto_x = braGtoGridBuffer.data(4 * i + 1);
+            auto bgto_x = braGtoGridBuffer.data(4 * i + 1);
             
-            //auto bgto_y = braGtoGridBuffer.data(4 * i + 2);
+            auto bgto_y = braGtoGridBuffer.data(4 * i + 2);
             
-            //auto bgto_z = braGtoGridBuffer.data(4 * i + 3);
+            auto bgto_z = braGtoGridBuffer.data(4 * i + 3);
             
             for (int32_t j = 0; j < ketAngularComponents; j++)
             {
@@ -441,6 +441,10 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                     psum += gridWeights[gridOffset + k] * fgrd * bgto[k] * (grada_x[gridOffset + k] * kgto_x[k] +
                                                                             grada_y[gridOffset + k] * kgto_y[k] +
                                                                             grada_z[gridOffset + k] * kgto_z[k]);
+                    
+                    psum += gridWeights[gridOffset + k] * fgrd * kgto[k] * (grada_x[gridOffset + k] * bgto_x[k] +
+                                                                            grada_y[gridOffset + k] * bgto_y[k] +
+                                                                            grada_z[gridOffset + k] * bgto_z[k]);
                 }
                 
                 ppvals[i * ketAngularComponents + j] = psum;
