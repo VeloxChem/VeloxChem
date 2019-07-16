@@ -75,13 +75,13 @@ namespace vxcfuncs {  // vxcfuncs namespace
             
             double xa = grada[i] / ra;
             
-            double faa10 = -fp * xa / ra;
+            double faa10 = -fp * xa / rhoa[i];
             
             double rb = std::pow(rhob[i], fp);
             
             double xb = gradb[i] / rb;
             
-            double fab10 = -fp * xb / rb;
+            double fab10 = -fp * xb / rhob[i];
     
             double fda = 1.0 + 6.0 * xa * fb * std::asinh(xa);
             
