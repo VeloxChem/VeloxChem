@@ -562,6 +562,18 @@ CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
             
             auto sgradab = mixedDensityGradient(i);
             
+            auto sgrada_x = alphaDensityGradientX(i);
+            
+            auto sgrada_y = alphaDensityGradientY(i);
+            
+            auto sgrada_z = alphaDensityGradientZ(i);
+            
+            auto sgradb_x = betaDensityGradientX(i);
+            
+            auto sgradb_y = betaDensityGradientY(i);
+            
+            auto sgradb_z = betaDensityGradientZ(i);
+            
             // set up pointers to destination density
             
             auto drhoa = densityGrids[i].alphaDensity(i);
@@ -573,6 +585,18 @@ CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
             auto dgradb = densityGrids[i].betaDensityGradient(i);
             
             auto dgradab = densityGrids[i].mixedDensityGradient(i);
+            
+            auto dgrada_x = densityGrids[i].alphaDensityGradientX(i);
+            
+            auto dgrada_y = densityGrids[i].alphaDensityGradientY(i);
+            
+            auto dgrada_z = densityGrids[i].alphaDensityGradientZ(i);
+            
+            auto dgradb_x = densityGrids[i].betaDensityGradientX(i);
+            
+            auto dgradb_y = densityGrids[i].betaDensityGradientY(i);
+            
+            auto dgradb_z = densityGrids[i].betaDensityGradientZ(i);
             
             // set up pointers to molecular grid data
             
@@ -601,6 +625,18 @@ CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
                     dgradb[ipoint] = sgradb[j];
                     
                     dgradab[ipoint] = sgradab[j];
+                    
+                    dgrada_x[ipoint] = sgrada_x[j];
+                    
+                    dgrada_y[ipoint] = sgrada_y[j];
+                    
+                    dgrada_z[ipoint] = sgrada_z[j];
+                    
+                    dgradb_x[ipoint] = sgradb_x[j];
+                    
+                    dgradb_y[ipoint] = sgradb_y[j];
+                    
+                    dgradb_z[ipoint] = sgradb_z[j];
                     
                     // molecula grid data
                     
