@@ -42,7 +42,8 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         if (fstr::upcase(xcLabel) == "B88X")
         {
-            return CXCFunctional({"B88X"}, xcfun::gga, 0.0, {setPrimitiveSlaterFunctional()}, {1.0});
+            return CXCFunctional({"B88X"}, xcfun::gga, 0.0, {setPrimitiveSlaterFunctional(),
+                                 setPrimitiveBecke88Functional()}, {1.0, 1.0});
         }
         
         // FIX ME: add other functionals here... 
