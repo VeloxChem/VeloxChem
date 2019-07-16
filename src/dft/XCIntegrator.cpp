@@ -395,17 +395,29 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         
         auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
         
+        auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+        
+        // set up pointers to density gradient norms
+        
+        auto ngrada = densityGrid->alphaDensityGradient(0);
+        
+        auto grada_x = densityGrid->alphaDensityGradientX(0);
+        
+        auto grada_y = densityGrid->alphaDensityGradientY(0);
+        
+        auto grada_z = densityGrid->alphaDensityGradientZ(0);
+        
         // NOTE: we compute F_a matrix, since F_a = F_b
         
         for (int32_t i = 0; i < braAngularComponents; i++)
         {
             auto bgto = braGtoGridBuffer.data(4 * i);
             
-            auto bgto_x = braGtoGridBuffer.data(4 * i + 1);
+            //auto bgto_x = braGtoGridBuffer.data(4 * i + 1);
             
-            auto bgto_y = braGtoGridBuffer.data(4 * i + 2);
+            //auto bgto_y = braGtoGridBuffer.data(4 * i + 2);
             
-            auto bgto_z = braGtoGridBuffer.data(4 * i + 3);
+            //auto bgto_z = braGtoGridBuffer.data(4 * i + 3);
             
             for (int32_t j = 0; j < ketAngularComponents; j++)
             {
@@ -423,6 +435,12 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                 for (int32_t k = 0; k < ngpoints; k++)
                 {
                     psum += gridWeights[gridOffset + k] * bgto[k] * kgto[k] * grhoa[gridOffset + k];
+                    
+                    double fgrd = 2.0 * ggrada[gridOffset + k] / ngrada[gridOffset + k];
+                    
+                    psum += gridWeights[gridOffset + k] * fgrd * bgto[k] * (grada_x[gridOffset + k] * kgto_x[k] +
+                                                                            grada_y[gridOffset + k] * kgto_y[k] +
+                                                                            grada_z[gridOffset + k] * kgto_z[k]);
                 }
                 
                 ppvals[i * ketAngularComponents + j] = psum;
