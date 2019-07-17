@@ -646,7 +646,7 @@ class ComplexResponse:
 
                         g[ntrials_ger:ntrials_ger + ntrials_ung] = g_realung[:]
                         g[-ntrials_ger -
-                          ntrials_ung:-ntrials_ger] = g_imagung[:]
+                          ntrials_ung:-ntrials_ger] = -g_imagung[:]
 
                         # matrix
 
