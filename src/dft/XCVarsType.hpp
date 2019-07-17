@@ -7,7 +7,7 @@
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef XCVarsType_hpp
-#define XCCarsType_hpp
+#define XCVarsType_hpp
 
 #include <string>
 #include "StringFormat.hpp"

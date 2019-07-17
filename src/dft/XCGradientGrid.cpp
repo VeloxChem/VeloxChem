@@ -185,7 +185,7 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType) const
         if (_densityGridType == dengrid::limb) return nullptr;
     }
     
-    if (gradientType == xcvars::grada)
+    if (gradientType == xcvars::gradab)
     {
         if (_densityGridType == dengrid::ab) return _xcValues.data(5);
         
@@ -236,7 +236,7 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType)
         if (_densityGridType == dengrid::limb) return nullptr;
     }
     
-    if (gradientType == xcvars::grada)
+    if (gradientType == xcvars::gradab)
     {
         if (_densityGridType == dengrid::ab) return _xcValues.data(5);
         

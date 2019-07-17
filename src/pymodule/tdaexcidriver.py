@@ -1,6 +1,8 @@
+from os.path import isfile
 import numpy as np
 import time as tm
 import math
+import h5py
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -14,6 +16,7 @@ from .veloxchemlib import molorb
 from .veloxchemlib import rotatory_strength_in_cgs
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
+from .errorhandler import assert_msg_critical
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
 
@@ -45,6 +48,10 @@ class TDAExciDriver:
         The number of MPI processes.
     :param ostream:
         The output stream.
+    :param restart:
+        The flag for restarting from checkpoint file.
+    :param checkpoint_file:
+        The name of checkpoint file.
     """
 
     def __init__(self, comm, ostream):
@@ -80,6 +87,10 @@ class TDAExciDriver:
         # output stream
         self.ostream = ostream
 
+        # restart information
+        self.restart = True
+        self.checkpoint_file = None
+
     def update_settings(self, settings):
         """
         Updates settings in TDA excited states computation driver.
@@ -102,6 +113,12 @@ class TDAExciDriver:
             self.conv_thresh = float(settings['conv_thresh'])
         if 'max_iter' in settings:
             self.max_iter = int(settings['max_iter'])
+
+        if 'restart' in settings:
+            key = settings['restart'].lower()
+            self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in settings:
+            self.checkpoint_file = settings['checkpoint_file']
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -152,19 +169,47 @@ class TDAExciDriver:
 
         self.solver = BlockDavidsonSolver()
 
+        # read initial guess from restart file
+
+        n_restart_vectors = 0
+        n_restart_iterations = 0
+
+        if self.restart:
+            if self.rank == mpi_master():
+                rst_trial_mat, rst_sig_mat = self.read_hdf5(
+                    self.checkpoint_file, molecule.elem_ids_to_numpy(),
+                    basis.get_label())
+                self.restart = (rst_trial_mat is not None and
+                                rst_sig_mat is not None)
+                if rst_trial_mat is not None:
+                    n_restart_vectors = rst_trial_mat.shape[1]
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
+            n_restart_vectors = self.comm.bcast(n_restart_vectors,
+                                                root=mpi_master())
+            n_restart_iterations = n_restart_vectors // self.nstates
+
+        # start TDA iteration
+
         for i in range(self.max_iter):
 
             # perform linear transformation of trial vectors
 
-            sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
-                                       mol_orbs, molecule, basis)
+            if i >= n_restart_iterations:
+                sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
+                                           mol_orbs, molecule, basis)
 
             # solve eigenvalues problem on master node
 
             if self.rank == mpi_master():
 
-                sig_mat = self.convert_to_sigma_matrix(sig_vecs)
-                trial_mat = self.convert_to_trial_matrix(trial_vecs)
+                if i >= n_restart_iterations:
+                    sig_mat = self.convert_to_sigma_matrix(sig_vecs)
+                    trial_mat = self.convert_to_trial_matrix(trial_vecs)
+                else:
+                    istart = i * self.nstates
+                    iend = (i + 1) * self.nstates
+                    sig_mat = np.copy(rst_sig_mat[:, istart:iend])
+                    trial_mat = np.copy(rst_trial_mat[:, istart:iend])
 
                 self.solver.add_iteration_data(sig_mat, trial_mat, i)
 
@@ -174,12 +219,23 @@ class TDAExciDriver:
 
                 self.update_trial_vectors(trial_vecs, zvecs)
 
+                if i >= n_restart_iterations:
+                    self.write_hdf5(self.checkpoint_file,
+                                    self.solver.trial_matrices,
+                                    self.solver.sigma_matrices,
+                                    molecule.elem_ids_to_numpy(),
+                                    basis.get_label())
+
             # check convergence
 
             self.check_convergence(i)
 
             if self.is_converged:
                 break
+
+        if self.rank == mpi_master():
+            assert_msg_critical(self.is_converged,
+                                'TDA driver: failed to converge')
 
         # compute 1e dipole integrals
 
@@ -618,7 +674,7 @@ class TDAExciDriver:
         if self.is_converged:
             valstr += "converged"
         else:
-            valstr += "not converged"
+            valstr += "NOT converged"
         valstr += " in {:d} iterations. ".format(self.cur_iter + 1)
         valstr += "Time: {:.2f}".format(tm.time() - start_time) + " sec."
         self.ostream.print_header(valstr.ljust(92))
@@ -661,3 +717,104 @@ class TDAExciDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
+
+    def write_hdf5(self, fname, trials, sigmas, nuclear_charges, basis_set):
+        """
+        Writes response vectors to checkpoint file. Nuclear charges and basis
+        set can also be written to the checkpoint file.
+
+        :param fname:
+            Name of the checkpoint file.
+        :param trials:
+            The trials vectors.
+        :param sigmas:
+            The sigma vectors.
+        :param nuclear_charges:
+            Nuclear charges of the molecule.
+        :param basis_set:
+            Name of the AO basis set.
+        """
+
+        valid_checkpoint = (self.checkpoint_file and
+                            isinstance(self.checkpoint_file, str))
+
+        if not valid_checkpoint:
+            return
+
+        hf = h5py.File(fname, 'w')
+
+        hf.create_dataset('TDA_trials', data=trials, compression="gzip")
+        hf.create_dataset('TDA_sigmas', data=sigmas, compression="gzip")
+
+        if nuclear_charges is not None:
+            hf.create_dataset('nuclear_charges',
+                              data=nuclear_charges,
+                              compression='gzip')
+
+        if basis_set is not None:
+            hf.create_dataset('basis_set',
+                              data=np.string_([basis_set]),
+                              compression='gzip')
+
+        hf.close()
+
+        checkpoint_text = 'Checkpoint written to file: '
+        checkpoint_text += self.checkpoint_file
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()
+
+    def read_hdf5(self, fname, nuclear_charges, basis_set):
+        """
+        Reads response vectors from checkpoint file. Nuclear charges and basis
+        set will be used to validate the checkpoint file.
+
+        :param fname:
+            Name of the checkpoint file.
+        :param nuclear_charges:
+            Nuclear charges of the molecule.
+        :param basis_set:
+            Name of the AO basis set.
+
+        :return:
+            The tuple of trials vectors and sigma vectors.
+        """
+
+        valid_checkpoint = (self.checkpoint_file and
+                            isinstance(self.checkpoint_file, str) and
+                            isfile(self.checkpoint_file))
+
+        if not valid_checkpoint:
+            return None, None
+
+        hf = h5py.File(fname, 'r')
+
+        match_nuclear_charges = False
+        if 'nuclear_charges' in hf:
+            hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
+            if hf_nuclear_charges.shape == nuclear_charges.shape:
+                match_nuclear_charges = (
+                    hf_nuclear_charges == nuclear_charges).all()
+
+        match_basis_set = False
+        if 'basis_set' in hf:
+            hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
+            match_basis_set = (hf_basis_set.upper() == basis_set.upper())
+
+        trials = None
+        sigmas = None
+
+        if match_nuclear_charges and match_basis_set:
+            if 'TDA_trials' in hf.keys():
+                trials = np.array(hf.get('TDA_trials'))
+            if 'TDA_sigmas' in hf.keys():
+                sigmas = np.array(hf.get('TDA_sigmas'))
+
+        hf.close()
+
+        if (trials is not None and sigmas is not None):
+            checkpoint_text = 'Restarting from checkpoint file: '
+            checkpoint_text += self.checkpoint_file
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
+
+        return trials, sigmas

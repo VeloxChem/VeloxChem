@@ -160,6 +160,8 @@ class CDensityGridDriver
      @param isRestrictedDensity the flag whatever density pair data is for restricted or unrestricted AO densities.
      @param braGtoValues the GTOs values on bra side.
      @param ketGtoValues the GTOs values on ket side.
+     @param braComponents the number of angular components on bra side.
+     @param ketComponents the number of angular components on ket side.
      @param gridOffset the offset og density grid.
      @param xcFunctional the exchange-correlation functional type.
      */
@@ -168,6 +170,8 @@ class CDensityGridDriver
                                   const bool                 isRestrictedDensity,
                                   const CMemBlock2D<double>& braGtoValues,
                                   const CMemBlock2D<double>& ketGtoValues,
+                                  const int32_t              braComponents,
+                                  const int32_t              ketComponents,
                                   const int32_t              gridOffset,
                                   const xcfun                xcFunctional) const;
 

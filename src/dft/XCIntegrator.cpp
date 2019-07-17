@@ -385,7 +385,79 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         return;
     }
     
-    // FIX ME: implement GGA case
+     // general gradient approximation
+    
+    if (xcFunctional == xcfun::gga)
+    {
+        auto ngpoints = braGtoGridBuffer.size(0);
+        
+        // set up pointers to gradient data
+        
+        auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+        
+        auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+
+        auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+        
+        // set up pointers to density gradient norms
+        
+        auto ngrada = densityGrid->alphaDensityGradient(0);
+        
+        auto grada_x = densityGrid->alphaDensityGradientX(0);
+        
+        auto grada_y = densityGrid->alphaDensityGradientY(0);
+        
+        auto grada_z = densityGrid->alphaDensityGradientZ(0);
+        
+        // NOTE: we compute F_a matrix, since F_a = F_b
+        
+        for (int32_t i = 0; i < braAngularComponents; i++)
+        {
+            auto bgto = braGtoGridBuffer.data(4 * i);
+            
+            auto bgto_x = braGtoGridBuffer.data(4 * i + 1);
+            
+            auto bgto_y = braGtoGridBuffer.data(4 * i + 2);
+            
+            auto bgto_z = braGtoGridBuffer.data(4 * i + 3);
+            
+            for (int32_t j = 0; j < ketAngularComponents; j++)
+            {
+                auto kgto = ketGtoGridBuffer.data(4 * j);
+                
+                auto kgto_x = ketGtoGridBuffer.data(4 * j + 1);
+                
+                auto kgto_y = ketGtoGridBuffer.data(4 * j + 2);
+                
+                auto kgto_z = ketGtoGridBuffer.data(4 * j + 3);
+                
+                double psum = 0.0;
+                
+                for (int32_t k = 0; k < ngpoints; k++)
+                {
+                    double w = gridWeights[gridOffset + k];
+
+                    double gx = grada_x[gridOffset + k];
+
+                    double gy = grada_y[gridOffset + k];
+
+                    double gz = grada_z[gridOffset + k];
+		    
+                    psum += w * bgto[k] * kgto[k] * grhoa[gridOffset + k];
+                    
+                    double fgrd = w * (ggrada[gridOffset + k] / ngrada[gridOffset + k] + ggradab[gridOffset + k]);
+  
+                    psum += fgrd * bgto[k] * (gx * kgto_x[k] + gy * kgto_y[k] + gz * kgto_z[k]);
+                    
+                    psum += fgrd * kgto[k] * (gx * bgto_x[k] + gy * bgto_y[k] + gz * bgto_z[k]);
+                }
+                
+                ppvals[i * ketAngularComponents + j] = psum;
+            }
+        }
+        
+        return;
+    }
     
     // FIX ME: impelemnt MGGA case
 }

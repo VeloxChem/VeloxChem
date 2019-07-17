@@ -126,6 +126,16 @@ public:
     void slice(const int32_t nGridPoints);
     
     /**
+     Updates beta densites (density, it's gradient components) by assigning alpha density values.
+     */
+    void updateBetaDensities();
+    
+    /**
+     Computes density norms.
+     */
+    void computeDensityNorms();
+    
+    /**
      Gets number of grid points in density grid object.
      
      @return the number of grid points.
@@ -225,6 +235,102 @@ public:
      @return the pointer to alpha * beta density gradients product values.
      */
     double* mixedDensityGradient(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to alpha density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient X values.
+     */
+    const double* alphaDensityGradientX(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to alpha density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient X values.
+     */
+    double* alphaDensityGradientX(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to alpha density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Y values.
+     */
+    const double* alphaDensityGradientY(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to alpha density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Y values.
+     */
+    double* alphaDensityGradientY(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to alpha density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Z values.
+     */
+    const double* alphaDensityGradientZ(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to alpha density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Z values.
+     */
+    double* alphaDensityGradientZ(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to beta density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient X values.
+     */
+    const double* betaDensityGradientX(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient X values.
+     */
+    double* betaDensityGradientX(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to beta density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Y values.
+     */
+    const double* betaDensityGradientY(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Y values.
+     */
+    double* betaDensityGradientY(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* betaDensityGradientZ(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* betaDensityGradientZ(const int32_t iDensityMatrix);
     
     /**
      Sets vectors of screened density and molecular grids for each density matrix in density grid object.
