@@ -396,6 +396,8 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
         
         auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+
+	auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
         
         // set up pointers to density gradient norms
         
@@ -434,17 +436,21 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                 #pragma omp simd
                 for (int32_t k = 0; k < ngpoints; k++)
                 {
-                    psum += gridWeights[gridOffset + k] * bgto[k] * kgto[k] * grhoa[gridOffset + k];
+		    double w = gridWeights[gridOffset + k];
+
+		    double gx = grada_x[gridOffset + k];
+
+		    double gy = grada_y[gridOffset + k];
+
+		    double gz = grada_z[gridOffset + k];
+		    
+                    psum += w * bgto[k] * kgto[k] * grhoa[gridOffset + k];
                     
-                    double fgrd = 2.0 * ggrada[gridOffset + k] / ngrada[gridOffset + k];
+                    double fgrd = ggrada[gridOffset + k] / ngrada[gridOffset + k] + ggradab[gridOffset + k];
+  
+                    psum += w * fgrd * bgto[k] * (gx * kgto_x[k] + gy * kgto_y[k] + gz * kgto_z[k]);
                     
-                    psum += gridWeights[gridOffset + k] * fgrd * bgto[k] * (grada_x[gridOffset + k] * kgto_x[k] +
-                                                                            grada_y[gridOffset + k] * kgto_y[k] +
-                                                                            grada_z[gridOffset + k] * kgto_z[k]);
-                    
-                    psum += gridWeights[gridOffset + k] * fgrd * kgto[k] * (grada_x[gridOffset + k] * bgto_x[k] +
-                                                                            grada_y[gridOffset + k] * bgto_y[k] +
-                                                                            grada_z[gridOffset + k] * bgto_z[k]);
+                    psum += w * fgrd * kgto[k] * (gx * bgto_x[k] + gy * bgto_y[k] + gz * bgto_z[k]);
                 }
                 
                 ppvals[i * ketAngularComponents + j] = psum;
