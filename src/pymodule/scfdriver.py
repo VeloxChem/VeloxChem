@@ -398,7 +398,7 @@ class ScfDriver:
         fock_mat = AOFockMatrix(den_mat)
 
         if self.dft:
-            self.update_fock_type(fock_mat)
+            self.update_fock_type(fock_mat) 
 
         if self.rank == mpi_master():
             self.print_scf_title()
@@ -417,6 +417,8 @@ class ScfDriver:
             if self.dft:
                 vxc_mat = xc_drv.integrate(den_mat, molecule, ao_basis, self.molgrid,
                                            self.xcfun.get_func_label())
+                #print("Energy: ", vxc_mat.get_energy())
+                #print("VXC matrix:", str(vxc_mat))
                 vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
                 e_ee += vxc_mat.get_energy() 

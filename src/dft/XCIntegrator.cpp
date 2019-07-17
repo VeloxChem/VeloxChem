@@ -433,7 +433,6 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                 
                 double psum = 0.0;
                 
-                #pragma omp simd
                 for (int32_t k = 0; k < ngpoints; k++)
                 {
                     double w = gridWeights[gridOffset + k];

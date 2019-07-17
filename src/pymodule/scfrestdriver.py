@@ -234,7 +234,7 @@ class ScfRestrictedDriver(ScfDriver):
         if math.fabs(fxc) < 1.0e-8:
             fock_mat.set_fock_type(fockmat.restj, 0)
         else:
-            fock_mat.set_fock_type(fockmat.restjkx)
-            fock_mat.set_scale_factor(fxc)
+            fock_mat.set_fock_type(fockmat.restjkx, 0)
+            fock_mat.set_scale_factor(fxc, 0)
         
         return
