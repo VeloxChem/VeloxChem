@@ -34,7 +34,7 @@ TEST_F(CXCIntegratorTest, IntegrateKohnSham)
     
     CXCIntegrator xcdrv(MPI_COMM_WORLD);
     
-    auto ksmat = xcdrv.integrate(dmat, mh2o, mbas, mgrid, std::string("BECKE88"));
+    auto ksmat = xcdrv.integrate(dmat, mh2o, mbas, mgrid, std::string("LYP"));
     
     ASSERT_NEAR(ksmat.getNumberOfElectrons(), 10.0, 1.0e-6);
     
