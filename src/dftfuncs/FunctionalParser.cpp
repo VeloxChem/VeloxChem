@@ -60,6 +60,32 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                  {1.0, 1.0, 1.0});
         }
         
+        // pure spin-polarized hybrid B3LYP exchange-correlation functional
+        
+        if (fstr::upcase(xcLabel) == "B3LYP")
+        {
+            return CXCFunctional({"B3LYP"}, xcfun::gga, 0.2, {setPrimitiveSlaterFunctional(),
+                                 setPrimitiveBecke88Functional(), setPrimitiveLYPFunctional(),
+                                 setPrimitiveVWN3Functional()}, {0.8, 0.72, 0.81, 0.19});
+        }
+        
+        // pure spin-polarized hybrid BHANDH exchange-correlation functional
+        
+        if (fstr::upcase(xcLabel) == "BHANDH")
+        {
+            return CXCFunctional({"BHANDH"}, xcfun::gga, 0.5, {setPrimitiveSlaterFunctional(),
+                                 setPrimitiveLYPFunctional()}, {0.5, 1.0});
+        }
+        
+        // pure spin-polarized hybrid B3LYP exchange-correlation functional
+        
+        if (fstr::upcase(xcLabel) == "BHANDHLYP")
+        {
+            return CXCFunctional({"BHANDHLYP"}, xcfun::gga, 0.5, {setPrimitiveSlaterFunctional(),
+                                 setPrimitiveBecke88Functional(), setPrimitiveLYPFunctional()},
+                                 {0.5, 0.5, 1.0});
+        }
+        
         // FIX ME: add other functionals here... 
         
         return CXCFunctional();
