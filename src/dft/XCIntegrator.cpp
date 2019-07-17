@@ -397,7 +397,7 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         
         auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
 
-	auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+        auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
         
         // set up pointers to density gradient norms
         
@@ -436,21 +436,21 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                 #pragma omp simd
                 for (int32_t k = 0; k < ngpoints; k++)
                 {
-		    double w = gridWeights[gridOffset + k];
+                    double w = gridWeights[gridOffset + k];
 
-		    double gx = grada_x[gridOffset + k];
+                    double gx = grada_x[gridOffset + k];
 
-		    double gy = grada_y[gridOffset + k];
+                    double gy = grada_y[gridOffset + k];
 
-		    double gz = grada_z[gridOffset + k];
+                    double gz = grada_z[gridOffset + k];
 		    
                     psum += w * bgto[k] * kgto[k] * grhoa[gridOffset + k];
                     
-                    double fgrd = ggrada[gridOffset + k] / ngrada[gridOffset + k] + ggradab[gridOffset + k];
+                    double fgrd = w * (ggrada[gridOffset + k] / ngrada[gridOffset + k] + ggradab[gridOffset + k]);
   
-                    psum += w * fgrd * bgto[k] * (gx * kgto_x[k] + gy * kgto_y[k] + gz * kgto_z[k]);
+                    psum += fgrd * bgto[k] * (gx * kgto_x[k] + gy * kgto_y[k] + gz * kgto_z[k]);
                     
-                    psum += w * fgrd * kgto[k] * (gx * bgto_x[k] + gy * bgto_y[k] + gz * bgto_z[k]);
+                    psum += fgrd * kgto[k] * (gx * bgto_x[k] + gy * bgto_y[k] + gz * bgto_z[k]);
                 }
                 
                 ppvals[i * ketAngularComponents + j] = psum;
