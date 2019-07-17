@@ -357,6 +357,7 @@ class ComplexResponse:
 
     def setup_trials(self,
                      vectors,
+                     trials_info,
                      pre=None,
                      bger=None,
                      bung=None,
@@ -412,9 +413,9 @@ class ComplexResponse:
 
         # orthogonalizing new trial vectors against existing ones
 
-        if bger is not None and bger.any():
+        if trials_info['bger']:
             new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
-        if bung is not None and bung.any():
+        if trials_info['bung']:
             new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
 
         # normalizing new trial vectors
@@ -428,6 +429,8 @@ class ComplexResponse:
             new_ger = orthogonalize_gram_schmidt(new_ger)
             new_ger = normalize(new_ger)
 
+            trials_info['new_trials_ger'] = True
+
         if new_ung.any() and renormalize:
 
             # removing linear dependencies in ungerade trials:
@@ -437,7 +440,9 @@ class ComplexResponse:
             new_ung = orthogonalize_gram_schmidt(new_ung)
             new_ung = normalize(new_ung)
 
-        return new_ger, new_ung
+            trials_info['new_trials_ung'] = True
+
+        return new_ger, new_ung, trials_info
 
     def compute(self, molecule, basis, scf_tensors, b_rhs=None):
         """
@@ -508,7 +513,8 @@ class ComplexResponse:
 
         if self.rank == mpi_master():
 
-            trials_info = {'bger': False, 'bung': False}
+            trials_info = {'bger': False, 'bung': False,
+                           'new_trials_ger': False, 'new_trials_ung': False}
 
             # calling the gradients
 
@@ -530,19 +536,16 @@ class ComplexResponse:
             # spawning initial trial vectors
 
             igs = self.initial_guess(v1, d, freqs, precond)
-            bger, bung = self.setup_trials(igs)
+            bger, bung, trials_info = self.setup_trials(igs, trials_info)
+
+            trials_info['bger'] = trials_info['new_trials_ger']
+            trials_info['bung'] = trials_info['new_trials_ung']
 
             assert_msg_critical(
-                bger.any() or bung.any(),
+                trials_info['bger'] or trials_info['bung'],
                 'ComplexResponseSolver: trial vectors are empty')
 
             # creating sigma and rho linear transformations
-
-            if bger.any():
-                trials_info['bger'] = True
-
-            if bung.any():
-                trials_info['bung'] = True
 
         else:
             trials_info = {}
@@ -595,7 +598,7 @@ class ComplexResponse:
 
                         # projections onto gerade and ungerade subspaces:
 
-                        if bger.any():
+                        if trials_info['bger']:
                             g_realger = np.matmul(bger.T, gradger.real)
                             g_imagger = np.matmul(bger.T, gradger.imag)
 
@@ -611,13 +614,13 @@ class ComplexResponse:
 
                             ntrials_ger = 0
 
-                        if bung.any():
+                        if trials_info['bung']:
                             g_realung = np.matmul(bung.T, gradung.real)
                             g_imagung = np.matmul(bung.T, gradung.imag)
 
                             e2uu = np.matmul(bung.T, e2bung)
 
-                            if bger.any():
+                            if trials_info['bger']:
                                 s2ug = np.matmul(bung.T, s2bung)
 
                             ntrials_ung = bung.shape[1]
@@ -628,7 +631,7 @@ class ComplexResponse:
 
                             e2uu = np.zeros((0,0))
 
-                            if bger.any():
+                            if trials_info['bger']:
                                 s2ug = np.zeros((0,ntrials_ger))
 
                             ntrials_ung = 0
@@ -640,13 +643,20 @@ class ComplexResponse:
                         # gradient
 
                         g = np.zeros(size)
+                        
+                        if trials_info['bger']:
+                            g[:ntrials_ger] = g_realger[:]
+                            g[-ntrials_ger:] = -g_imagger[:]
 
-                        g[:ntrials_ger] = g_realger[:]
-                        g[-ntrials_ger:] = -g_imagger[:]
-
-                        g[ntrials_ger:ntrials_ger + ntrials_ung] = g_realung[:]
-                        g[-ntrials_ger -
-                          ntrials_ung:-ntrials_ger] = -g_imagung[:]
+                        if trials_info['bung']:
+                            if trials_info['bger']:
+                                g[ntrials_ger:ntrials_ger +
+                                  ntrials_ung] = g_realung[:]
+                                g[-ntrials_ger -
+                                  ntrials_ung:-ntrials_ger] = -g_imagung[:]
+                            else:
+                                g[:ntrials_ung] = g_realung[:]
+                                g[-ntrials_ung:] = -g_imagung[:]
 
                         # matrix
 
@@ -654,47 +664,55 @@ class ComplexResponse:
 
                         # filling E2gg
 
-                        mat[:ntrials_ger, :ntrials_ger] = e2gg[:, :]
+                        if trials_info['bger']:
+                            mat[:ntrials_ger, :ntrials_ger] = e2gg[:, :]
 
-                        mat[-ntrials_ger:, -ntrials_ger:] = -e2gg[:, :]
+                            mat[-ntrials_ger:, -ntrials_ger:] = -e2gg[:, :]
 
                         # filling E2uu
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = e2uu[:, :]
+                        if trials_info['bung']:
+                            if trials_info['bger']:
+                                mat[ntrials_ger:ntrials_ger +
+                                    ntrials_ung, ntrials_ger:ntrials_ger +
+                                    ntrials_ung] = e2uu[:, :]
 
-                        mat[-ntrials_ger -
-                            ntrials_ung:-ntrials_ger, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = -e2uu[:, :]
+                                mat[-ntrials_ger -
+                                    ntrials_ung:-ntrials_ger, -ntrials_ger -
+                                    ntrials_ung:-ntrials_ger] = -e2uu[:, :]
+                            else:
+                                mat[:ntrials_ung, :ntrials_ung] = e2uu[:, :]
+
+                                mat[-ntrials_ung:, -ntrials_ung:] = -e2uu[:, :]
 
                         # filling S2ug
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, :ntrials_ger] = -w * s2ug[:, :]
+                        if trials_info['bger'] and trials_info['bung']:
+                            mat[ntrials_ger:ntrials_ger +
+                                ntrials_ung, :ntrials_ger] = -w * s2ug[:, :]
 
-                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger, :
-                            ntrials_ger] = d * s2ug[:, :]
+                            mat[-ntrials_ger - ntrials_ung:-ntrials_ger, :
+                                ntrials_ger] = d * s2ug[:, :]
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, -ntrials_ger:] = d * s2ug[:, :]
+                            mat[ntrials_ger:ntrials_ger +
+                                ntrials_ung, -ntrials_ger:] = d * s2ug[:, :]
 
-                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger,
-                            -ntrials_ger:] = w * s2ug[:, :]
+                            mat[-ntrials_ger - ntrials_ung:-ntrials_ger,
+                                -ntrials_ger:] = w * s2ug[:, :]
 
                         # filling S2ug.T (interchanging of row and col)
 
-                        mat[:ntrials_ger, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = -w * s2ug.T[:, :]
+                            mat[:ntrials_ger, ntrials_ger:ntrials_ger +
+                                ntrials_ung] = -w * s2ug.T[:, :]
 
-                        mat[:ntrials_ger, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = d * s2ug.T[:, :]
+                            mat[:ntrials_ger, -ntrials_ger -
+                                ntrials_ung:-ntrials_ger] = d * s2ug.T[:, :]
 
-                        mat[-ntrials_ger:, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = d * s2ug.T[:, :]
+                            mat[-ntrials_ger:, ntrials_ger:ntrials_ger +
+                                ntrials_ung] = d * s2ug.T[:, :]
 
-                        mat[-ntrials_ger:, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = w * s2ug.T[:, :]
+                            mat[-ntrials_ger:, -ntrials_ger -
+                                ntrials_ung:-ntrials_ger] = w * s2ug.T[:, :]
 
                         # solving matrix equation
 
@@ -707,12 +725,19 @@ class ComplexResponse:
                         c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
                             ntrials_ung)
 
-                        c_realger[:] = c[:ntrials_ger]
-                        c_imagger[:] = c[-ntrials_ger:]
+                        if trials_info['bger']:
+                            c_realger[:] = c[:ntrials_ger]
+                            c_imagger[:] = c[-ntrials_ger:]
 
-                        c_realung[:] = c[ntrials_ger:ntrials_ger + ntrials_ung]
-                        c_imagung[:] = c[-ntrials_ger -
-                                         ntrials_ung:-ntrials_ger]
+                        if trials_info['bung']:
+                            if trials_info['bger']:
+                                c_realung[:] = c[ntrials_ger:ntrials_ger +
+                                                 ntrials_ung]
+                                c_imagung[:] = c[-ntrials_ger -
+                                                 ntrials_ung:-ntrials_ger]
+                            else:
+                                c_realung[:] = c[:ntrials_ung]
+                                c_imagung[:] = c[-ntrials_ung:]
 
                         # ...and projecting them onto respective subspace
 
@@ -738,7 +763,7 @@ class ComplexResponse:
                         # composing E2 and S2 matrices projected onto solution
                         # subspace
 
-                        if bger.any():
+                        if trials_info['bger']:
                             e2realger = np.matmul(e2bger, c_realger)
                             e2imagger = np.matmul(e2bger, c_imagger)
                             s2realger = np.matmul(s2bung, c_realger)
@@ -750,7 +775,7 @@ class ComplexResponse:
                             s2realger = np.zeros(full_size)
                             s2imagger = np.zeros(full_size)
 
-                        if bung.any():
+                        if trials_info['bung']:
                             e2realung = np.matmul(e2bung, c_realung)
                             e2imagung = np.matmul(e2bung, c_imagung)
                             s2realung = np.matmul(s2bger, c_realung)
@@ -827,29 +852,28 @@ class ComplexResponse:
 
             if self.rank == mpi_master():
 
-                trials_info = {'new_trials_ger': False, 'new_trials_ung': False}
+                trials_info['new_trials_ger'] = False
+                trials_info['new_trials_ung'] = False
 
-                new_trials_ger, new_trials_ung = self.setup_trials(
+                new_trials_ger, new_trials_ung, trials_info = self.setup_trials(
                     residuals,
+                    trials_info,
                     pre=precond,
                     bger=bger,
                     bung=bung,
                     res_norm=relative_residual_norm)
 
                 assert_msg_critical(
-                    new_trials_ger.any() or new_trials_ung.any(),
+                    trials_info['new_trials_ger'] or
+                    trials_info['new_trials_ung'],
                     'ComplexResponseSolver: unable to add new trial vectors')
 
                 # creating new sigma and rho linear transformations
 
-                if new_trials_ger.any():
-                    trials_info['new_trials_ger'] = True
-
+                if trials_info['new_trials_ger']:
                     bger = np.append(bger, new_trials_ger, axis=1)
 
-                if new_trials_ung.any():
-                    trials_info['new_trials_ung'] = True
-
+                if trials_info['new_trials_ung']:
                     bung = np.append(bung, new_trials_ung, axis=1)
 
             else:
