@@ -13,7 +13,7 @@ class ResponseProperty:
         The dictionary of response property.
     """
 
-    def __init__(self, rsp_input):
+    def __init__(self, rsp_input, method_input={}):
         """
         Initializes response property/spectroscopy.
 
@@ -22,6 +22,7 @@ class ResponseProperty:
         """
 
         self.rsp_input = rsp_input
+        self.method_input = method_input
 
     def init_driver(self, comm, ostream):
         """
@@ -34,7 +35,7 @@ class ResponseProperty:
         """
 
         self.rsp_driver = ResponseDriver(comm, ostream)
-        self.rsp_driver.update_settings(self.rsp_input)
+        self.rsp_driver.update_settings(self.rsp_input, self.method_input)
 
     def compute(self, molecule, basis, scf_tensors):
         """

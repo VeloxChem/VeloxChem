@@ -10,10 +10,13 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
+from .veloxchemlib import GridDriver
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import molorb
 from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import parse_xc_func
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .errorhandler import assert_msg_critical
@@ -72,6 +75,12 @@ class TDAExciDriver:
         self.eri_thresh = 1.0e-15
         self.qq_type = 'QQ_DEN'
 
+        # dft
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = None
+        self.molgrid = None
+
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
@@ -91,7 +100,7 @@ class TDAExciDriver:
         self.restart = True
         self.checkpoint_file = None
 
-    def update_settings(self, settings):
+    def update_settings(self, settings, method_dict={}):
         """
         Updates settings in TDA excited states computation driver.
 
@@ -108,6 +117,14 @@ class TDAExciDriver:
             self.eri_thresh = float(settings['eri_thresh'])
         if 'qq_type' in settings:
             self.qq_type = settings['qq_type'].upper()
+
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key == 'yes' else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
 
         if 'conv_thresh' in settings:
             self.conv_thresh = float(settings['conv_thresh'])
@@ -151,6 +168,20 @@ class TDAExciDriver:
         # set start time
 
         start_time = tm.time()
+
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            self.molgrid = grid_drv.generate(molecule)
+            self.molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(self.molgrid.number_of_points(),
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
 

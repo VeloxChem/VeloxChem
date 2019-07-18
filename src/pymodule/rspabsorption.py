@@ -12,7 +12,7 @@ class Absorption(ResponseProperty):
         The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict):
+    def __init__(self, rsp_dict, method_dict):
         """
         Initializes the absorption property.
 
@@ -21,6 +21,7 @@ class Absorption(ResponseProperty):
         """
 
         rsp_input = dict(rsp_dict)
+        method_input = dict(method_dict)
 
         rsp_input['property'] = 'absorption'
         rsp_input['response'] = 'linear'
@@ -33,7 +34,7 @@ class Absorption(ResponseProperty):
         if 'spin' not in rsp_dict:
             rsp_input['spin'] = 'singlet'
 
-        super().__init__(rsp_input)
+        super().__init__(rsp_input, method_input)
 
     def get_property(self, key):
         """
