@@ -105,6 +105,56 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
     return CAOKohnShamMatrix(); 
 }
 
+void
+CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
+                         const CAODensityMatrix& aoDensityMatrix,
+                         const CMolecule&        molecule,
+                         const CMolecularBasis&  basis,
+                         const CMolecularGrid&   molecularGrid,
+                         const std::string&      xcFuncLabel) const
+{
+    // parse exchange-correlation functional data
+    
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    
+    // create GTOs container
+    
+    //CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+    
+    // generate reference density grid
+    
+    CDensityGridDriver dgdrv(_locComm);
+    
+    auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+    
+    // set up number of density matrices
+    
+    auto ndmat = refdengrid.getNumberOfDensityMatrices();
+    
+    if (aoDensityMatrix.isRestricted())
+    {
+        // molecular and density grids
+        
+        std::vector<CMolecularGrid> mgrids(ndmat, molecularGrid);
+        
+        std::vector<CDensityGrid> dgrids(ndmat, CDensityGrid(molecularGrid.getNumberOfGridPoints(), 1, fvxc.getFunctionalType(), dengrid::ab));
+        
+        // generate screened density and molecular grids
+        
+        refdengrid.setScreenedGrids(dgrids, mgrids, _thresholdOfDensity, fvxc.getFunctionalType());
+        
+        for (int32_t i = 0; i < ndmat; i++)
+        {
+            printf("@@@ Density Matrix: %i Number of Grid Points %i -> %i\n", i, mgrids[i].getNumberOfGridPoints(), molecularGrid.getNumberOfGridPoints());
+        }
+    }
+    else
+    {
+        // perform integration for spin unrestricted densities
+        
+        // FIX ME: implement partitioning and screening for density grid
+    }
+}
 
 void
 CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMatrix,

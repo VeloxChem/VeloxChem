@@ -26,7 +26,8 @@ namespace vxcfuncs {  // vxcfuncs namespace
         return CPrimitiveFunctional({"Becke88"}, xcfun::gga,
                                     &vxcfuncs::Becke88FuncGradientAB,
                                     &vxcfuncs::Becke88FuncGradientA,
-                                    &vxcfuncs::Becke88FuncGradientB);
+                                    &vxcfuncs::Becke88FuncGradientB,
+                                    nullptr, nullptr, nullptr);
     }
     
     void

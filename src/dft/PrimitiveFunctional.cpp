@@ -19,14 +19,23 @@ CPrimitiveFunctional::CPrimitiveFunctional()
     , _aFirstOrderFunction(nullptr)
 
     , _bFirstOrderFunction(nullptr)
+
+    , _abSecondOrderFunction(nullptr)
+
+    , _aSecondOrderFunction(nullptr)
+
+    , _bSecondOrderFunction(nullptr)
 {
 }
 
-CPrimitiveFunctional::CPrimitiveFunctional(const std::string&                     label,
-                                           const xcfun                            xcFuncType,
-                                           const std::function<def_vxc_func_typ>& abFirstOrderFunction,
-                                           const std::function<def_vxc_func_typ>& aFirstOrderFunction,
-                                           const std::function<def_vxc_func_typ>& bFirstOrderFunction)
+CPrimitiveFunctional::CPrimitiveFunctional(const std::string&                      label,
+                                           const xcfun                             xcFuncType,
+                                           const std::function<def_vxc_func_typ>&  abFirstOrderFunction,
+                                           const std::function<def_vxc_func_typ>&  aFirstOrderFunction,
+                                           const std::function<def_vxc_func_typ>&  bFirstOrderFunction,
+                                           const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
+                                           const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
+                                           const std::function<def_vxc2_func_typ>& bSecondOrderFunction)
 
     : _label(label)
 
@@ -37,6 +46,12 @@ CPrimitiveFunctional::CPrimitiveFunctional(const std::string&                   
     , _aFirstOrderFunction(aFirstOrderFunction)
 
     , _bFirstOrderFunction(bFirstOrderFunction)
+
+    , _abSecondOrderFunction(abSecondOrderFunction)
+
+    , _aSecondOrderFunction(aSecondOrderFunction)
+
+    , _bSecondOrderFunction(bSecondOrderFunction)
 {
     
 }
@@ -52,6 +67,12 @@ CPrimitiveFunctional::CPrimitiveFunctional(const CPrimitiveFunctional& source)
     , _aFirstOrderFunction(source._aFirstOrderFunction)
 
     , _bFirstOrderFunction(source._bFirstOrderFunction)
+
+    , _abSecondOrderFunction(source._abSecondOrderFunction)
+
+    , _aSecondOrderFunction(source._aSecondOrderFunction)
+
+    , _bSecondOrderFunction(source._bSecondOrderFunction)
 {
     
 }
@@ -67,6 +88,12 @@ CPrimitiveFunctional::CPrimitiveFunctional(CPrimitiveFunctional&& source) noexce
     , _aFirstOrderFunction(std::move(source._aFirstOrderFunction))
 
     , _bFirstOrderFunction(std::move(source._bFirstOrderFunction))
+
+    , _abSecondOrderFunction(std::move(source._abSecondOrderFunction))
+
+    , _aSecondOrderFunction(std::move(source._aSecondOrderFunction))
+
+    , _bSecondOrderFunction(std::move(source._bSecondOrderFunction))
 {
     
 }
@@ -89,6 +116,12 @@ CPrimitiveFunctional::operator=(const CPrimitiveFunctional& source)
     _aFirstOrderFunction = source._aFirstOrderFunction;
     
     _bFirstOrderFunction = source._bFirstOrderFunction;
+    
+    _abSecondOrderFunction = source._abSecondOrderFunction;
+    
+    _aSecondOrderFunction = source._aSecondOrderFunction;
+    
+    _bSecondOrderFunction = source._bSecondOrderFunction;
 
     return *this;
 }
@@ -107,6 +140,12 @@ CPrimitiveFunctional::operator=(CPrimitiveFunctional&& source) noexcept
     _aFirstOrderFunction = std::move(source._aFirstOrderFunction);
     
     _bFirstOrderFunction = std::move(source._bFirstOrderFunction);
+    
+    _abSecondOrderFunction = std::move(source._abSecondOrderFunction);
+    
+    _aSecondOrderFunction = std::move(source._aSecondOrderFunction);
+    
+    _bSecondOrderFunction = std::move(source._bSecondOrderFunction);
 
     return *this;
 }
@@ -139,6 +178,18 @@ CPrimitiveFunctional::compute(      CXCGradientGrid& xcGradientGrid,
     if (densityGrid.getDensityGridType() == dengrid::lima) _aFirstOrderFunction(xcGradientGrid, factor, densityGrid);
     
     if (densityGrid.getDensityGridType() == dengrid::limb) _bFirstOrderFunction(xcGradientGrid, factor, densityGrid);
+}
+
+void
+CPrimitiveFunctional::compute(      CXCHessianGrid& xcHessianGrid,
+                              const double          factor,
+                              const CDensityGrid&   densityGrid) const
+{
+    if (densityGrid.getDensityGridType() == dengrid::ab) _abSecondOrderFunction(xcHessianGrid, factor, densityGrid);
+    
+    if (densityGrid.getDensityGridType() == dengrid::lima) _aSecondOrderFunction(xcHessianGrid, factor, densityGrid);
+    
+    if (densityGrid.getDensityGridType() == dengrid::limb) _bSecondOrderFunction(xcHessianGrid, factor, densityGrid);
 }
 
 std::string

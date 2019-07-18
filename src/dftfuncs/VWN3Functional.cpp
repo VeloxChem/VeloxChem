@@ -26,7 +26,8 @@ namespace vxcfuncs {  // vxcfuncs namespace
         return CPrimitiveFunctional({"VWN3"}, xcfun::lda,
                                     &vxcfuncs::VWN3FuncGradientAB,
                                     &vxcfuncs::VWN3FuncGradientA,
-                                    &vxcfuncs::VWN3FuncGradientB);
+                                    &vxcfuncs::VWN3FuncGradientB,
+                                    nullptr, nullptr, nullptr);
     }
     
     void

@@ -16,9 +16,12 @@
 
 #include "XCFuncType.hpp"
 #include "XCGradientGrid.hpp"
+#include "XCHessianGrid.hpp"
 #include "DensityGrid.hpp"
 
 using def_vxc_func_typ = void(CXCGradientGrid&, const double factor, const CDensityGrid&);
+
+using def_vxc2_func_typ = void(CXCHessianGrid&, const double factor, const CDensityGrid&);
 
 // using def_vxc2_func_typ = void(CXCGradientGrid&, const CDensityGrid&);
 
@@ -58,6 +61,24 @@ class CPrimitiveFunctional
      */
     std::function<def_vxc_func_typ> _bFirstOrderFunction;
     
+    /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::ab type.
+     */
+    std::function<def_vxc2_func_typ> _abSecondOrderFunction;
+    
+    /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::lima type.
+     */
+    std::function<def_vxc2_func_typ> _aSecondOrderFunction;
+    
+    /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::limb type.
+     */
+    std::function<def_vxc2_func_typ> _bSecondOrderFunction;
+    
 public:
     /**
      Creates an empty primitive exchange-correlation functional object.
@@ -72,12 +93,18 @@ public:
      @param abFirstOrderFunction the first-order derivative function (dengrid::ab).
      @param aFirstOrderFunction the first-order derivative function (dengrid::lima).
      @param bFirstOrderFunction the first-order derivative function (dengrid::limb).
+     @param abSecondOrderFunction the second-order derivative function (dengrid::ab).
+     @param aSecondOrderFunction the second-order derivative function (dengrid::lima).
+     @param bSecondOrderFunction the second-order derivative function (dengrid::limb).
      */
-    CPrimitiveFunctional(const std::string&                     label,
-                         const xcfun                            xcFuncType,
-                         const std::function<def_vxc_func_typ>& abFirstOrderFunction,
-                         const std::function<def_vxc_func_typ>& aFirstOrderFunction,
-                         const std::function<def_vxc_func_typ>& bFirstOrderFunction);
+    CPrimitiveFunctional(const std::string&                      label,
+                         const xcfun                             xcFuncType,
+                         const std::function<def_vxc_func_typ>&  abFirstOrderFunction,
+                         const std::function<def_vxc_func_typ>&  aFirstOrderFunction,
+                         const std::function<def_vxc_func_typ>&  bFirstOrderFunction,
+                         const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
+                         const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
+                         const std::function<def_vxc2_func_typ>& bSecondOrderFunction);
     
     /**
      Creates a primitive exchange-correlation functional object by copying other primitive exchange-correlation functional
@@ -146,7 +173,6 @@ public:
      */
     xcfun getFunctionalType() const;
     
-    
     /**
      Computes first derivative of exchange-correlation functional for given density grid.
 
@@ -157,6 +183,17 @@ public:
     void compute(      CXCGradientGrid& xcGradientGrid,
                  const double           factor,
                  const CDensityGrid&    densityGrid) const;
+    
+    /**
+     Computes second derivative of exchange-correlation functional for given density grid.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid object.
+     @param factor the scaling factor of functional contribution.
+     @param densityGrid the density grid object.
+     */
+    void compute(      CXCHessianGrid& xcHessianGrid,
+                 const double          factor,
+                 const CDensityGrid&   densityGrid) const;
     
     /**
      Converts primitive exchange-correlation functional object to text format and insert it into output text stream.

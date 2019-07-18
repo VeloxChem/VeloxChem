@@ -26,7 +26,8 @@ namespace vxcfuncs {  // vxcfuncs namespace
         return CPrimitiveFunctional({"LYP"}, xcfun::gga,
                                     &vxcfuncs::LYPFuncGradientAB,
                                     &vxcfuncs::LYPFuncGradientA,
-                                    &vxcfuncs::LYPFuncGradientB);
+                                    &vxcfuncs::LYPFuncGradientB,
+                                    nullptr, nullptr, nullptr);
     }
     
     void

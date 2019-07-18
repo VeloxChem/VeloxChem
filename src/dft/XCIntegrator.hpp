@@ -226,6 +226,23 @@ public:
                                 const CMolecularBasis&  basis,
                                 const CMolecularGrid&   molecularGrid,
                                 const std::string&      xcFuncLabel) const;
+    
+    /**
+     Integrates exchnage-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.
+     
+     @param aoFockMatrix the AO Fock matrix.
+     @param aoDensityMatrix the AO density matrix object.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     */
+    void integrate(      CAOFockMatrix&    aoFockMatrix,
+                   const CAODensityMatrix& aoDensityMatrix,
+                   const CMolecule&        molecule,
+                   const CMolecularBasis&  basis,
+                   const CMolecularGrid&   molecularGrid,
+                   const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCIntegrator_hpp */
