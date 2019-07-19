@@ -148,6 +148,8 @@ export_dft(py::module& m)
         .def("get_frac_exact_exchange", &CXCFunctional::getFractionOfExactExchange)
         .def("get_func_type", &CXCFunctional::getFunctionalType)
         .def("get_func_label", &CXCFunctional::getLabel)
+        .def("is_hybrid", &CXCFunctional::isHybridFunctional)
+        .def("is_undefined", &CXCFunctional::isUndefined)
         .def(py::self == py::self);
     
     // CMolecularGrid class

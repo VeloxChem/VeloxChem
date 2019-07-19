@@ -93,6 +93,40 @@ TEST_F(CXCFunctionalTest, GetLabel)
     ASSERT_EQ(std::string("LDA"), rfa.getLabel());
 }
 
+TEST_F(CXCFunctionalTest, IsHybrid)
+{
+    CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+    
+    CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+    
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
+    
+    CXCFunctional rfb({"LDA"}, xcfun::lda, 0.0, {pfa, pfb}, {1.0, 2.0});
+    
+    ASSERT_TRUE(rfa.isHybridFunctional());
+    
+    ASSERT_FALSE(rfb.isHybridFunctional());
+}
+
+TEST_F(CXCFunctionalTest, IsUndefined)
+{
+    CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+    
+    CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+    
+    CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
+    
+    CXCFunctional rfb;
+    
+    ASSERT_FALSE(rfa.isUndefined());
+    
+    ASSERT_TRUE(rfb.isUndefined());
+}
+
 TEST_F(CXCFunctionalTest, GetFunctionalType)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,

@@ -150,6 +150,13 @@ public:
     bool isHybridFunctional() const;
     
     /**
+     Determines if exchange-correlation function is undefined.
+
+     @return true if functional is undefined, false otherwise.
+     */
+    bool isUndefined() const;
+    
+    /**
      Computes first derivative of exchange-correlation functional for given density grid.
      
      @param xcGradientGrid the exchange-correlation gradient grid object.

@@ -198,6 +198,14 @@ CXCFunctional::isHybridFunctional() const
     return true;
 }
 
+bool
+CXCFunctional::isUndefined() const
+{
+    if (_xcFuncType == xcfun::undefined) return true;
+    
+    return false;
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CXCFunctional& source)
 {

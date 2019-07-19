@@ -229,12 +229,10 @@ class ScfRestrictedDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         """
         
-        fxc = self.xcfun.get_frac_exact_exchange()
-
-        if math.fabs(fxc) < 1.0e-8:
-            fock_mat.set_fock_type(fockmat.restj, 0)
-        else:
+        if self.xcfun.is_hybrid():
             fock_mat.set_fock_type(fockmat.restjkx, 0)
-            fock_mat.set_scale_factor(fxc, 0)
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0)
+        else:
+            fock_mat.set_fock_type(fockmat.restj, 0)
         
         return
