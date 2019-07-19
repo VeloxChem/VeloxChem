@@ -114,10 +114,6 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
                          const CMolecularGrid&   molecularGrid,
                          const std::string&      xcFuncLabel) const
 {
-    // testing
-    
-    aoFockMatrix.zero();
-    
     // parse exchange-correlation functional data
     
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
@@ -150,7 +146,9 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         
         for (int32_t i = 0; i < ndmat; i++)
         {
-            std::cout << "Fock type (" <<  i << "): " << to_string(aoFockMatrix.getFockType(i)); 
+            // rescale AO Fock matrix for non-hybrid functionals
+            
+            if (!fvxc.isHybridFunctional()) aoFockMatrix.scale(2.0, i);
             
             // compute ground state density for compressed grid
             

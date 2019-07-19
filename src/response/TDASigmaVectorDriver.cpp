@@ -138,6 +138,26 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
     // compute AO Fock matrices
 
     CAOFockMatrix faomat(drwmat);
+    
+    // update AO Fock matrix type
+    
+    if (!xcFunctional.isUndefined())
+    {
+        if (xcFunctional.isHybridFunctional())
+        {
+            for (int32_t i = 0; i < nvecs; i++)
+            {
+                faomat.setFockType(fockmat::rgenjkx, i);
+            }
+        }
+        else
+        {
+            for (int32_t i = 0; i < nvecs; i++)
+            {
+                faomat.setFockType(fockmat::rgenj, i);
+            }
+        }
+    }
 
     double fock_prefactor = 1.0;
 
@@ -161,6 +181,7 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
     
     if (!xcFunctional.isUndefined())
     {
+        
         // generate ground state density
         
         auto dgsmat = molecularOrbitals.getAODensity(molecule.getNumberOfElectrons());
