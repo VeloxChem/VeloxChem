@@ -30,6 +30,8 @@ std::vector<CDenseMatrix>
 CTDASigmaVectorDriver::compute(const std::vector<CExcitationVector>& zVectors,
                                const bool                            isTripletStates,
                                const CScreeningContainer&            screeningContainer,
+                               const CMolecularGrid&                 molecularGrid,
+                               const CXCFunctional&                  xcFunctional, 
                                const CMolecularOrbitals&             molecularOrbitals,
                                const CMolecule&                      molecule,
                                const CMolecularBasis&                basis) const

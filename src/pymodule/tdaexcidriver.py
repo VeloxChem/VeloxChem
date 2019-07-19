@@ -12,6 +12,8 @@ from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import GridDriver
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import MolecularGrid
+from .veloxchemlib import XCFunctional
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import molorb
@@ -78,8 +80,8 @@ class TDAExciDriver:
         # dft
         self.dft = False
         self.grid_level = 4
-        self.xcfun = None
-        self.molgrid = None
+        self.xcfun = XCFunctional()
+        self.molgrid = MolecularGrid()
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -226,7 +228,7 @@ class TDAExciDriver:
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
+                sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data, self.molgrid, seld.xcfun,
                                            mol_orbs, molecule, basis)
 
             # solve eigenvalues problem on master node
