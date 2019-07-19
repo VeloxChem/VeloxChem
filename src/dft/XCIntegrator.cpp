@@ -172,7 +172,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
             
             _compRestrictedContribution(ksmat, gtovec, vxcgrid, vxc2grid, dgrids[i], curdengrid, mgrids[i], fvxc.getFunctionalType());
             
-            printf("Number of electrons: %lf\n", ksmat.getNumberOfElectrons());
+            std::cout << "Perturbed KS matrix: " << ksmat.getString() << std::endl;
         }
     }
     else
@@ -348,8 +348,8 @@ CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMa
                 
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
-                    //_compRestrictedVXCForBatchOfGridPoints(ksmatprt, gtoContainer, xcgridptr, dgridptr, mgx, mgy, mgz, mgw,
-                    //                                       tbposition, tbsize, xcFunctional);
+                    _compRestrictedVXCForBatchOfGridPoints(ksmatprt, gtoContainer, xcgridptr, xcgrid2ptr, drwptr, dgsptr, mgx, mgy, mgz, mgw,
+                                                           tbposition, tbsize, xcFunctional);
                     
                     _compRestrictedEnergyForBatchOfGridPoints(xcele, xcene, xcgridptr, drwptr, mgw, tbposition, tbsize);
                 }
@@ -389,6 +389,40 @@ CXCIntegrator::_compRestrictedVXCForBatchOfGridPoints(      CAOKohnShamMatrix* a
         {
             _compRestrictedVXCForGtoBlocks(aoKohnShamMatrix, bgtos, gtovec.getGtoBlock(j), xcGradientGrid, densityGrid,
                                            gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridWeights,
+                                           gridOffset, nGridPoints, xcFunctional);
+        }
+    }
+}
+
+void
+CXCIntegrator::_compRestrictedVXCForBatchOfGridPoints(      CAOKohnShamMatrix* aoKohnShamMatrix,
+                                                      const CGtoContainer*     gtoContainer,
+                                                      const CXCGradientGrid*   xcGradientGrid,
+                                                      const CXCHessianGrid*    xcHessianGrid,
+                                                      const CDensityGrid*      rwDensityGrid,
+                                                      const CDensityGrid*      gsDensityGrid,
+                                                      const double*            gridCoordinatesX,
+                                                      const double*            gridCoordinatesY,
+                                                      const double*            gridCoordinatesZ,
+                                                      const double*            gridWeights,
+                                                      const int32_t            gridOffset,
+                                                      const int32_t            nGridPoints,
+                                                      const xcfun              xcFunctional) const
+{
+    // local copy of GTOs containers
+    
+    auto gtovec = CGtoContainer(*gtoContainer);
+    
+    // loop over GTOs container data
+    
+    for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+    {
+        auto bgtos = gtovec.getGtoBlock(i);
+        
+        for (int32_t j = i; j < gtovec.getNumberOfGtoBlocks(); j++)
+        {
+            _compRestrictedVXCForGtoBlocks(aoKohnShamMatrix, bgtos, gtovec.getGtoBlock(j), xcGradientGrid, xcHessianGrid,
+                                           rwDensityGrid, gsDensityGrid, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridWeights,
                                            gridOffset, nGridPoints, xcFunctional);
         }
     }
@@ -501,6 +535,77 @@ CXCIntegrator::_compRestrictedVXCForGtoBlocks(      CAOKohnShamMatrix* aoKohnSha
 }
 
 void
+CXCIntegrator::_compRestrictedVXCForGtoBlocks(      CAOKohnShamMatrix* aoKohnShamMatrix,
+                                              const CGtoBlock&         braGtoBlock,
+                                              const CGtoBlock&         ketGtoBlock,
+                                              const CXCGradientGrid*   xcGradientGrid,
+                                              const CXCHessianGrid*    xcHessianGrid,
+                                              const CDensityGrid*      rwDensityGrid,
+                                              const CDensityGrid*      gsDensityGrid,
+                                              const double*            gridCoordinatesX,
+                                              const double*            gridCoordinatesY,
+                                              const double*            gridCoordinatesZ,
+                                              const double*            gridWeights,
+                                              const int32_t            gridOffset,
+                                              const int32_t            nGridPoints,
+                                              const xcfun              xcFunctional) const
+{
+    // determine symmetry of bra and ket sides
+    
+    auto symbk = (braGtoBlock == ketGtoBlock);
+    
+    // angular momentum data for bra and ket
+    
+    auto bang = braGtoBlock.getAngularMomentum();
+    
+    auto kang = ketGtoBlock.getAngularMomentum();
+    
+    // set up Cartesian GTOs buffers
+    
+    auto nvcomp = xcfun_components(xcFunctional);
+    
+    auto bncart = angmom::to_CartesianComponents(bang);
+    
+    auto kncart = angmom::to_CartesianComponents(kang);
+    
+    auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+    
+    auto kcartbuff = (kang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * kncart) : CMemBlock2D<double>();
+    
+    // set up spherical GTOs buffers
+    
+    auto bnspher = angmom::to_SphericalComponents(bang);
+    
+    auto knspher = angmom::to_SphericalComponents(kang);
+    
+    CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+    
+    CMemBlock2D<double> kspherbuff(nGridPoints, nvcomp * knspher);
+    
+    // initialize GTOs pairs values
+    
+    CMemBlock<double> ppvalues(bnspher * knspher);
+    
+    for (int32_t i = 0; i < braGtoBlock.getNumberOfContrGtos(); i++)
+    {
+        gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                                       braGtoBlock, i, xcFunctional);
+        
+        for (int32_t j = 0; j < ketGtoBlock.getNumberOfContrGtos(); j++)
+        {
+            gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                                           ketGtoBlock, j, xcFunctional);
+            
+            _compRestrictedVXCValueForGtosPair(ppvalues, bspherbuff, kspherbuff, bnspher, knspher, xcGradientGrid, xcHessianGrid,
+                                               rwDensityGrid, gsDensityGrid, gridWeights, gridOffset, xcFunctional);
+            
+            #pragma omp critical (ksmacc)
+            _distRestrictedVXCValues(aoKohnShamMatrix, ppvalues, braGtoBlock, ketGtoBlock, symbk, i, j);
+        }
+    }
+}
+
+void
 CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pairValues,
                                                   const CMemBlock2D<double>& braGtoGridBuffer,
                                                   const CMemBlock2D<double>& ketGtoGridBuffer,
@@ -542,7 +647,6 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                 
                 double psum = 0.0;
                 
-                #pragma omp simd
                 for (int32_t k = 0; k < ngpoints; k++)
                 {
                     psum += gridWeights[gridOffset + k] * bgto[k] * kgto[k] * grhoa[gridOffset + k];
@@ -625,6 +729,78 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                 ppvals[i * ketAngularComponents + j] = psum;
             }
         }
+        
+        return;
+    }
+    
+    // FIX ME: impelemnt MGGA case
+}
+
+void
+CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pairValues,
+                                                  const CMemBlock2D<double>& braGtoGridBuffer,
+                                                  const CMemBlock2D<double>& ketGtoGridBuffer,
+                                                  const int32_t              braAngularComponents,
+                                                  const int32_t              ketAngularComponents,
+                                                  const CXCGradientGrid*     xcGradientGrid,
+                                                  const CXCHessianGrid*      xcHessianGrid,
+                                                  const CDensityGrid*        rwDensityGrid,
+                                                  const CDensityGrid*        gsDensityGrid,
+                                                  const double*              gridWeights,
+                                                  const int32_t              gridOffset,
+                                                  const xcfun                xcFunctional) const
+{
+    // initialize pair values to zero
+    
+    pairValues.zero();
+    
+    // set up pointer to pair values
+    
+    auto ppvals = pairValues.data();
+    
+    // local density approximation
+    
+    if (xcFunctional == xcfun::lda)
+    {
+        auto ngpoints = braGtoGridBuffer.size(0);
+        
+        // set up pointers to gradient data
+        
+        auto grho_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+        
+        // set up pointer to perturbed density
+        
+        auto rhowa = rwDensityGrid->alphaDensity(0);
+        
+        // NOTE: we compute F_a matrix, since F_a = F_b
+        
+        for (int32_t i = 0; i < braAngularComponents; i++)
+        {
+            auto bgto = braGtoGridBuffer.data(i);
+            
+            for (int32_t j = 0; j < ketAngularComponents; j++)
+            {
+                auto kgto = ketGtoGridBuffer.data(j);
+                
+                double psum = 0.0;
+                
+                for (int32_t k = 0; k < ngpoints; k++)
+                {
+                    psum += gridWeights[gridOffset + k] * bgto[k] * kgto[k] * grho_aa[gridOffset + k] * rhowa[gridOffset + k];
+                }
+                
+                ppvals[i * ketAngularComponents + j] = psum;
+            }
+        }
+        
+        return;
+    }
+    
+    // general gradient approximation
+    
+    if (xcFunctional == xcfun::gga)
+    {
+      
         
         return;
     }
