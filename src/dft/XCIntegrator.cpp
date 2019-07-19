@@ -126,7 +126,8 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     CDensityGridDriver dgdrv(_locComm);
     
     auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
-    
+
+    printf("I am here...\n");  
     // set up number of density matrices
     
     auto ndmat = refdengrid.getNumberOfDensityMatrices();
@@ -145,7 +146,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         
         for (int32_t i = 0; i < ndmat; i++)
         {
-            printf("@@@ Density Matrix: %i Number of Grid Points %i -> %i\n", i, mgrids[i].getNumberOfGridPoints(), molecularGrid.getNumberOfGridPoints());
+	  printf("@@@ Density Matrix: %i Number of Grid Points %i -> %i\n", i, molecularGrid.getNumberOfGridPoints(), mgrids[i].getNumberOfGridPoints());
         }
     }
     else
