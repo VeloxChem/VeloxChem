@@ -189,6 +189,7 @@ export_dft(py::module& m)
                                                                 const std::string&) const) & CXCIntegrator::integrate)
         .def("integrate", (void (CXCIntegrator::*)(      CAOFockMatrix&,
                                                    const CAODensityMatrix&,
+                                                   const CAODensityMatrix&,
                                                    const CMolecule&,
                                                    const CMolecularBasis&,
                                                    const CMolecularGrid&,

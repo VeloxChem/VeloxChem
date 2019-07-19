@@ -231,14 +231,16 @@ public:
      Integrates exchnage-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.
      
      @param aoFockMatrix the AO Fock matrix.
-     @param aoDensityMatrix the AO density matrix object.
+     @param rwDensityMatrix the perturbed AO density matrix object.
+     @param gsDensityMatrix the ground state AO density matrix object.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      */
     void integrate(      CAOFockMatrix&    aoFockMatrix,
-                   const CAODensityMatrix& aoDensityMatrix,
+                   const CAODensityMatrix& rwDensityMatrix,
+                   const CAODensityMatrix& gsDensityMatrix,
                    const CMolecule&        molecule,
                    const CMolecularBasis&  basis,
                    const CMolecularGrid&   molecularGrid,

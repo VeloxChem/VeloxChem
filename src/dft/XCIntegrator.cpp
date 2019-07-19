@@ -107,7 +107,8 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
 
 void
 CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
-                         const CAODensityMatrix& aoDensityMatrix,
+                         const CAODensityMatrix& rwDensityMatrix,
+                         const CAODensityMatrix& gsDensityMatrix,
                          const CMolecule&        molecule,
                          const CMolecularBasis&  basis,
                          const CMolecularGrid&   molecularGrid,
@@ -125,14 +126,14 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     CDensityGridDriver dgdrv(_locComm);
     
-    auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+    auto refdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
     printf("I am here...\n");  
     // set up number of density matrices
     
     auto ndmat = refdengrid.getNumberOfDensityMatrices();
     
-    if (aoDensityMatrix.isRestricted())
+    if (rwDensityMatrix.isRestricted())
     {
         // molecular and density grids
         
@@ -146,7 +147,23 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         
         for (int32_t i = 0; i < ndmat; i++)
         {
-	  printf("@@@ Density Matrix: %i Number of Grid Points %i -> %i\n", i, molecularGrid.getNumberOfGridPoints(), mgrids[i].getNumberOfGridPoints());
+            printf("@@@ Density Matrix: %i Number of Grid Points %i -> %i\n", i, molecularGrid.getNumberOfGridPoints(), mgrids[i].getNumberOfGridPoints());
+            
+            // compute ground state density for compressed grid
+            
+            auto curdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, mgrids[i], fvxc.getFunctionalType());
+            
+            // compute gradient and hessian of exchange-correlation functional
+            
+            CXCGradientGrid vxcgrid(mgrids[i].getNumberOfGridPoints(), curdengrid.getDensityGridType(), fvxc.getFunctionalType());
+            
+            CXCHessianGrid vxc2grid(mgrids[i].getNumberOfGridPoints(), curdengrid.getDensityGridType(), fvxc.getFunctionalType());
+            
+            fvxc.compute(vxcgrid, curdengrid);
+            
+            fvxc.compute(vxc2grid, curdengrid);
+            
+            // compute linear response contribution...
         }
     }
     else

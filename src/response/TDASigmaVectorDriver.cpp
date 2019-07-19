@@ -124,20 +124,20 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
 
     // create first order transformed density
 
-    CAODensityMatrix dmat;
+    CAODensityMatrix drwmat;
 
-    dmat.setDensityType(denmat::rgen);
+    drwmat.setDensityType(denmat::rgen);
 
     for (int32_t i = 0; i < nvecs; i++)
     {
-        dmat.append(zVectors[i].getDensityZ(molecularOrbitals));
+        drwmat.append(zVectors[i].getDensityZ(molecularOrbitals));
     }
 
-    dmat.broadcast(_locRank, _locComm);
+    drwmat.broadcast(_locRank, _locComm);
 
     // compute AO Fock matrices
 
-    CAOFockMatrix faomat(dmat);
+    CAOFockMatrix faomat(drwmat);
 
     double fock_prefactor = 1.0;
 
@@ -155,18 +155,28 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
 
     CElectronRepulsionIntegralsDriver eri_drv(_locComm);
 
-    eri_drv.compute(faomat, dmat, molecule, basis, screeningContainer);
-    
-    faomat.reduce_sum(_locRank, _locNodes, _locComm);
+    eri_drv.compute(faomat, drwmat, molecule, basis, screeningContainer);
     
     // exchange-correlation contribution to Fock matrix
     
     if (!xcFunctional.isUndefined())
     {
+        // generate ground state density
+        
+        auto dgsmat = molecularOrbitals.getAODensity(molecule.getNumberOfElectrons());
+        
+        dgsmat.broadcast(_locRank, _locComm);
+        
+        // integrate functional hessian contribution 
+        
         CXCIntegrator xcdrv(_locComm);
         
-        xcdrv.integrate(faomat, dmat, molecule, basis, molecularGrid, xcFunctional.getLabel()); 
+        xcdrv.integrate(faomat, drwmat, dgsmat, molecule, basis, molecularGrid, xcFunctional.getLabel());
     }
+    
+    // collect full matrix
+    
+    faomat.reduce_sum(_locRank, _locNodes, _locComm);
 
     // add contributions to sigma vectors on master node
 
