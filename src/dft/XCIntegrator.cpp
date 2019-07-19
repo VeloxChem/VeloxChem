@@ -126,7 +126,9 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     CDensityGridDriver dgdrv(_locComm);
     
-    auto refdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+    //auto refdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+    
+    auto refdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
     // set up number of density matrices
     
@@ -136,9 +138,13 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     {
         // molecular and density grids
         
-        std::vector<CMolecularGrid> mgrids(ndmat, molecularGrid);
+        //std::vector<CMolecularGrid> mgrids(ndmat, molecularGrid);
         
-        std::vector<CDensityGrid> dgrids(ndmat, CDensityGrid(molecularGrid.getNumberOfGridPoints(), 1, fvxc.getFunctionalType(), dengrid::ab));
+        //std::vector<CDensityGrid> dgrids(ndmat, CDensityGrid(molecularGrid.getNumberOfGridPoints(), 1, fvxc.getFunctionalType(), dengrid::ab));
+        
+        std::vector<CMolecularGrid> mgrids(1, molecularGrid);
+        
+        std::vector<CDensityGrid> dgrids(1, CDensityGrid(molecularGrid.getNumberOfGridPoints(), 1, fvxc.getFunctionalType(), dengrid::ab));
         
         // generate screened density and molecular grids
         
@@ -152,17 +158,19 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
             
             // compute ground state density for compressed grid
             
-            auto curdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, mgrids[i], fvxc.getFunctionalType());
+            auto currden = CAODensityMatrix({rwDensityMatrix.getReferenceToDensity(i)}, rwDensityMatrix.getDensityType()); 
+            
+            auto currwgrid = dgdrv.generate(currden, molecule, basis, mgrids[0], fvxc.getFunctionalType());
             
             // compute gradient and hessian of exchange-correlation functional
             
-            CXCGradientGrid vxcgrid(mgrids[i].getNumberOfGridPoints(), curdengrid.getDensityGridType(), fvxc.getFunctionalType());
+            CXCGradientGrid vxcgrid(mgrids[0].getNumberOfGridPoints(), dgrids[0].getDensityGridType(), fvxc.getFunctionalType());
             
-            CXCHessianGrid vxc2grid(mgrids[i].getNumberOfGridPoints(), curdengrid.getDensityGridType(), fvxc.getFunctionalType());
+            CXCHessianGrid vxc2grid(mgrids[0].getNumberOfGridPoints(), dgrids[0].getDensityGridType(), fvxc.getFunctionalType());
             
-            fvxc.compute(vxcgrid, curdengrid);
+            fvxc.compute(vxcgrid, dgrids[0]);
             
-            fvxc.compute(vxc2grid, curdengrid);
+            fvxc.compute(vxc2grid, dgrids[0]);
             
             // compute Kohn-Sham matrix
             
@@ -174,7 +182,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
             
             // compute linear response contribution
             
-            _compRestrictedContribution(ksmat, gtovec, vxcgrid, vxc2grid, dgrids[i], curdengrid, mgrids[i], fvxc.getFunctionalType());
+            _compRestrictedContribution(ksmat, gtovec, vxcgrid, vxc2grid, currwgrid, dgrids[0], mgrids[0], fvxc.getFunctionalType());
             
             aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToKohnSham(), i); 
         }
