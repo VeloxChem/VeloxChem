@@ -19,6 +19,7 @@
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "XCGradientGrid.hpp"
+#include "XCHessianGrid.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DensityGrid.hpp"
 #include "GtoContainer.hpp"
@@ -51,13 +52,12 @@ class CXCIntegrator
      */
     double _thresholdOfDensity;
     
-    
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from restricted density.
 
      @param aoKohnShamMatrix the Kohn-Sham matrix.
      @param gtoContainer the container of GTOs blocks.
-     @param xcGradientGrid the exchange-correlation functional grid.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
      @param densityGrid the density grid.
      @param molecularGrid the molecular grid.
      @param xcFunctional the exchange-correlation functional type.
@@ -66,6 +66,27 @@ class CXCIntegrator
                                      const CGtoContainer*     gtoContainer,
                                      const CXCGradientGrid&   xcGradientGrid,
                                      const CDensityGrid&      densityGrid,
+                                     const CMolecularGrid&    molecularGrid,
+                                     const xcfun              xcFunctional) const;
+    
+    /**
+     Computes exchange-correlation contribution to perturbed Kohn-Sham matrix from restricted density.
+     
+     @param aoKohnShamMatrix the Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param xcHessianGrid the exchange-correlation functional hessian grid.
+     @param rwDensityGrid the perturbed density grid.
+     @param gsDensityGrid the ground state density grid.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional type.
+     */
+    void _compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                     const CGtoContainer*     gtoContainer,
+                                     const CXCGradientGrid&   xcGradientGrid,
+                                     const CXCHessianGrid&    xcHessianGrid,
+                                     const CDensityGrid&      rwDensityGrid,
+                                     const CDensityGrid&      gsDensityGrid,
                                      const CMolecularGrid&    molecularGrid,
                                      const xcfun              xcFunctional) const;
     

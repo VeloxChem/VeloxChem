@@ -120,7 +120,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     // create GTOs container
     
-    //CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
     
     // generate reference density grid
     
@@ -128,7 +128,6 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     auto refdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
-    printf("I am here...\n");  
     // set up number of density matrices
     
     auto ndmat = refdengrid.getNumberOfDensityMatrices();
@@ -147,8 +146,6 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         
         for (int32_t i = 0; i < ndmat; i++)
         {
-            printf("@@@ Density Matrix: %i Number of Grid Points %i -> %i\n", i, molecularGrid.getNumberOfGridPoints(), mgrids[i].getNumberOfGridPoints());
-            
             // compute ground state density for compressed grid
             
             auto curdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, mgrids[i], fvxc.getFunctionalType());
@@ -163,7 +160,19 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
             
             fvxc.compute(vxc2grid, curdengrid);
             
-            // compute linear response contribution...
+            // compute Kohn-Sham matrix
+            
+            auto nrow = gsDensityMatrix.getNumberOfRows(0);
+            
+            auto ncol = gsDensityMatrix.getNumberOfColumns(0);
+            
+            CAOKohnShamMatrix ksmat(nrow, ncol, true);
+            
+            // compute linear response contribution
+            
+            _compRestrictedContribution(ksmat, gtovec, vxcgrid, vxc2grid, dgrids[i], curdengrid, mgrids[i], fvxc.getFunctionalType());
+            
+            printf("Number of electrons: %lf\n", ksmat.getNumberOfElectrons());
         }
     }
     else
@@ -258,6 +267,99 @@ CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMa
     aoKohnShamMatrix.setNumberOfElectrons(xcele);
     
     aoKohnShamMatrix.setExchangeCorrelationEnergy(xcene); 
+}
+
+
+void
+CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                           const CGtoContainer*     gtoContainer,
+                                           const CXCGradientGrid&   xcGradientGrid,
+                                           const CXCHessianGrid&    xcHessianGrid,
+                                           const CDensityGrid&      rwDensityGrid,
+                                           const CDensityGrid&      gsDensityGrid,
+                                           const CMolecularGrid&    molecularGrid,
+                                           const xcfun              xcFunctional) const
+{
+    // initialize Kohn-Sham matrix to zero
+    
+    aoKohnShamMatrix.zero();
+    
+    // set up OMP tasks
+    
+    COMPTasks omptaks(5);
+    
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+    
+    auto ntasks = omptaks.getNumberOfTasks();
+    
+    auto tbsizes = omptaks.getTaskSizes();
+    
+    auto tbpositions = omptaks.getTaskPositions();
+    
+    // set up pointer to molecular grid weigths
+    
+    auto mgx = molecularGrid.getCoordinatesX();
+    
+    auto mgy = molecularGrid.getCoordinatesY();
+    
+    auto mgz = molecularGrid.getCoordinatesZ();
+    
+    auto mgw = molecularGrid.getWeights();
+    
+    // set up pointer to gradient and hessian grids
+    
+    auto xcgridptr = &xcGradientGrid;
+    
+    auto xcgrid2ptr = &xcHessianGrid;
+    
+    // set up poinet to density grids
+    
+    auto drwptr = &rwDensityGrid;
+    
+    auto dgsptr = &gsDensityGrid;
+    
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmatprt = &aoKohnShamMatrix;
+    
+    // number of electrons
+    
+    double xcele = 0.0;
+    
+    // exchange-correlation energy
+    
+    double xcene = 0.0;
+    
+    // generate density on grid points
+    
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, mgw, drwptr, dgsptr, xcgridptr, xcgrid2ptr, ksmatprt, xcele, xcene)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+                
+                auto tbsize = tbsizes[i];
+                
+                auto tbposition = tbpositions[i];
+                
+                // generate task
+                
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    //_compRestrictedVXCForBatchOfGridPoints(ksmatprt, gtoContainer, xcgridptr, dgridptr, mgx, mgy, mgz, mgw,
+                    //                                       tbposition, tbsize, xcFunctional);
+                    
+                    _compRestrictedEnergyForBatchOfGridPoints(xcele, xcene, xcgridptr, drwptr, mgw, tbposition, tbsize);
+                }
+            }
+        }
+    }
+    
+    aoKohnShamMatrix.setNumberOfElectrons(xcele);
+    
+    aoKohnShamMatrix.setExchangeCorrelationEnergy(xcene);
 }
 
 void
