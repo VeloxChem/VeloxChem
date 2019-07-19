@@ -150,6 +150,8 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         
         for (int32_t i = 0; i < ndmat; i++)
         {
+            std::cout << "Fock type (" <<  i << "): " << to_string(aoFockMatrix.getFockType(i)); 
+            
             // compute ground state density for compressed grid
             
             auto curdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, mgrids[i], fvxc.getFunctionalType());
