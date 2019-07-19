@@ -114,6 +114,10 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
                          const CMolecularGrid&   molecularGrid,
                          const std::string&      xcFuncLabel) const
 {
+    // testing
+    
+    aoFockMatrix.zero();
+    
     // parse exchange-correlation functional data
     
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
@@ -172,7 +176,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
             
             _compRestrictedContribution(ksmat, gtovec, vxcgrid, vxc2grid, dgrids[i], curdengrid, mgrids[i], fvxc.getFunctionalType());
             
-            std::cout << "Perturbed KS matrix: " << ksmat.getString() << std::endl;
+            aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToKohnSham(), i); 
         }
     }
     else
