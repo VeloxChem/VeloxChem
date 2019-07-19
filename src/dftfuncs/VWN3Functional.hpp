@@ -64,6 +64,39 @@ namespace vxcfuncs {  // vxcfuncs namespace
                            const double           factor,
                            const CDensityGrid&    densityGrid);
     
+    /**
+     Implements second order derivatives of spin-polarized Vosko-Wilk-Nusair functional (Parameterization 3)  for dengrid::ab case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+    void VWN3FuncHessianAB(      CXCHessianGrid& xcHessianGrid,
+                           const double         factor,
+                           const CDensityGrid&  densityGrid);
+    
+    /**
+     Implements second order derivatives of spin-polarized Vosko-Wilk-Nusair functional (Parameterization 3)  for dengrid::lima case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+    void VWN3FuncHessianA(      CXCHessianGrid& xcHessianGrid,
+                          const double          factor,
+                          const CDensityGrid&   densityGrid);
+    
+    /**
+     Implements second order derivatives of spin-polarized Vosko-Wilk-Nusair functional (Parameterization 3) for dengrid::lima case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+    void VWN3FuncHessianB(      CXCHessianGrid& xcHessianGrid,
+                          const double          factor,
+                          const CDensityGrid&   densityGrid);
+    
 }  // namespace vxcfuncs
 
 #endif /* VWN3Functional_hpp */
