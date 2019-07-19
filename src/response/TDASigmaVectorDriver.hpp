@@ -76,6 +76,8 @@ class CTDASigmaVectorDriver
             triplet excited states, instead of default singlet excited states.
      @param screeningContainer the electron repulsion integrals screeners
             container.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
      @param molecularOrbitals the molecular orbitals.
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -84,6 +86,8 @@ class CTDASigmaVectorDriver
                                         const std::vector<CExcitationVector>& zVectors,
                                         const bool                            isTripletStates,
                                         const CScreeningContainer&            screeningContainer,
+                                        const CMolecularGrid&                 molecularGrid,
+                                        const CXCFunctional&                  xcFunctional,
                                         const CMolecularOrbitals&             molecularOrbitals,
                                         const CMolecule&                      molecule,
                                         const CMolecularBasis&                basis) const;

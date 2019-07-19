@@ -11,6 +11,7 @@
 #include "AOFockMatrix.hpp"
 #include "DensityMatrixType.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
+#include "XCIntegrator.hpp"
 
 CTDASigmaVectorDriver::CTDASigmaVectorDriver(MPI_Comm comm)
 {
@@ -40,7 +41,8 @@ CTDASigmaVectorDriver::compute(const std::vector<CExcitationVector>& zVectors,
 
     _addCanonicalFockContribution(sig_vecs, zVectors, molecularOrbitals);
 
-    _addFirstOrderFockContribution(sig_vecs, zVectors, isTripletStates, screeningContainer, molecularOrbitals, molecule, basis);
+    _addFirstOrderFockContribution(sig_vecs, zVectors, isTripletStates, screeningContainer,
+                                   molecularGrid, xcFunctional, molecularOrbitals, molecule, basis);
 
     return sig_vecs;
 }
@@ -112,6 +114,8 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
                                                       const std::vector<CExcitationVector>& zVectors,
                                                       const bool                            isTripletStates,
                                                       const CScreeningContainer&            screeningContainer,
+                                                      const CMolecularGrid&                 molecularGrid,
+                                                      const CXCFunctional&                  xcFunctional,
                                                       const CMolecularOrbitals&             molecularOrbitals,
                                                       const CMolecule&                      molecule,
                                                       const CMolecularBasis&                basis) const
@@ -146,12 +150,23 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
             faomat.setFockType(fockmat::rgenk, i);
         }
     }
+    
+    // 2e-contribution to Fock matrix
 
     CElectronRepulsionIntegralsDriver eri_drv(_locComm);
 
     eri_drv.compute(faomat, dmat, molecule, basis, screeningContainer);
-
+    
     faomat.reduce_sum(_locRank, _locNodes, _locComm);
+    
+    // exchange-correlation contribution to Fock matrix
+    
+    if (!xcFunctional.isUndefined())
+    {
+        CXCIntegrator xcdrv(_locComm);
+        
+        xcdrv.integrate(faomat, dmat, molecule, basis, molecularGrid, xcFunctional.getLabel()); 
+    }
 
     // add contributions to sigma vectors on master node
 
