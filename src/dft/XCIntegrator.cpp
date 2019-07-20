@@ -804,7 +804,148 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
     
     if (xcFunctional == xcfun::gga)
     {
-      
+        auto ngpoints = braGtoGridBuffer.size(0);
+        
+        // set up pointers to gradient data
+        
+        auto grho_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+        
+        auto gmix_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::grada);
+        
+        auto gmix_ac = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradab);
+        
+        auto ggrad_aa = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::grada);
+        
+        auto ggrad_ac = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradab);
+        
+        auto ggrad_cc = xcHessianGrid->xcHessianValues(xcvars::gradab, xcvars::gradab);
+        
+        auto ggrad_a = xcGradientGrid->xcGradientValues(xcvars::grada);
+        
+        auto ggrad_c = xcGradientGrid->xcGradientValues(xcvars::gradab);
+        
+        // set up pointers to ground state density gradient norms
+        
+        auto ngrada = gsDensityGrid->alphaDensityGradient(0);
+        
+        auto grada_x = gsDensityGrid->alphaDensityGradientX(0);
+        
+        auto grada_y = gsDensityGrid->alphaDensityGradientY(0);
+        
+        auto grada_z = gsDensityGrid->alphaDensityGradientZ(0);
+        
+        // set up pointers to perturbed density gradient norms
+        
+        auto rhowa = rwDensityGrid->alphaDensity(0);
+        
+        auto gradw_x = rwDensityGrid->alphaDensityGradientX(0);
+        
+        auto gradw_y = rwDensityGrid->alphaDensityGradientY(0);
+        
+        auto gradw_z = rwDensityGrid->alphaDensityGradientZ(0);
+        
+        // NOTE: we compute F_a matrix, since F_a = F_b
+        
+        for (int32_t i = 0; i < braAngularComponents; i++)
+        {
+            auto bgto = braGtoGridBuffer.data(4 * i);
+            
+            auto bgto_x = braGtoGridBuffer.data(4 * i + 1);
+            
+            auto bgto_y = braGtoGridBuffer.data(4 * i + 2);
+            
+            auto bgto_z = braGtoGridBuffer.data(4 * i + 3);
+            
+            for (int32_t j = 0; j < ketAngularComponents; j++)
+            {
+                auto kgto = ketGtoGridBuffer.data(4 * j);
+                
+                auto kgto_x = ketGtoGridBuffer.data(4 * j + 1);
+                
+                auto kgto_y = ketGtoGridBuffer.data(4 * j + 2);
+                
+                auto kgto_z = ketGtoGridBuffer.data(4 * j + 3);
+                
+                double psum = 0.0;
+                
+                for (int32_t k = 0; k < ngpoints; k++)
+                {
+                    double w = gridWeights[gridOffset + k];
+                    
+                    double znva = 1.0 / ngrada[gridOffset + k];
+                    
+                    double rxa = znva * grada_x[gridOffset + k];
+                    
+                    double rya = znva * grada_y[gridOffset + k];
+                    
+                    double rza = znva * grada_z[gridOffset + k];
+                    
+                    double rxw = gradw_x[gridOffset + k];
+                    
+                    double ryw = gradw_y[gridOffset + k];
+                    
+                    double rzw = gradw_z[gridOffset + k];
+                    
+                    // GTOs values
+                    
+                    auto a0 = bgto[k] * kgto[k];
+                    
+                    auto ax = bgto_x[k] * kgto[k] + bgto[k] * kgto_x[k];
+                    
+                    auto ay = bgto_y[k] * kgto[k] + bgto[k] * kgto_y[k];
+                    
+                    auto az = bgto_z[k] * kgto[k] + bgto[k] * kgto_z[k];
+                    
+                    //  variations of functionals variables
+                    
+                    double zetaa = rxw * rxa + ryw * rya + rzw * rza;
+                    
+                    double zetac = 2.0 * zetaa;
+                    
+                    // first contribution
+                    
+                    double fac0 = 2.0 * gmix_aa[gridOffset + k] * zetaa + gmix_ac[gridOffset + k] * zetac
+                    
+                                + grho_aa[gridOffset + k] * rhowa[gridOffset + k];
+                    
+                    psum += w * a0 * fac0;
+                    
+                    // second contribution
+                    
+                    double facr = 2.0 * gmix_aa[gridOffset + k] * rhowa[gridOffset + k]
+                    
+                                + 2.0 * ggrad_aa[gridOffset + k] * zetaa + ggrad_ac[gridOffset + k] * zetac;
+                    
+                    double ar = ax * rxa + ay * rya + az * rza;
+                    
+                    psum += w * facr * ar;
+                    
+                    // third contribution
+                    
+                    double facz = 2.0 * gmix_ac[gridOffset + k] * rhowa[gridOffset + k]
+                    
+                                + 2.0 * ggrad_ac[gridOffset + k] * zetaa + ggrad_cc[gridOffset + k] * zetac;
+                    
+                    double arb = ax * grada_x[gridOffset + k] + ay * grada_y[gridOffset + k] + az * grada_z[gridOffset + k];
+                    
+                    psum += w * facz * arb;
+                    
+                    // fourth contribution
+                    
+                    double ab = ax * rxw + ay * ryw + az * rzw - ar * zetaa;
+                    
+                    psum += w * znva * ggrad_a[gridOffset + k] * ab;
+                    
+                    // fifth contribution
+                    
+                    double abw = ax * rxw + ay * ryw + az * rzw;
+                    
+                    psum += w * ggrad_c[gridOffset + k] * abw;
+                }
+                
+                ppvals[i * ketAngularComponents + j] = psum;
+            }
+        }
         
         return;
     }
