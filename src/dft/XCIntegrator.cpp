@@ -900,7 +900,9 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                     
                     double zetaa = rxw * rxa + ryw * rya + rzw * rza;
                     
-                    double zetac = 2.0 * zetaa;
+                    double zetac = 2.0 * (grada_x[gridOffset + k] * rxw +
+                                          grada_y[gridOffset + k] * ryw +
+                                          grada_z[gridOffset + k] * rzw) ;
                     
                     // first contribution
                     
