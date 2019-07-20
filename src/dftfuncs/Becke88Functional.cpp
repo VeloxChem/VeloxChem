@@ -27,7 +27,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                     &vxcfuncs::Becke88FuncGradientAB,
                                     &vxcfuncs::Becke88FuncGradientA,
                                     &vxcfuncs::Becke88FuncGradientB,
-                                    nullptr, nullptr, nullptr);
+                                    &vxcfuncs::Becke88FuncHessianAB,
+                                    &vxcfuncs::Becke88FuncHessianA,
+                                    &vxcfuncs::Becke88FuncHessianB); 
     }
     
     void
