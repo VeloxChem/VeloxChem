@@ -237,8 +237,6 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         auto ggrad_aa = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::grada);
         
-        auto ggrad_ab = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::gradb);
-        
         auto ggrad_bb = xcHessianGrid.xcHessianValues(xcvars::gradb, xcvars::gradb);
         
         auto gmix_aa = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::grada);
@@ -253,8 +251,8 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         auto gmix_bc = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::gradab);
         
-        #pragma omp simd aligned(rhoa, rhob, grada, gradb, grho_aa, grho_ab, grho_bb, ggrad_aa, ggrad_ab, ggrad_bb,\
-                                gmix_aa, gmix_ab, gmix_ba, gmix_bb: VLX_ALIGN)
+        #pragma omp simd aligned(rhoa, rhob, grada, gradb, grho_aa, grho_ab, grho_bb, ggrad_aa, ggrad_bb,\
+                                gmix_aa, gmix_ab, gmix_ba, gmix_bb, gmix_ac, gmix_bc: VLX_ALIGN)
         for (int32_t i = 0; i < ngpoints; i++)
         {
             double rho = rhoa[i] + rhob[i];
@@ -326,10 +324,6 @@ namespace vxcfuncs {  // vxcfuncs namespace
             double dl_2 = (4.0 * rho * (C + D) + 2.0 * D * (6.0 * rho13 * C * D + 2.0 * C * D * D + rho / rho13 * (6 * C + D))) / (9.0 * rho2 * rho13 * drho3_3);
             
             /* f0 derivatives */
-            
-            double f0_1000 = 4.0 * rhob[i] * (D * rhoa[i] + 3.0 * rhob[i] * drho13) * rho13 / (3.0 * rho * rho * drho3_2);
-
-            double f0_0100 = 4.0 * rhoa[i] * (D * rhob[i] + 3.0 * rhoa[i] * drho13) * rho13 / (3.0 * rho * rho * drho3_2);
             
             double f0_2000 = -8.0 * rhob[i] * (rhoa[i] * D * (D + 2.0 * rho13) + 3.0 * rhob[i] * drho13 * (2.0 * D + 3.0 * rho13)) / (9.0 * rho2 * rho / rho13 * drho3_2 * drho13);
             
