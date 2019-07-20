@@ -132,4 +132,103 @@ namespace vxcfuncs {  // vxcfuncs namespace
        
     }
     
+    void Becke88FuncHessianAB(      CXCHessianGrid& xcHessianGrid,
+                              const double          factor,
+                              const CDensityGrid&   densityGrid)
+    {
+        // functional prefactors
+        
+        double fb = 0.0042;
+        
+        double fp = 4.0 / 3.0;
+        
+        // determine number of grid points
+        
+        auto ngpoints = densityGrid.getNumberOfGridPoints();
+        
+        // set up pointers to density grid data
+        
+        auto rhoa = densityGrid.alphaDensity(0);
+        
+        //auto rhob = densityGrid.betaDensity(0);
+        
+        auto grada = densityGrid.alphaDensityGradient(0);
+        
+        //auto gradb = densityGrid.betaDensityGradient(0);
+        
+        // set up pointers to functional data
+        
+        auto grho_aa = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+        
+        //auto grho_bb = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::rhob);
+        
+        auto gmix_aa = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::grada);
+        
+        //auto gmix_bb = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::gradb);
+        
+        auto ggrad_aa = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::grada);
+        
+        //auto ggrad_bb = xcHessianGrid.xcHessianValues(xcvars::gradb, xcvars::gradb);
+        
+        #pragma omp simd aligned(rhoa, grada, grho_aa, gmix_aa, ggrad_aa: VLX_ALIGN)
+        for (int32_t i = 0; i < ngpoints; i++)
+        {
+            double ra = std::pow(rhoa[i], fp);
+            
+            double xa = grada[i] / ra;
+            
+            double xa2 = xa * xa;
+            
+            double xa3 = xa * xa2;
+            
+            double xa4 = xa3 * xa;
+            
+            double asha = std::asinh(xa);
+            
+            double alpha10 = -fp * xa / rhoa[i];
+            
+            double alpha20 = -7.0 / 3.0 * alpha10 / rhoa[i];
+            
+            double alpha01 = 1.0 / ra;
+            
+            double alpha11 = -fp * alpha01 / rhoa[i];
+            
+            double alpha10_2 = alpha10 * alpha10;
+            
+            double sq1a2 = std::sqrt(1.0 + xa2);
+            
+            double denom = 1.0 + 6.0 * xa * fb * asha;
+            
+            double denom2 = denom * denom;
+            
+            double denom3 = denom2 * denom;
+            
+            double ff1 = fb * (6 * xa2 * fb - sq1a2) / (sq1a2 * denom2);
+                
+            double ff2 = (6.0 * fb * fb * (4.0 * xa + xa3*(3.0 - 12.0 * sq1a2 * fb) + 2.0 * (std::pow(1.0 + xa2, 1.5) - 3.0 * xa4 * fb) * asha)) / (std::pow(1.0 + xa2, 1.5) * denom3);
+            
+            gmix_aa[i] += factor* (ff1 * alpha10 + grada[i] * (ff2 * alpha10* alpha01 + ff1 * alpha11));
+            
+            grho_aa[i] += factor * grada[i] * (ff2 * alpha10_2 + ff1 * alpha20);
+            
+            ggrad_aa[i] += factor * (2.0 * ff1 * alpha01 + grada[i] * (ff2 * alpha01 * alpha01));
+            
+            // FIX ME: Add beta part
+        }
+    }
+    
+    void Becke88FuncHessianA(      CXCHessianGrid& xcHessianGrid,
+                             const double          factor,
+                             const CDensityGrid&   densityGrid)
+    {
+        
+    }
+    
+    void Becke88FuncHessianB(      CXCHessianGrid& xcHessianGrid,
+                             const double          factor,
+                             const CDensityGrid&   densityGrid)
+    {
+        
+    }
+    
 }  // namespace vxcfuncs

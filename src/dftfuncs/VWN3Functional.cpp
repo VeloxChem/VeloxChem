@@ -274,7 +274,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
         // paramagnetic fitting factors
         
         double pa = 0.0621814, pb = 13.0720, pc = 42.7198, px0 = -0.4092860;
-        
+
         double pq = std::sqrt(4.0 * pc - pb * pb);
         
         double pxf0 = px0 * px0 + pb * px0 + pc;
