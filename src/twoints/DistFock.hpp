@@ -189,6 +189,32 @@ namespace distfock { // distfock namespace
                        const int32_t              iContrPair);
     
     /**
+     Distributes vector of spherical integrals into spin restricted closed shell
+     general Kohn-Sham matrix (2J - K)
+     
+     @param fockContainer the Fock container.
+     @param iFockMatrix the index of Fock submatrix in Fock container.
+     @param densityMatrix the constant pointer to AO density matrix.
+     @param nDensityColumns the number of columns in AO density matrix.
+     @param exchangeFactor the exact exchange scaling factor.
+     @param spherInts the spherical integrals buffer.
+     @param braGtoPairsBlock the GTOs pairs block on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param nKetContrPairs the number of contracted GTOs pairs on ket side.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     */
+    void distRestGenJKX(      CFockContainer&      fockContainer,
+                        const int32_t              iFockMatrix,
+                        const double*              densityMatrix,
+                        const int32_t              nDensityColumns,
+                        const double               exchangeFactor,
+                        const CMemBlock2D<double>& spherInts,
+                        const CGtoPairsBlock&      braGtoPairsBlock,
+                        const CGtoPairsBlock&      ketGtoPairsBlock,
+                        const int32_t              nKetContrPairs,
+                        const int32_t              iContrPair);
+    
+    /**
      Distributes vector of spherical integrals into spin unrestricted open shell
      Hartree-Fock matrix (2J + K)
 

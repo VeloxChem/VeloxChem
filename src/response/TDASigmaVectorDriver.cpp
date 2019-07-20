@@ -148,6 +148,8 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
             for (int32_t i = 0; i < nvecs; i++)
             {
                 faomat.setFockType(fockmat::rgenjkx, i);
+                
+                faomat.setFockScaleFactor(xcFunctional.getFractionOfExactExchange(), i); 
             }
         }
         else

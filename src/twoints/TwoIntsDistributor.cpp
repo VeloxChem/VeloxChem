@@ -318,6 +318,19 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                            braGtoPairsBlock, ketGtoPairsBlock,
                                            nKetContrPairs, iContrPair);
         }
+        
+        // closed shell restricted general Fock: 2J - K
+        
+        if (fcktyp == fockmat::rgenjkx)
+        {
+            distmaxden::getMaxRestGenDenJKX(maxDensityElements,
+                                            _aoDensity->getDensity(idden),
+                                            _aoDensity->getNumberOfColumns(idden),
+                                            _aoFock->getScaleFactor(i),
+                                            braGtoPairsBlock, ketGtoPairsBlock,
+                                            nKetContrPairs, iContrPair);
+        }
+
 
         // open shell unrestricted Hartree-Fock: 2J + K
         
@@ -508,6 +521,18 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                     _aoDensity->getNumberOfColumns(idden),
                                     spherInts, braGtoPairsBlock, ketGtoPairsBlock,
                                     nKetContrPairs, iContrPair);
+        }
+        
+        // closed shell restricted general Kohn-Sham: 2J + xK
+        
+        if (fcktyp == fockmat::rgenjkx)
+        {
+            distfock::distRestGenJKX(_fockContainer, i,
+                                     _aoDensity->getDensity(idden),
+                                     _aoDensity->getNumberOfColumns(idden),
+                                     _aoFock->getScaleFactor(i),
+                                     spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                     nKetContrPairs, iContrPair);
         }
 
         // open shell unrestricted Hartree-Fock: 2J + K
