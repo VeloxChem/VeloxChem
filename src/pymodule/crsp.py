@@ -80,6 +80,8 @@ class ComplexResponse:
         self.frequencies = (0.1,)
         self.damping = 0.004556335294880438
 
+        self.nonlinear = False
+
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
 
@@ -347,11 +349,17 @@ class ComplexResponse:
                 [gradger.real, gradung.real, -gradung.imag,
                  -gradger.imag]).flatten()
             gn = np.linalg.norm(grad)
-            for w in freqs:
+            if self.nonlinear:
                 if gn < self.small_thresh:
-                    ig[(op, w)] = np.zeros(grad.shape[0])
+                    ig[op] = np.zeros(grad.shape[0])
                 else:
-                    ig[(op, w)] = self.preconditioning(precond[w], grad)
+                    ig[op] = self.preconditioning(precond[op[1]], grad)
+            else:
+                for w in freqs:
+                    if gn < self.small_thresh:
+                        ig[(op, w)] = np.zeros(grad.shape[0])
+                    else:
+                        ig[(op, w)] = self.preconditioning(precond[w], grad)
 
         return ig
 
@@ -411,16 +419,17 @@ class ComplexResponse:
         new_ger = self.assemble_subsp(new_realger, new_imagger)
         new_ung = self.assemble_subsp(new_realung, new_imagung)
 
-        # orthogonalizing new trial vectors against existing ones
+        if new_ger.any():
+            trials_info['new_trials_ger'] = True
+        if new_ung.any():
+            trials_info['new_trials_ung'] = True
 
-        if trials_info['bger']:
-            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
-        if trials_info['bung']:
-            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
+        if trials_info['new_trials_ger'] and renormalize:
 
-        # normalizing new trial vectors
+            # orthogonalizing new trial vectors against existing ones
 
-        if new_ger.any() and renormalize:
+            if trials_info['bger']:
+                new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
 
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
@@ -429,9 +438,12 @@ class ComplexResponse:
             new_ger = orthogonalize_gram_schmidt(new_ger)
             new_ger = normalize(new_ger)
 
-            trials_info['new_trials_ger'] = True
+        if trials_info['new_trials_ung'] and renormalize:
 
-        if new_ung.any() and renormalize:
+            # orthogonalizing new trial vectors against existing ones
+
+            if trials_info['bung']:
+                new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
 
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
@@ -439,8 +451,6 @@ class ComplexResponse:
             new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
             new_ung = orthogonalize_gram_schmidt(new_ung)
             new_ung = normalize(new_ung)
-
-            trials_info['new_trials_ung'] = True
 
         return new_ger, new_ung, trials_info
 
@@ -479,7 +489,7 @@ class ComplexResponse:
             }
             timing_t0 = tm.time()
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.nonlinear is False:
             self.print_header()
 
         self.start_time = tm.time()
@@ -492,7 +502,10 @@ class ComplexResponse:
             'ComplexResponseSolver: not implemented for unrestricted case')
 
         d = self.damping
-        freqs = self.frequencies
+        if b_rhs:
+            freqs = [i[1] for i in b_rhs.keys()]
+        else:
+            freqs = self.frequencies
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
@@ -510,6 +523,9 @@ class ComplexResponse:
         if b_rhs is None:
             b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
+        else:
+            v1 = b_rhs
+            self.nonlinear = True
 
         if self.rank == mpi_master():
 
@@ -518,7 +534,8 @@ class ComplexResponse:
 
             # calling the gradients
 
-            v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
+            if self.nonlinear is False:
+                v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
 
             # creating the preconditioner matrix
 
@@ -591,7 +608,10 @@ class ComplexResponse:
                 for op, w in igs:
                     if iteration == 0 or (relative_residual_norm[(op, w)] >
                                           self.conv_thresh):
-                        grad = v1[op]
+                        if self.nonlinear:
+                            grad = v1[(op, w)]
+                        else:
+                            grad = v1[op]
 
                         gradger, gradung = self.decomp_sym(grad)
                         full_size = gradger.shape[0]
@@ -828,13 +848,14 @@ class ComplexResponse:
 
                 # write to output
 
-                self.ostream.print_info(
-                    '{:d} gerade trial vectors'.format(ntrials_ger))
-                self.ostream.print_info(
-                    '{:d} ungerade trial vectors'.format(ntrials_ung))
-                self.ostream.print_blank()
+                if self.nonlinear is False:
+                    self.ostream.print_info(
+                        '{:d} gerade trial vectors'.format(ntrials_ger))
+                    self.ostream.print_info(
+                        '{:d} ungerade trial vectors'.format(ntrials_ung))
+                    self.ostream.print_blank()
 
-                self.print_iteration(relative_residual_norm, nvs)
+                    self.print_iteration(relative_residual_norm, nvs)
 
             if self.timing:
                 tid = iteration + 1
@@ -911,7 +932,8 @@ class ComplexResponse:
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence()
+            if self.nonlinear is False:
+                self.print_convergence()
 
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
@@ -929,22 +951,29 @@ class ComplexResponse:
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
 
-        a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
-                        scf_tensors, self.rank, self.comm)
+        if self.nonlinear is False:
+            a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
+                            scf_tensors, self.rank, self.comm)
 
         if self.rank == mpi_master():
-            va = {op: v for op, v in zip(self.a_components, a_rhs)}
-            props = {}
-            for aop in self.a_components:
-                for bop, w in solutions:
-                    props[(aop, bop, w)] = -np.dot(va[aop], solutions[(bop, w)])
-            self.print_properties(props)
-
-            return {
-                'properties': props,
-                'solutions': solutions,
-                'kappas': kappas,
-            }
+            if self.nonlinear is False:
+                va = {op: v for op, v in zip(self.a_components, a_rhs)}
+                props = {}
+                for aop in self.a_components:
+                    for bop, w in solutions:
+                        props[(aop, bop, w)] = -np.dot(va[aop],
+                                                       solutions[(bop, w)])
+                self.print_properties(props)
+                return {
+                    'properties': props,
+                    'solutions': solutions,
+                    'kappas': kappas,
+                }
+            else:
+                return {
+                    'solutions': solutions,
+                    'kappas': kappas,
+                }
         else:
             return {}
 
