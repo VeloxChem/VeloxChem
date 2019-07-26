@@ -12,19 +12,19 @@ USE_MPI := true
 USE_GPU := false
 USE_MKL := true
 
-MATH_INC := -I/opt/intel/compilers_and_libraries_2018.1.163/linux/mkl/include
-MATH_LIB := -L/opt/intel/compilers_and_libraries_2018.1.163/linux/mkl/lib/intel64
-MATH_LIB += -Wl,-rpath,/opt/intel/compilers_and_libraries_2018.1.163/linux/mkl/lib/intel64
-MATH_LIB += -lmkl_rt -lmkl_intel_thread
-MATH_LIB += -liomp5 -lpthread -lm -ldl
+MATH_INC := -I/opt/intel/mkl/include
+MATH_LIB := -L/opt/intel/mkl/lib/intel64
+MATH_LIB += -Wl,-rpath,/opt/intel/mkl/lib/intel64
+MATH_LIB += -lmkl_rt -lmkl_gnu_thread
+MATH_LIB += -lgomp -lpthread -lm -ldl
 
 PYTHON := python3
 PYBIND11_ROOT := /home/xinli/software/pybind11
 
-CXX := mpiicpc
+CXX := mpicxx
 
-CXX_REL_FLG := -xHost -qopenmp
-CXX_DEB_FLG := -xHost -qopenmp
+CXX_REL_FLG := -fopenmp
+CXX_DEB_FLG := -fopenmp
 
 MACLIBS := 
 
@@ -75,7 +75,7 @@ PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
 PYTHON_INC += -I$(PYBIND11_ROOT)/include
-PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
+PYTHON_LD  := $(shell $(PYTHON)-config --ldflags) -fno-lto
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
