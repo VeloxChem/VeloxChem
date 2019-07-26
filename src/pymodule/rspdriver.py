@@ -34,6 +34,7 @@ class ResponseDriver:
         self.tamm_dancoff = False
         self.triplet = False
         self.rsp_input = {}
+        self.method_input = {}
 
         # mpi information
         self.comm = comm
@@ -43,7 +44,7 @@ class ResponseDriver:
         # output stream
         self.ostream = ostream
 
-    def update_settings(self, rsp_input):
+    def update_settings(self, rsp_input, method_input):
         """
         Updates settings in response solver.
 
@@ -65,6 +66,7 @@ class ResponseDriver:
             self.prop_type = 'POLARIZABILITY'
 
         self.rsp_input = dict(rsp_input)
+        self.method_input = dict(method_input)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -95,7 +97,7 @@ class ResponseDriver:
             else:
                 eigensolver = TDAExciDriver(self.comm, self.ostream)
 
-            eigensolver.update_settings(self.rsp_input)
+            eigensolver.update_settings(self.rsp_input, self.method_input)
 
             return eigensolver.compute(molecule, ao_basis, scf_tensors)
 

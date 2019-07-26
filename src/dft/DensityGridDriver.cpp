@@ -66,7 +66,7 @@ CDensityGridDriver::generate(const CAODensityMatrix& aoDensityMatrix,
 
 void
 CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
-                                         const CAODensityMatrix& density,
+                                         const CAODensityMatrix& aoDensityMatrix,
                                          const CMolecule&        molecule,
                                          const CMolecularBasis&  basis,
                                          const CMolecularGrid&   molecularGrid,
@@ -98,7 +98,7 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
     
     // set up pointer to density matrix
     
-    auto denptr = &density;
+    auto denptr = &aoDensityMatrix;
     
     // set up poinet to density grid
     
@@ -130,7 +130,7 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
 
     // finalize density grid
     
-    if (density.isRestricted()) densityGrid.updateBetaDensities(); 
+    if (aoDensityMatrix.isRestricted()) densityGrid.updateBetaDensities(); 
 
     densityGrid.computeDensityNorms(); 
     

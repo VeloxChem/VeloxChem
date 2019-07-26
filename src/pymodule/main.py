@@ -148,7 +148,7 @@ def main():
                     polar.print_property(task.ostream)
 
             elif rsp_dict['property'].lower() == 'absorption':
-                abs_spec = Absorption(rsp_dict)
+                abs_spec = Absorption(rsp_dict, method_dict)
                 abs_spec.init_driver(task.mpi_comm, task.ostream)
                 abs_spec.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():

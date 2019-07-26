@@ -417,8 +417,9 @@ class ScfDriver:
 
             fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
-            if fock_mat.get_fock_type(0) == fockmat.restj:
-                fock_mat.scale(2.0, 0)
+            if self.dft:
+                if not self.xcfun.is_hybrid():
+                    fock_mat.scale(2.0, 0)
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
                                                  den_mat)

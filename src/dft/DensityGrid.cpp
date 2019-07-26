@@ -494,9 +494,9 @@ CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
             
             // set up pointers to destination density
             
-            auto drhoa = densityGrids[i].alphaDensity(i);
+            auto drhoa = densityGrids[i].alphaDensity(0);
             
-            auto drhob = densityGrids[i].betaDensity(i);
+            auto drhob = densityGrids[i].betaDensity(0);
             
             // set up pointers to molecular grid data
             
@@ -576,27 +576,27 @@ CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
             
             // set up pointers to destination density
             
-            auto drhoa = densityGrids[i].alphaDensity(i);
+            auto drhoa = densityGrids[i].alphaDensity(0);
             
-            auto drhob = densityGrids[i].betaDensity(i);
+            auto drhob = densityGrids[i].betaDensity(0);
             
-            auto dgrada = densityGrids[i].alphaDensityGradient(i);
+            auto dgrada = densityGrids[i].alphaDensityGradient(0);
             
-            auto dgradb = densityGrids[i].betaDensityGradient(i);
+            auto dgradb = densityGrids[i].betaDensityGradient(0);
             
-            auto dgradab = densityGrids[i].mixedDensityGradient(i);
+            auto dgradab = densityGrids[i].mixedDensityGradient(0);
             
-            auto dgrada_x = densityGrids[i].alphaDensityGradientX(i);
+            auto dgrada_x = densityGrids[i].alphaDensityGradientX(0);
             
-            auto dgrada_y = densityGrids[i].alphaDensityGradientY(i);
+            auto dgrada_y = densityGrids[i].alphaDensityGradientY(0);
             
-            auto dgrada_z = densityGrids[i].alphaDensityGradientZ(i);
+            auto dgrada_z = densityGrids[i].alphaDensityGradientZ(0);
             
-            auto dgradb_x = densityGrids[i].betaDensityGradientX(i);
+            auto dgradb_x = densityGrids[i].betaDensityGradientX(0);
             
-            auto dgradb_y = densityGrids[i].betaDensityGradientY(i);
+            auto dgradb_y = densityGrids[i].betaDensityGradientY(0);
             
-            auto dgradb_z = densityGrids[i].betaDensityGradientZ(i);
+            auto dgradb_z = densityGrids[i].betaDensityGradientZ(0);
             
             // set up pointers to molecular grid data
             

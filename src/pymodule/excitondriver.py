@@ -294,7 +294,7 @@ class ExcitonModelDriver:
                 'eri_thresh': self.eri_thresh,
                 'conv_thresh': self.tda_conv_thresh,
                 'max_iter': self.tda_max_iter,
-            })
+            }, {})
             abs_spec.init_driver(self.comm, self.ostream)
             abs_spec.compute(monomer, basis, scf_drv.scf_tensors)
 

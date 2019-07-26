@@ -101,7 +101,7 @@ class LinearResponseEigenSolver:
         self.timing = False
         self.profiling = False
 
-    def update_settings(self, settings):
+    def update_settings(self, settings, method_dict = {}):
         """
         Updates settings in linear response eigensolver.
 

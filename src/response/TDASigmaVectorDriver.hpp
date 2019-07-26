@@ -22,6 +22,8 @@
 #include "Molecule.hpp"
 #include "MpiFunc.hpp"
 #include "ScreeningContainer.hpp"
+#include "MolecularGrid.hpp"
+#include "XCFunctional.hpp"
 
 /**
  Class CTDASigmaVectorDriver class computes sigma vector i.e. sigma = A * Z.
@@ -74,6 +76,8 @@ class CTDASigmaVectorDriver
             triplet excited states, instead of default singlet excited states.
      @param screeningContainer the electron repulsion integrals screeners
             container.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
      @param molecularOrbitals the molecular orbitals.
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -82,6 +86,8 @@ class CTDASigmaVectorDriver
                                         const std::vector<CExcitationVector>& zVectors,
                                         const bool                            isTripletStates,
                                         const CScreeningContainer&            screeningContainer,
+                                        const CMolecularGrid&                 molecularGrid,
+                                        const CXCFunctional&                  xcFunctional,
                                         const CMolecularOrbitals&             molecularOrbitals,
                                         const CMolecule&                      molecule,
                                         const CMolecularBasis&                basis) const;
@@ -106,7 +112,9 @@ class CTDASigmaVectorDriver
      @param isTripletStates the flag indicating A matrix construction for
             triplet excited states, instead of default singlet excited states.
      @param screeningContainer the electron repulsion integrals screeners
-     container.
+            container.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
      @param molecule the molecule.
      @param basis the molecular basis.
      @return the vector of sigma vectors.
@@ -114,6 +122,8 @@ class CTDASigmaVectorDriver
     std::vector<CDenseMatrix> compute(const std::vector<CExcitationVector>& zVectors,
                                       const bool                            isTripletStates,
                                       const CScreeningContainer&            screeningContainer,
+                                      const CMolecularGrid&                 molecularGrid,
+                                      const CXCFunctional&                  xcFunctional, 
                                       const CMolecularOrbitals&             molecularOrbitals,
                                       const CMolecule&                      molecule,
                                       const CMolecularBasis&                basis) const;

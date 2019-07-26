@@ -78,7 +78,7 @@ public:
     CXCGradientGrid(const CXCGradientGrid& source);
     
     /**
-     Creates a exchange-correlation gradient grid object by by moving other exchange-correlation gradient grid object.
+     Creates a exchange-correlation gradient grid object by moving other exchange-correlation gradient grid object.
      
      @param source the exchange-correlation gradient grid object.
      */
@@ -148,6 +148,7 @@ public:
     /**
      Gets constant pointer to exchange-correlation functional gradient values.
      
+     @param gradientType the type of exchange-correlation functional gradient.
      @return the constant pointer to exchage-correlation functional gradient values.
      */
     const double* xcGradientValues(const xcvars gradientType) const;
@@ -155,6 +156,7 @@ public:
     /**
     Gets pointer to exchange-correlation functional gradient values.
     
+    @param gradientType the type of exchange-correlation functional gradient.
     @return the pointer to exchage-correlation functional gradient values.
     */
     double* xcGradientValues(const xcvars gradientType);
