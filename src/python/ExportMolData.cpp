@@ -110,7 +110,7 @@ CMolecule_from_array(const std::vector<std::string>& labels,
 
     auto f_style = py::detail::check_flags(py_coords.ptr(), py::array::f_style);
 
-    errors::assertMsgCritical(c_style ^ f_style, errsrc);
+    errors::assertMsgCritical(c_style | f_style, errsrc);
 
     std::string errmol("CMolecule_from_array: Inconsistent size");
 
