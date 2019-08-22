@@ -15,7 +15,7 @@ include Makefile.setup
 VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
-PYVLX_MAIN := VeloxChemMain.py
+PYVLX_MAIN := vlx
 
 LIB_LIST += -shared $(PYTHON_LD)
 
