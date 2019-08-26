@@ -772,11 +772,13 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         
         auto grho_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
         
+        auto grho_ab = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhob);
+        
         // set up pointer to perturbed density
         
         auto rhowa = rwDensityGrid->alphaDensity(0);
         
-        // NOTE: we compute F_a matrix, since F_a = F_b
+        auto rhowb = rwDensityGrid->betaDensity(0);
         
         for (int32_t i = 0; i < braAngularComponents; i++)
         {
@@ -790,7 +792,9 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                 
                 for (int32_t k = 0; k < ngpoints; k++)
                 {
-                    psum += gridWeights[gridOffset + k] * bgto[k] * kgto[k] * grho_aa[gridOffset + k] * rhowa[gridOffset + k];
+                    psum += gridWeights[gridOffset + k] * bgto[k] * kgto[k] * (grho_aa[gridOffset + k] * rhowa[gridOffset + k] +
+                                                                               
+                                                                               grho_ab[gridOffset + k] * rhowb[gridOffset + k]);
                 }
                 
                 ppvals[i * ketAngularComponents + j] = psum;
