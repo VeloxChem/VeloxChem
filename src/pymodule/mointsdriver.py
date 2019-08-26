@@ -88,12 +88,6 @@ class MOIntegralsDriver:
         self.ostream.print_header("Conventional AO->MO Integral Transformation")
         self.ostream.print_header(45 * "=")
         self.ostream.print_blank()
-        cur_str = "ERI Screening Scheme         : Cauchy Schwarz"
-        self.ostream.print_header(cur_str.ljust(60))
-        cur_str = "ERI Screening Threshold      : "
-        cur_str += "{:.1e}".format(self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(60))
-        self.ostream.print_blank()
         self.ostream.flush()
 
         mo = mol_orbs.alpha_to_numpy()
