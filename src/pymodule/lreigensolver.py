@@ -6,9 +6,12 @@ import h5py
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import MolecularGrid
+from .veloxchemlib import XCFunctional
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import parse_xc_func
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
 from .lrmatvecdriver import orthogonalize_gram_schmidt
@@ -78,6 +81,12 @@ class LinearResponseEigenSolver:
         self.eri_thresh = 1.0e-15
         self.qq_type = 'QQ_DEN'
 
+        # dft
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
+        self.molgrid = MolecularGrid()
+
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
@@ -101,41 +110,51 @@ class LinearResponseEigenSolver:
         self.timing = False
         self.profiling = False
 
-    def update_settings(self, settings, method_dict = {}):
+    def update_settings(self, rsp_dict, method_dict={}):
         """
-        Updates settings in linear response eigensolver.
+        Updates response and method settings in linear response eigensolver.
 
-        :param settings:
-            The settings dictionary.
+        :param rsp_dict:
+            The dictionary of response dict.
+        :param method_dict:
+            The dictionary of method rsp_dict.
         """
 
-        if 'nstates' in settings:
-            self.nstates = int(settings['nstates'])
+        if 'nstates' in rsp_dict:
+            self.nstates = int(rsp_dict['nstates'])
 
-        if 'eri_thresh' in settings:
-            self.eri_thresh = float(settings['eri_thresh'])
-        if 'qq_type' in settings:
-            self.qq_type = str(settings['qq_type'])
+        if 'eri_thresh' in rsp_dict:
+            self.eri_thresh = float(rsp_dict['eri_thresh'])
+        if 'qq_type' in rsp_dict:
+            self.qq_type = str(rsp_dict['qq_type'])
 
-        if 'conv_thresh' in settings:
-            self.conv_thresh = float(settings['conv_thresh'])
-        if 'max_iter' in settings:
-            self.max_iter = int(settings['max_iter'])
-        if 'lindep_thresh' in settings:
-            self.lindep_thresh = float(settings['lindep_thresh'])
+        if 'conv_thresh' in rsp_dict:
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
+        if 'max_iter' in rsp_dict:
+            self.max_iter = int(rsp_dict['max_iter'])
+        if 'lindep_thresh' in rsp_dict:
+            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
 
-        if 'restart' in settings:
-            key = settings['restart'].lower()
+        if 'restart' in rsp_dict:
+            key = rsp_dict['restart'].lower()
             self.restart = True if key == 'yes' else False
-        if 'checkpoint_file' in settings:
-            self.checkpoint_file = settings['checkpoint_file']
+        if 'checkpoint_file' in rsp_dict:
+            self.checkpoint_file = rsp_dict['checkpoint_file']
 
-        if 'timing' in settings:
-            key = settings['timing'].lower()
+        if 'timing' in rsp_dict:
+            key = rsp_dict['timing'].lower()
             self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in settings:
-            key = settings['profiling'].lower()
+        if 'profiling' in rsp_dict:
+            key = rsp_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
+
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key == 'yes' else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
 
     def compute(self, molecule, basis, scf_tensors):
         """

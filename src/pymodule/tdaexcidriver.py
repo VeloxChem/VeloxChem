@@ -11,7 +11,6 @@ from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import mpi_master
@@ -102,23 +101,37 @@ class TDAExciDriver:
         self.restart = True
         self.checkpoint_file = None
 
-    def update_settings(self, settings, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict={}):
         """
-        Updates settings in TDA excited states computation driver.
+        Updates response and method settings in TDA excited states computation
+        driver.
 
-        :param settings:
-            The settings for the driver.
+        :param rsp_dict:
+            The dictionary of response dict.
+        :param method_dict:
+            The dictionary of method settings.
         """
 
-        if 'nstates' in settings:
-            self.nstates = int(settings['nstates'])
-        if 'spin' in settings:
-            self.triplet = (settings['spin'][0].upper() == 'T')
+        if 'nstates' in rsp_dict:
+            self.nstates = int(rsp_dict['nstates'])
+        if 'spin' in rsp_dict:
+            self.triplet = (rsp_dict['spin'][0].upper() == 'T')
 
-        if 'eri_thresh' in settings:
-            self.eri_thresh = float(settings['eri_thresh'])
-        if 'qq_type' in settings:
-            self.qq_type = settings['qq_type'].upper()
+        if 'eri_thresh' in rsp_dict:
+            self.eri_thresh = float(rsp_dict['eri_thresh'])
+        if 'qq_type' in rsp_dict:
+            self.qq_type = rsp_dict['qq_type'].upper()
+
+        if 'conv_thresh' in rsp_dict:
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
+        if 'max_iter' in rsp_dict:
+            self.max_iter = int(rsp_dict['max_iter'])
+
+        if 'restart' in rsp_dict:
+            key = rsp_dict['restart'].lower()
+            self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in rsp_dict:
+            self.checkpoint_file = rsp_dict['checkpoint_file']
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -127,17 +140,6 @@ class TDAExciDriver:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-
-        if 'conv_thresh' in settings:
-            self.conv_thresh = float(settings['conv_thresh'])
-        if 'max_iter' in settings:
-            self.max_iter = int(settings['max_iter'])
-
-        if 'restart' in settings:
-            key = settings['restart'].lower()
-            self.restart = True if key == 'yes' else False
-        if 'checkpoint_file' in settings:
-            self.checkpoint_file = settings['checkpoint_file']
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -228,8 +230,9 @@ class TDAExciDriver:
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data, self.molgrid, self.xcfun,
-                                           mol_orbs, molecule, basis)
+                sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
+                                           self.molgrid, self.xcfun, mol_orbs,
+                                           molecule, basis)
 
             # solve eigenvalues problem on master node
 
