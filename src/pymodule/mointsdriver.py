@@ -105,7 +105,7 @@ class MOIntegralsDriver:
         err_msg = 'MOIntegralsDriver.compute_in_mem: invalid mints_type'
         assert_msg_critical(len(mints_type) == 4, err_msg)
         for x in mints_type:
-            assert_msg_critical(x.lower() in 'ov', err_msg)
+            assert_msg_critical(x.lower() in ['o', 'v'], err_msg)
 
         mo_coefs = [mo_occ if x.lower() == 'o' else mo_vir for x in mints_type]
 
@@ -119,15 +119,14 @@ class MOIntegralsDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        # Need integrals in physicists' notation
-        pqrs = pqrs.swapaxes(1, 2)
+        # Note that we calculate the integrals in physicists' notation
 
         t0 = tm.time()
         tqrs = np.einsum('pqrs,pt->tqrs', pqrs, mo_coefs[0], optimize=True)
         del pqrs
-        turs = np.einsum('tqrs,qu->turs', tqrs, mo_coefs[1], optimize=True)
+        turs = np.einsum('tqrs,qu->turs', tqrs, mo_coefs[2], optimize=True)
         del tqrs
-        tuvs = np.einsum('turs,rv->tuvs', turs, mo_coefs[2], optimize=True)
+        tuvs = np.einsum('turs,rv->tuvs', turs, mo_coefs[1], optimize=True)
         del turs
         tuvw = np.einsum('tuvs,sw->tuvw', tuvs, mo_coefs[3], optimize=True)
         del tuvs
@@ -138,7 +137,7 @@ class MOIntegralsDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        return tuvw
+        return tuvw.swapaxes(1, 2)
 
     def compute(self, molecule, ao_basis, mol_orbs, mints_type, grps):
         """
