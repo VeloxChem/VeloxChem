@@ -193,7 +193,13 @@ def main():
 
     if 'mp2' in task_types and scf_drv.restricted:
 
+        if 'mp2' in task.input_dict:
+            mp2_dict = task.input_dict['mp2']
+        else:
+            mp2_dict = {}
+
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        mp2_drv.update_settings(mp2_dict)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
     # Cube file

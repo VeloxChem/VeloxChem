@@ -84,6 +84,18 @@ class MOIntegralsDriver:
         if self.rank != mpi_master():
             return None
 
+        self.ostream.print_blank()
+        self.ostream.print_header("Conventional AO->MO Integral Transformation")
+        self.ostream.print_header(45 * "=")
+        self.ostream.print_blank()
+        cur_str = "ERI Screening Scheme         : Cauchy Schwarz"
+        self.ostream.print_header(cur_str.ljust(60))
+        cur_str = "ERI Screening Threshold      : "
+        cur_str += "{:.1e}".format(self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(60))
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         mo = mol_orbs.alpha_to_numpy()
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc]
@@ -105,6 +117,7 @@ class MOIntegralsDriver:
         eri_info = 'Time spent in AO integrals: {:.2f} sec'.format(t1 - t0)
         self.ostream.print_info(eri_info)
         self.ostream.print_blank()
+        self.ostream.flush()
 
         # Need integrals in physicists' notation
         pqrs = pqrs.swapaxes(1, 2)
@@ -119,9 +132,11 @@ class MOIntegralsDriver:
         tuvw = np.einsum('tuvs,sw->tuvw', tuvs, mo_coefs[3], optimize=True)
         del tuvs
         t1 = tm.time()
-        mo_eri_info = 'Time spent in MO integrals: {:.2f} sec'.format(t1 - t0)
+        mo_eri_info = 'Time spent in AO->MO transformation: {:.2f} sec'.format(
+            t1 - t0)
         self.ostream.print_info(mo_eri_info)
         self.ostream.print_blank()
+        self.ostream.flush()
 
         return tuvw
 
