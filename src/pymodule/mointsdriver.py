@@ -1,16 +1,18 @@
+import numpy as np
 import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import MOIntsBatch
+from .veloxchemlib import TwoIndexes
 from .veloxchemlib import mpi_master
 from .veloxchemlib import fockmat
 from .veloxchemlib import moints
-from .veloxchemlib import MOIntsBatch
-from .veloxchemlib import TwoIndexes
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .errorhandler import assert_msg_critical
 
 
 class MOIntegralsDriver:
@@ -60,6 +62,68 @@ class MOIntegralsDriver:
 
         # output stream
         self.ostream = ostream
+
+    def compute_in_mem(self, molecule, basis, mol_orbs, mints_type):
+        """
+        Performs in-memory MO integrals calculation for a molecule and a basis
+        set.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mol_orbs:
+            The molecular orbitals.
+        :param mints_type:
+            The type of MO integrals to be calculated.
+
+        :return:
+            The computed MO integrals.
+        """
+
+        if self.rank != mpi_master():
+            return None
+
+        mo = mol_orbs.alpha_to_numpy()
+        nocc = molecule.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc]
+        mo_vir = mo[:, nocc:]
+        nao = mo.shape[0]
+
+        err_msg = 'MOIntegralsDriver.compute_in_mem: invalid mints_type'
+        assert_msg_critical(len(mints_type) == 4, err_msg)
+        for x in mints_type:
+            assert_msg_critical(x.lower() in 'ov', err_msg)
+
+        mo_coefs = [mo_occ if x.lower() == 'o' else mo_vir for x in mints_type]
+
+        t0 = tm.time()
+        pqrs = np.zeros((nao, nao, nao, nao))
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        eri_drv.compute_in_mem(molecule, basis, pqrs)
+        t1 = tm.time()
+        eri_info = 'Time spent in AO integrals: {:.2f} sec'.format(t1 - t0)
+        self.ostream.print_info(eri_info)
+        self.ostream.print_blank()
+
+        # Need integrals in physicists' notation
+        pqrs = pqrs.swapaxes(1, 2)
+
+        t0 = tm.time()
+        tqrs = np.einsum('pqrs,pt->tqrs', pqrs, mo_coefs[0], optimize=True)
+        del pqrs
+        turs = np.einsum('tqrs,qu->turs', tqrs, mo_coefs[1], optimize=True)
+        del tqrs
+        tuvs = np.einsum('turs,rv->tuvs', turs, mo_coefs[2], optimize=True)
+        del turs
+        tuvw = np.einsum('tuvs,sw->tuvw', tuvs, mo_coefs[3], optimize=True)
+        del tuvs
+        t1 = tm.time()
+        mo_eri_info = 'Time spent in MO integrals: {:.2f} sec'.format(t1 - t0)
+        self.ostream.print_info(mo_eri_info)
+        self.ostream.print_blank()
+
+        return tuvw
 
     def compute(self, molecule, ao_basis, mol_orbs, mints_type, grps):
         """

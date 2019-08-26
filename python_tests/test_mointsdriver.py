@@ -69,7 +69,20 @@ class TestMOIntegralsDriver(unittest.TestCase):
                 denom = eocc[pair.first()] + eocc[pair.second()] - eab
                 master_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
 
-            self.assertAlmostEqual(e_mp2, master_e_mp2, 10)
+            self.assertAlmostEqual(e_mp2, master_e_mp2, 12)
+
+            # in-memory test
+            in_mem_e_mp2 = 0.0
+            in_mem_oovv = moints_drv.compute_in_mem(
+                task.molecule, task.ao_basis, mol_orbs, "OOVV")
+            for i in range(in_mem_oovv.shape[0]):
+                for j in range(in_mem_oovv.shape[1]):
+                    ij = in_mem_oovv[i, j, :, :]
+                    ij_antisym = ij - ij.T
+                    denom = eocc[i] + eocc[j] - eab
+                    in_mem_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
+
+            self.assertAlmostEqual(e_mp2, in_mem_e_mp2, 12)
 
         task.finish()
 

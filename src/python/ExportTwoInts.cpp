@@ -24,6 +24,7 @@
 #include "MOIntsBatch.hpp"
 #include "MOIntsType.hpp"
 #include "ScreeningContainer.hpp"
+#include "ErrorHandler.hpp"
 
 namespace py = pybind11;
 
@@ -88,6 +89,56 @@ CElectronRepulsionIntegralsDriver_create(py::object py_comm)
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(*comm_ptr));
+}
+
+// Helper function for exporting CElectronRepulsionIntegralsDriver.computeInMemory
+
+static void
+CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegralsDriver& self,
+                                                 const CMolecule&                         molecule,
+                                                 const CMolecularBasis&                   basis,
+                                                       py::array_t<double>&               eri)
+{
+    std::string errsrc("compute_in_mem: need a c_style contiguous numpy array");
+
+    auto c_style = py::detail::check_flags(eri.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errsrc);
+
+    std::string errshape("compute_in_mem: invalid shape");
+
+    errors::assertMsgCritical(eri.ndim() == 4, errshape);
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
+
+    int32_t nao = 0;
+
+    for (int32_t angl = 0; angl <= max_angl; angl++)
+    {
+        for (int32_t s = -angl; s <= angl; s++)
+        {
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+            {
+                int32_t idelem = molecule.getIdsElemental()[atomidx];
+
+                nao += basis.getNumberOfBasisFunctions(idelem, angl);
+            }
+        }
+    }
+
+    std::string errsize("compute_in_mem: inconsistent size");
+
+    errors::assertMsgCritical(eri.shape(0) == nao, errsize);
+
+    errors::assertMsgCritical(eri.shape(1) == nao, errsize);
+
+    errors::assertMsgCritical(eri.shape(2) == nao, errsize);
+
+    errors::assertMsgCritical(eri.shape(3) == nao, errsize);
+
+    self.computeInMemory(molecule, basis, static_cast<double*>(eri.request().ptr));
 }
 
 // Helper function for reduce_sum CAOFockMatrix object
@@ -318,7 +369,8 @@ export_twoints(py::module& m)
         .def("compute",
              (CScreeningContainer(CElectronRepulsionIntegralsDriver::*)(
                  const ericut, const double, const CMolecule&, const CMolecularBasis&) const) &
-                 CElectronRepulsionIntegralsDriver::compute);
+                 CElectronRepulsionIntegralsDriver::compute)
+        .def("compute_in_mem", &CElectronRepulsionIntegralsDriver_compute_in_mem);
 
     // CMOIntsBatch class
 
