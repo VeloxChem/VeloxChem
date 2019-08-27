@@ -589,20 +589,20 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
 
     match_nuclear_repulsion = False
     if 'nuclear_repulsion' in hf:
-        hf_e_nuc = np.array(hf.get('nuclear_repulsion'))[0]
-        match_nuclear_repulsion = (abs(1.0 - hf_e_nuc / e_nuc) < 1.0e-13)
+        h5_e_nuc = np.array(hf.get('nuclear_repulsion'))[0]
+        match_nuclear_repulsion = (abs(1.0 - h5_e_nuc / e_nuc) < 1.0e-13)
 
     match_nuclear_charges = False
     if 'nuclear_charges' in hf:
-        hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
-        if hf_nuclear_charges.shape == nuclear_charges.shape:
+        h5_nuclear_charges = np.array(hf.get('nuclear_charges'))
+        if h5_nuclear_charges.shape == nuclear_charges.shape:
             match_nuclear_charges = (
-                hf_nuclear_charges == nuclear_charges).all()
+                h5_nuclear_charges == nuclear_charges).all()
 
     match_basis_set = False
     if 'basis_set' in hf:
-        hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
-        match_basis_set = (hf_basis_set.upper() == basis_set.upper())
+        h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
+        match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
     match_dft_func = False
     if 'dft_func_label' in hf:
