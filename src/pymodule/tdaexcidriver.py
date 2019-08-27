@@ -36,6 +36,16 @@ class TDAExciDriver:
         The triplet excited states flag.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
+    :param qq_type:
+        The electron repulsion integrals screening scheme.
+    :param dft:
+        The flag for running DFT.
+    :param grid_level:
+        The accuracy level of DFT grid.
+    :param xcfun:
+        The XC functional.
+    :param molgrid:
+        The molecular grid.
     :param conv_thresh:
         The excited states convergence threshold.
     :param max_iter:

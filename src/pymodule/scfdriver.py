@@ -90,10 +90,10 @@ class ScfDriver:
         The flag for running DFT.
     :param grid_level:
         The accuracy level of DFT grid.
-    :param xcfun_name:
-        The name of the XC functional.
-    :param xcfun_type:
-        The type of the XC functional.
+    :param xcfun:
+        The XC functional.
+    :param molgrid:
+        The molecular grid.
     """
 
     def __init__(self, comm, ostream):
