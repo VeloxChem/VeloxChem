@@ -1,8 +1,6 @@
-from os.path import isfile
 import numpy as np
 import time as tm
 import math
-import h5py
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -18,11 +16,13 @@ from .veloxchemlib import szblock
 from .veloxchemlib import molorb
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import parse_xc_func
-from .qqscheme import get_qq_scheme
-from .qqscheme import get_qq_type
-from .errorhandler import assert_msg_critical
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
+from .qqscheme import get_qq_scheme
+from .qqscheme import get_qq_type
+from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import write_rsp_hdf5
+from .errorhandler import assert_msg_critical
 
 
 class TDAExciDriver:
@@ -212,9 +212,11 @@ class TDAExciDriver:
 
         if self.restart:
             if self.rank == mpi_master():
-                rst_trial_mat, rst_sig_mat = self.read_hdf5(
-                    self.checkpoint_file, molecule.elem_ids_to_numpy(),
-                    basis.get_label())
+                rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
+                    self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
+                    molecule.nuclear_repulsion_energy(),
+                    molecule.elem_ids_to_numpy(), basis.get_label(),
+                    self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
                 if rst_trial_mat is not None:
@@ -257,11 +259,13 @@ class TDAExciDriver:
                 self.update_trial_vectors(trial_vecs, zvecs)
 
                 if i >= n_restart_iterations:
-                    self.write_hdf5(self.checkpoint_file,
-                                    self.solver.trial_matrices,
-                                    self.solver.sigma_matrices,
-                                    molecule.elem_ids_to_numpy(),
-                                    basis.get_label())
+                    write_rsp_hdf5(self.checkpoint_file,
+                                   self.solver.trial_matrices,
+                                   self.solver.sigma_matrices,
+                                   ['TDA_trials', 'TDA_sigmas'],
+                                   molecule.nuclear_repulsion_energy(),
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label(), self.ostream)
 
             # check convergence
 
@@ -754,104 +758,3 @@ class TDAExciDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
-
-    def write_hdf5(self, fname, trials, sigmas, nuclear_charges, basis_set):
-        """
-        Writes response vectors to checkpoint file. Nuclear charges and basis
-        set can also be written to the checkpoint file.
-
-        :param fname:
-            Name of the checkpoint file.
-        :param trials:
-            The trials vectors.
-        :param sigmas:
-            The sigma vectors.
-        :param nuclear_charges:
-            Nuclear charges of the molecule.
-        :param basis_set:
-            Name of the AO basis set.
-        """
-
-        valid_checkpoint = (self.checkpoint_file and
-                            isinstance(self.checkpoint_file, str))
-
-        if not valid_checkpoint:
-            return
-
-        hf = h5py.File(fname, 'w')
-
-        hf.create_dataset('TDA_trials', data=trials, compression="gzip")
-        hf.create_dataset('TDA_sigmas', data=sigmas, compression="gzip")
-
-        if nuclear_charges is not None:
-            hf.create_dataset('nuclear_charges',
-                              data=nuclear_charges,
-                              compression='gzip')
-
-        if basis_set is not None:
-            hf.create_dataset('basis_set',
-                              data=np.string_([basis_set]),
-                              compression='gzip')
-
-        hf.close()
-
-        checkpoint_text = 'Checkpoint written to file: '
-        checkpoint_text += self.checkpoint_file
-        self.ostream.print_info(checkpoint_text)
-        self.ostream.print_blank()
-
-    def read_hdf5(self, fname, nuclear_charges, basis_set):
-        """
-        Reads response vectors from checkpoint file. Nuclear charges and basis
-        set will be used to validate the checkpoint file.
-
-        :param fname:
-            Name of the checkpoint file.
-        :param nuclear_charges:
-            Nuclear charges of the molecule.
-        :param basis_set:
-            Name of the AO basis set.
-
-        :return:
-            The tuple of trials vectors and sigma vectors.
-        """
-
-        valid_checkpoint = (self.checkpoint_file and
-                            isinstance(self.checkpoint_file, str) and
-                            isfile(self.checkpoint_file))
-
-        if not valid_checkpoint:
-            return None, None
-
-        hf = h5py.File(fname, 'r')
-
-        match_nuclear_charges = False
-        if 'nuclear_charges' in hf:
-            hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
-            if hf_nuclear_charges.shape == nuclear_charges.shape:
-                match_nuclear_charges = (
-                    hf_nuclear_charges == nuclear_charges).all()
-
-        match_basis_set = False
-        if 'basis_set' in hf:
-            hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
-            match_basis_set = (hf_basis_set.upper() == basis_set.upper())
-
-        trials = None
-        sigmas = None
-
-        if match_nuclear_charges and match_basis_set:
-            if 'TDA_trials' in hf.keys():
-                trials = np.array(hf.get('TDA_trials'))
-            if 'TDA_sigmas' in hf.keys():
-                sigmas = np.array(hf.get('TDA_sigmas'))
-
-        hf.close()
-
-        if (trials is not None and sigmas is not None):
-            checkpoint_text = 'Restarting from checkpoint file: '
-            checkpoint_text += self.checkpoint_file
-            self.ostream.print_info(checkpoint_text)
-            self.ostream.print_blank()
-
-        return trials, sigmas

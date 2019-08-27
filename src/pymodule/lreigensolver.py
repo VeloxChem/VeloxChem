@@ -1,8 +1,6 @@
-from os.path import isfile
 import itertools
 import numpy as np
 import time as tm
-import h5py
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ExcitationVector
@@ -20,6 +18,8 @@ from .lrmatvecdriver import normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import swap_xy
+from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import write_rsp_hdf5
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .errorhandler import assert_msg_critical
@@ -240,9 +240,11 @@ class LinearResponseEigenSolver:
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
-                b, e2b = self.read_hdf5(self.checkpoint_file,
-                                        molecule.elem_ids_to_numpy(),
-                                        basis.get_label())
+                b, e2b = read_rsp_hdf5(self.checkpoint_file,
+                                       ['LR_eigen_b', 'LR_eigen_e2b'],
+                                       molecule.nuclear_repulsion_energy(),
+                                       molecule.elem_ids_to_numpy(),
+                                       basis.get_label(), self.ostream)
                 self.restart = (b is not None and e2b is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
@@ -349,8 +351,11 @@ class LinearResponseEigenSolver:
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
 
-                self.write_hdf5(self.checkpoint_file, b, e2b,
-                                molecule.elem_ids_to_numpy(), basis.get_label())
+                write_rsp_hdf5(self.checkpoint_file, b, e2b,
+                               ['LR_eigen_b', 'LR_eigen_e2b'],
+                               molecule.nuclear_repulsion_energy(),
+                               molecule.elem_ids_to_numpy(), basis.get_label(),
+                               self.ostream)
 
             if self.timing:
                 tid = iteration + 1
@@ -652,104 +657,3 @@ class LinearResponseEigenSolver:
         self.ostream.print_header(valstr.ljust(width))
 
         self.ostream.print_blank()
-
-    def write_hdf5(self, fname, b, e2b, nuclear_charges, basis_set):
-        """
-        Writes response vectors to checkpoint file. Nuclear charges and basis
-        set can also be written to the checkpoint file.
-
-        :param fname:
-            Name of the checkpoint file.
-        :param b:
-            The response vectors.
-        :param e2b:
-            The transformed response vectors E2 * b.
-        :param nuclear_charges:
-            Nuclear charges of the molecule.
-        :param basis_set:
-            Name of the AO basis set.
-        """
-
-        valid_checkpoint = (self.checkpoint_file and
-                            isinstance(self.checkpoint_file, str))
-
-        if not valid_checkpoint:
-            return
-
-        hf = h5py.File(fname, 'w')
-
-        hf.create_dataset('LR_eigen_b', data=b, compression="gzip")
-        hf.create_dataset('LR_eigen_e2b', data=e2b, compression="gzip")
-
-        if nuclear_charges is not None:
-            hf.create_dataset('nuclear_charges',
-                              data=nuclear_charges,
-                              compression='gzip')
-
-        if basis_set is not None:
-            hf.create_dataset('basis_set',
-                              data=np.string_([basis_set]),
-                              compression='gzip')
-
-        hf.close()
-
-        checkpoint_text = 'Checkpoint written to file: '
-        checkpoint_text += self.checkpoint_file
-        self.ostream.print_info(checkpoint_text)
-        self.ostream.print_blank()
-
-    def read_hdf5(self, fname, nuclear_charges, basis_set):
-        """
-        Reads response vectors from checkpoint file. Nuclear charges and basis
-        set will be used to validate the checkpoint file.
-
-        :param fname:
-            Name of the checkpoint file.
-        :param nuclear_charges:
-            Nuclear charges of the molecule.
-        :param basis_set:
-            Name of the AO basis set.
-
-        :return:
-            The response vectors b and the transformed vectors E2 * b.
-        """
-
-        valid_checkpoint = (self.checkpoint_file and
-                            isinstance(self.checkpoint_file, str) and
-                            isfile(self.checkpoint_file))
-
-        if not valid_checkpoint:
-            return None, None
-
-        hf = h5py.File(fname, 'r')
-
-        match_nuclear_charges = False
-        if 'nuclear_charges' in hf:
-            hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
-            if hf_nuclear_charges.shape == nuclear_charges.shape:
-                match_nuclear_charges = (
-                    hf_nuclear_charges == nuclear_charges).all()
-
-        match_basis_set = False
-        if 'basis_set' in hf:
-            hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
-            match_basis_set = (hf_basis_set.upper() == basis_set.upper())
-
-        b = None
-        e2b = None
-
-        if match_nuclear_charges and match_basis_set:
-            if 'LR_eigen_b' in hf.keys():
-                b = np.array(hf.get('LR_eigen_b'))
-            if 'LR_eigen_e2b' in hf.keys():
-                e2b = np.array(hf.get('LR_eigen_e2b'))
-
-        hf.close()
-
-        if (b is not None and e2b is not None):
-            checkpoint_text = 'Restarting from checkpoint file: '
-            checkpoint_text += self.checkpoint_file
-            self.ostream.print_info(checkpoint_text)
-            self.ostream.print_blank()
-
-        return b, e2b

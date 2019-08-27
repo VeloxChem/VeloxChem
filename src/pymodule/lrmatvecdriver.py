@@ -1,5 +1,7 @@
+from os.path import isfile
 import numpy as np
 import itertools
+import h5py
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -491,3 +493,123 @@ def swap_xy(xy):
         yx[half_rows:, :] = xy[:half_rows, :]
 
     return yx
+
+
+def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
+                   ostream):
+    """
+    Writes response vectors to checkpoint file. Nuclear charges and basis
+    set can also be written to the checkpoint file.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param b:
+        The trial vectors.
+    :param e2b:
+        The transformed vectors.
+    :param labels:
+        The list of labels for trial vecotrs and transformed vectors.
+    :param e_nuc:
+        Nuclear repulsion energy.
+    :param nuclear_charges:
+        Nuclear charges of the molecule.
+    :param basis_set:
+        Name of the AO basis set.
+    :param ostream:
+        The output stream.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str))
+
+    if not valid_checkpoint:
+        return
+
+    hf = h5py.File(fname, 'w')
+
+    hf.create_dataset(labels[0], data=b, compression="gzip")
+    hf.create_dataset(labels[1], data=e2b, compression="gzip")
+
+    hf.create_dataset('nuclear_repulsion',
+                      data=np.array([e_nuc]),
+                      compression='gzip')
+
+    hf.create_dataset('nuclear_charges',
+                      data=nuclear_charges,
+                      compression='gzip')
+
+    hf.create_dataset('basis_set',
+                      data=np.string_([basis_set]),
+                      compression='gzip')
+
+    hf.close()
+
+    checkpoint_text = 'Checkpoint written to file: '
+    checkpoint_text += fname
+    ostream.print_info(checkpoint_text)
+    ostream.print_blank()
+
+
+def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set, ostream):
+    """
+    Reads response vectors from checkpoint file. Nuclear charges and basis
+    set will be used to validate the checkpoint file.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param labels:
+        The list of labels for trial vecotrs and transformed vectors.
+    :param e_nuc:
+        Nuclear repulsion energy.
+    :param nuclear_charges:
+        Nuclear charges of the molecule.
+    :param basis_set:
+        Name of the AO basis set.
+    :param ostream:
+        The output stream.
+
+    :return:
+        The trial vectors and transformed vectors.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and isfile(fname))
+
+    if not valid_checkpoint:
+        return None, None
+
+    hf = h5py.File(fname, 'r')
+
+    match_nuclear_repulsion = False
+    if 'nuclear_repulsion' in hf:
+        hf_e_nuc = np.array(hf.get('nuclear_repulsion'))[0]
+        match_nuclear_repulsion = (abs(1.0 - hf_e_nuc / e_nuc) < 1.0e-13)
+
+    match_nuclear_charges = False
+    if 'nuclear_charges' in hf:
+        hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
+        if hf_nuclear_charges.shape == nuclear_charges.shape:
+            match_nuclear_charges = (
+                hf_nuclear_charges == nuclear_charges).all()
+
+    match_basis_set = False
+    if 'basis_set' in hf:
+        hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
+        match_basis_set = (hf_basis_set.upper() == basis_set.upper())
+
+    b = None
+    e2b = None
+
+    if match_nuclear_repulsion and match_nuclear_charges and match_basis_set:
+        if labels[0] in hf.keys():
+            b = np.array(hf.get(labels[0]))
+        if labels[1] in hf.keys():
+            e2b = np.array(hf.get(labels[1]))
+
+    hf.close()
+
+    if (b is not None and e2b is not None):
+        checkpoint_text = 'Restarting from checkpoint file: '
+        checkpoint_text += fname
+        ostream.print_info(checkpoint_text)
+        ostream.print_blank()
+
+    return b, e2b
