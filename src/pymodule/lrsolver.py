@@ -2,6 +2,7 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import mpi_master
@@ -210,6 +211,21 @@ class LinearResponseSolver:
         else:
             nocc = None
             norb = None
+
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            self.molgrid = grid_drv.generate(molecule)
+            n_grid_points = self.molgrid.number_of_points()
+            self.molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
