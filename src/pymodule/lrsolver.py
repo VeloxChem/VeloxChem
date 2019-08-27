@@ -251,6 +251,11 @@ class LinearResponseSolver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+        if self.dft:
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            dft_func_label = 'HF'
+
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
@@ -276,7 +281,8 @@ class LinearResponseSolver:
                 b, e2b = read_rsp_hdf5(self.checkpoint_file, ['LR_b', 'LR_e2b'],
                                        molecule.nuclear_repulsion_energy(),
                                        molecule.elem_ids_to_numpy(),
-                                       basis.get_label(), self.ostream)
+                                       basis.get_label(), dft_func_label,
+                                       self.ostream)
                 self.restart = (b is not None and e2b is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
@@ -376,7 +382,7 @@ class LinearResponseSolver:
                 write_rsp_hdf5(self.checkpoint_file, b, e2b, ['LR_b', 'LR_e2b'],
                                molecule.nuclear_repulsion_energy(),
                                molecule.elem_ids_to_numpy(), basis.get_label(),
-                               self.ostream)
+                               dft_func_label, self.ostream)
 
             if self.timing:
                 tid = iteration + 1

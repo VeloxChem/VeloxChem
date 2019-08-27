@@ -496,7 +496,7 @@ def swap_xy(xy):
 
 
 def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
-                   ostream):
+                   dft_func_label, ostream):
     """
     Writes response vectors to checkpoint file. Nuclear charges and basis
     set can also be written to the checkpoint file.
@@ -515,6 +515,8 @@ def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
         Nuclear charges of the molecule.
     :param basis_set:
         Name of the AO basis set.
+    :param dft_func_label:
+        Name of the density functional.
     :param ostream:
         The output stream.
     """
@@ -541,6 +543,10 @@ def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
                       data=np.string_([basis_set]),
                       compression='gzip')
 
+    hf.create_dataset('dft_func_label',
+                      data=np.string_([dft_func_label]),
+                      compression='gzip')
+
     hf.close()
 
     checkpoint_text = 'Checkpoint written to file: '
@@ -549,7 +555,8 @@ def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
     ostream.print_blank()
 
 
-def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set, ostream):
+def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
+                  dft_func_label, ostream):
     """
     Reads response vectors from checkpoint file. Nuclear charges and basis
     set will be used to validate the checkpoint file.
@@ -564,6 +571,8 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set, ostream):
         Nuclear charges of the molecule.
     :param basis_set:
         Name of the AO basis set.
+    :param dft_func_label:
+        Name of the density functional.
     :param ostream:
         The output stream.
 
@@ -595,10 +604,16 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set, ostream):
         hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
         match_basis_set = (hf_basis_set.upper() == basis_set.upper())
 
+    match_dft_func = False
+    if 'dft_func_label' in hf:
+        h5_func_label = hf.get('dft_func_label')[0].decode('utf-8')
+        match_dft_func = (h5_func_label.upper() == dft_func_label.upper())
+
     b = None
     e2b = None
 
-    if match_nuclear_repulsion and match_nuclear_charges and match_basis_set:
+    if (match_nuclear_repulsion and match_nuclear_charges and
+            match_basis_set and match_dft_func):
         if labels[0] in hf.keys():
             b = np.array(hf.get(labels[0]))
         if labels[1] in hf.keys():

@@ -198,6 +198,11 @@ class TDAExciDriver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+        if self.dft:
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            dft_func_label = 'HF'
+
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
 
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
@@ -226,7 +231,7 @@ class TDAExciDriver:
                     self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
-                    self.ostream)
+                    dft_func_label, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
                 if rst_trial_mat is not None:
@@ -275,7 +280,8 @@ class TDAExciDriver:
                                    ['TDA_trials', 'TDA_sigmas'],
                                    molecule.nuclear_repulsion_energy(),
                                    molecule.elem_ids_to_numpy(),
-                                   basis.get_label(), self.ostream)
+                                   basis.get_label(), dft_func_label,
+                                   self.ostream)
 
             # check convergence
 
