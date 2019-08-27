@@ -814,11 +814,17 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         
         auto grho_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
         
+        auto grho_ab = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhob);
+        
         auto gmix_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::grada);
+        
+        auto gmix_ab = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradb);
         
         auto gmix_ac = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradab);
         
         auto ggrad_aa = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::grada);
+        
+        auto ggrad_ab = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradb);
         
         auto ggrad_ac = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradab);
         
@@ -832,21 +838,37 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         
         auto ngrada = gsDensityGrid->alphaDensityGradient(0);
         
+        auto ngradb = gsDensityGrid->betaDensityGradient(0);
+        
         auto grada_x = gsDensityGrid->alphaDensityGradientX(0);
         
         auto grada_y = gsDensityGrid->alphaDensityGradientY(0);
         
         auto grada_z = gsDensityGrid->alphaDensityGradientZ(0);
         
+        auto gradb_x = gsDensityGrid->betaDensityGradientX(0);
+        
+        auto gradb_y = gsDensityGrid->betaDensityGradientY(0);
+        
+        auto gradb_z = gsDensityGrid->betaDensityGradientZ(0);
+        
         // set up pointers to perturbed density gradient norms
         
         auto rhowa = rwDensityGrid->alphaDensity(0);
         
-        auto gradw_x = rwDensityGrid->alphaDensityGradientX(0);
+        auto rhowb = rwDensityGrid->betaDensity(0);
         
-        auto gradw_y = rwDensityGrid->alphaDensityGradientY(0);
+        auto gradwa_x = rwDensityGrid->alphaDensityGradientX(0);
         
-        auto gradw_z = rwDensityGrid->alphaDensityGradientZ(0);
+        auto gradwa_y = rwDensityGrid->alphaDensityGradientY(0);
+        
+        auto gradwa_z = rwDensityGrid->alphaDensityGradientZ(0);
+        
+        auto gradwb_x = rwDensityGrid->betaDensityGradientX(0);
+        
+        auto gradwb_y = rwDensityGrid->betaDensityGradientY(0);
+        
+        auto gradwb_z = rwDensityGrid->betaDensityGradientZ(0);
         
         // NOTE: we compute F_a matrix, since F_a = F_b
         
@@ -878,17 +900,31 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                     
                     double znva = 1.0 / ngrada[gridOffset + k];
                     
+                    double znvb = 1.0 / ngradb[gridOffset + k];
+                    
                     double rxa = znva * grada_x[gridOffset + k];
                     
                     double rya = znva * grada_y[gridOffset + k];
                     
                     double rza = znva * grada_z[gridOffset + k];
                     
-                    double rxw = gradw_x[gridOffset + k];
+                    double rxb = znvb * gradb_x[gridOffset + k];
                     
-                    double ryw = gradw_y[gridOffset + k];
+                    double ryb = znvb * gradb_y[gridOffset + k];
                     
-                    double rzw = gradw_z[gridOffset + k];
+                    double rzb = znvb * gradb_z[gridOffset + k];
+                    
+                    double rxwa = gradwa_x[gridOffset + k];
+                    
+                    double rywa = gradwa_y[gridOffset + k];
+                    
+                    double rzwa = gradwa_z[gridOffset + k];
+                    
+                    double rxwb = gradwb_x[gridOffset + k];
+                    
+                    double rywb = gradwb_y[gridOffset + k];
+                    
+                    double rzwb = gradwb_z[gridOffset + k];
                     
                     // GTOs values
                     
@@ -902,25 +938,31 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                     
                     //  variations of functionals variables
                     
-                    double zetaa = rxw * rxa + ryw * rya + rzw * rza;
+                    double zetaa = rxwa * rxa + rywa * rya + rzwa * rza;
                     
-                    double zetac = 2.0 * (grada_x[gridOffset + k] * rxw +
-                                          grada_y[gridOffset + k] * ryw +
-                                          grada_z[gridOffset + k] * rzw) ;
+                    double zetab = rxwb * rxb + rywb * ryb + rzwb * rzb;
+                    
+                    double zetac = grada_x[gridOffset + k] * rxwb + grada_y[gridOffset + k] * rywb
+                    
+                                 + grada_z[gridOffset + k] * rzwb + gradb_x[gridOffset + k] * rxwa
+                    
+                                 + gradb_y[gridOffset + k] * rywa + gradb_z[gridOffset + k] * rzwa;
                     
                     // first contribution
                     
-                    double fac0 = 2.0 * gmix_aa[gridOffset + k] * zetaa + gmix_ac[gridOffset + k] * zetac
+                    double fac0 = gmix_aa[gridOffset + k] * zetaa + gmix_ab[gridOffset + k] * zetab
                     
-                                + grho_aa[gridOffset + k] * rhowa[gridOffset + k];
+                                + gmix_ac[gridOffset + k] * zetac + grho_aa[gridOffset + k] * rhowa[gridOffset + k]
+                    
+                                + grho_ab[gridOffset + k] * rhowb[gridOffset + k];
                     
                     psum += w * a0 * fac0;
                     
                     // second contribution
                     
-                    double facr = 2.0 * gmix_aa[gridOffset + k] * rhowa[gridOffset + k]
+                    double facr = gmix_aa[gridOffset + k] * rhowa[gridOffset + k] + gmix_ab[gridOffset + k] * rhowb[gridOffset + k]
                     
-                                + 2.0 * ggrad_aa[gridOffset + k] * zetaa + ggrad_ac[gridOffset + k] * zetac;
+                                + ggrad_aa[gridOffset + k] * zetaa + ggrad_ab[gridOffset + k] * zetab + ggrad_ac[gridOffset + k] * zetac;
                     
                     double ar = ax * rxa + ay * rya + az * rza;
                     
@@ -938,13 +980,13 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                     
                     // fourth contribution
                     
-                    double ab = ax * rxw + ay * ryw + az * rzw - ar * zetaa;
+                    double ab = ax * rxwa + ay * rywa + az * rzwa - ar * zetaa;
                     
                     psum += w * znva * ggrad_a[gridOffset + k] * ab;
                     
                     // fifth contribution
                     
-                    double abw = ax * rxw + ay * ryw + az * rzw;
+                    double abw = ax * rxwa + ay * rywa + az * rzwa;
                     
                     psum += w * ggrad_c[gridOffset + k] * abw;
                 }
