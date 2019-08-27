@@ -14,6 +14,8 @@ from .lrmatvecdriver import normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import swap_xy
+from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import write_rsp_hdf5
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .errorhandler import assert_msg_critical
@@ -58,6 +60,10 @@ class LinearResponseSolver:
         Number of MPI processes.
     :param ostream:
         The output stream.
+    :param restart:
+        The flag for restarting from checkpoint file.
+    :param checkpoint_file:
+        The name of checkpoint file.
     :param timing:
         The flag for printing timing information.
     :param profiling:
@@ -107,6 +113,10 @@ class LinearResponseSolver:
         # output stream
         self.ostream = ostream
 
+        # restart information
+        self.restart = True
+        self.checkpoint_file = None
+
         self.timing = False
         self.profiling = False
 
@@ -142,6 +152,12 @@ class LinearResponseSolver:
             self.max_iter = int(rsp_dict['max_iter'])
         if 'lindep_thresh' in rsp_dict:
             self.lindep_thresh = float(rsp_dict['lindep_thresh'])
+
+        if 'restart' in rsp_dict:
+            key = rsp_dict['restart'].lower()
+            self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in rsp_dict:
+            self.checkpoint_file = rsp_dict['checkpoint_file']
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -238,23 +254,38 @@ class LinearResponseSolver:
         b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
                         scf_tensors, self.rank, self.comm)
 
-        # start linear response calculation
         if self.rank == mpi_master():
             V1 = {op: v for op, v in zip(self.b_components, b_rhs)}
-            igs = self.initial_guess(self.frequencies, V1, od, sd, td)
-            b = self.setup_trials(igs)
+            op_freq_keys = [(op, w) for op in V1 for w in self.frequencies]
 
-            assert_msg_critical(
-                np.any(b),
-                'LinearResponseSolver.compute: trial vector is empty')
-        else:
-            b = None
+        b = None
+        e2b = None
+        s2b = None
 
-        if self.timing:
-            self.timing_dict['reduced_space'][0] += tm.time() - timing_t0
-            timing_t0 = tm.time()
+        # read initial guess from restart file
+        if self.restart:
+            if self.rank == mpi_master():
+                b, e2b = read_rsp_hdf5(self.checkpoint_file, ['LR_b', 'LR_e2b'],
+                                       molecule.nuclear_repulsion_energy(),
+                                       molecule.elem_ids_to_numpy(),
+                                       basis.get_label(), self.ostream)
+                self.restart = (b is not None and e2b is not None)
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
-        e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
+        # generate initial guess from scratch
+        if not self.restart:
+            if self.rank == mpi_master():
+                igs = self.initial_guess(self.frequencies, V1, od, sd, td)
+                b = self.setup_trials(igs)
+                if self.timing:
+                    self.timing_dict['reduced_space'][0] += tm.time(
+                    ) - timing_t0
+                    timing_t0 = tm.time()
+                assert_msg_critical(
+                    np.any(b),
+                    'LinearResponseSolver.compute: trial vector is empty')
+            e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
+
         if self.rank == mpi_master():
             s2b = e2x_drv.s2n(b, scf_tensors, nocc)
 
@@ -279,7 +310,7 @@ class LinearResponseSolver:
                 nvs = []
 
                 # next solution
-                for op, freq in igs:
+                for op, freq in op_freq_keys:
                     v = V1[op]
                     reduced_solution = np.linalg.solve(
                         np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
@@ -299,6 +330,9 @@ class LinearResponseSolver:
                     converged[(op, freq)] = (rn / nn < self.conv_thresh)
 
                 # write to output
+                self.ostream.print_info('{:d} trial vectors'.format(b.shape[1]))
+                self.ostream.print_blank()
+
                 self.print_iteration(relative_residual_norm, converged, nvs)
 
             if self.timing:
@@ -330,6 +364,11 @@ class LinearResponseSolver:
                 new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
+
+                write_rsp_hdf5(self.checkpoint_file, b, e2b, ['LR_b', 'LR_e2b'],
+                               molecule.nuclear_repulsion_energy(),
+                               molecule.elem_ids_to_numpy(), basis.get_label(),
+                               self.ostream)
 
             if self.timing:
                 tid = iteration + 1
