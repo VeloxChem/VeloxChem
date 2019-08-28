@@ -281,10 +281,7 @@ CDensityGridDriver::_setDensityPair(      CMemBlock2D<double>& densityPairs,
                 
                 (densityPairs.data(j * kcomp + k))[i] = dval;
                 
-                if (!islarge)
-                {
-                    if (std::fabs(dval) > _thresholdOfDensity) islarge = true;
-                }
+                if (std::fabs(dval) > _thresholdOfDensity) islarge = true;
             }
         }
     }
