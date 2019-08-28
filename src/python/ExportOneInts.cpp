@@ -328,7 +328,7 @@ CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
 
     std::string errsrc("CElectricFieldIntegralsDirver_compute: need a contiguous numpy array");
 
-    errors::assertMsgCritical(c_style ^ f_style, errsrc);
+    errors::assertMsgCritical(c_style | f_style, errsrc);
 
     std::string errdims(
         "CElectricFieldIntegralsDirver_compute:: Inconsistent size of dipoles and/or their coordinates");

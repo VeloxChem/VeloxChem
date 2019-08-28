@@ -590,7 +590,8 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
     match_nuclear_repulsion = False
     if 'nuclear_repulsion' in hf:
         h5_e_nuc = np.array(hf.get('nuclear_repulsion'))[0]
-        match_nuclear_repulsion = (abs(1.0 - h5_e_nuc / e_nuc) < 1.0e-13)
+        if h5_e_nuc > 0.0 and e_nuc > 0.0:
+            match_nuclear_repulsion = (abs(1.0 - h5_e_nuc / e_nuc) < 1.0e-13)
 
     match_nuclear_charges = False
     if 'nuclear_charges' in hf:
