@@ -14,6 +14,7 @@ PYTHONPATH = $(VLX_SOURCE):mocks
 VLX_EXCLUDE = $(VLX_SOURCE)/veloxchem/veloxchemlib.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/aodensitymatrix.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/aofockmatrix.py
+VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/main.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/molecularbasis.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/molecularorbitals.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/molecule.py
