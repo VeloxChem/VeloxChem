@@ -43,7 +43,7 @@ class MyInstall(SetuptoolsInstall):
 
 
 setup(
-    name='VeloxChem',
+    name='veloxchem',
     version='0.0',
     packages=[
         'veloxchem',
