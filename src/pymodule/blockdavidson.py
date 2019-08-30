@@ -134,7 +134,7 @@ class BlockDavidsonSolver:
         matrix in reduced space.
         """
 
-        rlmat = np.matmul(self.trial_matrices.transpose(), self.sigma_matrices)
+        rlmat = np.matmul(self.trial_matrices.T, self.sigma_matrices)
 
         reigs, rvecs = np.linalg.eigh(rlmat)
         yvecs = rvecs[:, :self.neigenpairs]

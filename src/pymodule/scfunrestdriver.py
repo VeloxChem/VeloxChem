@@ -217,8 +217,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
             tmat = oao_mat.to_numpy()
 
-            fmo_a = np.matmul(tmat.transpose(), np.matmul(fock_mat[0], tmat))
-            fmo_b = np.matmul(tmat.transpose(), np.matmul(fock_mat[1], tmat))
+            fmo_a = np.matmul(tmat.T, np.matmul(fock_mat[0], tmat))
+            fmo_b = np.matmul(tmat.T, np.matmul(fock_mat[1], tmat))
 
             eigs_a, evecs_a = np.linalg.eigh(fmo_a)
             eigs_b, evecs_b = np.linalg.eigh(fmo_b)

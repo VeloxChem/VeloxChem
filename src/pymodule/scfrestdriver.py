@@ -196,7 +196,7 @@ class ScfRestrictedDriver(ScfDriver):
 
             tmat = oao_mat.to_numpy()
 
-            fmo = np.matmul(tmat.transpose(), np.matmul(fock_mat, tmat))
+            fmo = np.matmul(tmat.T, np.matmul(fock_mat, tmat))
 
             eigs, evecs = np.linalg.eigh(fmo)
 
