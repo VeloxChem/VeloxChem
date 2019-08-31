@@ -12,7 +12,6 @@ from .veloxchemlib import GridDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import fockmat
 from .veloxchemlib import molorb
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix

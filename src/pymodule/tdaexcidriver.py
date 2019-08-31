@@ -264,7 +264,7 @@ class TDAExciDriver:
                 else:
                     istart = i * self.nstates
                     iend = (i + 1) * self.nstates
-                    if iend >= n_restart_vectors:
+                    if iend > n_restart_vectors:
                         iend = n_restart_vectors
                     sig_mat = np.copy(rst_sig_mat[:, istart:iend])
                     trial_mat = np.copy(rst_trial_mat[:, istart:iend])

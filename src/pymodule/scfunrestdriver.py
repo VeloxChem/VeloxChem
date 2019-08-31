@@ -274,5 +274,5 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         if self.dft:
             return "Spin-Unrestricted Kohn-Sham"
-        
+
         return "Spin-Unrestricted Hartree-Fock"
