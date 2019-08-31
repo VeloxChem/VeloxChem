@@ -240,6 +240,8 @@ class TDAExciDriver:
             n_restart_vectors = self.comm.bcast(n_restart_vectors,
                                                 root=mpi_master())
             n_restart_iterations = n_restart_vectors // self.nstates
+            if n_restart_vectors % self.nstates != 0:
+                n_restart_iterations += 1
 
         # start TDA iteration
 
@@ -262,6 +264,8 @@ class TDAExciDriver:
                 else:
                     istart = i * self.nstates
                     iend = (i + 1) * self.nstates
+                    if iend >= n_restart_vectors:
+                        iend = n_restart_vectors
                     sig_mat = np.copy(rst_sig_mat[:, istart:iend])
                     trial_mat = np.copy(rst_trial_mat[:, istart:iend])
 
@@ -271,7 +275,8 @@ class TDAExciDriver:
 
                 self.print_iter_data(i)
 
-                self.update_trial_vectors(trial_vecs, zvecs)
+                trial_vecs = self.convert_to_trial_vectors(
+                    mol_orbs, molecule, zvecs)
 
                 if i >= n_restart_iterations:
                     write_rsp_hdf5(self.checkpoint_file,
@@ -452,6 +457,34 @@ class TDAExciDriver:
             return trial_mat
 
         return None
+
+    def convert_to_trial_vectors(self, mol_orbs, molecule, zvecs):
+        """
+        Converts set of Z vectors from numpy 2D array to
+        std::vector<CExcitationVector>.
+
+        :param mol_orbs:
+            The molecular orbitals.
+        :param molecule:
+            The molecule.
+        :param trial_vecs:
+            The Z vectors as 2D numpy array.
+
+        :return:
+            The Z vectors as std::vector<CExcitationVector>.
+        """
+
+        nocc = molecule.number_of_electrons() // 2
+        norb = mol_orbs.number_mos()
+
+        trial_vecs = []
+        for i in range(zvecs.shape[1]):
+            trial_vecs.append(
+                ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True))
+            for j in range(zvecs.shape[0]):
+                trial_vecs[i].set_zcoefficient(zvecs[j, i], j)
+
+        return trial_vecs
 
     def comp_dipole_ints(self, molecule, basis):
         """
