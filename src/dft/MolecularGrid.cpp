@@ -264,12 +264,14 @@ CMolecularGrid::read_raw_grid(const std::string& fileName)
     
     int32_t npoints = 0;
     
-    while(!fst.eof())
+    while(true)
     {
         std::string str;
         
         std::getline(fst, str);
 
+        if (fst.eof()) break;
+        
         std::istringstream iss(str);
         
         int32_t idx = 0;
