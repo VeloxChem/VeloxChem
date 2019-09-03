@@ -182,6 +182,13 @@ class CMolecularGrid
      @param fileName the name of binary quad file.
      */
     void read_blocked_grid(const std::string& fileName);
+    
+    /**
+     Writes raw grid data to text file in format: (grid point index, rx, ry, rz, w).
+
+     @param fileName the name of text file.
+     */
+    void write_raw_grid(const std::string fileName) const;
 
     /**
      Converts molecular grid object to text and insert it into output text

@@ -236,6 +236,30 @@ CMolecularGrid::read_blocked_grid(const std::string& fileName)
     std::fclose(f);
 }
 
+void
+CMolecularGrid::write_raw_grid(const std::string fileName) const
+{
+    auto f = std::fopen(fileName.c_str(), "w");
+    
+    if (f != nullptr)
+    {
+        auto rx = getCoordinatesX();
+        
+        auto ry = getCoordinatesY();
+        
+        auto rz = getCoordinatesZ();
+        
+        auto rw = getWeights();
+        
+        for (int32_t i = 0; i < getNumberOfGridPoints(); i++)
+        {
+            std::fprintf(f, "%8i %16.12lf %16.12lf %16.12lf %16.12lf\n", i, rx[i], ry[i], rz[i], rw[i]);
+        }
+    }
+    
+    std::fclose(f);
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CMolecularGrid& source)
 {
