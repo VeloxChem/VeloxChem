@@ -303,7 +303,7 @@ CMolecularGrid::write_raw_grid(const std::string fileName) const
         
         for (int32_t i = 0; i < getNumberOfGridPoints(); i++)
         {
-            std::fprintf(f, "%8i %16.12lf %16.12lf %16.12lf %16.12lf\n", i, rx[i], ry[i], rz[i], rw[i]);
+            std::fprintf(f, "%8i %20.16lf %20.16lf %20.16lf %20.16lf\n", i, rx[i], ry[i], rz[i], rw[i]);
         }
     }
     
