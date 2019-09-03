@@ -203,7 +203,10 @@ class ScfDriver:
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
+            self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Undefined XC functional')
 
     def compute(self, molecule, ao_basis, min_basis):
         """
@@ -920,7 +923,7 @@ class ScfDriver:
 
         if self.dft:
             cur_str = "Exchange-Correlation Functional : "
-            cur_str += self.get_xcfun_label()
+            cur_str += self.get_xcfun_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = "Molecular Grid Level            : " + str(
                 self.grid_level)

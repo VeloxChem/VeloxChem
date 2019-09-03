@@ -149,7 +149,10 @@ class TDAExciDriver:
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
+            self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Undefined XC functional')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -578,6 +581,10 @@ class TDAExciDriver:
 
             trans_dipole = np.array(
                 [np.vdot(trans_dens, dipole_ints[d]) for d in range(3)])
+
+            if self.triplet:
+                trans_dipole = np.zeros(3)
+
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -611,6 +618,10 @@ class TDAExciDriver:
 
             trans_dipole = -1.0 / eigvals[s] * np.array(
                 [np.vdot(trans_dens, linmom_ints[d]) for d in range(3)])
+
+            if self.triplet:
+                trans_dipole = np.zeros(3)
+
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -641,6 +652,10 @@ class TDAExciDriver:
 
             trans_dipole = 0.5 * np.array(
                 [np.vdot(trans_dens, angmom_ints[d]) for d in range(3)])
+
+            if self.triplet:
+                trans_dipole = np.zeros(3)
+
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -758,8 +773,6 @@ class TDAExciDriver:
             The start time of SCF calculation.
         """
 
-        self.ostream.print_blank()
-
         valstr = "*** {:d} excited states ".format(self.nstates)
         if self.is_converged:
             valstr += "converged"
@@ -768,11 +781,11 @@ class TDAExciDriver:
         valstr += " in {:d} iterations. ".format(self.cur_iter + 1)
         valstr += "Time: {:.2f}".format(tm.time() - start_time) + " sec."
         self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
 
-        reigs, rnorms = self.solver.get_eigenvalues()
-
-        for i in range(reigs.shape[0]):
-            self.print_state_information(i, reigs[i], rnorms[i])
+        #reigs, rnorms = self.solver.get_eigenvalues()
+        #for i in range(reigs.shape[0]):
+        #    self.print_state_information(i, reigs[i], rnorms[i])
 
     def print_state_information(self, iteration, eigval, rnorm):
         """

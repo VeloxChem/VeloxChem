@@ -180,7 +180,10 @@ class LinearResponseSolver:
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
+            self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Undefined XC functional')
 
     def compute(self, molecule, basis, scf_tensors):
         """
