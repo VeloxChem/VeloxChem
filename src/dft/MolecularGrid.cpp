@@ -10,6 +10,9 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <string>
+#include <sstream>
 
 CMolecularGrid::CMolecularGrid()
 
@@ -234,6 +237,51 @@ CMolecularGrid::read_blocked_grid(const std::string& fileName)
     }
     
     std::fclose(f);
+}
+
+void
+CMolecularGrid::read_raw_grid(const std::string& fileName)
+{
+    // allocate raw grid
+    
+    const int32_t mpoints = 20000000;
+    
+    CMemBlock2D<double> rgrid(mpoints, 4);
+    
+    // set up pointers to grid data
+    
+    auto rx = rgrid.data(0);
+    
+    auto ry = rgrid.data(1);
+    
+    auto rz = rgrid.data(2);
+    
+    auto rw = rgrid.data(3);
+    
+    // read grid data from text file
+    
+    std::ifstream fst(fileName.c_str());
+    
+    int32_t npoints = 0;
+    
+    while(!fst.eof())
+    {
+        std::string str;
+        
+        std::getline(fst, str);
+
+        std::istringstream iss(str);
+        
+        int32_t idx = 0;
+        
+        iss >> idx >> rx[npoints] >> ry[npoints] >> rz[npoints] >> rw[npoints];
+        
+        npoints++;
+    }
+    
+    _isDistributed = false;
+    
+    _gridPoints = rgrid.slice(0, npoints);
 }
 
 void

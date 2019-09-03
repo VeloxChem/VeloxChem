@@ -184,6 +184,14 @@ class CMolecularGrid
     void read_blocked_grid(const std::string& fileName);
     
     /**
+     Reads raw blocked grid data from text file in format: (grid point index, rx, ry, rz, w). NOTE: maximum allowed
+     number of grid points is 20M.
+     
+     @param fileName the name of text file.
+     */
+    void read_raw_grid(const std::string& fileName);
+    
+    /**
      Writes raw grid data to text file in format: (grid point index, rx, ry, rz, w).
 
      @param fileName the name of text file.
