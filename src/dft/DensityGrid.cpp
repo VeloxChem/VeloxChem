@@ -612,7 +612,7 @@ CDensityGrid::setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
             
             for (int32_t j = 0; j < npoints; j++)
             {
-                if ((std::fabs(srhoa[j] + srhob[i]) > densityThreshold) &&
+                if ((std::fabs(srhoa[j] + srhob[i]) > densityThreshold) || 
                     ((sgrada[j] + sgradb[j]) > densityThreshold))
                 {
                     // density data
