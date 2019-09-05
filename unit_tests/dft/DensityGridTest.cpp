@@ -876,27 +876,42 @@ TEST_F(CDensityGridTest, SetScreenedGrids)
     
     CDensityGrid dgrida(dblocka, dengrid::ab);
     
-    std::vector<CDensityGrid> dgrids(1, CDensityGrid(3, 1, xcfun::lda, dengrid::ab));
-    
     CMemBlock2D<double> mblocka({1.2, 2.4, 3.0,
                                  1.3, 4.0, 1.0,
                                  3.0, 4.0, 5.0,
                                  7.1, 9.9, 1.0},
                                 3, 4);
     
-    std::vector<CMolecularGrid> mgrids(1, CMolecularGrid(mblocka));
+    CMolecularGrid mgrid(mblocka);
     
-    dgrida.setScreenedGrids(dgrids, mgrids, 0.1, xcfun::lda);
+    CDensityGrid dgrid;
     
-    ASSERT_EQ(dgrids[0], CDensityGrid(dblocka, dengrid::ab));
+    dgrida.getScreenedGridsPair(dgrid, mgrid, 0, 0.9, xcfun::lda);
     
-    ASSERT_EQ(mgrids[0], CMolecularGrid(mblocka));
+    ASSERT_EQ(dgrid, CDensityGrid(CMemBlock2D<double>({2.0, 1.0}, 1, 2), dengrid::ab));
     
-    dgrida.setScreenedGrids(dgrids, mgrids, 1.0, xcfun::lda);
+    ASSERT_EQ(mgrid, CMolecularGrid(CMemBlock2D<double>({2.4, 4.0, 4.0, 9.9}, 1, 4)));
+}
+
+TEST_F(CDensityGridTest, GetScreenedGrid)
+{
+    CMemBlock2D<double> dblocka({0.1, 2.0, 0.1,
+                                 0.7, 1.0, 0.2},
+                                 3, 2);
     
-    ASSERT_EQ(dgrids[0], CDensityGrid(CMemBlock2D<double>({2.0, 1.0}, 1, 2), dengrid::ab));
+    CDensityGrid dgrida(dblocka, dengrid::ab);
     
-    ASSERT_EQ(mgrids[0], CMolecularGrid(CMemBlock2D<double>({2.4, 4.0, 4.0, 9.9}, 1, 4)));
+    CMemBlock2D<double> mblocka({1.2, 2.4, 3.0,
+                                 1.3, 4.0, 1.0,
+                                 3.0, 4.0, 5.0,
+                                 7.1, 9.9, 1.0},
+                                 3, 4);
+    
+    CMolecularGrid refgrid(mblocka);
+    
+    auto mgrid = dgrida.getScreenedGrid(refgrid, 0, 0.9, xcfun::lda);
+    
+    ASSERT_EQ(mgrid, CMolecularGrid(CMemBlock2D<double>({2.4, 4.0, 4.0, 9.9}, 1, 4)));
 }
 
 TEST_F(CDensityGridTest, UpdateBetaDensities)

@@ -333,18 +333,35 @@ public:
     double* betaDensityGradientZ(const int32_t iDensityMatrix);
     
     /**
-     Sets vectors of screened density and molecular grids for each density matrix in density grid object.
-     NOTE: This method is exclusive to dengrid::ab type.
-
-     @param densityGrids the vector of density grid objects.
-     @param molecularGrids the vector of molecular grid objects.
+     Generates pair of screened molecular and density grids by removing grid points with specific density/density
+     gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
+     
+     @param densityGrid the screened density grid.
+     @param molecularGrid the screened molecular grid.
+     @param iDensityMatrix the index of density matrix.
      @param densityThreshold the screening threshold for density values.
      @param xcFuncType the type of exchange-correlation functional.
      */
-    void setScreenedGrids(      std::vector<CDensityGrid>&   densityGrids,
-                                std::vector<CMolecularGrid>& molecularGrids,
-                          const double                       densityThreshold,
-                          const xcfun                        xcFuncType) const;
+    void getScreenedGridsPair(      CDensityGrid&   densityGrid,
+                                    CMolecularGrid& molecularGrid,
+                              const int32_t         iDensityMatrix,
+                              const double          densityThreshold,
+                              const xcfun           xcFuncType) const;
+    
+    /**
+     Generates screened molecular grid from given molecular grid by removing grid points with specific density/density
+     gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
+
+     @param molecularGrids the molecular grid.
+     @param densityThreshold the density/density gradient screening threshold.
+     @param iDensityMatrix the index of density matrix.
+     @param xcFuncType the type of exchange-correlation functional.
+     @return the screened molecular grid.
+     */
+    CMolecularGrid getScreenedGrid(      CMolecularGrid& molecularGrids,
+                                   const int32_t         iDensityMatrix,
+                                   const double          densityThreshold,
+                                   const xcfun           xcFuncType) const;
     
     /**
      Converts density grid object to text and insert it into output text

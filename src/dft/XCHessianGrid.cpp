@@ -33,8 +33,8 @@ CXCHessianGrid::CXCHessianGrid(const CMemBlock2D<double>& xcValues,
 }
 
 CXCHessianGrid::CXCHessianGrid(const int32_t nGridPoints,
-                                 const dengrid densityGridType,
-                                 const xcfun   xcGridType)
+                               const dengrid densityGridType,
+                               const xcfun   xcGridType)
 {
     _densityGridType = densityGridType;
     

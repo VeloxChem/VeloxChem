@@ -174,6 +174,29 @@ class CMolecularGrid
      @param comm he MPI communicator.
      */
     void distribute(int32_t rank, int32_t nodes, MPI_Comm comm);
+    
+    /**
+     Reads raw blocked grid data from DALTON program quad file. NOTE: maximum allowed number of grid points
+     is 20M.
+
+     @param fileName the name of binary quad file.
+     */
+    void read_blocked_grid(const std::string& fileName);
+    
+    /**
+     Reads raw blocked grid data from text file in format: (grid point index, rx, ry, rz, w). NOTE: maximum allowed
+     number of grid points is 20M.
+     
+     @param fileName the name of text file.
+     */
+    void read_raw_grid(const std::string& fileName);
+    
+    /**
+     Writes raw grid data to text file in format: (grid point index, rx, ry, rz, w).
+
+     @param fileName the name of text file.
+     */
+    void write_raw_grid(const std::string fileName) const;
 
     /**
      Converts molecular grid object to text and insert it into output text
