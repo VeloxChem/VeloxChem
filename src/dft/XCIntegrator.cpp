@@ -156,9 +156,11 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
             
             fvxc.compute(vxc2grid, gsdengrid);
             
-            // compute perturbed density grids
+            // compute perturbed density grids (we will need to refactor this...)
             
-            auto rwdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+            CAODensityMatrix currden({rwDensityMatrix.getReferenceToDensity(i)}, denmat::rest);
+            
+            auto rwdengrid = dgdrv.generate(currden, molecule, basis, mgrid, fvxc.getFunctionalType());
             
             // compute perturbed Kohn-Sham matrix
             
