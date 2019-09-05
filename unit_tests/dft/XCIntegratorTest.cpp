@@ -37,10 +37,4 @@ TEST_F(CXCIntegratorTest, IntegrateKohnSham)
     auto ksmat = xcdrv.integrate(dmat, mh2o, mbas, mgrid, std::string("LYP"));
     
     ASSERT_NEAR(ksmat.getNumberOfElectrons(), 10.0, 1.0e-6);
-    
-    std::cout << ksmat << std::endl;
-    
-    auto ksene = 2.0 * denblas::trace(ksmat.getReferenceToKohnSham(), dmat.getReferenceToDensity(0));
-    
-    std::cout << ksene << std::endl;
 }
