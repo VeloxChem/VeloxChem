@@ -158,7 +158,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
             
             // compute perturbed density grids (we will need to refactor this...)
             
-            CAODensityMatrix currden({rwDensityMatrix.getReferenceToDensity(i)}, denmat::rest);
+            CAODensityMatrix currden({rwDensityMatrix.getReferenceToDensity(i)}, rwDensityMatrix.getDensityType());
             
             auto rwdengrid = dgdrv.generate(currden, molecule, basis, mgrid, fvxc.getFunctionalType());
             
@@ -821,11 +821,15 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
         
         auto gmix_ac = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradab);
         
+        auto gmix_bc = xcHessianGrid->xcHessianValues(xcvars::rhob, xcvars::gradab);
+        
         auto ggrad_aa = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::grada);
         
         auto ggrad_ab = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradb);
         
         auto ggrad_ac = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradab);
+        
+        auto ggrad_bc = xcHessianGrid->xcHessianValues(xcvars::gradb, xcvars::gradab);
         
         auto ggrad_cc = xcHessianGrid->xcHessianValues(xcvars::gradab, xcvars::gradab);
         
@@ -969,9 +973,9 @@ CXCIntegrator::_compRestrictedVXCValueForGtosPair(      CMemBlock<double>&   pai
                     
                     // third contribution
                     
-                    double facz = 2.0 * gmix_ac[gridOffset + k] * rhowa[gridOffset + k]
+                    double facz = gmix_ac[gridOffset + k] * rhowa[gridOffset + k] +  gmix_bc[gridOffset + k] * rhowb[gridOffset + k]
                     
-                                + 2.0 * ggrad_ac[gridOffset + k] * zetaa + ggrad_cc[gridOffset + k] * zetac;
+                                + ggrad_ac[gridOffset + k] * zetaa + ggrad_bc[gridOffset + k] * zetab + ggrad_cc[gridOffset + k] * zetac;
                     
                     double arb = ax * grada_x[gridOffset + k] + ay * grada_y[gridOffset + k] + az * grada_z[gridOffset + k];
                     
