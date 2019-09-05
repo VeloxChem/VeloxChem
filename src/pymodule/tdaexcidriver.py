@@ -282,9 +282,9 @@ class TDAExciDriver:
                     mol_orbs, molecule, zvecs)
 
                 if i >= n_restart_iterations:
-                    write_rsp_hdf5(self.checkpoint_file,
-                                   self.solver.trial_matrices,
-                                   self.solver.sigma_matrices,
+                    trials = self.solver.trial_matrices
+                    sigmas = self.solver.sigma_matrices
+                    write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
                                    ['TDA_trials', 'TDA_sigmas'],
                                    molecule.nuclear_repulsion_energy(),
                                    molecule.elem_ids_to_numpy(),

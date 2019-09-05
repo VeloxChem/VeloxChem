@@ -202,6 +202,9 @@ class LinearResponseMatrixVectorDriver:
             The S2 b matrix vector product.
         """
 
+        if not vecs.any():
+            return np.zeros(vecs.shape)
+
         assert_msg_critical(
             len(vecs.shape) == 2,
             'LinearResponseSolver.s2n: invalid shape of vecs')
@@ -495,7 +498,7 @@ def swap_xy(xy):
     return yx
 
 
-def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
+def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
                    dft_func_label, ostream):
     """
     Writes response vectors to checkpoint file. Nuclear charges and basis
@@ -503,10 +506,8 @@ def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
 
     :param fname:
         Name of the checkpoint file.
-    :param b:
-        The trial vectors.
-    :param e2b:
-        The transformed vectors.
+    :param arrays:
+        The response vectors.
     :param labels:
         The list of labels for trial vecotrs and transformed vectors.
     :param e_nuc:
@@ -528,8 +529,8 @@ def write_rsp_hdf5(fname, b, e2b, labels, e_nuc, nuclear_charges, basis_set,
 
     hf = h5py.File(fname, 'w')
 
-    hf.create_dataset(labels[0], data=b, compression="gzip")
-    hf.create_dataset(labels[1], data=e2b, compression="gzip")
+    for label, array in zip(labels, arrays):
+        hf.create_dataset(label, data=array, compression="gzip")
 
     hf.create_dataset('nuclear_repulsion',
                       data=np.array([e_nuc]),
@@ -583,7 +584,7 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
     valid_checkpoint = (fname and isinstance(fname, str) and isfile(fname))
 
     if not valid_checkpoint:
-        return None, None
+        return tuple([None] * len(labels))
 
     hf = h5py.File(fname, 'r')
 
@@ -612,22 +613,21 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
         h5_func_label = hf.get('dft_func_label')[0].decode('utf-8')
         match_dft_func = (h5_func_label.upper() == dft_func_label.upper())
 
-    b = None
-    e2b = None
+    arrays = [None] * len(labels)
 
     if (match_nuclear_repulsion and match_nuclear_charges and
             match_basis_set and match_dft_func):
-        if labels[0] in hf.keys():
-            b = np.array(hf.get(labels[0]))
-        if labels[1] in hf.keys():
-            e2b = np.array(hf.get(labels[1]))
+        for i in range(len(labels)):
+            if labels[i] in hf.keys():
+                arrays[i] = np.array(hf.get(labels[i]))
 
     hf.close()
 
-    if (b is not None and e2b is not None):
+    is_empty = [a is None for a in arrays]
+    if True not in is_empty:
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += fname
         ostream.print_info(checkpoint_text)
         ostream.print_blank()
 
-    return b, e2b
+    return tuple(arrays)

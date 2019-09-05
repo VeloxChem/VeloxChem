@@ -368,7 +368,7 @@ class LinearResponseEigenSolver:
                 e2b = np.append(e2b, new_e2b, axis=1)
                 s2b = np.append(s2b, new_s2b, axis=1)
 
-                write_rsp_hdf5(self.checkpoint_file, b, e2b,
+                write_rsp_hdf5(self.checkpoint_file, [b, e2b],
                                ['LR_eigen_b', 'LR_eigen_e2b'],
                                molecule.nuclear_repulsion_energy(),
                                molecule.elem_ids_to_numpy(), basis.get_label(),

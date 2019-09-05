@@ -13,7 +13,6 @@ from .lrmatvecdriver import orthogonalize_gram_schmidt
 from .lrmatvecdriver import normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import get_rhs
-from .lrmatvecdriver import swap_xy
 from .lrmatvecdriver import read_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
 from .qqscheme import get_qq_scheme
@@ -233,11 +232,6 @@ class LinearResponseSolver:
             ea = scf_tensors['E']
             nocc = nalpha
             norb = mo.shape[1]
-            od, sd = construct_ed_sd(ea, nocc, norb)
-            td = {w: od - w * sd for w in self.frequencies}
-        else:
-            nocc = None
-            norb = None
 
         # generate integration grid
         if self.dft:
@@ -273,38 +267,53 @@ class LinearResponseSolver:
         if self.rank == mpi_master():
             V1 = {op: v for op, v in zip(self.b_components, b_rhs)}
             op_freq_keys = [(op, w) for op in V1 for w in self.frequencies]
-
-        b = None
-        e2b = None
-        s2b = None
+            precond = {
+                w: self.get_precond(ea, nocc, norb, w) for w in self.frequencies
+            }
 
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
-                b, e2b = read_rsp_hdf5(self.checkpoint_file, ['LR_b', 'LR_e2b'],
-                                       molecule.nuclear_repulsion_energy(),
-                                       molecule.elem_ids_to_numpy(),
-                                       basis.get_label(), dft_func_label,
-                                       self.ostream)
-                self.restart = (b is not None and e2b is not None)
+                bger, bung, e2bger, e2bung = read_rsp_hdf5(
+                    self.checkpoint_file,
+                    ['LR_bger', 'LR_bung', 'LR_e2bger', 'LR_e2bung'],
+                    molecule.nuclear_repulsion_energy(),
+                    molecule.elem_ids_to_numpy(), basis.get_label(),
+                    dft_func_label, self.ostream)
+                self.restart = (bger is not None and bung is not None and
+                                e2bger is not None and e2bung is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # generate initial guess from scratch
         if not self.restart:
             if self.rank == mpi_master():
-                igs = self.initial_guess(self.frequencies, V1, od, sd, td)
-                b = self.setup_trials(igs)
+
+                igs = self.initial_guess(self.frequencies, V1, precond)
+                bger, bung = self.setup_trials(igs)
+
                 if self.timing:
-                    self.timing_dict['reduced_space'][0] += tm.time(
-                    ) - timing_t0
+                    elapsed_time = tm.time() - timing_t0
+                    self.timing_dict['reduced_space'][0] += elapsed_time
                     timing_t0 = tm.time()
+
                 assert_msg_critical(
-                    np.any(b),
+                    bger.any() or bung.any(),
                     'LinearResponseSolver.compute: trial vector is empty')
-            e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
+
+            btot = None
+            if self.rank == mpi_master():
+                btot = np.hstack((bger, bung))
+
+            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis)
+
+            if self.rank == mpi_master():
+                n_ger = bger.shape[1]
+                e2bger = e2btot[:, :n_ger]
+                e2bung = e2btot[:, n_ger:]
 
         if self.rank == mpi_master():
-            s2b = e2x_drv.s2n(b, scf_tensors, nocc)
+            s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
+            s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
 
         solutions = {}
         residuals = {}
@@ -326,14 +335,52 @@ class LinearResponseSolver:
                 self.cur_iter = iteration
                 nvs = []
 
+                n_ger = bger.shape[1]
+                n_ung = bung.shape[1]
+
+                e2gg = np.matmul(bger.T, e2bger)
+                e2uu = np.matmul(bung.T, e2bung)
+                s2ug = np.matmul(bung.T, s2bung)
+
                 # next solution
                 for op, freq in op_freq_keys:
                     v = V1[op]
-                    reduced_solution = np.linalg.solve(
-                        np.matmul(b.T, e2b - freq * s2b), np.matmul(b.T, v))
-                    solutions[(op, freq)] = np.matmul(b, reduced_solution)
-                    residuals[(op, freq)] = np.matmul(e2b - freq * s2b,
-                                                      reduced_solution) - v
+
+                    gradger, gradung = self.decomp_grad(v)
+
+                    g_ger = np.matmul(bger.T, gradger)
+                    g_ung = np.matmul(bung.T, gradung)
+
+                    mat = np.zeros((n_ger + n_ung, n_ger + n_ung))
+                    mat[:n_ger, :n_ger] = e2gg[:, :]
+                    mat[:n_ger, n_ger:] = -freq * s2ug.T[:, :]
+                    mat[n_ger:, :n_ger] = -freq * s2ug[:, :]
+                    mat[n_ger:, n_ger:] = e2uu[:, :]
+
+                    g = np.zeros(n_ger + n_ung)
+                    g[:n_ger] = g_ger[:]
+                    g[n_ger:] = g_ung[:]
+
+                    c = np.linalg.solve(mat, g)
+
+                    c_ger = c[:n_ger]
+                    c_ung = c[n_ger:]
+
+                    x_ger = np.matmul(bger, c_ger)
+                    x_ung = np.matmul(bung, c_ung)
+
+                    solutions[(op, freq)] = x_ger + x_ung
+
+                    e2ger = np.matmul(e2bger, c_ger)
+                    s2ung = np.matmul(s2bger, c_ung)
+
+                    e2ung = np.matmul(e2bung, c_ung)
+                    s2ger = np.matmul(s2bung, c_ger)
+
+                    r_ger = (e2ger - freq * s2ung - gradger)
+                    r_ung = (e2ung - freq * s2ger - gradung)
+
+                    residuals[(op, freq)] = np.array([r_ger, r_ung]).flatten()
 
                     r = residuals[(op, freq)]
                     n = solutions[(op, freq)]
@@ -347,7 +394,10 @@ class LinearResponseSolver:
                     converged[(op, freq)] = (rn / nn < self.conv_thresh)
 
                 # write to output
-                self.ostream.print_info('{:d} trial vectors'.format(b.shape[1]))
+                self.ostream.print_info(
+                    '{:d} gerade trial vectors'.format(n_ger))
+                self.ostream.print_info(
+                    '{:d} ungerade trial vectors'.format(n_ung))
                 self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, converged, nvs)
@@ -365,24 +415,43 @@ class LinearResponseSolver:
 
             # update trial vectors
             if self.rank == mpi_master():
-                new_trials = self.setup_trials(residuals, converged, td=td, b=b)
-                b = np.append(b, new_trials, axis=1)
-            else:
-                new_trials = None
+                new_trials_ger, new_trials_ung = self.setup_trials(
+                    residuals, converged, precond, bger, bung)
+
+                assert_msg_critical(
+                    new_trials_ger.any() or new_trials_ung.any(),
+                    'LinearResponseSolver: unable to add new trial vector')
+
+                bger = np.append(bger, new_trials_ger, axis=1)
+                bung = np.append(bung, new_trials_ung, axis=1)
 
             if self.timing:
                 tid = iteration + 1
                 self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
-                                  basis)
+            new_trials_tot = None
             if self.rank == mpi_master():
-                new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
-                e2b = np.append(e2b, new_e2b, axis=1)
-                s2b = np.append(s2b, new_s2b, axis=1)
+                new_trials_tot = np.hstack((new_trials_ger, new_trials_ung))
 
-                write_rsp_hdf5(self.checkpoint_file, b, e2b, ['LR_b', 'LR_e2b'],
+            new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
+                                     molecule, basis)
+
+            if self.rank == mpi_master():
+                new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
+                new_e2bung = new_e2btot[:, new_trials_ger.shape[1]:]
+
+                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
+                e2bger = np.append(e2bger, new_e2bger, axis=1)
+                s2bung = np.append(s2bung, new_s2bung, axis=1)
+
+                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
+                e2bung = np.append(e2bung, new_e2bung, axis=1)
+                s2bger = np.append(s2bger, new_s2bger, axis=1)
+
+                write_rsp_hdf5(self.checkpoint_file,
+                               [bger, bung, e2bger, e2bung],
+                               ['LR_bger', 'LR_bung', 'LR_e2bger', 'LR_e2bung'],
                                molecule.nuclear_repulsion_energy(),
                                molecule.elem_ids_to_numpy(), basis.get_label(),
                                dft_func_label, self.ostream)
@@ -515,7 +584,7 @@ class LinearResponseSolver:
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def initial_guess(self, freqs, V1, od, sd, td):
+    def initial_guess(self, freqs, V1, precond):
         """
         Creating initial guess for the linear response solver.
 
@@ -524,34 +593,117 @@ class LinearResponseSolver:
         :param V1:
             The dictionary containing operator components (key) and right-hand
             sides (values).
-        :param od:
-            The array of E0 diagonal elements.
-        :param sd:
-            The array of S0 diagonal elements.
-        :param td:
+        :param precond:
             The preconditioner.
 
         :return:
             The initial guess.
         """
 
-        dim = od.shape[0]
-
         ig = {}
         for op, grad in V1.items():
+            gradger, gradung = self.decomp_grad(grad)
+            grad = np.array([gradger, gradung]).flatten()
+
             gn = np.linalg.norm(grad)
             for w in freqs:
                 if gn < self.small_thresh:
-                    ig[(op, w)] = np.zeros(dim)
+                    ig[(op, w)] = np.zeros(grad.shape[0])
                 else:
-                    ig[(op, w)] = grad / td[w]
+                    ig[(op, w)] = self.preconditioning(precond[w], grad)
         return ig
+
+    def decomp_grad(self, grad):
+        """
+        Decomposes gradient into gerade and ungerade parts.
+
+        :param grad:
+            The gradient.
+
+        :return:
+            A tuple containing gerade and ungerade parts of gradient.
+        """
+
+        assert_msg_critical(
+            len(grad.shape) == 1, 'decomp_grad: Expecting a 1D array')
+
+        assert_msg_critical(grad.shape[0] % 2 == 0,
+                            'decomp_grad: size of array should be even')
+
+        half_size = grad.shape[0] // 2
+
+        grad_T = np.zeros(grad.shape)
+        grad_T[:half_size] = grad[half_size:]
+        grad_T[half_size:] = grad[:half_size]
+
+        ger = 0.5 * (grad + grad_T)
+        ung = 0.5 * (grad - grad_T)
+
+        return ger.T, ung.T
+
+    def get_precond(self, orb_ene, nocc, norb, w):
+        """
+        Constructs the preconditioner matrix.
+
+        :param orb_ene:
+            The orbital energies.
+        :param nocc:
+            The number of doubly occupied orbitals.
+        :param norb:
+            The number of orbitals.
+        :param w:
+            The frequency.
+
+        :return:
+            The preconditioner matrix.
+        """
+
+        # spawning needed components
+
+        ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag_sq = ediag**2
+        sdiag_sq = sdiag**2
+        w_sq = w**2
+
+        # constructing matrix block diagonals
+
+        pa_diag = ediag / (ediag_sq - w_sq * sdiag_sq)
+        pb_diag = (w * sdiag) / (ediag_sq - w_sq * sdiag_sq)
+
+        precond = np.array([pa_diag, pb_diag])
+
+        return precond
+
+    def preconditioning(self, precond, v_in):
+        """
+        Creates trial vectors out of residuals and the preconditioner matrix.
+
+        :param precond:
+            The preconditioner matrix.
+        :param v_in:
+            The input trial vectors.
+
+        :return:
+            The trail vectors after preconditioning.
+        """
+
+        pa, pb = precond[0], precond[1]
+
+        v_in_rg, v_in_ru = self.decomp_trials(v_in)
+
+        v_out_rg = pa * v_in_rg + pb * v_in_ru
+        v_out_ru = pb * v_in_rg + pa * v_in_ru
+
+        v_out = np.array([v_out_rg, v_out_ru]).flatten()
+
+        return v_out
 
     def setup_trials(self,
                      vectors,
                      converged={},
-                     td=None,
-                     b=None,
+                     precond=None,
+                     bger=None,
+                     bung=None,
                      renormalize=True):
         """
         Computes orthonormalized trial vectors.
@@ -560,15 +712,17 @@ class LinearResponseSolver:
             The set of vectors.
         :param converged:
             The flags for converged vectors.
-        :param td:
+        :param precond:
             The preconditioner.
-        :param b:
-            The subspace.
+        :param bger:
+            The gerade subspace.
+        :param bung:
+            The ungerade subspace.
         :param renormalize:
             The flag for normalization.
 
         :return:
-            The orthonormalized trial vectors.
+            The orthonormalized gerade and ungerade trial vectors.
         """
 
         trials = []
@@ -579,28 +733,64 @@ class LinearResponseSolver:
 
             vec = vectors[(op, freq)]
 
-            if td is not None:
-                v = vec / td[freq]
+            if precond is not None:
+                v = self.preconditioning(precond[freq], vec)
             else:
                 v = vec
 
             if np.linalg.norm(v) > self.small_thresh:
                 trials.append(v)
-                if freq > self.small_thresh:
-                    trials.append(swap_xy(v))
 
         new_trials = np.array(trials).T
 
-        if b is not None:
-            new_trials = new_trials - np.matmul(b, np.matmul(b.T, new_trials))
+        # decomposing the full space trial vectors...
 
-        if trials and renormalize:
-            new_trials = remove_linear_dependence(new_trials,
-                                                  self.lindep_thresh)
-            new_trials = orthogonalize_gram_schmidt(new_trials)
-            new_trials = normalize(new_trials)
+        new_ger, new_ung = self.decomp_trials(new_trials)
 
-        return new_trials
+        if bger is not None and bger.any():
+            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
+
+        if bung is not None and bung.any():
+            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
+
+        if new_ger.any() and renormalize:
+            new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
+            new_ger = orthogonalize_gram_schmidt(new_ger)
+            new_ger = normalize(new_ger)
+
+        if new_ung.any() and renormalize:
+            new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
+            new_ung = orthogonalize_gram_schmidt(new_ung)
+            new_ung = normalize(new_ung)
+
+        return new_ger, new_ung
+
+    def decomp_trials(self, vecs):
+        """
+        Decomposes trial vectors into gerade and ungerade parts.
+
+        :param vecs:
+            The trial vectors.
+
+        :return:
+            A tuple containing gerade and ungerade parts of the trial vectors.
+        """
+
+        assert_msg_critical(vecs.shape[0] % 2 == 0,
+                            'decomp_trials: shape[0] of array should be even')
+
+        ger, ung = None, None
+        half_rows = vecs.shape[0] // 2
+
+        if len(vecs.shape) == 1:
+            ger = vecs[:half_rows]
+            ung = vecs[half_rows:]
+
+        elif len(vecs.shape) == 2:
+            ger = vecs[:half_rows, :]
+            ung = vecs[half_rows:, :]
+
+        return ger, ung
 
     def print_timing(self):
         """
