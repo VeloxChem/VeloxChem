@@ -304,7 +304,8 @@ class LinearResponseSolver:
             if self.rank == mpi_master():
                 btot = np.hstack((bger, bung))
 
-            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis)
+            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
+                                 self.dft, self.xcfun, self.molgrid)
 
             if self.rank == mpi_master():
                 n_ger = bger.shape[1]
@@ -435,7 +436,8 @@ class LinearResponseSolver:
                 new_trials_tot = np.hstack((new_trials_ger, new_trials_ung))
 
             new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
-                                     molecule, basis)
+                                     molecule, basis, self.dft, self.xcfun,
+                                     self.molgrid)
 
             if self.rank == mpi_master():
                 new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
