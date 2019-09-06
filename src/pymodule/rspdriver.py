@@ -105,7 +105,7 @@ class ResponseDriver:
         if self.prop_type.upper() in ['POLARIZABILITY']:
             lr_solver = LinearResponseSolver(self.comm, self.ostream)
 
-            lr_solver.update_settings(self.rsp_dict)
+            lr_solver.update_settings(self.rsp_dict, self.method_dict)
 
             return lr_solver.compute(molecule, ao_basis, scf_tensors)
 

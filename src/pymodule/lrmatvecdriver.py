@@ -100,7 +100,8 @@ class LinearResponseMatrixVectorDriver:
         else:
             dks = None
 
-        fks = self.get_two_el_fock(dks, screening, molecule, basis)
+        fks = self.get_two_el_fock(dks, screening, molecule, basis,
+                                   tensors, dft, xcfun, molgrid)
 
         if self.rank == mpi_master():
             gv = np.zeros(vecs.shape)
@@ -175,17 +176,37 @@ class LinearResponseMatrixVectorDriver:
         # Note: skip spin density for restricted case
         # for i in range(len(dabs)):
         #    fock.set_fock_type(fockmat.rgenjk, i)
+        fock_flag = fockmat.rgenjk
+        if dft:
+            if xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj 
         for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fockmat.rgenjk, i)
+            fock.set_fock_type(fock_flag, i)
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         eri_drv.compute(fock, dens, molecule, basis, screening)
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
-        
+    
         # add XC contribution to Fock
         if dft:
+            if self.rank == mpi_master():
+                dgs = []
+                dgs.append(tensors['D'][0])
+                dengs = AODensityMatrix(dgs, denmat.rest) 
+            else:
+                dengs = AODensityMatrix()
+            dengs.broadcast(self.rank, self.comm)
+            
             xc_drv = XCIntegrator(self.comm)
+            xc_drv.integrate(fock,dens, dengs, molecule, basis, molgrid,
+                             xcfun.get_func_label())
 
+        fock.reduce_sum(self.rank, self.nodes, self.comm)
+        
         fabs = []
         if self.rank == mpi_master():
 

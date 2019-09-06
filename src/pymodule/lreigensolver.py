@@ -276,7 +276,8 @@ class LinearResponseEigenSolver:
                 assert_msg_critical(
                     np.any(b),
                     'LinearResponseEigenSolver: trial vector is empty')
-            e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
+            e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis,
+                              self.dft, self.xcfun, self.molgrid)
 
         if self.rank == mpi_master():
             s2b = e2x_drv.s2n(b, scf_tensors, nocc)
@@ -362,7 +363,7 @@ class LinearResponseEigenSolver:
                 timing_t0 = tm.time()
 
             new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
-                                  basis)
+                                  basis, self.dft, self.xcfun, self.molgrid)
             if self.rank == mpi_master():
                 new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
                 e2b = np.append(e2b, new_e2b, axis=1)
