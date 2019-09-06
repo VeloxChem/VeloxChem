@@ -232,7 +232,7 @@ class LinearResponseSolver:
             ea = scf_tensors['E']
             nocc = nalpha
             norb = mo.shape[1]
-    
+
         # generate integration grid
         if self.dft:
             grid_drv = GridDriver(self.comm)

@@ -40,6 +40,14 @@ class ComplexResponse:
         The electron repulsion integrals screening scheme.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
+    :param dft:
+        The flag for running DFT.
+    :param grid_level:
+        The accuracy level of DFT grid.
+    :param xcfun:
+        The XC functional.
+    :param molgrid:
+        The molecular grid.
     :param max_iter:
         The maximum number of solver iterations.
     :param conv_thresh:
@@ -86,6 +94,11 @@ class ComplexResponse:
 
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
+
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
+        self.molgrid = MolecularGrid()
 
         self.max_iter = 150
         self.conv_thresh = 1.0e-4
@@ -513,7 +526,7 @@ class ComplexResponse:
                 format(n_grid_points,
                        tm.time() - grid_t0))
             self.ostream.print_blank()
-        
+
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -543,8 +556,12 @@ class ComplexResponse:
 
         if self.rank == mpi_master():
 
-            trials_info = {'bger': False, 'bung': False,
-                           'new_trials_ger': False, 'new_trials_ung': False}
+            trials_info = {
+                'bger': False,
+                'bung': False,
+                'new_trials_ger': False,
+                'new_trials_ung': False
+            }
 
             # calling the gradients
 
@@ -642,7 +659,7 @@ class ComplexResponse:
                             g_realger = np.zeros(0)
                             g_imagger = np.zeros(0)
 
-                            e2gg = np.zeros((0,0))
+                            e2gg = np.zeros((0, 0))
 
                             ntrials_ger = 0
 
@@ -661,10 +678,10 @@ class ComplexResponse:
                             g_realung = np.zeros(0)
                             g_imagung = np.zeros(0)
 
-                            e2uu = np.zeros((0,0))
+                            e2uu = np.zeros((0, 0))
 
                             if trials_info['bger']:
-                                s2ug = np.zeros((0,ntrials_ger))
+                                s2ug = np.zeros((0, ntrials_ger))
 
                             ntrials_ung = 0
 
@@ -675,7 +692,7 @@ class ComplexResponse:
                         # gradient
 
                         g = np.zeros(size)
-                        
+
                         if trials_info['bger']:
                             g[:ntrials_ger] = g_realger[:]
                             g[-ntrials_ger:] = -g_imagger[:]
@@ -732,7 +749,7 @@ class ComplexResponse:
                             mat[-ntrials_ger - ntrials_ung:-ntrials_ger,
                                 -ntrials_ger:] = w * s2ug[:, :]
 
-                        # filling S2ug.T (interchanging of row and col)
+                            # filling S2ug.T (interchanging of row and col)
 
                             mat[:ntrials_ger, ntrials_ger:ntrials_ger +
                                 ntrials_ung] = -w * s2ug.T[:, :]
@@ -922,8 +939,8 @@ class ComplexResponse:
 
             if trials_info['new_trials_ger']:
                 new_e2bger = e2x_drv.e2n(new_trials_ger, scf_tensors, screening,
-                                         molecule, basis,
-                                         self.dft, self.xcfun, self.molgrid)
+                                         molecule, basis, self.dft, self.xcfun,
+                                         self.molgrid)
                 if self.rank == mpi_master():
                     new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
                     e2bger = np.append(e2bger, new_e2bger, axis=1)
@@ -931,8 +948,8 @@ class ComplexResponse:
 
             if trials_info['new_trials_ung']:
                 new_e2bung = e2x_drv.e2n(new_trials_ung, scf_tensors, screening,
-                                         molecule, basis,
-                                         self.dft, self.xcfun, self.molgrid)
+                                         molecule, basis, self.dft, self.xcfun,
+                                         self.molgrid)
                 if self.rank == mpi_master():
                     new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
                     e2bung = np.append(e2bung, new_e2bung, axis=1)

@@ -43,7 +43,15 @@ class LinearResponseMatrixVectorDriver:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-    def e2n(self, vecs, tensors, screening, molecule, basis, dft = False, xcfun = None, molgrid = None):
+    def e2n(self,
+            vecs,
+            tensors,
+            screening,
+            molecule,
+            basis,
+            dft=None,
+            xcfun=None,
+            molgrid=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -100,8 +108,8 @@ class LinearResponseMatrixVectorDriver:
         else:
             dks = None
 
-        fks = self.get_two_el_fock(dks, screening, molecule, basis,
-                                   tensors, dft, xcfun, molgrid)
+        fks = self.get_two_el_fock(dks, screening, molecule, basis, tensors,
+                                   dft, xcfun, molgrid)
 
         if self.rank == mpi_master():
             gv = np.zeros(vecs.shape)
@@ -123,8 +131,15 @@ class LinearResponseMatrixVectorDriver:
         else:
             return None
 
-    def get_two_el_fock(self, dabs, screening, molecule, basis,
-                        tensors = None, dft = False, xcfun = None, molgrid = None):
+    def get_two_el_fock(self,
+                        dabs,
+                        screening,
+                        molecule,
+                        basis,
+                        tensors=None,
+                        dft=False,
+                        xcfun=None,
+                        molgrid=None):
         """
         Computes two electron contribution to Fock.
 
@@ -184,29 +199,29 @@ class LinearResponseMatrixVectorDriver:
                 for i in range(fock.number_of_fock_matrices()):
                     fock.set_scale_factor(fact_xc, i)
             else:
-                fock_flag = fockmat.rgenj 
+                fock_flag = fockmat.rgenj
         for i in range(fock.number_of_fock_matrices()):
             fock.set_fock_type(fock_flag, i)
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         eri_drv.compute(fock, dens, molecule, basis, screening)
-    
+
         # add XC contribution to Fock
         if dft:
             if self.rank == mpi_master():
                 dgs = []
                 dgs.append(tensors['D'][0])
-                dengs = AODensityMatrix(dgs, denmat.rest) 
+                dengs = AODensityMatrix(dgs, denmat.rest)
             else:
                 dengs = AODensityMatrix()
             dengs.broadcast(self.rank, self.comm)
-            
+
             xc_drv = XCIntegrator(self.comm)
-            xc_drv.integrate(fock,dens, dengs, molecule, basis, molgrid,
+            xc_drv.integrate(fock, dens, dengs, molecule, basis, molgrid,
                              xcfun.get_func_label())
 
         fock.reduce_sum(self.rank, self.nodes, self.comm)
-        
+
         fabs = []
         if self.rank == mpi_master():
 
