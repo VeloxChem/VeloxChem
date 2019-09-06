@@ -923,7 +923,7 @@ class ScfDriver:
 
         if self.dft:
             cur_str = "Exchange-Correlation Functional : "
-            cur_str += self.get_xcfun_label().upper()
+            cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = "Molecular Grid Level            : " + str(
                 self.grid_level)
@@ -1083,16 +1083,6 @@ class ScfDriver:
             return "Dynamic"
 
         return "Static"
-
-    def get_xcfun_label(self):
-        """
-        Gets string with exchange-correlation functional name.
-
-        :return:
-            The string with exchange-correlation functional name.
-        """
-
-        return ((self.xcfun.get_func_label()).lower()).capitalize()
 
     def update_fock_type(self, fock_mat):
         """

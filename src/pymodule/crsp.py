@@ -985,6 +985,15 @@ class ComplexResponse:
         self.ostream.print_header(cur_str.ljust(width))
         self.ostream.print_blank()
 
+        if self.dft:
+            cur_str = "Exchange-Correlation Functional : "
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(width))
+            cur_str = "Molecular Grid Level            : " + str(
+                self.grid_level)
+            self.ostream.print_header(cur_str.ljust(width))
+        self.ostream.print_blank()
+
         self.ostream.flush()
 
     def print_convergence(self):

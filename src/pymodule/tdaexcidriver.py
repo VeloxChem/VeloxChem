@@ -732,6 +732,15 @@ class TDAExciDriver:
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
 
+        if self.dft:
+            cur_str = "Exchange-Correlation Functional : "
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = "Molecular Grid Level            : " + str(
+                self.grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
         self.ostream.flush()
 
     def print_iter_data(self, iteration):
