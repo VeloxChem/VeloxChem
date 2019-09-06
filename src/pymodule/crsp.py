@@ -3,6 +3,10 @@ import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
+from .veloxchemlib import GridDriver
+from .veloxchemlib import MolecularGrid
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import parse_xc_func
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
 from .lrmatvecdriver import orthogonalize_gram_schmidt
@@ -100,7 +104,7 @@ class ComplexResponse:
         self.timing = False
         self.profiling = False
 
-    def update_settings(self, settings):
+    def update_settings(self, settings, method_dict={}):
         """
         Updates settings in complex liner response solver.
 
@@ -141,6 +145,17 @@ class ComplexResponse:
         if 'profiling' in settings:
             key = settings['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
+
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key == 'yes' else False
+            if 'grid_level' in method_dict:
+                self.grid_level = int(method_dict['grid_level'])
+            if 'xcfun' in method_dict:
+                self.dft = True
+                self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+                assert_msg_critical(not self.xcfun.is_undefined(),
+                                    'Undefined XC functional')
 
     def paired(self, v_xy):
         """
@@ -484,6 +499,21 @@ class ComplexResponse:
 
         self.start_time = tm.time()
 
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            self.molgrid = grid_drv.generate(molecule)
+            n_grid_points = self.molgrid.number_of_points()
+            self.molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+        
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -559,12 +589,14 @@ class ComplexResponse:
         trials_info = self.comm.bcast(trials_info, root=mpi_master())
 
         if trials_info['bger']:
-            e2bger = e2x_drv.e2n(bger, scf_tensors, screening, molecule, basis)
+            e2bger = e2x_drv.e2n(bger, scf_tensors, screening, molecule, basis,
+                                 self.dft, self.xcfun, self.molgrid)
             if self.rank == mpi_master():
                 s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
 
         if trials_info['bung']:
-            e2bung = e2x_drv.e2n(bung, scf_tensors, screening, molecule, basis)
+            e2bung = e2x_drv.e2n(bung, scf_tensors, screening, molecule, basis,
+                                 self.dft, self.xcfun, self.molgrid)
             if self.rank == mpi_master():
                 s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
 
@@ -890,7 +922,8 @@ class ComplexResponse:
 
             if trials_info['new_trials_ger']:
                 new_e2bger = e2x_drv.e2n(new_trials_ger, scf_tensors, screening,
-                                         molecule, basis)
+                                         molecule, basis,
+                                         self.dft, self.xcfun, self.molgrid)
                 if self.rank == mpi_master():
                     new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
                     e2bger = np.append(e2bger, new_e2bger, axis=1)
@@ -898,7 +931,8 @@ class ComplexResponse:
 
             if trials_info['new_trials_ung']:
                 new_e2bung = e2x_drv.e2n(new_trials_ung, scf_tensors, screening,
-                                         molecule, basis)
+                                         molecule, basis,
+                                         self.dft, self.xcfun, self.molgrid)
                 if self.rank == mpi_master():
                     new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
                     e2bung = np.append(e2bung, new_e2bung, axis=1)

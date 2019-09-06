@@ -10,6 +10,7 @@ from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
@@ -42,7 +43,7 @@ class LinearResponseMatrixVectorDriver:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-    def e2n(self, vecs, tensors, screening, molecule, basis):
+    def e2n(self, vecs, tensors, screening, molecule, basis, dft = False, xcfun = None, molgrid = None):
         """
         Computes the E2 b matrix vector product.
 
@@ -56,6 +57,12 @@ class LinearResponseMatrixVectorDriver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param dft:
+            The DFT flag if true compute XC contribution, if false otherwise.
+        :param xcfun:
+            The exchange correlation functional.
+        :param molgrid:
+            The molecular grid for XC contributtion computation.
 
         :return:
             The E2 b matrix vector product.
@@ -93,7 +100,8 @@ class LinearResponseMatrixVectorDriver:
         else:
             dks = None
 
-        fks = self.get_two_el_fock(dks, screening, molecule, basis)
+        fks = self.get_two_el_fock(dks, screening, molecule, basis,
+                                   tensors, dft, xcfun, molgrid)
 
         if self.rank == mpi_master():
             gv = np.zeros(vecs.shape)
@@ -115,7 +123,8 @@ class LinearResponseMatrixVectorDriver:
         else:
             return None
 
-    def get_two_el_fock(self, dabs, screening, molecule, basis):
+    def get_two_el_fock(self, dabs, screening, molecule, basis,
+                        tensors = None, dft = False, xcfun = None, molgrid = None):
         """
         Computes two electron contribution to Fock.
 
@@ -127,6 +136,14 @@ class LinearResponseMatrixVectorDriver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param dft:
+            The DFT flag if true compute XC contribution, if false otherwise.
+        :param xcfun:
+            The exchange correlation functional.
+        :param molgrid:
+            The molecular grid for XC contributtion computation.
 
         :return:
             The tuple containing alpha and beta Fock matrices.
@@ -159,13 +176,37 @@ class LinearResponseMatrixVectorDriver:
         # Note: skip spin density for restricted case
         # for i in range(len(dabs)):
         #    fock.set_fock_type(fockmat.rgenjk, i)
+        fock_flag = fockmat.rgenjk
+        if dft:
+            if xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj 
         for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fockmat.rgenjk, i)
+            fock.set_fock_type(fock_flag, i)
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         eri_drv.compute(fock, dens, molecule, basis, screening)
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
+    
+        # add XC contribution to Fock
+        if dft:
+            if self.rank == mpi_master():
+                dgs = []
+                dgs.append(tensors['D'][0])
+                dengs = AODensityMatrix(dgs, denmat.rest) 
+            else:
+                dengs = AODensityMatrix()
+            dengs.broadcast(self.rank, self.comm)
+            
+            xc_drv = XCIntegrator(self.comm)
+            xc_drv.integrate(fock,dens, dengs, molecule, basis, molgrid,
+                             xcfun.get_func_label())
 
+        fock.reduce_sum(self.rank, self.nodes, self.comm)
+        
         fabs = []
         if self.rank == mpi_master():
 

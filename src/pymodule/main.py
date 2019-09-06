@@ -141,7 +141,7 @@ def main():
             rsp_dict = task.input_dict['response']
 
             if rsp_dict['property'].lower() == 'polarizability':
-                polar = Polarizability(rsp_dict)
+                polar = Polarizability(rsp_dict, method_dict)
                 polar.init_driver(task.mpi_comm, task.ostream)
                 polar.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():
@@ -173,7 +173,7 @@ def main():
             cpp_dict = {}
 
         crsp_drv = ComplexResponse(task.mpi_comm, task.ostream)
-        crsp_drv.update_settings(cpp_dict)
+        crsp_drv.update_settings(cpp_dict, method_dict)
         crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # ADC(1)
