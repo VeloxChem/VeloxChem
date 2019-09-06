@@ -184,7 +184,7 @@ class LinearResponseMatrixVectorDriver:
         
         # add XC contribution to Fock
         if dft:
-            XCIntegrator xc_drv(self.comm)
+            xc_drv = XCIntegrator(self.comm)
 
         fabs = []
         if self.rank == mpi_master():
