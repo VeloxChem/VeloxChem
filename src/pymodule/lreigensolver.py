@@ -17,7 +17,6 @@ from .lrmatvecdriver import orthogonalize_gram_schmidt
 from .lrmatvecdriver import normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import get_rhs
-from .lrmatvecdriver import swap_xy
 from .lrmatvecdriver import read_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
 from .qqscheme import get_qq_scheme
@@ -219,9 +218,6 @@ class LinearResponseEigenSolver:
             nocc = nalpha
             norb = mo.shape[1]
             od, sd = construct_ed_sd(ea, nocc, norb)
-        else:
-            nocc = None
-            norb = None
 
         # generate integration grid
         if self.dft:
@@ -249,37 +245,54 @@ class LinearResponseEigenSolver:
 
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
-        b = None
-        e2b = None
-        s2b = None
-
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
-                b, e2b = read_rsp_hdf5(self.checkpoint_file,
-                                       ['LR_eigen_b', 'LR_eigen_e2b'],
-                                       molecule.nuclear_repulsion_energy(),
-                                       molecule.elem_ids_to_numpy(),
-                                       basis.get_label(), dft_func_label,
-                                       self.ostream)
-                self.restart = (b is not None and e2b is not None)
+                rsp_vector_labels = [
+                    'LR_eigen_bger',
+                    'LR_eigen_bung',
+                    'LR_eigen_e2bger',
+                    'LR_eigen_e2bung',
+                ]
+                bger, bung, e2bger, e2bung = read_rsp_hdf5(
+                    self.checkpoint_file, rsp_vector_labels,
+                    molecule.nuclear_repulsion_energy(),
+                    molecule.elem_ids_to_numpy(), basis.get_label(),
+                    dft_func_label, self.ostream)
+                self.restart = (bger is not None and bung is not None and
+                                e2bger is not None and e2bung is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # generate initial guess from scratch
         if not self.restart:
             if self.rank == mpi_master():
+
                 igs = self.initial_excitations(self.nstates, ea, nocc, norb)
-                b = self.setup_trials(igs)
+                bger, bung = self.setup_trials(igs)
+
                 if self.timing:
-                    self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
+                    elapsed_time = tm.time() - timing_t0
+                    self.timing_dict['ortho_norm'][0] += elapsed_time
                     timing_t0 = tm.time()
+
                 assert_msg_critical(
-                    np.any(b),
+                    bger.any() or bung.any(),
                     'LinearResponseEigenSolver: trial vector is empty')
-            e2b = e2x_drv.e2n(b, scf_tensors, screening, molecule, basis)
+
+            btot = None
+            if self.rank == mpi_master():
+                btot = np.hstack((bger, bung))
+
+            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis)
+
+            if self.rank == mpi_master():
+                n_ger = bger.shape[1]
+                e2bger = e2btot[:, :n_ger]
+                e2bung = e2btot[:, n_ger:]
 
         if self.rank == mpi_master():
-            s2b = e2x_drv.s2n(b, scf_tensors, nocc)
+            s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
+            s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
 
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
@@ -302,34 +315,69 @@ class LinearResponseEigenSolver:
                 self.cur_iter = iteration
                 ws = []
 
-                # next solution
+                e2gg = np.matmul(bger.T, e2bger)
+                e2uu = np.matmul(bung.T, e2bung)
+                s2ug = np.matmul(bung.T, s2bung)
 
-                E2 = b.T @ e2b
-                S2 = b.T @ s2b
+                # Equations:
+                # E[2] X_g - w S[2] X_u = 0
+                # E[2] X_u - w S[2] X_g = 0
 
-                wn, Xn = np.linalg.eig((np.linalg.solve(E2, S2)))
-                p = list(reversed(wn.argsort()))
-                wn = wn[p]
-                Xn = Xn[:, p]
-                for s in range(self.nstates):
-                    norm = np.sqrt(Xn[:, s].T @ S2 @ Xn[:, s])
-                    Xn[:, s] /= norm
-                reduced_ev = zip(1.0 / wn[:self.nstates],
-                                 Xn[:, :self.nstates].T)
+                # Solutions:
+                # (S_gu (E_uu)^-1 S_ug) X_g = 1/w^2 E_gg X_g
+                # X_u = w (E_uu)^-1 S_ug X_g
 
-                for k, (w, reduced_X) in enumerate(reduced_ev):
-                    r = (e2b - w * s2b) @ reduced_X
-                    X = b @ reduced_X
-                    rn = np.linalg.norm(r)
-                    xn = np.linalg.norm(X)
+                evals, evecs = np.linalg.eigh(e2uu)
+                e2uu_inv = evecs @ np.diag(1.0 / evals) @ evecs.T
+                ses = s2ug.T @ e2uu_inv @ s2ug
+
+                evals, evecs = np.linalg.eigh(e2gg)
+                tmat = evecs @ np.diag(1.0 / np.sqrt(evals)) @ evecs.T
+                ses_tilde = tmat.T @ ses @ tmat
+
+                evals, evecs = np.linalg.eigh(ses_tilde)
+                p = list(reversed(evals.argsort()))
+                evals = evals[p]
+                evecs = evecs[:, p]
+
+                wn = 1.0 / np.sqrt(evals[:self.nstates])
+                Xn_ger = tmat @ evecs[:, :self.nstates]
+                Xn_ung = wn * (e2uu_inv @ (s2ug @ Xn_ger))
+
+                for k in range(self.nstates):
+                    x_ger = Xn_ger[:, k]
+                    x_ung = Xn_ung[:, k]
+                    norm = np.sqrt(x_ung.T @ s2ug @ x_ger +
+                                   x_ger.T @ s2ug.T @ x_ung)
+                    Xn_ger[:, k] /= norm
+                    Xn_ung[:, k] /= norm
+
+                for k in range(self.nstates):
+
+                    w = wn[k]
+                    x_ger = Xn_ger[:, k]
+                    x_ung = Xn_ung[:, k]
+
+                    r_ger = e2bger @ x_ger - w * (s2bger @ x_ung)
+                    r_ung = e2bung @ x_ung - w * (s2bung @ x_ger)
+
+                    r = np.array([r_ger, r_ung]).flatten()
+                    X = bger @ x_ger + bung @ x_ung
+
                     exresiduals[k] = (w, r)
                     excitations[k] = (w, X)
+
+                    rn = np.linalg.norm(r)
+                    xn = np.linalg.norm(X)
                     relative_residual_norm[k] = rn / xn
                     converged[k] = (rn / xn < self.conv_thresh)
                     ws.append(w)
 
                 # write to output
-                self.ostream.print_info('{:d} trial vectors'.format(b.shape[1]))
+                self.ostream.print_info('{:d} gerade trial vectors'.format(
+                    bger.shape[1]))
+                self.ostream.print_info('{:d} ungerade trial vectors'.format(
+                    bung.shape[1]))
                 self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, converged, ws)
@@ -347,29 +395,47 @@ class LinearResponseEigenSolver:
 
             # update trial vectors
             if self.rank == mpi_master():
-                tdx = {w: od - w * sd for w, x in excitations}
-                new_trials = self.setup_trials(exresiduals,
-                                               converged,
-                                               tdx=tdx,
-                                               b=b)
-                b = np.append(b, new_trials, axis=1)
-            else:
-                new_trials = None
+                precond = [
+                    self.get_precond(ea, nocc, norb, w) for w, x in excitations
+                ]
+
+                new_trials_ger, new_trials_ung = self.setup_trials(
+                    exresiduals, converged, precond, bger, bung)
+
+                assert_msg_critical(
+                    new_trials_ger.any() or new_trials_ung.any(),
+                    'LinearResponseEigenSolver: unable to add new trial vector')
+
+                bger = np.append(bger, new_trials_ger, axis=1)
+                bung = np.append(bung, new_trials_ung, axis=1)
 
             if self.timing:
                 tid = iteration + 1
                 self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            new_e2b = e2x_drv.e2n(new_trials, scf_tensors, screening, molecule,
-                                  basis)
+            new_trials_tot = None
             if self.rank == mpi_master():
-                new_s2b = e2x_drv.s2n(new_trials, scf_tensors, nocc)
-                e2b = np.append(e2b, new_e2b, axis=1)
-                s2b = np.append(s2b, new_s2b, axis=1)
+                new_trials_tot = np.hstack((new_trials_ger, new_trials_ung))
 
-                write_rsp_hdf5(self.checkpoint_file, [b, e2b],
-                               ['LR_eigen_b', 'LR_eigen_e2b'],
+            new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
+                                     molecule, basis)
+
+            if self.rank == mpi_master():
+                new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
+                new_e2bung = new_e2btot[:, new_trials_ger.shape[1]:]
+
+                e2bger = np.append(e2bger, new_e2bger, axis=1)
+                e2bung = np.append(e2bung, new_e2bung, axis=1)
+
+                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
+                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
+
+                s2bung = np.append(s2bung, new_s2bung, axis=1)
+                s2bger = np.append(s2bger, new_s2bger, axis=1)
+
+                write_rsp_hdf5(self.checkpoint_file,
+                               [bger, bung, e2bger, e2bung], rsp_vector_labels,
                                molecule.nuclear_repulsion_energy(),
                                molecule.elem_ids_to_numpy(), basis.get_label(),
                                dft_func_label, self.ostream)
@@ -585,16 +651,27 @@ class LinearResponseEigenSolver:
         final = []
         for (i, a) in sorted(w, key=w.get)[:nstates]:
             ia = excitations.index((i, a))
-            Xn = np.zeros(2 * len(excitations))
+            n_exc = len(excitations)
+
+            Xn = np.zeros(2 * n_exc)
             Xn[ia] = 1.0
-            final.append((w[(i, a)], Xn))
+
+            Xn_T = np.zeros(2 * n_exc)
+            Xn_T[:n_exc] = Xn[n_exc:]
+            Xn_T[n_exc:] = Xn[:n_exc]
+
+            Xn_ger = 0.5 * (Xn + Xn_T)
+            Xn_ung = 0.5 * (Xn - Xn_T)
+
+            final.append((w[(i, a)], np.array([Xn_ger, Xn_ung]).flatten()))
         return final
 
     def setup_trials(self,
                      excitations,
                      converged={},
-                     tdx=None,
-                     b=None,
+                     precond=None,
+                     bger=None,
+                     bung=None,
                      renormalize=True):
         """
         Computes orthonormalized trial vectors.
@@ -603,15 +680,17 @@ class LinearResponseEigenSolver:
             The set of excitations.
         :param converged:
             The flags of converged excitations.
-        :param tdx:
+        :param precond:
             The preconditioner.
-        :param b:
-            The subspace.
+        :param bger:
+            The gerade subspace.
+        :param bung:
+            The ungerade subspace.
         :param renormalize:
             The flag for normalization.
 
         :return:
-            The orthonormalized trial vectors.
+            The orthonormalized gerade and ungerade trial vectors.
         """
 
         trials = []
@@ -619,24 +698,122 @@ class LinearResponseEigenSolver:
         for k, (w, X) in enumerate(excitations):
             if converged and converged[k]:
                 continue
-            if tdx:
-                trials.append(X / tdx[w])
+
+            if precond is not None:
+                v = self.preconditioning(precond[k], X)
             else:
-                trials.append(X)
-            trials.append(swap_xy(X))
+                v = X
+
+            if np.linalg.norm(v) > self.small_thresh:
+                trials.append(v)
 
         new_trials = np.array(trials).T
 
-        if b is not None:
-            new_trials = new_trials - np.matmul(b, np.matmul(b.T, new_trials))
+        # decomposing the full space trial vectors...
 
-        if trials and renormalize:
-            new_trials = remove_linear_dependence(new_trials,
-                                                  self.lindep_thresh)
-            new_trials = orthogonalize_gram_schmidt(new_trials)
-            new_trials = normalize(new_trials)
+        new_ger, new_ung = self.decomp_trials(new_trials)
 
-        return new_trials
+        if bger is not None and bger.any():
+            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
+
+        if bung is not None and bung.any():
+            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
+
+        if new_ger.any() and renormalize:
+            new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
+            new_ger = orthogonalize_gram_schmidt(new_ger)
+            new_ger = normalize(new_ger)
+
+        if new_ung.any() and renormalize:
+            new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
+            new_ung = orthogonalize_gram_schmidt(new_ung)
+            new_ung = normalize(new_ung)
+
+        return new_ger, new_ung
+
+    def get_precond(self, orb_ene, nocc, norb, w):
+        """
+        Constructs the preconditioner matrix.
+
+        :param orb_ene:
+            The orbital energies.
+        :param nocc:
+            The number of doubly occupied orbitals.
+        :param norb:
+            The number of orbitals.
+        :param w:
+            The frequency.
+
+        :return:
+            The preconditioner matrix.
+        """
+
+        # spawning needed components
+
+        ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag_sq = ediag**2
+        sdiag_sq = sdiag**2
+        w_sq = w**2
+
+        # constructing matrix block diagonals
+
+        pa_diag = ediag / (ediag_sq - w_sq * sdiag_sq)
+        pb_diag = (w * sdiag) / (ediag_sq - w_sq * sdiag_sq)
+
+        precond = np.array([pa_diag, pb_diag])
+
+        return precond
+
+    def preconditioning(self, precond, v_in):
+        """
+        Creates trial vectors out of residuals and the preconditioner matrix.
+
+        :param precond:
+            The preconditioner matrix.
+        :param v_in:
+            The input trial vectors.
+
+        :return:
+            The trail vectors after preconditioning.
+        """
+
+        pa, pb = precond[0], precond[1]
+
+        v_in_rg, v_in_ru = self.decomp_trials(v_in)
+
+        v_out_rg = pa * v_in_rg + pb * v_in_ru
+        v_out_ru = pb * v_in_rg + pa * v_in_ru
+
+        v_out = np.array([v_out_rg, v_out_ru]).flatten()
+
+        return v_out
+
+    def decomp_trials(self, vecs):
+        """
+        Decomposes trial vectors into gerade and ungerade parts.
+
+        :param vecs:
+            The trial vectors.
+
+        :return:
+            A tuple containing gerade and ungerade parts of the trial vectors.
+        """
+
+        assert_msg_critical(vecs.shape[0] % 2 == 0,
+                            'decomp_trials: shape[0] of array should be even')
+
+        ger, ung = None, None
+        half_rows = vecs.shape[0] // 2
+
+        if len(vecs.shape) == 1:
+            ger = vecs[:half_rows]
+            ung = vecs[half_rows:]
+
+        elif len(vecs.shape) == 2:
+            ger = vecs[:half_rows, :]
+            ung = vecs[half_rows:, :]
+
+        return ger, ung
 
     def print_timing(self):
         """
