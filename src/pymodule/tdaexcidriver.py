@@ -7,13 +7,18 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import TDASigmaVectorDriver
+from .veloxchemlib import AODensityMatrix
+from .veloxchemlib import AOFockMatrix
+#from .veloxchemlib import TDASigmaVectorDriver
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import molorb
+from .veloxchemlib import denmat
+from .veloxchemlib import fockmat
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import parse_xc_func
 from .blockdavidson import BlockDavidsonSolver
@@ -211,13 +216,16 @@ class TDAExciDriver:
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, basis)
 
+        if self.dft:
+            xc_drv = XCIntegrator(self.comm)
+
         # set up trial excitation vectors on master node
 
         diag_mat, trial_vecs = self.gen_trial_vectors(mol_orbs, molecule)
 
         # initalize sigma vectors driver
 
-        a2x_drv = TDASigmaVectorDriver(self.comm)
+        #a2x_drv = TDASigmaVectorDriver(self.comm)
 
         # block Davidson algorithm setup
 
@@ -253,17 +261,27 @@ class TDAExciDriver:
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
-                                           self.molgrid, self.xcfun, mol_orbs,
-                                           molecule, basis)
+                #sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
+                #                           self.molgrid, self.xcfun, mol_orbs,
+                #                           molecule, basis)
+
+                fock, tdens, gsdens = self.get_densities(
+                    trial_vecs, scf_tensors, molecule)
+
+                eri_drv.compute(fock, tdens, molecule, basis, qq_data)
+                if self.dft:
+                    xc_drv.integrate(fock, tdens, gsdens, molecule, basis,
+                                     self.molgrid, self.xcfun.get_func_label())
+                fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             # solve eigenvalues problem on master node
 
             if self.rank == mpi_master():
 
                 if i >= n_restart_iterations:
-                    sig_mat = self.convert_to_sigma_matrix(sig_vecs)
                     trial_mat = self.convert_to_trial_matrix(trial_vecs)
+                    sig_mat = self.get_sigmas(fock, scf_tensors, molecule,
+                                              trial_mat)
                 else:
                     istart = i * self.nstates
                     iend = (i + 1) * self.nstates
@@ -488,6 +506,85 @@ class TDAExciDriver:
                 trial_vecs[i].set_zcoefficient(zvecs[j, i], j)
 
         return trial_vecs
+
+    def get_densities(self, trial_vecs, tensors, molecule):
+
+        # form transition densities
+
+        if self.rank == mpi_master():
+            nocc = molecule.number_of_electrons() // 2
+            norb = tensors['C'].shape[1]
+            nvir = norb - nocc
+            mo_occ = tensors['C'][:, :nocc]
+            mo_vir = tensors['C'][:, nocc:]
+            ao_mats = []
+            for vec in trial_vecs:
+                mat = vec.zvector_to_numpy().reshape(nocc, nvir)
+                mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
+                ao_mats.append(mat)
+            tdens = AODensityMatrix(ao_mats, denmat.rest)
+        else:
+            tdens = AODensityMatrix()
+        tdens.broadcast(self.rank, self.comm)
+
+        # initialize Fock matrices
+
+        fock = AOFockMatrix(tdens)
+
+        if self.dft:
+            if self.xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = self.xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj
+        else:
+            fock_flag = fockmat.rgenjk
+
+        for i in range(fock.number_of_fock_matrices()):
+            fock.set_fock_type(fock_flag, i)
+
+        # broadcast ground state density
+
+        if self.dft:
+            if self.rank == mpi_master():
+                gsdens = AODensityMatrix([tensors['D'][0]], denmat.rest)
+            else:
+                gsdens = AODensityMatrix()
+            gsdens.broadcast(self.rank, self.comm)
+        else:
+            gsdens = None
+
+        return fock, tdens, gsdens
+
+    def get_sigmas(self, fock, tensors, molecule, trial_mat):
+
+        nocc = molecule.number_of_electrons() // 2
+        norb = tensors['C'].shape[1]
+        nvir = norb - nocc
+        mo_occ = tensors['C'][:, :nocc]
+        mo_vir = tensors['C'][:, nocc:]
+        orb_ene = tensors['E']
+
+        sigma_vecs = []
+        for fockind in range(fock.number_of_fock_matrices()):
+            # 2e contribution
+            #prefactor = -1.0 if self.triplet else 1.0
+            #mat = prefactor * fock.to_numpy(fockind)
+            mat = fock.to_numpy(fockind)
+            mat = np.matmul(mo_occ.T, np.matmul(mat, mo_vir))
+            # 1e contribution
+            cjb = trial_mat[:, fockind].reshape(nocc, nvir)
+            mat += np.matmul(cjb, np.diag(orb_ene[nocc:]).T)
+            mat -= np.matmul(np.diag(orb_ene[:nocc]), cjb)
+            sigma_vecs.append(mat.reshape(nocc * nvir, 1))
+
+        sigma_mat = sigma_vecs[0]
+        for vec in sigma_vecs[1:]:
+            sigma_mat = np.hstack((sigma_mat, vec))
+
+        return sigma_mat
 
     def comp_dipole_ints(self, molecule, basis):
         """
