@@ -57,7 +57,7 @@ def main():
             exciton_dict = {}
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
-        exciton_drv.update_settings(exciton_dict)
+        exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Hartree-Fock
