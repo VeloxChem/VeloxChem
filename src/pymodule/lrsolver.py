@@ -301,6 +301,11 @@ class LinearResponseSolver:
                     bger.any() or bung.any(),
                     'LinearResponseSolver.compute: trial vector is empty')
 
+                if not bger.any():
+                    bger = np.zeros((bung.shape[0], 0))
+                if not bung.any():
+                    bung = np.zeros((bger.shape[0], 0))
+
             btot = None
             if self.rank == mpi_master():
                 btot = np.hstack((bger, bung))
@@ -424,6 +429,11 @@ class LinearResponseSolver:
                     new_trials_ger.any() or new_trials_ung.any(),
                     'LinearResponseSolver: unable to add new trial vector')
 
+                if not new_trials_ger.any():
+                    new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
+                if not new_trials_ung.any():
+                    new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
+
                 bger = np.append(bger, new_trials_ger, axis=1)
                 bung = np.append(bung, new_trials_ung, axis=1)
 
@@ -444,12 +454,13 @@ class LinearResponseSolver:
                 new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
                 new_e2bung = new_e2btot[:, new_trials_ger.shape[1]:]
 
-                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
-
-                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
+
+                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
+                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
+
+                s2bung = np.append(s2bung, new_s2bung, axis=1)
                 s2bger = np.append(s2bger, new_s2bger, axis=1)
 
                 write_rsp_hdf5(self.checkpoint_file,

@@ -280,6 +280,11 @@ class LinearResponseEigenSolver:
                     bger.any() or bung.any(),
                     'LinearResponseEigenSolver: trial vector is empty')
 
+                if not bger.any():
+                    bger = np.zeros((bung.shape[0], 0))
+                if not bung.any():
+                    bung = np.zeros((bger.shape[0], 0))
+
             btot = None
             if self.rank == mpi_master():
                 btot = np.hstack((bger, bung))
@@ -407,6 +412,11 @@ class LinearResponseEigenSolver:
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
                     'LinearResponseEigenSolver: unable to add new trial vector')
+
+                if not new_trials_ger.any():
+                    new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
+                if not new_trials_ung.any():
+                    new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
                 bger = np.append(bger, new_trials_ger, axis=1)
                 bung = np.append(bung, new_trials_ung, axis=1)

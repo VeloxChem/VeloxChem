@@ -579,6 +579,11 @@ class ComplexResponse:
                 bger.any() or bung.any(),
                 'ComplexResponseSolver: trial vectors are empty')
 
+            if not bger.any():
+                bger = np.zeros((bung.shape[0], 0))
+            if not bung.any():
+                bung = np.zeros((bger.shape[0], 0))
+
             # creating sigma and rho linear transformations
 
         if self.timing:
@@ -630,34 +635,28 @@ class ComplexResponse:
 
                         g_realger = np.matmul(bger.T, gradger.real)
                         g_imagger = np.matmul(bger.T, gradger.imag)
-
-                        e2gg = np.matmul(bger.T, e2bger)
-
-                        ntrials_ger = bger.shape[1]
-
                         g_realung = np.matmul(bung.T, gradung.real)
                         g_imagung = np.matmul(bung.T, gradung.imag)
 
+                        e2gg = np.matmul(bger.T, e2bger)
                         e2uu = np.matmul(bung.T, e2bung)
-
                         s2ug = np.matmul(bung.T, s2bung)
 
-                        ntrials_ung = bung.shape[1]
+                        n_ger = bger.shape[1]
+                        n_ung = bung.shape[1]
 
                         # creating gradient and matrix for linear equation
 
-                        size = 2 * (ntrials_ger + ntrials_ung)
+                        size = 2 * (n_ger + n_ung)
 
                         # gradient
 
                         g = np.zeros(size)
 
-                        g[:ntrials_ger] = g_realger[:]
-                        g[-ntrials_ger:] = -g_imagger[:]
-
-                        g[ntrials_ger:ntrials_ger + ntrials_ung] = g_realung[:]
-                        g[-ntrials_ger -
-                          ntrials_ung:-ntrials_ger] = -g_imagung[:]
+                        g[:n_ger] = g_realger[:]
+                        g[n_ger:n_ger + n_ung] = g_realung[:]
+                        g[n_ger + n_ung:size - n_ger] = -g_imagung[:]
+                        g[size - n_ger:] = -g_imagger[:]
 
                         # matrix
 
@@ -665,46 +664,40 @@ class ComplexResponse:
 
                         # filling E2gg
 
-                        mat[:ntrials_ger, :ntrials_ger] = e2gg[:, :]
-                        mat[-ntrials_ger:, -ntrials_ger:] = -e2gg[:, :]
+                        mat[:n_ger, :n_ger] = e2gg[:, :]
+                        mat[size - n_ger:, size - n_ger:] = -e2gg[:, :]
 
                         # filling E2uu
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = e2uu[:, :]
+                        mat[n_ger:n_ger + n_ung, n_ger:n_ger +
+                            n_ung] = e2uu[:, :]
 
-                        mat[-ntrials_ger -
-                            ntrials_ung:-ntrials_ger, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = -e2uu[:, :]
+                        mat[n_ger + n_ung:size - n_ger, n_ger + n_ung:size -
+                            n_ger] = -e2uu[:, :]
 
                         # filling S2ug
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, :ntrials_ger] = -w * s2ug[:, :]
+                        mat[n_ger:n_ger + n_ung, :n_ger] = -w * s2ug[:, :]
 
-                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger, :
-                            ntrials_ger] = d * s2ug[:, :]
+                        mat[n_ger + n_ung:size - n_ger, :n_ger] = d * s2ug[:, :]
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, -ntrials_ger:] = d * s2ug[:, :]
+                        mat[n_ger:n_ger + n_ung, size - n_ger:] = d * s2ug[:, :]
 
-                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger,
-                            -ntrials_ger:] = w * s2ug[:, :]
+                        mat[n_ger + n_ung:size - n_ger, size -
+                            n_ger:] = w * s2ug[:, :]
 
                         # filling S2ug.T (interchanging of row and col)
 
-                        mat[:ntrials_ger, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = -w * s2ug.T[:, :]
+                        mat[:n_ger, n_ger:n_ger + n_ung] = -w * s2ug.T[:, :]
 
-                        mat[:ntrials_ger, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = d * s2ug.T[:, :]
+                        mat[:n_ger, n_ger + n_ung:size -
+                            n_ger] = d * s2ug.T[:, :]
 
-                        mat[-ntrials_ger:, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = d * s2ug.T[:, :]
+                        mat[size - n_ger:, n_ger:n_ger +
+                            n_ung] = d * s2ug.T[:, :]
 
-                        mat[-ntrials_ger:, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = w * s2ug.T[:, :]
+                        mat[size - n_ger:, n_ger + n_ung:size -
+                            n_ger] = w * s2ug.T[:, :]
 
                         # solving matrix equation
 
@@ -712,24 +705,17 @@ class ComplexResponse:
 
                         # extracting the 4 components of c...
 
-                        c_realger, c_imagger = np.zeros(ntrials_ger), np.zeros(
-                            ntrials_ger)
-                        c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
-                            ntrials_ung)
-
-                        c_realger[:] = c[:ntrials_ger]
-                        c_imagger[:] = c[-ntrials_ger:]
-
-                        c_realung[:] = c[ntrials_ger:ntrials_ger + ntrials_ung]
-                        c_imagung[:] = c[-ntrials_ger -
-                                         ntrials_ung:-ntrials_ger]
+                        c_realger = c[:n_ger]
+                        c_realung = c[n_ger:n_ger + n_ung]
+                        c_imagung = c[n_ger + n_ung:size - n_ger]
+                        c_imagger = c[size - n_ger:]
 
                         # ...and projecting them onto respective subspace
 
                         x_realger = np.matmul(bger, c_realger)
-                        x_imagger = np.matmul(bger, c_imagger)
                         x_realung = np.matmul(bung, c_realung)
                         x_imagung = np.matmul(bung, c_imagung)
+                        x_imagger = np.matmul(bger, c_imagger)
 
                         # composing response vector
 
@@ -800,9 +786,9 @@ class ComplexResponse:
                 # write to output
 
                 self.ostream.print_info(
-                    '{:d} gerade trial vectors'.format(ntrials_ger))
+                    '{:d} gerade trial vectors'.format(n_ger))
                 self.ostream.print_info(
-                    '{:d} ungerade trial vectors'.format(ntrials_ung))
+                    '{:d} ungerade trial vectors'.format(n_ung))
                 self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, nvs)
@@ -833,6 +819,11 @@ class ComplexResponse:
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
                     'ComplexResponseSolver: unable to add new trial vectors')
+
+                if not new_trials_ger.any():
+                    new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
+                if not new_trials_ung.any():
+                    new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
                 # creating new sigma and rho linear transformations
 
