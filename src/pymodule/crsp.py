@@ -964,6 +964,9 @@ class ComplexResponse:
 
         width = 60
 
+        cur_str = "Damping Parameter (gamma) : {:.6e}".format(self.damping)
+        self.ostream.print_header(cur_str.ljust(width))
+
         cur_str = "Max. Number of Iterations : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(width))
         cur_str = "Convergence Threshold     : " + \
