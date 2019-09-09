@@ -180,6 +180,14 @@ CAOKohnShamMatrix::reduce_sum(int32_t  rank,
         
         MPI_Barrier(comm);
     }
+    
+    auto fsum = mpi::reduce_sum(_xcElectrons, comm);
+    
+    _xcElectrons = fsum;
+    
+    fsum = mpi::reduce_sum(_xcEnergy, comm);
+    
+    _xcEnergy = fsum; 
 }
 
 bool

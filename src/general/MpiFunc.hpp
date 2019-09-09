@@ -241,6 +241,15 @@ void gather(double* vector, double value, int32_t rank, MPI_Comm comm);
  @param comm the MPI communicator.
  */
 void reduce_sum(const double* source, double* destination, const int32_t nElements, MPI_Comm comm);
+    
+/**
+ Performs reduction operation over given real numbers accross MPI processes.
+
+ @param value the partial value of real number.
+ @param comm the MPI communicator
+ @return the sum of partial real numbes on master node, 0.0 on other nodes.
+ */
+double reduce_sum(const double value, MPI_Comm comm);
 
 /**
  Terminates all MPI processes and prints error message to standard error stream.
