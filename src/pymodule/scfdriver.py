@@ -93,6 +93,8 @@ class ScfDriver:
         The XC functional.
     :param molgrid:
         The molecular grid.
+    :param timing:
+        The flag for printing timing information.
     """
 
     def __init__(self, comm, ostream):
@@ -170,6 +172,8 @@ class ScfDriver:
         self.grid_level = 4
         self.xcfun = None
         self.molgrid = None
+    
+        self.timing = False
 
     def update_settings(self, scf_dict, method_dict={}):
         """
@@ -209,6 +213,10 @@ class ScfDriver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
 
+        if 'timing' in scf_dict:
+            key = scf_dict['timing'].lower()
+            self.timing = True if key in ['yes', 'y'] else False
+
     def compute(self, molecule, ao_basis, min_basis):
         """
         Performs SCF calculation using molecular data.
@@ -225,6 +233,13 @@ class ScfDriver:
         if self.dft:
             assert_msg_critical(self.xcfun is not None,
                                 'SCF driver: undefined XC functional')
+        # set up timing data
+        if self.timing:
+            self.timing_dict = {
+                'fock_2e': [ ],
+                'dft_vxc': [ ],
+                'fock_diag': [ ]
+            }
 
         # initial guess
         if self.restart:
@@ -317,6 +332,9 @@ class ScfDriver:
                 checkpoint_text += self.checkpoint_file
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()
+                    
+            if self.timing:
+                print(self.timing)
 
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
@@ -417,10 +435,16 @@ class ScfDriver:
 
         for i in self.get_scf_range():
 
+            if self.timing:
+                fock_t0 = tm.time()
+            
             eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data)
 
             fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
+            if self.timing:
+                self.timing_dict['fock_2e'].append(tm.time() - fock_t0)
+            
             if self.dft:
                 if not self.xcfun.is_hybrid():
                     fock_mat.scale(2.0, 0)
@@ -429,12 +453,18 @@ class ScfDriver:
                                                  den_mat)
 
             if self.dft:
+                if self.timing:
+                    vxc_t0 = tm.time()
+                
                 vxc_mat = xc_drv.integrate(den_mat, molecule, ao_basis,
                                            self.molgrid,
                                            self.xcfun.get_func_label())
                 vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
                 e_ee += vxc_mat.get_energy()
+            
+                if self.timing:
+                    self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
 
             self.comp_full_fock(fock_mat, kin_mat, npot_mat)
 
@@ -452,11 +482,17 @@ class ScfDriver:
 
             self.store_diis_data(i, fock_mat, den_mat)
 
+            if self.timing:
+                diag_t0 = tm.time()
+            
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat)
 
             self.update_mol_orbs_phase()
+            
+            if self.timing:
+                self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
 
             self.write_checkpoint(molecule.elem_ids_to_numpy(),
                                   ao_basis.get_label())
