@@ -334,7 +334,7 @@ class ScfDriver:
                 self.ostream.print_blank()
                     
             if self.timing:
-                print(self.timing)
+                self.print_timing()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
@@ -1261,8 +1261,8 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(width))
         self.ostream.print_header(('-' * len(valstr)).ljust(width))
         
-        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format('', 'Fock 2E part ',
-                                                          'XC part', 'Fock diagonalization')
+        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format('', 'Fock 2E Part',
+                                                          'XC Part', 'Diag. Part')
         self.ostream.print_header(valstr.ljust(width))
                                                   
         for i, (a, b, c) in enumerate(zip(self.timing_dict['fock_2e'],
