@@ -8,7 +8,7 @@ SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
 
-VLX_SOURCE = source
+VLX_SOURCE = "Reference Guide"
 PYTHONPATH = $(VLX_SOURCE):mocks
 
 VLX_EXCLUDE = $(VLX_SOURCE)/veloxchem/veloxchemlib.py
@@ -34,8 +34,8 @@ help:
 api: links
 	PYTHONPATH=$(PYTHONPATH) sphinx-apidoc -o api $(VLX_SOURCE) $(VLX_EXCLUDE)
 links:
-	mkdir -p source/veloxchem
-	for f in ../src/pymodule/*py; do ln -sf ../../$$f source/veloxchem; done
-	ln -sf ../../mocks/veloxchemlib.py source/veloxchem
+	mkdir -p $(VLX_SOURCE)/veloxchem
+	for f in ../src/pymodule/*py; do ln -sf ../../$$f $(VLX_SOURCE)/veloxchem; done
+	ln -sf ../../mocks/veloxchemlib.py $(VLX_SOURCE)/veloxchem
 serve:
 	python3 -c 'import webbrowser; webbrowser.open_new_tab("http://localhost:5000")' && python3 server.py
