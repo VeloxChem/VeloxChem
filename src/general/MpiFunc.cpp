@@ -417,6 +417,8 @@ reduce_sum(const double value, MPI_Comm comm)
         
         mpi::reduce_sum(&value, &dval, 1, comm);
         
+        MPI_Barrier(comm);
+        
         return dval;
     }
     
