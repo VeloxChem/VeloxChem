@@ -1249,3 +1249,31 @@ class ScfDriver:
         grad = self.iter_data[-1][2]
         valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
         self.ostream.print_header(valstr.ljust(92))
+
+    def print_timing(self):
+        """
+            Prints timing breakdown for the scf driver.
+        """
+        
+        width = 92
+        
+        valstr = 'Timing (in sec):'
+        self.ostream.print_header(valstr.ljust(width))
+        self.ostream.print_header(('-' * len(valstr)).ljust(width))
+        
+        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format('', 'Fock 2E part ',
+                                                          'XC part', 'Fock diagonalization')
+        self.ostream.print_header(valstr.ljust(width))
+                                                  
+        for i, (a, b, c) in enumerate(zip(self.timing_dict['fock_2e'],
+                                          self.timing_dict['dft_vxc'],
+                                          self.timing_dict['fock_diag'])):
+            
+            title = 'Iteration {:<5d}'.format(i)
+            valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
+            self.ostream.print_header(valstr.ljust(width))
+                                                                                             
+            valstr = '---------'
+            self.ostream.print_header(valstr.ljust(width))
+            
+        self.ostream.print_blank()
