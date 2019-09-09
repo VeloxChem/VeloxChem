@@ -809,7 +809,7 @@ CMemBlock<double>::reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         auto nsize = static_cast<size_t>(_nElements) * sizeof(double);
 
-        if (rank == mpi::master()) bdata = (double*)mem::malloc(nsize);
+        if (rank == mpi::master()) bdata = (double*) mem::malloc(nsize);
 
         mpi::reduce_sum(_data, bdata, _nElements, comm);
 
