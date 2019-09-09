@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import subprocess
-import importlib
 import platform
 import site
 import sys
@@ -237,9 +236,9 @@ def generate_setup(template_file, setup_file):
 
     # pybind11
 
-    pybind11 = importlib.util.find_spec('pybind11')
-
-    if pybind11 is None:
+    try:
+        import pybind11
+    except ImportError:
         print()
         print('*** Error: Unable to find pybind11!')
         print('***        Please install via \"pip install pybind11 --user\"')
