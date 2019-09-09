@@ -62,6 +62,7 @@ setup(
     ],
     python_requires='>=3.5',
     install_requires=[
+        'pybind11>=2.3.0',
         'mpi4py>=3.0',
         'numpy>=1.13',
         'h5py>=2.8',

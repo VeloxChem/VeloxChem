@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import subprocess
+import importlib
 import platform
+import site
 import sys
 import os
 
@@ -77,15 +79,13 @@ def check_ubuntu():
 
 def check_dir(dirname, label):
     if not os.path.isdir(dirname):
-        print('*** Error: {} dir {} does not exist!'.format(
-            label, dirname))
+        print('*** Error: {} dir {} does not exist!'.format(label, dirname))
         sys.exit(1)
 
 
 def check_file(filename, label):
     if not os.path.isfile(filename):
-        print('*** Error: {} file {} does not exist!'.format(
-            label, filename))
+        print('*** Error: {} file {} does not exist!'.format(label, filename))
         sys.exit(1)
 
 
@@ -235,21 +235,17 @@ def generate_setup(template_file, setup_file):
     if is_macos:
         maclibs = '-undefined dynamic_lookup'
 
-    # pybind11 rootdir
+    # pybind11
 
-    print('*** Checking pybind11... ', end='')
+    pybind11 = importlib.util.find_spec('pybind11')
 
-    if 'PYBIND11ROOT' not in os.environ:
+    if pybind11 is None:
         print()
         print('*** Error: Unable to find pybind11!')
-        print('***        Please make sure that you have set PYBIND11ROOT.')
-        print('***        pybind11 can be downloaded from')
-        print('***        https://github.com/pybind/pybind11')
+        print('***        Please install via \"pip install pybind11 --user\"')
         sys.exit(1)
 
-    pybind11_root = os.environ['PYBIND11ROOT']
-    print(pybind11_root)
-    check_dir(pybind11_root, 'pybind11 dir')
+    python_user_base = site.getuserbase()
 
     # google test lib
 
@@ -291,7 +287,12 @@ def generate_setup(template_file, setup_file):
                 print('', file=f_mkfile)
 
                 print('PYTHON :=', 'python3', file=f_mkfile)
-                print('PYBIND11_ROOT :=', pybind11_root, file=f_mkfile)
+                python_version = 'python{}.{}{}'.format(sys.version_info[0],
+                                                        sys.version_info[1],
+                                                        sys.abiflags)
+                print('PYTHON_USER_INC :=',
+                      os.path.join(python_user_base, 'include', python_version),
+                      file=f_mkfile)
                 print('', file=f_mkfile)
 
                 print('CXX :=', cxx, file=f_mkfile)
