@@ -81,9 +81,6 @@ class MOIntegralsDriver:
             The computed MO integrals.
         """
 
-        if self.rank != mpi_master():
-            return None
-
         self.ostream.print_blank()
         self.ostream.print_header("Conventional AO->MO Integral Transformation")
         self.ostream.print_header(45 * "=")

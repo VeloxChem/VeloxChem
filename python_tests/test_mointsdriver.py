@@ -71,10 +71,12 @@ class TestMOIntegralsDriver(unittest.TestCase):
 
             self.assertAlmostEqual(e_mp2, master_e_mp2, 12)
 
-            # in-memory test
+        # in-memory test
+        in_mem_oovv = moints_drv.compute_in_mem(task.molecule, task.ao_basis,
+                                                mol_orbs, "OOVV")
+
+        if task.mpi_rank == mpi_master():
             in_mem_e_mp2 = 0.0
-            in_mem_oovv = moints_drv.compute_in_mem(
-                task.molecule, task.ao_basis, mol_orbs, "OOVV")
             for i in range(in_mem_oovv.shape[0]):
                 for j in range(in_mem_oovv.shape[1]):
                     ij = in_mem_oovv[i, j, :, :]

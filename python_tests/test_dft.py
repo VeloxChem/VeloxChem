@@ -7,6 +7,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import hartree_in_ev
 
 
@@ -26,8 +27,9 @@ class TestDFT(unittest.TestCase):
         scf_drv.update_settings({}, {'xcfun': xcfun_label})
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        e_scf = scf_drv.get_scf_energy()
-        self.assertTrue(abs(e_scf - scf_ref) < 1.0e-5)
+        if task.mpi_rank == mpi_master():
+            e_scf = scf_drv.get_scf_energy()
+            self.assertTrue(abs(e_scf - scf_ref) < 1.0e-5)
 
         # TDA
 
@@ -36,11 +38,12 @@ class TestDFT(unittest.TestCase):
         tda_results = tda_exci.compute(task.molecule, task.ao_basis,
                                        scf_drv.scf_tensors)
 
-        exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-        osc_str = tda_results['oscillator_strengths']
+        if task.mpi_rank == mpi_master():
+            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
+            osc_str = tda_results['oscillator_strengths']
 
-        self.assertTrue(np.max(np.abs(exc_ene - tda_ref[:, 0])) < 5.0e-4)
-        self.assertTrue(np.max(np.abs(osc_str - tda_ref[:, 1])) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(exc_ene - tda_ref[:, 0])) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(osc_str - tda_ref[:, 1])) < 1.0e-4)
 
         # RPA
 
@@ -49,11 +52,12 @@ class TestDFT(unittest.TestCase):
         rpa_results = rpa_exci.compute(task.molecule, task.ao_basis,
                                        scf_drv.scf_tensors)
 
-        exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
-        osc_str = rpa_results['oscillator_strengths']
+        if task.mpi_rank == mpi_master():
+            exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
+            osc_str = rpa_results['oscillator_strengths']
 
-        self.assertTrue(np.max(np.abs(exc_ene - rpa_ref[:, 0])) < 5.0e-4)
-        self.assertTrue(np.max(np.abs(osc_str - rpa_ref[:, 1])) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(exc_ene - rpa_ref[:, 0])) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(osc_str - rpa_ref[:, 1])) < 1.0e-4)
 
     def test_bhandhlyp(self):
 
