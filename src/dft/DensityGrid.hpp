@@ -11,10 +11,12 @@
 
 #include <cstdint>
 #include <ostream>
+#include <vector>
 
 #include "MemBlock2D.hpp"
 #include "DensityGridType.hpp"
 #include "XCFuncType.hpp"
+#include "MolecularGrid.hpp"
 
 /**
  Class CDensityGrid class implements density grid.
@@ -117,6 +119,23 @@ public:
     void zero();
     
     /**
+     Reduces number of grid points by slicing off all grid points beoynd specific number of grid points.
+
+     @param nGridPoints the number of grid points. 
+     */
+    void slice(const int32_t nGridPoints);
+    
+    /**
+     Updates beta densites (density, it's gradient components) by assigning alpha density values.
+     */
+    void updateBetaDensities();
+    
+    /**
+     Computes density norms.
+     */
+    void computeDensityNorms();
+    
+    /**
      Gets number of grid points in density grid object.
      
      @return the number of grid points.
@@ -129,6 +148,13 @@ public:
      @return the number of density matrices.
      */
     int32_t getNumberOfDensityMatrices() const;
+    
+    /**
+     Gets type of density grid type object.
+
+     @return the type of density grid. 
+     */
+    dengrid getDensityGridType() const;
     
     /**
      Gets constant pointer to alpha density values.
@@ -211,6 +237,133 @@ public:
     double* mixedDensityGradient(const int32_t iDensityMatrix);
     
     /**
+     Gets constant pointer to alpha density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient X values.
+     */
+    const double* alphaDensityGradientX(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to alpha density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient X values.
+     */
+    double* alphaDensityGradientX(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to alpha density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Y values.
+     */
+    const double* alphaDensityGradientY(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to alpha density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Y values.
+     */
+    double* alphaDensityGradientY(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to alpha density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Z values.
+     */
+    const double* alphaDensityGradientZ(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to alpha density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha density gradient Z values.
+     */
+    double* alphaDensityGradientZ(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to beta density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient X values.
+     */
+    const double* betaDensityGradientX(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient X values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient X values.
+     */
+    double* betaDensityGradientX(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to beta density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Y values.
+     */
+    const double* betaDensityGradientY(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient Y values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Y values.
+     */
+    double* betaDensityGradientY(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* betaDensityGradientZ(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* betaDensityGradientZ(const int32_t iDensityMatrix);
+    
+    /**
+     Generates pair of screened molecular and density grids by removing grid points with specific density/density
+     gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
+     
+     @param densityGrid the screened density grid.
+     @param molecularGrid the screened molecular grid.
+     @param iDensityMatrix the index of density matrix.
+     @param densityThreshold the screening threshold for density values.
+     @param xcFuncType the type of exchange-correlation functional.
+     */
+    void getScreenedGridsPair(      CDensityGrid&   densityGrid,
+                                    CMolecularGrid& molecularGrid,
+                              const int32_t         iDensityMatrix,
+                              const double          densityThreshold,
+                              const xcfun           xcFuncType) const;
+    
+    /**
+     Generates screened molecular grid from given molecular grid by removing grid points with specific density/density
+     gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
+
+     @param molecularGrids the molecular grid.
+     @param densityThreshold the density/density gradient screening threshold.
+     @param iDensityMatrix the index of density matrix.
+     @param xcFuncType the type of exchange-correlation functional.
+     @return the screened molecular grid.
+     */
+    CMolecularGrid getScreenedGrid(      CMolecularGrid& molecularGrids,
+                                   const int32_t         iDensityMatrix,
+                                   const double          densityThreshold,
+                                   const xcfun           xcFuncType) const;
+    
+    /**
      Converts density grid object to text and insert it into output text
      stream.
      
@@ -219,6 +372,5 @@ public:
      */
     friend std::ostream& operator<<(std::ostream& output, const CDensityGrid& source);
 };
-
 
 #endif /* DensityGrid_hpp */

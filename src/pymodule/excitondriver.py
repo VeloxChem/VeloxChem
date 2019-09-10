@@ -9,12 +9,15 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import GridDriver
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import get_dimer_ao_indices
+from .veloxchemlib import parse_xc_func
 from .molecule import Molecule
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
@@ -48,6 +51,12 @@ class ExcitonModelDriver:
         The electron repulsion integrals screening scheme.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
+    :param dft:
+        The flag for running DFT.
+    :param grid_level:
+        The accuracy level of DFT grid.
+    :param xcfun_label:
+        The name of XC functional.
     :param scf_conv_thresh:
         The convergence threshold for the SCF driver.
     :param scf_max_iter:
@@ -102,6 +111,11 @@ class ExcitonModelDriver:
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-12
 
+        # dft settings
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun_label = 'Undefined'
+
         # scf settings
         self.scf_conv_thresh = 1.0e-6
         self.scf_max_iter = 150
@@ -124,7 +138,7 @@ class ExcitonModelDriver:
         # checkpoint file
         self.checkpoint_file = None
 
-    def update_settings(self, exciton_dict):
+    def update_settings(self, exciton_dict, method_dict={}):
         """
         Updates settings in exciton model driver.
 
@@ -155,6 +169,16 @@ class ExcitonModelDriver:
 
         if 'checkpoint_file' in exciton_dict:
             self.checkpoint_file = exciton_dict['checkpoint_file']
+
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key == 'yes' else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun_label = method_dict['xcfun']
 
     def compute(self, molecule, basis, min_basis):
         """
@@ -269,14 +293,24 @@ class ExcitonModelDriver:
                                angmom_mats.y_to_numpy(),
                                angmom_mats.z_to_numpy())
 
+            if self.dft:
+                method_dict = {
+                    'dft': 'yes',
+                    'grid_level': self.grid_level,
+                    'xcfun': self.xcfun_label
+                }
+            else:
+                method_dict = {'dft': 'no'}
+
             # SCF calculation
             scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-            scf_drv.update_settings({
-                'qq_type': self.qq_type,
-                'eri_thresh': self.eri_thresh,
-                'conv_thresh': self.scf_conv_thresh,
-                'max_iter': self.scf_max_iter,
-            })
+            scf_drv.update_settings(
+                {
+                    'qq_type': self.qq_type,
+                    'eri_thresh': self.eri_thresh,
+                    'conv_thresh': self.scf_conv_thresh,
+                    'max_iter': self.scf_max_iter,
+                }, method_dict)
             scf_drv.compute(monomer, basis, min_basis)
 
             if self.rank == mpi_master():
@@ -287,14 +321,15 @@ class ExcitonModelDriver:
                 self.eri_thresh = scf_drv.eri_thresh
 
             # TDA calculation
-            abs_spec = Absorption({
-                'tamm_dancoff': 'yes',
-                'nstates': self.nstates,
-                'qq_type': self.qq_type,
-                'eri_thresh': self.eri_thresh,
-                'conv_thresh': self.tda_conv_thresh,
-                'max_iter': self.tda_max_iter,
-            })
+            abs_spec = Absorption(
+                {
+                    'tamm_dancoff': 'yes',
+                    'nstates': self.nstates,
+                    'qq_type': self.qq_type,
+                    'eri_thresh': self.eri_thresh,
+                    'conv_thresh': self.tda_conv_thresh,
+                    'max_iter': self.tda_max_iter,
+                }, method_dict)
             abs_spec.init_driver(self.comm, self.ostream)
             abs_spec.compute(monomer, basis, scf_drv.scf_tensors)
 
@@ -374,6 +409,21 @@ class ExcitonModelDriver:
                 angmom_drv.set_origin(*self.center_of_mass)
                 angmom_mats = angmom_drv.compute(dimer, basis)
 
+                # dft grid
+                if self.dft:
+                    grid_drv = GridDriver(self.comm)
+                    grid_drv.set_level(self.grid_level)
+
+                    grid_t0 = tm.time()
+                    dimer_molgrid = grid_drv.generate(dimer)
+                    n_grid_points = dimer_molgrid.number_of_points()
+                    dimer_molgrid.distribute(self.rank, self.nodes, self.comm)
+                    self.ostream.print_info(
+                        'Molecular grid with {} points generated in {:.2f} sec.'
+                        .format(n_grid_points,
+                                tm.time() - grid_t0))
+                    self.ostream.print_blank()
+
                 if self.rank == mpi_master():
                     dipole_ints = (dipole_mats.x_to_numpy(),
                                    dipole_mats.y_to_numpy(),
@@ -444,7 +494,17 @@ class ExcitonModelDriver:
 
                 # compute Fock matrix
                 fock_mat = AOFockMatrix(dens_mat)
-                fock_mat.set_fock_type(fockmat.restjk, 0)
+
+                if self.dft:
+                    xcfun = parse_xc_func(self.xcfun_label.upper())
+                    if xcfun.is_hybrid():
+                        fock_mat.set_fock_type(fockmat.restjkx, 0)
+                        fock_mat.set_scale_factor(
+                            xcfun.get_frac_exact_exchange(), 0)
+                    else:
+                        fock_mat.set_fock_type(fockmat.restj, 0)
+                else:
+                    fock_mat.set_fock_type(fockmat.restjk, 0)
 
                 eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
                 screening = eri_drv.compute(get_qq_scheme(self.qq_type),
@@ -452,23 +512,40 @@ class ExcitonModelDriver:
                 eri_drv.compute(fock_mat, dens_mat, dimer, basis, screening)
                 fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
+                if self.dft:
+                    if not xcfun.is_hybrid():
+                        fock_mat.scale(2.0, 0)
+
+                    xc_drv = XCIntegrator(self.comm)
+                    vxc_mat = xc_drv.integrate(dens_mat, dimer, basis,
+                                               dimer_molgrid, self.xcfun_label)
+                    vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
                 if self.rank == mpi_master():
+
+                    # compute dimer energy
+
                     hcore = kin_mat.to_numpy() - npot_mat.to_numpy()
                     fock = hcore + fock_mat.to_numpy(0)
 
-                    # compute Fock in MO basis
-                    fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
-                    fock_occ = fock_mo[:nocc, :nocc]
-                    fock_vir = fock_mo[nocc:, nocc:]
-
-                    # compute dimer energy
                     dimer_energy = dimer.nuclear_repulsion_energy()
                     dimer_energy += np.sum(dens * (hcore + fock))
+                    if self.dft:
+                        dimer_energy += vxc_mat.get_energy()
 
                     valstr = 'Dimer Energy:{:20.10f} au'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(92))
                     self.ostream.print_blank()
                     self.ostream.flush()
+
+                    # compute Fock in MO basis
+
+                    if self.dft:
+                        fock += vxc_mat.get_matrix().to_numpy()
+
+                    fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
+                    fock_occ = fock_mo[:nocc, :nocc]
+                    fock_vir = fock_mo[nocc:, nocc:]
 
                     # assemble TDA CI vectors
 
@@ -569,10 +646,25 @@ class ExcitonModelDriver:
                 tdens_mat.broadcast(self.rank, self.comm)
 
                 tfock_mat = AOFockMatrix(tdens_mat)
+
+                if self.dft:
+                    if xcfun.is_hybrid():
+                        fock_flag = fockmat.rgenjkx
+                        fact_xc = xcfun.get_frac_exact_exchange()
+                        for s in range(tfock_mat.number_of_fock_matrices()):
+                            tfock_mat.set_scale_factor(fact_xc, s)
+                    else:
+                        fock_flag = fockmat.rgenj
+                else:
+                    fock_flag = fockmat.rgenjk
+
                 for s in range(tfock_mat.number_of_fock_matrices()):
-                    tfock_mat.set_fock_type(fockmat.rgenjk, s)
+                    tfock_mat.set_fock_type(fock_flag, s)
 
                 eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
+                if self.dft:
+                    xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer,
+                                     basis, dimer_molgrid, self.xcfun_label)
                 tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
                 if self.rank == mpi_master():

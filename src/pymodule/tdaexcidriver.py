@@ -7,14 +7,27 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import TDASigmaVectorDriver
+from .veloxchemlib import AODensityMatrix
+from .veloxchemlib import AOFockMatrix
+#from .veloxchemlib import TDASigmaVectorDriver
+from .veloxchemlib import GridDriver
+from .veloxchemlib import MolecularGrid
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import molorb
+from .veloxchemlib import denmat
+from .veloxchemlib import fockmat
 from .veloxchemlib import rotatory_strength_in_cgs
-from .qqscheme import get_qq_scheme
+from .veloxchemlib import parse_xc_func
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
+from .qqscheme import get_qq_scheme
+from .qqscheme import get_qq_type
+from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import write_rsp_hdf5
+from .errorhandler import assert_msg_critical
 
 
 class TDAExciDriver:
@@ -28,6 +41,16 @@ class TDAExciDriver:
         The triplet excited states flag.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
+    :param qq_type:
+        The electron repulsion integrals screening scheme.
+    :param dft:
+        The flag for running DFT.
+    :param grid_level:
+        The accuracy level of DFT grid.
+    :param xcfun:
+        The XC functional.
+    :param molgrid:
+        The molecular grid.
     :param conv_thresh:
         The excited states convergence threshold.
     :param max_iter:
@@ -44,6 +67,10 @@ class TDAExciDriver:
         The number of MPI processes.
     :param ostream:
         The output stream.
+    :param restart:
+        The flag for restarting from checkpoint file.
+    :param checkpoint_file:
+        The name of checkpoint file.
     """
 
     def __init__(self, comm, ostream):
@@ -64,6 +91,12 @@ class TDAExciDriver:
         self.eri_thresh = 1.0e-15
         self.qq_type = 'QQ_DEN'
 
+        # dft
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
+        self.molgrid = MolecularGrid()
+
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
@@ -79,28 +112,53 @@ class TDAExciDriver:
         # output stream
         self.ostream = ostream
 
-    def update_settings(self, settings):
+        # restart information
+        self.restart = True
+        self.checkpoint_file = None
+
+    def update_settings(self, rsp_dict, method_dict={}):
         """
-        Updates settings in TDA excited states computation driver.
+        Updates response and method settings in TDA excited states computation
+        driver.
 
-        :param settings:
-            The settings for the driver.
+        :param rsp_dict:
+            The dictionary of response dict.
+        :param method_dict:
+            The dictionary of method settings.
         """
 
-        if 'nstates' in settings:
-            self.nstates = settings['nstates']
-        if 'spin' in settings:
-            self.triplet = (settings['spin'][0].upper() == 'T')
+        if 'nstates' in rsp_dict:
+            self.nstates = int(rsp_dict['nstates'])
+        if 'spin' in rsp_dict:
+            self.triplet = (rsp_dict['spin'][0].upper() == 'T')
 
-        if 'eri_thresh' in settings:
-            self.eri_thresh = settings['eri_thresh']
-        if 'qq_type' in settings:
-            self.qq_type = settings['qq_type']
+        if 'eri_thresh' in rsp_dict:
+            self.eri_thresh = float(rsp_dict['eri_thresh'])
+        if 'qq_type' in rsp_dict:
+            self.qq_type = rsp_dict['qq_type'].upper()
 
-        if 'conv_thresh' in settings:
-            self.conv_thresh = settings['conv_thresh']
-        if 'max_iter' in settings:
-            self.max_iter = settings['max_iter']
+        if 'conv_thresh' in rsp_dict:
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
+        if 'max_iter' in rsp_dict:
+            self.max_iter = int(rsp_dict['max_iter'])
+
+        if 'restart' in rsp_dict:
+            key = rsp_dict['restart'].lower()
+            self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in rsp_dict:
+            self.checkpoint_file = rsp_dict['checkpoint_file']
+
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key == 'yes' else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Undefined XC functional')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -127,14 +185,40 @@ class TDAExciDriver:
         else:
             mol_orbs = MolecularOrbitals()
 
+        if self.rank == mpi_master():
+            self.print_header()
+
         # set start time
 
         start_time = tm.time()
+
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            self.molgrid = grid_drv.generate(molecule)
+            n_grid_points = self.molgrid.number_of_points()
+            self.molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+
+        if self.dft:
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            dft_func_label = 'HF'
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
 
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, basis)
+
+        if self.dft:
+            xc_drv = XCIntegrator(self.comm)
 
         # set up trial excitation vectors on master node
 
@@ -142,25 +226,70 @@ class TDAExciDriver:
 
         # initalize sigma vectors driver
 
-        a2x_drv = TDASigmaVectorDriver(self.comm)
+        #a2x_drv = TDASigmaVectorDriver(self.comm)
 
         # block Davidson algorithm setup
 
         self.solver = BlockDavidsonSolver()
 
+        # read initial guess from restart file
+
+        n_restart_vectors = 0
+        n_restart_iterations = 0
+
+        if self.restart:
+            if self.rank == mpi_master():
+                rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
+                    self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
+                    molecule.nuclear_repulsion_energy(),
+                    molecule.elem_ids_to_numpy(), basis.get_label(),
+                    dft_func_label, self.ostream)
+                self.restart = (rst_trial_mat is not None and
+                                rst_sig_mat is not None)
+                if rst_trial_mat is not None:
+                    n_restart_vectors = rst_trial_mat.shape[1]
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
+            n_restart_vectors = self.comm.bcast(n_restart_vectors,
+                                                root=mpi_master())
+            n_restart_iterations = n_restart_vectors // self.nstates
+            if n_restart_vectors % self.nstates != 0:
+                n_restart_iterations += 1
+
+        # start TDA iteration
+
         for i in range(self.max_iter):
 
             # perform linear transformation of trial vectors
 
-            sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
-                                       mol_orbs, molecule, basis)
+            if i >= n_restart_iterations:
+                #sig_vecs = a2x_drv.compute(trial_vecs, self.triplet, qq_data,
+                #                           self.molgrid, self.xcfun, mol_orbs,
+                #                           molecule, basis)
+
+                fock, tdens, gsdens = self.get_densities(
+                    trial_vecs, scf_tensors, molecule)
+
+                eri_drv.compute(fock, tdens, molecule, basis, qq_data)
+                if self.dft:
+                    xc_drv.integrate(fock, tdens, gsdens, molecule, basis,
+                                     self.molgrid, self.xcfun.get_func_label())
+                fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             # solve eigenvalues problem on master node
 
             if self.rank == mpi_master():
 
-                sig_mat = self.convert_to_sigma_matrix(sig_vecs)
-                trial_mat = self.convert_to_trial_matrix(trial_vecs)
+                if i >= n_restart_iterations:
+                    trial_mat = self.convert_to_trial_matrix(trial_vecs)
+                    sig_mat = self.get_sigmas(fock, scf_tensors, molecule,
+                                              trial_mat)
+                else:
+                    istart = i * self.nstates
+                    iend = (i + 1) * self.nstates
+                    if iend > n_restart_vectors:
+                        iend = n_restart_vectors
+                    sig_mat = np.copy(rst_sig_mat[:, istart:iend])
+                    trial_mat = np.copy(rst_trial_mat[:, istart:iend])
 
                 self.solver.add_iteration_data(sig_mat, trial_mat, i)
 
@@ -168,7 +297,18 @@ class TDAExciDriver:
 
                 self.print_iter_data(i)
 
-                self.update_trial_vectors(trial_vecs, zvecs)
+                trial_vecs = self.convert_to_trial_vectors(
+                    mol_orbs, molecule, zvecs)
+
+                if i >= n_restart_iterations:
+                    trials = self.solver.trial_matrices
+                    sigmas = self.solver.sigma_matrices
+                    write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
+                                   ['TDA_trials', 'TDA_sigmas'],
+                                   molecule.nuclear_repulsion_energy(),
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label(), dft_func_label,
+                                   self.ostream)
 
             # check convergence
 
@@ -176,6 +316,10 @@ class TDAExciDriver:
 
             if self.is_converged:
                 break
+
+        if self.rank == mpi_master():
+            assert_msg_critical(self.is_converged,
+                                'TDA driver: failed to converge')
 
         # compute 1e dipole integrals
 
@@ -336,6 +480,113 @@ class TDAExciDriver:
 
         return None
 
+    def convert_to_trial_vectors(self, mol_orbs, molecule, zvecs):
+        """
+        Converts set of Z vectors from numpy 2D array to
+        std::vector<CExcitationVector>.
+
+        :param mol_orbs:
+            The molecular orbitals.
+        :param molecule:
+            The molecule.
+        :param trial_vecs:
+            The Z vectors as 2D numpy array.
+
+        :return:
+            The Z vectors as std::vector<CExcitationVector>.
+        """
+
+        nocc = molecule.number_of_electrons() // 2
+        norb = mol_orbs.number_mos()
+
+        trial_vecs = []
+        for i in range(zvecs.shape[1]):
+            trial_vecs.append(
+                ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True))
+            for j in range(zvecs.shape[0]):
+                trial_vecs[i].set_zcoefficient(zvecs[j, i], j)
+
+        return trial_vecs
+
+    def get_densities(self, trial_vecs, tensors, molecule):
+
+        # form transition densities
+
+        if self.rank == mpi_master():
+            nocc = molecule.number_of_electrons() // 2
+            norb = tensors['C'].shape[1]
+            nvir = norb - nocc
+            mo_occ = tensors['C'][:, :nocc]
+            mo_vir = tensors['C'][:, nocc:]
+            ao_mats = []
+            for vec in trial_vecs:
+                mat = vec.zvector_to_numpy().reshape(nocc, nvir)
+                mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
+                ao_mats.append(mat)
+            tdens = AODensityMatrix(ao_mats, denmat.rest)
+        else:
+            tdens = AODensityMatrix()
+        tdens.broadcast(self.rank, self.comm)
+
+        # initialize Fock matrices
+
+        fock = AOFockMatrix(tdens)
+
+        if self.dft:
+            if self.xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = self.xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj
+        else:
+            fock_flag = fockmat.rgenjk
+
+        for i in range(fock.number_of_fock_matrices()):
+            fock.set_fock_type(fock_flag, i)
+
+        # broadcast ground state density
+
+        if self.dft:
+            if self.rank == mpi_master():
+                gsdens = AODensityMatrix([tensors['D'][0]], denmat.rest)
+            else:
+                gsdens = AODensityMatrix()
+            gsdens.broadcast(self.rank, self.comm)
+        else:
+            gsdens = None
+
+        return fock, tdens, gsdens
+
+    def get_sigmas(self, fock, tensors, molecule, trial_mat):
+
+        nocc = molecule.number_of_electrons() // 2
+        norb = tensors['C'].shape[1]
+        nvir = norb - nocc
+        mo_occ = tensors['C'][:, :nocc]
+        mo_vir = tensors['C'][:, nocc:]
+        orb_ene = tensors['E']
+
+        sigma_vecs = []
+        for fockind in range(fock.number_of_fock_matrices()):
+            # 2e contribution
+            #prefactor = -1.0 if self.triplet else 1.0
+            #mat = prefactor * fock.to_numpy(fockind)
+            mat = fock.to_numpy(fockind)
+            mat = np.matmul(mo_occ.T, np.matmul(mat, mo_vir))
+            # 1e contribution
+            cjb = trial_mat[:, fockind].reshape(nocc, nvir)
+            mat += np.matmul(cjb, np.diag(orb_ene[nocc:]).T)
+            mat -= np.matmul(np.diag(orb_ene[:nocc]), cjb)
+            sigma_vecs.append(mat.reshape(nocc * nvir, 1))
+
+        sigma_mat = sigma_vecs[0]
+        for vec in sigma_vecs[1:]:
+            sigma_mat = np.hstack((sigma_mat, vec))
+
+        return sigma_mat
+
     def comp_dipole_ints(self, molecule, basis):
         """
         Computes one-electron dipole integrals.
@@ -428,6 +679,10 @@ class TDAExciDriver:
 
             trans_dipole = np.array(
                 [np.vdot(trans_dens, dipole_ints[d]) for d in range(3)])
+
+            if self.triplet:
+                trans_dipole = np.zeros(3)
+
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -461,6 +716,10 @@ class TDAExciDriver:
 
             trans_dipole = -1.0 / eigvals[s] * np.array(
                 [np.vdot(trans_dens, linmom_ints[d]) for d in range(3)])
+
+            if self.triplet:
+                trans_dipole = np.zeros(3)
+
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -491,6 +750,10 @@ class TDAExciDriver:
 
             trans_dipole = 0.5 * np.array(
                 [np.vdot(trans_dens, angmom_ints[d]) for d in range(3)])
+
+            if self.triplet:
+                trans_dipole = np.zeros(3)
+
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -539,6 +802,45 @@ class TDAExciDriver:
 
         return rotatory_strengths
 
+    def print_header(self):
+        """
+        Prints TDA driver setup header to output stream.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header("TDA Driver Setup")
+        self.ostream.print_header(18 * "=")
+        self.ostream.print_blank()
+
+        str_width = 60
+
+        cur_str = "Number of States          : " + str(self.nstates)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "Max. Number of Iterations : " + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "Convergence Threshold     : " + \
+            "{:.1e}".format(self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = "ERI Screening Scheme      : " + get_qq_type(self.qq_type)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = "ERI Screening Threshold   : " + \
+            "{:.1e}".format(self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
+        if self.dft:
+            cur_str = "Exchange-Correlation Functional : "
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = "Molecular Grid Level            : " + str(
+                self.grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
+        self.ostream.flush()
+
     def print_iter_data(self, iteration):
         """
         Prints excited states solver iteration data to output stream.
@@ -578,52 +880,12 @@ class TDAExciDriver:
             The start time of SCF calculation.
         """
 
-        self.ostream.print_blank()
-
         valstr = "*** {:d} excited states ".format(self.nstates)
         if self.is_converged:
             valstr += "converged"
         else:
-            valstr += "not converged"
+            valstr += "NOT converged"
         valstr += " in {:d} iterations. ".format(self.cur_iter + 1)
         valstr += "Time: {:.2f}".format(tm.time() - start_time) + " sec."
         self.ostream.print_header(valstr.ljust(92))
-
-        reigs, rnorms = self.solver.get_eigenvalues()
-
-        for i in range(reigs.shape[0]):
-            self.print_state_information(i, reigs[i], rnorms[i])
-
-    def print_state_information(self, iteration, eigval, rnorm):
-        """
-        Prints excited state information to output stream.
-
-        :param iteration:
-            The current excited states solver iteration.
-        :param eigval:
-            The excitation energy.
-        :param rnorm:
-            The residual norm.
-        """
-
-        self.ostream.print_blank()
-
-        valstr = "Excited State No.{:3d}:".format(iteration + 1)
-        self.ostream.print_header(valstr.ljust(92))
-        valstr = 21 * "-"
-        self.ostream.print_header(valstr.ljust(92))
-
-        valstr = "Excitation Type   : "
-        if self.triplet:
-            valstr += "Triplet"
-        else:
-            valstr += "Singlet"
-        self.ostream.print_header(valstr.ljust(92))
-
-        valstr = "Excitation Energy : {:5.8f} au".format(eigval)
-        self.ostream.print_header(valstr.ljust(92))
-
-        valstr = "Residual Norm     : {:3.8f} au".format(rnorm)
-        self.ostream.print_header(valstr.ljust(92))
-
         self.ostream.print_blank()

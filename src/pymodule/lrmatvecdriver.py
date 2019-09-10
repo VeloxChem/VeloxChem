@@ -1,5 +1,7 @@
+from os.path import isfile
 import numpy as np
 import itertools
+import h5py
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -8,6 +10,7 @@ from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
@@ -40,7 +43,15 @@ class LinearResponseMatrixVectorDriver:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-    def e2n(self, vecs, tensors, screening, molecule, basis):
+    def e2n(self,
+            vecs,
+            tensors,
+            screening,
+            molecule,
+            basis,
+            dft=None,
+            xcfun=None,
+            molgrid=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -54,6 +65,12 @@ class LinearResponseMatrixVectorDriver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param dft:
+            The DFT flag if true compute XC contribution, if false otherwise.
+        :param xcfun:
+            The exchange correlation functional.
+        :param molgrid:
+            The molecular grid for XC contributtion computation.
 
         :return:
             The E2 b matrix vector product.
@@ -91,7 +108,8 @@ class LinearResponseMatrixVectorDriver:
         else:
             dks = None
 
-        fks = self.get_two_el_fock(dks, screening, molecule, basis)
+        fks = self.get_two_el_fock(dks, screening, molecule, basis, tensors,
+                                   dft, xcfun, molgrid)
 
         if self.rank == mpi_master():
             gv = np.zeros(vecs.shape)
@@ -113,7 +131,15 @@ class LinearResponseMatrixVectorDriver:
         else:
             return None
 
-    def get_two_el_fock(self, dabs, screening, molecule, basis):
+    def get_two_el_fock(self,
+                        dabs,
+                        screening,
+                        molecule,
+                        basis,
+                        tensors=None,
+                        dft=False,
+                        xcfun=None,
+                        molgrid=None):
         """
         Computes two electron contribution to Fock.
 
@@ -125,6 +151,14 @@ class LinearResponseMatrixVectorDriver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param dft:
+            The DFT flag if true compute XC contribution, if false otherwise.
+        :param xcfun:
+            The exchange correlation functional.
+        :param molgrid:
+            The molecular grid for XC contributtion computation.
 
         :return:
             The tuple containing alpha and beta Fock matrices.
@@ -157,11 +191,35 @@ class LinearResponseMatrixVectorDriver:
         # Note: skip spin density for restricted case
         # for i in range(len(dabs)):
         #    fock.set_fock_type(fockmat.rgenjk, i)
+        fock_flag = fockmat.rgenjk
+        if dft:
+            if xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj
         for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fockmat.rgenjk, i)
+            fock.set_fock_type(fock_flag, i)
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         eri_drv.compute(fock, dens, molecule, basis, screening)
+
+        # add XC contribution to Fock
+        if dft:
+            if self.rank == mpi_master():
+                dgs = []
+                dgs.append(tensors['D'][0])
+                dengs = AODensityMatrix(dgs, denmat.rest)
+            else:
+                dengs = AODensityMatrix()
+            dengs.broadcast(self.rank, self.comm)
+
+            xc_drv = XCIntegrator(self.comm)
+            xc_drv.integrate(fock, dens, dengs, molecule, basis, molgrid,
+                             xcfun.get_func_label())
+
         fock.reduce_sum(self.rank, self.nodes, self.comm)
 
         fabs = []
@@ -199,6 +257,9 @@ class LinearResponseMatrixVectorDriver:
         :return:
             The S2 b matrix vector product.
         """
+
+        if not vecs.any():
+            return np.zeros(vecs.shape)
 
         assert_msg_critical(
             len(vecs.shape) == 2,
@@ -491,3 +552,138 @@ def swap_xy(xy):
         yx[half_rows:, :] = xy[:half_rows, :]
 
     return yx
+
+
+def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
+                   dft_func_label, ostream):
+    """
+    Writes response vectors to checkpoint file. Nuclear charges and basis
+    set can also be written to the checkpoint file.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param arrays:
+        The response vectors.
+    :param labels:
+        The list of labels for trial vecotrs and transformed vectors.
+    :param e_nuc:
+        Nuclear repulsion energy.
+    :param nuclear_charges:
+        Nuclear charges of the molecule.
+    :param basis_set:
+        Name of the AO basis set.
+    :param dft_func_label:
+        Name of the density functional.
+    :param ostream:
+        The output stream.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str))
+
+    if not valid_checkpoint:
+        return
+
+    hf = h5py.File(fname, 'w')
+
+    for label, array in zip(labels, arrays):
+        hf.create_dataset(label, data=array, compression="gzip")
+
+    hf.create_dataset('nuclear_repulsion',
+                      data=np.array([e_nuc]),
+                      compression='gzip')
+
+    hf.create_dataset('nuclear_charges',
+                      data=nuclear_charges,
+                      compression='gzip')
+
+    hf.create_dataset('basis_set',
+                      data=np.string_([basis_set]),
+                      compression='gzip')
+
+    hf.create_dataset('dft_func_label',
+                      data=np.string_([dft_func_label]),
+                      compression='gzip')
+
+    hf.close()
+
+    checkpoint_text = 'Checkpoint written to file: '
+    checkpoint_text += fname
+    ostream.print_info(checkpoint_text)
+    ostream.print_blank()
+
+
+def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
+                  dft_func_label, ostream):
+    """
+    Reads response vectors from checkpoint file. Nuclear charges and basis
+    set will be used to validate the checkpoint file.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param labels:
+        The list of labels for trial vecotrs and transformed vectors.
+    :param e_nuc:
+        Nuclear repulsion energy.
+    :param nuclear_charges:
+        Nuclear charges of the molecule.
+    :param basis_set:
+        Name of the AO basis set.
+    :param dft_func_label:
+        Name of the density functional.
+    :param ostream:
+        The output stream.
+
+    :return:
+        The trial vectors and transformed vectors.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and isfile(fname))
+
+    if not valid_checkpoint:
+        return tuple([None] * len(labels))
+
+    hf = h5py.File(fname, 'r')
+
+    match_nuclear_repulsion = False
+    if 'nuclear_repulsion' in hf:
+        h5_e_nuc = np.array(hf.get('nuclear_repulsion'))[0]
+        if h5_e_nuc > 0.0 and e_nuc > 0.0:
+            match_nuclear_repulsion = (abs(1.0 - h5_e_nuc / e_nuc) < 1.0e-13)
+        else:
+            match_nuclear_repulsion = (h5_e_nuc == e_nuc)
+
+    match_nuclear_charges = False
+    if 'nuclear_charges' in hf:
+        h5_nuclear_charges = np.array(hf.get('nuclear_charges'))
+        if h5_nuclear_charges.shape == nuclear_charges.shape:
+            match_nuclear_charges = (
+                h5_nuclear_charges == nuclear_charges).all()
+
+    match_basis_set = False
+    if 'basis_set' in hf:
+        h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
+        match_basis_set = (h5_basis_set.upper() == basis_set.upper())
+
+    match_dft_func = False
+    if 'dft_func_label' in hf:
+        h5_func_label = hf.get('dft_func_label')[0].decode('utf-8')
+        match_dft_func = (h5_func_label.upper() == dft_func_label.upper())
+
+    arrays = [None] * len(labels)
+
+    if (match_nuclear_repulsion and match_nuclear_charges and
+            match_basis_set and match_dft_func):
+        for i in range(len(labels)):
+            if labels[i] in hf.keys():
+                arrays[i] = np.array(hf.get(labels[i]))
+
+    hf.close()
+
+    is_empty = [a is None for a in arrays]
+    if True not in is_empty:
+        checkpoint_text = 'Restarting from checkpoint file: '
+        checkpoint_text += fname
+        ostream.print_info(checkpoint_text)
+        ostream.print_blank()
+
+    return tuple(arrays)

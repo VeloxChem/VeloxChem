@@ -6,34 +6,39 @@ class Absorption(ResponseProperty):
     """
     Implements the absorption property.
 
-    :param rsp_input:
+    :param rsp_dict:
         The dictionary of response input.
+    :param method_dict:
+        The dictionary of method settings.
     :param rsp_property:
         The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict):
+    def __init__(self, rsp_dict, method_dict={}):
         """
         Initializes the absorption property.
 
         :param rsp_dict:
             The dictionary of response input.
+        :param method_dict:
+            The dictionary of method settings.
         """
 
-        rsp_input = dict(rsp_dict)
+        rsp_dict = dict(rsp_dict)
+        method_dict = dict(method_dict)
 
-        rsp_input['property'] = 'absorption'
-        rsp_input['response'] = 'linear'
-        rsp_input['residue'] = 'single'
+        rsp_dict['property'] = 'absorption'
+        rsp_dict['response'] = 'linear'
+        rsp_dict['residue'] = 'single'
 
         if 'nstates' not in rsp_dict:
-            rsp_input['nstates'] = '3'
+            rsp_dict['nstates'] = '3'
         if 'tamm_dancoff' not in rsp_dict:
-            rsp_input['tamm_dancoff'] = 'no'
+            rsp_dict['tamm_dancoff'] = 'no'
         if 'spin' not in rsp_dict:
-            rsp_input['spin'] = 'singlet'
+            rsp_dict['spin'] = 'singlet'
 
-        super().__init__(rsp_input)
+        super().__init__(rsp_dict, method_dict)
 
     def get_property(self, key):
         """
@@ -57,7 +62,7 @@ class Absorption(ResponseProperty):
         """
 
         ostream.print_blank()
-        spin_str = 'T' if self.rsp_input['spin'][0].upper() == 'T' else 'S'
+        spin_str = 'T' if self.rsp_dict['spin'][0].upper() == 'T' else 'S'
 
         self.print_transition_dipoles(
             ostream, spin_str,

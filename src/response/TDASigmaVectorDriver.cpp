@@ -11,6 +11,7 @@
 #include "AOFockMatrix.hpp"
 #include "DensityMatrixType.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
+#include "XCIntegrator.hpp"
 
 CTDASigmaVectorDriver::CTDASigmaVectorDriver(MPI_Comm comm)
 {
@@ -30,6 +31,8 @@ std::vector<CDenseMatrix>
 CTDASigmaVectorDriver::compute(const std::vector<CExcitationVector>& zVectors,
                                const bool                            isTripletStates,
                                const CScreeningContainer&            screeningContainer,
+                               const CMolecularGrid&                 molecularGrid,
+                               const CXCFunctional&                  xcFunctional, 
                                const CMolecularOrbitals&             molecularOrbitals,
                                const CMolecule&                      molecule,
                                const CMolecularBasis&                basis) const
@@ -38,7 +41,8 @@ CTDASigmaVectorDriver::compute(const std::vector<CExcitationVector>& zVectors,
 
     _addCanonicalFockContribution(sig_vecs, zVectors, molecularOrbitals);
 
-    _addFirstOrderFockContribution(sig_vecs, zVectors, isTripletStates, screeningContainer, molecularOrbitals, molecule, basis);
+    _addFirstOrderFockContribution(sig_vecs, zVectors, isTripletStates, screeningContainer,
+                                   molecularGrid, xcFunctional, molecularOrbitals, molecule, basis);
 
     return sig_vecs;
 }
@@ -110,6 +114,8 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
                                                       const std::vector<CExcitationVector>& zVectors,
                                                       const bool                            isTripletStates,
                                                       const CScreeningContainer&            screeningContainer,
+                                                      const CMolecularGrid&                 molecularGrid,
+                                                      const CXCFunctional&                  xcFunctional,
                                                       const CMolecularOrbitals&             molecularOrbitals,
                                                       const CMolecule&                      molecule,
                                                       const CMolecularBasis&                basis) const
@@ -118,20 +124,42 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
 
     // create first order transformed density
 
-    CAODensityMatrix dmat;
+    CAODensityMatrix drwmat;
 
-    dmat.setDensityType(denmat::rgen);
+    drwmat.setDensityType(denmat::rgen);
 
     for (int32_t i = 0; i < nvecs; i++)
     {
-        dmat.append(zVectors[i].getDensityZ(molecularOrbitals));
+        drwmat.append(zVectors[i].getDensityZ(molecularOrbitals));
     }
 
-    dmat.broadcast(_locRank, _locComm);
+    drwmat.broadcast(_locRank, _locComm);
 
     // compute AO Fock matrices
 
-    CAOFockMatrix faomat(dmat);
+    CAOFockMatrix faomat(drwmat);
+    
+    // update AO Fock matrix type
+    
+    if (!xcFunctional.isUndefined())
+    {
+        if (xcFunctional.isHybridFunctional())
+        {
+            for (int32_t i = 0; i < nvecs; i++)
+            {
+                faomat.setFockType(fockmat::rgenjkx, i);
+                
+                faomat.setFockScaleFactor(xcFunctional.getFractionOfExactExchange(), i); 
+            }
+        }
+        else
+        {
+            for (int32_t i = 0; i < nvecs; i++)
+            {
+                faomat.setFockType(fockmat::rgenj, i);
+            }
+        }
+    }
 
     double fock_prefactor = 1.0;
 
@@ -144,11 +172,33 @@ CTDASigmaVectorDriver::_addFirstOrderFockContribution(std::vector<CDenseMatrix>&
             faomat.setFockType(fockmat::rgenk, i);
         }
     }
+    
+    // 2e-contribution to Fock matrix
 
     CElectronRepulsionIntegralsDriver eri_drv(_locComm);
 
-    eri_drv.compute(faomat, dmat, molecule, basis, screeningContainer);
-
+    eri_drv.compute(faomat, drwmat, molecule, basis, screeningContainer);
+    
+    // exchange-correlation contribution to Fock matrix
+    
+    if (!xcFunctional.isUndefined())
+    {
+        
+        // generate ground state density
+        
+        auto dgsmat = molecularOrbitals.getAODensity(molecule.getNumberOfElectrons());
+        
+        dgsmat.broadcast(_locRank, _locComm);
+        
+        // integrate functional hessian contribution 
+        
+        CXCIntegrator xcdrv(_locComm);
+        
+        xcdrv.integrate(faomat, drwmat, dgsmat, molecule, basis, molecularGrid, xcFunctional.getLabel());
+    }
+    
+    // collect full matrix
+    
     faomat.reduce_sum(_locRank, _locNodes, _locComm);
 
     // add contributions to sigma vectors on master node

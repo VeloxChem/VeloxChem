@@ -222,6 +222,142 @@ CElectronRepulsionIntegralsDriver::computeMaxQValues(      CVecMemBlock<double>*
 }
 
 void
+CElectronRepulsionIntegralsDriver::computeInMemory(const CMolecule&       molecule,
+                                                   const CMolecularBasis& aoBasis,
+                                                         double*          eriData) const
+{
+    auto natoms = molecule.getNumberOfAtoms();
+
+    auto max_angl = aoBasis.getMolecularMaxAngularMomentum(molecule);
+
+    int32_t nao = 0;
+
+    for (int32_t angl = 0; angl <= max_angl; angl++)
+    {
+        for (int32_t s = -angl; s <= angl; s++)
+        {
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+            {
+                int32_t idelem = molecule.getIdsElemental()[atomidx];
+
+                nao += aoBasis.getNumberOfBasisFunctions(idelem, angl);
+            }
+        }
+    }
+
+    int64_t nao2 = nao * nao;
+
+    CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-15);
+
+    CGtoPairsContainer kgtopairs(molecule, aoBasis, 1.0e-15);
+
+    auto nbra = bgtopairs.getNumberOfGtoPairsBlocks();
+
+    auto nket = kgtopairs.getNumberOfGtoPairsBlocks();
+
+    // loop over pairs of GTOs blocks
+
+    for (int32_t ibra = (nbra - 1); ibra >= 0; ibra--)
+    {
+        auto bpairs = bgtopairs.getGtoPairsBlock(ibra);
+
+        auto nrow = bpairs.getNumberOfScreenedContrPairs();
+
+        auto acomp = angmom::to_SphericalComponents(bpairs.getBraAngularMomentum());
+
+        auto bcomp = angmom::to_SphericalComponents(bpairs.getKetAngularMomentum());
+
+        auto ketoff = ibra; // make use of symmetry (bgtopairs == kgtopairs)
+
+        for (int32_t iket = (nket - 1); iket >= ketoff; iket--)
+        {
+            auto kpairs = kgtopairs.getGtoPairsBlock(iket);
+
+            bool symbk = (bpairs == kpairs);
+
+            auto ncol = kpairs.getNumberOfScreenedContrPairs();
+
+            auto ccomp = angmom::to_SphericalComponents(kpairs.getBraAngularMomentum());
+
+            auto dcomp = angmom::to_SphericalComponents(kpairs.getKetAngularMomentum());
+
+            auto ncomp = acomp * bcomp * ccomp * dcomp;
+
+            int32_t npairs = 0;
+
+            for (int32_t irow = 0; irow < nrow; irow++)
+            {
+                int32_t numcols = symbk ? (irow + 1) : ncol;
+
+                npairs += numcols;
+            }
+
+            CMemBlock<double> intsBatch(npairs * ncomp);
+
+            CTwoIntsDistribution distpat(intsBatch.data(), nrow, ncol, dist2e::batch);
+
+            CCauchySchwarzScreener qqdat;
+
+            _compElectronRepulsionForGtoPairsBlocks(distpat, qqdat, bpairs, kpairs);
+
+            for (int32_t irow = 0, intsId = 0; irow < nrow; irow++)
+            {
+                int32_t numcols = symbk ? (irow + 1) : ncol;
+
+                for (int32_t icol = 0; icol < numcols; icol++)
+                {
+                    for (int32_t i = 0; i < acomp; i++)
+                    {
+                        int32_t idp = (bpairs.getBraIdentifiers(i))[irow];
+
+                        for (int32_t j = 0; j < bcomp; j++)
+                        {
+                            int32_t idq = (bpairs.getKetIdentifiers(j))[irow];
+
+                            int64_t pq = idp * nao + idq;
+
+                            int64_t qp = idq * nao + idp;
+
+                            for (int32_t k = 0; k < ccomp; k++)
+                            {
+                                int32_t idr = (kpairs.getBraIdentifiers(k))[icol];
+
+                                for (int32_t l = 0; l < dcomp; l++, intsId++)
+                                {
+                                    int32_t ids = (kpairs.getKetIdentifiers(l))[icol];
+
+                                    int64_t rs = idr * nao + ids;
+
+                                    int64_t sr = ids * nao + idr;
+
+                                    auto fval = intsBatch.data()[intsId];
+
+                                    eriData[pq * nao2 + rs] = fval;
+
+                                    eriData[pq * nao2 + sr] = fval;
+
+                                    eriData[qp * nao2 + rs] = fval;
+
+                                    eriData[qp * nao2 + sr] = fval;
+
+                                    eriData[rs * nao2 + pq] = fval;
+
+                                    eriData[rs * nao2 + qp] = fval;
+
+                                    eriData[sr * nao2 + pq] = fval;
+
+                                    eriData[sr * nao2 + qp] = fval;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void
 CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(      CTwoIntsDistribution&   distPattern,
                                                                            const CCauchySchwarzScreener& intsScreener,
                                                                            const CGtoPairsBlock&         braGtoPairsBlock,

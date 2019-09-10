@@ -3,6 +3,7 @@ import numpy as np
 from .veloxchemlib import mpi_master
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
+from .veloxchemlib import fockmat
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
 
@@ -194,7 +195,7 @@ class ScfRestrictedDriver(ScfDriver):
 
             tmat = oao_mat.to_numpy()
 
-            fmo = np.matmul(tmat.transpose(), np.matmul(fock_mat, tmat))
+            fmo = np.matmul(tmat.T, np.matmul(fock_mat, tmat))
 
             eigs, evecs = np.linalg.eigh(fmo)
 
@@ -214,5 +215,24 @@ class ScfRestrictedDriver(ScfDriver):
         :return:
             The string for spin restricted closed shell SCF calculation.
         """
+        if self.dft:
+            return "Spin-Restricted Kohn-Sham"
 
         return "Spin-Restricted Hartree-Fock"
+
+    def update_fock_type(self, fock_mat):
+        """
+        Updates Fock matrix to fit selected functional in Kohn-Sham
+        calculations.
+
+        :param fock_mat:
+            The Fock/Kohn-Sham matrix.
+        """
+
+        if self.xcfun.is_hybrid():
+            fock_mat.set_fock_type(fockmat.restjkx, 0)
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0)
+        else:
+            fock_mat.set_fock_type(fockmat.restj, 0)
+
+        return

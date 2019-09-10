@@ -9,9 +9,10 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
-from .veloxchemlib import DensityGridDriver
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
-from .veloxchemlib import to_xcfun
+from .veloxchemlib import parse_xc_func
+from .veloxchemlib import molorb
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
@@ -80,16 +81,20 @@ class ScfDriver:
         The flag for restarting from checkpoint file.
     :param checkpoint_file:
         The name of checkpoint file.
+    :param ref_mol_orbs:
+        The reference molecular orbitals read from checkpoint file.
     :param restricted:
         The flag for restricted SCF.
     :param dft:
         The flag for running DFT.
     :param grid_level:
         The accuracy level of DFT grid.
-    :param xcfun_name:
-        The name of the XC functional.
-    :param xcfun_type:
-        The type of the XC functional.
+    :param xcfun:
+        The XC functional.
+    :param molgrid:
+        The molecular grid.
+    :param timing:
+        The flag for printing timing information.
     """
 
     def __init__(self, comm, ostream):
@@ -157,14 +162,18 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+        self.ref_mol_orbs = None
 
         # restricted?
         self.restricted = True
 
+        # dft
         self.dft = False
-        self.grid_level = 3
-        self.xcfun_name = 'undefined'
-        self.xcfun_type = None
+        self.grid_level = 4
+        self.xcfun = None
+        self.molgrid = None
+    
+        self.timing = False
 
     def update_settings(self, scf_dict, method_dict={}):
         """
@@ -198,29 +207,15 @@ class ScfDriver:
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
-            self.xcfun_name = method_dict['xcfun'].lower()
-            self.xcfun_type = self.get_xcfun_type(self.xcfun_name)
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Undefined XC functional')
 
-    def get_xcfun_type(self, label):
-        """
-        Gets the type of the XC funtional.
-
-        :param label:
-            The name of the XC functional.
-
-        :return:
-            The type of the XC functional.
-        """
-
-        xcfun_dict = {
-            'lda': [],
-            'gga': ['blyp', 'pbe'],
-            'mgga': [],
-        }
-        for xcfun_type in xcfun_dict:
-            if label.lower() in xcfun_dict[xcfun_type]:
-                return to_xcfun(xcfun_type)
-        return None
+        if 'timing' in scf_dict:
+            key = scf_dict['timing'].lower()
+            self.timing = True if key in ['yes', 'y'] else False
 
     def compute(self, molecule, ao_basis, min_basis):
         """
@@ -234,32 +229,17 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
+        # check dft setup
         if self.dft:
-            assert_msg_critical(self.xcfun_type is not None,
+            assert_msg_critical(self.xcfun is not None,
                                 'SCF driver: undefined XC functional')
-
-            grid_drv = GridDriver(self.comm)
-            den_grid_drv = DensityGridDriver(self.comm)
-
-            grid_drv.set_level(self.grid_level)
-            self.ostream.print_info(
-                'DFT grid accuracy level set to {:d}.'.format(self.grid_level))
-            self.ostream.print_blank()
-
-            grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
-            molgrid.distribute(self.rank, self.nodes, self.comm)
-            self.ostream.print_info(
-                'Molecular grid generated in {:.2f} sec.'.format(tm.time() -
-                                                                 grid_t0))
-            self.ostream.print_blank()
-
-            grid_t0 = tm.time()
-            dengrid = den_grid_drv.generate(molecule, ao_basis, molgrid,
-                                            self.xcfun_type)
-            self.ostream.print_info(
-                'Density grid generated in {:.2f} sec.'.format(tm.time() -
-                                                               grid_t0))
+        # set up timing data
+        if self.timing:
+            self.timing_dict = {
+                'fock_2e': [ ],
+                'dft_vxc': [ ],
+                'fock_diag': [ ]
+            }
 
         # initial guess
         if self.restart:
@@ -270,6 +250,9 @@ class ScfDriver:
 
         if self.restart:
             self.acc_type = "DIIS"
+            if self.rank == mpi_master():
+                self.ref_mol_orbs = MolecularOrbitals.read_hdf5(
+                    self.checkpoint_file)
         else:
             self.den_guess = DensityGuess("SAD")
 
@@ -278,6 +261,21 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_header()
+
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            self.molgrid = grid_drv.generate(molecule)
+            n_grid_points = self.molgrid.number_of_points()
+            self.molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
 
         # C2-DIIS method
         if self.acc_type == "DIIS":
@@ -334,6 +332,9 @@ class ScfDriver:
                 checkpoint_text += self.checkpoint_file
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()
+                    
+            if self.timing:
+                self.print_timing()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
@@ -414,6 +415,9 @@ class ScfDriver:
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
 
+        if self.dft:
+            xc_drv = XCIntegrator(self.comm)
+
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
                                           ovl_mat)
 
@@ -423,17 +427,44 @@ class ScfDriver:
 
         fock_mat = AOFockMatrix(den_mat)
 
+        if self.dft:
+            self.update_fock_type(fock_mat)
+
         if self.rank == mpi_master():
             self.print_scf_title()
 
         for i in self.get_scf_range():
 
+            if self.timing:
+                fock_t0 = tm.time()
+            
             eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data)
 
             fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
+            if self.timing:
+                self.timing_dict['fock_2e'].append(tm.time() - fock_t0)
+            
+            if self.dft:
+                if not self.xcfun.is_hybrid():
+                    fock_mat.scale(2.0, 0)
+
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
                                                  den_mat)
+
+            if self.dft:
+                if self.timing:
+                    vxc_t0 = tm.time()
+                
+                vxc_mat = xc_drv.integrate(den_mat, molecule, ao_basis,
+                                           self.molgrid,
+                                           self.xcfun.get_func_label())
+                vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+                fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
+                e_ee += vxc_mat.get_energy()
+            
+                if self.timing:
+                    self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
 
             self.comp_full_fock(fock_mat, kin_mat, npot_mat)
 
@@ -451,9 +482,17 @@ class ScfDriver:
 
             self.store_diis_data(i, fock_mat, den_mat)
 
+            if self.timing:
+                diag_t0 = tm.time()
+            
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat)
+
+            self.update_mol_orbs_phase()
+            
+            if self.timing:
+                self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
 
             self.write_checkpoint(molecule.elem_ids_to_numpy(),
                                   ao_basis.get_label())
@@ -743,6 +782,38 @@ class ScfDriver:
 
         return MolecularOrbitals()
 
+    def update_mol_orbs_phase(self):
+        """
+        Updates phase of molecular orbitals.
+        """
+
+        if self.rank == mpi_master():
+            if self.ref_mol_orbs is None:
+                return
+
+            ref_mo = self.ref_mol_orbs.alpha_to_numpy()
+            mo = self.mol_orbs.alpha_to_numpy()
+            ea = self.mol_orbs.ea_to_numpy()
+
+            for col in range(mo.shape[1]):
+                if np.dot(mo[:, col], ref_mo[:, col]) < 0.0:
+                    mo[:, col] *= -1.0
+
+            if self.mol_orbs.get_orbitals_type() == molorb.rest:
+                self.mol_orbs = MolecularOrbitals([mo], [ea], molorb.rest)
+
+            elif self.mol_orbs.get_orbitals_type() == molorb.unrest:
+                ref_mo_b = self.ref_mol_orbs.beta_to_numpy()
+                mo_b = self.mol_orbs.beta_to_numpy()
+                eb = self.mol_orbs.eb_to_numpy()
+
+                for col in range(mo_b.shape[1]):
+                    if np.dot(mo_b[:, col], ref_mo_b[:, col]) < 0.0:
+                        mo_b[:, col] *= -1.0
+
+                self.mol_orbs = MolecularOrbitals([mo, mo_b], [ea, eb],
+                                                  molorb.unrest)
+
     def gen_new_density(self, molecule):
         """
         Generates density matrix from current molecular orbitals.
@@ -859,32 +930,42 @@ class ScfDriver:
         self.ostream.print_header(36 * "=")
         self.ostream.print_blank()
 
-        str_width = 80
-        cur_str = "Wave Function Model          : " + self.get_scf_type()
+        str_width = 84
+        cur_str = "Wave Function Model             : " + self.get_scf_type()
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Initial Guess Model          : " + self.get_guess_type()
+        cur_str = "Initial Guess Model             : " + self.get_guess_type()
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "Convergence Accelerator      : " + self.get_acc_type()
+        cur_str = "Convergence Accelerator         : " + self.get_acc_type()
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Max. Number of Iterations    : " + str(self.max_iter)
+        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Max. Number of Error Vectors : " + str(self.max_err_vecs)
+        cur_str = "Max. Number of Error Vectors    : " + str(self.max_err_vecs)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold        : " + \
+        cur_str = "Convergence Threshold           : " + \
             "{:.1e}".format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI Screening Scheme         : " + get_qq_type(self.qq_type)
+        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+            self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Mode           : " + self.get_qq_dyn()
+        cur_str = "ERI Screening Mode              : " + self.get_qq_dyn()
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold      : " + \
+        cur_str = "ERI Screening Threshold         : " + \
             "{:.1e}".format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Linear Dependence Threshold  : " + \
+        cur_str = "Linear Dependence Threshold     : " + \
             "{:.1e}".format(self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.dft:
+            cur_str = "Exchange-Correlation Functional : "
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = "Molecular Grid Level            : " + str(
+                self.grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         self.ostream.print_blank()
 
     def print_scf_title(self):
@@ -896,9 +977,16 @@ class ScfDriver:
             self.ostream.print_info("Starting Reduced Basis SCF calculation...")
         else:
             self.ostream.print_blank()
-            self.ostream.print_header("Iter. |   Hartree-Fock Energy, au   | "
-                                      "Energy Change, au |  Gradient Norm  | "
-                                      "Density Change |")
+            if self.dft:
+                self.ostream.print_header(
+                    "Iter. |     Kohn-Sham Energy, au    | "
+                    "Energy Change, au |  Gradient Norm  | "
+                    "Density Change |")
+            else:
+                self.ostream.print_header(
+                    "Iter. |   Hartree-Fock Energy, au   | "
+                    "Energy Change, au |  Gradient Norm  | "
+                    "Density Change |")
             self.ostream.print_header(92 * "-")
 
     def print_scf_finish(self, start_time):
@@ -1033,6 +1121,17 @@ class ScfDriver:
 
         return "Static"
 
+    def update_fock_type(self, fock_mat):
+        """
+        Updates Fock matrix to fit selected functional in Kohn-Sham
+        calculations.
+
+        :param fock_mat:
+            The Fock/Kohn-Sham matrix.
+        """
+
+        return
+
     def need_min_basis(self):
         """
         Determines if minimal AO basis is needed in SCF calculation. Usage of
@@ -1150,3 +1249,31 @@ class ScfDriver:
         grad = self.iter_data[-1][2]
         valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
         self.ostream.print_header(valstr.ljust(92))
+
+    def print_timing(self):
+        """
+            Prints timing breakdown for the scf driver.
+        """
+        
+        width = 92
+        
+        valstr = 'Timing (in sec):'
+        self.ostream.print_header(valstr.ljust(width))
+        self.ostream.print_header(('-' * len(valstr)).ljust(width))
+        
+        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format('', 'Fock 2E Part',
+                                                          'XC Part', 'Diag. Part')
+        self.ostream.print_header(valstr.ljust(width))
+                                                  
+        for i, (a, b, c) in enumerate(zip(self.timing_dict['fock_2e'],
+                                          self.timing_dict['dft_vxc'],
+                                          self.timing_dict['fock_diag'])):
+            
+            title = 'Iteration {:<5d}'.format(i)
+            valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
+            self.ostream.print_header(valstr.ljust(width))
+                                                                                             
+            valstr = '---------'
+            self.ostream.print_header(valstr.ljust(width))
+            
+        self.ostream.print_blank()

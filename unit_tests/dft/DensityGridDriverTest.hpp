@@ -19,5 +19,4 @@ protected:
     virtual ~CDensityGridDriverTest() {};
 };
 
-
 #endif /* DensityGridDriverTest_hpp */

@@ -232,6 +232,25 @@ CAOFockMatrix::setFockType(const fockmat& fockType,
 }
 
 void
+CAOFockMatrix::setFockScaleFactor(const double  factor,
+                                  const int32_t iFockMatrix,
+                                  const bool    beta)
+{
+    if (isRestricted())
+    {
+        _scaleFactors[iFockMatrix] = factor;
+    }
+    else if (!beta)
+    {
+        _scaleFactors[2 * iFockMatrix] = factor;
+    }
+    else
+    {
+        _scaleFactors[2 * iFockMatrix + 1] = factor;
+    }
+}
+
+void
 CAOFockMatrix::zero()
 {
     for (size_t i = 0; i < _fockMatrices.size(); i++)
@@ -364,6 +383,24 @@ CAOFockMatrix::addOneElectronMatrix(const CDenseMatrix& oneElectronMatrix,
     for (int32_t i = 0; i < ndim; i++)
     {
         pfock[i] += pone[i];
+    }
+}
+
+void
+CAOFockMatrix::scale(const double  factor,
+                     const int32_t iFockMatrix)
+{
+    
+    auto pfock = _fockMatrices[iFockMatrix].values();
+    
+    // add one electron operator contribution contributions
+    
+    auto ndim = _fockMatrices[iFockMatrix].getNumberOfElements();
+    
+    #pragma omp simd aligned(pfock: VLX_ALIGN)
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        pfock[i] *= factor;
     }
 }
 
