@@ -217,10 +217,12 @@ class InputParser:
                 fname = '.'.join(self.filename.split('.')[:-1])
                 fchkp = fname + '.scf.h5'
                 frsp = fname + '.rsp.h5'
+                fcpp = fname + '.rsp.h5'
                 fexciton = fname + '.exciton.h5'
             else:
                 fchkp = self.filename + '.scf.h5'
                 frsp = self.filename + '.rsp.h5'
+                fcpp = self.filename + '.rsp.h5'
                 fexciton = self.filename + '.exciton.h5'
 
             self.input_dict['input_file'] = self.filename
@@ -232,6 +234,10 @@ class InputParser:
             if 'response' not in self.input_dict:
                 self.input_dict['response'] = {}
             self.input_dict['response']['checkpoint_file'] = frsp
+
+            if 'cpp' not in self.input_dict:
+                self.input_dict['cpp'] = {}
+            self.input_dict['cpp']['checkpoint_file'] = fcpp
 
             if 'exciton' not in self.input_dict:
                 self.input_dict['exciton'] = {}
