@@ -62,6 +62,9 @@ class MpiTask:
             output_fname = sys.stdout
             if len(fname_list) >= 2:
                 output_fname = fname_list[1]
+                if isinstance(output_fname, str):
+                    if not fname_list[1].split():
+                        output_fname = sys.stdout
 
             assert_msg_critical(
                 isfile(input_fname),
@@ -91,7 +94,7 @@ class MpiTask:
 
             # read input file
 
-            self.input_dict = InputParser(input_fname).get_dict()
+            self.input_dict = InputParser(input_fname, output_fname).get_dict()
 
             self.ostream.print_info("Found {} control groups.".format(
                 len(self.input_dict)))

@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 import re
 import os
 
@@ -23,18 +24,21 @@ class InputParser:
         The name of the basis set.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename, outname=None):
         """
         Initializes the parser and parses the input file.
 
         :param filename:
             The name of the input file.
+        :param outname:
+            The name of the output file.
         """
 
         self.input_dict = {}
         self.success_monitor = True
 
         self.filename = filename
+        self.outname = outname
         self.is_basis_set = False
         self.basis_set_name = ''
 
@@ -212,20 +216,20 @@ class InputParser:
             self.input_dict['basis_set_name'] = self.basis_set_name
 
         else:
-            # for input file, save input file name and checkpoint file name
-            if '.' in self.filename:
-                fname = '.'.join(self.filename.split('.')[:-1])
-                fchkp = fname + '.scf.h5'
-                frsp = fname + '.rsp.h5'
-                fcpp = fname + '.rsp.h5'
-                fexciton = fname + '.exciton.h5'
-            else:
-                fchkp = self.filename + '.scf.h5'
-                frsp = self.filename + '.rsp.h5'
-                fcpp = self.filename + '.rsp.h5'
-                fexciton = self.filename + '.exciton.h5'
-
+            # for input file, save input file name
             self.input_dict['input_file'] = self.filename
+
+            # save checkpoint file name (based on output file name)
+            if self.outname not in [None, sys.stdout]:
+                fname = self.outname
+            else:
+                fname = self.filename
+            if '.' in fname:
+                fname = '.'.join(fname.split('.')[:-1])
+            fchkp = fname + '.scf.h5'
+            frsp = fname + '.rsp.h5'
+            fcpp = fname + '.cpp.h5'
+            fexciton = fname + '.exciton.h5'
 
             if 'scf' not in self.input_dict:
                 self.input_dict['scf'] = {}
