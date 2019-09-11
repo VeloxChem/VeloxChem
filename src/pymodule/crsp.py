@@ -6,7 +6,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
+from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
 from .lrmatvecdriver import orthogonalize_gram_schmidt
@@ -48,6 +50,8 @@ class ComplexResponse:
         The XC functional.
     :param molgrid:
         The molecular grid.
+    :param gs_density:
+        The ground state density matrix.
     :param max_iter:
         The maximum number of solver iterations.
     :param conv_thresh:
@@ -99,6 +103,7 @@ class ComplexResponse:
         self.grid_level = 4
         self.xcfun = XCFunctional()
         self.molgrid = MolecularGrid()
+        self.gs_density = AODensityMatrix()
 
         self.max_iter = 150
         self.conv_thresh = 1.0e-4
@@ -524,6 +529,11 @@ class ComplexResponse:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+            if self.rank == mpi_master():
+                self.gs_density = AODensityMatrix([scf_tensors['D'][0]],
+                                                  denmat.rest)
+            self.gs_density.broadcast(self.rank, self.comm)
+
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -595,7 +605,8 @@ class ComplexResponse:
             btot = np.hstack((bger, bung))
 
         e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
-                             self.dft, self.xcfun, self.molgrid)
+                             self.dft, self.xcfun, self.molgrid,
+                             self.gs_density)
 
         if self.rank == mpi_master():
             e2bger = e2btot[:, :bger.shape[1]]
@@ -841,7 +852,7 @@ class ComplexResponse:
 
             new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
                                      molecule, basis, self.dft, self.xcfun,
-                                     self.molgrid)
+                                     self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
                 new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]

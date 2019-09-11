@@ -5,8 +5,10 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
+from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
 from .lrmatvecdriver import orthogonalize_gram_schmidt
@@ -47,6 +49,8 @@ class LinearResponseSolver:
         The XC functional.
     :param molgrid:
         The molecular grid.
+    :param gs_density:
+        The ground state density matrix.
     :param conv_thresh:
         The convergence threshold for the solver.
     :param max_iter:
@@ -103,6 +107,7 @@ class LinearResponseSolver:
         self.grid_level = 4
         self.xcfun = XCFunctional()
         self.molgrid = MolecularGrid()
+        self.gs_density = AODensityMatrix()
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -249,6 +254,11 @@ class LinearResponseSolver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+            if self.rank == mpi_master():
+                self.gs_density = AODensityMatrix([scf_tensors['D'][0]],
+                                                  denmat.rest)
+            self.gs_density.broadcast(self.rank, self.comm)
+
         if self.dft:
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
@@ -311,7 +321,8 @@ class LinearResponseSolver:
                 btot = np.hstack((bger, bung))
 
             e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
-                                 self.dft, self.xcfun, self.molgrid)
+                                 self.dft, self.xcfun, self.molgrid,
+                                 self.gs_density)
 
             if self.rank == mpi_master():
                 n_ger = bger.shape[1]
@@ -448,7 +459,7 @@ class LinearResponseSolver:
 
             new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
                                      molecule, basis, self.dft, self.xcfun,
-                                     self.molgrid)
+                                     self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
                 new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]

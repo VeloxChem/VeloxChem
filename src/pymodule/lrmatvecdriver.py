@@ -51,7 +51,8 @@ class LinearResponseMatrixVectorDriver:
             basis,
             dft=None,
             xcfun=None,
-            molgrid=None):
+            molgrid=None,
+            gs_density=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -71,6 +72,8 @@ class LinearResponseMatrixVectorDriver:
             The exchange correlation functional.
         :param molgrid:
             The molecular grid for XC contributtion computation.
+        :param gs_density:
+            The ground state density matrix.
 
         :return:
             The E2 b matrix vector product.
@@ -109,7 +112,7 @@ class LinearResponseMatrixVectorDriver:
             dks = None
 
         fks = self.get_two_el_fock(dks, screening, molecule, basis, tensors,
-                                   dft, xcfun, molgrid)
+                                   dft, xcfun, molgrid, gs_density)
 
         if self.rank == mpi_master():
             gv = np.zeros(vecs.shape)
@@ -139,7 +142,8 @@ class LinearResponseMatrixVectorDriver:
                         tensors=None,
                         dft=False,
                         xcfun=None,
-                        molgrid=None):
+                        molgrid=None,
+                        gs_density=None):
         """
         Computes two electron contribution to Fock.
 
@@ -159,6 +163,8 @@ class LinearResponseMatrixVectorDriver:
             The exchange correlation functional.
         :param molgrid:
             The molecular grid for XC contributtion computation.
+        :param gs_density:
+            The ground state density matrix.
 
         :return:
             The tuple containing alpha and beta Fock matrices.
@@ -208,16 +214,8 @@ class LinearResponseMatrixVectorDriver:
 
         # add XC contribution to Fock
         if dft:
-            if self.rank == mpi_master():
-                dgs = []
-                dgs.append(tensors['D'][0])
-                dengs = AODensityMatrix(dgs, denmat.rest)
-            else:
-                dengs = AODensityMatrix()
-            dengs.broadcast(self.rank, self.comm)
-
             xc_drv = XCIntegrator(self.comm)
-            xc_drv.integrate(fock, dens, dengs, molecule, basis, molgrid,
+            xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
                              xcfun.get_func_label())
 
         fock.reduce_sum(self.rank, self.nodes, self.comm)
