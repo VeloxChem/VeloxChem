@@ -16,10 +16,10 @@
 namespace gpu {  // gpu namespace
 
 void
-getDeviceProperties(std::vector<std::string>& namesOfDevices,
-                    std::vector<int32_t>&     globalMemoryOfDevices,
-                    std::vector<int32_t>&     computeMajorCapabilityOfDevices,
-                    std::vector<int32_t>&     computeMinorCapabilityOfDevices)
+getDevicesProperty(std::vector<std::string>& namesOfDevices,
+                   std::vector<int32_t>&     globalMemoryOfDevices,
+                   std::vector<int32_t>&     computeMajorCapabilityOfDevices,
+                   std::vector<int32_t>&     computeMinorCapabilityOfDevices)
 {
 #ifdef ENABLE_GPU
 

@@ -28,7 +28,7 @@ CCudaDevices::CCudaDevices()
     , _computeMinorCapabilityOfDevices(std::vector<int32_t>())
 {
 #ifdef ENABLE_GPU
-    gpu::getDevicesProperties();
+  gpu::getDevicesProperty(_namesOfDevices, _globalMemoryOfDevices, _computeMajorCapabilityOfDevices, _computeMinorCapabilityOfDevices);
 #endif
 }
 

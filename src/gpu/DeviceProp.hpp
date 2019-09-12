@@ -9,6 +9,10 @@
 #ifndef DeviceProp_hpp
 #define DeviceProp_hpp
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 namespace gpu {
 
 /**
@@ -21,10 +25,10 @@ namespace gpu {
  @param computeMinorCapabilityOfDevices the vector of minor compute capabilities of CUDA
         compute capable devices.
  */
-void getDeviceProperties(std::vector<std::string>& namesOfDevices,
-                         std::vector<int32_t>&     globalMemoryOfDevices,
-                         std::vector<int32_t>&     computeMajorCapabilityOfDevices,
-                         std::vector<int32_t>&     computeMinorCapabilityOfDevices);
+void getDevicesProperty(std::vector<std::string>& namesOfDevices,
+                        std::vector<int32_t>&     globalMemoryOfDevices,
+                        std::vector<int32_t>&     computeMajorCapabilityOfDevices,
+                        std::vector<int32_t>&     computeMinorCapabilityOfDevices);
 }
 
 #endif
