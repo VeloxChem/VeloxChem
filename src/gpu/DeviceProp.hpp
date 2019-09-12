@@ -11,7 +11,20 @@
 
 namespace gpu {
 
-std::string getDeviceProperties();
+/**
+ Collects information about available CUDA compute capable devices.
+
+ @param namesOfDevices the vector of names of CUDA compute capable devices.
+ @param globalMemoryOfDevices the vector of global memory sizes of CUDA compute capable devices.
+ @param computeMajorCapabilityOfDevices the vector of major compute capabilities of CUDA
+        compute capable devices.
+ @param computeMinorCapabilityOfDevices the vector of minor compute capabilities of CUDA
+        compute capable devices.
+ */
+void getDeviceProperties(std::vector<std::string>& namesOfDevices,
+                         std::vector<int32_t>&     globalMemoryOfDevices,
+                         std::vector<int32_t>&     computeMajorCapabilityOfDevices,
+                         std::vector<int32_t>&     computeMinorCapabilityOfDevices);
 }
 
 #endif
