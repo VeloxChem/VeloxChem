@@ -15,7 +15,7 @@ class MyBuildPy(SetuptoolsBuildPy):
         SetuptoolsBuildPy.run(self)
 
     def make_veloxchem(self):
-        process = subprocess.Popen('make -C src'.split(),
+        process = subprocess.Popen('make -C src -j'.split(),
                                    stdout=sys.stdout,
                                    stderr=subprocess.STDOUT)
         if process.wait() != 0:
