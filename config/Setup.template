@@ -57,6 +57,7 @@ endif
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
+PYTHON_INC += -I$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_include())")
 PYTHON_INC += -I$(PYTHON_USER_INC)
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
 
