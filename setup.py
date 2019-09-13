@@ -16,6 +16,7 @@ class MyBuildPy(SetuptoolsBuildPy):
 
     def make_veloxchem(self):
         process = subprocess.Popen('make -C src'.split(),
+                                   stdout=sys.stdout,
                                    stderr=subprocess.STDOUT)
         if process.wait() != 0:
             print('Error: failed to build veloxchem')
