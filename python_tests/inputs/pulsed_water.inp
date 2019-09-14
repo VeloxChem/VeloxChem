@@ -20,9 +20,9 @@ H   0.0  -1.4   1.1
 @pulses
 envelope: gaussian
 field_max : 1.0e-5
-smallest_field_ratio: 1e-5
 number_pulses: 1
 centers: 300 
+field_cutoff_ratio: 1e-5
 frequency_range : 0.2-0.4(0.007)
 carrier_frequencies: 0.325
 pulse_widths: 50 

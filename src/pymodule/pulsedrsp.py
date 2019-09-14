@@ -17,37 +17,40 @@ class PulsedResponse():
         The MPI communicator.
     :param rank:
         The MPI rank.
-    :param smallest_field_ratio:
-        
+    :param field_cutoff_ratio:
+        Float - Ratio between the smallest field amplitude to be included in the calculation 
+        wrt. the maximum field amplitude. 
+        Frequencies with associated field amplitudes smaller than this ratio will NOT be included in the calculation.
     :param envelope:
-        Envelope of pulse - available arguments: ['gaussian', ]
+        String - Envelope of the of pulse - available arguments: ['gaussian', ]
     :param number_pulses:
-        The number of different pulse settings to expect 'N' 
+        Integer - The number of different pulse settings to expect 'N' 
+        Currently limited to one.
     :param pulse_widths:
-        List(N) of pulse widths give in [au]
+        List of floats (len(N)) - pulse widths in [au]
     :param carrier_frequencies:
-        List(N) of carrier frequencies given in [au]
+        List of floats (len(N)) - carrier frequencies in [au]
+    :param field_max:
+        List of floats (len(N)) - pulse amplitudes in [au]
     :param centers:
-        List(N) of time centers for the pulses given in [au]
+        List of floats (len(N)) - time centers for the pulses in [au]
     :param pol_dir:
-        List(N) of polarization directions, arguments given in combinations of x, y and z
+        List of strings (len(N)) - polarization directions, arguments given in combinations of x, y and z
         e.g.: 'x' for [1 0 0], yz for [0 1 1].
     :param frequency_range:
-        Frequencies to map solution to - given as range 'start-end(df)' in [au]
+        List Frequencies to map solution to - given as range 'start-end(df)' in [au]
         e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 au in steps of 0.007 au
         zero-padding will be applied if range does not start at 0
     :param CEP:
-        
-    :param field_max:
-
+        List of floats (len(N)) - carrier envelope phases in [radians]  
     :param h5file:
-        If a name is given - a h5 formatted file is saved using gzip compression
+        String - optional - name of requested h5 formatted result file
     :param ascii:
-        If a name is given - a ASCII formatted file is saved
+        String - optional - name of requested ASCII formatted file
     """
 
     # List of parameters that are floats for parsing
-    float_input_keys = ['smallest_field_ratio',
+    float_input_keys = ['field_cutoff_ratio',
                         'pulse_duration',
                         'carrier_frequencies',
                         'center',
@@ -74,7 +77,7 @@ class PulsedResponse():
         # TODO: make a E-field class that takes pulse settings
         #       as input and generate field_w and frequency window 
         # Default Pulse settings
-        self.pulse_settings['smallest_field_ratio']  = 1.e-7 # Smallest fraction field amplitude to be included
+        self.pulse_settings['field_cutoff_ratio']  = 1.e-7 # Smallest fraction field amplitude to be included
         self.pulse_settings['envelope']              = 'gaussian'
         self.pulse_settings['pulse_duration']        = 50. 
         self.pulse_settings['carrier_frequencies']   = 0.325 
@@ -136,9 +139,9 @@ class PulsedResponse():
 
         # Threshold to limit the number of complex polarizability evaluations
         # Based on the field strength and bandwidth of the pulse
-        if self.pulse_settings['smallest_field_ratio'] > 0.:
+        if self.pulse_settings['field_cutoff_ratio'] > 0.:
             self.zero_pad = True
-            least_field = self.pulse_settings['smallest_field_ratio'] * max(field_w)
+            least_field = self.pulse_settings['field_cutoff_ratio'] * max(field_w)
             freqs = freqs[np.abs(field_w) > least_field]
             field_w = field_w[np.abs(field_w) > least_field]
 
@@ -319,7 +322,7 @@ class PulsedResponse():
         The zero padding may be necessary due to:
             1)  the limited number of frequencies for which 
                 the complex response function is being computed
-                as dictated by "smallest_field_ratio"
+                as dictated by "field_cutoff_ratio"
             2)  the need for extending the frequency range to achieve
                 higher temporal resolution
         
@@ -419,7 +422,7 @@ class PulsedResponse():
 
         # Print all settings
         header_fields = {
-                "smallest_field_ratio" : "Smallest Field ratio",
+                "field_cutoff_ratio" : "Field cutoff ratio",
                 "envelope" : "Envelope",
                 "pulse_duration" : "Pulse Duration",
                 "carrier_frequencies" : "Carrier Frequency",
