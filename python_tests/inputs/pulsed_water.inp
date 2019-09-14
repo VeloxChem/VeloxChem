@@ -1,0 +1,32 @@
+@jobs
+task: hf
+@end
+
+@method settings
+basis: aug-cc-pvdz
+basis path: ../../basis
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+units: au
+xyz:
+O   0.0   0.0   0.0
+H   0.0   1.4   1.1
+H   0.0  -1.4   1.1
+@end
+
+@pulses
+envelope: gaussian
+field_max : 1.0e-5
+smallest_field_ratio: 1e-5
+number_pulses: 1
+centers: 300 
+frequency_range : 0.2-0.4(0.007)
+carrier_frequencies: 0.325
+pulse_widths: 50 
+pol_dir: x
+h5 : pulsed
+ascii : pulsed
+@end
