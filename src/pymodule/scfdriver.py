@@ -176,6 +176,8 @@ class ScfDriver:
         self.xcfun = None
         self.molgrid = None
 
+        self.split_comm_ratio = None
+
         self.timing = False
 
     def update_settings(self, scf_dict, method_dict={}):
@@ -427,6 +429,8 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_scf_title()
+
+        self.split_comm_ratio = None
 
         for i in self.get_scf_range():
 
@@ -711,8 +715,18 @@ class ScfDriver:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
-        eri_nodes = self.nodes // 2
+        if self.split_comm_ratio is None:
+            self.split_comm_ratio = [0.5, 0.5]
+        eri_nodes = int(float(self.nodes) * self.split_comm_ratio[0] + 0.5)
         dft_nodes = self.nodes - eri_nodes
+
+        if eri_nodes < 1:
+            eri_nodes = 1
+            dft_nodes = self.nodes - eri_nodes
+
+        if dft_nodes < 1:
+            dft_nodes = 1
+            eri_nodes = self.nodes - dft_nodes
 
         node_grps = [0] * eri_nodes + [1] * dft_nodes
         eri_comm = (node_grps[self.rank] == 0)
@@ -724,12 +738,14 @@ class ScfDriver:
 
         # calculate Fock on ERI nodes
         if eri_comm:
+            t0 = tm.time()
             eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
             eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
             fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                 local_comm)
             if self.dft and (not self.xcfun.is_hybrid()):
                 fock_mat.scale(2.0, 0)
+            dt = tm.time() - t0
 
         # reset molecular grid
         if self.rank != mpi_master():
@@ -739,6 +755,7 @@ class ScfDriver:
 
         # calculate Vxc on DFT nodes
         if dft_comm:
+            t0 = tm.time()
             xc_drv = XCIntegrator(local_comm)
             self.molgrid.distribute(local_comm.Get_rank(),
                                     local_comm.Get_size(), local_comm)
@@ -746,6 +763,7 @@ class ScfDriver:
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
+            dt = tm.time() - t0
         else:
             vxc_mat = AOKohnShamMatrix()
 
@@ -753,6 +771,16 @@ class ScfDriver:
         if local_comm.Get_rank() == mpi_master():
             vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
                             cross_comm, 1)
+
+        dt = self.comm.gather(dt, root=mpi_master())
+        if self.rank == mpi_master():
+            time_eri = sum(dt[:eri_nodes])
+            time_dft = sum(dt[eri_nodes:])
+            self.split_comm_ratio = [
+                time_eri / (time_eri + time_dft),
+                time_dft / (time_eri + time_dft),
+            ]
+        self.comm.bcast(self.split_comm_ratio, root=mpi_master())
 
         return vxc_mat
 
