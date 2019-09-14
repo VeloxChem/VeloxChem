@@ -9,13 +9,16 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
+from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import AOKohnShamMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
+from .subcommunicators import SubCommunicators
 from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
@@ -172,7 +175,7 @@ class ScfDriver:
         self.grid_level = 4
         self.xcfun = None
         self.molgrid = None
-    
+
         self.timing = False
 
     def update_settings(self, scf_dict, method_dict={}):
@@ -235,11 +238,7 @@ class ScfDriver:
                                 'SCF driver: undefined XC functional')
         # set up timing data
         if self.timing:
-            self.timing_dict = {
-                'fock_2e': [ ],
-                'dft_vxc': [ ],
-                'fock_diag': [ ]
-            }
+            self.timing_dict = {'fock_2e': [], 'dft_vxc': [], 'fock_diag': []}
 
         # initial guess
         if self.restart:
@@ -270,7 +269,6 @@ class ScfDriver:
             grid_t0 = tm.time()
             self.molgrid = grid_drv.generate(molecule)
             n_grid_points = self.molgrid.number_of_points()
-            self.molgrid.distribute(self.rank, self.nodes, self.comm)
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,
@@ -332,7 +330,7 @@ class ScfDriver:
                 checkpoint_text += self.checkpoint_file
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()
-                    
+
             if self.timing:
                 self.print_timing()
 
@@ -415,9 +413,6 @@ class ScfDriver:
         qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
                                   molecule, ao_basis)
 
-        if self.dft:
-            xc_drv = XCIntegrator(self.comm)
-
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
                                           ovl_mat)
 
@@ -435,36 +430,16 @@ class ScfDriver:
 
         for i in self.get_scf_range():
 
-            if self.timing:
-                fock_t0 = tm.time()
-            
-            eri_drv.compute(fock_mat, den_mat, molecule, ao_basis, qq_data)
-
-            fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
-
-            if self.timing:
-                self.timing_dict['fock_2e'].append(tm.time() - fock_t0)
-            
-            if self.dft:
-                if not self.xcfun.is_hybrid():
-                    fock_mat.scale(2.0, 0)
+            vxc_mat = self.comp_2e_fock(fock_mat, den_mat, molecule, ao_basis,
+                                        qq_data)
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
                                                  den_mat)
 
             if self.dft:
-                if self.timing:
-                    vxc_t0 = tm.time()
-                
-                vxc_mat = xc_drv.integrate(den_mat, molecule, ao_basis,
-                                           self.molgrid,
-                                           self.xcfun.get_func_label())
-                vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
-                fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
-                e_ee += vxc_mat.get_energy()
-            
-                if self.timing:
-                    self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
+                if self.rank == mpi_master():
+                    fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
+                    e_ee += vxc_mat.get_energy()
 
             self.comp_full_fock(fock_mat, kin_mat, npot_mat)
 
@@ -484,13 +459,13 @@ class ScfDriver:
 
             if self.timing:
                 diag_t0 = tm.time()
-            
+
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
             self.mol_orbs = self.gen_molecular_orbitals(eff_fock_mat, oao_mat)
 
             self.update_mol_orbs_phase()
-            
+
             if self.timing:
                 self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
 
@@ -648,6 +623,138 @@ class ScfDriver:
                 self.skip_iter = False
             else:
                 self.skip_iter = True
+
+    def comp_2e_fock(self, fock_mat, den_mat, molecule, basis, screening):
+        """
+        Computes Fock/Kohn-Sham matrix (only 2e part).
+
+        :param fock_mat:
+            The AO Fock matrix (only 2e-part).
+        :param den_mat:
+            The AO density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screening:
+            The screening container object.
+
+        :return:
+            The AO Kohn-Sham (Vxc) matrix.
+        """
+
+        if self.dft and self.nodes >= 4:
+            vxc_mat = self.comp_2e_fock_split_comm(fock_mat, den_mat, molecule,
+                                                   basis, screening)
+        else:
+            vxc_mat = self.comp_2e_fock_single_comm(fock_mat, den_mat, molecule,
+                                                    basis, screening)
+
+        return vxc_mat
+
+    def comp_2e_fock_single_comm(self, fock_mat, den_mat, molecule, basis,
+                                 screening):
+        """
+        Computes Fock/Kohn-Sham matrix on single communicator.
+
+        :param fock_mat:
+            The AO Fock matrix (only 2e-part).
+        :param den_mat:
+            The AO density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screening:
+            The screening container object.
+
+        :return:
+            The AO Kohn-Sham (Vxc) matrix.
+        """
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        xc_drv = XCIntegrator(self.comm)
+
+        eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
+        fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.dft:
+            if not self.xcfun.is_hybrid():
+                fock_mat.scale(2.0, 0)
+
+            self.molgrid.distribute(self.rank, self.nodes, self.comm)
+            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
+                                       self.xcfun.get_func_label())
+            vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+            return vxc_mat
+        else:
+            return None
+
+    def comp_2e_fock_split_comm(self, fock_mat, den_mat, molecule, basis,
+                                screening):
+        """
+        Computes Fock/Kohn-Sham matrix on split communicators.
+
+        :param fock_mat:
+            The AO Fock matrix (only 2e-part).
+        :param den_mat:
+            The AO density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screening:
+            The screening container object.
+
+        :return:
+            The AO Kohn-Sham (Vxc) matrix.
+        """
+
+        eri_nodes = self.nodes // 2
+        dft_nodes = self.nodes - eri_nodes
+
+        node_grps = [0] * eri_nodes + [1] * dft_nodes
+        eri_comm = (node_grps[self.rank] == 0)
+        dft_comm = (node_grps[self.rank] == 1)
+
+        subcomms = SubCommunicators(self.comm, node_grps)
+        local_comm = subcomms.local_comm
+        cross_comm = subcomms.cross_comm
+
+        # calculate Fock on ERI nodes
+        if eri_comm:
+            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
+            eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
+            fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
+                                local_comm)
+            if self.dft and (not self.xcfun.is_hybrid()):
+                fock_mat.scale(2.0, 0)
+
+        # reset molecular grid
+        if self.rank != mpi_master():
+            self.molgrid = MolecularGrid()
+        if local_comm.Get_rank() == mpi_master():
+            self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
+
+        # calculate Vxc on DFT nodes
+        if dft_comm:
+            xc_drv = XCIntegrator(local_comm)
+            self.molgrid.distribute(local_comm.Get_rank(),
+                                    local_comm.Get_size(), local_comm)
+            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
+                                       self.xcfun.get_func_label())
+            vxc_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
+                               local_comm)
+        else:
+            vxc_mat = AOKohnShamMatrix()
+
+        # collect Vxc to master node
+        if local_comm.Get_rank() == mpi_master():
+            vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
+                            cross_comm, 1)
+
+        return vxc_mat
 
     def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
         """
@@ -1254,26 +1361,26 @@ class ScfDriver:
         """
             Prints timing breakdown for the scf driver.
         """
-        
+
         width = 92
-        
+
         valstr = 'Timing (in sec):'
         self.ostream.print_header(valstr.ljust(width))
         self.ostream.print_header(('-' * len(valstr)).ljust(width))
-        
-        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format('', 'Fock 2E Part',
-                                                          'XC Part', 'Diag. Part')
+
+        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format(
+            '', 'Fock 2E Part', 'XC Part', 'Diag. Part')
         self.ostream.print_header(valstr.ljust(width))
-                                                  
-        for i, (a, b, c) in enumerate(zip(self.timing_dict['fock_2e'],
-                                          self.timing_dict['dft_vxc'],
-                                          self.timing_dict['fock_diag'])):
-            
+
+        for i, (a, b, c) in enumerate(
+                zip(self.timing_dict['fock_2e'], self.timing_dict['dft_vxc'],
+                    self.timing_dict['fock_diag'])):
+
             title = 'Iteration {:<5d}'.format(i)
             valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
             self.ostream.print_header(valstr.ljust(width))
-                                                                                             
+
             valstr = '---------'
             self.ostream.print_header(valstr.ljust(width))
-            
+
         self.ostream.print_blank()
