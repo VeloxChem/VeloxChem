@@ -302,6 +302,17 @@ public:
                                  CVecMemBlock<double>* ketQValuesBuffer,
                            const CGtoPairsContainer*   braGtoPairsContainer,
                            const CGtoPairsContainer*   ketGtoPairsContainer) const;
+
+    /**
+     Computes electron repulsion integrals and stores them in full 4D array.
+     
+     @param molecule the molecule.
+     @param aoBasis the molecular AO basis.
+     @param eriData the pointer to C-style contiguous memory of 4D array.
+     */
+    void computeInMemory(const CMolecule&       molecule,
+                         const CMolecularBasis& aoBasis,
+                               double*          eriData) const;
 };
 
 

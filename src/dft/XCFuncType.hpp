@@ -65,4 +65,22 @@ to_xcfun(const std::string label)
     return xcfun::undefined;
 }
 
+/**
+ Gets number of components required for compupation of all relevant density
+ contributions for specific type of exchange-correlation functions.
+ 
+ @param xcFunctional the exchange-correlations functional type.
+ @return the number of components.
+ */
+inline int32_t xcfun_components(const xcfun xcFunctional)
+{
+    if (xcFunctional == xcfun::lda) return 1;
+    
+    if (xcFunctional == xcfun::gga) return 4;
+    
+    if (xcFunctional == xcfun::mgga) return 5;
+    
+    return 0;
+}
+
 #endif /* XCFuncType_hpp */

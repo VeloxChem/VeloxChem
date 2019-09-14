@@ -12,8 +12,9 @@
 
 #include "GenFunc.hpp"
 #include "OMPTasks.hpp"
+#include "MpiFunc.hpp"
 #include "AngularMomentum.hpp"
-#include "GtoFuncForLDA.hpp"
+#include "GtoFunc.hpp"
 
 
 CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
@@ -26,8 +27,6 @@ CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
 
     _thresholdOfDensity = 1.0e-13;
 
-    _thresholdOfPrimGTOs = 1.0e-15;
-
     _runMode = execmode::cpu;
 }
 
@@ -36,15 +35,15 @@ CDensityGridDriver::~CDensityGridDriver()
 }
 
 CDensityGrid
-CDensityGridDriver::generate(const CAODensityMatrix& density,
+CDensityGridDriver::generate(const CAODensityMatrix& aoDensityMatrix,
                              const CMolecule&        molecule,
                              const CMolecularBasis&  basis,
-                             const CMolecularGrid&   molGrid,
+                             const CMolecularGrid&   molecularGrid,
                              const xcfun             xcFunctional)
 {
     // initialize density grid
     
-    CDensityGrid dgrid(molGrid.getNumberOfGridPoints(), density.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab);
+    CDensityGrid dgrid(molecularGrid.getNumberOfGridPoints(), aoDensityMatrix.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab);
     
     dgrid.zero(); 
     
@@ -52,7 +51,7 @@ CDensityGridDriver::generate(const CAODensityMatrix& density,
 
     if (_runMode == execmode::cpu)
     {
-        _genDensityGridOnCPU(dgrid, density, molecule, basis, molGrid, xcFunctional);
+        _genDensityGridOnCPU(dgrid, aoDensityMatrix, molecule, basis, molecularGrid, xcFunctional);
     }
 
     // execution mode: CPU/GPU
@@ -66,18 +65,18 @@ CDensityGridDriver::generate(const CAODensityMatrix& density,
 }
 
 void
-CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid, 
-                                         const CAODensityMatrix& density,
+CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
+                                         const CAODensityMatrix& aoDensityMatrix,
                                          const CMolecule&        molecule,
                                          const CMolecularBasis&  basis,
-                                         const CMolecularGrid&   molGrid,
+                                         const CMolecularGrid&   molecularGrid,
                                          const xcfun             xcFunctional)
 {
     // set up OMP tasks
 
     COMPTasks omptaks(5);
 
-    omptaks.set(molGrid.getNumberOfGridPoints());
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
 
     auto ntasks = omptaks.getNumberOfTasks();
 
@@ -87,11 +86,11 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid,
 
     // set up molecular grid data
 
-    auto mgx = molGrid.getCoordinatesX();
+    auto mgx = molecularGrid.getCoordinatesX();
 
-    auto mgy = molGrid.getCoordinatesY();
+    auto mgy = molecularGrid.getCoordinatesY();
 
-    auto mgz = molGrid.getCoordinatesZ();
+    auto mgz = molecularGrid.getCoordinatesZ();
 
     // create GTOs container
 
@@ -99,11 +98,11 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid,
     
     // set up pointer to density matrix
     
-    auto denptr = &density;
+    auto denptr = &aoDensityMatrix;
     
     // set up poinet to density grid
     
-    auto dgridptr = &denGrid;
+    auto dgridptr = &densityGrid;
 
     // generate density on grid points
 
@@ -129,6 +128,12 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     denGrid,
         }
     }
 
+    // finalize density grid
+    
+    if (aoDensityMatrix.isRestricted()) densityGrid.updateBetaDensities(); 
+
+    densityGrid.computeDensityNorms(); 
+    
     // delete GTOs container
 
     delete gtovec;
@@ -192,7 +197,7 @@ CDensityGridDriver::_compDensityForGtoBlocks(      CDensityGrid*     densityGrid
     
     // set up Cartesian GTOs buffers
     
-    auto nvcomp = _getNumberOfXCComponents(xcFunctional);
+    auto nvcomp = xcfun_components(xcFunctional);
     
     auto bncart = angmom::to_CartesianComponents(bang);
     
@@ -218,105 +223,24 @@ CDensityGridDriver::_compDensityForGtoBlocks(      CDensityGrid*     densityGrid
     
     // density type: restricted or unrestricted
     
-    bool isrestden = (aoDensityMatrix->getDensityType() == denmat::unrest) ? false : true;
+    bool isrest = aoDensityMatrix->isRestricted();
     
     for (int32_t i = 0; i < braGtoBlock.getNumberOfContrGtos(); i++)
     {
-        _compGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                             braGtoBlock, i, xcFunctional);
+        gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                                       braGtoBlock, i, xcFunctional);
         
         for (int32_t j = 0; j < ketGtoBlock.getNumberOfContrGtos(); j++)
         {
             if (_setDensityPair(denpair, aoDensityMatrix, braGtoBlock, ketGtoBlock, symbk, i, j))
             {
-                _compGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                     ketGtoBlock, j, xcFunctional);
+                gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
+                                               ketGtoBlock, j, xcFunctional);
                 
-                _addGtosPairContribution(densityGrid, denpair, isrestden, bspherbuff, kspherbuff, gridOffset, xcFunctional);
+                
+                _addGtosPairContribution(densityGrid, denpair, isrest, bspherbuff, kspherbuff, bnspher, knspher, gridOffset, xcFunctional);
             }
         }
-    }
-}
-
-int32_t
-CDensityGridDriver::_getNumberOfXCComponents(const xcfun xcFunctional) const
-{
-    if (xcFunctional == xcfun::lda) return 1;
-
-    if (xcFunctional == xcfun::gga) return 4;
-
-    if (xcFunctional == xcfun::mgga) return 5;
-
-    return 0;
-}
-
-void
-CDensityGridDriver::_compGtoValuesOnGrid(      CMemBlock2D<double>& spherGtoGridBuffer,
-                                               CMemBlock2D<double>& cartGtoGridBuffer,
-                                         const double*              gridCoordinatesX,
-                                         const double*              gridCoordinatesY,
-                                         const double*              gridCoordinatesZ,
-                                         const int32_t              gridOffset,
-                                         const CGtoBlock&           gtoBlock,
-                                         const int32_t              iContrGto,
-                                         const xcfun                xcFunctional) const
-{
-    // set up angular momentum
-    
-    auto mang = gtoBlock.getAngularMomentum();
-    
-    // local density approximation
-    
-    if (xcFunctional == xcfun::lda)
-    {
-        switch (mang)
-        {
-            // s-type GTOs on grid
-                
-            case 0:
-                ldarec::compGtoValuesForS(spherGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                          gtoBlock, iContrGto);
-                break;
-                
-            // p-type GTOs on grid
-                
-            case 1:
-                ldarec::compGtoValuesForP(spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                          gtoBlock, iContrGto);
-                break;
-                
-            // d-type GTOs on grid
-                
-            case 2:
-                ldarec::compGtoValuesForD(spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset,
-                                          gtoBlock, iContrGto);
-                break;
-                
-            // FIX ME: implement l > 2 cases
-                
-            default:
-                break;
-        }
-        
-        return;
-    }
-    
-    // generalized gradient approximation
-    
-    if (xcFunctional == xcfun::gga)
-    {
-        // FIX ME: GGA case
-        
-        return;
-    }
-    
-    // meta generalized gradient approximation
-    
-    if (xcFunctional == xcfun::mgga)
-    {
-        // FIX ME: MGGA case
-        
-        return;
     }
 }
 
@@ -329,7 +253,7 @@ CDensityGridDriver::_setDensityPair(      CMemBlock2D<double>& densityPairs,
                                     const int32_t              iBraContrGto,
                                     const int32_t              iKetContrGto) const
 {
-    bool small = false;
+    bool islarge = false;
     
     // set up angular momentum data
     
@@ -357,12 +281,12 @@ CDensityGridDriver::_setDensityPair(      CMemBlock2D<double>& densityPairs,
                 
                 (densityPairs.data(j * kcomp + k))[i] = dval;
                 
-                if (std::fabs(dval) > _thresholdOfDensity) small = true; 
+                if (std::fabs(dval) > _thresholdOfDensity) islarge = true;
             }
         }
     }
     
-    return small;
+    return islarge;
 }
 
 void
@@ -371,18 +295,14 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
                                              const bool                 isRestrictedDensity, 
                                              const CMemBlock2D<double>& braGtoValues,
                                              const CMemBlock2D<double>& ketGtoValues,
+                                             const int32_t              braComponents,
+                                             const int32_t              ketComponents,
                                              const int32_t              gridOffset,
                                              const xcfun                xcFunctional) const
 {
     // determine number of density matrices
     
     auto ndmat = densityPairs.size(0);
-    
-    // determine number of GTOs spherical components
-    
-    auto bcomp = braGtoValues.blocks();
-    
-    auto kcomp = ketGtoValues.blocks();
     
     // set up number of grid points
     
@@ -400,30 +320,24 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
             {
                 auto rhoa = densityGrid->alphaDensity(i);
                 
-                auto rhob = densityGrid->betaDensity(i);
-                
                 // loop over density pair components
                 
-                for (int32_t j = 0; j < bcomp; j++)
+                for (int32_t j = 0; j < braComponents; j++)
                 {
                     auto bgto = braGtoValues.data(j);
                     
-                    for (int32_t k = 0; k < kcomp; k++)
+                    for (int32_t k = 0; k < ketComponents; k++)
                     {
                         auto kgto = ketGtoValues.data(k);
                         
-                        auto fden = (densityPairs.data(j * kcomp + k))[i];
+                        auto fden = (densityPairs.data(j * ketComponents + k))[i];
                         
                         if (std::fabs(fden) > _thresholdOfDensity)
                         {
                             #pragma omp simd
                             for (int32_t l = 0; l < ngpoints; l++)
                             {
-                                double fact = fden * bgto[l] * kgto[l];
-                                
-                                rhoa[gridOffset + l] += fact;
-                                
-                                rhob[gridOffset + l] += fact;
+                                rhoa[gridOffset + l] += fden * bgto[l] * kgto[l];
                             }
                         }
                     }
@@ -438,7 +352,73 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
         }
     }
     
-    // FIX ME: general gradient approximation
+    // general gradient approximation
+    
+    if (xcFunctional == xcfun::gga)
+    {
+        if (isRestrictedDensity)
+        {
+            // restricted densities
+            
+            for (int32_t i = 0; i < ndmat; i++)
+            {
+                auto rhoa = densityGrid->alphaDensity(i);
+                
+                auto grada_x = densityGrid->alphaDensityGradientX(i);
+                
+                auto grada_y = densityGrid->alphaDensityGradientY(i);
+                
+                auto grada_z = densityGrid->alphaDensityGradientZ(i);
+                
+                // loop over density pair components
+                
+                for (int32_t j = 0; j < braComponents; j++)
+                {
+                    auto bgto = braGtoValues.data(4 * j);
+                    
+                    auto bgto_x = braGtoValues.data(4 * j + 1);
+                    
+                    auto bgto_y = braGtoValues.data(4 * j + 2);
+                    
+                    auto bgto_z = braGtoValues.data(4 * j + 3);
+                    
+                    for (int32_t k = 0; k < ketComponents; k++)
+                    {
+                        auto kgto = ketGtoValues.data(4 * k);
+                        
+                        auto kgto_x = ketGtoValues.data(4 * k + 1);
+                        
+                        auto kgto_y = ketGtoValues.data(4 * k + 2);
+                        
+                        auto kgto_z = ketGtoValues.data(4 * k + 3);
+                        
+                        auto fden = (densityPairs.data(j * ketComponents + k))[i];
+                        
+                        if (std::fabs(fden) > _thresholdOfDensity)
+                        {
+                            #pragma omp simd
+                            for (int32_t l = 0; l < ngpoints; l++)
+                            {
+                                rhoa[gridOffset + l] += fden * bgto[l] * kgto[l];
+                                
+                                grada_x[gridOffset + l] += fden * (bgto_x[l] * kgto[l] + bgto[l] * kgto_x[l]);
+                                
+                                grada_y[gridOffset + l] += fden * (bgto_y[l] * kgto[l] + bgto[l] * kgto_y[l]);
+                                
+                                grada_z[gridOffset + l] += fden * (bgto_z[l] * kgto[l] + bgto[l] * kgto_z[l]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // unrestricted densities
+            
+            // FIX ME: implement unrestricted case
+        }
+    }
     
     // FIX ME: meta general gradient approximation
     

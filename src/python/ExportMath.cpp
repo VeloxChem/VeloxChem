@@ -65,7 +65,7 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 
     auto f_style = py::detail::check_flags(arr.ptr(), py::array::f_style);
 
-    errors::assertMsgCritical(c_style ^ f_style, errsrc);
+    errors::assertMsgCritical(c_style | f_style, errsrc);
 
     // create CDenseMatrix from numpy array
 

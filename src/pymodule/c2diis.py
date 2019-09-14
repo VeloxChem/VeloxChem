@@ -45,7 +45,7 @@ class CTwoDiis:
             fb = np.matmul(smat, np.matmul(dmat, fmat))
 
             self.error_vectors.append(
-                np.matmul(tmat.transpose(), np.matmul(fa - fb, tmat)))
+                np.matmul(tmat.T, np.matmul(fa - fb, tmat)))
 
     def compute_unrestricted_error_vectors(self, fock_matrices,
                                            fock_matrices_beta, density_matrices,

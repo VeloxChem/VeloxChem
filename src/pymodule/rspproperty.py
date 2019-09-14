@@ -5,23 +5,26 @@ class ResponseProperty:
     """
     Implements the base class for response property/spectroscopy.
 
-    :param rsp_input:
+    :param rsp_dict:
         The dictionary of response input.
+    :param method_dict:
+        The dictionary of method settings.
     :param rsp_driver:
         The response driver.
     :param rsp_property:
         The dictionary of response property.
     """
 
-    def __init__(self, rsp_input):
+    def __init__(self, rsp_dict, method_dict={}):
         """
         Initializes response property/spectroscopy.
 
-        :param rsp_input:
+        :param rsp_dict:
             The input dictionary that defines the property/spectroscopy.
         """
 
-        self.rsp_input = rsp_input
+        self.rsp_dict = rsp_dict
+        self.method_dict = method_dict
 
     def init_driver(self, comm, ostream):
         """
@@ -34,7 +37,7 @@ class ResponseProperty:
         """
 
         self.rsp_driver = ResponseDriver(comm, ostream)
-        self.rsp_driver.update_settings(self.rsp_input)
+        self.rsp_driver.update_settings(self.rsp_dict, self.method_dict)
 
     def compute(self, molecule, basis, scf_tensors):
         """

@@ -306,15 +306,15 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
 
     match_nuclear_charges = False
     if 'nuclear_charges' in hf:
-        hf_nuclear_charges = np.array(hf.get('nuclear_charges'))
-        if hf_nuclear_charges.shape == nuclear_charges.shape:
+        h5_nuclear_charges = np.array(hf.get('nuclear_charges'))
+        if h5_nuclear_charges.shape == nuclear_charges.shape:
             match_nuclear_charges = (
-                hf_nuclear_charges == nuclear_charges).all()
+                h5_nuclear_charges == nuclear_charges).all()
 
     match_basis_set = False
     if 'basis_set' in hf:
-        hf_basis_set = hf.get('basis_set')[0].decode('utf-8')
-        match_basis_set = (hf_basis_set.upper() == basis_set.upper())
+        h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
+        match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
     hf.close()
 

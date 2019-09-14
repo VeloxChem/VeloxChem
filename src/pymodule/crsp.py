@@ -3,6 +3,10 @@ import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
+from .veloxchemlib import GridDriver
+from .veloxchemlib import MolecularGrid
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import parse_xc_func
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
 from .lrmatvecdriver import orthogonalize_gram_schmidt
@@ -36,6 +40,14 @@ class ComplexResponse:
         The electron repulsion integrals screening scheme.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
+    :param dft:
+        The flag for running DFT.
+    :param grid_level:
+        The accuracy level of DFT grid.
+    :param xcfun:
+        The XC functional.
+    :param molgrid:
+        The molecular grid.
     :param max_iter:
         The maximum number of solver iterations.
     :param conv_thresh:
@@ -83,6 +95,11 @@ class ComplexResponse:
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
 
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
+        self.molgrid = MolecularGrid()
+
         self.max_iter = 150
         self.conv_thresh = 1.0e-4
 
@@ -100,7 +117,7 @@ class ComplexResponse:
         self.timing = False
         self.profiling = False
 
-    def update_settings(self, settings):
+    def update_settings(self, settings, method_dict={}):
         """
         Updates settings in complex liner response solver.
 
@@ -141,6 +158,18 @@ class ComplexResponse:
         if 'profiling' in settings:
             key = settings['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
+
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key == 'yes' else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Undefined XC functional')
 
     def paired(self, v_xy):
         """
@@ -414,6 +443,7 @@ class ComplexResponse:
 
         if bger is not None and bger.any():
             new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
+
         if bung is not None and bung.any():
             new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
 
@@ -479,6 +509,21 @@ class ComplexResponse:
 
         self.start_time = tm.time()
 
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            self.molgrid = grid_drv.generate(molecule)
+            n_grid_points = self.molgrid.number_of_points()
+            self.molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -508,8 +553,6 @@ class ComplexResponse:
 
         if self.rank == mpi_master():
 
-            trials_info = {'bger': False, 'bung': False}
-
             # calling the gradients
 
             v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
@@ -536,34 +579,30 @@ class ComplexResponse:
                 bger.any() or bung.any(),
                 'ComplexResponseSolver: trial vectors are empty')
 
+            if not bger.any():
+                bger = np.zeros((bung.shape[0], 0))
+            if not bung.any():
+                bung = np.zeros((bger.shape[0], 0))
+
             # creating sigma and rho linear transformations
-
-            if bger.any():
-                trials_info['bger'] = True
-
-            if bung.any():
-                trials_info['bung'] = True
-
-        else:
-            trials_info = {}
-            bger = None
-            bung = None
 
         if self.timing:
             self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
             timing_t0 = tm.time()
 
-        trials_info = self.comm.bcast(trials_info, root=mpi_master())
+        btot = None
+        if self.rank == mpi_master():
+            btot = np.hstack((bger, bung))
 
-        if trials_info['bger']:
-            e2bger = e2x_drv.e2n(bger, scf_tensors, screening, molecule, basis)
-            if self.rank == mpi_master():
-                s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
+        e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
+                             self.dft, self.xcfun, self.molgrid)
 
-        if trials_info['bung']:
-            e2bung = e2x_drv.e2n(bung, scf_tensors, screening, molecule, basis)
-            if self.rank == mpi_master():
-                s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
+        if self.rank == mpi_master():
+            e2bger = e2btot[:, :bger.shape[1]]
+            e2bung = e2btot[:, bger.shape[1]:]
+
+            s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
+            s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
 
         solutions = {}
         residuals = {}
@@ -591,49 +630,33 @@ class ComplexResponse:
                         grad = v1[op]
 
                         gradger, gradung = self.decomp_sym(grad)
-                        full_size = gradger.shape[0]
 
                         # projections onto gerade and ungerade subspaces:
 
-                        if bger.any():
-                            g_realger = np.matmul(bger.T, gradger.real)
-                            g_imagger = np.matmul(bger.T, gradger.imag)
+                        g_realger = np.matmul(bger.T, gradger.real)
+                        g_imagger = np.matmul(bger.T, gradger.imag)
+                        g_realung = np.matmul(bung.T, gradung.real)
+                        g_imagung = np.matmul(bung.T, gradung.imag)
 
-                            e2gg = np.matmul(bger.T, e2bger)
+                        e2gg = np.matmul(bger.T, e2bger)
+                        e2uu = np.matmul(bung.T, e2bung)
+                        s2ug = np.matmul(bung.T, s2bung)
 
-                            ntrials_ger = bger.shape[1]
-
-                        else:
-                            ntrials_ger = 0
-
-                        if bung.any():
-                            g_realung = np.matmul(bung.T, gradung.real)
-                            g_imagung = np.matmul(bung.T, gradung.imag)
-
-                            e2uu = np.matmul(bung.T, e2bung)
-
-                            if bger.any():
-                                s2ug = np.matmul(bung.T, s2bung)
-
-                            ntrials_ung = bung.shape[1]
-
-                        else:
-                            ntrials_ung = 0
+                        n_ger = bger.shape[1]
+                        n_ung = bung.shape[1]
 
                         # creating gradient and matrix for linear equation
 
-                        size = 2 * (ntrials_ger + ntrials_ung)
+                        size = 2 * (n_ger + n_ung)
 
                         # gradient
 
                         g = np.zeros(size)
 
-                        g[:ntrials_ger] = g_realger[:]
-                        g[-ntrials_ger:] = -g_imagger[:]
-
-                        g[ntrials_ger:ntrials_ger + ntrials_ung] = g_realung[:]
-                        g[-ntrials_ger -
-                          ntrials_ung:-ntrials_ger] = g_imagung[:]
+                        g[:n_ger] = g_realger[:]
+                        g[n_ger:n_ger + n_ung] = g_realung[:]
+                        g[n_ger + n_ung:size - n_ger] = -g_imagung[:]
+                        g[size - n_ger:] = -g_imagger[:]
 
                         # matrix
 
@@ -641,47 +664,40 @@ class ComplexResponse:
 
                         # filling E2gg
 
-                        mat[:ntrials_ger, :ntrials_ger] = e2gg[:, :]
-
-                        mat[-ntrials_ger:, -ntrials_ger:] = -e2gg[:, :]
+                        mat[:n_ger, :n_ger] = e2gg[:, :]
+                        mat[size - n_ger:, size - n_ger:] = -e2gg[:, :]
 
                         # filling E2uu
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = e2uu[:, :]
+                        mat[n_ger:n_ger + n_ung, n_ger:n_ger +
+                            n_ung] = e2uu[:, :]
 
-                        mat[-ntrials_ger -
-                            ntrials_ung:-ntrials_ger, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = -e2uu[:, :]
+                        mat[n_ger + n_ung:size - n_ger, n_ger + n_ung:size -
+                            n_ger] = -e2uu[:, :]
 
                         # filling S2ug
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, :ntrials_ger] = -w * s2ug[:, :]
+                        mat[n_ger:n_ger + n_ung, :n_ger] = -w * s2ug[:, :]
 
-                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger, :
-                            ntrials_ger] = d * s2ug[:, :]
+                        mat[n_ger + n_ung:size - n_ger, :n_ger] = d * s2ug[:, :]
 
-                        mat[ntrials_ger:ntrials_ger +
-                            ntrials_ung, -ntrials_ger:] = d * s2ug[:, :]
+                        mat[n_ger:n_ger + n_ung, size - n_ger:] = d * s2ug[:, :]
 
-                        mat[-ntrials_ger - ntrials_ung:-ntrials_ger,
-                            -ntrials_ger:] = w * s2ug[:, :]
+                        mat[n_ger + n_ung:size - n_ger, size -
+                            n_ger:] = w * s2ug[:, :]
 
                         # filling S2ug.T (interchanging of row and col)
 
-                        mat[:ntrials_ger, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = -w * s2ug.T[:, :]
+                        mat[:n_ger, n_ger:n_ger + n_ung] = -w * s2ug.T[:, :]
 
-                        mat[:ntrials_ger, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = d * s2ug.T[:, :]
+                        mat[:n_ger, n_ger + n_ung:size -
+                            n_ger] = d * s2ug.T[:, :]
 
-                        mat[-ntrials_ger:, ntrials_ger:ntrials_ger +
-                            ntrials_ung] = d * s2ug.T[:, :]
+                        mat[size - n_ger:, n_ger:n_ger +
+                            n_ung] = d * s2ug.T[:, :]
 
-                        mat[-ntrials_ger:, -ntrials_ger -
-                            ntrials_ung:-ntrials_ger] = w * s2ug.T[:, :]
+                        mat[size - n_ger:, n_ger + n_ung:size -
+                            n_ger] = w * s2ug.T[:, :]
 
                         # solving matrix equation
 
@@ -689,24 +705,17 @@ class ComplexResponse:
 
                         # extracting the 4 components of c...
 
-                        c_realger, c_imagger = np.zeros(ntrials_ger), np.zeros(
-                            ntrials_ger)
-                        c_realung, c_imagung = np.zeros(ntrials_ung), np.zeros(
-                            ntrials_ung)
-
-                        c_realger[:] = c[:ntrials_ger]
-                        c_imagger[:] = c[-ntrials_ger:]
-
-                        c_realung[:] = c[ntrials_ger:ntrials_ger + ntrials_ung]
-                        c_imagung[:] = c[-ntrials_ger -
-                                         ntrials_ung:-ntrials_ger]
+                        c_realger = c[:n_ger]
+                        c_realung = c[n_ger:n_ger + n_ung]
+                        c_imagung = c[n_ger + n_ung:size - n_ger]
+                        c_imagger = c[size - n_ger:]
 
                         # ...and projecting them onto respective subspace
 
                         x_realger = np.matmul(bger, c_realger)
-                        x_imagger = np.matmul(bger, c_imagger)
                         x_realung = np.matmul(bung, c_realung)
                         x_imagung = np.matmul(bung, c_imagung)
+                        x_imagger = np.matmul(bger, c_imagger)
 
                         # composing response vector
 
@@ -725,29 +734,15 @@ class ComplexResponse:
                         # composing E2 and S2 matrices projected onto solution
                         # subspace
 
-                        if bger.any():
-                            e2realger = np.matmul(e2bger, c_realger)
-                            e2imagger = np.matmul(e2bger, c_imagger)
-                            s2realger = np.matmul(s2bung, c_realger)
-                            s2imagger = np.matmul(s2bung, c_imagger)
+                        e2realger = np.matmul(e2bger, c_realger)
+                        e2imagger = np.matmul(e2bger, c_imagger)
+                        s2realger = np.matmul(s2bung, c_realger)
+                        s2imagger = np.matmul(s2bung, c_imagger)
 
-                        else:
-                            e2realger = np.zeros(full_size)
-                            e2imagger = np.zeros(full_size)
-                            s2realger = np.zeros(full_size)
-                            s2imagger = np.zeros(full_size)
-
-                        if bung.any():
-                            e2realung = np.matmul(e2bung, c_realung)
-                            e2imagung = np.matmul(e2bung, c_imagung)
-                            s2realung = np.matmul(s2bger, c_realung)
-                            s2imagung = np.matmul(s2bger, c_imagung)
-
-                        else:
-                            e2realung = np.zeros(full_size)
-                            e2imagung = np.zeros(full_size)
-                            s2realung = np.zeros(full_size)
-                            s2imagung = np.zeros(full_size)
+                        e2realung = np.matmul(e2bung, c_realung)
+                        e2imagung = np.matmul(e2bung, c_imagung)
+                        s2realung = np.matmul(s2bger, c_realung)
+                        s2imagung = np.matmul(s2bger, c_imagung)
 
                         # calculating the residual components
 
@@ -791,9 +786,9 @@ class ComplexResponse:
                 # write to output
 
                 self.ostream.print_info(
-                    '{:d} gerade trial vectors'.format(ntrials_ger))
+                    '{:d} gerade trial vectors'.format(n_ger))
                 self.ostream.print_info(
-                    '{:d} ungerade trial vectors'.format(ntrials_ung))
+                    '{:d} ungerade trial vectors'.format(n_ung))
                 self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, nvs)
@@ -814,8 +809,6 @@ class ComplexResponse:
 
             if self.rank == mpi_master():
 
-                trials_info = {'new_trials_ger': False, 'new_trials_ung': False}
-
                 new_trials_ger, new_trials_ung = self.setup_trials(
                     residuals,
                     pre=precond,
@@ -827,45 +820,41 @@ class ComplexResponse:
                     new_trials_ger.any() or new_trials_ung.any(),
                     'ComplexResponseSolver: unable to add new trial vectors')
 
+                if not new_trials_ger.any():
+                    new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
+                if not new_trials_ung.any():
+                    new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
+
                 # creating new sigma and rho linear transformations
 
-                if new_trials_ger.any():
-                    trials_info['new_trials_ger'] = True
-
-                    bger = np.append(bger, new_trials_ger, axis=1)
-
-                if new_trials_ung.any():
-                    trials_info['new_trials_ung'] = True
-
-                    bung = np.append(bung, new_trials_ung, axis=1)
-
-            else:
-                trials_info = {}
-                new_trials_ger = None
-                new_trials_ung = None
+                bger = np.append(bger, new_trials_ger, axis=1)
+                bung = np.append(bung, new_trials_ung, axis=1)
 
             if self.timing:
                 tid = iteration + 1
                 self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            trials_info = self.comm.bcast(trials_info, root=mpi_master())
+            new_trials_tot = None
+            if self.rank == mpi_master():
+                new_trials_tot = np.hstack((new_trials_ger, new_trials_ung))
 
-            if trials_info['new_trials_ger']:
-                new_e2bger = e2x_drv.e2n(new_trials_ger, scf_tensors, screening,
-                                         molecule, basis)
-                if self.rank == mpi_master():
-                    new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
-                    e2bger = np.append(e2bger, new_e2bger, axis=1)
-                    s2bung = np.append(s2bung, new_s2bung, axis=1)
+            new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
+                                     molecule, basis, self.dft, self.xcfun,
+                                     self.molgrid)
 
-            if trials_info['new_trials_ung']:
-                new_e2bung = e2x_drv.e2n(new_trials_ung, scf_tensors, screening,
-                                         molecule, basis)
-                if self.rank == mpi_master():
-                    new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
-                    e2bung = np.append(e2bung, new_e2bung, axis=1)
-                    s2bger = np.append(s2bger, new_s2bger, axis=1)
+            if self.rank == mpi_master():
+                new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
+                new_e2bung = new_e2btot[:, new_trials_ger.shape[1]:]
+
+                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
+                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
+
+                e2bger = np.append(e2bger, new_e2bger, axis=1)
+                e2bung = np.append(e2bung, new_e2bung, axis=1)
+
+                s2bung = np.append(s2bung, new_s2bung, axis=1)
+                s2bger = np.append(s2bger, new_s2bger, axis=1)
 
             if self.timing:
                 tid = iteration + 1
@@ -975,6 +964,9 @@ class ComplexResponse:
 
         width = 60
 
+        cur_str = "Damping Parameter (gamma) : {:.6e}".format(self.damping)
+        self.ostream.print_header(cur_str.ljust(width))
+
         cur_str = "Max. Number of Iterations : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(width))
         cur_str = "Convergence Threshold     : " + \
@@ -986,6 +978,15 @@ class ComplexResponse:
         cur_str = "ERI Screening Threshold   : " + \
             "{:.1e}".format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(width))
+        self.ostream.print_blank()
+
+        if self.dft:
+            cur_str = "Exchange-Correlation Functional : "
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(width))
+            cur_str = "Molecular Grid Level            : " + str(
+                self.grid_level)
+            self.ostream.print_header(cur_str.ljust(width))
         self.ostream.print_blank()
 
         self.ostream.flush()

@@ -1,5 +1,9 @@
 import numpy as np
 
+from .lrmatvecdriver import remove_linear_dependence
+from .lrmatvecdriver import orthogonalize_gram_schmidt
+from .lrmatvecdriver import normalize
+
 
 class BlockDavidsonSolver:
     """
@@ -71,9 +75,7 @@ class BlockDavidsonSolver:
         self.comp_residual_vectors()
 
         tvecs = self.comp_trial_vectors(diag_mat)
-
-        self.project_trial_vectors(tvecs)
-        self.orthogonalize_gram_schmidt(tvecs)
+        tvecs = self.project_trial_vectors(tvecs)
 
         return tvecs
 
@@ -134,7 +136,7 @@ class BlockDavidsonSolver:
         matrix in reduced space.
         """
 
-        rlmat = np.matmul(self.trial_matrices.transpose(), self.sigma_matrices)
+        rlmat = np.matmul(self.trial_matrices.T, self.sigma_matrices)
 
         reigs, rvecs = np.linalg.eigh(rlmat)
         yvecs = rvecs[:, :self.neigenpairs]
@@ -180,14 +182,14 @@ class BlockDavidsonSolver:
             The trial vectors.
         """
 
-        for i in range(tvecs.shape[1]):
-            uvec = np.zeros((tvecs.shape[0], 1))
-            for j in range(self.trial_matrices.shape[1]):
-                f = np.dot(self.trial_matrices[:, j], tvecs[:, i])
-                uvec[:, 0] += f * self.trial_matrices[:, j]
-            tvecs[:, i] -= uvec[:, 0]
+        tvecs = tvecs - np.matmul(self.trial_matrices,
+                                  np.matmul(self.trial_matrices.T, tvecs))
 
-        self.norm_vectors(tvecs)
+        tvecs = remove_linear_dependence(tvecs, 1.0e-6)
+        tvecs = orthogonalize_gram_schmidt(tvecs)
+        tvecs = normalize(tvecs)
+
+        return tvecs
 
     def orthogonalize_gram_schmidt(self, tvecs):
         """

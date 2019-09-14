@@ -118,7 +118,7 @@ class TestExciton(unittest.TestCase):
             V_exmod = NuclearPotentialMatrix(DenseMatrix(vmat))
             self.assertEqual(V, V_exmod)
 
-    def test_exciton_model(self):
+    def run_exciton_model(self, method_dict, ref_H, threshold):
 
         inpfile = os.path.join('inputs', 'exciton.inp')
         if not os.path.isfile(inpfile):
@@ -128,8 +128,24 @@ class TestExciton(unittest.TestCase):
         exciton_dict = task.input_dict['exciton']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
-        exciton_drv.update_settings(exciton_dict)
+        exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        if task.mpi_rank == mpi_master():
+
+            diag_diff = np.max(np.abs(np.diag(exciton_drv.H) - np.diag(ref_H)))
+            abs_diff = np.max(np.abs(np.abs(exciton_drv.H) - np.abs(ref_H)))
+
+            self.assertTrue(diag_diff < threshold)
+            self.assertTrue(abs_diff < threshold)
+
+            ref_eigvals, ref_eigvecs = np.linalg.eigh(ref_H)
+            eigvals, eigvecs = np.linalg.eigh(exciton_drv.H)
+
+            eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
+            self.assertTrue(eigval_diff < threshold)
+
+    def test_exciton_model_rhf(self):
 
         ref_H = np.array([
             [
@@ -194,19 +210,74 @@ class TestExciton(unittest.TestCase):
             ],
         ])
 
-        if task.mpi_rank == mpi_master():
+        self.run_exciton_model({}, ref_H, 1.0e-6)
 
-            diag_diff = np.max(np.abs(np.diag(exciton_drv.H) - np.diag(ref_H)))
-            abs_diff = np.max(np.abs(np.abs(exciton_drv.H) - np.abs(ref_H)))
+    def test_exciton_model_blyp(self):
 
-            self.assertTrue(diag_diff < 1.0e-6)
-            self.assertTrue(abs_diff < 1.0e-6)
+        ref_H = np.array([
+            [
+                0.26550288, 0.00000000, 0.00053985, -0.00007107, -0.00046722,
+                -0.00001194, -0.02127701, -0.08556111, -0.00971544, -0.00102652,
+                0.00000000, 0.00000000
+            ],
+            [
+                0.00000000, 0.33377587, -0.00003367, 0.00011101, 0.00000776,
+                -0.00004853, -0.00471510, 0.00007431, 0.00037179, 0.00000004,
+                0.00000000, 0.00000000
+            ],
+            [
+                0.00053985, -0.00003367, 0.24687045, 0.00000000, 0.00065528,
+                0.00001467, -0.08456939, -0.02187964, 0.00000000, 0.00000000,
+                -0.02468677, -0.08723902
+            ],
+            [
+                -0.00007107, 0.00011101, 0.00000000, 0.32510989, -0.00025792,
+                0.00016169, 0.00174433, 0.00025942, 0.00000000, 0.00000000,
+                0.00011489, 0.00208286
+            ],
+            [
+                -0.00046722, 0.00000776, 0.00065528, -0.00025792, 0.26550288,
+                0.00000000, 0.00000000, 0.00000000, -0.00101523, -0.00970974,
+                -0.08738004, -0.02491757
+            ],
+            [
+                -0.00001194, -0.00004853, 0.00001467, 0.00016169, 0.00000000,
+                0.33377587, 0.00000000, 0.00000000, -0.00000102, -0.00041626,
+                -0.00002727, -0.00476095
+            ],
+            [
+                -0.02127701, -0.00471510, -0.08456939, 0.00174433, 0.00000000,
+                0.00000000, 0.20903659, -0.00876215, -0.02327856, 0.00000000,
+                0.00000000, -0.00093644
+            ],
+            [
+                -0.08556111, 0.00007431, -0.02187964, 0.00025942, 0.00000000,
+                0.00000000, -0.00876215, 0.23442624, 0.00000000, -0.08476485,
+                -0.00959202, 0.00000000
+            ],
+            [
+                -0.00971544, 0.00037179, 0.00000000, 0.00000000, -0.00101523,
+                -0.00000102, -0.02327856, 0.00000000, 0.25033212, -0.00001416,
+                -0.08250530, 0.00000000
+            ],
+            [
+                -0.00102652, 0.00000004, 0.00000000, 0.00000000, -0.00970974,
+                -0.00041626, 0.00000000, -0.08476485, -0.00001416, 0.25235590,
+                0.00000000, -0.02018017
+            ],
+            [
+                0.00000000, 0.00000000, -0.02468677, 0.00011489, -0.08738004,
+                -0.00002727, 0.00000000, -0.00959202, -0.08250530, 0.00000000,
+                0.21467399, -0.00882345
+            ],
+            [
+                0.00000000, 0.00000000, -0.08723902, 0.00208286, -0.02491757,
+                -0.00476095, -0.00093644, 0.00000000, 0.00000000, -0.02018017,
+                -0.00882345, 0.21791556
+            ],
+        ])
 
-            ref_eigvals, ref_eigvecs = np.linalg.eigh(ref_H)
-            eigvals, eigvecs = np.linalg.eigh(exciton_drv.H)
-
-            eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
-            self.assertTrue(eigval_diff < 1.0e-6)
+        self.run_exciton_model({'xcfun': 'blyp'}, ref_H, 1.0e-5)
 
 
 if __name__ == "__main__":

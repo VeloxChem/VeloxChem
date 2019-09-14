@@ -20,6 +20,9 @@
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
 #include "XCFuncType.hpp"
+#include "XCIntegrator.hpp"
+#include "XCFunctional.hpp"
+#include "FunctionalParser.hpp"
 
 namespace py = pybind11;
 
@@ -27,6 +30,32 @@ namespace vlx_dft {  // vlx_dft namespace
 
 // Exports classes/functions in src/dft to python
 
+// Helper function for CAOKohnShamMatrix constructor
+
+static std::shared_ptr<CAOKohnShamMatrix>
+CAOKohnShamMatrix_from_dimensions(const int32_t nrows, const int32_t ncols, const bool is_rest)
+{
+    return std::shared_ptr<CAOKohnShamMatrix>(new CAOKohnShamMatrix(nrows, ncols, is_rest));
+}
+    
+// Helper function for printing CAOKohnShamkMatrix
+
+static std::string
+CAOKohnShamMatrix_str(const CAOKohnShamMatrix& self)
+{
+    return self.getString();
+}
+    
+// Helper function for reduce_sum CAOKohnShamMatrix object
+
+static void
+CAOKohnShamMatrix_reduce_sum(CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    self.reduce_sum(rank, nodes, *comm_ptr);
+}
+    
 // Helper function for getting grid coordinates and weigths as numpy array
 
 static py::array_t<double>
@@ -82,6 +111,16 @@ CDensityGridDriver_create(py::object py_comm)
 
     return std::shared_ptr<CDensityGridDriver>(new CDensityGridDriver(*comm_ptr));
 }
+    
+// Helper function for CXCIntegrator constructor
+
+static std::shared_ptr<CXCIntegrator>
+CXCIntegrator_create(py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    return std::shared_ptr<CXCIntegrator>(new CXCIntegrator(*comm_ptr));
+}
 
 void
 export_dft(py::module& m)
@@ -89,7 +128,30 @@ export_dft(py::module& m)
     // xcfun enum class
 
     py::enum_<xcfun>(m, "xcfun").value("lda", xcfun::lda).value("gga", xcfun::gga).value("mgga", xcfun::mgga);
+    
+    // CAOKohnShamMatrix class
 
+    py::class_<CAOKohnShamMatrix, std::shared_ptr<CAOKohnShamMatrix>>(m, "AOKohnShamMatrix")
+        .def(py::init<>())
+        .def(py::init(&CAOKohnShamMatrix_from_dimensions))
+        .def("__str__", &CAOKohnShamMatrix_str)
+        .def("get_matrix", &CAOKohnShamMatrix::getReferenceToKohnSham, py::arg("beta") = false)
+        .def("reduce_sum", &CAOKohnShamMatrix_reduce_sum)
+        .def("get_electrons", &CAOKohnShamMatrix::getNumberOfElectrons)
+        .def("get_energy", &CAOKohnShamMatrix::getExchangeCorrelationEnergy)
+        .def(py::self == py::self);
+
+    // CXCFunctional class
+    
+     py::class_<CXCFunctional, std::shared_ptr<CXCFunctional>>(m, "XCFunctional")
+        .def(py::init<>())
+        .def("get_frac_exact_exchange", &CXCFunctional::getFractionOfExactExchange)
+        .def("get_func_type", &CXCFunctional::getFunctionalType)
+        .def("get_func_label", &CXCFunctional::getLabel)
+        .def("is_hybrid", &CXCFunctional::isHybridFunctional)
+        .def("is_undefined", &CXCFunctional::isUndefined)
+        .def(py::self == py::self);
+    
     // CMolecularGrid class
 
     py::class_<CMolecularGrid, std::shared_ptr<CMolecularGrid>>(m, "MolecularGrid")
@@ -116,9 +178,28 @@ export_dft(py::module& m)
         .def(py::init(&CDensityGridDriver_create))
         .def("generate", &CDensityGridDriver::generate);
 
+    // CXCIntegrator class
+
+    py::class_<CXCIntegrator, std::shared_ptr<CXCIntegrator>>(m, "XCIntegrator")
+        .def(py::init(&CXCIntegrator_create))
+        .def("integrate", (CAOKohnShamMatrix (CXCIntegrator::*)(const CAODensityMatrix&,
+                                                                const CMolecule&,
+                                                                const CMolecularBasis&,
+                                                                const CMolecularGrid&,
+                                                                const std::string&) const) & CXCIntegrator::integrate)
+        .def("integrate", (void (CXCIntegrator::*)(      CAOFockMatrix&,
+                                                   const CAODensityMatrix&,
+                                                   const CAODensityMatrix&,
+                                                   const CMolecule&,
+                                                   const CMolecularBasis&,
+                                                   const CMolecularGrid&,
+                                                   const std::string&) const) &  CXCIntegrator::integrate);
+    
     // exposing functions
 
     m.def("to_xcfun", &to_xcfun);
+    
+    m.def("parse_xc_func", &vxcfuncs::getExchangeCorrelationFunctional);
 }
 
 }  // namespace vlx_dft

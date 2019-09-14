@@ -211,6 +211,14 @@ class CAODensityMatrix
      @return the string representation.
      */
     std::string getString() const;
+    
+    
+    /**
+     Checks if AO density matrix of spin restricted type.
+
+     @return true if AO density of spin restricted type.
+     */
+    bool isRestricted() const;
 
     /**
      Broadcasts AO density matrix object within domain of MPI communicator.

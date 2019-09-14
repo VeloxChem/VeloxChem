@@ -58,7 +58,7 @@ def main():
             exciton_dict = {}
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
-        exciton_drv.update_settings(exciton_dict)
+        exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Hartree-Fock
@@ -142,14 +142,14 @@ def main():
             rsp_dict = task.input_dict['response']
 
             if rsp_dict['property'].lower() == 'polarizability':
-                polar = Polarizability(rsp_dict)
+                polar = Polarizability(rsp_dict, method_dict)
                 polar.init_driver(task.mpi_comm, task.ostream)
                 polar.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():
                     polar.print_property(task.ostream)
 
             elif rsp_dict['property'].lower() == 'absorption':
-                abs_spec = Absorption(rsp_dict)
+                abs_spec = Absorption(rsp_dict, method_dict)
                 abs_spec.init_driver(task.mpi_comm, task.ostream)
                 abs_spec.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():
@@ -174,7 +174,7 @@ def main():
             cpp_dict = {}
 
         crsp_drv = ComplexResponse(task.mpi_comm, task.ostream)
-        crsp_drv.update_settings(cpp_dict)
+        crsp_drv.update_settings(cpp_dict, method_dict)
         crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
 
@@ -205,7 +205,13 @@ def main():
 
     if 'mp2' in task_types and scf_drv.restricted:
 
+        if 'mp2' in task.input_dict:
+            mp2_dict = task.input_dict['mp2']
+        else:
+            mp2_dict = {}
+
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        mp2_drv.update_settings(mp2_dict)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
     # Cube file

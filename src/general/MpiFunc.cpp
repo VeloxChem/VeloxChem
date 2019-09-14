@@ -407,6 +407,23 @@ reduce_sum(const double* source, double* destination, const int32_t nElements, M
         mathfunc::copy(destination, 0, source, 0, nElements);
     }
 }
+    
+double
+reduce_sum(const double value, MPI_Comm comm)
+{
+    if (ENABLE_MPI)
+    {
+        double dval = 0.0;
+        
+        mpi::reduce_sum(&value, &dval, 1, comm);
+        
+        MPI_Barrier(comm);
+        
+        return dval;
+    }
+    
+    return value;
+}
 
 // TODO: Add other MPI functions for generic types
 

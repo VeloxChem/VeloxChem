@@ -16,7 +16,6 @@
 
 namespace ldarec {  // ldarec namespace
     
-  
     /**
      Computes S-type GTOs values on given grid.
 

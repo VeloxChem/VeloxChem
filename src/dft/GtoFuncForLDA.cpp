@@ -291,6 +291,4 @@ namespace ldarec {  // ldarec namespace
         genfunc::transform(spherGtoGridBuffer, cartGtoGridBuffer, CSphericalMomentum(2), 0, 0, ngpnts, 1);
     }
     
-    
-    
 }  // namespace ldarec

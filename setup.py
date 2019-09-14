@@ -43,7 +43,7 @@ class MyInstall(SetuptoolsInstall):
 
 
 setup(
-    name='VeloxChem',
+    name='veloxchem',
     version='0.0',
     packages=[
         'veloxchem',
@@ -58,16 +58,11 @@ setup(
         ],
     },
     scripts=[
-        os.path.join('build', 'bin', 'VeloxChemMain.py'),
+        os.path.join('build', 'bin', 'vlx'),
     ],
-    entry_points={
-        'console_scripts': [
-            'veloxchem=veloxchem.main:main',
-            'vlx=veloxchem.main:main',
-        ],
-    },
     python_requires='>=3.5',
     install_requires=[
+        'pybind11>=2.3.0',
         'mpi4py>=3.0',
         'numpy>=1.13',
         'h5py>=2.8',

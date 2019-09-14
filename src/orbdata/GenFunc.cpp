@@ -250,7 +250,7 @@ transform(CMemBlock2D<double>&       spherData,
 }
 
 void
-transform(CMemBlock2D<double>&       spherData,
+transform(      CMemBlock2D<double>& spherData,
           const CMemBlock2D<double>& cartData,
           const CSphericalMomentum&  braMomentum,
           const CSphericalMomentum&  ketMomentum,

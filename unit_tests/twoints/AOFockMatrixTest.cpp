@@ -115,7 +115,7 @@ TEST_F(CAOFockMatrixTest, MoveAssignment)
     ASSERT_EQ(fmata, fmatb);
 }
 
-TEST_F(CAOFockMatrixTest, SetType)
+TEST_F(CAOFockMatrixTest, SetFockType)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
     
@@ -133,6 +133,29 @@ TEST_F(CAOFockMatrixTest, SetType)
     
     CAOFockMatrix fmatb({ma, ma, mb, mb}, {fockmat::restjkx, fockmat::restkx,
                         fockmat::restj, fockmat::restjk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
+    
+    ASSERT_EQ(fmata, fmatb);
+}
+
+TEST_F(CAOFockMatrixTest, SetFockScaleFactor)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAOFockMatrix fmata({ma, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                        fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
+    
+    fmata.setFockScaleFactor(3.2, 0);
+    
+    fmata.setFockScaleFactor(2.1, 1);
+    
+    fmata.setFockScaleFactor(0.5, 3);
+    
+    CAOFockMatrix fmatb({ma, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                        fockmat::restj, fockmat::restk}, {3.2, 2.1, 0.0, 0.5},
                         {0, 2, 3, 6});
     
     ASSERT_EQ(fmata, fmatb);
@@ -207,6 +230,31 @@ TEST_F(CAOFockMatrixTest, Add)
                         {0, 2, 3, 6});
     
     ASSERT_EQ(fmatb, fmatc);
+}
+
+TEST_F(CAOFockMatrixTest, Scale)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAOFockMatrix fmata({ma, ma, mb, mb}, {fockmat::restj, fockmat::restk,
+                        fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
+    
+    fmata.scale(2.0, 0);
+    
+    fmata.scale(3.0, 3);
+    
+    CDenseMatrix mc({2.0, -2.0, -6.0, -4.0, 10.0, 8.0, 12.0, 8.0, -8.0}, 3, 3);
+    
+    CDenseMatrix md({3.0, -3.0, -9.0, -6.0, 15.0, 12.0}, 3, 2);
+    
+    CAOFockMatrix fmatb({mc, ma, mb, md}, {fockmat::restj, fockmat::restk,
+                        fockmat::restj, fockmat::restk}, {1.0, 2.0, 0.0, 1.0},
+                        {0, 2, 3, 6});
+    
+    ASSERT_EQ(fmata, fmatb);
 }
 
 TEST_F(CAOFockMatrixTest, GetNumberOfFockMatrices)
