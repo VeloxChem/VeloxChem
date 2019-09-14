@@ -4,6 +4,7 @@ import os
 
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
+from .veloxchemlib import CudaDevices
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -42,6 +43,12 @@ def main():
 
     task_types = task.input_dict['jobs']['task'].lower().split(',')
     task_types = [x.strip() for x in task_types]
+
+    # initializa CUDA capable devices 
+
+    gpu_devs = CudaDevices()
+    if gpu_devs.get_number_devices() > 0:
+        print(gpu_devs)
 
     if 'method_settings' in task.input_dict:
         method_dict = task.input_dict['method_settings']

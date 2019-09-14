@@ -134,7 +134,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File(h5file)
+            hf = h5py.File(h5file, 'r')
             ref_S11 = np.array(hf.get("S_h2o_def2-svp"))
             ref_T11 = np.array(hf.get("T_h2o_def2-svp"))
             ref_V11 = np.array(hf.get("V_h2o_def2-svp"))
@@ -160,7 +160,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File(h5file)
+            hf = h5py.File(h5file, 'r')
             ref_S12 = np.array(hf.get("S_h2o_def2-svp_cc-pvdz"))
             ref_T12 = np.array(hf.get("T_h2o_def2-svp_cc-pvdz"))
             ref_V12 = np.array(hf.get("V_h2o_def2-svp_cc-pvdz"))
@@ -187,7 +187,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File(h5file)
+            hf = h5py.File(h5file, 'r')
             ref_S12 = np.array(hf.get("S_h2o_nh3_def2-svp"))
             ref_T12 = np.array(hf.get("T_h2o_nh3_def2-svp"))
             ref_V12 = np.array(hf.get("V_h2o_nh3_def2-svp"))
@@ -215,7 +215,7 @@ class TestOneInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            hf = h5py.File(h5file)
+            hf = h5py.File(h5file, 'r')
             ref_S12 = np.array(hf.get("S_h2o_def2-svp_nh3_cc-pvdz"))
             ref_T12 = np.array(hf.get("T_h2o_def2-svp_nh3_cc-pvdz"))
             ref_V12 = np.array(hf.get("V_h2o_def2-svp_nh3_cc-pvdz"))

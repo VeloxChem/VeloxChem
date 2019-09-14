@@ -55,6 +55,16 @@ CAOKohnShamMatrix_reduce_sum(CAOKohnShamMatrix& self, int32_t rank, int32_t node
 
     self.reduce_sum(rank, nodes, *comm_ptr);
 }
+
+// Helper function for collect CAOKohnShamMatrix object
+
+static void
+CAOKohnShamMatrix_collect(CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, py::object py_comm, int32_t source)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    self.collect(rank, nodes, *comm_ptr, source);
+}
     
 // Helper function for getting grid coordinates and weigths as numpy array
 
@@ -90,6 +100,16 @@ CMolecularGrid_distribute(CMolecularGrid& self, int32_t rank, int32_t nodes, py:
     MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
     self.distribute(rank, nodes, *comm_ptr);
+}
+
+// Helper function for broadcasting CMolecularGrid object
+
+static void
+CMolecularGrid_broadcast(CMolecularGrid& self, int32_t rank, py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    self.broadcast(rank, *comm_ptr);
 }
 
 // Helper function for CGridDriver constructor
@@ -137,6 +157,7 @@ export_dft(py::module& m)
         .def("__str__", &CAOKohnShamMatrix_str)
         .def("get_matrix", &CAOKohnShamMatrix::getReferenceToKohnSham, py::arg("beta") = false)
         .def("reduce_sum", &CAOKohnShamMatrix_reduce_sum)
+        .def("collect", &CAOKohnShamMatrix_collect)
         .def("get_electrons", &CAOKohnShamMatrix::getNumberOfElectrons)
         .def("get_energy", &CAOKohnShamMatrix::getExchangeCorrelationEnergy)
         .def(py::self == py::self);
@@ -163,6 +184,7 @@ export_dft(py::module& m)
         .def("z_to_numpy", &CMolecularGrid_z_to_numpy)
         .def("w_to_numpy", &CMolecularGrid_w_to_numpy)
         .def("distribute", &CMolecularGrid_distribute)
+        .def("broadcast", &CMolecularGrid_broadcast)
         .def(py::self == py::self);
 
     // CGridDriver class

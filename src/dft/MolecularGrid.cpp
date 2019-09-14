@@ -163,6 +163,12 @@ CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
 }
 
 void
+CMolecularGrid::broadcast(int32_t rank, MPI_Comm comm)
+{
+    _gridPoints.broadcast(rank, comm);
+}
+
+void
 CMolecularGrid::read_blocked_grid(const std::string& fileName)
 {
     const int32_t mpoints = 20000000;

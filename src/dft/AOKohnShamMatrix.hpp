@@ -166,6 +166,16 @@ public:
     void reduce_sum(int32_t  rank,
                     int32_t  nodes,
                     MPI_Comm comm);
+
+    /**
+     Collect Kohn-Sham matrix object to master node of MPI communicator.
+
+     @param rank the rank of MPI process.
+     @param nodes the number of MPI processes in MPI communicator.
+     @param comm the MPI communicator.
+     @param source the rank of MPI process that provides the Kohn-Sham matrix.
+     */
+    void collect(int32_t rank, int32_t nodes, MPI_Comm comm, int32_t source);
     
     /**
      Checks if the Fock matrices are restricted.

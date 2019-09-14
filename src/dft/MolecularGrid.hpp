@@ -174,6 +174,15 @@ class CMolecularGrid
      @param comm he MPI communicator.
      */
     void distribute(int32_t rank, int32_t nodes, MPI_Comm comm);
+
+    /**
+     Broadcasts grid points data across a molecular grid objects within domain
+     of MPI communacator.
+
+     @param rank the rank of MPI process.
+     @param comm he MPI communicator.
+     */
+    void broadcast(int32_t rank, MPI_Comm comm);
     
     /**
      Reads raw blocked grid data from DALTON program quad file. NOTE: maximum allowed number of grid points

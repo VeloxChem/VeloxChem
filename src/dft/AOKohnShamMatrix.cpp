@@ -6,7 +6,10 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
+#include <string>
+
 #include "AOKohnShamMatrix.hpp"
+#include "ErrorHandler.hpp"
 
 CAOKohnShamMatrix::CAOKohnShamMatrix()
     : _xcMatrices(std::vector<CDenseMatrix>())
@@ -188,6 +191,107 @@ CAOKohnShamMatrix::reduce_sum(int32_t  rank,
     fsum = mpi::reduce_sum(_xcEnergy, comm);
     
     _xcEnergy = fsum; 
+}
+
+void
+CAOKohnShamMatrix::collect(int32_t rank, int32_t nodes, MPI_Comm comm, int32_t source)
+{
+    if (ENABLE_MPI)
+    {
+        std::string errsource("CAOKohnShamMatrix.collect: invalid rank for the source");
+
+        errors::assertMsgCritical(0 <= source && source < nodes, errsource);
+
+        // master: receive data
+
+        if (rank == mpi::master())
+        {
+            int32_t tag_id = source;
+
+            MPI_Status mstat;
+
+            // xc_integers: nxcmats, nrows, ncols, rest
+
+            std::vector<int32_t> xc_integers(4);
+
+            auto merror = MPI_Recv(xc_integers.data(), xc_integers.size(), MPI_INT, source, tag_id++, comm, &mstat);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_integers");
+
+            int32_t nxcmats = xc_integers[0];
+
+            int32_t nrows = xc_integers[1];
+
+            int32_t ncols = xc_integers[2];
+
+            _xcRestricted = (xc_integers[3] == 1) ? true : false;
+
+            // xc_doubles: xc_electrons, xc_energy
+
+            std::vector<double> xc_doubles(2);
+
+            merror = MPI_Recv(xc_doubles.data(), xc_doubles.size(), MPI_DOUBLE, source, tag_id++, comm, &mstat);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_doubles");
+
+            _xcElectrons = xc_doubles[0];
+
+            _xcEnergy = xc_doubles[1];
+
+            // _xcMatrices
+
+            std::vector<double> data(nrows * ncols);
+
+            for (int32_t imat = 0; imat < nxcmats; imat++)
+            {
+                merror = MPI_Recv(data.data(), nrows * ncols, MPI_DOUBLE, source, tag_id++, comm, &mstat);
+
+                if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_matrices");
+
+                _xcMatrices.push_back(CDenseMatrix(data, nrows, ncols));
+            }
+        }
+
+        // source: send data
+
+        else if (rank == source)
+        {
+            int32_t tag_id = rank;
+
+            // xc_integers: nxcmats, nrows, ncols, rest
+
+            int32_t nxcmats = static_cast<int32_t>(_xcMatrices.size());
+
+            int32_t nrows = getNumberOfRows();
+
+            int32_t ncols = getNumberOfColumns();
+
+            int32_t rest = _xcRestricted ? 1 : 0;
+
+            std::vector<int32_t> xc_integers({nxcmats, nrows, ncols, rest});
+
+            auto merror = MPI_Send(xc_integers.data(), xc_integers.size(), MPI_INT, mpi::master(), tag_id++, comm);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_integers");
+
+            // xc_doubles: xc_electrons, xc_energy
+
+            std::vector<double> xc_doubles({_xcElectrons, _xcEnergy});
+
+            merror = MPI_Send(xc_doubles.data(), xc_doubles.size(), MPI_DOUBLE, mpi::master(), tag_id++, comm);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_doubles");
+
+            // _xcMatrices
+
+            for (int32_t imat = 0; imat < nxcmats; imat++)
+            {
+                merror = MPI_Send(_xcMatrices[imat].values(), nrows * ncols, MPI_DOUBLE, mpi::master(), tag_id++, comm);
+
+                if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_matrices");
+            }
+        }
+    }
 }
 
 bool

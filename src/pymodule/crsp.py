@@ -6,7 +6,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
+from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
 from .lrmatvecdriver import orthogonalize_gram_schmidt
@@ -14,6 +16,8 @@ from .lrmatvecdriver import normalize
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_rhs
+from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import write_rsp_hdf5
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -48,6 +52,8 @@ class ComplexResponse:
         The XC functional.
     :param molgrid:
         The molecular grid.
+    :param gs_density:
+        The ground state density matrix.
     :param max_iter:
         The maximum number of solver iterations.
     :param conv_thresh:
@@ -68,6 +74,10 @@ class ComplexResponse:
         Number of MPI processes.
     :param ostream:
         The output stream.
+    :param restart:
+        The flag for restarting from checkpoint file.
+    :param checkpoint_file:
+        The name of checkpoint file.
     :param timing:
         The flag for printing timing information.
     :param profiling:
@@ -99,6 +109,7 @@ class ComplexResponse:
         self.grid_level = 4
         self.xcfun = XCFunctional()
         self.molgrid = MolecularGrid()
+        self.gs_density = AODensityMatrix()
 
         self.max_iter = 150
         self.conv_thresh = 1.0e-4
@@ -114,49 +125,60 @@ class ComplexResponse:
 
         self.ostream = ostream
 
+        self.restart = True
+        self.checkpoint_file = None
+
         self.timing = False
         self.profiling = False
 
-    def update_settings(self, settings, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict={}):
         """
-        Updates settings in complex liner response solver.
+        Updates response and method settings in complex liner response solver.
 
-        :param settings:
-            The settings dictionary.
+        :param rsp_dict:
+            The dictionary of response dict.
+        :param method_dict:
+            The dictionary of method rsp_dict.
         """
 
-        if 'a_operator' in settings:
-            self.a_operator = settings['a_operator'].lower()
-        if 'a_components' in settings:
-            self.a_components = settings['a_components'].lower()
-        if 'b_operator' in settings:
-            self.b_operator = settings['b_operator'].lower()
-        if 'b_components' in settings:
-            self.b_components = settings['b_components'].lower()
+        if 'a_operator' in rsp_dict:
+            self.a_operator = rsp_dict['a_operator'].lower()
+        if 'a_components' in rsp_dict:
+            self.a_components = rsp_dict['a_components'].lower()
+        if 'b_operator' in rsp_dict:
+            self.b_operator = rsp_dict['b_operator'].lower()
+        if 'b_components' in rsp_dict:
+            self.b_components = rsp_dict['b_components'].lower()
 
-        if 'frequencies' in settings:
-            self.frequencies = parse_frequencies(settings['frequencies'])
-        if 'damping' in settings:
-            self.damping = float(settings['damping'])
+        if 'frequencies' in rsp_dict:
+            self.frequencies = parse_frequencies(rsp_dict['frequencies'])
+        if 'damping' in rsp_dict:
+            self.damping = float(rsp_dict['damping'])
 
-        if 'lindep_thresh' in settings:
-            self.lindep_thresh = float(settings['lindep_thresh'])
+        if 'lindep_thresh' in rsp_dict:
+            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
 
-        if 'conv_thresh' in settings:
-            self.conv_thresh = float(settings['conv_thresh'])
-        if 'max_iter' in settings:
-            self.max_iter = int(settings['max_iter'])
+        if 'conv_thresh' in rsp_dict:
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
+        if 'max_iter' in rsp_dict:
+            self.max_iter = int(rsp_dict['max_iter'])
 
-        if 'eri_thresh' in settings:
-            self.eri_thresh = float(settings['eri_thresh'])
-        if 'qq_type' in settings:
-            self.qq_type = settings['qq_type'].upper()
+        if 'eri_thresh' in rsp_dict:
+            self.eri_thresh = float(rsp_dict['eri_thresh'])
+        if 'qq_type' in rsp_dict:
+            self.qq_type = rsp_dict['qq_type'].upper()
 
-        if 'timing' in settings:
-            key = settings['timing'].lower()
+        if 'restart' in rsp_dict:
+            key = rsp_dict['restart'].lower()
+            self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in rsp_dict:
+            self.checkpoint_file = rsp_dict['checkpoint_file']
+
+        if 'timing' in rsp_dict:
+            key = rsp_dict['timing'].lower()
             self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in settings:
-            key = settings['profiling'].lower()
+        if 'profiling' in rsp_dict:
+            key = rsp_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
 
         if 'dft' in method_dict:
@@ -524,6 +546,16 @@ class ComplexResponse:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+            if self.rank == mpi_master():
+                self.gs_density = AODensityMatrix([scf_tensors['D'][0]],
+                                                  denmat.rest)
+            self.gs_density.broadcast(self.rank, self.comm)
+
+        if self.dft:
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            dft_func_label = 'HF'
+
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -556,51 +588,66 @@ class ComplexResponse:
             # calling the gradients
 
             v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
+            op_freq_keys = [(op, w) for op in v1 for w in freqs]
 
             # creating the preconditioner matrix
 
-            precond_start_time = tm.time()
             precond = {
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
-            self.ostream.print_info(
-                'Precondition {} created in {:.2f} sec.'.format(
-                    'matrices' if len(freqs) > 1 else 'matrix',
-                    tm.time() - precond_start_time))
-            self.ostream.print_blank()
-            self.ostream.flush()
 
-            # spawning initial trial vectors
+        # read initial guess from restart file
 
-            igs = self.initial_guess(v1, d, freqs, precond)
-            bger, bung = self.setup_trials(igs)
+        if self.restart:
+            if self.rank == mpi_master():
+                bger, bung, e2bger, e2bung = read_rsp_hdf5(
+                    self.checkpoint_file,
+                    ['CLR_bger', 'CLR_bung', 'CLR_e2bger', 'CLR_e2bung'],
+                    molecule.nuclear_repulsion_energy(),
+                    molecule.elem_ids_to_numpy(), basis.get_label(),
+                    dft_func_label, self.ostream)
+                self.restart = (bger is not None and bung is not None and
+                                e2bger is not None and e2bung is not None)
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
-            assert_msg_critical(
-                bger.any() or bung.any(),
-                'ComplexResponseSolver: trial vectors are empty')
+        # generate initial guess from scratch
 
-            if not bger.any():
-                bger = np.zeros((bung.shape[0], 0))
-            if not bung.any():
-                bung = np.zeros((bger.shape[0], 0))
+        if not self.restart:
+            if self.rank == mpi_master():
 
-            # creating sigma and rho linear transformations
+                # spawning initial trial vectors
 
-        if self.timing:
-            self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
-            timing_t0 = tm.time()
+                igs = self.initial_guess(v1, d, freqs, precond)
+                bger, bung = self.setup_trials(igs)
 
-        btot = None
+                assert_msg_critical(
+                    bger.any() or bung.any(),
+                    'ComplexResponseSolver: trial vectors are empty')
+
+                if not bger.any():
+                    bger = np.zeros((bung.shape[0], 0))
+                if not bung.any():
+                    bung = np.zeros((bger.shape[0], 0))
+
+                # creating sigma and rho linear transformations
+
+            if self.timing:
+                self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
+                timing_t0 = tm.time()
+
+            btot = None
+            if self.rank == mpi_master():
+                btot = np.hstack((bger, bung))
+
+            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
+                                 self.dft, self.xcfun, self.molgrid,
+                                 self.gs_density)
+
+            if self.rank == mpi_master():
+                e2bger = e2btot[:, :bger.shape[1]]
+                e2bung = e2btot[:, bger.shape[1]:]
+
         if self.rank == mpi_master():
-            btot = np.hstack((bger, bung))
-
-        e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
-                             self.dft, self.xcfun, self.molgrid)
-
-        if self.rank == mpi_master():
-            e2bger = e2btot[:, :bger.shape[1]]
-            e2bung = e2btot[:, bger.shape[1]:]
-
             s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
             s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
 
@@ -624,7 +671,7 @@ class ComplexResponse:
             if self.rank == mpi_master():
                 nvs = []
 
-                for op, w in igs:
+                for op, w in op_freq_keys:
                     if iteration == 0 or (relative_residual_norm[(op, w)] >
                                           self.conv_thresh):
                         grad = v1[op]
@@ -841,7 +888,7 @@ class ComplexResponse:
 
             new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
                                      molecule, basis, self.dft, self.xcfun,
-                                     self.molgrid)
+                                     self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
                 new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
@@ -855,6 +902,13 @@ class ComplexResponse:
 
                 s2bung = np.append(s2bung, new_s2bung, axis=1)
                 s2bger = np.append(s2bger, new_s2bger, axis=1)
+
+                write_rsp_hdf5(
+                    self.checkpoint_file, [bger, bung, e2bger, e2bung],
+                    ['CLR_bger', 'CLR_bung', 'CLR_e2bger', 'CLR_e2bung'],
+                    molecule.nuclear_repulsion_energy(),
+                    molecule.elem_ids_to_numpy(), basis.get_label(),
+                    dft_func_label, self.ostream)
 
             if self.timing:
                 tid = iteration + 1
