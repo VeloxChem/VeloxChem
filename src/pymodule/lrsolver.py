@@ -247,7 +247,6 @@ class LinearResponseSolver:
             grid_t0 = tm.time()
             self.molgrid = grid_drv.generate(molecule)
             n_grid_points = self.molgrid.number_of_points()
-            self.molgrid.distribute(self.rank, self.nodes, self.comm)
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,

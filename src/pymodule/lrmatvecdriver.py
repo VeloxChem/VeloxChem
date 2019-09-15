@@ -1,5 +1,6 @@
 from os.path import isfile
 import numpy as np
+import time as tm
 import itertools
 import h5py
 
@@ -11,11 +12,13 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
 from .errorhandler import assert_msg_critical
+from .subcommunicators import SubCommunicators
 
 
 class LinearResponseMatrixVectorDriver:
@@ -42,6 +45,8 @@ class LinearResponseMatrixVectorDriver:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
+        self.split_comm_ratio = None
 
     def e2n(self,
             vecs,
@@ -209,19 +214,8 @@ class LinearResponseMatrixVectorDriver:
         for i in range(fock.number_of_fock_matrices()):
             fock.set_fock_type(fock_flag, i)
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        eri_drv.compute(fock, dens, molecule, basis, screening)
-
-        # add XC contribution to Fock
-        if dft:
-            if not xcfun.is_hybrid():
-                for ifock in range(fock.number_of_fock_matrices()):
-                    fock.scale(2.0, ifock)
-            xc_drv = XCIntegrator(self.comm)
-            xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
-                             xcfun.get_func_label())
-
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
+        self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
+                          molgrid, gs_density)
 
         fabs = []
         if self.rank == mpi_master():
@@ -243,6 +237,135 @@ class LinearResponseMatrixVectorDriver:
             return tuple(fabs)
         else:
             return None
+
+    def comp_lr_fock(self, fock, dens, molecule, basis, screening, dft, xcfun,
+                     molgrid, gs_density):
+        """
+        Computes Fock/Fxc matrix (2e part) for linear response calculation.
+
+        :param fock:
+            The Fock matrix (2e part).
+        :param dens:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screening:
+            The screening container object.
+        :param dft:
+            The DFT flag if true compute XC contribution, if false otherwise.
+        :param xcfun:
+            The exchange correlation functional.
+        :param molgrid:
+            The molecular grid for XC contributtion computation.
+        :param gs_density:
+            The ground state density matrix.
+        """
+
+        if dft and self.nodes >= 4:
+            self.comp_lr_fock_split_comm(fock, dens, molecule, basis, screening,
+                                         dft, xcfun, molgrid, gs_density)
+
+        else:
+            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+            eri_drv.compute(fock, dens, molecule, basis, screening)
+            if dft:
+                if not xcfun.is_hybrid():
+                    for ifock in range(fock.number_of_fock_matrices()):
+                        fock.scale(2.0, ifock)
+                xc_drv = XCIntegrator(self.comm)
+                molgrid.distribute(self.rank, self.nodes, self.comm)
+                xc_drv.integrate(fock, dens, gs_density, molecule, basis,
+                                 molgrid, xcfun.get_func_label())
+            fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+    def comp_lr_fock_split_comm(self, fock, dens, molecule, basis, screening,
+                                dft, xcfun, molgrid, gs_density):
+        """
+        Computes linear response Fock/Fxc matrix on split communicators.
+
+        :param fock:
+            The Fock matrix (2e part).
+        :param dens:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screening:
+            The screening container object.
+        :param dft:
+            The DFT flag if true compute XC contribution, if false otherwise.
+        :param xcfun:
+            The exchange correlation functional.
+        :param molgrid:
+            The molecular grid for XC contributtion computation.
+        :param gs_density:
+            The ground state density matrix.
+        """
+
+        if self.split_comm_ratio is None:
+            self.split_comm_ratio = [0.5, 0.5]
+        eri_nodes = int(float(self.nodes) * self.split_comm_ratio[0] + 0.5)
+        dft_nodes = self.nodes - eri_nodes
+
+        if eri_nodes < 1:
+            eri_nodes = 1
+            dft_nodes = self.nodes - eri_nodes
+
+        if dft_nodes < 1:
+            dft_nodes = 1
+            eri_nodes = self.nodes - dft_nodes
+
+        node_grps = [0] * eri_nodes + [1] * dft_nodes
+        eri_comm = (node_grps[self.rank] == 0)
+        dft_comm = (node_grps[self.rank] == 1)
+
+        subcomms = SubCommunicators(self.comm, node_grps)
+        local_comm = subcomms.local_comm
+        cross_comm = subcomms.cross_comm
+
+        # calculate Fock on ERI nodes
+        if eri_comm:
+            t0 = tm.time()
+            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
+            eri_drv.compute(fock, dens, molecule, basis, screening)
+            if dft:
+                if not xcfun.is_hybrid():
+                    for ifock in range(fock.number_of_fock_matrices()):
+                        fock.scale(2.0, ifock)
+            dt = tm.time() - t0
+
+        # reset molecular grid
+        if self.rank != mpi_master():
+            molgrid = MolecularGrid()
+        if local_comm.Get_rank() == mpi_master():
+            molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
+
+        # calculate Fxc on DFT nodes
+        if dft_comm:
+            t0 = tm.time()
+            xc_drv = XCIntegrator(local_comm)
+            molgrid.distribute(local_comm.Get_rank(), local_comm.Get_size(),
+                               local_comm)
+            xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
+                             xcfun.get_func_label())
+            dt = tm.time() - t0
+
+        # collect Fock on master node
+        fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+        dt = self.comm.gather(dt, root=mpi_master())
+        if self.rank == mpi_master():
+            time_eri = sum(dt[:eri_nodes])
+            time_dft = sum(dt[eri_nodes:])
+            self.split_comm_ratio = [
+                time_eri / (time_eri + time_dft),
+                time_dft / (time_eri + time_dft),
+            ]
+        self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
+                                                root=mpi_master())
 
     def s2n(self, vecs, tensors, nocc):
         """

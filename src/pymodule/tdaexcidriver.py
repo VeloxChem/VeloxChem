@@ -424,7 +424,7 @@ class TDAExciDriver:
     def comp_tda_fock_split_comm(self, fock, tdens, gsdens, molecule, basis,
                                  screening):
         """
-        Computes Fock/Kohn-Sham matrix on split communicators.
+        Computes TDA Fock/Fxc matrix on split communicators.
 
         :param fock:
             The Fock matrix (2e part).
@@ -478,7 +478,7 @@ class TDAExciDriver:
         if local_comm.Get_rank() == mpi_master():
             self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
 
-        # calculate Vxc on DFT nodes
+        # calculate Fxc on DFT nodes
         if dft_comm:
             t0 = tm.time()
             xc_drv = XCIntegrator(local_comm)
