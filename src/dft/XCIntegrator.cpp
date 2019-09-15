@@ -142,10 +142,6 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     {
         for (int32_t i = 0; i < ndmat; i++)
         {
-            // rescale AO Fock matrix for non-hybrid functionals
-            
-            if (!fvxc.isHybridFunctional()) aoFockMatrix.scale(2.0, i);
-            
             // compute gradient and hessian of exchange-correlation functional
             
             CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());

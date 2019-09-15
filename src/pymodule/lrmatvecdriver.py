@@ -214,6 +214,9 @@ class LinearResponseMatrixVectorDriver:
 
         # add XC contribution to Fock
         if dft:
+            if not xcfun.is_hybrid():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    fock.scale(2.0, ifock)
             xc_drv = XCIntegrator(self.comm)
             xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
                              xcfun.get_func_label())
