@@ -35,7 +35,9 @@ getDevicesProperty(std::vector<std::string>& namesOfDevices,
 
         namesOfDevices.push_back(std::string(prop.name));
 
-        globalMemoryOfDevices.push_back(static_cast<int32_t>(prop.totalGlobalMem));
+        auto globalMemInMB = static_cast<double>(prop.totalGlobalMem) / std::pow(1024, 2);
+
+        globalMemoryOfDevices.push_back(static_cast<int32_t>(globalMemInMB));
 
         computeMajorCapabilityOfDevices.push_back(static_cast<int32_t>(prop.major));
 

@@ -28,7 +28,7 @@ class CCudaDevices
     std::vector<std::string> _namesOfDevices;
     
     /**
-     The vector of available global memory on CUDA compute capable devices.
+     The vector of available global memory (in megabyte) on CUDA compute capable devices.
      */
     std::vector<int32_t> _globalMemoryOfDevices;
     
