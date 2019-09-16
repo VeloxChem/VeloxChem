@@ -82,7 +82,7 @@ CCudaDevices::getString() const
         
         str.assign("  Global memory:           ");
         
-        auto glbmem = static_cast<double>(_globalMemoryOfDevices[i]) / 1024;
+        auto glbmem = static_cast<double>(_globalMemoryOfDevices[i]) / 1024.0;
         
         str.append(fstr::to_string(glbmem, 0));
         
