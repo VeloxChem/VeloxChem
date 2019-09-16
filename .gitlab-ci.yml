@@ -7,7 +7,6 @@
 #  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 before_script:
-  - . /opt/intel/bin/compilervars.sh intel64
   - export PATH=/opt/intel/intelpython3/bin:$PATH
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
   - export OMP_NUM_THREADS=10
@@ -25,6 +24,7 @@ velxochem_build:
     - vlx-test
   stage: build
   script:
+    - source /opt/intel/bin/compilervars.sh intel64
     - python3 config/generate_setup.py
     - make -j 10 -C src release && make -j 10 -C unit_tests release
 
@@ -33,6 +33,7 @@ veloxchem_test:
     - vlx-test
   stage: test
   script:
+    - source /opt/intel/bin/compilervars.sh intel64
     - python3 config/generate_setup.py
     - make -j 10 -C src release && make -j 10 -C unit_tests release
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
