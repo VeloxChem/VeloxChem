@@ -19,15 +19,16 @@ LOCAL_CU_OBJ := $(subst .cu,.o,$(LOCAL_CU_SCR))
 LOCAL_CU_DEP := $(subst .cu,.d,$(LOCAL_CU_SCR))
 LOCAL_CU_OPT := $(subst .cu,.optrpt,$(LOCAL_CU_SCR))
 
+# Read in compilers & shell commands info
+include ../Makefile.setup
+
+# Add cuda objects
 ifeq ($(USE_GPU),true)
 LOCAL_SCR += $(LOCAL_CU_SCR)
 LOCAL_OBJ += $(LOCAL_CU_OBJ)
 LOCAL_DEP += $(LOCAL_CU_DEP)
 LOCAL_OPT += $(LOCAL_CU_OPT)
 endif
-
-# Read in compilers & shell commands info
-include ../Makefile.setup
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
