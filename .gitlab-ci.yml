@@ -12,6 +12,8 @@ before_script:
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
   - export OMP_NUM_THREADS=10
   - export PYTHONPATH=$PYTHONPATH:/home/xinli/software/cppe/build/stage/lib
+  - export GTESTROOT=/home/xinli/software/googletest/googletest
+  - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
 
 after_script:
   - echo "Done!"
