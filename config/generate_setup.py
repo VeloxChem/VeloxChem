@@ -286,10 +286,10 @@ def generate_setup(template_file, setup_file):
 
     # print Makefile.setup
 
-    with open(template_file, 'r') as f_temp:
+    with open(template_file, 'r', encoding='utf-8') as f_temp:
         lines = f_temp.readlines()
 
-    with open(setup_file, 'w') as f_mkfile:
+    with open(setup_file, 'w', encoding='utf-8') as f_mkfile:
         for line in lines:
             if '====placeholder====' in line:
                 print('# Automatically generated settings', file=f_mkfile)
