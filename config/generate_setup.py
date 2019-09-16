@@ -328,12 +328,6 @@ def generate_setup(template_file, setup_file):
                     print('CUDA_LIB :=', cuda_lib, file=f_mkfile)
                     print('', file=f_mkfile)
 
-                else:
-                    print('NVCC :=', cxx, file=f_mkfile)
-                    print('NVCC_REL_FLG :=', cxx_flags, file=f_mkfile)
-                    print('NVCC_DEB_FLG :=', cxx_flags, file=f_mkfile)
-                    print('', file=f_mkfile)
-
                 print('MACLIBS :=', maclibs, file=f_mkfile)
                 print('', file=f_mkfile)
 
