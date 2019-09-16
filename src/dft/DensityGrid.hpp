@@ -40,6 +40,34 @@ class CDensityGrid
      */
     CMemBlock2D<double> _densityValues;
     
+    /**
+     Checks if density grid point is within range of allowe density values for LDA case.
+
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForLDA(const double alphaDensity,
+                                 const double betaDensity,
+                                 const double densityThreshold) const;
+    
+    /**
+     Checks if density grid point is within range of allowe density values for GGA case.
+     
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param alphaDensityGradient the value of alpha density gradient at grid point.
+     @param betaDensityGradient the value of beta density gradient at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForGGA(const double alphaDensity,
+                                 const double betaDensity,
+                                 const double alphaDensityGradient,
+                                 const double betaDensityGradient,
+                                 const double densityThreshold) const;
+    
 public:
     /**
      Creates an empty density grid object.

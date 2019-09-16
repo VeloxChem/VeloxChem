@@ -163,9 +163,7 @@ CDensityGrid::updateBetaDensities()
     {
         for (int32_t i = 0; i < _nDensityMatrices; i++)
         {
-            auto rhoa = alphaDensity(i);
-            
-            auto rhob = betaDensity(i);
+            auto rhoa = alphaDensity(i); auto rhob = betaDensity(i);
             
             auto grada_x = alphaDensityGradientX(i);
             
@@ -184,11 +182,7 @@ CDensityGrid::updateBetaDensities()
             {
                 rhob[j] = rhoa[j];
                 
-                gradb_x[j] = grada_x[j];
-                
-                gradb_y[j] = grada_y[j];
-                
-                gradb_z[j] = grada_z[j];
+                gradb_x[j] = grada_x[j]; gradb_y[j] = grada_y[j]; gradb_z[j] = grada_z[j];
             }
         }
     }
@@ -511,11 +505,9 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if ((std::fabs(srhoa[i]) > densityThreshold) && (std::fabs(srhob[i]) > densityThreshold))
+            if (_isValidGridPointForLDA(srhoa[i], srhob[i], densityThreshold))
             {
-                drhoa[ipoints] = srhoa[i];
-                
-                drhob[ipoints] = srhob[i];
+                drhoa[ipoints] = srhoa[i]; drhob[ipoints] = srhob[i];
                 
                 ipoints++;
             }
@@ -568,30 +560,15 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if ((std::fabs(srhoa[i]) > densityThreshold) && (std::fabs(srhob[i]) > densityThreshold) &&
-                (sgrada[i]           > densityThreshold) && (sgradb[i]           > densityThreshold))
+            if (_isValidGridPointForGGA(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
             {
-                drhoa[ipoints] = srhoa[i];
+                drhoa[ipoints] = srhoa[i]; drhob[ipoints] = srhob[i];
                 
-                drhob[ipoints] = srhob[i];
+                dgrada[ipoints] = sgrada[i]; dgradb[ipoints] = sgradb[i]; dgradab[ipoints] = sgradab[i];
                 
-                dgrada[ipoints] = sgrada[i];
+                dgrada_x[ipoints] = sgrada_x[i]; dgrada_y[ipoints] = sgrada_y[i]; dgrada_z[ipoints] = sgrada_z[i];
                 
-                dgradb[ipoints] = sgradb[i];
-                
-                dgradab[ipoints] = sgradab[i];
-                
-                dgrada_x[ipoints] = sgrada_x[i];
-                
-                dgrada_y[ipoints] = sgrada_y[i];
-                
-                dgrada_z[ipoints] = sgrada_z[i];
-                
-                dgradb_x[ipoints] = sgradb_x[i];
-                
-                dgradb_y[ipoints] = sgradb_y[i];
-                
-                dgradb_z[ipoints] = sgradb_z[i];
+                dgradb_x[ipoints] = sgradb_x[i]; dgradb_y[ipoints] = sgradb_y[i]; dgradb_z[ipoints] = sgradb_z[i];
                 
                 ipoints++;
             }
@@ -643,15 +620,9 @@ CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGrids,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if ((std::fabs(rhoa[i]) > densityThreshold) && (std::fabs(rhob[i]) > densityThreshold))
+            if (_isValidGridPointForLDA(rhoa[i], rhob[i], densityThreshold))
             {
-                gx[ipoints] = gx[i];
-                
-                gy[ipoints] = gy[i];
-                
-                gz[ipoints] = gz[i];
-                
-                gw[ipoints] = gw[i];
+                gx[ipoints] = gx[i]; gy[ipoints] = gy[i]; gz[ipoints] = gz[i]; gw[ipoints] = gw[i];
                 
                 ipoints++;
             }
@@ -670,16 +641,9 @@ CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGrids,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if ((std::fabs(rhoa[i]) > densityThreshold) && (std::fabs(rhob[i]) > densityThreshold) &&
-                (grada[i]           > densityThreshold) && (gradb[i]           > densityThreshold))
+            if (_isValidGridPointForGGA(rhoa[i], rhob[i], grada[i], gradb[i], densityThreshold))
             {
-                gx[ipoints] = gx[i];
-                
-                gy[ipoints] = gy[i];
-                
-                gz[ipoints] = gz[i];
-                
-                gw[ipoints] = gw[i];
+                gx[ipoints] = gx[i]; gy[ipoints] = gy[i]; gz[ipoints] = gz[i]; gw[ipoints] = gw[i];
                 
                 ipoints++;
             }
@@ -691,6 +655,36 @@ CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGrids,
     mgrid.slice(ipoints);
     
     return mgrid;
+}
+
+bool
+CDensityGrid::_isValidGridPointForLDA(const double alphaDensity,
+                                      const double betaDensity,
+                                      const double densityThreshold) const
+{
+    if (std::fabs(alphaDensity) < densityThreshold) return false;
+    
+    if (std::fabs(betaDensity) < densityThreshold) return false;
+    
+    return true;
+}
+
+bool
+CDensityGrid::_isValidGridPointForGGA(const double alphaDensity,
+                                      const double betaDensity,
+                                      const double alphaDensityGradient,
+                                      const double betaDensityGradient,
+                                      const double densityThreshold) const
+{
+    if (std::fabs(alphaDensity) < densityThreshold) return false;
+    
+    if (std::fabs(betaDensity) < densityThreshold) return false;
+    
+    if (std::fabs(alphaDensityGradient) < densityThreshold) return false;
+    
+    if (std::fabs(betaDensityGradient) < densityThreshold) return false;
+    
+    return true;
 }
 
 std::ostream&
