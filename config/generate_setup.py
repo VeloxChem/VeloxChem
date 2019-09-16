@@ -111,7 +111,7 @@ def generate_setup(template_file, setup_file):
 
     # compiler information
 
-    print('*** Checking compiler... ', end='')
+    print('*** Checking c++ compiler... ', end='')
 
     if 'CXX' in os.environ:
         cxx, cxx_path = find_exe([os.environ['CXX']])
