@@ -602,7 +602,9 @@ class ComplexResponse:
 
             if not self.nonlinear:
                 v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
-            op_freq_keys = [(op, w) for op in v1 for w in freqs]
+                op_freq_keys = [(op, w) for op in v1 for w in freqs]
+            else:
+                op_freq_keys = [op for op in v1]
 
             # creating the preconditioner matrix
 
