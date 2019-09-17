@@ -48,6 +48,39 @@ class LinearResponseMatrixVectorDriver:
 
         self.split_comm_ratio = None
 
+    def e2n_half_size(self,
+                      vecs_ger,
+                      vecs_ung,
+                      tensors,
+                      screening,
+                      molecule,
+                      basis,
+                      dft=None,
+                      xcfun=None,
+                      molgrid=None,
+                      gs_density=None):
+
+        n_ger = 0
+        full_ger = None
+        full_ung = None
+        if self.rank == mpi_master():
+            if vecs_ger is not None:
+                n_ger = vecs_ger.shape[1]
+                full_ger = np.vstack((vecs_ger, vecs_ger))
+            if vecs_ung is not None:
+                full_ung = np.vstack((vecs_ung, -vecs_ung))
+
+        e2b_full = self.e2n(np.hstack((full_ger, full_ung)), tensors, screening,
+                            molecule, basis, dft, xcfun, molgrid, gs_density)
+
+        if self.rank == mpi_master():
+            half_size = e2b_full.shape[0] // 2
+            ger_e2b = e2b_full[:half_size, :n_ger]
+            ung_e2b = e2b_full[:half_size, n_ger:]
+            return ger_e2b, ung_e2b
+        else:
+            return None, None
+
     def e2n(self,
             vecs,
             tensors,
@@ -366,6 +399,28 @@ class LinearResponseMatrixVectorDriver:
             ]
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
+
+    def s2n_half_size(self, vecs_ger, vecs_ung, tensors, nocc):
+
+        n_ger = 0
+        full_ger = None
+        full_ung = None
+        if self.rank == mpi_master():
+            if vecs_ger is not None:
+                n_ger = vecs_ger.shape[1]
+                full_ger = np.vstack((vecs_ger, vecs_ger))
+            if vecs_ung is not None:
+                full_ung = np.vstack((vecs_ung, -vecs_ung))
+
+        s2b_full = self.s2n(np.hstack((full_ger, full_ung)), tensors, nocc)
+
+        if self.rank == mpi_master():
+            half_size = s2b_full.shape[0] // 2
+            ung_s2b = s2b_full[:half_size, :n_ger]
+            ger_s2b = s2b_full[:half_size, n_ger:]
+            return ung_s2b, ger_s2b
+        else:
+            return None, None
 
     def s2n(self, vecs, tensors, nocc):
         """

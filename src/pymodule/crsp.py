@@ -649,21 +649,27 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            btot = None
+            half_bger = None
+            half_bung = None
             if self.rank == mpi_master():
-                btot = np.hstack((bger, bung))
+                if bger is not None:
+                    half_bger = bger[:bger.shape[0] // 2]
+                if bung is not None:
+                    half_bung = bung[:bung.shape[0] // 2]
 
-            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
-                                 self.dft, self.xcfun, self.molgrid,
-                                 self.gs_density)
+            half_e2bger, half_e2bung = e2x_drv.e2n_half_size(
+                half_bger, half_bung, scf_tensors, screening, molecule, basis,
+                self.dft, self.xcfun, self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
-                e2bger = e2btot[:, :bger.shape[1]]
-                e2bung = e2btot[:, bger.shape[1]:]
+                e2bger = np.vstack((half_e2bger, half_e2bger))
+                e2bung = np.vstack((half_e2bung, -half_e2bung))
 
         if self.rank == mpi_master():
-            s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
-            s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
+            half_s2bung, half_s2bger = e2x_drv.s2n_half_size(
+                half_bger, half_bung, scf_tensors, nocc)
+            s2bung = np.vstack((half_s2bung, -half_s2bung))
+            s2bger = np.vstack((half_s2bger, half_s2bger))
 
         solutions = {}
         residuals = {}
@@ -900,20 +906,26 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            new_trials_tot = None
+            half_new_ger = None
+            half_new_ung = None
             if self.rank == mpi_master():
-                new_trials_tot = np.hstack((new_trials_ger, new_trials_ung))
+                if new_trials_ger is not None:
+                    half_new_ger = new_trials_ger[:new_trials_ger.shape[0] // 2]
+                if new_trials_ung is not None:
+                    half_new_ung = new_trials_ung[:new_trials_ung.shape[0] // 2]
 
-            new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
-                                     molecule, basis, self.dft, self.xcfun,
-                                     self.molgrid, self.gs_density)
+            half_new_e2bger, half_new_e2bung = e2x_drv.e2n_half_size(
+                half_new_ger, half_new_ung, scf_tensors, screening, molecule,
+                basis, self.dft, self.xcfun, self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
-                new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
-                new_e2bung = new_e2btot[:, new_trials_ger.shape[1]:]
+                new_e2bger = np.vstack((half_new_e2bger, half_new_e2bger))
+                new_e2bung = np.vstack((half_new_e2bung, -half_new_e2bung))
 
-                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
-                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
+                half_new_s2bung, half_new_s2bger = e2x_drv.s2n_half_size(
+                    half_new_ger, half_new_ung, scf_tensors, nocc)
+                new_s2bung = np.vstack((half_new_s2bung, -half_new_s2bung))
+                new_s2bger = np.vstack((half_new_s2bger, half_new_s2bger))
 
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
