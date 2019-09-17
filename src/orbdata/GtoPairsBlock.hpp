@@ -13,6 +13,7 @@
 
 #include "GtoBlock.hpp"
 #include "MemBlock2D.hpp"
+#include "CudaDevices.hpp"
 
 /**
  Class CGtoPairsBlock stores data about basis function pairs and provides set of
@@ -81,6 +82,13 @@ class CGtoPairsBlock
      @return the number of GTOs pairs.
      */
     int32_t _getBlockDimensions() const;
+    
+    /**
+     Determines recommended dimensions of GTOs pairs block for GPU compute code.
+     
+     @return the number of GTOs pairs.
+     */
+    int32_t _getBlockDimensionsForGPU() const;
 
    public:
     /**
@@ -179,9 +187,11 @@ class CGtoPairsBlock
      Creates vector of GTOs pairs objects by splitting GTOs pairs object.
 
      @param nodes the number of MPI ranks.
+     @param cudaDevices the CUDA compute capable devices.
      @return the vector of GTOs pairs objects.
      */
-    std::vector<CGtoPairsBlock> split(const int32_t nodes) const;
+    std::vector<CGtoPairsBlock> split(const int32_t       nodes,
+                                      const CCudaDevices& cudaDevices = CCudaDevices()) const;
 
     /**
      Creates GTOs pairs object consisting from specific GTOs pairs object.
