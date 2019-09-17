@@ -303,6 +303,28 @@ class ComplexResponse:
 
         return np.array(ger).T, np.array(ung).T
 
+    def discard_lower_halfs(self, vecs):
+        """
+        Discards lower halfs of vectors sent in.
+
+        :param vecs:
+            The trial vectors.
+
+        :return:
+            The upper halfs of the vectors sent in.
+        """
+
+        half = vecs.shape[0] // 2
+        if len(vecs.shape) != 1:
+            upperhalf = []
+            for vec in range(len(vecs[0, :])):
+                upperhalf.append(vecs[:half, vec])
+        else:
+            upperhalf = vecs[:half]
+
+        return np.array(upperhalf)
+
+
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """
         Constructs the preconditioner matrix.
@@ -404,13 +426,17 @@ class ComplexResponse:
                 if gn < self.small_thresh:
                     ig[op] = np.zeros(grad.shape[0])
                 else:
-                    ig[op] = self.preconditioning(precond[op[1]], grad)
+                    fullsize = self.preconditioning(precond[op[1]], grad)
+                    ig[op] = self.discard_lower_halfs(np.array(
+                             self.decomp_trials(fullsize)).T).flatten()
             else:
                 for w in freqs:
                     if gn < self.small_thresh:
                         ig[(op, w)] = np.zeros(grad.shape[0])
                     else:
-                        ig[(op, w)] = self.preconditioning(precond[w], grad)
+                        fullsize = self.preconditioning(precond[w], grad)
+                        ig[(op, w)] = self.discard_lower_halfs(np.array(
+                            self.decomp_trials(fullsize)).T).flatten()
 
         return ig
 
@@ -472,10 +498,10 @@ class ComplexResponse:
         # orthogonalizing new trial vectors against existing ones
 
         if bger is not None and bger.any():
-            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
+            new_ger = new_ger - 2 * np.matmul(bger, np.matmul(bger.T, new_ger))
 
         if bung is not None and bung.any():
-            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
+            new_ung = new_ung - 2 * np.matmul(bung, np.matmul(bung.T, new_ung))
 
         # normalizing new trial vectors
 
@@ -632,7 +658,6 @@ class ComplexResponse:
             if self.rank == mpi_master():
 
                 # spawning initial trial vectors
-
                 igs = self.initial_guess(v1, d, freqs, precond)
                 bger, bung = self.setup_trials(igs)
 
@@ -655,9 +680,9 @@ class ComplexResponse:
             half_bung = None
             if self.rank == mpi_master():
                 if bger is not None:
-                    half_bger = bger[:bger.shape[0] // 2]
+                    half_bger = bger#[:bger.shape[0] // 2]
                 if bung is not None:
-                    half_bung = bung[:bung.shape[0] // 2]
+                    half_bung = bung#[:bung.shape[0] // 2]
 
             half_e2bger, half_e2bung = e2x_drv.e2n_half_size(
                 half_bger, half_bung, scf_tensors, screening, molecule, basis,
