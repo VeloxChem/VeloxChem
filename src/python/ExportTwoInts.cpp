@@ -91,6 +91,31 @@ CElectronRepulsionIntegralsDriver_create(py::object py_comm)
     return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(*comm_ptr));
 }
 
+// Helper function for exporting CElectronRepulsionIntegralsDriver.compute
+
+static void
+CElectronRepulsionIntegralsDriver_compute(const CElectronRepulsionIntegralsDriver& self,
+                                                CAOFockMatrix&       aoFockMatrix,
+                                          const CAODensityMatrix&    aoDensityMatrix,
+                                          const CMolecule&           molecule,
+                                          const CMolecularBasis&     aoBasis,
+                                          const CScreeningContainer& screeningContainer)
+{
+    self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis, screeningContainer);
+}
+
+static void
+CElectronRepulsionIntegralsDriver_compute_1(const CElectronRepulsionIntegralsDriver& self,
+                                                  CAOFockMatrix&       aoFockMatrix,
+                                            const CAODensityMatrix&    aoDensityMatrix,
+                                            const CMolecule&           molecule,
+                                            const CMolecularBasis&     aoBasis,
+                                            const CScreeningContainer& screeningContainer,
+                                            const CCudaDevices&        cudaDevices)
+{
+    self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis, screeningContainer, cudaDevices);
+}
+
 // Helper function for exporting CElectronRepulsionIntegralsDriver.computeInMemory
 
 static void
@@ -360,16 +385,11 @@ export_twoints(py::module& m)
         m, "ElectronRepulsionIntegralsDriver")
         .def(py::init(&CElectronRepulsionIntegralsDriver_create))
         .def("compute",
-             (void (CElectronRepulsionIntegralsDriver::*)(CAOFockMatrix&,
-                                                          const CAODensityMatrix&,
-                                                          const CMolecule&,
-                                                          const CMolecularBasis&,
-                                                          const CScreeningContainer&) const) &
-                 CElectronRepulsionIntegralsDriver::compute)
-        .def("compute",
              (CScreeningContainer(CElectronRepulsionIntegralsDriver::*)(
                  const ericut, const double, const CMolecule&, const CMolecularBasis&) const) &
                  CElectronRepulsionIntegralsDriver::compute)
+        .def("compute", &CElectronRepulsionIntegralsDriver_compute)
+        .def("compute", &CElectronRepulsionIntegralsDriver_compute_1)
         .def("compute_in_mem", &CElectronRepulsionIntegralsDriver_compute_in_mem);
 
     // CMOIntsBatch class
