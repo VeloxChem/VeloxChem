@@ -31,6 +31,8 @@
 #include "AODensityMatrix.hpp"
 #include "AOFockMatrix.hpp"
 #include "RecursionMap.hpp"
+#include "CudaDevices.hpp"
+
 
 /**
  Class CElectronicRepulsionIntegralsDriver computes electron repulsion
@@ -198,6 +200,23 @@ class CElectronRepulsionIntegralsDriver
                                          const CGtoPairsContainer*  braGtoPairsContainer,
                                          const CGtoPairsContainer*  ketGtoPairsContainer,
                                          const CScreeningContainer* screeningContainer) const;
+    
+    /**
+     Comutes electron repulsion integrals and stores them into AO Fock matrix
+     for two GTOs pairs containers on give CUDA compute capable devices.
+     
+     @param aoFockMatrix the AO Fock matrix.
+     @param aoDensityMatrix the AO density matrix.
+     @param braGtoPairsContainer the GTOs pairs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     @param screeningContainer the screening container object.
+     */
+    void _compElectronRepulsionIntegralsOnGPU(      CAOFockMatrix&       aoFockMatrix,
+                                              const CAODensityMatrix&    aoDensityMatrix,
+                                              const CGtoPairsContainer*  braGtoPairsContainer,
+                                              const CGtoPairsContainer*  ketGtoPairsContainer,
+                                              const CScreeningContainer* screeningContainer,
+                                              const CCudaDevices&        cudaDevices) const;
 
     /**
      Comutes maximum Q values of electron repulsion integrals for GTOs pairs
@@ -260,7 +279,8 @@ public:
                  const CAODensityMatrix&    aoDensityMatrix,
                  const CMolecule&           molecule,
                  const CMolecularBasis&     aoBasis,
-                 const CScreeningContainer& screeningContainer) const;
+                 const CScreeningContainer& screeningContainer,
+                 const CCudaDevices&        cudaDevices = CCudaDevices()) const;
     
     /**
      Computes Q values for electron repulsion integrals for molecule with
