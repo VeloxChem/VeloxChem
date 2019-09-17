@@ -250,6 +250,17 @@ class CElectronRepulsionIntegralsDriver
     CMemBlock<int32_t> _setTasksGrid(const int32_t nBraGtoPairsBlocks,
                                      const int32_t nKetGtoPairsBlocks,
                                      const bool    isBraEqualKet) const;
+    
+    /**
+     Creates tasks execution grid for computation of AO Fock matrix on CUDA
+     compute capable devices associated with specific MPI process.
+
+     @param braGtoPairsContainer the GTOs pairs container on bra side.
+     @param ketGtoPairsContainer the GTOs pairs container on ket side.
+     @return the vector of tasks indexes.
+     */
+    CMemBlock2D<int32_t> _setTasksGridForGPU(const CGtoPairsContainer* braGtoPairsContainer,
+                                             const CGtoPairsContainer* ketGtoPairsContainer) const;
         
 public:
     
