@@ -44,7 +44,7 @@ CCudaDevices::setCudaDevice(const int32_t iDevice) const
 #ifdef ENABLE_GPU
     if (iDevice < getNumberOfDevices())
     {
-        gpu:setDevice(iDevice); 
+        gpu::setDevice(iDevice); 
     }
 #endif
 }
