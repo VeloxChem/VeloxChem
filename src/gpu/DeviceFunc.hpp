@@ -6,8 +6,8 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#ifndef DeviceProp_hpp
-#define DeviceProp_hpp
+#ifndef DeviceFunc_hpp
+#define DeviceFunc_hpp
 
 #include <cstdint>
 
