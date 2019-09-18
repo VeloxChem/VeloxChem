@@ -1278,11 +1278,23 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CA
     
     auto pden = &aoDensityMatrix;
     
+    // set pointer to CUDA devices
+    
+    auto pdevs = &cudaDevices;
+    
     // set up GTOS pairs grid for GPUs
     
     auto gpupatt = _setTasksGridForGPU(braGtoPairsContainer, ketGtoPairsContainer);
- 
-    std::cout << "TEST partitioning: " << gpupatt << std::endl;
+    
+    #pragma omp parallel num_threads(ndevs) shared(pfock, pden, pdevs)
+    {
+        int32_t tid = omp_get_thread_num();
+     
+        // set up CUDA device for each thread
+        
+        pdevs->setCudaDevice(tid);
+    
+    }
 }
 
 void

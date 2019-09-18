@@ -11,11 +11,12 @@
 #include <sstream>
 #include <cmath>
 
+#include "StringFormat.hpp"
+#include "ErrorHandler.hpp"
+
 #ifdef ENABLE_GPU
 #include "DeviceProp.hpp"
 #endif
-
-#include "StringFormat.hpp"
 
 CCudaDevices::CCudaDevices()
 
@@ -35,6 +36,19 @@ CCudaDevices::CCudaDevices()
 CCudaDevices::~CCudaDevices()
 {
     
+}
+
+void
+CCudaDevices::setCudaDevice(const int32_t iDevice) const
+{
+#ifdef ENABLE_GPU
+    if (iDevice < getNumberOfDevices())
+    {
+        auto cerr = cudaSetDevice(iDevice);
+        
+        if (errors::assertMsgCritical(cerr == cudaSuccess), {"setCudaDevice"}); 
+    }
+#endif
 }
 
 int32_t
