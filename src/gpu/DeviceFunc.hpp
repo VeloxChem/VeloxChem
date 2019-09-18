@@ -18,7 +18,7 @@ namespace gpu {
 
  @param iDevice the identifier of CUDA compute capable device.
  */
-void setDevices(const int32_t iDevice);
+void setDevice(const int32_t iDevice);
 }
 
 #endif
