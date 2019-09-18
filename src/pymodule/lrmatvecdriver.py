@@ -62,8 +62,10 @@ class LinearResponseMatrixVectorDriver:
         """
         Computes the E2 b matrix vector product.
 
-        :param vecs:
-            The gerade and ungerade trial vectors in half-size.
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param screening:
@@ -382,48 +384,25 @@ class LinearResponseMatrixVectorDriver:
                                                 root=mpi_master())
 
     def s2n_half_size(self, vecs_ger, vecs_ung, tensors, nocc):
-
-        n_ger = 0
-        full_ger = None
-        full_ung = None
-        if self.rank == mpi_master():
-            if vecs_ger is not None:
-                n_ger = vecs_ger.shape[1]
-                full_ger = np.vstack((vecs_ger, vecs_ger))
-            if vecs_ung is not None:
-                full_ung = np.vstack((vecs_ung, -vecs_ung))
-
-        s2b_full = self.s2n(np.hstack((full_ger, full_ung)), tensors, nocc)
-
-        if self.rank == mpi_master():
-            half_size = s2b_full.shape[0] // 2
-            ung_s2b = s2b_full[:half_size, :n_ger]
-            ger_s2b = s2b_full[:half_size, n_ger:]
-            return ung_s2b, ger_s2b
-        else:
-            return None, None
-
-    def s2n(self, vecs, tensors, nocc):
         """
         Computes the S2 b matrix vector product.
 
-        :param vecs:
-            The trial vectors.
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param nocc:
             Number of occupied orbitals.
 
         :return:
-            The S2 b matrix vector product.
+            The gerade and ungerade S2 b matrix vector product in half-size.
         """
 
-        if not vecs.any():
-            return np.zeros(vecs.shape)
-
         assert_msg_critical(
-            len(vecs.shape) == 2,
-            'LinearResponseSolver.s2n: invalid shape of vecs')
+            vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
+            'LinearResponseSolver.e2n: invalid shape of trial vectors')
 
         mo = tensors['C']
         S = tensors['S']
@@ -431,18 +410,32 @@ class LinearResponseMatrixVectorDriver:
 
         norb = mo.shape[1]
 
-        s2n_vecs = np.ndarray(vecs.shape)
-        rows, columns = vecs.shape
+        n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
+        n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
 
-        for c in range(columns):
-            kappa = lrvec2mat(vecs[:, c], nocc, norb).T
+        if vecs_ger is not None:
+            half_size = vecs_ger.shape[0]
+        else:
+            half_size = vecs_ung.shape[0]
+        s2n_vecs = np.zeros((half_size, n_ger + n_ung))
+
+        for c in range(n_ger + n_ung):
+            if c < n_ger:
+                # full-size gerade trial vector
+                vec = np.hstack((vecs_ger[:, c], vecs_ger[:, c]))
+            else:
+                # full-size ungerade trial vector
+                vec = np.hstack(
+                    (vecs_ung[:, c - n_ger], -vecs_ung[:, c - n_ger]))
+
+            kappa = lrvec2mat(vec, nocc, norb).T
             kappa_ao = mo @ kappa @ mo.T
 
             s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
             s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)
+            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)[:half_size]
 
-        return s2n_vecs
+        return s2n_vecs[:, :n_ger], s2n_vecs[:, n_ger:]
 
 
 def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
