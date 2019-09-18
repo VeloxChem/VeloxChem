@@ -12,7 +12,8 @@
 
 namespace gpu {  // gpu namespace
 
-void setDevice(const int32_t iDevice);
+void
+setDevice(const int32_t iDevice)
 {
 #ifdef ENABLE_GPU
     auto cerr = cudaSetDevice(iDevice);
