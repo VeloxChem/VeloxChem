@@ -119,17 +119,19 @@ class LinearResponseMatrixVectorDriver:
                 kn = mo @ kN @ mo.T
 
                 dak = kn.T @ S @ da - da @ S @ kn.T
-                dbk = kn.T @ S @ db - db @ S @ kn.T
+                # dbk = kn.T @ S @ db - db @ S @ kn.T
 
-                dks.append((dak, dbk))
+                dks.append(dak)
                 kns.append(kn)
-
-            dks = tuple(dks)
+            dens = AODensityMatrix(dks, denmat.rest)
         else:
-            dks = None
+            dens = AODensityMatrix()
+        dens.broadcast(self.rank, self.comm)
 
-        fks = self.get_two_el_fock(dks, screening, molecule, basis, tensors,
-                                   dft, xcfun, molgrid, gs_density)
+        fock = AOFockMatrix(dens)
+
+        self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
+                          molgrid, gs_density)
 
         if self.rank == mpi_master():
             if vecs_ger is not None:
@@ -138,13 +140,17 @@ class LinearResponseMatrixVectorDriver:
                 half_size = vecs_ung.shape[0]
             gv = np.zeros((half_size, n_ger + n_ung))
 
-            for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
+            for col, kn in enumerate(kns):
+
+                fak = fock.alpha_to_numpy(col).T
+                # fbk = fock.beta_to_numpy(col).T
 
                 kfa = S @ kn @ fa - fa @ kn @ S
-                kfb = S @ kn @ fb - fb @ kn @ S
+                # kfb = S @ kn @ fb - fb @ kn @ S
 
                 fat = fak + kfa
-                fbt = fbk + kfb
+                fbt = fat
+                # fbt = fbk + kfb
 
                 gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da +
                                                        fbt.T @ db) @ S
@@ -154,105 +160,6 @@ class LinearResponseMatrixVectorDriver:
             return gv[:, :n_ger], gv[:, n_ger:]
         else:
             return None, None
-
-    def get_two_el_fock(self,
-                        dabs,
-                        screening,
-                        molecule,
-                        basis,
-                        tensors=None,
-                        dft=False,
-                        xcfun=None,
-                        molgrid=None,
-                        gs_density=None):
-        """
-        Computes two electron contribution to Fock.
-
-        :param dabs:
-            The tuple containing alpha and beta density matrices.
-        :param screening:
-            The electron repulsion integrals screening pattern.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-        :param dft:
-            The DFT flag if true compute XC contribution, if false otherwise.
-        :param xcfun:
-            The exchange correlation functional.
-        :param molgrid:
-            The molecular grid for XC contributtion computation.
-        :param gs_density:
-            The ground state density matrix.
-
-        :return:
-            The tuple containing alpha and beta Fock matrices.
-        """
-
-        # TODO: make this routine more general (for both rest and unrest)
-
-        if self.rank == mpi_master():
-            dts = []
-            for dab in dabs:
-                da, db = dab
-                dt = da + db
-                dts.append(dt)
-
-                # Note: skip spin density for restricted case
-                # ds = da - db
-                # dts.append(ds)
-
-            dens = AODensityMatrix(dts, denmat.rest)
-        else:
-            dens = AODensityMatrix()
-        dens.broadcast(self.rank, self.comm)
-
-        fock = AOFockMatrix(dens)
-
-        # for i in range(0, 2 * len(dabs), 2):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
-        #    fock.set_fock_type(fockmat.rgenk, i + 1)
-
-        # Note: skip spin density for restricted case
-        # for i in range(len(dabs)):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
-        fock_flag = fockmat.rgenjk
-        if dft:
-            if xcfun.is_hybrid():
-                fock_flag = fockmat.rgenjkx
-                fact_xc = xcfun.get_frac_exact_exchange()
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_scale_factor(fact_xc, i)
-            else:
-                fock_flag = fockmat.rgenj
-        for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fock_flag, i)
-
-        self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
-                          molgrid, gs_density)
-
-        fabs = []
-        if self.rank == mpi_master():
-
-            # for i in range(0, 2 * len(dabs), 2):
-            #    ft = fock.to_numpy(i).T
-            #    fs = -fock.to_numpy(i + 1).T
-            #    fa = (ft + fs) / 2
-            #    fb = (ft - fs) / 2
-            #    fabs.append((fa, fb))
-
-            # Note: skip spin density for restricted case
-            for i in range(len(dabs)):
-                ft = fock.to_numpy(i).T
-                fa = ft * 0.5
-                fb = ft * 0.5
-                fabs.append((fa, fb))
-
-            return tuple(fabs)
-        else:
-            return None
 
     def comp_lr_fock(self, fock, dens, molecule, basis, screening, dft, xcfun,
                      molgrid, gs_density):
@@ -278,6 +185,22 @@ class LinearResponseMatrixVectorDriver:
         :param gs_density:
             The ground state density matrix.
         """
+
+        # set flags for Fock matrices
+
+        fock_flag = fockmat.rgenjk
+        if dft:
+            if xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj
+        for i in range(fock.number_of_fock_matrices()):
+            fock.set_fock_type(fock_flag, i)
+
+        # calculate Fock on subcommunicators
 
         if dft and self.nodes >= 4:
             self.comp_lr_fock_split_comm(fock, dens, molecule, basis, screening,
