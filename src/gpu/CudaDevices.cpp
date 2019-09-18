@@ -46,7 +46,7 @@ CCudaDevices::setCudaDevice(const int32_t iDevice) const
     {
         auto cerr = cudaSetDevice(iDevice);
         
-        if (errors::assertMsgCritical(cerr == cudaSuccess), {"setCudaDevice"}); 
+        if (errors::assertMsgCritical(cerr == cudaSuccess, {"setCudaDevice"}); 
     }
 #endif
 }
