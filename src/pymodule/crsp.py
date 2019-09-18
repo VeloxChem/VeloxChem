@@ -11,8 +11,11 @@ from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence
+from .lrmatvecdriver import remove_linear_dependence_half # routine for halfsized vectors
 from .lrmatvecdriver import orthogonalize_gram_schmidt
+from .lrmatvecdriver import orthogonalize_gram_schmidt_half
 from .lrmatvecdriver import normalize
+from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_rhs
@@ -510,18 +513,18 @@ class ComplexResponse:
             # removing linear dependencies in gerade trials
             # and normalizing gerade trials
 
-            new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
-            new_ger = orthogonalize_gram_schmidt(new_ger)
-            new_ger = normalize(new_ger)
+            new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
+            new_ger = orthogonalize_gram_schmidt_half(new_ger)
+            new_ger = normalize_half(new_ger)
 
         if new_ung.any() and renormalize:
 
             # removing linear dependencies in ungerade trials:
             # and normalizing ungerade trials
 
-            new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
-            new_ung = orthogonalize_gram_schmidt(new_ung)
-            new_ung = normalize(new_ung)
+            new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
+            new_ung = orthogonalize_gram_schmidt_half(new_ung)
+            new_ung = normalize_half(new_ung)
 
         return new_ger, new_ung
 
@@ -638,6 +641,10 @@ class ComplexResponse:
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
 
+            halfprecond = {
+                w: self.discard_lower_halfs(self.get_precond(orb_ene, nocc, norb, w, d).T) for w in freqs
+            } # introduced half_sized_precond
+
         # read initial guess from restart file
 
         if self.restart:
@@ -676,27 +683,27 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            half_bger = None
-            half_bung = None
-            if self.rank == mpi_master():
-                if bger is not None:
-                    half_bger = bger#[:bger.shape[0] // 2]
-                if bung is not None:
-                    half_bung = bung#[:bung.shape[0] // 2]
+            #half_bger = None
+            #half_bung = None
+            #if self.rank == mpi_master():
+            #    if bger is not None:
+            #        half_bger = bger#[:bger.shape[0] // 2]
+            #    if bung is not None:
+            #        half_bung = bung#[:bung.shape[0] // 2]
 
-            half_e2bger, half_e2bung = e2x_drv.e2n_half_size(
-                half_bger, half_bung, scf_tensors, screening, molecule, basis,
+            e2bger, e2bung = e2x_drv.e2n_half_size(
+                bger, bung, scf_tensors, screening, molecule, basis,
                 self.dft, self.xcfun, self.molgrid, self.gs_density)
 
-            if self.rank == mpi_master():
-                e2bger = np.vstack((half_e2bger, half_e2bger))
-                e2bung = np.vstack((half_e2bung, -half_e2bung))
+            #if self.rank == mpi_master():
+            #    e2bger = half_e2bger # set subspace to halfsized subspace
+            #    e2bung = half_e2bung # set subspace to halfsized subspace
 
         if self.rank == mpi_master():
-            half_s2bung, half_s2bger = e2x_drv.s2n_half_size(
-                half_bger, half_bung, scf_tensors, nocc)
-            s2bung = np.vstack((half_s2bung, -half_s2bung))
-            s2bger = np.vstack((half_s2bger, half_s2bger))
+            s2bung, s2bger = e2x_drv.s2n_half_size(
+                bger, bung, scf_tensors, nocc)
+            #s2bung = half_s2bung # set subspace to halfsized subspace
+            #s2bger = half_s2bger # set subspace to halfsized subspace
 
         solutions = {}
         residuals = {}
@@ -726,7 +733,11 @@ class ComplexResponse:
                         else:
                             grad = v1[op]
 
+########################### SCREENING FROM HERE ###############################
+
                         gradger, gradung = self.decomp_sym(grad)
+                        gradger = self.discard_lower_halfs(gradger) # lower half discarded
+                        gradung = self.discard_lower_halfs(gradung) # lower half discarded
 
                         # projections onto gerade and ungerade subspaces:
 
@@ -870,7 +881,7 @@ class ComplexResponse:
                         # calculating relative residual norm
                         # for convergence check
 
-                        nv = np.matmul(n, grad)
+                        nv = np.matmul(n, grad[:grad.shape[0] // 2]) # only upper half of grad (maybe blow n up?)
                         nvs.append((op, w, nv))
 
                         rn = np.linalg.norm(r)
@@ -909,7 +920,7 @@ class ComplexResponse:
 
                 new_trials_ger, new_trials_ung = self.setup_trials(
                     residuals,
-                    pre=precond,
+                    pre=halfprecond,
                     bger=bger,
                     bung=bung,
                     res_norm=relative_residual_norm)
@@ -937,22 +948,22 @@ class ComplexResponse:
             half_new_ung = None
             if self.rank == mpi_master():
                 if new_trials_ger is not None:
-                    half_new_ger = new_trials_ger[:new_trials_ger.shape[0] // 2]
+                    half_new_ger = new_trials_ger#[:new_trials_ger.shape[0] // 2]
                 if new_trials_ung is not None:
-                    half_new_ung = new_trials_ung[:new_trials_ung.shape[0] // 2]
+                    half_new_ung = new_trials_ung#[:new_trials_ung.shape[0] // 2]
 
             half_new_e2bger, half_new_e2bung = e2x_drv.e2n_half_size(
                 half_new_ger, half_new_ung, scf_tensors, screening, molecule,
                 basis, self.dft, self.xcfun, self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
-                new_e2bger = np.vstack((half_new_e2bger, half_new_e2bger))
-                new_e2bung = np.vstack((half_new_e2bung, -half_new_e2bung))
+                new_e2bger = half_new_e2bger # set subspace to halfsized subspace
+                new_e2bung = half_new_e2bung # set subspace to halfsized subspace
 
                 half_new_s2bung, half_new_s2bger = e2x_drv.s2n_half_size(
                     half_new_ger, half_new_ung, scf_tensors, nocc)
-                new_s2bung = np.vstack((half_new_s2bung, -half_new_s2bung))
-                new_s2bger = np.vstack((half_new_s2bger, half_new_s2bger))
+                new_s2bung = half_new_s2bung # set subspace to halfsized subspace
+                new_s2bger = half_new_s2bger # set subspace to halfsized subspace
 
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
@@ -1003,7 +1014,7 @@ class ComplexResponse:
                 props = {}
                 for aop in self.a_components:
                     for bop, w in solutions:
-                        props[(aop, bop, w)] = -np.dot(va[aop],
+                        props[(aop, bop, w)] = -np.dot(va[aop][:va[aop].shape[0] // 2], # only halfsized rhs
                                                        solutions[(bop, w)])
                 self.print_properties(props)
                 return {

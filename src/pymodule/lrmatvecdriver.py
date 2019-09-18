@@ -625,6 +625,25 @@ def remove_linear_dependence(basis, threshold):
     mask = l > b_norm * threshold
     return np.matmul(basis, T[:, mask])
 
+def remove_linear_dependence_half(basis, threshold):
+    """
+    Removes linear dependence in a set of symmetrized vectors.
+
+    :param basis:
+        The set of upper parts of symmetrized vectors.
+    :param threshold:
+        The threshold for removing linear dependence.
+
+    :return:
+        The new set of vectors.
+    """
+
+    Sb = 2 * np.matmul(basis.T, basis)
+    l, T = np.linalg.eigh(Sb)
+    b_norm = np.sqrt(Sb.diagonal())
+    mask = l > b_norm * threshold
+    return np.matmul(basis, T[:, mask])
+
 
 def orthogonalize_gram_schmidt(tvecs):
     """
@@ -653,6 +672,33 @@ def orthogonalize_gram_schmidt(tvecs):
     return tvecs
 
 
+def orthogonalize_gram_schmidt_half(tvecs):
+    """
+    Applies modified Gram Schmidt orthogonalization to trial vectors.
+
+    :param tvecs:
+        The trial vectors.
+
+    :return:
+        The orthogonalized trial vectors.
+    """
+
+    if tvecs.shape[1] > 0:
+
+        f = 1.0 / (np.sqrt(2) * np.linalg.norm(tvecs[:, 0]))
+        tvecs[:, 0] *= f
+
+        for i in range(1, tvecs.shape[1]):
+            for j in range(i):
+                f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
+                    tvecs[:, j], tvecs[:, j])
+                tvecs[:, i] -= f * tvecs[:, j]
+            f = 1.0 / (np.sqrt(2) * np.linalg.norm(tvecs[:, i]))
+            tvecs[:, i] *= f
+
+    return tvecs
+
+
 def normalize(vecs):
     """
     Normalizes vectors by dividing by vector norm.
@@ -670,6 +716,28 @@ def normalize(vecs):
             vecs[:, vec] *= invnorm
     else:
         invnorm = 1.0 / np.linalg.norm(vecs)
+        vecs *= invnorm
+
+    return vecs
+
+
+def normalize_half(vecs):
+    """
+    Normalizes half-sized vectors by dividing by vector norm.
+
+    :param vecs:
+        The half-sized vectors.
+
+    :param Retruns:
+        The normalized vectors.
+    """
+
+    if len(vecs.shape) != 1:
+        for vec in range(vecs.shape[1]):
+            invnorm = 1.0 / (np.sqrt(2) * np.linalg.norm(vecs[:, vec]))
+            vecs[:, vec] *= invnorm
+    else:
+        invnorm = 1.0 / (np.sqrt(2) * np.linalg.norm(vecs))
         vecs *= invnorm
 
     return vecs
