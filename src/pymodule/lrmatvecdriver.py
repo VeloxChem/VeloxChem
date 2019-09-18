@@ -59,43 +59,11 @@ class LinearResponseMatrixVectorDriver:
                       xcfun=None,
                       molgrid=None,
                       gs_density=None):
-
-        n_ger = 0
-        full_ger = None
-        full_ung = None
-        if self.rank == mpi_master():
-            if vecs_ger is not None:
-                n_ger = vecs_ger.shape[1]
-                full_ger = np.vstack((vecs_ger, vecs_ger))
-            if vecs_ung is not None:
-                full_ung = np.vstack((vecs_ung, -vecs_ung))
-
-        e2b_full = self.e2n(np.hstack((full_ger, full_ung)), tensors, screening,
-                            molecule, basis, dft, xcfun, molgrid, gs_density)
-
-        if self.rank == mpi_master():
-            half_size = e2b_full.shape[0] // 2
-            ger_e2b = e2b_full[:half_size, :n_ger]
-            ung_e2b = e2b_full[:half_size, n_ger:]
-            return ger_e2b, ung_e2b
-        else:
-            return None, None
-
-    def e2n(self,
-            vecs,
-            tensors,
-            screening,
-            molecule,
-            basis,
-            dft=None,
-            xcfun=None,
-            molgrid=None,
-            gs_density=None):
         """
         Computes the E2 b matrix vector product.
 
         :param vecs:
-            The trial vectors.
+            The gerade and ungerade trial vectors in half-size.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param screening:
@@ -114,13 +82,13 @@ class LinearResponseMatrixVectorDriver:
             The ground state density matrix.
 
         :return:
-            The E2 b matrix vector product.
+            The gerade and ungerade E2 b matrix vector product in half-size.
         """
 
         if self.rank == mpi_master():
             assert_msg_critical(
-                len(vecs.shape) == 2,
-                'LinearResponseSolver.e2n: invalid shape of vecs')
+                vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
+                'LinearResponseSolver.e2n: invalid shape of trial vectors')
 
             mo = tensors['C']
             S = tensors['S']
@@ -133,8 +101,17 @@ class LinearResponseMatrixVectorDriver:
             dks = []
             kns = []
 
-            for col in range(vecs.shape[1]):
-                vec = vecs[:, col]
+            n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
+            n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
+
+            for col in range(n_ger + n_ung):
+                if col < n_ger:
+                    # full-size gerade trial vector
+                    vec = np.hstack((vecs_ger[:, col], vecs_ger[:, col]))
+                else:
+                    # full-size ungerade trial vector
+                    vec = np.hstack(
+                        (vecs_ung[:, col - n_ger], -vecs_ung[:, col - n_ger]))
 
                 kN = lrvec2mat(vec, nocc, norb).T
                 kn = mo @ kN @ mo.T
@@ -153,7 +130,11 @@ class LinearResponseMatrixVectorDriver:
                                    dft, xcfun, molgrid, gs_density)
 
         if self.rank == mpi_master():
-            gv = np.zeros(vecs.shape)
+            if vecs_ger is not None:
+                half_size = vecs_ger.shape[0]
+            else:
+                half_size = vecs_ung.shape[0]
+            gv = np.zeros((half_size, n_ger + n_ung))
 
             for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
 
@@ -167,10 +148,10 @@ class LinearResponseMatrixVectorDriver:
                                                        fbt.T @ db) @ S
                 gmo = mo.T @ gao @ mo
 
-                gv[:, col] = -lrmat2vec(gmo, nocc, norb)
-            return gv
+                gv[:, col] = -lrmat2vec(gmo, nocc, norb)[:half_size]
+            return gv[:, :n_ger], gv[:, n_ger:]
         else:
-            return None
+            return None, None
 
     def get_two_el_fock(self,
                         dabs,
