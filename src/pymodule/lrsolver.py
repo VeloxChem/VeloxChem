@@ -126,7 +126,7 @@ class LinearResponseSolver:
         self.ostream = ostream
 
         # restart information
-        self.restart = False
+        self.restart = True
         self.checkpoint_file = None
 
         self.timing = False
@@ -281,6 +281,13 @@ class LinearResponseSolver:
                 w: self.get_precond(ea, nocc, norb, w) for w in self.frequencies
             }
 
+        rsp_vector_labels = [
+            'LR_bger_half_size',
+            'LR_bung_half_size',
+            'LR_e2bger_half_size',
+            'LR_e2bung_half_size',
+        ]
+
         bger = None
         bung = None
         new_trials_ger = None
@@ -290,8 +297,7 @@ class LinearResponseSolver:
         if self.restart:
             if self.rank == mpi_master():
                 bger, bung, e2bger, e2bung = read_rsp_hdf5(
-                    self.checkpoint_file,
-                    ['LR_bger', 'LR_bung', 'LR_e2bger', 'LR_e2bung'],
+                    self.checkpoint_file, rsp_vector_labels,
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
                     dft_func_label, self.ostream)
@@ -456,8 +462,7 @@ class LinearResponseSolver:
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
 
                 write_rsp_hdf5(self.checkpoint_file,
-                               [bger, bung, e2bger, e2bung],
-                               ['LR_bger', 'LR_bung', 'LR_e2bger', 'LR_e2bung'],
+                               [bger, bung, e2bger, e2bung], rsp_vector_labels,
                                molecule.nuclear_repulsion_energy(),
                                molecule.elem_ids_to_numpy(), basis.get_label(),
                                dft_func_label, self.ostream)

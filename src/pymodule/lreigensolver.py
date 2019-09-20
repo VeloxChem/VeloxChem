@@ -117,7 +117,7 @@ class LinearResponseEigenSolver:
         self.ostream = ostream
 
         # restart information
-        self.restart = False
+        self.restart = True
         self.checkpoint_file = None
 
         self.timing = False
@@ -256,10 +256,10 @@ class LinearResponseEigenSolver:
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
         rsp_vector_labels = [
-            'LR_eigen_bger',
-            'LR_eigen_bung',
-            'LR_eigen_e2bger',
-            'LR_eigen_e2bung',
+            'LR_eigen_bger_half_size',
+            'LR_eigen_bung_half_size',
+            'LR_eigen_e2bger_half_size',
+            'LR_eigen_e2bung_half_size',
         ]
 
         bger = None
