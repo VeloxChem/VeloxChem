@@ -362,8 +362,8 @@ class LinearResponseSolver:
 
                     gradger, gradung = self.decomp_grad(v)
 
-                    g_ger = np.matmul(bger.T, gradger[:bger.shape[0]]) * 2.0
-                    g_ung = np.matmul(bung.T, gradung[:bung.shape[0]]) * 2.0
+                    g_ger = np.matmul(bger.T, gradger) * 2.0
+                    g_ung = np.matmul(bung.T, gradung) * 2.0
 
                     mat = np.zeros((n_ger + n_ung, n_ger + n_ung))
                     mat[:n_ger, :n_ger] = e2gg[:, :]
@@ -394,14 +394,10 @@ class LinearResponseSolver:
                     e2ung = np.matmul(e2bung, c_ung)
                     s2ger = np.matmul(s2bung, c_ger)
 
-                    r_ger = (e2ger - freq * s2ung - gradger[:bger.shape[0]])
-                    r_ung = (e2ung - freq * s2ger - gradung[:bung.shape[0]])
+                    r_ger = (e2ger - freq * s2ung - gradger)
+                    r_ung = (e2ung - freq * s2ger - gradung)
 
-                    r_ger_full = np.hstack((r_ger, r_ger))
-                    r_ung_full = np.hstack((r_ung, -r_ung))
-
-                    residuals[(op, freq)] = np.array([r_ger_full,
-                                                      r_ung_full]).flatten()
+                    residuals[(op, freq)] = np.array([r_ger, r_ung]).flatten()
 
                     r = residuals[(op, freq)]
                     n = solutions[(op, freq)]
@@ -409,9 +405,10 @@ class LinearResponseSolver:
                     nv = np.dot(n, v)
                     nvs.append((op, freq, nv))
 
-                    rn = np.linalg.norm(r)
+                    rn = np.linalg.norm(r) * np.sqrt(2.0)
                     nn = np.linalg.norm(n)
                     relative_residual_norm[(op, freq)] = rn / nn
+
                     converged[(op, freq)] = (rn / nn < self.conv_thresh)
 
                 # write to output
@@ -634,9 +631,10 @@ class LinearResponseSolver:
         ig = {}
         for op, grad in V1.items():
             gradger, gradung = self.decomp_grad(grad)
-            grad = np.array([gradger, gradung]).flatten()
 
-            gn = np.linalg.norm(grad)
+            grad = np.array([gradger, gradung]).flatten()
+            gn = np.linalg.norm(grad) * np.sqrt(2.0)
+
             for w in freqs:
                 if gn < self.small_thresh:
                     ig[(op, w)] = np.zeros(grad.shape[0])
@@ -667,8 +665,8 @@ class LinearResponseSolver:
         grad_T[:half_size] = grad[half_size:]
         grad_T[half_size:] = grad[:half_size]
 
-        ger = 0.5 * (grad + grad_T)
-        ung = 0.5 * (grad - grad_T)
+        ger = 0.5 * (grad + grad_T)[:half_size]
+        ung = 0.5 * (grad - grad_T)[:half_size]
 
         return ger.T, ung.T
 
@@ -692,6 +690,9 @@ class LinearResponseSolver:
         # spawning needed components
 
         ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag = ediag[:ediag.shape[0] // 2]
+        sdiag = sdiag[:sdiag.shape[0] // 2]
+
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         w_sq = w**2
@@ -769,7 +770,7 @@ class LinearResponseSolver:
             else:
                 v = vec
 
-            if np.linalg.norm(v) > self.small_thresh:
+            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
                 trials.append(v)
 
         new_trials = np.array(trials).T
@@ -777,9 +778,6 @@ class LinearResponseSolver:
         # decomposing the full space trial vectors...
 
         new_ger, new_ung = self.decomp_trials(new_trials)
-
-        new_ger = new_ger[:new_ger.shape[0] // 2, :]
-        new_ung = new_ung[:new_ung.shape[0] // 2, :]
 
         if bger is not None and bger.any():
             new_ger_proj = np.matmul(bger, 2.0 * np.matmul(bger.T, new_ger))

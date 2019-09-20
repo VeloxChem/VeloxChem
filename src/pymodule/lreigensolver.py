@@ -371,31 +371,29 @@ class LinearResponseEigenSolver:
                 for k in range(self.nstates):
 
                     w = wn[k]
-                    x_ger = Xn_ger[:, k]
-                    x_ung = Xn_ung[:, k]
+                    c_ger = Xn_ger[:, k]
+                    c_ung = Xn_ung[:, k]
 
-                    r_ger = e2bger @ x_ger - w * (s2bger @ x_ung)
-                    r_ung = e2bung @ x_ung - w * (s2bung @ x_ger)
+                    r_ger = e2bger @ c_ger - w * (s2bger @ c_ung)
+                    r_ung = e2bung @ c_ung - w * (s2bung @ c_ger)
 
-                    r_ger_full = np.hstack((r_ger, r_ger))
-                    r_ung_full = np.hstack((r_ung, -r_ung))
+                    r = np.array([r_ger, r_ung]).flatten()
 
-                    r = np.array([r_ger_full, r_ung_full]).flatten()
+                    x_ger = bger @ c_ger
+                    x_ung = bung @ c_ung
 
-                    bxger = bger @ x_ger
-                    bxung = bung @ x_ung
+                    x_ger_full = np.hstack((x_ger, x_ger))
+                    x_ung_full = np.hstack((x_ung, -x_ung))
 
-                    bxger_full = np.hstack((bxger, bxger))
-                    bxung_full = np.hstack((bxung, -bxung))
-
-                    X = bxger_full + bxung_full
+                    X = x_ger_full + x_ung_full
 
                     exresiduals[k] = (w, r)
                     excitations[k] = (w, X)
 
-                    rn = np.linalg.norm(r)
+                    rn = np.linalg.norm(r) * np.sqrt(2.0)
                     xn = np.linalg.norm(X)
                     relative_residual_norm[k] = rn / xn
+
                     converged[k] = (rn / xn < self.conv_thresh)
                     ws.append(w)
 
@@ -678,8 +676,7 @@ class LinearResponseEigenSolver:
         excitations = list(
             itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
 
-        ediag, sdiag = construct_ed_sd(ea, nocc, norb)
-        excitation_energies = 0.5 * ediag
+        excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
         w = {ia: w for ia, w in zip(excitations, excitation_energies)}
 
@@ -695,8 +692,8 @@ class LinearResponseEigenSolver:
             Xn_T[:n_exc] = Xn[n_exc:]
             Xn_T[n_exc:] = Xn[:n_exc]
 
-            Xn_ger = 0.5 * (Xn + Xn_T)
-            Xn_ung = 0.5 * (Xn - Xn_T)
+            Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
+            Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
 
             final.append((w[(i, a)], np.array([Xn_ger, Xn_ung]).flatten()))
         return final
@@ -739,7 +736,7 @@ class LinearResponseEigenSolver:
             else:
                 v = X
 
-            if np.linalg.norm(v) > self.small_thresh:
+            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
                 trials.append(v)
 
         new_trials = np.array(trials).T
@@ -747,9 +744,6 @@ class LinearResponseEigenSolver:
         # decomposing the full space trial vectors...
 
         new_ger, new_ung = self.decomp_trials(new_trials)
-
-        new_ger = new_ger[:new_ger.shape[0] // 2, :]
-        new_ung = new_ung[:new_ung.shape[0] // 2, :]
 
         if bger is not None and bger.any():
             new_ger_proj = np.matmul(bger, 2.0 * np.matmul(bger.T, new_ger))
@@ -791,6 +785,9 @@ class LinearResponseEigenSolver:
         # spawning needed components
 
         ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag = ediag[:ediag.shape[0] // 2]
+        sdiag = sdiag[:sdiag.shape[0] // 2]
+
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         w_sq = w**2
