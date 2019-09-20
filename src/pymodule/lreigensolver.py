@@ -329,7 +329,7 @@ class LinearResponseEigenSolver:
 
                 e2gg = np.matmul(bger.T, e2bger) * 2.0
                 e2uu = np.matmul(bung.T, e2bung) * 2.0
-                s2ug = np.matmul(bung.T, bger * 2.0) * 2.0
+                s2ug = np.matmul(bung.T, bger) * 4.0
 
                 # Equations:
                 # E[2] X_g - w S[2] X_u = 0
@@ -374,9 +374,9 @@ class LinearResponseEigenSolver:
                     c_ung = Xn_ung[:, k]
 
                     r_ger = np.matmul(e2bger,
-                                      c_ger) - w * np.matmul(bung * 2.0, c_ung)
+                                      c_ger) - w * 2.0 * np.matmul(bung, c_ung)
                     r_ung = np.matmul(e2bung,
-                                      c_ung) - w * np.matmul(bger * 2.0, c_ger)
+                                      c_ung) - w * 2.0 * np.matmul(bger, c_ger)
 
                     r = np.array([r_ger, r_ung]).flatten()
 

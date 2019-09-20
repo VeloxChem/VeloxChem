@@ -357,7 +357,7 @@ class LinearResponseSolver:
 
                 e2gg = np.matmul(bger.T, e2bger) * 2.0
                 e2uu = np.matmul(bung.T, e2bung) * 2.0
-                s2ug = np.matmul(bung.T, bger * 2.0) * 2.0
+                s2ug = np.matmul(bung.T, bger) * 4.0
 
                 # next solution
                 for op, freq in op_freq_keys:
@@ -391,10 +391,10 @@ class LinearResponseSolver:
 
                     solutions[(op, freq)] = x_ger_full + x_ung_full
 
-                    r_ger = np.matmul(e2bger, c_ger) - freq * np.matmul(
-                        bung * 2.0, c_ung) - gradger
-                    r_ung = np.matmul(e2bung, c_ung) - freq * np.matmul(
-                        bger * 2.0, c_ger) - gradung
+                    r_ger = np.matmul(e2bger, c_ger) - freq * 2.0 * np.matmul(
+                        bung, c_ung) - gradger
+                    r_ung = np.matmul(e2bung, c_ung) - freq * 2.0 * np.matmul(
+                        bger, c_ger) - gradung
 
                     residuals[(op, freq)] = np.array([r_ger, r_ung]).flatten()
 
