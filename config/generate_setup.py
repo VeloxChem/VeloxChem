@@ -12,8 +12,8 @@ def find_exe(executables):
         for path in os.environ['PATH'].split(os.pathsep):
             fname = os.path.join(path, exe)
             if os.path.isfile(fname) and os.access(fname, os.X_OK):
-                return exe
-    return None
+                return exe, path
+    return None, None
 
 
 def get_command_output(command):
@@ -111,12 +111,12 @@ def generate_setup(template_file, setup_file):
 
     # compiler information
 
-    print('*** Checking compiler... ', end='')
+    print('*** Checking c++ compiler... ', end='')
 
     if 'CXX' in os.environ:
-        cxx = find_exe([os.environ['CXX']])
+        cxx, cxx_path = find_exe([os.environ['CXX']])
     else:
-        cxx = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
+        cxx, cxx_path = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
 
     print(cxx)
 
@@ -152,17 +152,38 @@ def generate_setup(template_file, setup_file):
         print('***        Only Intel, GNU, and Clang compilers are supported.')
         sys.exit(1)
 
+    # cuda information
+
+    print('*** Checking cuda compiler... ', end='')
+
+    nvcc, nvcc_path = find_exe(['nvcc'])
+
+    print(nvcc)
+
+    use_gpu = (nvcc is not None)
+
+    if use_gpu:
+        cuda_root = os.path.split(nvcc_path)[0]
+        cuda_dir = os.path.join(cuda_root, 'lib64')
+        if not os.path.isdir(cuda_dir):
+            cuda_dir = os.path.join(cuda_root, 'lib')
+        check_dir(cuda_dir, 'cuda lib')
+        cuda_lib = '-L{} -lcuda -lcudart'.format(cuda_dir)
+
     # cxx and omp flags
 
     if use_intel:
         cxx_flags = '-xHost -qopenmp'
         omp_flag = '-liomp5'
+        nvcc_flags = '--compiler-options \"-qopenmp\"'
     elif use_gnu:
         cxx_flags = '-fopenmp'
         omp_flag = '-lgomp'
+        nvcc_flags = '--compiler-options \"-fopenmp\"'
     elif use_clang:
         cxx_flags = '-Xpreprocessor -fopenmp'
         omp_flag = '-lomp'
+        nvcc_flags = '--compiler-options \"-fopenmp\"'
 
     # math library
 
@@ -265,21 +286,20 @@ def generate_setup(template_file, setup_file):
 
     # print Makefile.setup
 
-    with open(template_file, 'r') as f_temp:
+    with open(template_file, 'r', encoding='utf-8') as f_temp:
         lines = f_temp.readlines()
 
-    with open(setup_file, 'w') as f_mkfile:
+    with open(setup_file, 'w', encoding='utf-8') as f_mkfile:
         for line in lines:
             if '====placeholder====' in line:
                 print('# Automatically generated settings', file=f_mkfile)
                 print('', file=f_mkfile)
 
                 print('USE_MPI := true', file=f_mkfile)
-                print('USE_GPU := false', file=f_mkfile)
-                if use_mkl:
-                    print('USE_MKL := true', file=f_mkfile)
-                else:
-                    print('USE_MKL := false', file=f_mkfile)
+                print('USE_GPU := {}'.format('true' if use_gpu else 'false'),
+                      file=f_mkfile)
+                print('USE_MKL := {}'.format('true' if use_mkl else 'false'),
+                      file=f_mkfile)
                 print('', file=f_mkfile)
 
                 print(math_lib, file=f_mkfile)
@@ -300,6 +320,13 @@ def generate_setup(template_file, setup_file):
                 print('CXX_REL_FLG :=', cxx_flags, file=f_mkfile)
                 print('CXX_DEB_FLG :=', cxx_flags, file=f_mkfile)
                 print('', file=f_mkfile)
+
+                if use_gpu:
+                    print('NVCC :=', nvcc, file=f_mkfile)
+                    print('NVCC_REL_FLG :=', nvcc_flags, file=f_mkfile)
+                    print('NVCC_DEB_FLG :=', nvcc_flags, file=f_mkfile)
+                    print('CUDA_LIB :=', cuda_lib, file=f_mkfile)
+                    print('', file=f_mkfile)
 
                 print('MACLIBS :=', maclibs, file=f_mkfile)
                 print('', file=f_mkfile)

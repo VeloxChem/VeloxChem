@@ -1,5 +1,6 @@
 from os.path import isfile
 import numpy as np
+import time as tm
 import itertools
 import h5py
 
@@ -11,11 +12,13 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
 from .errorhandler import assert_msg_critical
+from .subcommunicators import SubCommunicators
 
 
 class LinearResponseMatrixVectorDriver:
@@ -43,21 +46,26 @@ class LinearResponseMatrixVectorDriver:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-    def e2n(self,
-            vecs,
-            tensors,
-            screening,
-            molecule,
-            basis,
-            dft=None,
-            xcfun=None,
-            molgrid=None,
-            gs_density=None):
+        self.split_comm_ratio = None
+
+    def e2n_half_size(self,
+                      vecs_ger,
+                      vecs_ung,
+                      tensors,
+                      screening,
+                      molecule,
+                      basis,
+                      dft=None,
+                      xcfun=None,
+                      molgrid=None,
+                      gs_density=None):
         """
         Computes the E2 b matrix vector product.
 
-        :param vecs:
-            The trial vectors.
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param screening:
@@ -76,13 +84,13 @@ class LinearResponseMatrixVectorDriver:
             The ground state density matrix.
 
         :return:
-            The E2 b matrix vector product.
+            The gerade and ungerade E2 b matrix vector product in half-size.
         """
 
         if self.rank == mpi_master():
             assert_msg_critical(
-                len(vecs.shape) == 2,
-                'LinearResponseSolver.e2n: invalid shape of vecs')
+                vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
+                'LinearResponseSolver.e2n: invalid shape of trial vectors')
 
             mo = tensors['C']
             S = tensors['S']
@@ -95,68 +103,79 @@ class LinearResponseMatrixVectorDriver:
             dks = []
             kns = []
 
-            for col in range(vecs.shape[1]):
-                vec = vecs[:, col]
+            n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
+            n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
+
+            for col in range(n_ger + n_ung):
+                if col < n_ger:
+                    # full-size gerade trial vector
+                    vec = np.hstack((vecs_ger[:, col], vecs_ger[:, col]))
+                else:
+                    # full-size ungerade trial vector
+                    vec = np.hstack(
+                        (vecs_ung[:, col - n_ger], -vecs_ung[:, col - n_ger]))
 
                 kN = lrvec2mat(vec, nocc, norb).T
                 kn = mo @ kN @ mo.T
 
                 dak = kn.T @ S @ da - da @ S @ kn.T
-                dbk = kn.T @ S @ db - db @ S @ kn.T
+                # dbk = kn.T @ S @ db - db @ S @ kn.T
 
-                dks.append((dak, dbk))
+                dks.append(dak)
                 kns.append(kn)
-
-            dks = tuple(dks)
+            dens = AODensityMatrix(dks, denmat.rest)
         else:
-            dks = None
+            dens = AODensityMatrix()
+        dens.broadcast(self.rank, self.comm)
 
-        fks = self.get_two_el_fock(dks, screening, molecule, basis, tensors,
-                                   dft, xcfun, molgrid, gs_density)
+        fock = AOFockMatrix(dens)
+
+        self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
+                          molgrid, gs_density)
 
         if self.rank == mpi_master():
-            gv = np.zeros(vecs.shape)
+            if vecs_ger is not None:
+                half_size = vecs_ger.shape[0]
+            else:
+                half_size = vecs_ung.shape[0]
+            gv = np.zeros((half_size, n_ger + n_ung))
 
-            for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
+            for col, kn in enumerate(kns):
+
+                fak = fock.alpha_to_numpy(col).T
+                # fbk = fock.beta_to_numpy(col).T
 
                 kfa = S @ kn @ fa - fa @ kn @ S
-                kfb = S @ kn @ fb - fb @ kn @ S
+                # kfb = S @ kn @ fb - fb @ kn @ S
 
                 fat = fak + kfa
-                fbt = fbk + kfb
+                fbt = fat
+                # fbt = fbk + kfb
 
                 gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da +
                                                        fbt.T @ db) @ S
                 gmo = mo.T @ gao @ mo
 
-                gv[:, col] = -lrmat2vec(gmo, nocc, norb)
-            return gv
+                gv[:, col] = -lrmat2vec(gmo, nocc, norb)[:half_size]
+            return gv[:, :n_ger], gv[:, n_ger:]
         else:
-            return None
+            return None, None
 
-    def get_two_el_fock(self,
-                        dabs,
-                        screening,
-                        molecule,
-                        basis,
-                        tensors=None,
-                        dft=False,
-                        xcfun=None,
-                        molgrid=None,
-                        gs_density=None):
+    def comp_lr_fock(self, fock, dens, molecule, basis, screening, dft, xcfun,
+                     molgrid, gs_density):
         """
-        Computes two electron contribution to Fock.
+        Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
-        :param dabs:
-            The tuple containing alpha and beta density matrices.
-        :param screening:
-            The electron repulsion integrals screening pattern.
+        :param fock:
+            The Fock matrix (2e part).
+        :param dens:
+            The density matrix.
         :param molecule:
             The molecule.
         :param basis:
-            The AO basis set.
-        :param tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+            The basis set.
+        :param screening:
+            The screening container object.
         :param dft:
             The DFT flag if true compute XC contribution, if false otherwise.
         :param xcfun:
@@ -165,38 +184,10 @@ class LinearResponseMatrixVectorDriver:
             The molecular grid for XC contributtion computation.
         :param gs_density:
             The ground state density matrix.
-
-        :return:
-            The tuple containing alpha and beta Fock matrices.
         """
 
-        # TODO: make this routine more general (for both rest and unrest)
+        # set flags for Fock matrices
 
-        if self.rank == mpi_master():
-            dts = []
-            for dab in dabs:
-                da, db = dab
-                dt = da + db
-                dts.append(dt)
-
-                # Note: skip spin density for restricted case
-                # ds = da - db
-                # dts.append(ds)
-
-            dens = AODensityMatrix(dts, denmat.rest)
-        else:
-            dens = AODensityMatrix()
-        dens.broadcast(self.rank, self.comm)
-
-        fock = AOFockMatrix(dens)
-
-        # for i in range(0, 2 * len(dabs), 2):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
-        #    fock.set_fock_type(fockmat.rgenk, i + 1)
-
-        # Note: skip spin density for restricted case
-        # for i in range(len(dabs)):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
         fock_flag = fockmat.rgenjk
         if dft:
             if xcfun.is_hybrid():
@@ -209,59 +200,132 @@ class LinearResponseMatrixVectorDriver:
         for i in range(fock.number_of_fock_matrices()):
             fock.set_fock_type(fock_flag, i)
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        eri_drv.compute(fock, dens, molecule, basis, screening)
+        # calculate Fock on subcommunicators
 
-        # add XC contribution to Fock
-        if dft:
-            xc_drv = XCIntegrator(self.comm)
+        if dft and self.nodes >= 4:
+            self.comp_lr_fock_split_comm(fock, dens, molecule, basis, screening,
+                                         dft, xcfun, molgrid, gs_density)
+
+        else:
+            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+            eri_drv.compute(fock, dens, molecule, basis, screening)
+            if dft:
+                if not xcfun.is_hybrid():
+                    for ifock in range(fock.number_of_fock_matrices()):
+                        fock.scale(2.0, ifock)
+                xc_drv = XCIntegrator(self.comm)
+                molgrid.distribute(self.rank, self.nodes, self.comm)
+                xc_drv.integrate(fock, dens, gs_density, molecule, basis,
+                                 molgrid, xcfun.get_func_label())
+            fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+    def comp_lr_fock_split_comm(self, fock, dens, molecule, basis, screening,
+                                dft, xcfun, molgrid, gs_density):
+        """
+        Computes linear response Fock/Fxc matrix on split communicators.
+
+        :param fock:
+            The Fock matrix (2e part).
+        :param dens:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screening:
+            The screening container object.
+        :param dft:
+            The DFT flag if true compute XC contribution, if false otherwise.
+        :param xcfun:
+            The exchange correlation functional.
+        :param molgrid:
+            The molecular grid for XC contributtion computation.
+        :param gs_density:
+            The ground state density matrix.
+        """
+
+        if self.split_comm_ratio is None:
+            self.split_comm_ratio = [0.5, 0.5]
+        eri_nodes = int(float(self.nodes) * self.split_comm_ratio[0] + 0.5)
+        dft_nodes = self.nodes - eri_nodes
+
+        if eri_nodes < 1:
+            eri_nodes = 1
+            dft_nodes = self.nodes - eri_nodes
+
+        if dft_nodes < 1:
+            dft_nodes = 1
+            eri_nodes = self.nodes - dft_nodes
+
+        node_grps = [0] * eri_nodes + [1] * dft_nodes
+        eri_comm = (node_grps[self.rank] == 0)
+        dft_comm = (node_grps[self.rank] == 1)
+
+        subcomms = SubCommunicators(self.comm, node_grps)
+        local_comm = subcomms.local_comm
+        cross_comm = subcomms.cross_comm
+
+        # calculate Fock on ERI nodes
+        if eri_comm:
+            t0 = tm.time()
+            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
+            eri_drv.compute(fock, dens, molecule, basis, screening)
+            if dft:
+                if not xcfun.is_hybrid():
+                    for ifock in range(fock.number_of_fock_matrices()):
+                        fock.scale(2.0, ifock)
+            dt = tm.time() - t0
+
+        # reset molecular grid
+        if self.rank != mpi_master():
+            molgrid = MolecularGrid()
+        if local_comm.Get_rank() == mpi_master():
+            molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
+
+        # calculate Fxc on DFT nodes
+        if dft_comm:
+            t0 = tm.time()
+            xc_drv = XCIntegrator(local_comm)
+            molgrid.distribute(local_comm.Get_rank(), local_comm.Get_size(),
+                               local_comm)
             xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
                              xcfun.get_func_label())
+            dt = tm.time() - t0
 
+        # collect Fock on master node
         fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-        fabs = []
+        dt = self.comm.gather(dt, root=mpi_master())
         if self.rank == mpi_master():
+            time_eri = sum(dt[:eri_nodes])
+            time_dft = sum(dt[eri_nodes:])
+            self.split_comm_ratio = [
+                time_eri / (time_eri + time_dft),
+                time_dft / (time_eri + time_dft),
+            ]
+        self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
+                                                root=mpi_master())
 
-            # for i in range(0, 2 * len(dabs), 2):
-            #    ft = fock.to_numpy(i).T
-            #    fs = -fock.to_numpy(i + 1).T
-            #    fa = (ft + fs) / 2
-            #    fb = (ft - fs) / 2
-            #    fabs.append((fa, fb))
-
-            # Note: skip spin density for restricted case
-            for i in range(len(dabs)):
-                ft = fock.to_numpy(i).T
-                fa = ft * 0.5
-                fb = ft * 0.5
-                fabs.append((fa, fb))
-
-            return tuple(fabs)
-        else:
-            return None
-
-    def s2n(self, vecs, tensors, nocc):
+    def s2n_half_size(self, vecs_ger, vecs_ung, tensors, nocc):
         """
         Computes the S2 b matrix vector product.
 
-        :param vecs:
-            The trial vectors.
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param nocc:
             Number of occupied orbitals.
 
         :return:
-            The S2 b matrix vector product.
+            The gerade and ungerade S2 b matrix vector product in half-size.
         """
 
-        if not vecs.any():
-            return np.zeros(vecs.shape)
-
         assert_msg_critical(
-            len(vecs.shape) == 2,
-            'LinearResponseSolver.s2n: invalid shape of vecs')
+            vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
+            'LinearResponseSolver.e2n: invalid shape of trial vectors')
 
         mo = tensors['C']
         S = tensors['S']
@@ -269,18 +333,32 @@ class LinearResponseMatrixVectorDriver:
 
         norb = mo.shape[1]
 
-        s2n_vecs = np.ndarray(vecs.shape)
-        rows, columns = vecs.shape
+        n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
+        n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
 
-        for c in range(columns):
-            kappa = lrvec2mat(vecs[:, c], nocc, norb).T
+        if vecs_ger is not None:
+            half_size = vecs_ger.shape[0]
+        else:
+            half_size = vecs_ung.shape[0]
+        s2n_vecs = np.zeros((half_size, n_ger + n_ung))
+
+        for c in range(n_ger + n_ung):
+            if c < n_ger:
+                # full-size gerade trial vector
+                vec = np.hstack((vecs_ger[:, c], vecs_ger[:, c]))
+            else:
+                # full-size ungerade trial vector
+                vec = np.hstack(
+                    (vecs_ung[:, c - n_ger], -vecs_ung[:, c - n_ger]))
+
+            kappa = lrvec2mat(vec, nocc, norb).T
             kappa_ao = mo @ kappa @ mo.T
 
             s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
             s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)
+            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)[:half_size]
 
-        return s2n_vecs
+        return s2n_vecs[:, :n_ger], s2n_vecs[:, n_ger:]
 
 
 def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):

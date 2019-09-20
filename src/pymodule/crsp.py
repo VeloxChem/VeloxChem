@@ -102,6 +102,8 @@ class ComplexResponse:
         self.frequencies = (0.1,)
         self.damping = 0.004556335294880438
 
+        self.nonlinear = False
+
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
 
@@ -125,7 +127,7 @@ class ComplexResponse:
 
         self.ostream = ostream
 
-        self.restart = True
+        self.restart = False
         self.checkpoint_file = None
 
         self.timing = False
@@ -398,11 +400,17 @@ class ComplexResponse:
                 [gradger.real, gradung.real, -gradung.imag,
                  -gradger.imag]).flatten()
             gn = np.linalg.norm(grad)
-            for w in freqs:
+            if self.nonlinear:
                 if gn < self.small_thresh:
-                    ig[(op, w)] = np.zeros(grad.shape[0])
+                    ig[op] = np.zeros(grad.shape[0])
                 else:
-                    ig[(op, w)] = self.preconditioning(precond[w], grad)
+                    ig[op] = self.preconditioning(precond[op[1]], grad)
+            else:
+                for w in freqs:
+                    if gn < self.small_thresh:
+                        ig[(op, w)] = np.zeros(grad.shape[0])
+                    else:
+                        ig[(op, w)] = self.preconditioning(precond[w], grad)
 
         return ig
 
@@ -526,7 +534,7 @@ class ComplexResponse:
             }
             timing_t0 = tm.time()
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and (not self.nonlinear):
             self.print_header()
 
         self.start_time = tm.time()
@@ -539,7 +547,6 @@ class ComplexResponse:
             grid_t0 = tm.time()
             self.molgrid = grid_drv.generate(molecule)
             n_grid_points = self.molgrid.number_of_points()
-            self.molgrid.distribute(self.rank, self.nodes, self.comm)
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,
@@ -564,7 +571,10 @@ class ComplexResponse:
             'ComplexResponseSolver: not implemented for unrestricted case')
 
         d = self.damping
-        freqs = self.frequencies
+        if b_rhs:
+            freqs = [i[1] for i in b_rhs.keys()]
+        else:
+            freqs = self.frequencies
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
@@ -582,13 +592,19 @@ class ComplexResponse:
         if b_rhs is None:
             b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
+        else:
+            v1 = b_rhs
+            self.nonlinear = True
 
         if self.rank == mpi_master():
 
             # calling the gradients
 
-            v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
-            op_freq_keys = [(op, w) for op in v1 for w in freqs]
+            if not self.nonlinear:
+                v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
+                op_freq_keys = [(op, w) for op in v1 for w in freqs]
+            else:
+                op_freq_keys = [op for op in v1]
 
             # creating the preconditioner matrix
 
@@ -635,21 +651,27 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            btot = None
+            half_bger = None
+            half_bung = None
             if self.rank == mpi_master():
-                btot = np.hstack((bger, bung))
+                if bger is not None:
+                    half_bger = bger[:bger.shape[0] // 2]
+                if bung is not None:
+                    half_bung = bung[:bung.shape[0] // 2]
 
-            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
-                                 self.dft, self.xcfun, self.molgrid,
-                                 self.gs_density)
+            half_e2bger, half_e2bung = e2x_drv.e2n_half_size(
+                half_bger, half_bung, scf_tensors, screening, molecule, basis,
+                self.dft, self.xcfun, self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
-                e2bger = e2btot[:, :bger.shape[1]]
-                e2bung = e2btot[:, bger.shape[1]:]
+                e2bger = np.vstack((half_e2bger, half_e2bger))
+                e2bung = np.vstack((half_e2bung, -half_e2bung))
 
         if self.rank == mpi_master():
-            s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
-            s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
+            half_s2bung, half_s2bger = e2x_drv.s2n_half_size(
+                half_bger, half_bung, scf_tensors, nocc)
+            s2bung = np.vstack((half_s2bung, -half_s2bung))
+            s2bger = np.vstack((half_s2bger, half_s2bger))
 
         solutions = {}
         residuals = {}
@@ -674,7 +696,10 @@ class ComplexResponse:
                 for op, w in op_freq_keys:
                     if iteration == 0 or (relative_residual_norm[(op, w)] >
                                           self.conv_thresh):
-                        grad = v1[op]
+                        if self.nonlinear:
+                            grad = v1[(op, w)]
+                        else:
+                            grad = v1[op]
 
                         gradger, gradung = self.decomp_sym(grad)
 
@@ -832,13 +857,14 @@ class ComplexResponse:
 
                 # write to output
 
-                self.ostream.print_info(
-                    '{:d} gerade trial vectors'.format(n_ger))
-                self.ostream.print_info(
-                    '{:d} ungerade trial vectors'.format(n_ung))
-                self.ostream.print_blank()
+                if not self.nonlinear:
+                    self.ostream.print_info(
+                        '{:d} gerade trial vectors'.format(n_ger))
+                    self.ostream.print_info(
+                        '{:d} ungerade trial vectors'.format(n_ung))
+                    self.ostream.print_blank()
 
-                self.print_iteration(relative_residual_norm, nvs)
+                    self.print_iteration(relative_residual_norm, nvs)
 
             if self.timing:
                 tid = iteration + 1
@@ -882,20 +908,26 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            new_trials_tot = None
+            half_new_ger = None
+            half_new_ung = None
             if self.rank == mpi_master():
-                new_trials_tot = np.hstack((new_trials_ger, new_trials_ung))
+                if new_trials_ger is not None:
+                    half_new_ger = new_trials_ger[:new_trials_ger.shape[0] // 2]
+                if new_trials_ung is not None:
+                    half_new_ung = new_trials_ung[:new_trials_ung.shape[0] // 2]
 
-            new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
-                                     molecule, basis, self.dft, self.xcfun,
-                                     self.molgrid, self.gs_density)
+            half_new_e2bger, half_new_e2bung = e2x_drv.e2n_half_size(
+                half_new_ger, half_new_ung, scf_tensors, screening, molecule,
+                basis, self.dft, self.xcfun, self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
-                new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
-                new_e2bung = new_e2btot[:, new_trials_ger.shape[1]:]
+                new_e2bger = np.vstack((half_new_e2bger, half_new_e2bger))
+                new_e2bung = np.vstack((half_new_e2bung, -half_new_e2bung))
 
-                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
-                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
+                half_new_s2bung, half_new_s2bger = e2x_drv.s2n_half_size(
+                    half_new_ger, half_new_ung, scf_tensors, nocc)
+                new_s2bung = np.vstack((half_new_s2bung, -half_new_s2bung))
+                new_s2bger = np.vstack((half_new_s2bger, half_new_s2bger))
 
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
@@ -917,7 +949,8 @@ class ComplexResponse:
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence()
+            if not self.nonlinear:
+                self.print_convergence()
 
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
@@ -935,22 +968,29 @@ class ComplexResponse:
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
 
-        a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
-                        scf_tensors, self.rank, self.comm)
+        if not self.nonlinear:
+            a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
+                            scf_tensors, self.rank, self.comm)
 
         if self.rank == mpi_master():
-            va = {op: v for op, v in zip(self.a_components, a_rhs)}
-            props = {}
-            for aop in self.a_components:
-                for bop, w in solutions:
-                    props[(aop, bop, w)] = -np.dot(va[aop], solutions[(bop, w)])
-            self.print_properties(props)
-
-            return {
-                'properties': props,
-                'solutions': solutions,
-                'kappas': kappas,
-            }
+            if not self.nonlinear:
+                va = {op: v for op, v in zip(self.a_components, a_rhs)}
+                props = {}
+                for aop in self.a_components:
+                    for bop, w in solutions:
+                        props[(aop, bop, w)] = -np.dot(va[aop],
+                                                       solutions[(bop, w)])
+                self.print_properties(props)
+                return {
+                    'properties': props,
+                    'solutions': solutions,
+                    'kappas': kappas,
+                }
+            else:
+                return {
+                    'solutions': solutions,
+                    'kappas': kappas,
+                }
         else:
             return {}
 

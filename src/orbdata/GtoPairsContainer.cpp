@@ -102,13 +102,18 @@ CGtoPairsContainer::operator!=(const CGtoPairsContainer& other) const
 }
 
 CGtoPairsContainer
-CGtoPairsContainer::split(const int32_t nodes) const
+CGtoPairsContainer::split(const int32_t       nodes,
+                          const CCudaDevices& cudaDevices) const
 {
     std::vector<CGtoPairsBlock> ppvec;
 
+    auto ndevs = cudaDevices.getNumberOfDevices();
+
+    auto nblocks = (ndevs > 1) ? ndevs * nodes : nodes;
+    
     for (size_t i = 0; i < _gtoPairsBlocks.size(); i++)
     {
-        auto cvec = _gtoPairsBlocks[i].split(nodes);
+        auto cvec = _gtoPairsBlocks[i].split(nblocks);
 
         for (size_t j = 0; j < cvec.size(); j++)
         {

@@ -44,16 +44,30 @@ LIB_LIST := $(MATH_LIB)
 
 LIB_LIST += $(MACLIBS)
 
+# Cuda flags
+
+ifeq ($(USE_GPU),true)
+  NVCC_REL_FLG += -std=c++11 -O3 --compiler-options "-Wall"
+  NVCC_DEB_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-g"
+  LIB_LIST += $(CUDA_LIB)
+endif
+
 # Python interface
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
+PYTHON_INC += -I$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_include())")
 PYTHON_INC += -I$(PYTHON_USER_INC)
 PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
+
+ifeq ($(USE_GPU),true)
+  NVCC_REL_FLG += --compiler-options "-fPIC" $(PYTHON_INC)
+  NVCC_DEB_FLG += --compiler-options "-fPIC" $(PYTHON_INC)
+endif
 
 # Native shell commands
 

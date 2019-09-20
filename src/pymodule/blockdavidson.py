@@ -169,7 +169,7 @@ class BlockDavidsonSolver:
             pmat[:, 0] = 1.0 / pmat[:, 0]
             tvecs[:, i] *= pmat[:, 0]
 
-        self.norm_vectors(tvecs)
+        tvecs = normalize(tvecs)
 
         return tvecs
 
@@ -190,37 +190,3 @@ class BlockDavidsonSolver:
         tvecs = normalize(tvecs)
 
         return tvecs
-
-    def orthogonalize_gram_schmidt(self, tvecs):
-        """
-        Applies modified Gram Schmidt orthogonalization to trial vectors.
-
-        :param tvecs:
-            The trial vectors.
-        """
-
-        if tvecs.shape[1] > 0:
-
-            f = 1.0 / np.linalg.norm(tvecs[:, 0])
-            tvecs[:, 0] *= f
-
-            for i in range(1, tvecs.shape[1]):
-                for j in range(i):
-                    f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
-                        tvecs[:, j], tvecs[:, j])
-                    tvecs[:, i] -= f * tvecs[:, j]
-                f = 1.0 / np.linalg.norm(tvecs[:, i])
-                tvecs[:, i] *= f
-
-    def norm_vectors(self, tvecs):
-        """
-        Normalizes set of tria vectors by inner product.
-
-        :param tvecs:
-            The trial vectors.
-        """
-
-        fnorms = np.linalg.norm(tvecs, axis=0)
-
-        for i in range(tvecs.shape[1]):
-            tvecs[:, i] *= 1.0 / fnorms[i]

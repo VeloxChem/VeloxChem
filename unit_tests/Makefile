@@ -52,18 +52,10 @@ VST_LIBS_OPTS = $(foreach d,$(VST_LIBS_DIR),$(addprefix $d/,*.optrpt))
 VST_LIBS_LIST = $(foreach d,$(VST_LIBS_DIR),$(addprefix -L$d -l,$d))
 
 # Add list of internal libraries
-ifeq ($(USE_GPU),true)
-  VLX_LIBS_DIR := ${shell find ../src/*        \
-                    -not -path ../src/pymodule \
-                    -not -path ../src/python   \
-                    -type d -print}
-else
-  VLX_LIBS_DIR := ${shell find ../src/*        \
-                    -not -path ../src/pymodule \
-                    -not -path ../src/python   \
-                    -not -path ../src/gpu      \
-                    -type d -print}
-endif
+VLX_LIBS_DIR := ${shell find ../src/*        \
+                  -not -path ../src/pymodule \
+                  -not -path ../src/python   \
+                  -type d -print}
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))

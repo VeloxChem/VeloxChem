@@ -7,12 +7,13 @@
 #  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 before_script:
-  - export PATH=/usr/lib/binutils-2.26/bin:$PATH
-  - export PATH=/home/xinli/software/anaconda3/bin:$PATH
-  - export PATH=/home/xinli/software/openmpi/4.0.1/bin:$PATH
-  - export LD_LIBRARY_PATH=/home/xinli/software/openmpi/4.0.1/lib:$LD_LIBRARY_PATH
-  - export PYTHONPATH=/home/xinli/software/cppe/build/stage/lib:$PYTHONPATH
-  - export OMP_NUM_THREADS=6
+  - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
+  - export PATH=/opt/intel/intelpython3/bin:$PATH
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
+  - export OMP_NUM_THREADS=10
+  - export PYTHONPATH=$PYTHONPATH:/home/xinli/software/cppe/build/stage/lib
+  - export GTESTROOT=/home/xinli/software/googletest/googletest
+  - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
 
 after_script:
   - echo "Done!"
@@ -26,15 +27,15 @@ velxochem_build:
     - vlx-test
   stage: build
   script:
-    - cp config/Setup.Monkey src/Makefile.setup
-    - make -j 6 -C src release && make -j 6 -C unit_tests release
+    - python3 config/generate_setup.py
+    - make -j 10 -C src release && make -j 10 -C unit_tests release
 
 veloxchem_test:
   tags:
     - vlx-test
   stage: test
   script:
-    - cp config/Setup.Monkey src/Makefile.setup
-    - make -j 6 -C src release && make -j 6 -C unit_tests release
+    - python3 config/generate_setup.py
+    - make -j 10 -C src release && make -j 10 -C unit_tests release
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
     - ./build/bin/UnitTestVeloxChemMP.x && python3 -m pytest -v --cov=veloxchem
