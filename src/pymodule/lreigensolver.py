@@ -344,12 +344,14 @@ class LinearResponseEigenSolver:
                 # X_u = w (E_uu)^-1 S_ug X_g
 
                 evals, evecs = np.linalg.eigh(e2uu)
-                e2uu_inv = evecs @ np.diag(1.0 / evals) @ evecs.T
-                ses = s2ug.T @ e2uu_inv @ s2ug
+                e2uu_inv = np.linalg.multi_dot(
+                    [evecs, np.diag(1.0 / evals), evecs.T])
+                ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
 
                 evals, evecs = np.linalg.eigh(e2gg)
-                tmat = evecs @ np.diag(1.0 / np.sqrt(evals)) @ evecs.T
-                ses_tilde = tmat.T @ ses @ tmat
+                tmat = np.linalg.multi_dot(
+                    [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
+                ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
 
                 evals, evecs = np.linalg.eigh(ses_tilde)
                 p = list(reversed(evals.argsort()))
@@ -357,14 +359,15 @@ class LinearResponseEigenSolver:
                 evecs = evecs[:, p]
 
                 wn = 1.0 / np.sqrt(evals[:self.nstates])
-                Xn_ger = tmat @ evecs[:, :self.nstates]
-                Xn_ung = wn * (e2uu_inv @ (s2ug @ Xn_ger))
+                Xn_ger = np.matmul(tmat, evecs[:, :self.nstates])
+                Xn_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, Xn_ger])
 
                 for k in range(self.nstates):
                     x_ger = Xn_ger[:, k]
                     x_ung = Xn_ung[:, k]
-                    norm = np.sqrt(x_ung.T @ s2ug @ x_ger +
-                                   x_ger.T @ s2ug.T @ x_ung)
+                    norm = np.sqrt(
+                        np.linalg.multi_dot([x_ung.T, s2ug, x_ger]) +
+                        np.linalg.multi_dot([x_ger.T, s2ug.T, x_ung]))
                     Xn_ger[:, k] /= norm
                     Xn_ung[:, k] /= norm
 
@@ -374,13 +377,15 @@ class LinearResponseEigenSolver:
                     c_ger = Xn_ger[:, k]
                     c_ung = Xn_ung[:, k]
 
-                    r_ger = e2bger @ c_ger - w * (s2bger @ c_ung)
-                    r_ung = e2bung @ c_ung - w * (s2bung @ c_ger)
+                    r_ger = np.matmul(e2bger,
+                                      c_ger) - w * np.matmul(s2bger, c_ung)
+                    r_ung = np.matmul(e2bung,
+                                      c_ung) - w * np.matmul(s2bung, c_ger)
 
                     r = np.array([r_ger, r_ung]).flatten()
 
-                    x_ger = bger @ c_ger
-                    x_ung = bung @ c_ung
+                    x_ger = np.matmul(bger, c_ger)
+                    x_ung = np.matmul(bung, c_ung)
 
                     x_ger_full = np.hstack((x_ger, x_ger))
                     x_ung_full = np.hstack((x_ung, -x_ung))

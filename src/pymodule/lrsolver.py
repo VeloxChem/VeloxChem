@@ -388,14 +388,10 @@ class LinearResponseSolver:
 
                     solutions[(op, freq)] = x_ger_full + x_ung_full
 
-                    e2ger = np.matmul(e2bger, c_ger)
-                    s2ung = np.matmul(s2bger, c_ung)
-
-                    e2ung = np.matmul(e2bung, c_ung)
-                    s2ger = np.matmul(s2bung, c_ger)
-
-                    r_ger = (e2ger - freq * s2ung - gradger)
-                    r_ung = (e2ung - freq * s2ger - gradung)
+                    r_ger = np.matmul(e2bger, c_ger) - freq * np.matmul(
+                        s2bger, c_ung) - gradger
+                    r_ung = np.matmul(e2bung, c_ung) - freq * np.matmul(
+                        s2bung, c_ger) - gradung
 
                     residuals[(op, freq)] = np.array([r_ger, r_ung]).flatten()
 

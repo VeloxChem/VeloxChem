@@ -116,9 +116,10 @@ class LinearResponseMatrixVectorDriver:
                         (vecs_ung[:, col - n_ger], -vecs_ung[:, col - n_ger]))
 
                 kN = lrvec2mat(vec, nocc, norb).T
-                kn = mo @ kN @ mo.T
+                kn = np.linalg.multi_dot([mo, kN, mo.T])
 
-                dak = kn.T @ S @ da - da @ S @ kn.T
+                dak = np.linalg.multi_dot([kn.T, S, da])
+                dak -= np.linalg.multi_dot([da, S, kn.T])
                 # dbk = kn.T @ S @ db - db @ S @ kn.T
 
                 dks.append(dak)
@@ -145,16 +146,18 @@ class LinearResponseMatrixVectorDriver:
                 fak = fock.alpha_to_numpy(col).T
                 # fbk = fock.beta_to_numpy(col).T
 
-                kfa = S @ kn @ fa - fa @ kn @ S
+                kfa = np.linalg.multi_dot([S, kn, fa])
+                kfa -= np.linalg.multi_dot([fa, kn, S])
                 # kfb = S @ kn @ fb - fb @ kn @ S
 
                 fat = fak + kfa
                 fbt = fat
                 # fbt = fbk + kfb
 
-                gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da +
-                                                       fbt.T @ db) @ S
-                gmo = mo.T @ gao @ mo
+                gao = np.matmul(S, np.matmul(da, fat.T) + np.matmul(db, fbt.T))
+                gao -= np.matmul(np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
+
+                gmo = np.linalg.multi_dot([mo.T, gao, mo])
 
                 gv[:, col] = -lrmat2vec(gmo, nocc, norb)[:half_size]
             return gv[:, :n_ger], gv[:, n_ger:]
@@ -352,10 +355,12 @@ class LinearResponseMatrixVectorDriver:
                     (vecs_ung[:, c - n_ger], -vecs_ung[:, c - n_ger]))
 
             kappa = lrvec2mat(vec, nocc, norb).T
-            kappa_ao = mo @ kappa @ mo.T
+            kappa_ao = np.linalg.multi_dot([mo, kappa, mo.T])
 
-            s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
-            s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
+            s2n_ao = np.linalg.multi_dot([kappa_ao.T, S, D])
+            s2n_ao -= np.linalg.multi_dot([D, S, kappa_ao.T])
+
+            s2n_mo = np.linalg.multi_dot([mo.T, S, s2n_ao, S, mo])
             s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)[:half_size]
 
         return s2n_vecs[:, :n_ger], s2n_vecs[:, n_ger:]
@@ -436,7 +441,11 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
         norb = mo.shape[1]
 
         matrices = tuple(
-            mo.T @ (S @ D @ P.T - P.T @ D @ S) @ mo for P in integral_comps)
+            np.linalg.multi_dot([
+                mo.T,
+                (np.linalg.multi_dot([S, D, P.T]) -
+                 np.linalg.multi_dot([P.T, D, S])), mo
+            ]) for P in integral_comps)
 
         gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
         return gradients
