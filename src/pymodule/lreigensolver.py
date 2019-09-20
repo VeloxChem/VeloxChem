@@ -306,10 +306,6 @@ class LinearResponseEigenSolver:
                                                    self.molgrid,
                                                    self.gs_density)
 
-        if self.rank == mpi_master():
-            s2bung, s2bger = e2x_drv.s2n_half_size(bger, bung, scf_tensors,
-                                                   nocc)
-
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
         relative_residual_norm = {}
@@ -333,7 +329,7 @@ class LinearResponseEigenSolver:
 
                 e2gg = np.matmul(bger.T, e2bger) * 2.0
                 e2uu = np.matmul(bung.T, e2bung) * 2.0
-                s2ug = np.matmul(bung.T, s2bung) * 2.0
+                s2ug = np.matmul(bung.T, bger * 2.0) * 2.0
 
                 # Equations:
                 # E[2] X_g - w S[2] X_u = 0
@@ -378,9 +374,9 @@ class LinearResponseEigenSolver:
                     c_ung = Xn_ung[:, k]
 
                     r_ger = np.matmul(e2bger,
-                                      c_ger) - w * np.matmul(s2bger, c_ung)
+                                      c_ger) - w * np.matmul(bung * 2.0, c_ung)
                     r_ung = np.matmul(e2bung,
-                                      c_ung) - w * np.matmul(s2bung, c_ger)
+                                      c_ung) - w * np.matmul(bger * 2.0, c_ger)
 
                     r = np.array([r_ger, r_ung]).flatten()
 
@@ -454,14 +450,8 @@ class LinearResponseEigenSolver:
                 self.gs_density)
 
             if self.rank == mpi_master():
-                new_s2bung, new_s2bger = e2x_drv.s2n_half_size(
-                    new_trials_ger, new_trials_ung, scf_tensors, nocc)
-
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
-
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
-                s2bger = np.append(s2bger, new_s2bger, axis=1)
 
                 write_rsp_hdf5(self.checkpoint_file,
                                [bger, bung, e2bger, e2bung], rsp_vector_labels,

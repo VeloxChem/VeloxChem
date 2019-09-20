@@ -326,9 +326,6 @@ class LinearResponseSolver:
                                                    self.molgrid,
                                                    self.gs_density)
 
-        if self.rank == mpi_master():
-            s2bung, s2bger = e2x_drv.s2n_half_size(bger, bung, scf_tensors,
-                                                   nocc)
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
@@ -354,7 +351,7 @@ class LinearResponseSolver:
 
                 e2gg = np.matmul(bger.T, e2bger) * 2.0
                 e2uu = np.matmul(bung.T, e2bung) * 2.0
-                s2ug = np.matmul(bung.T, s2bung) * 2.0
+                s2ug = np.matmul(bung.T, bger * 2.0) * 2.0
 
                 # next solution
                 for op, freq in op_freq_keys:
@@ -389,9 +386,9 @@ class LinearResponseSolver:
                     solutions[(op, freq)] = x_ger_full + x_ung_full
 
                     r_ger = np.matmul(e2bger, c_ger) - freq * np.matmul(
-                        s2bger, c_ung) - gradger
+                        bung * 2.0, c_ung) - gradger
                     r_ung = np.matmul(e2bung, c_ung) - freq * np.matmul(
-                        s2bung, c_ger) - gradung
+                        bger * 2.0, c_ger) - gradung
 
                     residuals[(op, freq)] = np.array([r_ger, r_ung]).flatten()
 
@@ -455,14 +452,8 @@ class LinearResponseSolver:
                 self.gs_density)
 
             if self.rank == mpi_master():
-                new_s2bung, new_s2bger = e2x_drv.s2n_half_size(
-                    new_trials_ger, new_trials_ung, scf_tensors, nocc)
-
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
-
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
-                s2bger = np.append(s2bger, new_s2bger, axis=1)
 
                 write_rsp_hdf5(self.checkpoint_file,
                                [bger, bung, e2bger, e2bung],
