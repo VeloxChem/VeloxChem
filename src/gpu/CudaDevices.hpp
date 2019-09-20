@@ -53,6 +53,14 @@ public:
      */
     ~CCudaDevices();
     
+    
+    /**
+     Sets up requested CUDA compute capable device.
+
+     @param iDevice the identifier of CUDA compute capable device.
+     */
+    void setCudaDevice(const int32_t iDevice) const;
+    
     /**
      Gets number of CUDA compute capable devices.
 
