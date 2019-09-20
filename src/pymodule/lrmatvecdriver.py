@@ -772,6 +772,34 @@ def construct_ed_sd(orb_ene, nocc, norb):
     return ediag, sdiag
 
 
+def construct_ed_sd_half(orb_ene, nocc, norb):
+    """
+    Gets the upper half of E0 and S0 diagonal elements as arrays.
+
+    :param orb_ene:
+        Orbital energies.
+    :param nocc:
+        Number of occupied orbitals.
+    :param norb:
+        Number of orbitals.
+
+    :return:
+        The upper half of E0 and S0 diagonal elements as numpy arrays.
+    """
+
+    xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+    excitations = list(
+        itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+    z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
+    ediag = np.array(z)
+
+    lz = len(excitations)
+    sdiag = 2.0 * np.ones(lz)
+
+    return ediag, sdiag
+
+
 def swap_xy(xy):
     """
     Swaps X and Y parts of response vector.

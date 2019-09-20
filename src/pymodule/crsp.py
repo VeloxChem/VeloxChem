@@ -10,13 +10,10 @@ from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .lrmatvecdriver import remove_linear_dependence
-from .lrmatvecdriver import remove_linear_dependence_half # routine for halfsized vectors
-from .lrmatvecdriver import orthogonalize_gram_schmidt
+from .lrmatvecdriver import remove_linear_dependence_half
 from .lrmatvecdriver import orthogonalize_gram_schmidt_half
-from .lrmatvecdriver import normalize
 from .lrmatvecdriver import normalize_half
-from .lrmatvecdriver import construct_ed_sd
+from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import read_rsp_hdf5
@@ -349,7 +346,7 @@ class ComplexResponse:
 
         # spawning needed components
 
-        ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag, sdiag = construct_ed_sd_half(orb_ene, nocc, norb)
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         sdiag_fp = sdiag**4
@@ -420,26 +417,25 @@ class ComplexResponse:
 
         ig = {}
         for op, grad in op_grads.items():
-            gradger, gradung = self.decomp_sym(grad)
+            fullgradger, fullgradung = self.decomp_sym(grad)
+            gradger = self.discard_lower_halfs(fullgradger)
+            gradung = self.discard_lower_halfs(fullgradung)
+
             grad = np.array(
                 [gradger.real, gradung.real, -gradung.imag,
                  -gradger.imag]).flatten()
-            gn = np.linalg.norm(grad)
+            gn = np.sqrt(2) * np.linalg.norm(grad)
             if self.nonlinear:
                 if gn < self.small_thresh:
                     ig[op] = np.zeros(grad.shape[0])
                 else:
-                    fullsize = self.preconditioning(precond[op[1]], grad)
-                    ig[op] = self.discard_lower_halfs(np.array(
-                             self.decomp_trials(fullsize)).T).flatten()
+                    ig[op] = self.preconditioning(precond[op[1]], grad)
             else:
                 for w in freqs:
                     if gn < self.small_thresh:
                         ig[(op, w)] = np.zeros(grad.shape[0])
                     else:
-                        fullsize = self.preconditioning(precond[w], grad)
-                        ig[(op, w)] = self.discard_lower_halfs(np.array(
-                            self.decomp_trials(fullsize)).T).flatten()
+                        ig[(op, w)] = self.preconditioning(precond[w], grad)
 
         return ig
 
@@ -506,21 +502,15 @@ class ComplexResponse:
         if bung is not None and bung.any():
             new_ung = new_ung - 2 * np.matmul(bung, np.matmul(bung.T, new_ung))
 
-        # normalizing new trial vectors
+        # orthonormalizing new trial vectors
 
         if new_ger.any() and renormalize:
-
-            # removing linear dependencies in gerade trials
-            # and normalizing gerade trials
 
             new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
             new_ger = orthogonalize_gram_schmidt_half(new_ger)
             new_ger = normalize_half(new_ger)
 
         if new_ung.any() and renormalize:
-
-            # removing linear dependencies in ungerade trials:
-            # and normalizing ungerade trials
 
             new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
             new_ung = orthogonalize_gram_schmidt_half(new_ung)
@@ -641,10 +631,6 @@ class ComplexResponse:
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
 
-            halfprecond = {
-                w: self.discard_lower_halfs(self.get_precond(orb_ene, nocc, norb, w, d).T) for w in freqs
-            } # introduced half_sized_precond
-
         # read initial guess from restart file
 
         if self.restart:
@@ -665,6 +651,7 @@ class ComplexResponse:
             if self.rank == mpi_master():
 
                 # spawning initial trial vectors
+
                 igs = self.initial_guess(v1, d, freqs, precond)
                 bger, bung = self.setup_trials(igs)
 
@@ -683,27 +670,13 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            #half_bger = None
-            #half_bung = None
-            #if self.rank == mpi_master():
-            #    if bger is not None:
-            #        half_bger = bger#[:bger.shape[0] // 2]
-            #    if bung is not None:
-            #        half_bung = bung#[:bung.shape[0] // 2]
-
             e2bger, e2bung = e2x_drv.e2n_half_size(
                 bger, bung, scf_tensors, screening, molecule, basis,
                 self.dft, self.xcfun, self.molgrid, self.gs_density)
 
-            #if self.rank == mpi_master():
-            #    e2bger = half_e2bger # set subspace to halfsized subspace
-            #    e2bung = half_e2bung # set subspace to halfsized subspace
-
         if self.rank == mpi_master():
             s2bung, s2bger = e2x_drv.s2n_half_size(
                 bger, bung, scf_tensors, nocc)
-            #s2bung = half_s2bung # set subspace to halfsized subspace
-            #s2bger = half_s2bger # set subspace to halfsized subspace
 
         solutions = {}
         residuals = {}
@@ -733,22 +706,20 @@ class ComplexResponse:
                         else:
                             grad = v1[op]
 
-########################### SCREENING FROM HERE ###############################
-
-                        gradger, gradung = self.decomp_sym(grad)
-                        gradger = self.discard_lower_halfs(gradger) # lower half discarded
-                        gradung = self.discard_lower_halfs(gradung) # lower half discarded
+                        fullgradger, fullgradung = self.decomp_sym(grad)
+                        gradger = self.discard_lower_halfs(fullgradger)
+                        gradung = self.discard_lower_halfs(fullgradung)
 
                         # projections onto gerade and ungerade subspaces:
 
-                        g_realger = np.matmul(bger.T, gradger.real)
-                        g_imagger = np.matmul(bger.T, gradger.imag)
-                        g_realung = np.matmul(bung.T, gradung.real)
-                        g_imagung = np.matmul(bung.T, gradung.imag)
+                        g_realger = 2 * np.matmul(bger.T, gradger.real)
+                        g_imagger = 2 * np.matmul(bger.T, gradger.imag)
+                        g_realung = 2 * np.matmul(bung.T, gradung.real)
+                        g_imagung = 2 * np.matmul(bung.T, gradung.imag)
 
-                        e2gg = np.matmul(bger.T, e2bger)
-                        e2uu = np.matmul(bung.T, e2bung)
-                        s2ug = np.matmul(bung.T, s2bung)
+                        e2gg = 2 * np.matmul(bger.T, e2bger)
+                        e2uu = 2 * np.matmul(bung.T, e2bung)
+                        s2ug = 2 * np.matmul(bung.T, s2bung)
 
                         n_ger = bger.shape[1]
                         n_ung = bung.shape[1]
@@ -820,12 +791,17 @@ class ComplexResponse:
 
                         # ...and projecting them onto respective subspace
 
-                        x_realger = np.matmul(bger, c_realger)
-                        x_realung = np.matmul(bung, c_realung)
-                        x_imagung = np.matmul(bung, c_imagung)
-                        x_imagger = np.matmul(bger, c_imagger)
+                        halfx_realger = np.matmul(bger, c_realger)
+                        halfx_realung = np.matmul(bung, c_realung)
+                        halfx_imagung = np.matmul(bung, c_imagung)
+                        halfx_imagger = np.matmul(bger, c_imagger)
 
-                        # composing response vector
+                        # composing full size response vector
+
+                        x_realger = np.hstack((halfx_realger, halfx_realger))
+                        x_realung = np.hstack((halfx_realung, -halfx_realung))
+                        x_imagung = np.hstack((halfx_imagung, -halfx_imagung))
+                        x_imagger = np.hstack((halfx_imagger, halfx_imagger))
 
                         x_real = x_realger + x_realung
                         x_imag = x_imagung + x_imagger
@@ -863,7 +839,7 @@ class ComplexResponse:
                         r_imagger = (-e2imagger + w * s2imagung +
                                      d * s2realung + gradger.imag)
 
-                        # composing total residual
+                        # composing total half-sized residual
 
                         r_real = r_realger + r_realung
                         r_imag = r_imagung + r_imagger
@@ -881,10 +857,10 @@ class ComplexResponse:
                         # calculating relative residual norm
                         # for convergence check
 
-                        nv = np.matmul(n, grad[:grad.shape[0] // 2]) # only upper half of grad (maybe blow n up?)
+                        nv = np.matmul(n, grad)
                         nvs.append((op, w, nv))
 
-                        rn = np.linalg.norm(r)
+                        rn = np.sqrt(2) * np.linalg.norm(r)
                         nn = np.linalg.norm(n)
                         if nn != 0:
                             relative_residual_norm[(op, w)] = rn / nn
@@ -920,7 +896,7 @@ class ComplexResponse:
 
                 new_trials_ger, new_trials_ung = self.setup_trials(
                     residuals,
-                    pre=halfprecond,
+                    pre=precond,
                     bger=bger,
                     bung=bung,
                     res_norm=relative_residual_norm)
@@ -944,26 +920,14 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            half_new_ger = None
-            half_new_ung = None
-            if self.rank == mpi_master():
-                if new_trials_ger is not None:
-                    half_new_ger = new_trials_ger#[:new_trials_ger.shape[0] // 2]
-                if new_trials_ung is not None:
-                    half_new_ung = new_trials_ung#[:new_trials_ung.shape[0] // 2]
-
-            half_new_e2bger, half_new_e2bung = e2x_drv.e2n_half_size(
-                half_new_ger, half_new_ung, scf_tensors, screening, molecule,
+            new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
+                new_trials_ger, new_trials_ung, scf_tensors, screening, molecule,
                 basis, self.dft, self.xcfun, self.molgrid, self.gs_density)
 
             if self.rank == mpi_master():
-                new_e2bger = half_new_e2bger # set subspace to halfsized subspace
-                new_e2bung = half_new_e2bung # set subspace to halfsized subspace
 
-                half_new_s2bung, half_new_s2bger = e2x_drv.s2n_half_size(
-                    half_new_ger, half_new_ung, scf_tensors, nocc)
-                new_s2bung = half_new_s2bung # set subspace to halfsized subspace
-                new_s2bger = half_new_s2bger # set subspace to halfsized subspace
+                new_s2bung, new_s2bger = e2x_drv.s2n_half_size(
+                    new_trials_ger, new_trials_ung, scf_tensors, nocc)
 
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
@@ -1014,7 +978,7 @@ class ComplexResponse:
                 props = {}
                 for aop in self.a_components:
                     for bop, w in solutions:
-                        props[(aop, bop, w)] = -np.dot(va[aop][:va[aop].shape[0] // 2], # only halfsized rhs
+                        props[(aop, bop, w)] = -np.dot(va[aop],
                                                        solutions[(bop, w)])
                 self.print_properties(props)
                 return {
