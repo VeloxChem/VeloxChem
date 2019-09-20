@@ -262,6 +262,11 @@ class LinearResponseEigenSolver:
             'LR_eigen_e2bung',
         ]
 
+        bger = None
+        bung = None
+        new_trials_ger = None
+        new_trials_ung = None
+
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
@@ -290,32 +295,20 @@ class LinearResponseEigenSolver:
                     bger.any() or bung.any(),
                     'LinearResponseEigenSolver: trial vector is empty')
 
-                if not bger.any():
+                if bger is None or not bger.any():
                     bger = np.zeros((bung.shape[0], 0))
-                if not bung.any():
+                if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
 
-            half_bger = None
-            half_bung = None
-            if self.rank == mpi_master():
-                if bger is not None:
-                    half_bger = bger[:bger.shape[0] // 2]
-                if bung is not None:
-                    half_bung = bung[:bung.shape[0] // 2]
-
-            half_e2bger, half_e2bung = e2x_drv.e2n_half_size(
-                half_bger, half_bung, scf_tensors, screening, molecule, basis,
-                self.dft, self.xcfun, self.molgrid, self.gs_density)
-
-            if self.rank == mpi_master():
-                e2bger = np.vstack((half_e2bger, half_e2bger))
-                e2bung = np.vstack((half_e2bung, -half_e2bung))
+            e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
+                                                   screening, molecule, basis,
+                                                   self.dft, self.xcfun,
+                                                   self.molgrid,
+                                                   self.gs_density)
 
         if self.rank == mpi_master():
-            half_s2bung, half_s2bger = e2x_drv.s2n_half_size(
-                half_bger, half_bung, scf_tensors, nocc)
-            s2bung = np.vstack((half_s2bung, -half_s2bung))
-            s2bger = np.vstack((half_s2bger, half_s2bger))
+            s2bung, s2bger = e2x_drv.s2n_half_size(bger, bung, scf_tensors,
+                                                   nocc)
 
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
@@ -338,9 +331,9 @@ class LinearResponseEigenSolver:
                 self.cur_iter = iteration
                 ws = []
 
-                e2gg = np.matmul(bger.T, e2bger)
-                e2uu = np.matmul(bung.T, e2bung)
-                s2ug = np.matmul(bung.T, s2bung)
+                e2gg = np.matmul(bger.T, e2bger) * 2.0
+                e2uu = np.matmul(bung.T, e2bung) * 2.0
+                s2ug = np.matmul(bung.T, s2bung) * 2.0
 
                 # Equations:
                 # E[2] X_g - w S[2] X_u = 0
@@ -351,12 +344,14 @@ class LinearResponseEigenSolver:
                 # X_u = w (E_uu)^-1 S_ug X_g
 
                 evals, evecs = np.linalg.eigh(e2uu)
-                e2uu_inv = evecs @ np.diag(1.0 / evals) @ evecs.T
-                ses = s2ug.T @ e2uu_inv @ s2ug
+                e2uu_inv = np.linalg.multi_dot(
+                    [evecs, np.diag(1.0 / evals), evecs.T])
+                ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
 
                 evals, evecs = np.linalg.eigh(e2gg)
-                tmat = evecs @ np.diag(1.0 / np.sqrt(evals)) @ evecs.T
-                ses_tilde = tmat.T @ ses @ tmat
+                tmat = np.linalg.multi_dot(
+                    [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
+                ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
 
                 evals, evecs = np.linalg.eigh(ses_tilde)
                 p = list(reversed(evals.argsort()))
@@ -364,35 +359,46 @@ class LinearResponseEigenSolver:
                 evecs = evecs[:, p]
 
                 wn = 1.0 / np.sqrt(evals[:self.nstates])
-                Xn_ger = tmat @ evecs[:, :self.nstates]
-                Xn_ung = wn * (e2uu_inv @ (s2ug @ Xn_ger))
+                Xn_ger = np.matmul(tmat, evecs[:, :self.nstates])
+                Xn_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, Xn_ger])
 
                 for k in range(self.nstates):
                     x_ger = Xn_ger[:, k]
                     x_ung = Xn_ung[:, k]
-                    norm = np.sqrt(x_ung.T @ s2ug @ x_ger +
-                                   x_ger.T @ s2ug.T @ x_ung)
+                    norm = np.sqrt(
+                        np.linalg.multi_dot([x_ung.T, s2ug, x_ger]) +
+                        np.linalg.multi_dot([x_ger.T, s2ug.T, x_ung]))
                     Xn_ger[:, k] /= norm
                     Xn_ung[:, k] /= norm
 
                 for k in range(self.nstates):
 
                     w = wn[k]
-                    x_ger = Xn_ger[:, k]
-                    x_ung = Xn_ung[:, k]
+                    c_ger = Xn_ger[:, k]
+                    c_ung = Xn_ung[:, k]
 
-                    r_ger = e2bger @ x_ger - w * (s2bger @ x_ung)
-                    r_ung = e2bung @ x_ung - w * (s2bung @ x_ger)
+                    r_ger = np.matmul(e2bger,
+                                      c_ger) - w * np.matmul(s2bger, c_ung)
+                    r_ung = np.matmul(e2bung,
+                                      c_ung) - w * np.matmul(s2bung, c_ger)
 
                     r = np.array([r_ger, r_ung]).flatten()
-                    X = bger @ x_ger + bung @ x_ung
+
+                    x_ger = np.matmul(bger, c_ger)
+                    x_ung = np.matmul(bung, c_ung)
+
+                    x_ger_full = np.hstack((x_ger, x_ger))
+                    x_ung_full = np.hstack((x_ung, -x_ung))
+
+                    X = x_ger_full + x_ung_full
 
                     exresiduals[k] = (w, r)
                     excitations[k] = (w, X)
 
-                    rn = np.linalg.norm(r)
+                    rn = np.linalg.norm(r) * np.sqrt(2.0)
                     xn = np.linalg.norm(X)
                     relative_residual_norm[k] = rn / xn
+
                     converged[k] = (rn / xn < self.conv_thresh)
                     ws.append(w)
 
@@ -429,9 +435,9 @@ class LinearResponseEigenSolver:
                     new_trials_ger.any() or new_trials_ung.any(),
                     'LinearResponseEigenSolver: unable to add new trial vector')
 
-                if not new_trials_ger.any():
+                if new_trials_ger is None or not new_trials_ger.any():
                     new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
-                if not new_trials_ung.any():
+                if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
                 bger = np.append(bger, new_trials_ger, axis=1)
@@ -442,26 +448,14 @@ class LinearResponseEigenSolver:
                 self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            half_new_ger = None
-            half_new_ung = None
-            if self.rank == mpi_master():
-                if new_trials_ger is not None:
-                    half_new_ger = new_trials_ger[:new_trials_ger.shape[0] // 2]
-                if new_trials_ung is not None:
-                    half_new_ung = new_trials_ung[:new_trials_ung.shape[0] // 2]
-
-            half_new_e2bger, half_new_e2bung = e2x_drv.e2n_half_size(
-                half_new_ger, half_new_ung, scf_tensors, screening, molecule,
-                basis, self.dft, self.xcfun, self.molgrid, self.gs_density)
+            new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
+                new_trials_ger, new_trials_ung, scf_tensors, screening,
+                molecule, basis, self.dft, self.xcfun, self.molgrid,
+                self.gs_density)
 
             if self.rank == mpi_master():
-                new_e2bger = np.vstack((half_new_e2bger, half_new_e2bger))
-                new_e2bung = np.vstack((half_new_e2bung, -half_new_e2bung))
-
-                half_new_s2bung, half_new_s2bger = e2x_drv.s2n_half_size(
-                    half_new_ger, half_new_ung, scf_tensors, nocc)
-                new_s2bung = np.vstack((half_new_s2bung, -half_new_s2bung))
-                new_s2bger = np.vstack((half_new_s2bger, half_new_s2bger))
+                new_s2bung, new_s2bger = e2x_drv.s2n_half_size(
+                    new_trials_ger, new_trials_ung, scf_tensors, nocc)
 
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
@@ -687,8 +681,7 @@ class LinearResponseEigenSolver:
         excitations = list(
             itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
 
-        ediag, sdiag = construct_ed_sd(ea, nocc, norb)
-        excitation_energies = 0.5 * ediag
+        excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
         w = {ia: w for ia, w in zip(excitations, excitation_energies)}
 
@@ -704,8 +697,8 @@ class LinearResponseEigenSolver:
             Xn_T[:n_exc] = Xn[n_exc:]
             Xn_T[n_exc:] = Xn[:n_exc]
 
-            Xn_ger = 0.5 * (Xn + Xn_T)
-            Xn_ung = 0.5 * (Xn - Xn_T)
+            Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
+            Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
 
             final.append((w[(i, a)], np.array([Xn_ger, Xn_ung]).flatten()))
         return final
@@ -748,7 +741,7 @@ class LinearResponseEigenSolver:
             else:
                 v = X
 
-            if np.linalg.norm(v) > self.small_thresh:
+            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
                 trials.append(v)
 
         new_trials = np.array(trials).T
@@ -758,10 +751,12 @@ class LinearResponseEigenSolver:
         new_ger, new_ung = self.decomp_trials(new_trials)
 
         if bger is not None and bger.any():
-            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
+            new_ger_proj = np.matmul(bger, 2.0 * np.matmul(bger.T, new_ger))
+            new_ger = new_ger - new_ger_proj
 
         if bung is not None and bung.any():
-            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
+            new_ung_proj = np.matmul(bung, 2.0 * np.matmul(bung.T, new_ung))
+            new_ung = new_ung - new_ung_proj
 
         if new_ger.any() and renormalize:
             new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
@@ -795,6 +790,9 @@ class LinearResponseEigenSolver:
         # spawning needed components
 
         ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag = ediag[:ediag.shape[0] // 2]
+        sdiag = sdiag[:sdiag.shape[0] // 2]
+
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         w_sq = w**2
