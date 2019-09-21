@@ -728,27 +728,92 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     double* ptr_rpq = nullptr; size_t pitch_rpq = 0;
     
-    cudaDevices->allocate(&ptr_rpq, &pitch_rpq, pdim, pmax);
+    cudaDevices->allocate(&ptr_rpq, &pitch_rpq, pdim, 3 * pmax);
     
-    //CMemBlock2D<double> rpq(pdim, 3 * pmax);
+    double* ptr_rfacts = nullptr; size_t pitch_rfacts = 0;
     
+    cudaDevices->allocate(&ptr_rfacts, &pitch_rfacts, pdim, 4 *  pmax);
     
+    double* ptr_rw = nullptr; size_t pitch_rw = 0;
     
-    printf("@pitch for r_pq: %zu\n", pitch_rpq); 
+    cudaDevices->allocate(&ptr_rw, &pitch_rw, pdim, 3 * pmax);
     
-    //CMemBlock2D<double> rfacts(pdim, 4 * pmax);
+    double* ptr_rwp = nullptr; size_t pitch_rwp = 0;
     
-    //CMemBlock2D<double> rw(pdim, 3 * pmax);
+    cudaDevices->allocate(&ptr_rwp, &pitch_rwp, pdim, 3 * pmax);
     
-    //CMemBlock2D<double> rwp(pdim, 3 * pmax);
+    double* ptr_rwq = nullptr; size_t pitch_rwq = 0;
     
-    //CMemBlock2D<double> rwq(pdim, 3 * pmax);
+    cudaDevices->allocate(&ptr_rwq, &pitch_rwq, pdim, 3 * pmax);
     
+    // set up horizontal recursion buffer for ket side
     
+    auto cdim = ketpairs.getNumberOfScreenedContrPairs();
+    
+    // set up integrals screening
+    
+    bool useqq = !intsScreener.isEmpty();
+    
+    auto qqpairs = ketpairs;
+    
+    auto ddpairs = ketpairs;
+    
+    CMemBlock<int32_t> qqvec(cdim);
+    
+    CMemBlock<int32_t> qqidx(cdim);
+    
+    CMemBlock<double> distpq(cdim);
+    
+    CMemBlock<double> qqden(cdim);
+    
+    // loop over contracted GTOs ob bra side
+    
+    for (int32_t i = 0; i < brapairs.getNumberOfScreenedContrPairs(); i++)
+    {
+        // determine GTOs pairs  effective dimensions on ket side
+        
+        auto nqpdim = (symbk) ? ketpairs.getNumberOfPrimPairs(i) : pdim;
+        
+        auto nqcdim = (symbk) ? i + 1 : cdim;
+        
+        // integrals screening: QQ or QQR scheme
+        
+        if (useqq)
+        {
+            // compute effective distances between GTOs pairs on bra and ket sides
+            
+            if (intsScreener.getScreeningScheme() == ericut::qqr)
+            {
+                twointsfunc::compEffectiveDistancesPQ(distpq, brapairs, ketpairs,
+                                                      symbk, i);
+            }
+            
+            intsScreener.setScreeningVector(qqvec, distpq, symbk, i);
+            
+            mathfunc::ordering(qqidx.data(), qqvec.data(), nqcdim);
+            
+            nqcdim = qqpairs.compress(ketpairs, qqvec, nqcdim);
+            
+            if (nqcdim > 0) nqpdim = qqpairs.getNumberOfPrimPairs(nqcdim - 1);
+        }
+        
+        // all integrals are vanishing in batch, skip computations
+        
+        if (nqcdim == 0) continue;
+        
+    }
     
     // deallocate prefactors used in Obara-Saika recursion on device
     
     cudaDevices->free(ptr_rpq);
+    
+    cudaDevices->free(ptr_rfacts);
+    
+    cudaDevices->free(ptr_rw);
+    
+    cudaDevices->free(ptr_rwp);
+    
+    cudaDevices->free(ptr_rwq);
 }
 
 CRecursionMap

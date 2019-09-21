@@ -15,6 +15,7 @@
 #include <string>
 
 #include "DeviceFunc.hpp"
+#include "MemBlock2D.hpp"
 
 /**
  Class CudaDevices stores data about available CUDA devices and provides these devices managment functions.
@@ -79,24 +80,36 @@ public:
     void allocate(double** pointer,
                   size_t*  pitch,
                   int32_t  nElements,
-                  int32_t  nBlocks) const
-    {
-#ifdef ENABLE_GPU
-        gpu::allocateDeviceMemory((void**)pointer, pitch, nElements * sizeof(double), static_cast<size_t>(nBlocks));
-#endif
-    }
+                  int32_t  nBlocks) const;
     
     /**
      Deallocates device memory.
      
      @param pointer the pointer to device memory.
      */
-    void free(double* pointer) const
-    {
-#ifdef ENABLE_GPU
-        gpu::freeDeviceMemory((void*)pointer);
-#endif
-    }
+    void free(double* pointer) const;
+    
+    /**
+     Copies 2D data to CUDA device.
+
+     @param pointer the pointer to device memory.
+     @param pitch the pitch of device memory.
+     @param memBlock2D the 2D memory block.
+     */
+    void copyToDevice(      double*              pointer,
+                            size_t               pitch,
+                      const CMemBlock2D<double>& memBlock2D) const;
+    
+    /**
+     Copies 2D data from CUDA device.
+     
+     @param pointer the pointer to device memory.
+     @param pitch the pitch of device memory.
+     @param memBlock2D the 2D memory block.
+     */
+    void copyFromDevice(double*              pointer,
+                        size_t               pitch,
+                        CMemBlock2D<double>& memBlock2D) const;
     
     /**
      Gets string representation of CUDA devices object.

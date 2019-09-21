@@ -55,6 +55,47 @@ CCudaDevices::getNumberOfDevices() const
     return static_cast<int32_t>(_namesOfDevices.size());
 }
 
+void
+CCudaDevices::allocate(double** pointer,
+                       size_t*  pitch,
+                       int32_t  nElements,
+                       int32_t  nBlocks) const
+{
+#ifdef ENABLE_GPU
+    gpu::allocateDeviceMemory((void**) pointer, pitch, nElements * sizeof(double), static_cast<size_t>(nBlocks));
+#endif
+}
+
+void
+CCudaDevices::free(double* pointer) const
+{
+#ifdef ENABLE_GPU
+    gpu::freeDeviceMemory((void*)pointer);
+#endif
+}
+
+void
+CCudaDevices::copyToDevice(      double*              pointer,
+                                 size_t               pitch,
+                           const CMemBlock2D<double>& memBlock2D) const
+{
+#ifdef ENABLE_GPU
+    gpu::copyToDeviceMemory(pointer, pitch, memBlock2D.data(), memBlock2D.pitched_size(0) * sizeof(double),
+                            memBlock2D.size(0) * sizeof(double), static_cast<size_t>(memBlock2D.blocks()));
+#endif
+}
+
+void
+CCudaDevices::copyFromDevice(double*              pointer,
+                             size_t               pitch,
+                             CMemBlock2D<double>& memBlock2D) const
+{
+#ifdef ENABLE_GPU
+    gpu::copyFromDeviceMemory(memBlock2D.data(), memBlock2D.pitched_size(0) * sizeof(double), pointer, pitch,
+                              memBlock2D.size(0) * sizeof(double), static_cast<size_t>(memBlock2D.blocks()));
+#endif
+}
+
 std::string
 CCudaDevices::getString() const
 {
