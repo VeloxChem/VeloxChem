@@ -13,6 +13,7 @@
 #include <tuple>
 
 #include "MemBlock2D.hpp"
+#include "ErrorHandler.hpp"
 
 namespace gpu {
 
@@ -33,7 +34,7 @@ void setDevice(const int32_t iDevice);
 template<class T>
 void allocateDeviceMemory(      T**             pointerToMemory,
                                 size_t*         pointerToPitch,
-                          const CMemBlock2d<T>& memBlock2D)
+                          const CMemBlock2D<T>& memBlock2D)
 {
 #ifdef ENABLE_GPU
     auto cerr = cudaMallocPitch((void**)pointerToMemory, pointerToPitch, memBlock2D.size(0) * sizeof(T),
@@ -68,7 +69,7 @@ void freeDeviceMemory(T* pointerToMemory)
 template<class T>
 void copyToDeviceMemory(      T*              pointerToMemory,
                               size_t          pitch,
-                        const CMemBlock2d<T>& memBlock2D)
+                        const CMemBlock2D<T>& memBlock2D)
 {
 #ifdef ENABLE_GPU
     
@@ -89,7 +90,7 @@ void copyToDeviceMemory(      T*              pointerToMemory,
 template<class T>
 void copyFromDeviceMemory(    T*          pointerToMemory,
                           size_t          pitch,
-                          CMemBlock2d<T>& memBlock2D)
+                          CMemBlock2D<T>& memBlock2D)
 {
 #ifdef ENABLE_GPU
     
