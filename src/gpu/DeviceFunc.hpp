@@ -97,7 +97,7 @@ void copyFromDeviceMemory(    T*          pointerToMemory,
     auto cerr = cudaMemcpy2D(memBlock2D.data(), memBlock2D.pitched_size(0) * sizeof(T), pointerToMemory, pitch,
                              memBlock2D.size(0) * sizeof(T), memBlock2D.blocks(), cudaMemcpyDeviceToHost);
     
-    errors::assertMsgCritical(cerr == cudaSuccess, {"allocateDeviceMemory"});
+    errors::assertMsgCritical(cerr == cudaSuccess, {"copyFromDeviceMemory"});
 #endif
 }
 

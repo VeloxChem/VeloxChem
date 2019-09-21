@@ -1285,15 +1285,47 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CA
     // set up GTOS pairs grid for GPUs
     
     auto gpupatt = _setTasksGridForGPU(braGtoPairsContainer, ketGtoPairsContainer);
+
+    auto pbraidx = gpupatt.data(0);
     
-    #pragma omp parallel num_threads(ndevs) shared(pfock, pden, pdevs)
+    auto pketidx = gpupatt.data(1);
+    
+    auto pbkidx = gpupatt.data(2);
+    
+    auto nblocks = gpupatt.size(0);
+    
+    #pragma omp parallel num_threads(ndevs) shared(pfock, pden, pdevs, ndevs, pbraidx, pketidx, pbkidx, nblocks)
     {
         int32_t tid = omp_get_thread_num();
      
         // set up CUDA device for each thread
         
         pdevs->setCudaDevice(tid);
-    
+        
+        // loop over integral blocks
+        
+        for (int32_t i = 0; i < nblocks; i++)
+        {
+            if ((i % ndevs) == tid)
+            {
+                auto bpairs = braGtoPairsContainer->getGtoPairsBlock(pbraidx[i]);
+                
+                auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(pketidx[i]);
+                
+                auto qqdat = screeningContainer->getScreener(pbkidx[i]);
+                
+                printf("tid: %i (i,j): (%i,%i) idx: %i\n", tid, pbraidx[i], pketidx[i], pbkidx[i]);
+                
+                CTwoIntsDistribution distpat(pfock, pden);
+                
+                distpat.setFockContainer(bpairs, kpairs);
+                
+                // accumulate AO Fock matrix
+                
+                #pragma omp critical (fockacc)
+                distpat.accumulate();
+            }
+        }
     }
 }
 
@@ -1414,6 +1446,8 @@ CElectronRepulsionIntegralsDriver::_setTasksGridForGPU(const CGtoPairsContainer*
     
     std::vector<int32_t> ketpos;
     
+    std::vector<int32_t> bkidx;
+    
     for (int32_t i = (nbra - 1); i >= 0; i--)
     {
         auto joff = (symbk) ? i : 0;
@@ -1425,6 +1459,8 @@ CElectronRepulsionIntegralsDriver::_setTasksGridForGPU(const CGtoPairsContainer*
                 brapos.push_back(i);
                 
                 ketpos.push_back(j);
+                
+                bkidx.push_back(idx);
             }
             
             idx++;
@@ -1433,5 +1469,7 @@ CElectronRepulsionIntegralsDriver::_setTasksGridForGPU(const CGtoPairsContainer*
     
     brapos.insert(brapos.end(), ketpos.begin(), ketpos.end());
     
-    return CMemBlock2D<int32_t>(brapos, idx, 2);
+    brapos.insert(brapos.end(), bkidx.begin(), bkidx.end());
+    
+    return CMemBlock2D<int32_t>(brapos, idx, 3);
 }
