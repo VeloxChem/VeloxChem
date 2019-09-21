@@ -72,6 +72,19 @@ class CElectronRepulsionIntegralsDriver
                                                  const CGtoPairsBlock&         ketGtoPairsBlock) const;
     
     /**
+     Computes electronic repulsion integrals for combination of GTOs pairs blocks on CUDA compute capable device.
+     
+     @param distPattern the ponter to integrals distribution pattern.
+     @param intsScreener the integrals screener object.
+     @param braGtoPairsBlock the GTOs pairsblock on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     */
+    void _compElectronRepulsionForGtoPairsBlocksOnGPU(      CTwoIntsDistribution&   distPattern,
+                                                      const CCauchySchwarzScreener& intsScreener,
+                                                      const CGtoPairsBlock&         braGtoPairsBlock,
+                                                      const CGtoPairsBlock&         ketGtoPairsBlock) const;
+    
+    /**
      Sets horrizontal recursion map for bra side.
      
      @param angularMomentumA the angular momentum of center A.

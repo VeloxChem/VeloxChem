@@ -69,6 +69,8 @@
 #include "ElectronRepulsionBRRRecFuncForFXYY.hpp"
 #include "ElectronRepulsionBRRRecFuncForGGYY.hpp"
 
+#include "DeviceFunc.hpp"
+
 CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
@@ -679,6 +681,71 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     // deallocate recursion buffers
     
     vrrmap.destroyBuffer(pbuffer);
+}
+
+void
+CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(      CTwoIntsDistribution&   distPattern,
+                                                                                const CCauchySchwarzScreener& intsScreener,
+                                                                                const CGtoPairsBlock&         braGtoPairsBlock,
+                                                                                const CGtoPairsBlock&         ketGtoPairsBlock) const
+{
+    // copy GTOs pairs blocks for bra and ket sides
+    
+    auto brapairs = braGtoPairsBlock;
+    
+    auto ketpairs = ketGtoPairsBlock;
+    
+    // determine symmetry of bra and ket sides
+    
+    bool symbk = (brapairs == ketpairs);
+    
+    // set up angular momentum for four centers
+    
+    auto anga = brapairs.getBraAngularMomentum();
+    
+    auto angb = brapairs.getKetAngularMomentum();
+    
+    auto angc = ketpairs.getBraAngularMomentum();
+    
+    auto angd = ketpairs.getKetAngularMomentum();
+    
+    // set up spherical angular momentum for bra and ket sides
+    
+    CSphericalMomentum amom(anga);
+    
+    CSphericalMomentum bmom(angb);
+    
+    CSphericalMomentum cmom(angc);
+    
+    CSphericalMomentum dmom(angd);
+    
+    // allocate prefactors used in Obara-Saika recursion on device
+    
+    auto pdim = ketpairs.getNumberOfScreenedPrimPairs();
+    
+    auto pmax = brapairs.getMaxContractionDepth();
+    
+    double* ptr_rpq = nullptr; size_t pitch_rpq = 0;
+    
+    //CMemBlock2D<double> rpq(pdim, 3 * pmax);
+    
+    gpu::allocateDeviceMemory(&ptr_rpq, &pitch_rpq, CMemBlock2D<double>(pdim, 3 * pmax));
+    
+    printf("@pitch for r_pq: %zu\n", pitch_rpq); 
+    
+    //CMemBlock2D<double> rfacts(pdim, 4 * pmax);
+    
+    //CMemBlock2D<double> rw(pdim, 3 * pmax);
+    
+    //CMemBlock2D<double> rwp(pdim, 3 * pmax);
+    
+    //CMemBlock2D<double> rwq(pdim, 3 * pmax);
+    
+    
+    
+    // deallocate prefactors used in Obara-Saika recursion on device
+    
+    gpu::freeDeviceMemory(ptr_rpq);
 }
 
 CRecursionMap
@@ -1319,6 +1386,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CA
                 CTwoIntsDistribution distpat(pfock, pden);
                 
                 distpat.setFockContainer(bpairs, kpairs);
+                
+                _compElectronRepulsionForGtoPairsBlocksOnGPU(distpat, qqdat, bpairs, kpairs);
                 
                 // accumulate AO Fock matrix
                 
