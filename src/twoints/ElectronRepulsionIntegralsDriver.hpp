@@ -78,11 +78,13 @@ class CElectronRepulsionIntegralsDriver
      @param intsScreener the integrals screener object.
      @param braGtoPairsBlock the GTOs pairsblock on bra side.
      @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param cudaDevices the CUDA compute capable devices.
      */
     void _compElectronRepulsionForGtoPairsBlocksOnGPU(      CTwoIntsDistribution&   distPattern,
                                                       const CCauchySchwarzScreener& intsScreener,
                                                       const CGtoPairsBlock&         braGtoPairsBlock,
-                                                      const CGtoPairsBlock&         ketGtoPairsBlock) const;
+                                                      const CGtoPairsBlock&         ketGtoPairsBlock,
+                                                      const CCudaDevices*           cudaDevices) const;
     
     /**
      Sets horrizontal recursion map for bra side.
@@ -298,6 +300,7 @@ public:
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
      @param screeningContainer the screening container object.
+     @param cudaDevices the CUDA compute capable devices.
      */
     void compute(      CAOFockMatrix&       aoFockMatrix,
                  const CAODensityMatrix&    aoDensityMatrix,

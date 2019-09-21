@@ -11,9 +11,10 @@
 
 #include <cstdint>
 #include <cstdlib>
-
 #include <vector>
 #include <string>
+
+#include "DeviceFunc.hpp"
 
 /**
  Class CudaDevices stores data about available CUDA devices and provides these devices managment functions.
@@ -53,7 +54,6 @@ public:
      */
     ~CCudaDevices();
     
-    
     /**
      Sets up requested CUDA compute capable device.
 
@@ -67,6 +67,36 @@ public:
      @return the number of devices.
      */
     int32_t getNumberOfDevices() const;
+    
+    /**
+     Allocates 2D memory block on CUDA compute capable device.
+
+     @param pointer the pointer to 2D memory block.
+     @param pitch the pointer to pitch of 2D  memory block.
+     @param nElements the number of columns in 2D  memory block.
+     @param nBlocks the number of rows in 2D memory block.
+     */
+    void allocate(double** pointer,
+                  size_t*  pitch,
+                  int32_t  nElements,
+                  int32_t  nBlocks) const
+    {
+#ifdef ENABLE_GPU
+        gpu::allocateDeviceMemory((void**)pointer, pitch, nElements * sizeof(double), static_cast<size_t>(nBlocks));
+#endif
+    }
+    
+    /**
+     Deallocates device memory.
+     
+     @param pointer the pointer to device memory.
+     */
+    void free(double* pointer) const
+    {
+#ifdef ENABLE_GPU
+        gpu::freeDeviceMemory((void*)pointer);
+#endif
+    }
     
     /**
      Gets string representation of CUDA devices object.

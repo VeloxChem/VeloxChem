@@ -687,7 +687,8 @@ void
 CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(      CTwoIntsDistribution&   distPattern,
                                                                                 const CCauchySchwarzScreener& intsScreener,
                                                                                 const CGtoPairsBlock&         braGtoPairsBlock,
-                                                                                const CGtoPairsBlock&         ketGtoPairsBlock) const
+                                                                                const CGtoPairsBlock&         ketGtoPairsBlock,
+                                                                                const CCudaDevices*           cudaDevices) const
 {
     // copy GTOs pairs blocks for bra and ket sides
     
@@ -727,9 +728,11 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     double* ptr_rpq = nullptr; size_t pitch_rpq = 0;
     
+    cudaDevices->allocate(&ptr_rpq, &pitch_rpq, pdim, pmax);
+    
     //CMemBlock2D<double> rpq(pdim, 3 * pmax);
     
-    gpu::allocateDeviceMemory(&ptr_rpq, &pitch_rpq, CMemBlock2D<double>(pdim, 3 * pmax));
+    
     
     printf("@pitch for r_pq: %zu\n", pitch_rpq); 
     
@@ -745,7 +748,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     // deallocate prefactors used in Obara-Saika recursion on device
     
-    gpu::freeDeviceMemory(ptr_rpq);
+    cudaDevices->free(ptr_rpq);
 }
 
 CRecursionMap
@@ -1387,7 +1390,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CA
                 
                 distpat.setFockContainer(bpairs, kpairs);
                 
-                _compElectronRepulsionForGtoPairsBlocksOnGPU(distpat, qqdat, bpairs, kpairs);
+                _compElectronRepulsionForGtoPairsBlocksOnGPU(distpat, qqdat, bpairs, kpairs, pdevs);
                 
                 // accumulate AO Fock matrix
                 
