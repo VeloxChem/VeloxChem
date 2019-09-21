@@ -22,4 +22,6 @@ setDevice(const int32_t iDevice)
 #endif
 }
 
+
+
 }  // namespace gpu
