@@ -746,6 +746,26 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     cudaDevices->allocate(&ptr_rwq, &pitch_rwq, pdim, 3 * pmax);
     
+    // allocate bra and ket GTO pairs primitive factors on device
+    
+    auto bpfacts = brapairs.getPairFactors();
+    
+    auto kpfacts = ketpairs.getPairFactors();
+    
+    double* ptr_bpfacts = nullptr; size_t pitch_bpfacts = 0;
+    
+    cudaDevices->allocate(&ptr_bpfacts, &pitch_bpfacts, bpfacts.size(0), bpfacts.blocks());
+    
+    double* ptr_kpfacts = nullptr; size_t pitch_kpfacts = 0;
+    
+    cudaDevices->allocate(&ptr_kpfacts, &pitch_kpfacts, kpfacts.size(0), kpfacts.blocks());
+    
+    // copy bra pair factors to device
+    
+    cudaDevices->copyToDevice(ptr_bpfacts, pitch_bpfacts, bpfacts);
+    
+    printf("Pair factors: bra %zu ket %zu\n", pitch_bpfacts, pitch_kpfacts);
+    
     // set up horizontal recursion buffer for ket side
     
     auto cdim = ketpairs.getNumberOfScreenedContrPairs();
