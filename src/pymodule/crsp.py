@@ -497,10 +497,10 @@ class ComplexResponse:
         # orthogonalizing new trial vectors against existing ones
 
         if bger is not None and bger.any():
-            new_ger = new_ger - 2 * np.matmul(bger, np.matmul(bger.T, new_ger))
+            new_ger = new_ger - 2.0 * np.matmul(bger, np.matmul(bger.T, new_ger))
 
         if bung is not None and bung.any():
-            new_ung = new_ung - 2 * np.matmul(bung, np.matmul(bung.T, new_ung))
+            new_ung = new_ung - 2.0 * np.matmul(bung, np.matmul(bung.T, new_ung))
 
         # orthonormalizing new trial vectors
 
@@ -674,10 +674,6 @@ class ComplexResponse:
                 bger, bung, scf_tensors, screening, molecule, basis,
                 self.dft, self.xcfun, self.molgrid, self.gs_density)
 
-        if self.rank == mpi_master():
-            s2bung, s2bger = e2x_drv.s2n_half_size(
-                bger, bung, scf_tensors, nocc)
-
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
@@ -712,14 +708,14 @@ class ComplexResponse:
 
                         # projections onto gerade and ungerade subspaces:
 
-                        g_realger = 2 * np.matmul(bger.T, gradger.real)
-                        g_imagger = 2 * np.matmul(bger.T, gradger.imag)
-                        g_realung = 2 * np.matmul(bung.T, gradung.real)
-                        g_imagung = 2 * np.matmul(bung.T, gradung.imag)
+                        g_realger = 2.0 * np.matmul(bger.T, gradger.real)
+                        g_imagger = 2.0 * np.matmul(bger.T, gradger.imag)
+                        g_realung = 2.0 * np.matmul(bung.T, gradung.real)
+                        g_imagung = 2.0 * np.matmul(bung.T, gradung.imag)
 
-                        e2gg = 2 * np.matmul(bger.T, e2bger)
-                        e2uu = 2 * np.matmul(bung.T, e2bung)
-                        s2ug = 2 * np.matmul(bung.T, s2bung)
+                        e2gg = 2.0 * np.matmul(bger.T, e2bger)
+                        e2uu = 2.0 * np.matmul(bung.T, e2bung)
+                        s2ug = 4.0 * np.matmul(bung.T, bger)
 
                         n_ger = bger.shape[1]
                         n_ung = bung.shape[1]
@@ -820,13 +816,13 @@ class ComplexResponse:
 
                         e2realger = np.matmul(e2bger, c_realger)
                         e2imagger = np.matmul(e2bger, c_imagger)
-                        s2realger = np.matmul(s2bung, c_realger)
-                        s2imagger = np.matmul(s2bung, c_imagger)
+                        s2realger = 2.0 * np.matmul(bger, c_realger)
+                        s2imagger = 2.0 * np.matmul(bger, c_imagger)
 
                         e2realung = np.matmul(e2bung, c_realung)
                         e2imagung = np.matmul(e2bung, c_imagung)
-                        s2realung = np.matmul(s2bger, c_realung)
-                        s2imagung = np.matmul(s2bger, c_imagung)
+                        s2realung = 2.0 * np.matmul(bung, c_realung)
+                        s2imagung = 2.0 * np.matmul(bung, c_imagung)
 
                         # calculating the residual components
 
@@ -926,14 +922,8 @@ class ComplexResponse:
 
             if self.rank == mpi_master():
 
-                new_s2bung, new_s2bger = e2x_drv.s2n_half_size(
-                    new_trials_ger, new_trials_ung, scf_tensors, nocc)
-
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
-
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
-                s2bger = np.append(s2bger, new_s2bger, axis=1)
 
                 write_rsp_hdf5(
                     self.checkpoint_file, [bger, bung, e2bger, e2bung],
