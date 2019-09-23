@@ -821,6 +821,18 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
         
         if (nqcdim == 0) continue;
         
+        // density screened scheme
+        
+        if ((intsScreener.getScreeningScheme() == ericut::qqden) ||
+            (intsScreener.getScreeningScheme() == ericut::qqrden))
+        {
+            cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, ddpairs.getPairFactors());
+            
+        }
+        else
+        {
+            cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, qqpairs.getPairFactors());
+        }
     }
     
     // deallocate prefactors used in Obara-Saika recursion on device
@@ -834,6 +846,12 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     cudaDevices->free(ptr_rwp);
     
     cudaDevices->free(ptr_rwq);
+    
+    // deallocate primitive GTOs pairs factors on device
+    
+    cudaDevices->free(ptr_bpfacts);
+    
+    cudaDevices->free(ptr_kpfacts);
 }
 
 CRecursionMap
