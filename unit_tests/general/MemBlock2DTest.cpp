@@ -244,6 +244,17 @@ TEST_F(CMemBlock2DTest, Size)
     ASSERT_EQ(ma.size(2), 5);
 }
 
+TEST_F(CMemBlock2DTest, pitched_size)
+{
+    CMemBlock2D<double> ma(std::vector<int32_t>({2, 9, 5}));
+    
+    ASSERT_EQ(ma.pitched_size(0), 8);
+    
+    ASSERT_EQ(ma.pitched_size(1), 16);
+    
+    ASSERT_EQ(ma.pitched_size(2), 8);
+}
+
 TEST_F(CMemBlock2DTest, Blocks)
 {
     CMemBlock2D<double> ma(3, 2);

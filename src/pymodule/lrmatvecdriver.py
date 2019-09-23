@@ -59,43 +59,13 @@ class LinearResponseMatrixVectorDriver:
                       xcfun=None,
                       molgrid=None,
                       gs_density=None):
-
-        n_ger = 0
-        full_ger = None
-        full_ung = None
-        if self.rank == mpi_master():
-            if vecs_ger is not None:
-                n_ger = vecs_ger.shape[1]
-                full_ger = np.vstack((vecs_ger, vecs_ger))
-            if vecs_ung is not None:
-                full_ung = np.vstack((vecs_ung, -vecs_ung))
-
-        e2b_full = self.e2n(np.hstack((full_ger, full_ung)), tensors, screening,
-                            molecule, basis, dft, xcfun, molgrid, gs_density)
-
-        if self.rank == mpi_master():
-            half_size = e2b_full.shape[0] // 2
-            ger_e2b = e2b_full[:half_size, :n_ger]
-            ung_e2b = e2b_full[:half_size, n_ger:]
-            return ger_e2b, ung_e2b
-        else:
-            return None, None
-
-    def e2n(self,
-            vecs,
-            tensors,
-            screening,
-            molecule,
-            basis,
-            dft=None,
-            xcfun=None,
-            molgrid=None,
-            gs_density=None):
         """
         Computes the E2 b matrix vector product.
 
-        :param vecs:
-            The trial vectors.
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param screening:
@@ -114,13 +84,13 @@ class LinearResponseMatrixVectorDriver:
             The ground state density matrix.
 
         :return:
-            The E2 b matrix vector product.
+            The gerade and ungerade E2 b matrix vector product in half-size.
         """
 
         if self.rank == mpi_master():
             assert_msg_critical(
-                len(vecs.shape) == 2,
-                'LinearResponseSolver.e2n: invalid shape of vecs')
+                vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
+                'LinearResponseSolver.e2n: invalid shape of trial vectors')
 
             mo = tensors['C']
             S = tensors['S']
@@ -133,143 +103,66 @@ class LinearResponseMatrixVectorDriver:
             dks = []
             kns = []
 
-            for col in range(vecs.shape[1]):
-                vec = vecs[:, col]
+            n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
+            n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
+
+            for col in range(n_ger + n_ung):
+                if col < n_ger:
+                    # full-size gerade trial vector
+                    vec = np.hstack((vecs_ger[:, col], vecs_ger[:, col]))
+                else:
+                    # full-size ungerade trial vector
+                    vec = np.hstack(
+                        (vecs_ung[:, col - n_ger], -vecs_ung[:, col - n_ger]))
 
                 kN = lrvec2mat(vec, nocc, norb).T
-                kn = mo @ kN @ mo.T
+                kn = np.linalg.multi_dot([mo, kN, mo.T])
 
-                dak = kn.T @ S @ da - da @ S @ kn.T
-                dbk = kn.T @ S @ db - db @ S @ kn.T
+                dak = np.linalg.multi_dot([kn.T, S, da])
+                dak -= np.linalg.multi_dot([da, S, kn.T])
+                # dbk = kn.T @ S @ db - db @ S @ kn.T
 
-                dks.append((dak, dbk))
+                dks.append(dak)
                 kns.append(kn)
-
-            dks = tuple(dks)
-        else:
-            dks = None
-
-        fks = self.get_two_el_fock(dks, screening, molecule, basis, tensors,
-                                   dft, xcfun, molgrid, gs_density)
-
-        if self.rank == mpi_master():
-            gv = np.zeros(vecs.shape)
-
-            for col, (kn, (fak, fbk)) in enumerate(zip(kns, fks)):
-
-                kfa = S @ kn @ fa - fa @ kn @ S
-                kfb = S @ kn @ fb - fb @ kn @ S
-
-                fat = fak + kfa
-                fbt = fbk + kfb
-
-                gao = S @ (da @ fat.T + db @ fbt.T) - (fat.T @ da +
-                                                       fbt.T @ db) @ S
-                gmo = mo.T @ gao @ mo
-
-                gv[:, col] = -lrmat2vec(gmo, nocc, norb)
-            return gv
-        else:
-            return None
-
-    def get_two_el_fock(self,
-                        dabs,
-                        screening,
-                        molecule,
-                        basis,
-                        tensors=None,
-                        dft=False,
-                        xcfun=None,
-                        molgrid=None,
-                        gs_density=None):
-        """
-        Computes two electron contribution to Fock.
-
-        :param dabs:
-            The tuple containing alpha and beta density matrices.
-        :param screening:
-            The electron repulsion integrals screening pattern.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-        :param dft:
-            The DFT flag if true compute XC contribution, if false otherwise.
-        :param xcfun:
-            The exchange correlation functional.
-        :param molgrid:
-            The molecular grid for XC contributtion computation.
-        :param gs_density:
-            The ground state density matrix.
-
-        :return:
-            The tuple containing alpha and beta Fock matrices.
-        """
-
-        # TODO: make this routine more general (for both rest and unrest)
-
-        if self.rank == mpi_master():
-            dts = []
-            for dab in dabs:
-                da, db = dab
-                dt = da + db
-                dts.append(dt)
-
-                # Note: skip spin density for restricted case
-                # ds = da - db
-                # dts.append(ds)
-
-            dens = AODensityMatrix(dts, denmat.rest)
+            dens = AODensityMatrix(dks, denmat.rest)
         else:
             dens = AODensityMatrix()
         dens.broadcast(self.rank, self.comm)
 
         fock = AOFockMatrix(dens)
 
-        # for i in range(0, 2 * len(dabs), 2):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
-        #    fock.set_fock_type(fockmat.rgenk, i + 1)
-
-        # Note: skip spin density for restricted case
-        # for i in range(len(dabs)):
-        #    fock.set_fock_type(fockmat.rgenjk, i)
-        fock_flag = fockmat.rgenjk
-        if dft:
-            if xcfun.is_hybrid():
-                fock_flag = fockmat.rgenjkx
-                fact_xc = xcfun.get_frac_exact_exchange()
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_scale_factor(fact_xc, i)
-            else:
-                fock_flag = fockmat.rgenj
-        for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fock_flag, i)
-
         self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
                           molgrid, gs_density)
 
-        fabs = []
         if self.rank == mpi_master():
+            if vecs_ger is not None:
+                half_size = vecs_ger.shape[0]
+            else:
+                half_size = vecs_ung.shape[0]
+            gv = np.zeros((half_size, n_ger + n_ung))
 
-            # for i in range(0, 2 * len(dabs), 2):
-            #    ft = fock.to_numpy(i).T
-            #    fs = -fock.to_numpy(i + 1).T
-            #    fa = (ft + fs) / 2
-            #    fb = (ft - fs) / 2
-            #    fabs.append((fa, fb))
+            for col, kn in enumerate(kns):
 
-            # Note: skip spin density for restricted case
-            for i in range(len(dabs)):
-                ft = fock.to_numpy(i).T
-                fa = ft * 0.5
-                fb = ft * 0.5
-                fabs.append((fa, fb))
+                fak = fock.alpha_to_numpy(col).T
+                # fbk = fock.beta_to_numpy(col).T
 
-            return tuple(fabs)
+                kfa = np.linalg.multi_dot([S, kn, fa])
+                kfa -= np.linalg.multi_dot([fa, kn, S])
+                # kfb = S @ kn @ fb - fb @ kn @ S
+
+                fat = fak + kfa
+                fbt = fat
+                # fbt = fbk + kfb
+
+                gao = np.matmul(S, np.matmul(da, fat.T) + np.matmul(db, fbt.T))
+                gao -= np.matmul(np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
+
+                gmo = np.linalg.multi_dot([mo.T, gao, mo])
+
+                gv[:, col] = -lrmat2vec(gmo, nocc, norb)[:half_size]
+            return gv[:, :n_ger], gv[:, n_ger:]
         else:
-            return None
+            return None, None
 
     def comp_lr_fock(self, fock, dens, molecule, basis, screening, dft, xcfun,
                      molgrid, gs_density):
@@ -295,6 +188,22 @@ class LinearResponseMatrixVectorDriver:
         :param gs_density:
             The ground state density matrix.
         """
+
+        # set flags for Fock matrices
+
+        fock_flag = fockmat.rgenjk
+        if dft:
+            if xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj
+        for i in range(fock.number_of_fock_matrices()):
+            fock.set_fock_type(fock_flag, i)
+
+        # calculate Fock on subcommunicators
 
         if dft and self.nodes >= 4:
             self.comp_lr_fock_split_comm(fock, dens, molecule, basis, screening,
@@ -401,48 +310,25 @@ class LinearResponseMatrixVectorDriver:
                                                 root=mpi_master())
 
     def s2n_half_size(self, vecs_ger, vecs_ung, tensors, nocc):
-
-        n_ger = 0
-        full_ger = None
-        full_ung = None
-        if self.rank == mpi_master():
-            if vecs_ger is not None:
-                n_ger = vecs_ger.shape[1]
-                full_ger = np.vstack((vecs_ger, vecs_ger))
-            if vecs_ung is not None:
-                full_ung = np.vstack((vecs_ung, -vecs_ung))
-
-        s2b_full = self.s2n(np.hstack((full_ger, full_ung)), tensors, nocc)
-
-        if self.rank == mpi_master():
-            half_size = s2b_full.shape[0] // 2
-            ung_s2b = s2b_full[:half_size, :n_ger]
-            ger_s2b = s2b_full[:half_size, n_ger:]
-            return ung_s2b, ger_s2b
-        else:
-            return None, None
-
-    def s2n(self, vecs, tensors, nocc):
         """
         Computes the S2 b matrix vector product.
 
-        :param vecs:
-            The trial vectors.
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param nocc:
             Number of occupied orbitals.
 
         :return:
-            The S2 b matrix vector product.
+            The gerade and ungerade S2 b matrix vector product in half-size.
         """
 
-        if not vecs.any():
-            return np.zeros(vecs.shape)
-
         assert_msg_critical(
-            len(vecs.shape) == 2,
-            'LinearResponseSolver.s2n: invalid shape of vecs')
+            vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
+            'LinearResponseSolver.e2n: invalid shape of trial vectors')
 
         mo = tensors['C']
         S = tensors['S']
@@ -450,18 +336,34 @@ class LinearResponseMatrixVectorDriver:
 
         norb = mo.shape[1]
 
-        s2n_vecs = np.ndarray(vecs.shape)
-        rows, columns = vecs.shape
+        n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
+        n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
 
-        for c in range(columns):
-            kappa = lrvec2mat(vecs[:, c], nocc, norb).T
-            kappa_ao = mo @ kappa @ mo.T
+        if vecs_ger is not None:
+            half_size = vecs_ger.shape[0]
+        else:
+            half_size = vecs_ung.shape[0]
+        s2n_vecs = np.zeros((half_size, n_ger + n_ung))
 
-            s2n_ao = kappa_ao.T @ S @ D - D @ S @ kappa_ao.T
-            s2n_mo = mo.T @ S @ s2n_ao @ S @ mo
-            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)
+        for c in range(n_ger + n_ung):
+            if c < n_ger:
+                # full-size gerade trial vector
+                vec = np.hstack((vecs_ger[:, c], vecs_ger[:, c]))
+            else:
+                # full-size ungerade trial vector
+                vec = np.hstack(
+                    (vecs_ung[:, c - n_ger], -vecs_ung[:, c - n_ger]))
 
-        return s2n_vecs
+            kappa = lrvec2mat(vec, nocc, norb).T
+            kappa_ao = np.linalg.multi_dot([mo, kappa, mo.T])
+
+            s2n_ao = np.linalg.multi_dot([kappa_ao.T, S, D])
+            s2n_ao -= np.linalg.multi_dot([D, S, kappa_ao.T])
+
+            s2n_mo = np.linalg.multi_dot([mo.T, S, s2n_ao, S, mo])
+            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)[:half_size]
+
+        return s2n_vecs[:, :n_ger], s2n_vecs[:, n_ger:]
 
 
 def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
@@ -539,7 +441,11 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
         norb = mo.shape[1]
 
         matrices = tuple(
-            mo.T @ (S @ D @ P.T - P.T @ D @ S) @ mo for P in integral_comps)
+            np.linalg.multi_dot([
+                mo.T,
+                (np.linalg.multi_dot([S, D, P.T]) -
+                 np.linalg.multi_dot([P.T, D, S])), mo
+            ]) for P in integral_comps)
 
         gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
         return gradients

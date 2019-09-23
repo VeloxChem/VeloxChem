@@ -1451,6 +1451,12 @@ CGtoPairsBlock::getScreenedSizeString() const
     return fstr::format(str, 32, fmt::left);
 }
 
+CMemBlock2D<double>
+CGtoPairsBlock::getPairFactors() const
+{
+    return _pairFactors; 
+}
+
 int32_t
 CGtoPairsBlock::_getBlockDimensions() const
 {

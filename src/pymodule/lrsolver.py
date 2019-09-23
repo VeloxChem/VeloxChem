@@ -281,12 +281,23 @@ class LinearResponseSolver:
                 w: self.get_precond(ea, nocc, norb, w) for w in self.frequencies
             }
 
+        rsp_vector_labels = [
+            'LR_bger_half_size',
+            'LR_bung_half_size',
+            'LR_e2bger_half_size',
+            'LR_e2bung_half_size',
+        ]
+
+        bger = None
+        bung = None
+        new_trials_ger = None
+        new_trials_ung = None
+
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
                 bger, bung, e2bger, e2bung = read_rsp_hdf5(
-                    self.checkpoint_file,
-                    ['LR_bger', 'LR_bung', 'LR_e2bger', 'LR_e2bung'],
+                    self.checkpoint_file, rsp_vector_labels,
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
                     dft_func_label, self.ostream)
@@ -310,27 +321,16 @@ class LinearResponseSolver:
                     bger.any() or bung.any(),
                     'LinearResponseSolver.compute: trial vector is empty')
 
-                if not bger.any():
+                if bger is None or not bger.any():
                     bger = np.zeros((bung.shape[0], 0))
-                if not bung.any():
+                if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
 
-            btot = None
-            if self.rank == mpi_master():
-                btot = np.hstack((bger, bung))
-
-            e2btot = e2x_drv.e2n(btot, scf_tensors, screening, molecule, basis,
-                                 self.dft, self.xcfun, self.molgrid,
-                                 self.gs_density)
-
-            if self.rank == mpi_master():
-                n_ger = bger.shape[1]
-                e2bger = e2btot[:, :n_ger]
-                e2bung = e2btot[:, n_ger:]
-
-        if self.rank == mpi_master():
-            s2bung = e2x_drv.s2n(bger, scf_tensors, nocc)
-            s2bger = e2x_drv.s2n(bung, scf_tensors, nocc)
+            e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
+                                                   screening, molecule, basis,
+                                                   self.dft, self.xcfun,
+                                                   self.molgrid,
+                                                   self.gs_density)
 
         solutions = {}
         residuals = {}
@@ -355,9 +355,9 @@ class LinearResponseSolver:
                 n_ger = bger.shape[1]
                 n_ung = bung.shape[1]
 
-                e2gg = np.matmul(bger.T, e2bger)
-                e2uu = np.matmul(bung.T, e2bung)
-                s2ug = np.matmul(bung.T, s2bung)
+                e2gg = np.matmul(bger.T, e2bger) * 2.0
+                e2uu = np.matmul(bung.T, e2bung) * 2.0
+                s2ug = np.matmul(bung.T, bger) * 4.0
 
                 # next solution
                 for op, freq in op_freq_keys:
@@ -365,8 +365,8 @@ class LinearResponseSolver:
 
                     gradger, gradung = self.decomp_grad(v)
 
-                    g_ger = np.matmul(bger.T, gradger)
-                    g_ung = np.matmul(bung.T, gradung)
+                    g_ger = np.matmul(bger.T, gradger) * 2.0
+                    g_ung = np.matmul(bung.T, gradung) * 2.0
 
                     mat = np.zeros((n_ger + n_ung, n_ger + n_ung))
                     mat[:n_ger, :n_ger] = e2gg[:, :]
@@ -386,16 +386,15 @@ class LinearResponseSolver:
                     x_ger = np.matmul(bger, c_ger)
                     x_ung = np.matmul(bung, c_ung)
 
-                    solutions[(op, freq)] = x_ger + x_ung
+                    x_ger_full = np.hstack((x_ger, x_ger))
+                    x_ung_full = np.hstack((x_ung, -x_ung))
 
-                    e2ger = np.matmul(e2bger, c_ger)
-                    s2ung = np.matmul(s2bger, c_ung)
+                    solutions[(op, freq)] = x_ger_full + x_ung_full
 
-                    e2ung = np.matmul(e2bung, c_ung)
-                    s2ger = np.matmul(s2bung, c_ger)
-
-                    r_ger = (e2ger - freq * s2ung - gradger)
-                    r_ung = (e2ung - freq * s2ger - gradung)
+                    r_ger = np.matmul(e2bger, c_ger) - freq * 2.0 * np.matmul(
+                        bung, c_ung) - gradger
+                    r_ung = np.matmul(e2bung, c_ung) - freq * 2.0 * np.matmul(
+                        bger, c_ger) - gradung
 
                     residuals[(op, freq)] = np.array([r_ger, r_ung]).flatten()
 
@@ -405,9 +404,10 @@ class LinearResponseSolver:
                     nv = np.dot(n, v)
                     nvs.append((op, freq, nv))
 
-                    rn = np.linalg.norm(r)
+                    rn = np.linalg.norm(r) * np.sqrt(2.0)
                     nn = np.linalg.norm(n)
                     relative_residual_norm[(op, freq)] = rn / nn
+
                     converged[(op, freq)] = (rn / nn < self.conv_thresh)
 
                 # write to output
@@ -439,9 +439,9 @@ class LinearResponseSolver:
                     new_trials_ger.any() or new_trials_ung.any(),
                     'LinearResponseSolver: unable to add new trial vector')
 
-                if not new_trials_ger.any():
+                if new_trials_ger is None or not new_trials_ger.any():
                     new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
-                if not new_trials_ung.any():
+                if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
                 bger = np.append(bger, new_trials_ger, axis=1)
@@ -452,30 +452,17 @@ class LinearResponseSolver:
                 self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            new_trials_tot = None
-            if self.rank == mpi_master():
-                new_trials_tot = np.hstack((new_trials_ger, new_trials_ung))
-
-            new_e2btot = e2x_drv.e2n(new_trials_tot, scf_tensors, screening,
-                                     molecule, basis, self.dft, self.xcfun,
-                                     self.molgrid, self.gs_density)
+            new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
+                new_trials_ger, new_trials_ung, scf_tensors, screening,
+                molecule, basis, self.dft, self.xcfun, self.molgrid,
+                self.gs_density)
 
             if self.rank == mpi_master():
-                new_e2bger = new_e2btot[:, :new_trials_ger.shape[1]]
-                new_e2bung = new_e2btot[:, new_trials_ger.shape[1]:]
-
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
 
-                new_s2bung = e2x_drv.s2n(new_trials_ger, scf_tensors, nocc)
-                new_s2bger = e2x_drv.s2n(new_trials_ung, scf_tensors, nocc)
-
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
-                s2bger = np.append(s2bger, new_s2bger, axis=1)
-
                 write_rsp_hdf5(self.checkpoint_file,
-                               [bger, bung, e2bger, e2bung],
-                               ['LR_bger', 'LR_bung', 'LR_e2bger', 'LR_e2bung'],
+                               [bger, bung, e2bger, e2bung], rsp_vector_labels,
                                molecule.nuclear_repulsion_energy(),
                                molecule.elem_ids_to_numpy(), basis.get_label(),
                                dft_func_label, self.ostream)
@@ -636,9 +623,10 @@ class LinearResponseSolver:
         ig = {}
         for op, grad in V1.items():
             gradger, gradung = self.decomp_grad(grad)
-            grad = np.array([gradger, gradung]).flatten()
 
-            gn = np.linalg.norm(grad)
+            grad = np.array([gradger, gradung]).flatten()
+            gn = np.linalg.norm(grad) * np.sqrt(2.0)
+
             for w in freqs:
                 if gn < self.small_thresh:
                     ig[(op, w)] = np.zeros(grad.shape[0])
@@ -669,8 +657,8 @@ class LinearResponseSolver:
         grad_T[:half_size] = grad[half_size:]
         grad_T[half_size:] = grad[:half_size]
 
-        ger = 0.5 * (grad + grad_T)
-        ung = 0.5 * (grad - grad_T)
+        ger = 0.5 * (grad + grad_T)[:half_size]
+        ung = 0.5 * (grad - grad_T)[:half_size]
 
         return ger.T, ung.T
 
@@ -694,6 +682,9 @@ class LinearResponseSolver:
         # spawning needed components
 
         ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag = ediag[:ediag.shape[0] // 2]
+        sdiag = sdiag[:sdiag.shape[0] // 2]
+
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         w_sq = w**2
@@ -771,7 +762,7 @@ class LinearResponseSolver:
             else:
                 v = vec
 
-            if np.linalg.norm(v) > self.small_thresh:
+            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
                 trials.append(v)
 
         new_trials = np.array(trials).T
@@ -781,10 +772,12 @@ class LinearResponseSolver:
         new_ger, new_ung = self.decomp_trials(new_trials)
 
         if bger is not None and bger.any():
-            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
+            new_ger_proj = np.matmul(bger, 2.0 * np.matmul(bger.T, new_ger))
+            new_ger = new_ger - new_ger_proj
 
         if bung is not None and bung.any():
-            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
+            new_ung_proj = np.matmul(bung, 2.0 * np.matmul(bung.T, new_ung))
+            new_ung = new_ung - new_ung_proj
 
         if new_ger.any() and renormalize:
             new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)

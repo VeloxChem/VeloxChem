@@ -253,6 +253,14 @@ class CMemBlock2D
      @return the number of elements in data chunk.
      */
     int32_t size(const int32_t iBlock) const;
+    
+    /**
+     Gets number of elements in specific pitched data chunk.
+     
+     @param iBlock the index of data chunk.
+     @return the number of elements in pitched data chunk.
+     */
+    int32_t pitched_size(const int32_t iBlock) const;
 
     /**
      Gets number of data chunk.
@@ -603,6 +611,15 @@ CMemBlock2D<T>::size(const int32_t iBlock) const
 {
     if (iBlock < _originalSizes.size()) return _originalSizes.at(iBlock);
 
+    return 0;
+}
+
+template <class T>
+int32_t
+CMemBlock2D<T>::pitched_size(const int32_t iBlock) const
+{
+    if (iBlock < _paddedSizes.size()) return _paddedSizes.at(iBlock);
+    
     return 0;
 }
 

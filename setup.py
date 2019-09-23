@@ -68,6 +68,11 @@ setup(
         'numpy>=1.13',
         'h5py>=2.8',
     ],
+    tests_require=[
+        'pytest>=5.1.2',
+        'pytest-cov>=2.7.1',
+    ],
+    test_suite='python_tests',
     cmdclass={
         'build_py': MyBuildPy,
         'install': MyInstall,

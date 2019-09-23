@@ -127,7 +127,7 @@ class ComplexResponse:
 
         self.ostream = ostream
 
-        self.restart = True
+        self.restart = False
         self.checkpoint_file = None
 
         self.timing = False

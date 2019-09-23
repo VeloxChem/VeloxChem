@@ -6,11 +6,12 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
+#include "DeviceProp.hpp"
+ 
 #include <cmath>
 #include <sstream>
 #include <string>
 
-#include "DeviceProp.hpp"
 #include "StringFormat.hpp"
 
 namespace gpu {  // gpu namespace

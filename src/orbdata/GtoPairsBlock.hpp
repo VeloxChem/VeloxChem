@@ -571,6 +571,13 @@ class CGtoPairsBlock
      @return the raw size string.
      */
     std::string getScreenedSizeString() const;
+    
+    /**
+     Gets pair factors data from GTOs pair block object.
+
+     @return <#return value description#>
+     */
+    CMemBlock2D<double> getPairFactors() const;
 
     /**
      Converts GTOs pairs block object to text output and insert it into output
