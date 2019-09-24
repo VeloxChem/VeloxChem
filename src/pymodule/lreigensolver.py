@@ -17,7 +17,7 @@ from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
 from .lrmatvecdriver import orthogonalize_gram_schmidt_half
 from .lrmatvecdriver import normalize_half
-from .lrmatvecdriver import construct_ed_sd
+from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import read_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
@@ -223,7 +223,6 @@ class LinearResponseEigenSolver:
             ea = scf_tensors['E']
             nocc = nalpha
             norb = mo.shape[1]
-            od, sd = construct_ed_sd(ea, nocc, norb)
 
         # generate integration grid
         if self.dft:
@@ -779,9 +778,7 @@ class LinearResponseEigenSolver:
 
         # spawning needed components
 
-        ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
-        ediag = ediag[:ediag.shape[0] // 2]
-        sdiag = sdiag[:sdiag.shape[0] // 2]
+        ediag, sdiag = construct_ed_sd_half(orb_ene, nocc, norb)
 
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2

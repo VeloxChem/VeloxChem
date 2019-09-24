@@ -590,9 +590,11 @@ def orthogonalize_gram_schmidt_half(tvecs):
         The orthogonalized trial vectors.
     """
 
+    invsqrt2 = np.sqrt(2.0)
+
     if tvecs.shape[1] > 0:
 
-        f = 1.0 / (np.sqrt(2.0) * np.linalg.norm(tvecs[:, 0]))
+        f = invsqrt2 / np.linalg.norm(tvecs[:, 0])
         tvecs[:, 0] *= f
 
         for i in range(1, tvecs.shape[1]):
@@ -600,7 +602,7 @@ def orthogonalize_gram_schmidt_half(tvecs):
                 f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
                     tvecs[:, j], tvecs[:, j])
                 tvecs[:, i] -= f * tvecs[:, j]
-            f = 1.0 / (np.sqrt(2.0) * np.linalg.norm(tvecs[:, i]))
+            f = invsqrt2 / np.linalg.norm(tvecs[:, i])
             tvecs[:, i] *= f
 
     return tvecs
@@ -639,12 +641,14 @@ def normalize_half(vecs):
         The normalized vectors.
     """
 
+    invsqrt2 = np.sqrt(2.0)
+
     if len(vecs.shape) != 1:
         for vec in range(vecs.shape[1]):
-            invnorm = 1.0 / (np.sqrt(2.0) * np.linalg.norm(vecs[:, vec]))
+            invnorm = invsqrt2 / np.linalg.norm(vecs[:, vec])
             vecs[:, vec] *= invnorm
     else:
-        invnorm = 1.0 / (np.sqrt(2.0) * np.linalg.norm(vecs))
+        invnorm = invsqrt2 / np.linalg.norm(vecs)
         vecs *= invnorm
 
     return vecs
