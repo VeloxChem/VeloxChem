@@ -77,7 +77,4 @@ copyFromDeviceMemory(     void*  destination,
 #endif
 }
 
-
-
-
 }  // namespace gpu

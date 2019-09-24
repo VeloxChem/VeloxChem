@@ -80,7 +80,7 @@ CCudaDevices::copyToDevice(      double*              pointer,
                            const CMemBlock2D<double>& memBlock2D) const
 {
 #ifdef ENABLE_GPU
-    gpu::copyToDeviceMemory(pointer, pitch, memBlock2D.data(), memBlock2D.pitched_size(0) * sizeof(double),
+    gpu::copyToDeviceMemory(pointer, pitch, memBlock2D.data(0), memBlock2D.pitched_size(0) * sizeof(double),
                             memBlock2D.size(0) * sizeof(double), static_cast<size_t>(memBlock2D.blocks()));
 #endif
 }
@@ -91,7 +91,7 @@ CCudaDevices::copyFromDevice(double*              pointer,
                              CMemBlock2D<double>& memBlock2D) const
 {
 #ifdef ENABLE_GPU
-    gpu::copyFromDeviceMemory(memBlock2D.data(), memBlock2D.pitched_size(0) * sizeof(double), pointer, pitch,
+    gpu::copyFromDeviceMemory(memBlock2D.data(0), memBlock2D.pitched_size(0) * sizeof(double), pointer, pitch,
                               memBlock2D.size(0) * sizeof(double), static_cast<size_t>(memBlock2D.blocks()));
 #endif
 }
@@ -145,4 +145,12 @@ CCudaDevices::getString() const
     }
     
     return ss.str();
+}
+
+int32_t
+CCudaDevices::getGridBlockSize(const int32_t iDevice) const
+{
+    // FIX ME: set up optimal block size using device name
+    
+    return 256;
 }

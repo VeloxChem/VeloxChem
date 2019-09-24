@@ -70,6 +70,7 @@
 #include "ElectronRepulsionBRRRecFuncForGGYY.hpp"
 
 #include "DeviceFunc.hpp"
+#include "TwoIntsFuncGPU.hpp"
 
 CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(MPI_Comm comm)
 {
@@ -828,10 +829,18 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
         {
             cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, ddpairs.getPairFactors());
             
+            // compute distances: R(PQ) = P - Q
+            
+            twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
+                                        brapairs, nqpdim, i, cudaDevices);
+            
         }
         else
         {
             cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, qqpairs.getPairFactors());
+            
+            twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
+                                        brapairs, nqpdim, i, cudaDevices);
         }
     }
     

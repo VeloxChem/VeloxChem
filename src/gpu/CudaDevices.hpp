@@ -117,6 +117,14 @@ public:
      @return the representation string.
      */
     std::string getString() const;
+    
+    /**
+     Gets recommended size of grid block for specific CUDA compute capable device.
+
+     @param iDevice the identifier of CUDA compute capable device.
+     @return the recomended grid block size.
+     */
+    int32_t getGridBlockSize(const int32_t iDevice = 0) const;
 };
 
 #endif /* CudaDevices_hpp */

@@ -10,7 +10,6 @@
 #define DeviceFunc_hpp
 
 #include <cstdint>
-#include <tuple>
 
 #include "MemBlock2D.hpp"
 #include "ErrorHandler.hpp"
