@@ -195,24 +195,6 @@ class ComplexResponse:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
 
-    def paired(self, v_xy):
-        """
-        Computes paired trial vector.
-
-        :param v_xy:
-            The trial vector.
-
-        :return:
-            The paired trial vector.
-        """
-
-        v_yx = v_xy.copy()
-        half_rows = v_xy.shape[0] // 2
-        v_yx[:half_rows] = v_xy[half_rows:]
-        v_yx[half_rows:] = v_xy[:half_rows]
-
-        return v_yx
-
     def decomp_trials(self, vecs):
         """
         Decomposes trial vectors into their 4 respective parts (real gerade,
@@ -278,52 +260,33 @@ class ComplexResponse:
 
         return np.array(space).T
 
-    def decomp_sym(self, vecs):
+    def decomp_grad(self, grad):
         """
         Decomposes gradient into gerade and ungerade parts.
 
-        :param vecs:
+        :param grad:
             The trial vectors.
 
         :return:
             A tuple containing gerade and ungerade parts of vectors.
         """
 
-        if len(vecs.shape) != 1:
-            ger = []
-            ung = []
-            for vec in range(len(vecs[0, :])):
-                vecp = self.paired(vec)
-                ger.append(.5 * (vec + vecp))
-                ung.append(.5 * (vec - vecp))
-        else:
-            vecp = self.paired(vecs)
-            ger = .5 * (vecs + vecp)
-            ung = .5 * (vecs - vecp)
+        assert_msg_critical(
+            len(grad.shape) == 1, 'decomp_grad: Expecting a 1D array')
 
-        return np.array(ger).T, np.array(ung).T
+        assert_msg_critical(grad.shape[0] % 2 == 0,
+                            'decomp_grad: size of array should be even')
 
-    def discard_lower_halfs(self, vecs):
-        """
-        Discards lower halfs of vectors sent in.
+        half_size = grad.shape[0] // 2
 
-        :param vecs:
-            The trial vectors.
+        grad_T = np.zeros(grad.shape)
+        grad_T[:half_size] = grad[half_size:]
+        grad_T[half_size:] = grad[:half_size]
 
-        :return:
-            The upper halfs of the vectors sent in.
-        """
+        ger = 0.5 * (grad + grad_T)[:half_size]
+        ung = 0.5 * (grad - grad_T)[:half_size]
 
-        half = vecs.shape[0] // 2
-        if len(vecs.shape) != 1:
-            upperhalf = []
-            for vec in range(len(vecs[0, :])):
-                upperhalf.append(vecs[:half, vec])
-        else:
-            upperhalf = vecs[:half]
-
-        return np.array(upperhalf)
-
+        return ger.T, ung.T
 
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """
@@ -417,14 +380,13 @@ class ComplexResponse:
 
         ig = {}
         for op, grad in op_grads.items():
-            fullgradger, fullgradung = self.decomp_sym(grad)
-            gradger = self.discard_lower_halfs(fullgradger)
-            gradung = self.discard_lower_halfs(fullgradung)
+            gradger, gradung = self.decomp_grad(grad)
 
             grad = np.array(
                 [gradger.real, gradung.real, -gradung.imag,
                  -gradger.imag]).flatten()
-            gn = np.sqrt(2) * np.linalg.norm(grad)
+            gn = np.sqrt(2.0) * np.linalg.norm(grad)
+
             if self.nonlinear:
                 if gn < self.small_thresh:
                     ig[op] = np.zeros(grad.shape[0])
@@ -479,7 +441,7 @@ class ComplexResponse:
                     v = self.preconditioning(pre[w], vec)
                 else:
                     v = vec
-                if np.linalg.norm(v) > self.small_thresh:
+                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
                     trials.append(v)
 
         new_trials = np.array(trials).T
@@ -497,10 +459,12 @@ class ComplexResponse:
         # orthogonalizing new trial vectors against existing ones
 
         if bger is not None and bger.any():
-            new_ger = new_ger - 2.0 * np.matmul(bger, np.matmul(bger.T, new_ger))
+            new_ger = new_ger - 2.0 * np.matmul(bger, np.matmul(
+                bger.T, new_ger))
 
         if bung is not None and bung.any():
-            new_ung = new_ung - 2.0 * np.matmul(bung, np.matmul(bung.T, new_ung))
+            new_ung = new_ung - 2.0 * np.matmul(bung, np.matmul(
+                bung.T, new_ung))
 
         # orthonormalizing new trial vectors
 
@@ -670,9 +634,11 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            e2bger, e2bung = e2x_drv.e2n_half_size(
-                bger, bung, scf_tensors, screening, molecule, basis,
-                self.dft, self.xcfun, self.molgrid, self.gs_density)
+            e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
+                                                   screening, molecule, basis,
+                                                   self.dft, self.xcfun,
+                                                   self.molgrid,
+                                                   self.gs_density)
 
         solutions = {}
         residuals = {}
@@ -694,6 +660,13 @@ class ComplexResponse:
             if self.rank == mpi_master():
                 nvs = []
 
+                n_ger = bger.shape[1]
+                n_ung = bung.shape[1]
+
+                e2gg = 2.0 * np.matmul(bger.T, e2bger)
+                e2uu = 2.0 * np.matmul(bung.T, e2bung)
+                s2ug = 4.0 * np.matmul(bung.T, bger)
+
                 for op, w in op_freq_keys:
                     if iteration == 0 or (relative_residual_norm[(op, w)] >
                                           self.conv_thresh):
@@ -702,9 +675,7 @@ class ComplexResponse:
                         else:
                             grad = v1[op]
 
-                        fullgradger, fullgradung = self.decomp_sym(grad)
-                        gradger = self.discard_lower_halfs(fullgradger)
-                        gradung = self.discard_lower_halfs(fullgradung)
+                        gradger, gradung = self.decomp_grad(grad)
 
                         # projections onto gerade and ungerade subspaces:
 
@@ -712,13 +683,6 @@ class ComplexResponse:
                         g_imagger = 2.0 * np.matmul(bger.T, gradger.imag)
                         g_realung = 2.0 * np.matmul(bung.T, gradung.real)
                         g_imagung = 2.0 * np.matmul(bung.T, gradung.imag)
-
-                        e2gg = 2.0 * np.matmul(bger.T, e2bger)
-                        e2uu = 2.0 * np.matmul(bung.T, e2bung)
-                        s2ug = 4.0 * np.matmul(bung.T, bger)
-
-                        n_ger = bger.shape[1]
-                        n_ung = bung.shape[1]
 
                         # creating gradient and matrix for linear equation
 
@@ -837,17 +801,11 @@ class ComplexResponse:
 
                         # composing total half-sized residual
 
-                        r_real = r_realger + r_realung
-                        r_imag = r_imagung + r_imagger
-                        r = np.zeros(len(r_real), dtype=complex)
-
-                        for pos in range(len(r_real)):
-                            r[pos] = complex(r_real[pos], r_imag[pos])
-
                         residuals[(op, w)] = np.array(
                             [r_realger, r_realung, r_imagung,
                              r_imagger]).flatten()
 
+                        r = residuals[(op, w)]
                         n = solutions[(op, w)]
 
                         # calculating relative residual norm
@@ -856,7 +814,7 @@ class ComplexResponse:
                         nv = np.matmul(n, grad)
                         nvs.append((op, w, nv))
 
-                        rn = np.sqrt(2) * np.linalg.norm(r)
+                        rn = np.sqrt(2.0) * np.linalg.norm(r)
                         nn = np.linalg.norm(n)
                         if nn != 0:
                             relative_residual_norm[(op, w)] = rn / nn
@@ -917,8 +875,9 @@ class ComplexResponse:
                 timing_t0 = tm.time()
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
-                new_trials_ger, new_trials_ung, scf_tensors, screening, molecule,
-                basis, self.dft, self.xcfun, self.molgrid, self.gs_density)
+                new_trials_ger, new_trials_ung, scf_tensors, screening,
+                molecule, basis, self.dft, self.xcfun, self.molgrid,
+                self.gs_density)
 
             if self.rank == mpi_master():
 
@@ -968,8 +927,8 @@ class ComplexResponse:
                 props = {}
                 for aop in self.a_components:
                     for bop, w in solutions:
-                        props[(aop, bop, w)] = -np.dot(va[aop],
-                                                       solutions[(bop, w)])
+                        props[(aop, bop,
+                               w)] = -np.dot(va[aop], solutions[(bop, w)])
                 self.print_properties(props)
                 return {
                     'properties': props,

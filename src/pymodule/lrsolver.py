@@ -10,9 +10,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .lrmatvecdriver import remove_linear_dependence
-from .lrmatvecdriver import orthogonalize_gram_schmidt
-from .lrmatvecdriver import normalize
+from .lrmatvecdriver import remove_linear_dependence_half
+from .lrmatvecdriver import orthogonalize_gram_schmidt_half
+from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import read_rsp_hdf5
@@ -780,14 +780,14 @@ class LinearResponseSolver:
             new_ung = new_ung - new_ung_proj
 
         if new_ger.any() and renormalize:
-            new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
-            new_ger = orthogonalize_gram_schmidt(new_ger)
-            new_ger = normalize(new_ger)
+            new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
+            new_ger = orthogonalize_gram_schmidt_half(new_ger)
+            new_ger = normalize_half(new_ger)
 
         if new_ung.any() and renormalize:
-            new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
-            new_ung = orthogonalize_gram_schmidt(new_ung)
-            new_ung = normalize(new_ung)
+            new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
+            new_ung = orthogonalize_gram_schmidt_half(new_ung)
+            new_ung = normalize_half(new_ung)
 
         return new_ger, new_ung
 
