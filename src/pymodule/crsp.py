@@ -102,8 +102,6 @@ class ComplexResponse:
         self.frequencies = (0.1,)
         self.damping = 0.004556335294880438
 
-        self.nonlinear = False
-
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
 
@@ -360,13 +358,13 @@ class ComplexResponse:
 
         return v_out
 
-    def initial_guess(self, op_grads, d, freqs, precond):
+    def initial_guess(self, v1, d, freqs, precond):
         """
         Creating initial guess (un-orthonormalized trials) out of gradients.
 
-        :param op_grads:
-            The dictionary containing operator components (key) and right-hand
-            sides (values).
+        :param v1:
+            The dictionary containing (operator, frequency) as keys and
+            right-hand sides as values.
         :param d:
             The damping parameter.
         :param freqs:
@@ -379,7 +377,7 @@ class ComplexResponse:
         """
 
         ig = {}
-        for op, grad in op_grads.items():
+        for (op, w), grad in v1.items():
             gradger, gradung = self.decomp_grad(grad)
 
             grad = np.array(
@@ -387,17 +385,10 @@ class ComplexResponse:
                  -gradger.imag]).flatten()
             gn = np.sqrt(2.0) * np.linalg.norm(grad)
 
-            if self.nonlinear:
-                if gn < self.small_thresh:
-                    ig[op] = np.zeros(grad.shape[0])
-                else:
-                    ig[op] = self.preconditioning(precond[op[1]], grad)
+            if gn < self.small_thresh:
+                ig[(op, w)] = np.zeros(grad.shape[0])
             else:
-                for w in freqs:
-                    if gn < self.small_thresh:
-                        ig[(op, w)] = np.zeros(grad.shape[0])
-                    else:
-                        ig[(op, w)] = self.preconditioning(precond[w], grad)
+                ig[(op, w)] = self.preconditioning(precond[w], grad)
 
         return ig
 
@@ -482,7 +473,7 @@ class ComplexResponse:
 
         return new_ger, new_ung
 
-    def compute(self, molecule, basis, scf_tensors, b_rhs=None):
+    def compute(self, molecule, basis, scf_tensors, v1=None):
         """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
@@ -493,9 +484,9 @@ class ComplexResponse:
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param b_rhs:
-            The right-hand side. If not provided, b_rhs will be computed for
-            the B operator.
+        :param v1:
+            The gradients on the right-hand side. If not provided, v1 will be
+            computed for the B operator.
 
         :return:
             A dictionary containing properties, solutions, and kappas.
@@ -517,7 +508,7 @@ class ComplexResponse:
             }
             timing_t0 = tm.time()
 
-        if self.rank == mpi_master() and (not self.nonlinear):
+        if self.rank == mpi_master():
             self.print_header()
 
         self.start_time = tm.time()
@@ -553,12 +544,6 @@ class ComplexResponse:
             nalpha == nbeta,
             'ComplexResponseSolver: not implemented for unrestricted case')
 
-        d = self.damping
-        if b_rhs:
-            freqs = [i[1] for i in b_rhs.keys()]
-        else:
-            freqs = self.frequencies
-
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
@@ -572,28 +557,32 @@ class ComplexResponse:
         else:
             nocc = None
 
-        if b_rhs is None:
+        nonlinear_flag = False
+
+        if not v1:
             b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
+            if self.rank == mpi_master():
+                v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
+                      for w in self.frequencies}
         else:
-            v1 = b_rhs
-            self.nonlinear = True
+            nonlinear_flag = True
 
         if self.rank == mpi_master():
-
-            # calling the gradients
-
-            if not self.nonlinear:
-                v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
-                op_freq_keys = [(op, w) for op in v1 for w in freqs]
-            else:
-                op_freq_keys = [op for op in v1]
+            d = self.damping
+            freqs = [op_freq[1] for op_freq in v1]
+            op_freq_keys = list(v1.keys())
 
             # creating the preconditioner matrix
 
             precond = {
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
+
+        bger = None
+        bung = None
+        new_trials_ger = None
+        new_trials_ung = None
 
         # read initial guess from restart file
 
@@ -670,11 +659,7 @@ class ComplexResponse:
                 for op, w in op_freq_keys:
                     if iteration == 0 or (relative_residual_norm[(op, w)] >
                                           self.conv_thresh):
-                        if self.nonlinear:
-                            grad = v1[(op, w)]
-                        else:
-                            grad = v1[op]
-
+                        grad = v1[(op, w)]
                         gradger, gradung = self.decomp_grad(grad)
 
                         # projections onto gerade and ungerade subspaces:
@@ -823,14 +808,13 @@ class ComplexResponse:
 
                 # write to output
 
-                if not self.nonlinear:
-                    self.ostream.print_info(
-                        '{:d} gerade trial vectors'.format(n_ger))
-                    self.ostream.print_info(
-                        '{:d} ungerade trial vectors'.format(n_ung))
-                    self.ostream.print_blank()
+                self.ostream.print_info(
+                    '{:d} gerade trial vectors'.format(n_ger))
+                self.ostream.print_info(
+                    '{:d} ungerade trial vectors'.format(n_ung))
+                self.ostream.print_blank()
 
-                    self.print_iteration(relative_residual_norm, nvs)
+                self.print_iteration(relative_residual_norm, nvs)
 
             if self.timing:
                 tid = iteration + 1
@@ -898,8 +882,7 @@ class ComplexResponse:
 
         # converged?
         if self.rank == mpi_master():
-            if not self.nonlinear:
-                self.print_convergence()
+            self.print_convergence()
 
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
@@ -917,12 +900,11 @@ class ComplexResponse:
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
 
-        if not self.nonlinear:
+        if not nonlinear_flag:
             a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
 
-        if self.rank == mpi_master():
-            if not self.nonlinear:
+            if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}
                 props = {}
                 for aop in self.a_components:
@@ -933,15 +915,14 @@ class ComplexResponse:
                 return {
                     'properties': props,
                     'solutions': solutions,
-                    'kappas': kappas,
+                    'kappas': kappas
                 }
-            else:
-                return {
-                    'solutions': solutions,
-                    'kappas': kappas,
-                }
+
         else:
-            return {}
+            if self.rank == mpi_master():
+                return {'solutions': solutions, 'kappas': kappas}
+
+        return {}
 
     def check_convergence(self, relative_residual_norm):
         """
