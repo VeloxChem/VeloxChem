@@ -87,20 +87,3 @@ launchKernelForDistancesPQ(      double* pqDistancesData,
 
 }  // namespace gpu
 
-const double*
-CGtoPairsBlock::getCoordinatesPX() const
-{
-return _pairFactors.data(4);
-}
-
-const double*
-CGtoPairsBlock::getCoordinatesPY() const
-{
-return _pairFactors.data(5);
-}
-
-const double*
-CGtoPairsBlock::getCoordinatesPZ() const
-{
-return _pairFactors.data(6);
-}
