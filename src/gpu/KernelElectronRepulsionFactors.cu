@@ -28,15 +28,15 @@ __global__ void kernelElectronRepulsionFactors(      double* osFactorsData,
     {
         // set up pointers to primitve pair factors on bra side
 
-        double* bfxi = braGtoPairsData;
+        const double* bfxi = braGtoPairsData;
 
-        double* boxi = (double*)((char*)braGtoPairsData + pitchOfBraGtoPairsData);
+        const double* boxi = (double*)((char*)braGtoPairsData + pitchOfBraGtoPairsData);
 
         // set up pointers to primitve pair factors on ket side
 
-        double* kfxi = ketGtoPairsData;
+        const double* kfxi = ketGtoPairsData;
 
-        double* koxi = (double*)((char*)ketGtoPairsData + pitchOfKetGtoPairsData);
+        const double* koxi = (double*)((char*)ketGtoPairsData + pitchOfKetGtoPairsData);
 
         // compute Obara-Saika factors
 

@@ -12,6 +12,7 @@
 
 #ifdef ENABLE_GPU
 #include "KernelDistancesPQ.hpp"
+#include "KernelElectronRepulsionFactors.hpp"
 #endif
 
 namespace twointsgpu { // twointsgpu namespace
@@ -50,8 +51,8 @@ namespace twointsgpu { // twointsgpu namespace
     }
     
     void
-    compFactorsForElectronRepulsion(        double*         pqDistancesData,
-                                    const   size_t          pitchOfDistancesData,
+    compFactorsForElectronRepulsion(        double*         osFactorsData,
+                                    const   size_t          pitchOfFactorsData,
                                     const   double*         braGtoPairsData,
                                     const   size_t          pitchOfBraGtoPairsData,
                                     const   double*         ketGtoPairsData,
@@ -83,7 +84,7 @@ namespace twointsgpu { // twointsgpu namespace
         
         // execute CUDA kernel: Obara-Saika recursion factors for electron repulsion integrals
         
-        gpu::launchKernelForElectronRepulsionFactors(pqDistancesData, pitchOfDistancesData, braGtoPairsData,
+        gpu::launchKernelForElectronRepulsionFactors(osFactorsData, pitchOfFactorsData, braGtoPairsData,
                                                      pitchOfBraGtoPairsData, ketGtoPairsData, pitchOfKetGtoPairsData,
                                                      bang, kang, spos, epos, nKetPrimPairs, gsize, bsize);
 #endif

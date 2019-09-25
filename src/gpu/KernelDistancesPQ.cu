@@ -26,19 +26,19 @@ __global__ void kernelDistancesPQ(      double* pqDistancesData,
     {
         // set up pointers to P center coordinates
 
-        double* rpx = (double*)((char*)braGtoPairsData + 4 * pitchOfBraGtoPairsData);
+        const double* rpx = (double*)((char*)braGtoPairsData + 4 * pitchOfBraGtoPairsData);
 
-        double* rpy = (double*)((char*)braGtoPairsData + 5 * pitchOfBraGtoPairsData);
+        const double* rpy = (double*)((char*)braGtoPairsData + 5 * pitchOfBraGtoPairsData);
 
-        double* rpz = (double*)((char*)braGtoPairsData + 6 * pitchOfBraGtoPairsData);
+        const double* rpz = (double*)((char*)braGtoPairsData + 6 * pitchOfBraGtoPairsData);
 
         // set up pointers to Q center coordinates
 
-        double* rqx = (double*)((char*)ketGtoPairsData + 4 * pitchOfKetGtoPairsData);
+        const double* rqx = (double*)((char*)ketGtoPairsData + 4 * pitchOfKetGtoPairsData);
 
-        double* rqy = (double*)((char*)ketGtoPairsData + 5 * pitchOfKetGtoPairsData);
+        const double* rqy = (double*)((char*)ketGtoPairsData + 5 * pitchOfKetGtoPairsData);
 
-        double* rqz = (double*)((char*)ketGtoPairsData + 6 * pitchOfKetGtoPairsData);
+        const double* rqz = (double*)((char*)ketGtoPairsData + 6 * pitchOfKetGtoPairsData);
 
         // compute R(PQ) = P - Q distances
 
