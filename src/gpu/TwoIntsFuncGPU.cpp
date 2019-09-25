@@ -49,4 +49,44 @@ namespace twointsgpu { // twointsgpu namespace
 #endif
     }
     
+    void
+    compFactorsForElectronRepulsion(        double*         pqDistancesData,
+                                    const   size_t          pitchOfDistancesData,
+                                    const   double*         braGtoPairsData,
+                                    const   size_t          pitchOfBraGtoPairsData,
+                                    const   double*         ketGtoPairsData,
+                                    const   size_t          pitchOfKetGtoPairsData,
+                                    const   CGtoPairsBlock& braGtoPairsBlock,
+                                    const   CGtoPairsBlock& ketGtoPairsBlock,
+                                    const   int32_t         nKetPrimPairs,
+                                    const   int32_t         iContrPair,
+                                    const   CCudaDevices*   cudaDevices)
+    {
+#ifdef ENABLE_GPU
+        // set up angular momentum data
+        
+        auto bang = braGtoPairsBlock.getBraAngularMomentum() + braGtoPairsBlock.getKetAngularMomentum();
+        
+        auto kang = ketGtoPairsBlock.getBraAngularMomentum() + ketGtoPairsBlock.getKetAngularMomentum();
+        
+        // set up GTOs pair position on bra side
+        
+        auto spos = (braGtoPairsBlock.getStartPositions())[iContrPair];
+        
+        auto epos = (braGtoPairsBlock.getEndPositions())[iContrPair];
+        
+        //  determine execution grid on GPU device
+        
+        auto bsize = cudaDevices->getGridBlockSize();
+        
+        auto gsize = gpu::getNumberOfGridBlocks(nKetPrimPairs, bsize);
+        
+        // execute CUDA kernel: Obara-Saika recursion factors for electron repulsion integrals
+        
+        gpu::launchKernelForElectronRepulsionFactors(pqDistancesData, pitchOfDistancesData, braGtoPairsData,
+                                                     pitchOfBraGtoPairsData, ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                     bang, kang, spos, epos, nKetPrimPairs, gsize, bsize);
+#endif
+    }
+    
 } // intsfunc namespace

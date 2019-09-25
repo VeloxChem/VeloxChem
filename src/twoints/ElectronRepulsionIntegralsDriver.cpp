@@ -855,13 +855,25 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
                                         brapairs, nqpdim, i, cudaDevices);
             
+            // compute Obara-Saika recursion factors
+            
+            twointsgpu::compFactorsForElectronRepulsion(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
+                                                        pitch_kpfacts, brapairs, ddpairs, nqpdim, i, cudaDevices);
+            
         }
         else
         {
             cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, qqpairs.getPairFactors());
             
+            // compute distances: R(PQ) = P - Q
+            
             twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
                                         brapairs, nqpdim, i, cudaDevices);
+            
+            // compute Obara-Saika recursion factors
+            
+            twointsgpu::compFactorsForElectronRepulsion(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
+                                                        pitch_kpfacts, brapairs, qqpairs, nqpdim, i, cudaDevices);
         }
     }
     
