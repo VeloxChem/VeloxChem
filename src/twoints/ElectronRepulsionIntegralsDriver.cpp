@@ -857,7 +857,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             
             // compute Obara-Saika recursion factors
             
-            twointsgpu::compFactorsForElectronRepulsion(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
+            twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
                                                         pitch_kpfacts, brapairs, ddpairs, nqpdim, i, cudaDevices);
             
         }
@@ -872,7 +872,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             
             // compute Obara-Saika recursion factors
             
-            twointsgpu::compFactorsForElectronRepulsion(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
+            twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
                                                         pitch_kpfacts, brapairs, qqpairs, nqpdim, i, cudaDevices);
         }
     }
