@@ -11,7 +11,6 @@
 
 #include <cstdint>
 
-#include "MemBlock2D.hpp"
 #include "ErrorHandler.hpp"
 
 namespace gpu {
