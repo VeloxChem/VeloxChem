@@ -822,6 +822,27 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
         
         if (nqcdim == 0) continue;
         
+        // density based screeing of integrals batches
+        
+        if (useqq)
+        {
+            // determine max. density element for GTO pairs on ket side
+            
+            if ((intsScreener.getScreeningScheme() == ericut::qqden) ||
+                (intsScreener.getScreeningScheme() == ericut::qqrden))
+            {
+                distPattern.getMaxDensityElements(qqden, brapairs, qqpairs,
+                                                  symbk, nqcdim, i);
+                
+                intsScreener.setScreeningVector(qqvec, qqidx, qqden, distpq,
+                                                nqcdim, i);
+                
+                nqcdim = ddpairs.compress(qqpairs, qqvec, nqcdim);
+                
+                if (nqcdim > 0) nqpdim = ddpairs.getNumberOfPrimPairs(nqcdim - 1);
+            }
+        }
+        
         // density screened scheme
         
         if ((intsScreener.getScreeningScheme() == ericut::qqden) ||

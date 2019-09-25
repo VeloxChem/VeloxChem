@@ -8,6 +8,12 @@
 
 #include "TwoIntsFuncGPU.hpp"
 
+#include "CudaGenFunc.hpp"
+
+#ifdef ENABLE_GPU
+#include "KernelDistancesPQ.hpp"
+#endif
+
 namespace twointsgpu { // twointsgpu namespace
     
     void
@@ -22,7 +28,25 @@ namespace twointsgpu { // twointsgpu namespace
                     const   int32_t         iContrPair,
                     const   CCudaDevices*   cudaDevices)
     {
+#ifdef ENABLE_GPU
+        // set up GTOs pair position on bra side
         
+        auto spos = (braGtoPairsBlock.getStartPositions())[iContrPair];
+        
+        auto epos = (braGtoPairsBlock.getEndPositions())[iContrPair];
+        
+        //  determine execution grid on GPU device
+        
+        auto bsize = cudaDevices->getGridBlockSize();
+        
+        auto gsize = gpu::getNumberOfGridBlocks(nKetPrimPairs, bsize);
+        
+        // execute CUDA kernel: R(PQ) = P - Q
+        
+        gpu::launchKernelForDistancePQ(pqDistancesData, pitchOfDistancesData, braGtoPairsData, pitchOfBraGtoPairsData,
+                                       ketGtoPairsData, pitchOfKetGtoPairsData, spos, epos, nKetPrimPairs,
+                                       gsize, bsize); 
+#endif
     }
     
 } // intsfunc namespace
