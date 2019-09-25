@@ -23,11 +23,11 @@ launchKernelForDistancesPQ(      double* pqDistancesData,
                            const int32_t gridSize,
                            const int32_t blockSize)
 {
-    gpu::kernelDistancesPQ<<gridSize, blockSize>>(pqDistancesData, pitchOfDistancesData,
-                                                  braGtoPairsData, pitchOfBraGtoPairsData,
-                                                  ketGtoPairsData, pitchOfKetGtoPairsData,
-                                                  startPositionOfBraPair, endPositionOfBraPair,
-                                                  nKetPrimPairs);
+    gpu::kernelDistancesPQ<<<gridSize, blockSize>>>(pqDistancesData, pitchOfDistancesData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    startPositionOfBraPair, endPositionOfBraPair,
+                                                    nKetPrimPairs);
 }
 
 __global__ void kernelDistancesPQ(      double* pqDistancesData,

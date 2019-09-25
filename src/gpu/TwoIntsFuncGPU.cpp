@@ -43,9 +43,9 @@ namespace twointsgpu { // twointsgpu namespace
         
         // execute CUDA kernel: R(PQ) = P - Q
         
-        gpu::launchKernelForDistancePQ(pqDistancesData, pitchOfDistancesData, braGtoPairsData, pitchOfBraGtoPairsData,
-                                       ketGtoPairsData, pitchOfKetGtoPairsData, spos, epos, nKetPrimPairs,
-                                       gsize, bsize); 
+        gpu::launchKernelForDistancesPQ(pqDistancesData, pitchOfDistancesData, braGtoPairsData, pitchOfBraGtoPairsData,
+                                        ketGtoPairsData, pitchOfKetGtoPairsData, spos, epos, nKetPrimPairs,
+                                        gsize, bsize); 
 #endif
     }
     
