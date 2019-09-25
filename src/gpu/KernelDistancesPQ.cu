@@ -10,6 +10,19 @@
 
 namespace gpu {  // gpu namespace
 
+__global__ void kernelDistancesPQ(      double* pqDistancesData,
+                                  const size_t  pitchOfDistancesData,
+                                  const double* braGtoPairsData,
+                                  const size_t  pitchOfBraGtoPairsData,
+                                  const double* ketGtoPairsData,
+                                  const size_t  pitchOfKetGtoPairsData,
+                                  const int32_t startPositionOfBraPair,
+                                  const int32_t endPositionOfBraPair,
+                                  const int32_t nKetPrimPairs)
+{
+    // FIX ME: add CUDA kernel body 
+}
+
 void
 launchKernelForDistancesPQ(      double* pqDistancesData,
                            const size_t  pitchOfDistancesData,
@@ -28,19 +41,6 @@ launchKernelForDistancesPQ(      double* pqDistancesData,
                                                     ketGtoPairsData, pitchOfKetGtoPairsData,
                                                     startPositionOfBraPair, endPositionOfBraPair,
                                                     nKetPrimPairs);
-}
-
-__global__ void kernelDistancesPQ(      double* pqDistancesData,
-                                  const size_t  pitchOfDistancesData,
-                                  const double* braGtoPairsData,
-                                  const size_t  pitchOfBraGtoPairsData,
-                                  const double* ketGtoPairsData,
-                                  const size_t  pitchOfKetGtoPairsData,
-                                  const int32_t startPositionOfBraPair,
-                                  const int32_t endPositionOfBraPair,
-                                  const int32_t nKetPrimPairs)
-{
-    // FIX ME: add CUDA kernel body 
 }
 
 }  // namespace gpu
