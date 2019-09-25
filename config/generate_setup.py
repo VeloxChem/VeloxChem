@@ -144,7 +144,7 @@ def generate_setup(template_file, setup_file):
         sys.exit(1)
 
     use_intel = (cxxname == 'icpc')
-    use_gnu = (cxxname == 'g++')
+    use_gnu = cxxname in ['g++', 'x86_64-conda_cos6-linux-gnu-c++']
     use_clang = (cxxname == 'clang++')
 
     if not (use_intel or use_gnu or use_clang):
