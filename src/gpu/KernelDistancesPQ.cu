@@ -20,7 +20,49 @@ __global__ void kernelDistancesPQ(      double* pqDistancesData,
                                   const int32_t endPositionOfBraPair,
                                   const int32_t nKetPrimPairs)
 {
-    // FIX ME: add CUDA kernel body 
+    int32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (tid < nKetPrimPairs)
+    {
+        // set up pointers to P center coordinates
+
+        double* rpx = (double*)((char*)braGtoPairsData + 4 * pitchOfBraGtoPairsData);
+
+        double* rpy = (double*)((char*)braGtoPairsData + 5 * pitchOfBraGtoPairsData);
+
+        double* rpz = (double*)((char*)braGtoPairsData + 6 * pitchOfBraGtoPairsData);
+
+        // set up pointers to Q center coordinates
+
+        double* rqx = (double*)((char*)ketGtoPairsData + 4 * pitchOfKetGtoPairsData);
+
+        double* rqy = (double*)((char*)ketGtoPairsData + 5 * pitchOfKetGtoPairsData);
+
+        double* rqz = (double*)((char*)ketGtoPairsData + 6 * pitchOfKetGtoPairsData);
+
+        // compute R(PQ) = P - Q distances
+
+        for (int32_t i = startPositionOfBraPair; i < endPositionOfBraPair; i++)
+        {
+            // set up pointers to R(PQ) distances
+
+            int32_t ioff = 3 * (i - startPositionOfBraPair);
+
+            double* pqx = (double*)((char*)pqDistancesData + ioff * pitchOfDistancesData);
+
+            double* pqy = (double*)((char*)pqDistancesData + (ioff + 1) * pitchOfDistancesData);
+
+            double* pqz = (double*)((char*)pqDistancesData + (ioff + 2) * pitchOfDistancesData);
+
+            // compute R(PQ) distances
+
+            pqx[tid] = rpx[i] - rqx[tid];
+
+            pqy[tid] = rpy[i] - rqy[tid];
+
+            pqz[tid] = rpz[i] - rqz[tid];
+        }
+    }
 }
 
 void
@@ -44,3 +86,21 @@ launchKernelForDistancesPQ(      double* pqDistancesData,
 }
 
 }  // namespace gpu
+
+const double*
+CGtoPairsBlock::getCoordinatesPX() const
+{
+return _pairFactors.data(4);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesPY() const
+{
+return _pairFactors.data(5);
+}
+
+const double*
+CGtoPairsBlock::getCoordinatesPZ() const
+{
+return _pairFactors.data(6);
+}
