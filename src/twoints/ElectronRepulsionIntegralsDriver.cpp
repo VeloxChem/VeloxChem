@@ -1509,25 +1509,19 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CA
     
     auto nblocks = gpupatt.size(0);
     
-    #pragma omp parallel shared(pfock, pden, pdevs, ndevs, pbraidx, pketidx, pbkidx, nblocks)
+    #pragma omp parallel num_threads(ndevs) shared(pfock, pden, pdevs, ndevs, pbraidx, pketidx, pbkidx, nblocks)
     {
         // set up OMP data
         
         int32_t tid = omp_get_thread_num();
         
-        int32_t nthreads = omp_get_num_threads();
-     
-        // set up CUDA device for each thread
-        
-        int32_t curr_dev = tid % ndevs;
-        
-        pdevs->setCudaDevice(curr_dev);
+        pdevs->setCudaDevice(tid);
         
         // loop over integral blocks
         
         for (int32_t i = 0; i < nblocks; i++)
         {
-            if ((i % nthreads) == tid)
+            if ((i % ndevs) == tid)
             {
                 auto bpairs = braGtoPairsContainer->getGtoPairsBlock(pbraidx[i]);
                 
@@ -1535,7 +1529,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CA
                 
                 auto qqdat = screeningContainer->getScreener(pbkidx[i]);
                 
-                printf("tid: %i curr_dev: %i (i,j): (%i,%i) idx: %i\n", tid, curr_dev, pbraidx[i], pketidx[i], pbkidx[i]);
+                printf("tid: %i dev: %i (i,j): (%i,%i) idx: %i\n", tid, i % ndevs, pbraidx[i], pketidx[i], pbkidx[i]);
                 
                 CTwoIntsDistribution distpat(pfock, pden);
                 
