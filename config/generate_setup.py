@@ -255,6 +255,12 @@ def generate_setup(template_file, setup_file):
     if is_macos:
         maclibs = '-undefined dynamic_lookup'
 
+    # lto flag
+
+    lto_flag = ''
+    if use_gnu:
+        lto_flag = '-fno-lto'
+
     # pybind11
 
     try:
@@ -329,6 +335,9 @@ def generate_setup(template_file, setup_file):
                     print('', file=f_mkfile)
 
                 print('MACLIBS :=', maclibs, file=f_mkfile)
+                print('', file=f_mkfile)
+
+                print('LTOFLAG :=', lto_flag, file=f_mkfile)
                 print('', file=f_mkfile)
 
                 if gtest_root is not None and gtest_lib is not None:
