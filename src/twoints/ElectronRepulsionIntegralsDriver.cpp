@@ -860,6 +860,10 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
                                                         pitch_kpfacts, brapairs, ddpairs, nqpdim, i, cudaDevices);
             
+            // compute coordinates of center W
+            
+            twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
+                                         ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
         }
         else
         {
@@ -874,6 +878,11 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             
             twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
                                                         pitch_kpfacts, brapairs, qqpairs, nqpdim, i, cudaDevices);
+            
+            // compute coordinates of center W
+            
+            twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
+                                         ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
         }
     }
     

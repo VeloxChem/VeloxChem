@@ -70,10 +70,12 @@ namespace twointsgpu { // twointsgpu namespace
                                          const   CCudaDevices*   cudaDevices);
     
     /**
-     Computes coordinates of combined 
+     Computes coordinates of combined bra and ket GTOs pairs.
      
-     @param pqDistancesData the vector of Cartesian R(PQ) = P - Q distances on CUDA compute capable device.
-     @param pitchOfDistancesData the pitch of R(P-Q) data on CUDA compute capable device.
+     @param wCoordinatesData the vector of combined W coordinates on CUDA compute capable device.
+     @param pitchOfCoordinatesData the pitch of W coordinates data on CUDA compute capable device.
+     @param osFactorsData the vector of Obara-Saika factors on CUDA compute capable device.
+     @param pitchOfFactorsData the pitch of Obara-Saika factors data on CUDA compute capable device.
      @param braGtoPairsData the bra GTOs pairs data on on CUDA compute capable device.
      @param pitchOfBraGtoPairsData the pitch of bra GTOs pairs data on on CUDA compute capable device.
      @param ketGtoPairsData the ket GTOs pairs data on on CUDA compute capable device.
@@ -83,11 +85,13 @@ namespace twointsgpu { // twointsgpu namespace
      @param iContrPair the index of contracted GTO pair on bra side.
      @param cudaDevices the CUDA compute capable devices.
      */
-    void compCoordinatesW(        double*         pqDistancesData,
-                          const   size_t          pitchOfDistancesData,
+    void compCoordinatesW(        double*         wCoordinatesData,
+                          const   size_t          pitchOfCoordinatesData,
+                          const   double*         osFactorsData,
+                          const   size_t          pitchOfFactorsData,
                           const   double*         braGtoPairsData,
                           const   size_t          pitchOfBraGtoPairsData,
-                         const   double*         ketGtoPairsData,
+                          const   double*         ketGtoPairsData,
                           const   size_t          pitchOfKetGtoPairsData,
                           const   CGtoPairsBlock& braGtoPairsBlock,
                           const   int32_t         nKetPrimPairs,

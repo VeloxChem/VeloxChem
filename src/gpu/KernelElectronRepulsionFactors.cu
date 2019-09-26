@@ -6,7 +6,7 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-#include "KernelDistancesPQ.hpp"
+#include "KernelElectronRepulsionFactors.hpp"
 
 namespace gpu {  // gpu namespace
 

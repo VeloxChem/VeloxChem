@@ -90,4 +90,39 @@ namespace twointsgpu { // twointsgpu namespace
 #endif
     }
     
+    void
+    compCoordinatesW(        double*         wCoordinatesData,
+                     const   size_t          pitchOfCoordinatesData,
+                     const   double*         osFactorsData,
+                     const   size_t          pitchOfFactorsData,
+                     const   double*         braGtoPairsData,
+                     const   size_t          pitchOfBraGtoPairsData,
+                     const   double*         ketGtoPairsData,
+                     const   size_t          pitchOfKetGtoPairsData,
+                     const   CGtoPairsBlock& braGtoPairsBlock,
+                     const   int32_t         nKetPrimPairs,
+                     const   int32_t         iContrPair,
+                     const   CCudaDevices*   cudaDevices)
+    {
+#ifdef ENABLE_GPU
+        // set up GTOs pair position on bra side
+        
+        auto spos = (braGtoPairsBlock.getStartPositions())[iContrPair];
+        
+        auto epos = (braGtoPairsBlock.getEndPositions())[iContrPair];
+        
+        //  determine execution grid on GPU device
+        
+        auto bsize = cudaDevices->getGridBlockSize();
+        
+        auto gsize = gpu::getNumberOfGridBlocks(nKetPrimPairs, bsize);
+        
+        // execute CUDA kernel: W coordinates
+        
+        gpu::launchKernelForCoordinatesW(wCoordinatesData, pitchOfCoordinatesData, osFactorsData, pitchOfFactorsData,
+                                         braGtoPairsData, pitchOfBraGtoPairsData, ketGtoPairsData, pitchOfKetGtoPairsData,
+                                         spos, epos, nKetPrimPairs, gsize, bsize);
+#endif
+    }
+    
 } // intsfunc namespace
