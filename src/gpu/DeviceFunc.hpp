@@ -76,6 +76,11 @@ void copyFromDeviceMemory(      void*  destination,
                                 size_t dataWidth,
                                 size_t dataHeight);
     
+/**
+ Synchronizes CUDA compute capable device.
+ */
+void synchronizeDevice();
+    
 }
 
 #endif

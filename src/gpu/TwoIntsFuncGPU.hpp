@@ -98,6 +98,31 @@ namespace twointsgpu { // twointsgpu namespace
                           const   int32_t         iContrPair,
                           const   CCudaDevices*   cudaDevices);
     
+    /**
+     Computes distances R(WP) = W - P.
+     
+     @param wpDistancesData the vector of R(WP) = W - P distances on CUDA compute capable device.
+     @param pitchOfDistancesData the pitch of R(WP) distances data on CUDA compute capable device.
+     @param wCoordinatesData the vector of combined W coordinates on CUDA compute capable device.
+     @param pitchOfCoordinatesData the pitch of W coordinates data on CUDA compute capable device.
+     @param braGtoPairsData the bra GTOs pairs data on on CUDA compute capable device.
+     @param pitchOfBraGtoPairsData the pitch of bra GTOs pairs data on on CUDA compute capable device.
+     @param braGtoPairsBlock the bra GTOs pairs block object.
+     @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
+     @param iContrPair the index of contracted GTO pair on bra side.
+     @param cudaDevices the CUDA compute capable devices.
+     */
+    void compDistancesWP(        double*         wpDistancesData,
+                         const   size_t          pitchOfDistancesData,
+                         const   double*         wCoordinatesData,
+                         const   size_t          pitchOfCoordinatesData,
+                         const   double*         braGtoPairsData,
+                         const   size_t          pitchOfBraGtoPairsData,
+                         const   CGtoPairsBlock& braGtoPairsBlock,
+                         const   int32_t         nKetPrimPairs,
+                         const   int32_t         iContrPair,
+                         const   CCudaDevices*   cudaDevices);
+    
 } // twointsgpu namespace
 
 #endif /* TwoIntsFuncGPU_hpp */

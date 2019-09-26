@@ -63,6 +63,11 @@ public:
     void setCudaDevice(const int32_t iDevice) const;
     
     /**
+     Synchorizes current CUDA compute capable device.
+     */
+    void synchronizeCudaDevice() const;
+    
+    /**
      Gets number of CUDA compute capable devices.
 
      @return the number of devices.

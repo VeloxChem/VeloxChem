@@ -765,7 +765,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     cudaDevices->copyToDevice(ptr_bpfacts, pitch_bpfacts, bpfacts);
     
-    printf("Pair factors: bra %zu ket %zu\n", pitch_bpfacts, pitch_kpfacts);
+    //printf("Pair factors: bra %zu ket %zu\n", pitch_bpfacts, pitch_kpfacts);
     
     // set up horizontal recursion buffer for ket side
     
@@ -864,6 +864,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             
             twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
                                          ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
+            
+            cudaDevices->synchronizeCudaDevice();
         }
         else
         {
@@ -883,6 +885,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             
             twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
                                          ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
+            
+            cudaDevices->synchronizeCudaDevice();
         }
     }
     
@@ -1538,7 +1542,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CA
                 
                 auto qqdat = screeningContainer->getScreener(pbkidx[i]);
                 
-                printf("tid: %i dev: %i (i,j): (%i,%i) idx: %i\n", tid, i % ndevs, pbraidx[i], pketidx[i], pbkidx[i]);
+                //printf("tid: %i dev: %i (i,j): (%i,%i) idx: %i\n", tid, i % ndevs, pbraidx[i], pketidx[i], pbkidx[i]);
                 
                 CTwoIntsDistribution distpat(pfock, pden);
                 

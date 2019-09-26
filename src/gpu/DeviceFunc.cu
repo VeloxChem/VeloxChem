@@ -77,4 +77,14 @@ copyFromDeviceMemory(     void*  destination,
 #endif
 }
 
+void
+synchronizeDevice()
+{
+#ifdef ENABLE_GPU
+    auto cerr = cudaDeviceSynchronize();
+
+    errors::assertMsgCritical(cerr == cudaSuccess, {"synchronizeDevice"});
+#endif
+}
+
 }  // namespace gpu

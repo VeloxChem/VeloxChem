@@ -49,6 +49,14 @@ CCudaDevices::setCudaDevice(const int32_t iDevice) const
 #endif
 }
 
+void
+CCudaDevices::synchronizeCudaDevice() const
+{
+#ifdef ENABLE_GPU
+    gpu::synchronizeCudaDevice(); 
+#endif
+}
+
 int32_t
 CCudaDevices::getNumberOfDevices() const
 {

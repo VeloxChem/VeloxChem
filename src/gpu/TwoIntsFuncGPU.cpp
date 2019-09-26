@@ -126,4 +126,41 @@ namespace twointsgpu { // twointsgpu namespace
 #endif
     }
     
+    void
+    compDistancesWP(        double*         wpDistancesData,
+                    const   size_t          pitchOfDistancesData,
+                    const   double*         wCoordinatesData,
+                    const   size_t          pitchOfCoordinatesData,
+                    const   double*         braGtoPairsData,
+                    const   size_t          pitchOfBraGtoPairsData,
+                    const   CGtoPairsBlock& braGtoPairsBlock,
+                    const   int32_t         nKetPrimPairs,
+                    const   int32_t         iContrPair,
+                    const   CCudaDevices*   cudaDevices)
+    {
+#ifdef ENABLE_GPU
+    // skip computation for zero angular momentum on bra side
+        
+    if ((braGtoPairsBlock.getBraAngularMomentum() == 0) &&
+        (braGtoPairsBlock.getKetAngularMomentum() == 0)) return;
+        
+    // set up GTOs pair position on bra side
+    
+    auto spos = (braGtoPairsBlock.getStartPositions())[iContrPair];
+    
+    auto epos = (braGtoPairsBlock.getEndPositions())[iContrPair];
+    
+    //  determine execution grid on GPU device
+    
+    auto bsize = cudaDevices->getGridBlockSize();
+    
+    auto gsize = gpu::getNumberOfGridBlocks(nKetPrimPairs, bsize);
+    
+    // execute CUDA kernel: R(WP) distances
+    
+    //gpu::launchKernelForDistancesWP(wpDistancesData, pitchOfDistancesData, wCoordinatesData, pitchOfCoordinatesData,
+    //                                braGtoPairsData, pitchOfBraGtoPairsData, spos, epos, nKetPrimPairs, gsize, bsize);
+#endif
+    }
+    
 } // intsfunc namespace
