@@ -13,6 +13,7 @@
 #ifdef ENABLE_GPU
 #include "KernelDistancesPQ.hpp"
 #include "KernelElectronRepulsionFactors.hpp"
+#include "KernelCoordinatesW.hpp"
 #endif
 
 namespace twointsgpu { // twointsgpu namespace

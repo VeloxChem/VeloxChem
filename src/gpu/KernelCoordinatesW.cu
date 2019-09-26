@@ -10,17 +10,17 @@
 
 namespace gpu {  // gpu namespace
 
-__global__ void kernelDistancesPQ(      double* wCoordinatesData,
-                                  const size_t  pitchOfCoordinatesData,
-                                  const double* osFactorsData,
-                                  const size_t  pitchOfFactorsData,
-                                  const double* braGtoPairsData,
-                                  const size_t  pitchOfBraGtoPairsData,
-                                  const double* ketGtoPairsData,
-                                  const size_t  pitchOfKetGtoPairsData,
-                                  const int32_t startPositionOfBraPair,
-                                  const int32_t endPositionOfBraPair,
-                                  const int32_t nKetPrimPairs)
+__global__ void kernelCoordinatesW(      double* wCoordinatesData,
+                                   const size_t  pitchOfCoordinatesData,
+                                   const double* osFactorsData,
+                                   const size_t  pitchOfFactorsData,
+                                   const double* braGtoPairsData,
+                                   const size_t  pitchOfBraGtoPairsData,
+                                   const double* ketGtoPairsData,
+                                   const size_t  pitchOfKetGtoPairsData,
+                                   const int32_t startPositionOfBraPair,
+                                   const int32_t endPositionOfBraPair,
+                                   const int32_t nKetPrimPairs)
 {
     int32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -62,11 +62,11 @@ __global__ void kernelDistancesPQ(      double* wCoordinatesData,
 
             int32_t ioff = 3 * (i - startPositionOfBraPair);
 
-            double* wx = (double*)((char*)pqDistancesData + ioff * pitchOfDistancesData);
+            double* wx = (double*)((char*)wCoordinatesData + ioff * pitchOfCoordinatesData);
 
-            double* wy = (double*)((char*)pqDistancesData + (ioff + 1) * pitchOfDistancesData);
+            double* wy = (double*)((char*)wCoordinatesData + (ioff + 1) * pitchOfCoordinatesData);
 
-            double* wz = (double*)((char*)pqDistancesData + (ioff + 2) * pitchOfDistancesData);
+            double* wz = (double*)((char*)wCoordinatesData + (ioff + 2) * pitchOfCoordinatesData);
 
             // compute coordinates W
 
