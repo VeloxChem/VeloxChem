@@ -874,6 +874,11 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
                                         nqpdim, i, cudaDevices);
             
+            // compute distances: R(WQ) = W - Q;
+            
+            twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
+                                        ketpairs, nqpdim, i, cudaDevices);
+            
             cudaDevices->synchronizeCudaDevice();
         }
         else
@@ -902,7 +907,12 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             // compute distances: R(WP) = W - P
             
             twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
-                                        nqpdim, i, cudaDevices); 
+                                        nqpdim, i, cudaDevices);
+            
+            // compute distances: R(WQ) = W - Q;
+            
+            twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
+                                        ketpairs, nqpdim, i, cudaDevices);
             
             cudaDevices->synchronizeCudaDevice();
         }

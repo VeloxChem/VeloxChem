@@ -15,21 +15,22 @@
 #include "KernelElectronRepulsionFactors.hpp"
 #include "KernelCoordinatesW.hpp"
 #include "KernelDistancesWP.hpp"
+#include "KernelDistancesWQ.hpp"
 #endif
 
 namespace twointsgpu { // twointsgpu namespace
     
     void
-    compDistancesPQ(        double*         pqDistancesData,
-                    const   size_t          pitchOfDistancesData,
-                    const   double*         braGtoPairsData,
-                    const   size_t          pitchOfBraGtoPairsData,
-                    const   double*         ketGtoPairsData,
-                    const   size_t          pitchOfKetGtoPairsData,
-                    const   CGtoPairsBlock& braGtoPairsBlock,
-                    const   int32_t         nKetPrimPairs,
-                    const   int32_t         iContrPair,
-                    const   CCudaDevices*   cudaDevices)
+    compDistancesPQ(      double*         pqDistancesData,
+                    const size_t          pitchOfDistancesData,
+                    const double*         braGtoPairsData,
+                    const size_t          pitchOfBraGtoPairsData,
+                    const double*         ketGtoPairsData,
+                    const size_t          pitchOfKetGtoPairsData,
+                    const CGtoPairsBlock& braGtoPairsBlock,
+                    const int32_t         nKetPrimPairs,
+                    const int32_t         iContrPair,
+                    const CCudaDevices*   cudaDevices)
     {
 #ifdef ENABLE_GPU
         // set up GTOs pair position on bra side
@@ -53,17 +54,17 @@ namespace twointsgpu { // twointsgpu namespace
     }
     
     void
-    compFactorsForElectronRepulsion(        double*         osFactorsData,
-                                    const   size_t          pitchOfFactorsData,
-                                    const   double*         braGtoPairsData,
-                                    const   size_t          pitchOfBraGtoPairsData,
-                                    const   double*         ketGtoPairsData,
-                                    const   size_t          pitchOfKetGtoPairsData,
-                                    const   CGtoPairsBlock& braGtoPairsBlock,
-                                    const   CGtoPairsBlock& ketGtoPairsBlock,
-                                    const   int32_t         nKetPrimPairs,
-                                    const   int32_t         iContrPair,
-                                    const   CCudaDevices*   cudaDevices)
+    compFactorsForElectronRepulsion(      double*         osFactorsData,
+                                    const size_t          pitchOfFactorsData,
+                                    const double*         braGtoPairsData,
+                                    const size_t          pitchOfBraGtoPairsData,
+                                    const double*         ketGtoPairsData,
+                                    const size_t          pitchOfKetGtoPairsData,
+                                    const CGtoPairsBlock& braGtoPairsBlock,
+                                    const CGtoPairsBlock& ketGtoPairsBlock,
+                                    const int32_t         nKetPrimPairs,
+                                    const int32_t         iContrPair,
+                                    const CCudaDevices*   cudaDevices)
     {
 #ifdef ENABLE_GPU
         // set up angular momentum data
@@ -93,18 +94,18 @@ namespace twointsgpu { // twointsgpu namespace
     }
     
     void
-    compCoordinatesW(        double*         wCoordinatesData,
-                     const   size_t          pitchOfCoordinatesData,
-                     const   double*         osFactorsData,
-                     const   size_t          pitchOfFactorsData,
-                     const   double*         braGtoPairsData,
-                     const   size_t          pitchOfBraGtoPairsData,
-                     const   double*         ketGtoPairsData,
-                     const   size_t          pitchOfKetGtoPairsData,
-                     const   CGtoPairsBlock& braGtoPairsBlock,
-                     const   int32_t         nKetPrimPairs,
-                     const   int32_t         iContrPair,
-                     const   CCudaDevices*   cudaDevices)
+    compCoordinatesW(      double*         wCoordinatesData,
+                     const size_t          pitchOfCoordinatesData,
+                     const double*         osFactorsData,
+                     const size_t          pitchOfFactorsData,
+                     const double*         braGtoPairsData,
+                     const size_t          pitchOfBraGtoPairsData,
+                     const double*         ketGtoPairsData,
+                     const size_t          pitchOfKetGtoPairsData,
+                     const CGtoPairsBlock& braGtoPairsBlock,
+                     const int32_t         nKetPrimPairs,
+                     const int32_t         iContrPair,
+                     const CCudaDevices*   cudaDevices)
     {
 #ifdef ENABLE_GPU
         // set up GTOs pair position on bra side
@@ -128,16 +129,16 @@ namespace twointsgpu { // twointsgpu namespace
     }
     
     void
-    compDistancesWP(        double*         wpDistancesData,
-                    const   size_t          pitchOfDistancesData,
-                    const   double*         wCoordinatesData,
-                    const   size_t          pitchOfCoordinatesData,
-                    const   double*         braGtoPairsData,
-                    const   size_t          pitchOfBraGtoPairsData,
-                    const   CGtoPairsBlock& braGtoPairsBlock,
-                    const   int32_t         nKetPrimPairs,
-                    const   int32_t         iContrPair,
-                    const   CCudaDevices*   cudaDevices)
+    compDistancesWP(      double*         wpDistancesData,
+                    const size_t          pitchOfDistancesData,
+                    const double*         wCoordinatesData,
+                    const size_t          pitchOfCoordinatesData,
+                    const double*         braGtoPairsData,
+                    const size_t          pitchOfBraGtoPairsData,
+                    const CGtoPairsBlock& braGtoPairsBlock,
+                    const int32_t         nKetPrimPairs,
+                    const int32_t         iContrPair,
+                    const CCudaDevices*   cudaDevices)
     {
 #ifdef ENABLE_GPU
     // skip computation for zero angular momentum on bra side
@@ -161,6 +162,44 @@ namespace twointsgpu { // twointsgpu namespace
     
     gpu::launchKernelForDistancesWP(wpDistancesData, pitchOfDistancesData, wCoordinatesData, pitchOfCoordinatesData,
                                     braGtoPairsData, pitchOfBraGtoPairsData, spos, epos, nKetPrimPairs, gsize, bsize);
+#endif
+    }
+    
+    void
+    compDistancesWQ(      double*         wqDistancesData,
+                    const size_t          pitchOfDistancesData,
+                    const double*         wCoordinatesData,
+                    const size_t          pitchOfCoordinatesData,
+                    const double*         ketGtoPairsData,
+                    const size_t          pitchOfKetGtoPairsData,
+                    const CGtoPairsBlock& braGtoPairsBlock,
+                    const CGtoPairsBlock& ketGtoPairsBlock,
+                    const int32_t         nKetPrimPairs,
+                    const int32_t         iContrPair,
+                    const CCudaDevices*   cudaDevices)
+    {
+#ifdef ENABLE_GPU
+        // skip computation for zero angular momentum on bra side
+        
+        if ((ketGtoPairsBlock.getBraAngularMomentum() == 0) &&
+            (ketGtoPairsBlock.getKetAngularMomentum() == 0)) return;
+        
+        // set up GTOs pair position on bra side
+        
+        auto spos = (braGtoPairsBlock.getStartPositions())[iContrPair];
+        
+        auto epos = (braGtoPairsBlock.getEndPositions())[iContrPair];
+        
+        //  determine execution grid on GPU device
+        
+        auto bsize = cudaDevices->getGridBlockSize();
+        
+        auto gsize = gpu::getNumberOfGridBlocks(nKetPrimPairs, bsize);
+        
+        // execute CUDA kernel: R(WQ) distances
+        
+        gpu::launchKernelForDistancesWQ(wqDistancesData, pitchOfDistancesData, wCoordinatesData, pitchOfCoordinatesData,
+                                        ketGtoPairsData, pitchOfKetGtoPairsData, spos, epos, nKetPrimPairs, gsize, bsize);
 #endif
     }
     
