@@ -53,7 +53,7 @@ void
 CCudaDevices::synchronizeCudaDevice() const
 {
 #ifdef ENABLE_GPU
-    gpu::synchronizeCudaDevice(); 
+    gpu::synchronizeDevice(); 
 #endif
 }
 
