@@ -14,6 +14,7 @@
 #include "KernelDistancesPQ.hpp"
 #include "KernelElectronRepulsionFactors.hpp"
 #include "KernelCoordinatesW.hpp"
+#include "KernelDistancesWP.hpp"
 #endif
 
 namespace twointsgpu { // twointsgpu namespace
@@ -158,8 +159,8 @@ namespace twointsgpu { // twointsgpu namespace
     
     // execute CUDA kernel: R(WP) distances
     
-    //gpu::launchKernelForDistancesWP(wpDistancesData, pitchOfDistancesData, wCoordinatesData, pitchOfCoordinatesData,
-    //                                braGtoPairsData, pitchOfBraGtoPairsData, spos, epos, nKetPrimPairs, gsize, bsize);
+    gpu::launchKernelForDistancesWP(wpDistancesData, pitchOfDistancesData, wCoordinatesData, pitchOfCoordinatesData,
+                                    braGtoPairsData, pitchOfBraGtoPairsData, spos, epos, nKetPrimPairs, gsize, bsize);
 #endif
     }
     

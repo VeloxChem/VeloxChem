@@ -850,6 +850,10 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
         {
             cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, ddpairs.getPairFactors());
             
+            // for sanity check...
+            
+            cudaDevices->synchronizeCudaDevice();
+            
             // compute distances: R(PQ) = P - Q
             
             twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
@@ -865,11 +869,20 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
                                          ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
             
+            // compute distances: R(WP) = W - P
+            
+            twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
+                                        nqpdim, i, cudaDevices);
+            
             cudaDevices->synchronizeCudaDevice();
         }
         else
         {
             cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, qqpairs.getPairFactors());
+            
+            // for sanity check...
+            
+            cudaDevices->synchronizeCudaDevice();
             
             // compute distances: R(PQ) = P - Q
             
@@ -885,6 +898,11 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             
             twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
                                          ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
+            
+            // compute distances: R(WP) = W - P
+            
+            twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
+                                        nqpdim, i, cudaDevices); 
             
             cudaDevices->synchronizeCudaDevice();
         }
