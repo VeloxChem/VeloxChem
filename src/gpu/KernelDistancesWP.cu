@@ -75,7 +75,7 @@ void launchKernelForDistancesWP(      double* wpDistancesData,
                                 const int32_t endPositionOfBraPair,
                                 const int32_t nKetPrimPairs,
                                 const int32_t gridSize,
-                                const int32_t blockSize);
+                                const int32_t blockSize)
 {
     gpu::kernelDistancesWP<<<gridSize, blockSize>>>(wpDistancesData, pitchOfDistancesData,
                                                     wCoordinatesData, pitchOfCoordinatesData,
