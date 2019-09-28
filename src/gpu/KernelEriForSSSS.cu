@@ -44,7 +44,9 @@ __global__ void kernelEriForSSSS(      double* primBufferData,
         {
             // set up pointers to Boys function arguments
 
-            int32_t ioff = posIntegralInBuffer + maxOrderOfIntegral * ncomps + i - startPositionOfBraPair;
+            int32_t poff = i - startPositionOfBraPair;
+
+            int32_t ioff = posIntegralInBuffer + maxOrderOfIntegral * ncomps + poff;
 
             double* bvals = (double*)((char*)primBufferData + ioff * pitchOfBufferData);
 
@@ -58,17 +60,32 @@ __global__ void kernelEriForSSSS(      double* primBufferData,
 
             int32_t koff = 3 * (i - startPositionOfBraPair);
 
-            double* pqx = (double*)((char*)pqDistancesData + koff * pitchOfDistancesPQData);
+            const double* pqx = (double*)((char*)pqDistancesData + koff * pitchOfDistancesPQData);
 
-            double* pqy = (double*)((char*)pqDistancesData + (koff + 1) * pitchOfDistancesPQData);
+            const double* pqy = (double*)((char*)pqDistancesData + (koff + 1) * pitchOfDistancesPQData);
 
-            double* pqz = (double*)((char*)pqDistancesData + (koff + 2) * pitchOfDistancesPQData);
+            const double* pqz = (double*)((char*)pqDistancesData + (koff + 2) * pitchOfDistancesPQData);
 
             // compute Boys function of maximum order
 
-            double barg = fz[tid] * (pqx[tid] * pqx[tid] + pqy[tid] * pqy[tid] + pqz[tid] * pqz[tid]);
+            const double barg = fz[tid] * (pqx[tid] * pqx[tid] + pqy[tid] * pqy[tid] + pqz[tid] * pqz[tid]);
 
             bvals[tid] = boys(maxOrderOfIntegral, barg);
+
+            // compute Boys function of lower orders by downward recursion
+
+            for (int32_t j = maxOrderOfIntegral; j > 0; j--)
+            {
+                int32_t buoff = posIntegralInBuffer + j * ncomps + poff;
+
+                double* buvals = (double*)((char*)primBufferData + buoff * pitchOfBufferData);
+
+                int32_t bloff = posIntegralInBuffer + (j - 1) * ncomps + poff;
+
+                double* blvals = (double*)((char*)primBufferData + bloff * pitchOfBufferData);
+
+                blvals[tid] = fma(2.0 * barg, buvals[tid], exp (-barg)) / (2.0 * j - 1.0);
+            }
         }
     }
 }
