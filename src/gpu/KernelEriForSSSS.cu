@@ -34,6 +34,12 @@ __global__ void kernelEriForSSSS(      double* primBufferData,
 
     if (tid < nKetPrimPairs)
     {
+        // set up pointers to bra and ket pair overlaps
+
+        const double* bss = (double*)((char*)braGtoPairsData + 3 * pitchOfBraGtoPairsData);
+
+        const double* kss = (double*)((char*)ketGtoPairsData + 3 * pitchOfKetGtoPairsData);
+
         // number of primitive integrals components
 
         int32_t ncomps = endPositionOfBraPair - startPositionOfBraPair;
@@ -85,6 +91,19 @@ __global__ void kernelEriForSSSS(      double* primBufferData,
                 double* blvals = (double*)((char*)primBufferData + bloff * pitchOfBufferData);
 
                 blvals[tid] = fma(2.0 * barg, buvals[tid], exp (-barg)) / (2.0 * j - 1.0);
+            }
+
+            // compute (SS||SS)^(m) integrals
+
+            double fovl = bss[i] * kss[tid];
+
+            for (int32_t j = 0; j <= maxOrderOfIntegral; j++)
+            {
+                int32_t boff = posIntegralInBuffer + j * ncomps + poff;
+
+                double* bvals = (double*)((char*)primBufferData + boff * pitchOfBufferData);
+
+                bvals[tid] = bvals[tid] * fovl;
             }
         }
     }
