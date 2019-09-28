@@ -121,6 +121,28 @@ CNuclearPotentialIntegralsDriver::compute(const CMolecule&       molecule,
 }
 
 CNuclearPotentialMatrix
+CNuclearPotentialIntegralsDriver::compute(const CMolecule&           molecule,
+                                          const CMolecularBasis&     basis,
+                                          const CMemBlock<double>&   charges,
+                                          const CMemBlock2D<double>& coordinates) const
+{
+    CNuclearPotentialMatrix npotmat;
+
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs container
+
+        CGtoContainer bracontr(molecule, basis);
+
+        // compute nuclear potential integrals
+
+        npotmat = _compNuclearPotentialIntegrals(&charges, &coordinates, &bracontr, &bracontr);
+    }
+
+    return npotmat;
+}
+
+CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver::compute(const CMolecule&       braMolecule,
                                           const CMolecule&       ketMolecule,
                                           const CMolecularBasis& basis,

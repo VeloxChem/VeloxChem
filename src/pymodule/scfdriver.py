@@ -1,8 +1,8 @@
 from collections import deque
-from os.path import isfile
 import numpy as np
 import time as tm
 import math
+import os
 
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
@@ -12,6 +12,7 @@ from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix
+from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
@@ -20,6 +21,7 @@ from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .denguess import DensityGuess
+from .polembed import PolEmbed
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -96,6 +98,12 @@ class ScfDriver:
         The XC functional.
     :param molgrid:
         The molecular grid.
+    :param pe:
+        The flag for running polarizable embedding calculation.
+    :param pe_state:
+        The state of the polarizable embedding.
+    :param potfile:
+        The name of the potential file for polarizable embedding.
     :param timing:
         The flag for printing timing information.
     """
@@ -176,6 +184,10 @@ class ScfDriver:
         self.xcfun = None
         self.molgrid = None
 
+        self.pe = False
+        self.pe_state = None
+        self.potfile = None
+
         self.split_comm_ratio = None
 
         self.timing = False
@@ -217,6 +229,14 @@ class ScfDriver:
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
+
+        if 'pe' in method_dict:
+            key = method_dict['pe'].lower()
+            self.pe = True if key == 'yes' else False
+        if 'potfile' in method_dict:
+            if 'pe' not in method_dict:
+                self.pe = True
+            self.potfile = method_dict['potfile']
 
         if 'timing' in scf_dict:
             key = scf_dict['timing'].lower()
@@ -277,6 +297,12 @@ class ScfDriver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+        # set up polarizable embedding
+
+        if self.pe:
+            self.pe_state = PolEmbed(molecule, ao_basis, self.comm,
+                                     self.ostream, self.potfile)
+
         # C2-DIIS method
         if self.acc_type == "DIIS":
             self.comp_diis(molecule, ao_basis, min_basis)
@@ -327,7 +353,7 @@ class ScfDriver:
 
             if (self.checkpoint_file and
                     isinstance(self.checkpoint_file, str) and
-                    isfile(self.checkpoint_file)):
+                    os.path.isfile(self.checkpoint_file)):
                 checkpoint_text = "Checkpoint written to file: "
                 checkpoint_text += self.checkpoint_file
                 self.ostream.print_info(checkpoint_text)
@@ -437,15 +463,10 @@ class ScfDriver:
             vxc_mat = self.comp_2e_fock(fock_mat, den_mat, molecule, ao_basis,
                                         qq_data)
 
-            e_ee, e_kin, e_en = self.comp_energy(fock_mat, kin_mat, npot_mat,
-                                                 den_mat)
+            e_ee, e_kin, e_en, e_pe, V_pe = self.comp_energy(
+                fock_mat, vxc_mat, kin_mat, npot_mat, den_mat)
 
-            if self.dft:
-                if self.rank == mpi_master():
-                    fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
-                    e_ee += vxc_mat.get_energy()
-
-            self.comp_full_fock(fock_mat, kin_mat, npot_mat)
+            self.comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
 
             e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, oao_mat)
 
@@ -453,7 +474,7 @@ class ScfDriver:
 
             diff_den = self.comp_density_change(den_mat, self.density)
 
-            self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
+            self.add_iter_data(e_ee, e_kin, e_en, e_pe, e_grad, diff_den)
 
             self.check_convergence()
 
@@ -785,13 +806,15 @@ class ScfDriver:
 
         return vxc_mat
 
-    def comp_energy(self, fock_mat, kin_mat, npot_mat, den_mat):
+    def comp_energy(self, fock_mat, vxc_mat, kin_mat, npot_mat, den_mat):
         """
         Computes SCF energy components: electronic energy, kinetic energy, and
         nuclear potential energy.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (only 2e-part).
+        :param vxc_mat:
+            The Vxc matrix.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -804,23 +827,35 @@ class ScfDriver:
             energy).
         """
 
+        e_ee = 0.0
+        e_kin = 0.0
+        e_en = 0.0
+        e_pe = 0.0
+        V_pe = None
+
         if self.rank == mpi_master():
             # electronic, kinetic, nuclear energy
             e_ee = fock_mat.get_energy(0, den_mat, 0)
             e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
             e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
-        else:
-            e_ee = 0.0
-            e_kin = 0.0
-            e_en = 0.0
+            if self.dft:
+                e_ee += vxc_mat.get_energy()
+
+        if self.pe and not self.first_step:
+            if self.rank == mpi_master():
+                dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
+            else:
+                dm = None
+            e_pe, V_pe = self.pe_state.get_pe_contribution(dm)
 
         e_ee = self.comm.bcast(e_ee, root=mpi_master())
         e_kin = self.comm.bcast(e_kin, root=mpi_master())
         e_en = self.comm.bcast(e_en, root=mpi_master())
+        e_pe = self.comm.bcast(e_pe, root=mpi_master())
 
-        return (e_ee, e_kin, e_en)
+        return (e_ee, e_kin, e_en, e_pe, V_pe)
 
-    def comp_full_fock(self, fock_mat, kin_mat, npot_mat):
+    def comp_full_fock(self, fock_mat, vxc_mat, pe_mat, kin_mat, npot_mat):
         """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
         Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
@@ -828,6 +863,10 @@ class ScfDriver:
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (2e-part).
+        :param vxc_mat:
+            The Vxc matrix.
+        :param pe_mat:
+            The polarizable embedding matrix.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -836,6 +875,10 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
+            if self.dft:
+                fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
+            if self.pe and not self.first_step:
+                fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -993,7 +1036,7 @@ class ScfDriver:
 
         return nteri
 
-    def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
+    def add_iter_data(self, e_ee, e_kin, e_en, e_pe, e_grad, diff_den):
         """
         Adds SCF iteration data (electronic energy, electronic energy change,
         electronic gradient, density difference) to SCF iterations list
@@ -1004,13 +1047,15 @@ class ScfDriver:
             The kinetic energy.
         :param e_en:
             The nuclear potential energy.
+        :param e_pe:
+            The polarizable embedding energy.
         :param e_grad:
             The electronic energy gradient.
         :param diff_den:
             The density change with respect to previous SCF iteration.
         """
 
-        e_elec = e_ee + e_kin + e_en + self.nuc_energy
+        e_elec = e_ee + e_kin + e_en + e_pe + self.nuc_energy
 
         de_elec = e_elec - self.old_energy
 
@@ -1055,6 +1100,13 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
         self.print_energy_components()
+
+        if self.pe:
+            self.ostream.print_blank()
+            pe_summary = self.pe_state.cppe_state.summary_string
+            for line in pe_summary.split(os.linesep):
+                self.ostream.print_header(line.ljust(92))
+            self.ostream.flush()
 
     def print_header(self):
         """

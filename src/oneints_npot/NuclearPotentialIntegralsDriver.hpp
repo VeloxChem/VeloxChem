@@ -207,6 +207,22 @@ class CNuclearPotentialIntegralsDriver
                                     const CMolecule&       pchgMolecule) const;
 
     /**
+     Computes nuclear potential integrals for a molecule in specific basis
+     using pre-defined point charges and coordinates
+     and stores results in nuclear potential matrix object.
+
+     @param molecule the molecule for nuclear potential matrix.
+     @param basis the molecular basis.
+     @param charges the point charges
+     @param coordinates the coordinates of the charges
+     @return the nuclear potential matrix object.
+     */
+    CNuclearPotentialMatrix compute(const CMolecule&           molecule,
+                                    const CMolecularBasis&     basis,
+                                    const CMemBlock<double>&   charges,
+                                    const CMemBlock2D<double>& coordinates) const;
+
+    /**
      Computes nuclear potential integrals for two molecules in two basis sets
      and stores results in nuclear potential matrix object.
 

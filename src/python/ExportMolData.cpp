@@ -94,23 +94,15 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 }
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_array(const std::vector<std::string>& labels,
-                     const py::array_t<double>&      py_coords,
-                     const std::string&              units = std::string("angs"))
+CMolecule_from_array(const std::vector<std::string>&                labels,
+                     const py::array_t<double, py::array::f_style>& py_coords,
+                     const std::string&                             units = std::string("angs"))
 {
     // NOTE:
     // The Python Molecule constructor expects the coordinates as a 2d numpy array,
     // namely np.array([[x1, y1, z1], [x2, y2, z2], [x3, y3, z3], [x4, y4, z4], ...])
 
     // sanity check
-
-    std::string errsrc("CMolecule_from_array: need a contiguous numpy array");
-
-    auto c_style = py::detail::check_flags(py_coords.ptr(), py::array::c_style);
-
-    auto f_style = py::detail::check_flags(py_coords.ptr(), py::array::f_style);
-
-    errors::assertMsgCritical(c_style | f_style, errsrc);
 
     std::string errmol("CMolecule_from_array: Inconsistent size");
 
@@ -122,22 +114,7 @@ CMolecule_from_array(const std::vector<std::string>& labels,
 
     std::vector<double> coords(py_coords.size());
 
-    if (c_style)
-    {
-        for (size_t d = 0; d < 3; d++)
-        {
-            for (size_t a = 0; a < labels.size(); a++)
-            {
-                // need to transpose py_coords for the C++ Molecule contructor
-                coords[d * labels.size() + a] = py_coords.data()[a * 3 + d];
-            }
-        }
-    }
-    else if (f_style)
-    {
-        // no need to transpose py_coords for fortran style numpy array
-        std::memcpy(coords.data(), py_coords.data(), py_coords.size() * sizeof(double));
-    }
+    std::memcpy(coords.data(), py_coords.data(), py_coords.size() * sizeof(double));
 
     return CMolecule_from_coords(labels, coords, units);
 }

@@ -148,6 +148,26 @@ CNuclearPotentialMatrix_from_numpy(const py::array_t<double>& arr)
     return std::shared_ptr<CNuclearPotentialMatrix>(new CNuclearPotentialMatrix(*mp));
 }
 
+// Helper function for exporting CNuclearPotentialMatrix.compute
+
+static CNuclearPotentialMatrix
+CNuclearPotentialIntegralsDriver_compute(CNuclearPotentialIntegralsDriver&              self,
+                                         const CMolecule&                               molecule,
+                                         const CMolecularBasis&                         basis,
+                                         const py::array_t<double>&                     charges,
+                                         const py::array_t<double, py::array::f_style>& coordinates)
+{
+    std::vector<double> charges_vec(charges.size());
+    std::memcpy(charges_vec.data(), charges.data(), charges.size() * sizeof(double));
+    CMemBlock<double> charges_blk(charges_vec);
+
+    std::vector<double> coords_vec(coordinates.size());
+    std::memcpy(coords_vec.data(), coordinates.data(), coordinates.size() * sizeof(double));
+    CMemBlock2D<double> coords_blk(coords_vec, coordinates.shape(0), coordinates.shape(1));
+
+    return self.compute(molecule, basis, charges_blk, coords_blk);
+}
+
 // Helper function for CElectricDipoleIntegralsDriver constructor
 
 static std::shared_ptr<CElectricDipoleIntegralsDriver>
@@ -301,11 +321,11 @@ CElectricFieldMatrix_z_to_numpy(const CElectricFieldMatrix& self)
 }
 
 CElectricFieldMatrix
-CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
-                                      const CMolecule&                     molecule,
-                                      const CMolecularBasis&               basis,
-                                      const py::array_t<double>&           py_dipoles,
-                                      const py::array_t<double>&           py_coords)
+CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver&           self,
+                                      const CMolecule&                               molecule,
+                                      const CMolecularBasis&                         basis,
+                                      const py::array_t<double, py::array::f_style>& py_dipoles,
+                                      const py::array_t<double, py::array::f_style>& py_coords)
 {
     // NOTE: Dipoles data order
     // Dipole values:
@@ -314,21 +334,6 @@ CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
     // namely np.array([[x1, y1, z1], [x2, y2, z2], [x3, y3, z3], [d4, y4, z4], ...])
 
     // sanity check
-
-    std::string errform(
-        "CElectricFieldIntegralsDirver_compute: py_dipoles and py_coords must have same data ordering C or Fortran");
-
-    auto c_style = py::detail::check_flags(py_coords.ptr(), py::array::c_style);
-
-    auto f_style = py::detail::check_flags(py_coords.ptr(), py::array::f_style);
-
-    errors::assertMsgCritical(c_style == py::detail::check_flags(py_dipoles.ptr(), py::array::c_style), errform);
-
-    errors::assertMsgCritical(f_style == py::detail::check_flags(py_dipoles.ptr(), py::array::f_style), errform);
-
-    std::string errsrc("CElectricFieldIntegralsDirver_compute: need a contiguous numpy array");
-
-    errors::assertMsgCritical(c_style | f_style, errsrc);
 
     std::string errdims(
         "CElectricFieldIntegralsDirver_compute:: Inconsistent size of dipoles and/or their coordinates");
@@ -349,28 +354,9 @@ CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver& self,
 
     std::vector<double> dipoles(py_dipoles.size());
 
-    if (c_style)
-    {
-        for (ssize_t d = 0; d < 3; d++)
-        {
-            for (ssize_t a = 0; a < py_coords.shape(0); a++)
-            {
-                // need to transpose py_coords for the C++ Molecule contructor
+    std::memcpy(coords.data(), py_coords.data(), py_coords.size() * sizeof(double));
 
-                coords[d * py_coords.shape(0) + a] = py_coords.data()[a * 3 + d];
-
-                dipoles[d * py_coords.shape(0) + a] = py_dipoles.data()[a * 3 + d];
-            }
-        }
-    }
-    else if (f_style)
-    {
-        // no need to transpose py_coords for fortran style numpy array
-
-        std::memcpy(coords.data(), py_coords.data(), py_coords.size() * sizeof(double));
-
-        std::memcpy(dipoles.data(), py_dipoles.data(), py_dipoles.size() * sizeof(double));
-    }
+    std::memcpy(dipoles.data(), py_dipoles.data(), py_dipoles.size() * sizeof(double));
 
     CMemBlock2D<double> dipdat(dipoles, static_cast<int32_t>(py_dipoles.shape(0)), 3);
 
@@ -486,7 +472,8 @@ export_oneints(py::module& m)
              (CNuclearPotentialMatrix(CNuclearPotentialIntegralsDriver::*)(
                  const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&)
                   const) &
-                 CNuclearPotentialIntegralsDriver::compute);
+                 CNuclearPotentialIntegralsDriver::compute)
+         .def("compute", &CNuclearPotentialIntegralsDriver_compute);
 
     // CElectricDipoleMatrix class
 
