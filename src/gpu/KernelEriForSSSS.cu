@@ -66,9 +66,9 @@ __global__ void kernelEriForSSSS(      double* primBufferData,
 
             // compute Boys function of maximum order
 
-            barg = fz[tid] * (pqx[tid] * pqx[tid] + pqy[tid] * pqy[tid] + pqz[tid] * pqz[tid]);
+            double barg = fz[tid] * (pqx[tid] * pqx[tid] + pqy[tid] * pqy[tid] + pqz[tid] * pqz[tid]);
 
-            bvals[tid] = boys (maxOrderOfIntegral, barg);
+            bvals[tid] = boys(maxOrderOfIntegral, barg);
         }
     }
 }
@@ -95,6 +95,7 @@ launchKernelEriForSSSS(      double* primBufferData,
     gpu::kernelEriForSSSS<<<gridSize, blockSize>>>(primBufferData, pitchOfBufferData,
                                                    posIntegralInBuffer, maxOrderOfIntegral,
                                                    osFactorsData, pitchOfFactorsData,
+						   pqDistancesData, pitchOfDistancesPQData,  
                                                    braGtoPairsData, pitchOfBraGtoPairsData,
                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
                                                    startPositionOfBraPair, endPositionOfBraPair,

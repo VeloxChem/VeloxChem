@@ -9,6 +9,7 @@
 #include "TwoIntsFuncGPU.hpp"
 
 #include "CudaGenFunc.hpp"
+#include "EriRecFuncGPU.hpp"
 
 #ifdef ENABLE_GPU
 #include "KernelDistancesPQ.hpp"
