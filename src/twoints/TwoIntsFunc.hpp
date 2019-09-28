@@ -219,7 +219,6 @@ namespace twointsfunc { // twointsfunc namespace
                                   const CGtoPairsBlock&    ketGtoPairsBlock,
                                   const bool               isBraEqualKet,
                                   const int32_t            iContrPair);
-    
 } // intsfunc namespace
 
 #endif /* TwoIntsFunc_hpp */

@@ -761,6 +761,13 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     cudaDevices->allocate(&ptr_kpfacts, &pitch_kpfacts, kpfacts.size(0), kpfacts.blocks());
     
+    // allocate vertical recursion buffer on device
+    
+    double* ptr_pbuffer = nullptr; size_t pitch_pbuffer = 0;
+    
+    cudaDevices->allocate(&ptr_pbuffer, &pitch_pbuffer, pdim,
+                          _getBufferDimensionsForVerticalRecursion(anga + angb, angc + angd, pmax));
+    
     // copy bra pair factors to device
     
     cudaDevices->copyToDevice(ptr_bpfacts, pitch_bpfacts, bpfacts);
@@ -879,6 +886,13 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
                                         ketpairs, nqpdim, i, cudaDevices);
             
+            // compute primitive electron repulsion integrals
+            
+            twointsgpu::compPrimElectronRepulsionIntsOnGPU(ptr_pbuffer, pitch_pbuffer, ptr_rfacts, pitch_rfacts,
+                                                           ptr_rpq, pitch_rpq, ptr_rwp, pitch_rwp, ptr_rwq, pitch_rwq,
+                                                           ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
+                                                           brapairs, ddpairs, nqpdim, i, cudaDevices);
+            
             cudaDevices->synchronizeCudaDevice();
         }
         else
@@ -914,6 +928,13 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
             twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
                                         ketpairs, nqpdim, i, cudaDevices);
             
+            // compute primitive electron repulsion integrals
+            
+            twointsgpu::compPrimElectronRepulsionIntsOnGPU(ptr_pbuffer, pitch_pbuffer, ptr_rfacts, pitch_rfacts,
+                                                           ptr_rpq, pitch_rpq, ptr_rwp, pitch_rwp, ptr_rwq, pitch_rwq,
+                                                           ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
+                                                           brapairs, qqpairs, nqpdim, i, cudaDevices);
+            
             cudaDevices->synchronizeCudaDevice();
         }
     }
@@ -935,6 +956,10 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     cudaDevices->free(ptr_bpfacts);
     
     cudaDevices->free(ptr_kpfacts);
+    
+    // deallocate vertical recursion buffer
+    
+    cudaDevices->free(ptr_pbuffer);
 }
 
 CRecursionMap
@@ -1003,6 +1028,18 @@ CElectronRepulsionIntegralsDriver::_setVerticalRecursionMap(const CRecursionMap&
     }
     
     return recmap;
+}
+
+int32_t
+CElectronRepulsionIntegralsDriver::_getBufferDimensionsForVerticalRecursion(const int32_t braAngularMomentum,
+                                                                            const int32_t ketAngularMomentum,
+                                                                            const int32_t maxNumberOfPrimPairs) const
+{
+    int32_t vrrdim = 1;
+    
+    // FIX ME: Add other angular momentum terms
+    
+    return maxNumberOfPrimPairs * vrrdim;
 }
 
 void

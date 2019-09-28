@@ -203,4 +203,60 @@ namespace twointsgpu { // twointsgpu namespace
 #endif
     }
     
+    void
+    compPrimElectronRepulsionIntsOnGPU(      double*         primBufferData,
+                                       const size_t          pitchOfBufferData,
+                                       const double*         osFactorsData,
+                                       const size_t          pitchOfFactorsData,
+                                       const double*         pqDistancesData,
+                                       const size_t          pitchOfDistancesPQData,
+                                       const double*         wpDistancesData,
+                                       const size_t          pitchOfDistancesWPData,
+                                       const double*         wqDistancesData,
+                                       const size_t          pitchOfDistancesWQData,
+                                       const double*         braGtoPairsData,
+                                       const size_t          pitchOfBraGtoPairsData,
+                                       const double*         ketGtoPairsData,
+                                       const size_t          pitchOfKetGtoPairsData,
+                                       const CGtoPairsBlock& braGtoPairsBlock,
+                                       const CGtoPairsBlock& ketGtoPairsBlock,
+                                       const int32_t         nKetPrimPairs,
+                                       const int32_t         iContrPair,
+                                       const CCudaDevices*   cudaDevices)
+    {
+#ifdef ENABLE_GPU
+        // set up angular momentum
+        
+        auto bang = braGtoPairsBlock.getBraAngularMomentum() + braGtoPairsBlock.getKetAngularMomentum();
+        
+        auto kang = ketGtoPairsBlock.getBraAngularMomentum() + ketGtoPairsBlock.getKetAngularMomentum();
+        
+        // set up GTOs pair position on bra side
+        
+        auto spos = (braGtoPairsBlock.getStartPositions())[iContrPair];
+        
+        auto epos = (braGtoPairsBlock.getEndPositions())[iContrPair];
+        
+        //  determine execution grid on GPU device
+        
+        auto bsize = cudaDevices->getGridBlockSize();
+        
+        auto gsize = gpu::getNumberOfGridBlocks(nKetPrimPairs, bsize);
+        
+        // primitive integrals (SS||SS) integrals
+        
+        if ((bang == 0) && (kang == 0))
+        {
+            erirecgpu::compElectronRepulsionForSSSS(primBufferData, pitchOfBufferData, 0, 0,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+#endif
+    }
+    
 } // intsfunc namespace
