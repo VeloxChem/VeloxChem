@@ -106,6 +106,8 @@ class ScfDriver:
         The name of the potential file for polarizable embedding.
     :param timing:
         The flag for printing timing information.
+    :param profiling:
+        The flag for printing profiling information.
     """
 
     def __init__(self, comm, ostream):
@@ -191,6 +193,7 @@ class ScfDriver:
         self.split_comm_ratio = None
 
         self.timing = False
+        self.profiling = False
 
     def update_settings(self, scf_dict, method_dict={}):
         """
@@ -241,6 +244,9 @@ class ScfDriver:
         if 'timing' in scf_dict:
             key = scf_dict['timing'].lower()
             self.timing = True if key in ['yes', 'y'] else False
+        if 'profiling' in scf_dict:
+            key = scf_dict['profiling'].lower()
+            self.profiling = True if key in ['yes', 'y'] else False
 
     def compute(self, molecule, ao_basis, min_basis):
         """
@@ -254,14 +260,14 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
-        # check dft setup
-        if self.dft:
-            assert_msg_critical(self.xcfun is not None,
-                                'SCF driver: undefined XC functional')
         # set up timing data
         if self.timing:
             self.timing_dict = {'fock_2e': [], 'dft_vxc': [], 'fock_diag': []}
 
+        # check dft setup
+        if self.dft:
+            assert_msg_critical(self.xcfun is not None,
+                                'SCF driver: undefined XC functional')
         # initial guess
         if self.restart:
             self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
@@ -301,7 +307,7 @@ class ScfDriver:
 
         if self.pe:
             self.pe_state = PolEmbed(molecule, ao_basis, self.comm,
-                                     self.ostream, self.potfile)
+                                     self.potfile)
 
         # C2-DIIS method
         if self.acc_type == "DIIS":
@@ -388,6 +394,13 @@ class ScfDriver:
         :param min_basis:
             The minimal AO basis set.
         """
+
+        if self.profiling and not self.first_step:
+            import cProfile
+            import pstats
+            import io
+            pr = cProfile.Profile()
+            pr.enable()
 
         start_time = tm.time()
 
@@ -508,6 +521,17 @@ class ScfDriver:
 
             if self.is_converged:
                 break
+
+        if self.profiling and not self.first_step:
+            pr.disable()
+            s = io.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats(20)
+            if self.rank == mpi_master():
+                self.ostream.print_blank()
+                for line in s.getvalue().split(os.linesep):
+                    self.ostream.print_info(line)
 
         if self.rank == mpi_master():
             self.scf_tensors = {
@@ -842,10 +866,7 @@ class ScfDriver:
                 e_ee += vxc_mat.get_energy()
 
         if self.pe and not self.first_step:
-            if self.rank == mpi_master():
-                dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
-            else:
-                dm = None
+            dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
             e_pe, V_pe = self.pe_state.get_pe_contribution(dm)
 
         e_ee = self.comm.bcast(e_ee, root=mpi_master())
