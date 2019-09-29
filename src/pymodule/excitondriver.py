@@ -663,6 +663,9 @@ class ExcitonModelDriver:
 
                 eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
                 if self.dft:
+                    if not xcfun.is_hybrid():
+                        for s in range(tfock_mat.number_of_fock_matrices()):
+                            tfock_mat.scale(2.0, s)
                     xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer,
                                      basis, dimer_molgrid, self.xcfun_label)
                 tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)

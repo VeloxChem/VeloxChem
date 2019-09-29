@@ -29,11 +29,7 @@ else
 endif 
 
 # Add includes directories
-ifeq ($(USE_GPU),true)
-  VLX_INCLUDES := ${shell find * -not -path pymodule -type d -print}
-else
-  VLX_INCLUDES := ${shell find * -not -path pymodule -not -path gpu -type d -print}
-endif
+VLX_INCLUDES := ${shell find * -not -path pymodule -type d -print}
 
 # Update CXX flags & includes path
 CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
@@ -43,11 +39,7 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS += $(MATH_INC)
 
 # Add list of internal libraries
-ifeq ($(USE_GPU),true)
-  VLX_LIBS_DIR := ${shell find * -not -path pymodule -type d -print}
-else
-  VLX_LIBS_DIR := ${shell find * -not -path pymodule -not -path gpu -type d -print}
-endif
+VLX_LIBS_DIR := ${shell find * -not -path pymodule -type d -print}
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))

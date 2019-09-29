@@ -88,22 +88,35 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
                                            const CAODensityMatrix&    aoDensityMatrix,
                                            const CMolecule&           molecule,
                                            const CMolecularBasis&     aoBasis,
-                                           const CScreeningContainer& screeningContainer) const
+                                           const CScreeningContainer& screeningContainer,
+                                           const CCudaDevices&        cudaDevices) const
 {
     // generate GTOs pairs blocks for AO basis on bra side
     
     CGtoPairsContainer bgtopairs(molecule, aoBasis, 1.0e-15);
     
-    // split GTOs pairs into batches on bra side
-    
-    auto bbpairs = bgtopairs.split(_locNodes);
-    
     // compute repulsion integrals
     
     aoFockMatrix.zero(); 
     
-    _compElectronRepulsionIntegrals(aoFockMatrix, aoDensityMatrix, &bbpairs,
-                                    &bbpairs, &screeningContainer);
+    if (cudaDevices.getNumberOfDevices() > 0)
+    {
+        // compute integrals on GPUs
+        
+        auto bbpairs = bgtopairs.split(_locNodes, cudaDevices);
+        
+        _compElectronRepulsionIntegralsOnGPU(aoFockMatrix, aoDensityMatrix, &bbpairs,
+                                             &bbpairs, &screeningContainer, cudaDevices);
+    }
+    else
+    {
+        // compute integrals on CPUs
+        
+        auto bbpairs = bgtopairs.split(_locNodes);
+        
+        _compElectronRepulsionIntegrals(aoFockMatrix, aoDensityMatrix, &bbpairs,
+                                        &bbpairs, &screeningContainer);
+    }
     
     aoFockMatrix.symmetrize(); 
 }
@@ -1246,6 +1259,44 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
     }
 }
 
+
+void
+CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CAOFockMatrix&       aoFockMatrix,
+                                                                        const CAODensityMatrix&    aoDensityMatrix,
+                                                                        const CGtoPairsContainer*  braGtoPairsContainer,
+                                                                        const CGtoPairsContainer*  ketGtoPairsContainer,
+                                                                        const CScreeningContainer* screeningContainer,
+                                                                        const CCudaDevices&        cudaDevices) const
+{
+    // set up number of GPUs
+    
+    auto ndevs = cudaDevices.getNumberOfDevices();
+    
+    // set up pointers to AO Fock and AO density matrices
+    
+    auto pfock = &aoFockMatrix;
+    
+    auto pden = &aoDensityMatrix;
+    
+    // set pointer to CUDA devices
+    
+    auto pdevs = &cudaDevices;
+    
+    // set up GTOS pairs grid for GPUs
+    
+    auto gpupatt = _setTasksGridForGPU(braGtoPairsContainer, ketGtoPairsContainer);
+    
+    #pragma omp parallel num_threads(ndevs) shared(pfock, pden, pdevs)
+    {
+        int32_t tid = omp_get_thread_num();
+     
+        // set up CUDA device for each thread
+        
+        pdevs->setCudaDevice(tid);
+    
+    }
+}
+
 void
 CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*         qValuesBuffer,
                                                                    const CGtoPairsBlock& gtoPairsBlock) const
@@ -1333,4 +1384,54 @@ CElectronRepulsionIntegralsDriver::_setTasksGrid(const int32_t nBraGtoPairsBlock
     }
     
     return tgrid;
+}
+
+CMemBlock2D<int32_t>
+CElectronRepulsionIntegralsDriver::_setTasksGridForGPU(const CGtoPairsContainer* braGtoPairsContainer,
+                                                       const CGtoPairsContainer* ketGtoPairsContainer) const
+{
+    // determine number of GTOs pairs blocks in bra/ket sides
+    
+    auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
+    
+    auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
+    
+    // determine symmetry of bra/ket GTOs pairs containers
+    
+    auto symbk = ((*braGtoPairsContainer) == (*ketGtoPairsContainer));
+    
+    // initialize tasks grid for each MPI process
+    
+    auto nodpatt = _setTasksGrid(nbra, nket, symbk);
+    
+    auto ptgrid = nodpatt.data();
+    
+    // loop over pairs of GTOs blocks
+    
+    int32_t idx = 0;
+    
+    std::vector<int32_t> brapos;
+    
+    std::vector<int32_t> ketpos;
+    
+    for (int32_t i = (nbra - 1); i >= 0; i--)
+    {
+        auto joff = (symbk) ? i : 0;
+        
+        for (int32_t j = (nket - 1); j >= joff; j--)
+        {
+            if (ptgrid[idx] == 1)
+            {
+                brapos.push_back(i);
+                
+                ketpos.push_back(j);
+            }
+            
+            idx++;
+        }
+    }
+    
+    brapos.insert(brapos.end(), ketpos.begin(), ketpos.end());
+    
+    return CMemBlock2D<int32_t>(brapos, idx, 2);
 }

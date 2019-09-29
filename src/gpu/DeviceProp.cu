@@ -6,11 +6,12 @@
 //  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 //  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
+#include "DeviceProp.hpp"
+ 
 #include <cmath>
 #include <sstream>
 #include <string>
 
-#include "DeviceProp.hpp"
 #include "StringFormat.hpp"
 
 namespace gpu {  // gpu namespace
@@ -35,7 +36,9 @@ getDevicesProperty(std::vector<std::string>& namesOfDevices,
 
         namesOfDevices.push_back(std::string(prop.name));
 
-        globalMemoryOfDevices.push_back(static_cast<int32_t>(prop.totalGlobalMem));
+        auto globalMemInMB = prop.totalGlobalMem / (1024u * 1024u);
+
+        globalMemoryOfDevices.push_back(static_cast<int32_t>(globalMemInMB));
 
         computeMajorCapabilityOfDevices.push_back(static_cast<int32_t>(prop.major));
 

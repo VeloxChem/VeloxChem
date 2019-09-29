@@ -11,11 +11,12 @@
 #include <sstream>
 #include <cmath>
 
+#include "StringFormat.hpp"
+
 #ifdef ENABLE_GPU
 #include "DeviceProp.hpp"
+#include "DeviceFunc.hpp"
 #endif
-
-#include "StringFormat.hpp"
 
 CCudaDevices::CCudaDevices()
 
@@ -28,13 +29,24 @@ CCudaDevices::CCudaDevices()
     , _computeMinorCapabilityOfDevices(std::vector<int32_t>())
 {
 #ifdef ENABLE_GPU
-  gpu::getDevicesProperty(_namesOfDevices, _globalMemoryOfDevices, _computeMajorCapabilityOfDevices, _computeMinorCapabilityOfDevices);
+    gpu::getDevicesProperty(_namesOfDevices, _globalMemoryOfDevices, _computeMajorCapabilityOfDevices, _computeMinorCapabilityOfDevices);
 #endif
 }
 
 CCudaDevices::~CCudaDevices()
 {
     
+}
+
+void
+CCudaDevices::setCudaDevice(const int32_t iDevice) const
+{
+#ifdef ENABLE_GPU
+    if (iDevice < getNumberOfDevices())
+    {
+        gpu::setDevice(iDevice); 
+    }
+#endif
 }
 
 int32_t
@@ -82,7 +94,7 @@ CCudaDevices::getString() const
         
         str.assign("  Global memory:           ");
         
-        auto glbmem = static_cast<double>(_globalMemoryOfDevices[i]) / std::pow(1024.0, 3.0);
+        auto glbmem = static_cast<double>(_globalMemoryOfDevices[i]) / 1024.0;
         
         str.append(fstr::to_string(glbmem, 0));
         

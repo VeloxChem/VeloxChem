@@ -780,7 +780,8 @@ class ScfDriver:
                 time_eri / (time_eri + time_dft),
                 time_dft / (time_eri + time_dft),
             ]
-        self.comm.bcast(self.split_comm_ratio, root=mpi_master())
+        self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
+                                                root=mpi_master())
 
         return vxc_mat
 

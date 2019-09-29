@@ -9,18 +9,26 @@
 # Makefile for internal Velox Chem MP library
 
 LOCAL_LIB := gpu.a
-LOCAL_SCR := $(wildcard *.cu)
-LOCAL_OBJ := $(subst .cu,.o,$(LOCAL_SCR))
-LOCAL_DEP := $(subst .cu,.d,$(LOCAL_SCR))
-LOCAL_OPT := $(subst .cu,.optrpt,$(LOCAL_SCR))
+LOCAL_SCR := $(wildcard *.cpp)
+LOCAL_OBJ := $(subst .cpp,.o,$(LOCAL_SCR))
+LOCAL_DEP := $(subst .cpp,.d,$(LOCAL_SCR))
+LOCAL_OPT := $(subst .cpp,.optrpt,$(LOCAL_SCR))
 
-LOCAL_CPP_SCR := $(wildcard *.cpp)
-LOCAL_CPP_OBJ := $(subst .cpp,.o,$(LOCAL_CPP_SCR))
-LOCAL_CPP_DEP := $(subst .cpp,.d,$(LOCAL_CPP_SCR))
-LOCAL_CPP_OPT := $(subst .cpp,.optrpt,$(LOCAL_CPP_SCR))
+LOCAL_CU_SCR := $(wildcard *.cu)
+LOCAL_CU_OBJ := $(subst .cu,.o,$(LOCAL_CU_SCR))
+LOCAL_CU_DEP := $(subst .cu,.d,$(LOCAL_CU_SCR))
+LOCAL_CU_OPT := $(subst .cu,.optrpt,$(LOCAL_CU_SCR))
 
 # Read in compilers & shell commands info
 include ../Makefile.setup
+
+# Add cuda objects
+ifeq ($(USE_GPU),true)
+LOCAL_SCR += $(LOCAL_CU_SCR)
+LOCAL_OBJ += $(LOCAL_CU_OBJ)
+LOCAL_DEP += $(LOCAL_CU_DEP)
+LOCAL_OPT += $(LOCAL_CU_OPT)
+endif
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -51,12 +59,12 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS += $(MATH_INC)
 
 # Default rule for linking library
-debug: $(LOCAL_OBJ) $(LOCAL_CPP_OBJ)
+debug: $(LOCAL_OBJ)
 	@echo ====== Linking $(LOCAL_LIB)...
 	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
 
 # Default rule for linking library
-release: $(LOCAL_OBJ) $(LOCAL_CPP_OBJ)
+release: $(LOCAL_OBJ)
 	@echo ====== Linking $(LOCAL_LIB)...
 	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
 
@@ -64,11 +72,10 @@ release: $(LOCAL_OBJ) $(LOCAL_CPP_OBJ)
 clean:
 	@echo ====== Removing temporary files...
 	$(RM) $(LOCAL_LIB) $(LOCAL_DEP) $(LOCAL_OBJ) $(LOCAL_OPT)
-	$(RM) $(LOCAL_CPP_DEP) $(LOCAL_CPP_OBJ) $(LOCAL_CPP_OPT)
 
 # Include dependency files
 ifneq "$(MAKECMDGOALS)" "clean"
-  -include $(LOCAL_DEP) $(LOCAL_CPP_DEP)
+  -include $(LOCAL_DEP)
 endif
 
 # Default rule for compiling cu files
