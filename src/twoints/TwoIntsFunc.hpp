@@ -146,7 +146,7 @@ namespace twointsfunc { // twointsfunc namespace
     
     /**
      Computes coordinates of combined Gaussian functions, which is obtained by
-     applying Gaussian product rule to thee Gaussian functions.
+     applying Gaussian product rule to the Gaussian functions.
      
      @param wCoordinates the vector of coordinates for combined Gaussian
             functions.
@@ -219,7 +219,6 @@ namespace twointsfunc { // twointsfunc namespace
                                   const CGtoPairsBlock&    ketGtoPairsBlock,
                                   const bool               isBraEqualKet,
                                   const int32_t            iContrPair);
-    
 } // intsfunc namespace
 
 #endif /* TwoIntsFunc_hpp */

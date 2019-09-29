@@ -532,6 +532,26 @@ def remove_linear_dependence(basis, threshold):
     return np.matmul(basis, T[:, mask])
 
 
+def remove_linear_dependence_half(basis, threshold):
+    """
+    Removes linear dependence in a set of symmetrized vectors.
+
+    :param basis:
+        The set of upper parts of symmetrized vectors.
+    :param threshold:
+        The threshold for removing linear dependence.
+
+    :return:
+        The new set of vectors.
+    """
+
+    Sb = 2 * np.matmul(basis.T, basis)
+    l, T = np.linalg.eigh(Sb)
+    b_norm = np.sqrt(Sb.diagonal())
+    mask = l > b_norm * threshold
+    return np.matmul(basis, T[:, mask])
+
+
 def orthogonalize_gram_schmidt(tvecs):
     """
     Applies modified Gram Schmidt orthogonalization to trial vectors.
@@ -559,6 +579,35 @@ def orthogonalize_gram_schmidt(tvecs):
     return tvecs
 
 
+def orthogonalize_gram_schmidt_half(tvecs):
+    """
+    Applies modified Gram Schmidt orthogonalization to trial vectors.
+
+    :param tvecs:
+        The trial vectors.
+
+    :return:
+        The orthogonalized trial vectors.
+    """
+
+    invsqrt2 = np.sqrt(2.0)
+
+    if tvecs.shape[1] > 0:
+
+        f = invsqrt2 / np.linalg.norm(tvecs[:, 0])
+        tvecs[:, 0] *= f
+
+        for i in range(1, tvecs.shape[1]):
+            for j in range(i):
+                f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
+                    tvecs[:, j], tvecs[:, j])
+                tvecs[:, i] -= f * tvecs[:, j]
+            f = invsqrt2 / np.linalg.norm(tvecs[:, i])
+            tvecs[:, i] *= f
+
+    return tvecs
+
+
 def normalize(vecs):
     """
     Normalizes vectors by dividing by vector norm.
@@ -576,6 +625,30 @@ def normalize(vecs):
             vecs[:, vec] *= invnorm
     else:
         invnorm = 1.0 / np.linalg.norm(vecs)
+        vecs *= invnorm
+
+    return vecs
+
+
+def normalize_half(vecs):
+    """
+    Normalizes half-sized vectors by dividing by vector norm.
+
+    :param vecs:
+        The half-sized vectors.
+
+    :param Retruns:
+        The normalized vectors.
+    """
+
+    invsqrt2 = np.sqrt(2.0)
+
+    if len(vecs.shape) != 1:
+        for vec in range(vecs.shape[1]):
+            invnorm = invsqrt2 / np.linalg.norm(vecs[:, vec])
+            vecs[:, vec] *= invnorm
+    else:
+        invnorm = invsqrt2 / np.linalg.norm(vecs)
         vecs *= invnorm
 
     return vecs
@@ -606,6 +679,34 @@ def construct_ed_sd(orb_ene, nocc, norb):
     lz = len(excitations)
     sdiag = 2.0 * np.ones(2 * lz)
     sdiag[lz:] = -2.0
+
+    return ediag, sdiag
+
+
+def construct_ed_sd_half(orb_ene, nocc, norb):
+    """
+    Gets the upper half of E0 and S0 diagonal elements as arrays.
+
+    :param orb_ene:
+        Orbital energies.
+    :param nocc:
+        Number of occupied orbitals.
+    :param norb:
+        Number of orbitals.
+
+    :return:
+        The upper half of E0 and S0 diagonal elements as numpy arrays.
+    """
+
+    xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+    excitations = list(
+        itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+    z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
+    ediag = np.array(z)
+
+    lz = len(excitations)
+    sdiag = 2.0 * np.ones(lz)
 
     return ediag, sdiag
 

@@ -380,7 +380,7 @@ static __device__ double boys (int m, double a)
         double u, e;
         
         for (int k = 1; k < m; k++) {
-          term = term * fma (k, -ooa, mphooa);
+          term = term * fma (1.0 * k, -ooa, mphooa);
           sum += term;
         }
 

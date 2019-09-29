@@ -14,10 +14,10 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .lrmatvecdriver import remove_linear_dependence
-from .lrmatvecdriver import orthogonalize_gram_schmidt
-from .lrmatvecdriver import normalize
-from .lrmatvecdriver import construct_ed_sd
+from .lrmatvecdriver import remove_linear_dependence_half
+from .lrmatvecdriver import orthogonalize_gram_schmidt_half
+from .lrmatvecdriver import normalize_half
+from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import read_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
@@ -117,7 +117,7 @@ class LinearResponseEigenSolver:
         self.ostream = ostream
 
         # restart information
-        self.restart = False
+        self.restart = True
         self.checkpoint_file = None
 
         self.timing = False
@@ -223,7 +223,6 @@ class LinearResponseEigenSolver:
             ea = scf_tensors['E']
             nocc = nalpha
             norb = mo.shape[1]
-            od, sd = construct_ed_sd(ea, nocc, norb)
 
         # generate integration grid
         if self.dft:
@@ -256,10 +255,10 @@ class LinearResponseEigenSolver:
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
         rsp_vector_labels = [
-            'LR_eigen_bger',
-            'LR_eigen_bung',
-            'LR_eigen_e2bger',
-            'LR_eigen_e2bung',
+            'LR_eigen_bger_half_size',
+            'LR_eigen_bung_half_size',
+            'LR_eigen_e2bger_half_size',
+            'LR_eigen_e2bung_half_size',
         ]
 
         bger = None
@@ -306,10 +305,6 @@ class LinearResponseEigenSolver:
                                                    self.molgrid,
                                                    self.gs_density)
 
-        if self.rank == mpi_master():
-            s2bung, s2bger = e2x_drv.s2n_half_size(bger, bung, scf_tensors,
-                                                   nocc)
-
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
         relative_residual_norm = {}
@@ -333,7 +328,7 @@ class LinearResponseEigenSolver:
 
                 e2gg = np.matmul(bger.T, e2bger) * 2.0
                 e2uu = np.matmul(bung.T, e2bung) * 2.0
-                s2ug = np.matmul(bung.T, s2bung) * 2.0
+                s2ug = np.matmul(bung.T, bger) * 4.0
 
                 # Equations:
                 # E[2] X_g - w S[2] X_u = 0
@@ -378,9 +373,9 @@ class LinearResponseEigenSolver:
                     c_ung = Xn_ung[:, k]
 
                     r_ger = np.matmul(e2bger,
-                                      c_ger) - w * np.matmul(s2bger, c_ung)
+                                      c_ger) - w * 2.0 * np.matmul(bung, c_ung)
                     r_ung = np.matmul(e2bung,
-                                      c_ung) - w * np.matmul(s2bung, c_ger)
+                                      c_ung) - w * 2.0 * np.matmul(bger, c_ger)
 
                     r = np.array([r_ger, r_ung]).flatten()
 
@@ -454,14 +449,8 @@ class LinearResponseEigenSolver:
                 self.gs_density)
 
             if self.rank == mpi_master():
-                new_s2bung, new_s2bger = e2x_drv.s2n_half_size(
-                    new_trials_ger, new_trials_ung, scf_tensors, nocc)
-
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
-
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
-                s2bger = np.append(s2bger, new_s2bger, axis=1)
 
                 write_rsp_hdf5(self.checkpoint_file,
                                [bger, bung, e2bger, e2bung], rsp_vector_labels,
@@ -759,14 +748,14 @@ class LinearResponseEigenSolver:
             new_ung = new_ung - new_ung_proj
 
         if new_ger.any() and renormalize:
-            new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
-            new_ger = orthogonalize_gram_schmidt(new_ger)
-            new_ger = normalize(new_ger)
+            new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
+            new_ger = orthogonalize_gram_schmidt_half(new_ger)
+            new_ger = normalize_half(new_ger)
 
         if new_ung.any() and renormalize:
-            new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
-            new_ung = orthogonalize_gram_schmidt(new_ung)
-            new_ung = normalize(new_ung)
+            new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
+            new_ung = orthogonalize_gram_schmidt_half(new_ung)
+            new_ung = normalize_half(new_ung)
 
         return new_ger, new_ung
 
@@ -789,9 +778,7 @@ class LinearResponseEigenSolver:
 
         # spawning needed components
 
-        ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
-        ediag = ediag[:ediag.shape[0] // 2]
-        sdiag = sdiag[:sdiag.shape[0] // 2]
+        ediag, sdiag = construct_ed_sd_half(orb_ene, nocc, norb)
 
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2

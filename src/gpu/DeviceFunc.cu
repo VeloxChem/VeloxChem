@@ -22,4 +22,69 @@ setDevice(const int32_t iDevice)
 #endif
 }
 
+void
+allocateDeviceMemory(void**  pointer,
+                     size_t* dataPitch,
+                     size_t  dataWidth,
+                     size_t  dataHeight)
+{
+#ifdef ENABLE_GPU
+    auto cerr = cudaMallocPitch(pointer, dataPitch, dataWidth, dataHeight);
+
+    errors::assertMsgCritical(cerr == cudaSuccess, {"allocateDeviceMemory"});
+#endif
+}
+
+void
+freeDeviceMemory(void* pointerToMemory)
+{
+#ifdef ENABLE_GPU
+    auto cerr = cudaFree(pointerToMemory);
+
+    errors::assertMsgCritical(cerr == cudaSuccess, {"freeDeviceMemory"});
+#endif
+}
+
+void
+copyToDeviceMemory(      void*  destination,
+                         size_t destinationPitch,
+                   const void*  source,
+                         size_t sourcePitch,
+                         size_t dataWidth,
+                         size_t dataHeight)
+{
+#ifdef ENABLE_GPU
+    auto cerr = cudaMemcpy2D(destination, destinationPitch, source, sourcePitch, dataWidth, dataHeight,
+                             cudaMemcpyHostToDevice);
+
+    errors::assertMsgCritical(cerr == cudaSuccess, {"copyToDeviceMemory"});
+#endif
+}
+
+void
+copyFromDeviceMemory(     void*  destination,
+                          size_t destinationPitch,
+                    const void*  source,
+                          size_t sourcePitch,
+                          size_t dataWidth,
+                          size_t dataHeight)
+{
+#ifdef ENABLE_GPU
+    auto cerr = cudaMemcpy2D(destination, destinationPitch, source, sourcePitch, dataWidth, dataHeight,
+                             cudaMemcpyDeviceToHost);
+
+    errors::assertMsgCritical(cerr == cudaSuccess, {"copyFromDeviceMemory"});
+#endif
+}
+
+void
+synchronizeDevice()
+{
+#ifdef ENABLE_GPU
+    auto cerr = cudaDeviceSynchronize();
+
+    errors::assertMsgCritical(cerr == cudaSuccess, {"synchronizeDevice"});
+#endif
+}
+
 }  // namespace gpu

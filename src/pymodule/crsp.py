@@ -10,10 +10,10 @@ from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .lrmatvecdriver import remove_linear_dependence
-from .lrmatvecdriver import orthogonalize_gram_schmidt
-from .lrmatvecdriver import normalize
-from .lrmatvecdriver import construct_ed_sd
+from .lrmatvecdriver import remove_linear_dependence_half
+from .lrmatvecdriver import orthogonalize_gram_schmidt_half
+from .lrmatvecdriver import normalize_half
+from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import read_rsp_hdf5
@@ -101,8 +101,6 @@ class ComplexResponse:
 
         self.frequencies = (0.1,)
         self.damping = 0.004556335294880438
-
-        self.nonlinear = False
 
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
@@ -195,24 +193,6 @@ class ComplexResponse:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
 
-    def paired(self, v_xy):
-        """
-        Computes paired trial vector.
-
-        :param v_xy:
-            The trial vector.
-
-        :return:
-            The paired trial vector.
-        """
-
-        v_yx = v_xy.copy()
-        half_rows = v_xy.shape[0] // 2
-        v_yx[:half_rows] = v_xy[half_rows:]
-        v_yx[half_rows:] = v_xy[:half_rows]
-
-        return v_yx
-
     def decomp_trials(self, vecs):
         """
         Decomposes trial vectors into their 4 respective parts (real gerade,
@@ -278,30 +258,33 @@ class ComplexResponse:
 
         return np.array(space).T
 
-    def decomp_sym(self, vecs):
+    def decomp_grad(self, grad):
         """
         Decomposes gradient into gerade and ungerade parts.
 
-        :param vecs:
+        :param grad:
             The trial vectors.
 
         :return:
             A tuple containing gerade and ungerade parts of vectors.
         """
 
-        if len(vecs.shape) != 1:
-            ger = []
-            ung = []
-            for vec in range(len(vecs[0, :])):
-                vecp = self.paired(vec)
-                ger.append(.5 * (vec + vecp))
-                ung.append(.5 * (vec - vecp))
-        else:
-            vecp = self.paired(vecs)
-            ger = .5 * (vecs + vecp)
-            ung = .5 * (vecs - vecp)
+        assert_msg_critical(
+            len(grad.shape) == 1, 'decomp_grad: Expecting a 1D array')
 
-        return np.array(ger).T, np.array(ung).T
+        assert_msg_critical(grad.shape[0] % 2 == 0,
+                            'decomp_grad: size of array should be even')
+
+        half_size = grad.shape[0] // 2
+
+        grad_T = np.zeros(grad.shape)
+        grad_T[:half_size] = grad[half_size:]
+        grad_T[half_size:] = grad[:half_size]
+
+        ger = 0.5 * (grad + grad_T)[:half_size]
+        ung = 0.5 * (grad - grad_T)[:half_size]
+
+        return ger.T, ung.T
 
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """
@@ -324,7 +307,7 @@ class ComplexResponse:
 
         # spawning needed components
 
-        ediag, sdiag = construct_ed_sd(orb_ene, nocc, norb)
+        ediag, sdiag = construct_ed_sd_half(orb_ene, nocc, norb)
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         sdiag_fp = sdiag**4
@@ -375,13 +358,13 @@ class ComplexResponse:
 
         return v_out
 
-    def initial_guess(self, op_grads, d, freqs, precond):
+    def initial_guess(self, v1, d, freqs, precond):
         """
         Creating initial guess (un-orthonormalized trials) out of gradients.
 
-        :param op_grads:
-            The dictionary containing operator components (key) and right-hand
-            sides (values).
+        :param v1:
+            The dictionary containing (operator, frequency) as keys and
+            right-hand sides as values.
         :param d:
             The damping parameter.
         :param freqs:
@@ -394,23 +377,18 @@ class ComplexResponse:
         """
 
         ig = {}
-        for op, grad in op_grads.items():
-            gradger, gradung = self.decomp_sym(grad)
+        for (op, w), grad in v1.items():
+            gradger, gradung = self.decomp_grad(grad)
+
             grad = np.array(
                 [gradger.real, gradung.real, -gradung.imag,
                  -gradger.imag]).flatten()
-            gn = np.linalg.norm(grad)
-            if self.nonlinear:
-                if gn < self.small_thresh:
-                    ig[op] = np.zeros(grad.shape[0])
-                else:
-                    ig[op] = self.preconditioning(precond[op[1]], grad)
+            gn = np.sqrt(2.0) * np.linalg.norm(grad)
+
+            if gn < self.small_thresh:
+                ig[(op, w)] = np.zeros(grad.shape[0])
             else:
-                for w in freqs:
-                    if gn < self.small_thresh:
-                        ig[(op, w)] = np.zeros(grad.shape[0])
-                    else:
-                        ig[(op, w)] = self.preconditioning(precond[w], grad)
+                ig[(op, w)] = self.preconditioning(precond[w], grad)
 
         return ig
 
@@ -454,7 +432,7 @@ class ComplexResponse:
                     v = self.preconditioning(pre[w], vec)
                 else:
                     v = vec
-                if np.linalg.norm(v) > self.small_thresh:
+                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
                     trials.append(v)
 
         new_trials = np.array(trials).T
@@ -472,34 +450,30 @@ class ComplexResponse:
         # orthogonalizing new trial vectors against existing ones
 
         if bger is not None and bger.any():
-            new_ger = new_ger - np.matmul(bger, np.matmul(bger.T, new_ger))
+            new_ger = new_ger - 2.0 * np.matmul(bger, np.matmul(
+                bger.T, new_ger))
 
         if bung is not None and bung.any():
-            new_ung = new_ung - np.matmul(bung, np.matmul(bung.T, new_ung))
+            new_ung = new_ung - 2.0 * np.matmul(bung, np.matmul(
+                bung.T, new_ung))
 
-        # normalizing new trial vectors
+        # orthonormalizing new trial vectors
 
         if new_ger.any() and renormalize:
 
-            # removing linear dependencies in gerade trials
-            # and normalizing gerade trials
-
-            new_ger = remove_linear_dependence(new_ger, self.lindep_thresh)
-            new_ger = orthogonalize_gram_schmidt(new_ger)
-            new_ger = normalize(new_ger)
+            new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
+            new_ger = orthogonalize_gram_schmidt_half(new_ger)
+            new_ger = normalize_half(new_ger)
 
         if new_ung.any() and renormalize:
 
-            # removing linear dependencies in ungerade trials:
-            # and normalizing ungerade trials
-
-            new_ung = remove_linear_dependence(new_ung, self.lindep_thresh)
-            new_ung = orthogonalize_gram_schmidt(new_ung)
-            new_ung = normalize(new_ung)
+            new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
+            new_ung = orthogonalize_gram_schmidt_half(new_ung)
+            new_ung = normalize_half(new_ung)
 
         return new_ger, new_ung
 
-    def compute(self, molecule, basis, scf_tensors, b_rhs=None):
+    def compute(self, molecule, basis, scf_tensors, v1=None):
         """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
@@ -510,9 +484,9 @@ class ComplexResponse:
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param b_rhs:
-            The right-hand side. If not provided, b_rhs will be computed for
-            the B operator.
+        :param v1:
+            The gradients on the right-hand side. If not provided, v1 will be
+            computed for the B operator.
 
         :return:
             A dictionary containing properties, solutions, and kappas.
@@ -534,7 +508,7 @@ class ComplexResponse:
             }
             timing_t0 = tm.time()
 
-        if self.rank == mpi_master() and (not self.nonlinear):
+        if self.rank == mpi_master():
             self.print_header()
 
         self.start_time = tm.time()
@@ -570,12 +544,6 @@ class ComplexResponse:
             nalpha == nbeta,
             'ComplexResponseSolver: not implemented for unrestricted case')
 
-        d = self.damping
-        if b_rhs:
-            freqs = [i[1] for i in b_rhs.keys()]
-        else:
-            freqs = self.frequencies
-
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
@@ -589,28 +557,32 @@ class ComplexResponse:
         else:
             nocc = None
 
-        if b_rhs is None:
+        nonlinear_flag = False
+
+        if not v1:
             b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
+            if self.rank == mpi_master():
+                v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
+                      for w in self.frequencies}
         else:
-            v1 = b_rhs
-            self.nonlinear = True
+            nonlinear_flag = True
 
         if self.rank == mpi_master():
-
-            # calling the gradients
-
-            if not self.nonlinear:
-                v1 = {op: v for op, v in zip(self.b_components, b_rhs)}
-                op_freq_keys = [(op, w) for op in v1 for w in freqs]
-            else:
-                op_freq_keys = [op for op in v1]
+            d = self.damping
+            freqs = [op_freq[1] for op_freq in v1]
+            op_freq_keys = list(v1.keys())
 
             # creating the preconditioner matrix
 
             precond = {
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
+
+        bger = None
+        bung = None
+        new_trials_ger = None
+        new_trials_ung = None
 
         # read initial guess from restart file
 
@@ -651,27 +623,11 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            half_bger = None
-            half_bung = None
-            if self.rank == mpi_master():
-                if bger is not None:
-                    half_bger = bger[:bger.shape[0] // 2]
-                if bung is not None:
-                    half_bung = bung[:bung.shape[0] // 2]
-
-            half_e2bger, half_e2bung = e2x_drv.e2n_half_size(
-                half_bger, half_bung, scf_tensors, screening, molecule, basis,
-                self.dft, self.xcfun, self.molgrid, self.gs_density)
-
-            if self.rank == mpi_master():
-                e2bger = np.vstack((half_e2bger, half_e2bger))
-                e2bung = np.vstack((half_e2bung, -half_e2bung))
-
-        if self.rank == mpi_master():
-            half_s2bung, half_s2bger = e2x_drv.s2n_half_size(
-                half_bger, half_bung, scf_tensors, nocc)
-            s2bung = np.vstack((half_s2bung, -half_s2bung))
-            s2bger = np.vstack((half_s2bger, half_s2bger))
+            e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
+                                                   screening, molecule, basis,
+                                                   self.dft, self.xcfun,
+                                                   self.molgrid,
+                                                   self.gs_density)
 
         solutions = {}
         residuals = {}
@@ -693,29 +649,25 @@ class ComplexResponse:
             if self.rank == mpi_master():
                 nvs = []
 
+                n_ger = bger.shape[1]
+                n_ung = bung.shape[1]
+
+                e2gg = 2.0 * np.matmul(bger.T, e2bger)
+                e2uu = 2.0 * np.matmul(bung.T, e2bung)
+                s2ug = 4.0 * np.matmul(bung.T, bger)
+
                 for op, w in op_freq_keys:
                     if iteration == 0 or (relative_residual_norm[(op, w)] >
                                           self.conv_thresh):
-                        if self.nonlinear:
-                            grad = v1[(op, w)]
-                        else:
-                            grad = v1[op]
-
-                        gradger, gradung = self.decomp_sym(grad)
+                        grad = v1[(op, w)]
+                        gradger, gradung = self.decomp_grad(grad)
 
                         # projections onto gerade and ungerade subspaces:
 
-                        g_realger = np.matmul(bger.T, gradger.real)
-                        g_imagger = np.matmul(bger.T, gradger.imag)
-                        g_realung = np.matmul(bung.T, gradung.real)
-                        g_imagung = np.matmul(bung.T, gradung.imag)
-
-                        e2gg = np.matmul(bger.T, e2bger)
-                        e2uu = np.matmul(bung.T, e2bung)
-                        s2ug = np.matmul(bung.T, s2bung)
-
-                        n_ger = bger.shape[1]
-                        n_ung = bung.shape[1]
+                        g_realger = 2.0 * np.matmul(bger.T, gradger.real)
+                        g_imagger = 2.0 * np.matmul(bger.T, gradger.imag)
+                        g_realung = 2.0 * np.matmul(bung.T, gradung.real)
+                        g_imagung = 2.0 * np.matmul(bung.T, gradung.imag)
 
                         # creating gradient and matrix for linear equation
 
@@ -784,12 +736,17 @@ class ComplexResponse:
 
                         # ...and projecting them onto respective subspace
 
-                        x_realger = np.matmul(bger, c_realger)
-                        x_realung = np.matmul(bung, c_realung)
-                        x_imagung = np.matmul(bung, c_imagung)
-                        x_imagger = np.matmul(bger, c_imagger)
+                        halfx_realger = np.matmul(bger, c_realger)
+                        halfx_realung = np.matmul(bung, c_realung)
+                        halfx_imagung = np.matmul(bung, c_imagung)
+                        halfx_imagger = np.matmul(bger, c_imagger)
 
-                        # composing response vector
+                        # composing full size response vector
+
+                        x_realger = np.hstack((halfx_realger, halfx_realger))
+                        x_realung = np.hstack((halfx_realung, -halfx_realung))
+                        x_imagung = np.hstack((halfx_imagung, -halfx_imagung))
+                        x_imagger = np.hstack((halfx_imagger, halfx_imagger))
 
                         x_real = x_realger + x_realung
                         x_imag = x_imagung + x_imagger
@@ -808,13 +765,13 @@ class ComplexResponse:
 
                         e2realger = np.matmul(e2bger, c_realger)
                         e2imagger = np.matmul(e2bger, c_imagger)
-                        s2realger = np.matmul(s2bung, c_realger)
-                        s2imagger = np.matmul(s2bung, c_imagger)
+                        s2realger = 2.0 * np.matmul(bger, c_realger)
+                        s2imagger = 2.0 * np.matmul(bger, c_imagger)
 
                         e2realung = np.matmul(e2bung, c_realung)
                         e2imagung = np.matmul(e2bung, c_imagung)
-                        s2realung = np.matmul(s2bger, c_realung)
-                        s2imagung = np.matmul(s2bger, c_imagung)
+                        s2realung = 2.0 * np.matmul(bung, c_realung)
+                        s2imagung = 2.0 * np.matmul(bung, c_imagung)
 
                         # calculating the residual components
 
@@ -827,19 +784,13 @@ class ComplexResponse:
                         r_imagger = (-e2imagger + w * s2imagung +
                                      d * s2realung + gradger.imag)
 
-                        # composing total residual
-
-                        r_real = r_realger + r_realung
-                        r_imag = r_imagung + r_imagger
-                        r = np.zeros(len(r_real), dtype=complex)
-
-                        for pos in range(len(r_real)):
-                            r[pos] = complex(r_real[pos], r_imag[pos])
+                        # composing total half-sized residual
 
                         residuals[(op, w)] = np.array(
                             [r_realger, r_realung, r_imagung,
                              r_imagger]).flatten()
 
+                        r = residuals[(op, w)]
                         n = solutions[(op, w)]
 
                         # calculating relative residual norm
@@ -848,7 +799,7 @@ class ComplexResponse:
                         nv = np.matmul(n, grad)
                         nvs.append((op, w, nv))
 
-                        rn = np.linalg.norm(r)
+                        rn = np.sqrt(2.0) * np.linalg.norm(r)
                         nn = np.linalg.norm(n)
                         if nn != 0:
                             relative_residual_norm[(op, w)] = rn / nn
@@ -857,14 +808,13 @@ class ComplexResponse:
 
                 # write to output
 
-                if not self.nonlinear:
-                    self.ostream.print_info(
-                        '{:d} gerade trial vectors'.format(n_ger))
-                    self.ostream.print_info(
-                        '{:d} ungerade trial vectors'.format(n_ung))
-                    self.ostream.print_blank()
+                self.ostream.print_info(
+                    '{:d} gerade trial vectors'.format(n_ger))
+                self.ostream.print_info(
+                    '{:d} ungerade trial vectors'.format(n_ung))
+                self.ostream.print_blank()
 
-                    self.print_iteration(relative_residual_norm, nvs)
+                self.print_iteration(relative_residual_norm, nvs)
 
             if self.timing:
                 tid = iteration + 1
@@ -908,32 +858,15 @@ class ComplexResponse:
                 self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
-            half_new_ger = None
-            half_new_ung = None
-            if self.rank == mpi_master():
-                if new_trials_ger is not None:
-                    half_new_ger = new_trials_ger[:new_trials_ger.shape[0] // 2]
-                if new_trials_ung is not None:
-                    half_new_ung = new_trials_ung[:new_trials_ung.shape[0] // 2]
-
-            half_new_e2bger, half_new_e2bung = e2x_drv.e2n_half_size(
-                half_new_ger, half_new_ung, scf_tensors, screening, molecule,
-                basis, self.dft, self.xcfun, self.molgrid, self.gs_density)
+            new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
+                new_trials_ger, new_trials_ung, scf_tensors, screening,
+                molecule, basis, self.dft, self.xcfun, self.molgrid,
+                self.gs_density)
 
             if self.rank == mpi_master():
-                new_e2bger = np.vstack((half_new_e2bger, half_new_e2bger))
-                new_e2bung = np.vstack((half_new_e2bung, -half_new_e2bung))
-
-                half_new_s2bung, half_new_s2bger = e2x_drv.s2n_half_size(
-                    half_new_ger, half_new_ung, scf_tensors, nocc)
-                new_s2bung = np.vstack((half_new_s2bung, -half_new_s2bung))
-                new_s2bger = np.vstack((half_new_s2bger, half_new_s2bger))
 
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
-
-                s2bung = np.append(s2bung, new_s2bung, axis=1)
-                s2bger = np.append(s2bger, new_s2bger, axis=1)
 
                 write_rsp_hdf5(
                     self.checkpoint_file, [bger, bung, e2bger, e2bung],
@@ -949,8 +882,7 @@ class ComplexResponse:
 
         # converged?
         if self.rank == mpi_master():
-            if not self.nonlinear:
-                self.print_convergence()
+            self.print_convergence()
 
             assert_msg_critical(self.is_converged,
                                 'ComplexResponseSolver: failed to converge')
@@ -968,31 +900,29 @@ class ComplexResponse:
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
 
-        if not self.nonlinear:
+        if not nonlinear_flag:
             a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
 
-        if self.rank == mpi_master():
-            if not self.nonlinear:
+            if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}
                 props = {}
                 for aop in self.a_components:
                     for bop, w in solutions:
-                        props[(aop, bop, w)] = -np.dot(va[aop],
-                                                       solutions[(bop, w)])
+                        props[(aop, bop,
+                               w)] = -np.dot(va[aop], solutions[(bop, w)])
                 self.print_properties(props)
                 return {
                     'properties': props,
                     'solutions': solutions,
-                    'kappas': kappas,
+                    'kappas': kappas
                 }
-            else:
-                return {
-                    'solutions': solutions,
-                    'kappas': kappas,
-                }
+
         else:
-            return {}
+            if self.rank == mpi_master():
+                return {'solutions': solutions, 'kappas': kappas}
+
+        return {}
 
     def check_convergence(self, relative_residual_norm):
         """

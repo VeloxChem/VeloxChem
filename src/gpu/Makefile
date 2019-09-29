@@ -81,7 +81,7 @@ endif
 # Default rule for compiling cu files
 %.o: %.cu
 	@echo ====== Compiling $@...
-	$(NVCC) -c $(NVCCFLAGS) $(CPPFLAGS) $(LIB_INC) -o $@ $<
+	$(NVCC) -c $(NVCCFLAGS) $(CPPFLAGS) $(LIB_INC) $(MPI_INC) -o $@ $<
 
 # Default rule for generating dependencies
 %.d: %.cu

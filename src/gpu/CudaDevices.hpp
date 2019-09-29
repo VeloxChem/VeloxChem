@@ -11,9 +11,11 @@
 
 #include <cstdint>
 #include <cstdlib>
-
 #include <vector>
 #include <string>
+
+#include "DeviceFunc.hpp"
+#include "MemBlock2D.hpp"
 
 /**
  Class CudaDevices stores data about available CUDA devices and provides these devices managment functions.
@@ -53,13 +55,17 @@ public:
      */
     ~CCudaDevices();
     
-    
     /**
      Sets up requested CUDA compute capable device.
 
      @param iDevice the identifier of CUDA compute capable device.
      */
     void setCudaDevice(const int32_t iDevice) const;
+    
+    /**
+     Synchorizes current CUDA compute capable device.
+     */
+    void synchronizeCudaDevice() const;
     
     /**
      Gets number of CUDA compute capable devices.
@@ -69,11 +75,61 @@ public:
     int32_t getNumberOfDevices() const;
     
     /**
+     Allocates 2D memory block on CUDA compute capable device.
+
+     @param pointer the pointer to 2D memory block.
+     @param pitch the pointer to pitch of 2D  memory block.
+     @param nElements the number of columns in 2D  memory block.
+     @param nBlocks the number of rows in 2D memory block.
+     */
+    void allocate(double** pointer,
+                  size_t*  pitch,
+                  int32_t  nElements,
+                  int32_t  nBlocks) const;
+    
+    /**
+     Deallocates device memory.
+     
+     @param pointer the pointer to device memory.
+     */
+    void free(double* pointer) const;
+    
+    /**
+     Copies 2D data to CUDA device.
+
+     @param pointer the pointer to device memory.
+     @param pitch the pitch of device memory.
+     @param memBlock2D the 2D memory block.
+     */
+    void copyToDevice(      double*              pointer,
+                            size_t               pitch,
+                      const CMemBlock2D<double>& memBlock2D) const;
+    
+    /**
+     Copies 2D data from CUDA device.
+     
+     @param pointer the pointer to device memory.
+     @param pitch the pitch of device memory.
+     @param memBlock2D the 2D memory block.
+     */
+    void copyFromDevice(double*              pointer,
+                        size_t               pitch,
+                        CMemBlock2D<double>& memBlock2D) const;
+    
+    /**
      Gets string representation of CUDA devices object.
 
      @return the representation string.
      */
     std::string getString() const;
+    
+    /**
+     Gets recommended size of grid block for specific CUDA compute capable device.
+
+     @param iDevice the identifier of CUDA compute capable device.
+     @return the recomended grid block size.
+     */
+    int32_t getGridBlockSize(const int32_t iDevice = 0) const;
 };
 
 #endif /* CudaDevices_hpp */

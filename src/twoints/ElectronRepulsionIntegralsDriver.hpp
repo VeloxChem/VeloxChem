@@ -72,12 +72,27 @@ class CElectronRepulsionIntegralsDriver
                                                  const CGtoPairsBlock&         ketGtoPairsBlock) const;
     
     /**
+     Computes electronic repulsion integrals for combination of GTOs pairs blocks on CUDA compute capable device.
+     
+     @param distPattern the ponter to integrals distribution pattern.
+     @param intsScreener the integrals screener object.
+     @param braGtoPairsBlock the GTOs pairsblock on bra side.
+     @param ketGtoPairsBlock the GTOs pairs block on ket side.
+     @param cudaDevices the CUDA compute capable devices.
+     */
+    void _compElectronRepulsionForGtoPairsBlocksOnGPU(      CTwoIntsDistribution&   distPattern,
+                                                      const CCauchySchwarzScreener& intsScreener,
+                                                      const CGtoPairsBlock&         braGtoPairsBlock,
+                                                      const CGtoPairsBlock&         ketGtoPairsBlock,
+                                                      const CCudaDevices*           cudaDevices) const;
+    
+    /**
      Sets horrizontal recursion map for bra side.
      
      @param angularMomentumA the angular momentum of center A.
      @param angularMomentumB the angular momentum of center B.
      @param angularMomentumC the angular momentum of center C.
-     @param angularMomentumD the angular momentum od center D-
+     @param angularMomentumD the angular momentum od center D.
      @return the recursion map.
      */
     CRecursionMap _setBraHorizontalRecursionPattern(const int32_t angularMomentumA,
@@ -108,6 +123,18 @@ class CElectronRepulsionIntegralsDriver
      */
     CRecursionMap _setVerticalRecursionMap(const CRecursionMap& leadTerms,
                                            const int32_t        maxNumberOfPrimPairs) const;
+    
+    /**
+     Gets dimensions of primitive integrals buffer.
+     
+     @param braAngularMomentum the angular momentum of centers on bra side.
+     @param ketAngularMomentum the angular momentum of centers on ket side.
+     @param maxNumberOfPrimPairs the maximum number of primitive pairs.
+     @return the dimensions of vertical recursion buffer.
+     */
+    int32_t _getBufferDimensionsForVerticalRecursion(const int32_t braAngularMomentum,
+                                                     const int32_t ketAngularMomentum,
+                                                     const int32_t maxNumberOfPrimPairs) const;
     
     /**
      Computes batch of primitive electron repulsion integrals using Obara-Saika
@@ -285,6 +312,7 @@ public:
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
      @param screeningContainer the screening container object.
+     @param cudaDevices the CUDA compute capable devices.
      */
     void compute(      CAOFockMatrix&       aoFockMatrix,
                  const CAODensityMatrix&    aoDensityMatrix,

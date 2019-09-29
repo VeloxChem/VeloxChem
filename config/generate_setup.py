@@ -144,7 +144,7 @@ def generate_setup(template_file, setup_file):
         sys.exit(1)
 
     use_intel = (cxxname == 'icpc')
-    use_gnu = (cxxname == 'g++')
+    use_gnu = cxxname in ['g++', 'x86_64-conda_cos6-linux-gnu-c++']
     use_clang = (cxxname == 'clang++')
 
     if not (use_intel or use_gnu or use_clang):
@@ -255,6 +255,12 @@ def generate_setup(template_file, setup_file):
     if is_macos:
         maclibs = '-undefined dynamic_lookup'
 
+    # lto flag
+
+    lto_flag = ''
+    if use_gnu:
+        lto_flag = '-fno-lto'
+
     # pybind11
 
     try:
@@ -329,6 +335,9 @@ def generate_setup(template_file, setup_file):
                     print('', file=f_mkfile)
 
                 print('MACLIBS :=', maclibs, file=f_mkfile)
+                print('', file=f_mkfile)
+
+                print('LTOFLAG :=', lto_flag, file=f_mkfile)
                 print('', file=f_mkfile)
 
                 if gtest_root is not None and gtest_lib is not None:
