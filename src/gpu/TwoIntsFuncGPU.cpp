@@ -248,9 +248,39 @@ namespace twointsgpu { // twointsgpu namespace
         
         if ((bang == 0) && (kang == 0))
         {
-            erirecgpu::compElectronRepulsionForSSSS(primBufferData, pitchOfBufferData, 0, 0,
+            erirecgpu::compElectronRepulsionForSSSS(primBufferData, pitchOfBufferData,
                                                     osFactorsData, pitchOfFactorsData,
                                                     pqDistancesData, pitchOfDistancesPQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SS||SP) integrals
+        
+        if ((bang == 0) && (kang == 1))
+        {
+            erirecgpu::compElectronRepulsionForSSSP(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SP||SS) integrals
+        
+        if ((bang == 1) && (kang == 0))
+        {
+            erirecgpu::compElectronRepulsionForSPSS(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
                                                     braGtoPairsData, pitchOfBraGtoPairsData,
                                                     ketGtoPairsData, pitchOfKetGtoPairsData,
                                                     spos, epos, nKetPrimPairs, gsize, bsize);
