@@ -287,6 +287,96 @@ namespace twointsgpu { // twointsgpu namespace
             
             return;
         }
+        
+        // primitive integrals (SS||SD) integrals
+        
+        if ((bang == 0) && (kang == 2))
+        {
+            erirecgpu::compElectronRepulsionForSSSD(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SD||SS) integrals
+        
+        if ((bang == 2) && (kang == 0))
+        {
+            erirecgpu::compElectronRepulsionForSDSS(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SS||SF) integrals
+        
+        if ((bang == 0) && (kang == 3))
+        {
+            erirecgpu::compElectronRepulsionForSSSF(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SF||SS) integrals
+        
+        if ((bang == 3) && (kang == 0))
+        {
+            erirecgpu::compElectronRepulsionForSFSS(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SS||SG) integrals
+        
+        if ((bang == 0) && (kang == 4))
+        {
+            erirecgpu::compElectronRepulsionForSSSG(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SG||SS) integrals
+        
+        if ((bang == 4) && (kang == 0))
+        {
+            erirecgpu::compElectronRepulsionForSGSS(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
 #endif
     }
     

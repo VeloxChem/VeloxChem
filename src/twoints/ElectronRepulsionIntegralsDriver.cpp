@@ -1035,7 +1035,11 @@ CElectronRepulsionIntegralsDriver::_getBufferDimensionsForVerticalRecursion(cons
                                                                             const int32_t ketAngularMomentum,
                                                                             const int32_t maxNumberOfPrimPairs) const
 {
-    int32_t vrrdim = 1;
+    int32_t vrrdim = braAngularMomentum +  ketAngularMomentum + 1;
+    
+    if ((braAngularMomentum ==  0) && (ketAngularMomentum == 1)) vrrdim = 5;
+    
+    if ((braAngularMomentum ==  1) && (ketAngularMomentum == 0)) vrrdim = 5;
     
     // FIX ME: Add other angular momentum terms
     
