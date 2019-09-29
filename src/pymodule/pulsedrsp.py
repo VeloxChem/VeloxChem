@@ -20,7 +20,8 @@ class PulsedResponse():
     :param field_cutoff_ratio:
         Float - Ratio between the smallest field amplitude to be included in the calculation 
         wrt. the maximum field amplitude. 
-        Frequencies with associated field amplitudes smaller than this ratio will NOT be included in the calculation.
+        Frequencies with associated field amplitudes smaller than this ratio will NOT be included 
+        in the calculation.
     :param envelope:
         String - Envelope of the of pulse - available arguments: ['gaussian', ]
     :param number_pulses:
@@ -35,7 +36,7 @@ class PulsedResponse():
     :param centers:
         List of floats (len(N)) - time centers for the pulses in [au]
     :param pol_dir:
-        List of strings (len(N)) - polarization directions, arguments given in combinations of x, y and z
+        string - polarization directions, arguments given in combinations of x, y and z
         e.g.: 'x' for [1 0 0], yz for [0 1 1].
     :param frequency_range:
         List Frequencies to map solution to - given as range 'start-end(df)' in [au]
@@ -49,11 +50,17 @@ class PulsedResponse():
         String - optional - name of requested ASCII formatted file
     """
 
+    multi_input_keys = ['pulse_widths',
+                        'carrier_frequencies',
+                        'field_max',
+                        'centers',
+                        'CEP']
+
     # List of parameters that are floats for parsing
     float_input_keys = ['field_cutoff_ratio',
-                        'pulse_duration',
+                        'pulse_widths',
                         'carrier_frequencies',
-                        'center',
+                        'centers',
                         'CEP',
                         'field_max',
                         ]
@@ -74,19 +81,16 @@ class PulsedResponse():
         self.pulse_settings = {}
         self.crsp_settings = {}
 
-        # TODO: make a E-field class that takes pulse settings
-        #       as input and generate field_w and frequency window 
         # Default Pulse settings
         self.pulse_settings['field_cutoff_ratio']  = 1.e-7 # Smallest fraction field amplitude to be included
         self.pulse_settings['envelope']              = 'gaussian'
-        self.pulse_settings['pulse_duration']        = 50. 
+        self.pulse_settings['pulse_widths']          = 50.
         self.pulse_settings['carrier_frequencies']   = 0.325 
-        self.pulse_settings['center']                = 300.0 
-        self.pulse_settings['CEP']                   = self.pulse_settings['carrier_frequencies'] * self.pulse_settings['center'] 
+        self.pulse_settings['centers']                = 300.0 
+        self.pulse_settings['CEP']                   = self.pulse_settings['carrier_frequencies'] * self.pulse_settings['centers']
         self.pulse_settings['field_max']             = 1.0e-5
         self.pulse_settings['pol_dir']               = 'x'
         self.pulse_settings['frequency_range']       = "0.0 - 1.0 (0.0025)"
-
 
 
     def update_settings(self, settings, crsp_settings):
@@ -99,24 +103,15 @@ class PulsedResponse():
         :param crsp_settings:
             The settings dictionary for complex response driver.
         """
+
         # Default CRSP settings (if nothing else given, it will use defaults in crsp.cpp)
-#        crsp_settings['rot_averaging']           = False
+        #crsp_settings['rot_averaging']           = False
 
         # Update the default args with the user provided inputs
         self.pulse_settings.update(settings)
         self.crsp_settings.update(crsp_settings)
 
-        for key in PulsedResponse.float_input_keys:
-            if key in self.pulse_settings: 
-                try:
-                    self.pulse_settings[key] = float(self.pulse_settings[key])
-                except:
-                    raise TypeError("Pulsed response key: '{}' was not parseable as a float: {}".format(key, self.pulse_settings[key]))
-        
 
-        # TODO: Setup response operators based on polarization vector
-        #       The crsp.py file needs to be updated with a/b operator input option
-         
         # Construct frequency array based on input
         self.pulse_settings['given_frequencies'] = self.pulse_settings['frequency_range']
         freqs = parse_frequencies(self.pulse_settings['frequency_range'])
@@ -124,18 +119,58 @@ class PulsedResponse():
         self.w, freqs = self.verify_frequencies(freqs)
         self.end_w = freqs[-1]
 
-        # Compute electric field in frequency domain
-        field_w = self.gauss_env_pulse_w(
-                        freqs,
-                        self.pulse_settings['field_max'],
-                        self.pulse_settings['center'],
-                        self.pulse_settings['pulse_duration'],
-                        self.pulse_settings['carrier_frequencies'],
-                        self.pulse_settings['CEP'],
-                        )
+        # TODO: Setup response operators based on polarization vector
+        #       The crsp.py file needs to be updated with a/b operator input option
 
         # Save frequencies for later zero padding
         self.freqs = copy.copy(freqs)
+
+        # TODO Override of number of pulses - set to 1
+        self.pulse_settings['number_pulses'] = 1
+
+        field_w = np.zeros_like(freqs, dtype=np.complex128)
+
+        # Check that all Pulse list parameters are given correct
+        for key in PulsedResponse.multi_input_keys: 
+            if key not in self.pulse_settings:
+                raise KeyError("Key '{}' not defined for PulsedResponse".format(key))
+
+            if self.pulse_settings['number_pulses'] == 1:
+                self.pulse_settings[key] = [self.pulse_settings[key]]
+                continue
+            else:
+                try:
+                    self.pulse_settings[key] = self.pulse_settings[key].split()
+                except:
+                    raise ValueError("Could not split jey '{}' : {}".format(key, self.pulse_settings[key]))
+
+            if len(self.pulse_settings[key]) != self.pulse_settings['number_pulses']:
+                raise KeyError("Lengt of key '{}' did not match 'number_pulses': {}".format(key, 
+                                                            self.pulse_settings['number_pulses']))
+
+
+        # Loop over number of pulses
+        for p in range(self.pulse_settings['number_pulses']):
+            for key in PulsedResponse.float_input_keys:
+                if key in self.pulse_settings: 
+                    try:
+                        if key in PulsedResponse.multi_input_keys:
+                            self.pulse_settings[key][p] = float(self.pulse_settings[key][p])
+                        else:
+                            self.pulse_settings[key] = float(self.pulse_settings[key])
+                    except:
+                        raise TypeError("Pulsed response key: '{}' was not parseable as a float: {}".format(key, self.pulse_settings[key]))
+            
+            # Compute electric field in frequency domain
+            field_w += self.gauss_env_pulse_w(
+                            freqs,
+                            float(self.pulse_settings['field_max'][p]),
+                            float(self.pulse_settings['centers'][p]),
+                            float(self.pulse_settings['pulse_widths'][p]),
+                            float(self.pulse_settings['carrier_frequencies'][p]),
+                            float(self.pulse_settings['CEP'][p]),
+                            )
+
 
         # Threshold to limit the number of complex polarizability evaluations
         # Based on the field strength and bandwidth of the pulse
@@ -160,7 +195,9 @@ class PulsedResponse():
         self.amplitudes = field_w 
 
         # Set up complex response solver
-        crsp_settings.update({'frequencies' : freqs})
+        crsp_settings.update({'frequencies' : freqs,
+                              'a_components' : self.pulse_settings['pol_dir'],
+                              'b_components' : self.pulse_settings['pol_dir']})
         self.rsp_driver = ComplexResponse(self.comm, self.ostream)
         self.rsp_driver.update_settings(crsp_settings)
 
@@ -289,7 +326,7 @@ class PulsedResponse():
         """
         try:
             with h5py.File(fname, 'w') as hf:
-                hf.create_dataset('frequencies', data=self.freqs, compression="gzip")
+                hf.create_dataset('frequencies', data=self.frequencies, compression="gzip")
                 hf.create_dataset('amplitudes', data=self.amplitudes, compression="gzip")
                 hf.create_dataset('zero_padded_frequencies', data=self.w, compression="gzip")
                 hf.create_dataset('zero_padded', data=zeropad, compression="gzip")
@@ -307,7 +344,6 @@ class PulsedResponse():
 
                         hf.create_dataset("{}{}".format(xyz1,xyz2), data=np.array(amplitudes), compression="gzip")
 
-            print("Pulsed response data saved to '{}'".format(fname))
         except Exception as e:
             print("Pulsed response failed to create h5 data file: {}".format(e))
             
@@ -387,8 +423,21 @@ class PulsedResponse():
         truncated_frequencies = zero_padded_frequencies[zero_padded_frequencies >= frequencies[0]]
         return zero_padded_frequencies, truncated_frequencies
         
-
     def gauss_env_pulse_w(self, w, F0, t0, delta_t, w_carrier, cep):
+        """
+        Gaussian pulse from frequency domain input
+
+        :param frequencies:
+            w         - np array - list of frequencies
+            F0        - float    - pulse amplitude in [au]
+            t0        - float    - time center for pulse in [au]
+            delta_t   - float    - pulse width in [au] 
+            w_carrier - float    - carrier frequency in [au]
+            cep       - float    - carrier envelope phases in [radians]
+
+        :return:
+            numpy array of the pulse amplitude in the frequency domain
+        """
 
         return ((F0 * delta_t)/(2.*(2.*np.pi)**0.5) 
                 * ( np.exp( -(delta_t**2 * (w - w_carrier)**2 ) / 2.0 ) * np.exp(1.j * (w - w_carrier) * t0 - 1.j * cep) 
@@ -424,9 +473,9 @@ class PulsedResponse():
         header_fields = {
                 "field_cutoff_ratio" : "Field cutoff ratio",
                 "envelope" : "Envelope",
-                "pulse_duration" : "Pulse Duration",
+                "pulse_widths" : "Pulse Duration",
                 "carrier_frequencies" : "Carrier Frequency",
-                "center" : "Pulse Center time",
+                "centers" : "Pulse Center time",
                 "field_max" : "Max Field",
                 "pol_dir" : "Polarization Direction",
                 "frequency_range" : "Frequency Range",

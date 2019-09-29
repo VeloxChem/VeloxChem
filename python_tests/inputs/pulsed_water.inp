@@ -26,7 +26,7 @@ field_cutoff_ratio: 1e-5
 frequency_range : 0.2-0.4(0.007)
 carrier_frequencies: 0.325
 pulse_widths: 50 
-pol_dir: x
+pol_dir: xyz
 h5 : pulsed
 ascii : pulsed
 @end
