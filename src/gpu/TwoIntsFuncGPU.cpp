@@ -377,6 +377,262 @@ namespace twointsgpu { // twointsgpu namespace
             
             return;
         }
+        
+        // primitive integrals (SP||SP) integrals
+        
+        if ((bang == 1) && (kang == 1))
+        {
+            erirecgpu::compElectronRepulsionForSPSP(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SP||SD) integrals
+        
+        if ((bang == 1) && (kang == 2))
+        {
+            erirecgpu::compElectronRepulsionForSPSD(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SD||SP) integrals
+        
+        if ((bang == 2) && (kang == 1))
+        {
+            erirecgpu::compElectronRepulsionForSDSP(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SP||SF) integrals
+        
+        if ((bang == 1) && (kang == 3))
+        {
+            erirecgpu::compElectronRepulsionForSPSF(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SF||SP) integrals
+        
+        if ((bang == 3) && (kang == 1))
+        {
+            erirecgpu::compElectronRepulsionForSFSP(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SP||SG) integrals
+        
+        if ((bang == 1) && (kang == 4))
+        {
+            erirecgpu::compElectronRepulsionForSPSG(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SG||SP) integrals
+        
+        if ((bang == 4) && (kang == 1))
+        {
+            erirecgpu::compElectronRepulsionForSGSP(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SD||SD) integrals
+        
+        if ((bang == 2) && (kang == 2))
+        {
+            erirecgpu::compElectronRepulsionForSDSD(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SD||SF) integrals
+        
+        if ((bang == 2) && (kang == 3))
+        {
+            erirecgpu::compElectronRepulsionForSDSF(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SF||SD) integrals
+        
+        if ((bang == 3) && (kang == 2))
+        {
+            erirecgpu::compElectronRepulsionForSFSD(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SD||SG) integrals
+        
+        if ((bang == 2) && (kang == 4))
+        {
+            erirecgpu::compElectronRepulsionForSDSG(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SG||SD) integrals
+        
+        if ((bang == 4) && (kang == 2))
+        {
+            erirecgpu::compElectronRepulsionForSGSD(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SF||SF) integrals
+        
+        if ((bang == 3) && (kang == 3))
+        {
+            erirecgpu::compElectronRepulsionForSFSF(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SF||SG) integrals
+        
+        if ((bang == 3) && (kang == 4))
+        {
+            erirecgpu::compElectronRepulsionForSFSG(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SG||SF) integrals
+        
+        if ((bang == 4) && (kang == 3))
+        {
+            erirecgpu::compElectronRepulsionForSGSF(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
+        
+        // primitive integrals (SG||SG) integrals
+        
+        if ((bang == 4) && (kang == 4))
+        {
+            erirecgpu::compElectronRepulsionForSGSG(primBufferData, pitchOfBufferData,
+                                                    osFactorsData, pitchOfFactorsData,
+                                                    pqDistancesData, pitchOfDistancesPQData,
+                                                    wpDistancesData, pitchOfDistancesWPData,
+                                                    wqDistancesData, pitchOfDistancesWQData,
+                                                    braGtoPairsData, pitchOfBraGtoPairsData,
+                                                    ketGtoPairsData, pitchOfKetGtoPairsData,
+                                                    spos, epos, nKetPrimPairs, gsize, bsize);
+            
+            return;
+        }
 #endif
     }
     
