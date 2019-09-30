@@ -100,10 +100,12 @@ class ScfDriver:
         The molecular grid.
     :param pe:
         The flag for running polarizable embedding calculation.
-    :param pe_state:
-        The state of the polarizable embedding.
+    :param V_es:
+        The polarizable embedding matrix.
     :param potfile:
         The name of the potential file for polarizable embedding.
+    :param pe_summary:
+        The summary string for polarizable embedding.
     :param timing:
         The flag for printing timing information.
     :param profiling:
@@ -187,8 +189,9 @@ class ScfDriver:
         self.molgrid = None
 
         self.pe = False
-        self.pe_state = None
+        self.V_es = None
         self.potfile = None
+        self.pe_summary = ''
 
         self.split_comm_ratio = None
 
@@ -306,8 +309,8 @@ class ScfDriver:
         # set up polarizable embedding
 
         if self.pe:
-            self.pe_state = PolEmbed(molecule, ao_basis, self.comm,
-                                     self.potfile)
+            pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
+            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
         # C2-DIIS method
         if self.acc_type == "DIIS":
@@ -473,11 +476,11 @@ class ScfDriver:
 
         for i in self.get_scf_range():
 
-            vxc_mat = self.comp_2e_fock(fock_mat, den_mat, molecule, ao_basis,
-                                        qq_data)
+            vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
+                                                    ao_basis, qq_data)
 
-            e_ee, e_kin, e_en, e_pe, V_pe = self.comp_energy(
-                fock_mat, vxc_mat, kin_mat, npot_mat, den_mat)
+            e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
+                                                 kin_mat, npot_mat, den_mat)
 
             self.comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
 
@@ -487,7 +490,7 @@ class ScfDriver:
 
             diff_den = self.comp_density_change(den_mat, self.density)
 
-            self.add_iter_data(e_ee, e_kin, e_en, e_pe, e_grad, diff_den)
+            self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
 
             self.check_convergence()
 
@@ -692,14 +695,14 @@ class ScfDriver:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
-        if self.dft and self.nodes >= 4:
-            vxc_mat = self.comp_2e_fock_split_comm(fock_mat, den_mat, molecule,
-                                                   basis, screening)
+        if (self.dft or self.pe) and self.nodes >= 4:
+            vxc_mat, e_pe, V_pe = self.comp_2e_fock_split_comm(
+                fock_mat, den_mat, molecule, basis, screening)
         else:
-            vxc_mat = self.comp_2e_fock_single_comm(fock_mat, den_mat, molecule,
-                                                    basis, screening)
+            vxc_mat, e_pe, V_pe = self.comp_2e_fock_single_comm(
+                fock_mat, den_mat, molecule, basis, screening)
 
-        return vxc_mat
+        return vxc_mat, e_pe, V_pe
 
     def comp_2e_fock_single_comm(self, fock_mat, den_mat, molecule, basis,
                                  screening):
@@ -735,10 +738,19 @@ class ScfDriver:
             vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
-
-            return vxc_mat
         else:
-            return None
+            vxc_mat = None
+
+        if self.pe and not self.first_step:
+            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
+            pe_drv.V_es = self.V_es.copy()
+            dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
+            e_pe, V_pe = pe_drv.get_pe_contribution(dm)
+            self.pe_summary = pe_drv.cppe_state.summary_string
+        else:
+            e_pe, V_pe = 0.0, None
+
+        return vxc_mat, e_pe, V_pe
 
     def comp_2e_fock_split_comm(self, fock_mat, den_mat, molecule, basis,
                                 screening):
@@ -761,21 +773,37 @@ class ScfDriver:
         """
 
         if self.split_comm_ratio is None:
-            self.split_comm_ratio = [0.5, 0.5]
-        eri_nodes = int(float(self.nodes) * self.split_comm_ratio[0] + 0.5)
-        dft_nodes = self.nodes - eri_nodes
+            self.split_comm_ratio = [0.5, 0.25, 0.25]
+            if not self.dft:
+                self.split_comm_ratio = [0.5, 0.0, 0.5]
+            if not (self.pe and not self.first_step):
+                self.split_comm_ratio = [0.5, 0.5, 0.0]
 
-        if eri_nodes < 1:
-            eri_nodes = 1
-            dft_nodes = self.nodes - eri_nodes
+        if self.dft:
+            dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
+            dft_nodes = max(1, dft_nodes)
+        else:
+            dft_nodes = 0
 
-        if dft_nodes < 1:
-            dft_nodes = 1
-            eri_nodes = self.nodes - dft_nodes
+        if self.pe and not self.first_step:
+            pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
+            pe_nodes = max(1, pe_nodes)
+        else:
+            pe_nodes = 0
 
-        node_grps = [0] * eri_nodes + [1] * dft_nodes
+        eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
+
+        if eri_nodes >= dft_nodes and eri_nodes >= pe_nodes:
+            eri_nodes = self.nodes - dft_nodes - pe_nodes
+        elif dft_nodes >= eri_nodes and dft_nodes >= pe_nodes:
+            dft_nodes = self.nodes - eri_nodes - pe_nodes
+        else:
+            pe_nodes = self.nodes - eri_nodes - dft_nodes
+
+        node_grps = [0] * eri_nodes + [1] * dft_nodes + [2] * pe_nodes
         eri_comm = (node_grps[self.rank] == 0)
         dft_comm = (node_grps[self.rank] == 1)
+        pe_comm = (node_grps[self.rank] == 2)
 
         subcomms = SubCommunicators(self.comm, node_grps)
         local_comm = subcomms.local_comm
@@ -792,11 +820,16 @@ class ScfDriver:
                 fock_mat.scale(2.0, 0)
             dt = tm.time() - t0
 
-        # reset molecular grid
+        # reset molecular grid for DFT and V_es for PE
         if self.rank != mpi_master():
             self.molgrid = MolecularGrid()
-        if local_comm.Get_rank() == mpi_master():
-            self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
+            self.V_es = np.zeros(0)
+        if self.dft:
+            if local_comm.Get_rank() == mpi_master():
+                self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
+        if self.pe and not self.first_step:
+            if local_comm.Get_rank() == mpi_master():
+                self.V_es = cross_comm.bcast(self.V_es, root=mpi_master())
 
         # calculate Vxc on DFT nodes
         if dft_comm:
@@ -813,24 +846,50 @@ class ScfDriver:
             vxc_mat = AOKohnShamMatrix()
 
         # collect Vxc to master node
-        if local_comm.Get_rank() == mpi_master():
-            vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
-                            cross_comm, 1)
+        if self.dft:
+            if local_comm.Get_rank() == mpi_master():
+                vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
+                                cross_comm, 1)
+
+        # calculate e_pe and V_pe on PE nodes
+        if pe_comm:
+            t0 = tm.time()
+            pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
+            pe_drv.V_es = self.V_es.copy()
+            dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
+            e_pe, V_pe = pe_drv.get_pe_contribution(dm)
+            self.pe_summary = pe_drv.cppe_state.summary_string
+            dt = tm.time() - t0
+        else:
+            e_pe, V_pe = 0.0, None
+            self.pe_summary = ''
+
+        # collect PE results to master node
+        if self.pe and not self.first_step:
+            pe_root = 2 if self.dft else 1
+            if local_comm.Get_rank() == mpi_master():
+                e_pe = cross_comm.bcast(e_pe, root=pe_root)
+                V_pe = cross_comm.bcast(V_pe, root=pe_root)
+                self.pe_summary = cross_comm.bcast(self.pe_summary,
+                                                   root=pe_root)
 
         dt = self.comm.gather(dt, root=mpi_master())
         if self.rank == mpi_master():
             time_eri = sum(dt[:eri_nodes])
-            time_dft = sum(dt[eri_nodes:])
+            time_dft = sum(dt[eri_nodes:eri_nodes + dft_nodes])
+            time_pe = sum(dt[eri_nodes + dft_nodes:])
+            time_sum = time_eri + time_dft + time_pe
             self.split_comm_ratio = [
-                time_eri / (time_eri + time_dft),
-                time_dft / (time_eri + time_dft),
+                time_eri / time_sum,
+                time_dft / time_sum,
+                time_pe / time_sum,
             ]
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
 
-        return vxc_mat
+        return vxc_mat, e_pe, V_pe
 
-    def comp_energy(self, fock_mat, vxc_mat, kin_mat, npot_mat, den_mat):
+    def comp_energy(self, fock_mat, vxc_mat, e_pe, kin_mat, npot_mat, den_mat):
         """
         Computes SCF energy components: electronic energy, kinetic energy, and
         nuclear potential energy.
@@ -839,6 +898,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (only 2e-part).
         :param vxc_mat:
             The Vxc matrix.
+        :param e_pe:
+            The polarizable embedding energy.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -854,8 +915,6 @@ class ScfDriver:
         e_ee = 0.0
         e_kin = 0.0
         e_en = 0.0
-        e_pe = 0.0
-        V_pe = None
 
         if self.rank == mpi_master():
             # electronic, kinetic, nuclear energy
@@ -864,17 +923,14 @@ class ScfDriver:
             e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
             if self.dft:
                 e_ee += vxc_mat.get_energy()
-
-        if self.pe and not self.first_step:
-            dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
-            e_pe, V_pe = self.pe_state.get_pe_contribution(dm)
+            if self.pe and not self.first_step:
+                e_ee += e_pe
 
         e_ee = self.comm.bcast(e_ee, root=mpi_master())
         e_kin = self.comm.bcast(e_kin, root=mpi_master())
         e_en = self.comm.bcast(e_en, root=mpi_master())
-        e_pe = self.comm.bcast(e_pe, root=mpi_master())
 
-        return (e_ee, e_kin, e_en, e_pe, V_pe)
+        return (e_ee, e_kin, e_en)
 
     def comp_full_fock(self, fock_mat, vxc_mat, pe_mat, kin_mat, npot_mat):
         """
@@ -1057,7 +1113,7 @@ class ScfDriver:
 
         return nteri
 
-    def add_iter_data(self, e_ee, e_kin, e_en, e_pe, e_grad, diff_den):
+    def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
         """
         Adds SCF iteration data (electronic energy, electronic energy change,
         electronic gradient, density difference) to SCF iterations list
@@ -1068,15 +1124,13 @@ class ScfDriver:
             The kinetic energy.
         :param e_en:
             The nuclear potential energy.
-        :param e_pe:
-            The polarizable embedding energy.
         :param e_grad:
             The electronic energy gradient.
         :param diff_den:
             The density change with respect to previous SCF iteration.
         """
 
-        e_elec = e_ee + e_kin + e_en + e_pe + self.nuc_energy
+        e_elec = e_ee + e_kin + e_en + self.nuc_energy
 
         de_elec = e_elec - self.old_energy
 
@@ -1124,8 +1178,7 @@ class ScfDriver:
 
         if self.pe:
             self.ostream.print_blank()
-            pe_summary = self.pe_state.cppe_state.summary_string
-            for line in pe_summary.split(os.linesep):
+            for line in self.pe_summary.split(os.linesep):
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 
