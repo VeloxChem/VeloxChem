@@ -54,7 +54,6 @@ class TestPolEmbed(unittest.TestCase):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['method_settings']['potfile'] = potfile
-        task.input_dict['method_settings']['xcfun'] = 'slater'
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
@@ -70,18 +69,18 @@ class TestPolEmbed(unittest.TestCase):
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
         #  -----------------------------------------------------------
-        #     1     6.2079     0.0536     0.0554     0.1250     0.5057
-        #     2     7.5234     0.0049     0.0056    -0.0673     0.2430
-        #     3     8.3137     0.0594     0.0841    -0.2521     1.5850
-        #     4     9.1766     0.0030     0.0029    -0.1330    -0.5048
-        #     5     9.6380     0.0059     0.0093     0.1047    -0.7910
+        #     1     8.1131     0.0667     0.0595     0.1212     0.3229
+        #     2     9.9888     0.0085     0.0092    -0.1655     0.1105
+        #     3    10.3548     0.0864     0.1098    -0.2905     2.5348
+        #     4    10.9487     0.0001     0.0003    -0.0258    -0.0721
+        #     5    11.8707     0.0026     0.0008     0.1443    -0.4440
 
         data = np.array([
-            [6.2079, 0.0554, 0.1250],
-            [7.5234, 0.0056, -0.0673],
-            [8.3137, 0.0841, -0.2521],
-            [9.1766, 0.0029, -0.1330],
-            [9.6380, 0.0093, 0.1047],
+            [8.1131, 0.0595, 0.1212],
+            [9.9888, 0.0092, -0.1655],
+            [10.3548, 0.1098, -0.2905],
+            [10.9487, 0.0003, -0.0258],
+            [11.8707, 0.0008, 0.1443],
         ])
 
         ref_exc_ene = data[:, 0]
@@ -93,7 +92,7 @@ class TestPolEmbed(unittest.TestCase):
             osc_str = tda_results['oscillator_strengths']
             rot_str = tda_results['rotatory_strengths']
 
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 1.0e-4)
             self.assertTrue(np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2)
 
