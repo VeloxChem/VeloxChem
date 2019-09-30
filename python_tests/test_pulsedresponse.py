@@ -73,6 +73,8 @@ class TestComplexResponse(unittest.TestCase):
         cls.h5fname = "pulsed"
 
         inpfile = os.path.join('inputs', 'pulsed_water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
         outfile = inpfile.replace('.inp', '.out')
 
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
