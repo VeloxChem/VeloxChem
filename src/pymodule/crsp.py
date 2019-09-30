@@ -8,6 +8,7 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
+from .polembed import PolEmbed
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -54,6 +55,12 @@ class ComplexResponse:
         The molecular grid.
     :param gs_density:
         The ground state density matrix.
+    :param pe:
+        The flag for running polarizable embedding calculation.
+    :param V_es:
+        The polarizable embedding matrix.
+    :param potfile:
+        The name of the potential file for polarizable embedding.
     :param max_iter:
         The maximum number of solver iterations.
     :param conv_thresh:
@@ -110,6 +117,10 @@ class ComplexResponse:
         self.xcfun = XCFunctional()
         self.molgrid = MolecularGrid()
         self.gs_density = AODensityMatrix()
+
+        self.pe = False
+        self.V_es = None
+        self.potfile = None
 
         self.max_iter = 150
         self.conv_thresh = 1.0e-4
@@ -192,6 +203,14 @@ class ComplexResponse:
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
+
+        if 'pe' in method_dict:
+            key = method_dict['pe'].lower()
+            self.pe = True if key == 'yes' else False
+        if 'potfile' in method_dict:
+            if 'pe' not in method_dict:
+                self.pe = True
+            self.potfile = method_dict['potfile']
 
     def decomp_trials(self, vecs):
         """
@@ -537,6 +556,11 @@ class ComplexResponse:
         else:
             dft_func_label = 'HF'
 
+        # set up polarizable embedding
+        if self.pe:
+            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
+            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
+
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -627,7 +651,8 @@ class ComplexResponse:
                                                    screening, molecule, basis,
                                                    self.dft, self.xcfun,
                                                    self.molgrid,
-                                                   self.gs_density)
+                                                   self.gs_density, self.pe,
+                                                   self.V_es, self.potfile)
 
         solutions = {}
         residuals = {}
@@ -861,7 +886,7 @@ class ComplexResponse:
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
                 molecule, basis, self.dft, self.xcfun, self.molgrid,
-                self.gs_density)
+                self.gs_density, self.pe, self.V_es, self.potfile)
 
             if self.rank == mpi_master():
 
