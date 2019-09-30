@@ -9,6 +9,7 @@ from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
+from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
@@ -23,6 +24,7 @@ from .veloxchemlib import parse_xc_func
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
+from .polembed import PolEmbed
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .lrmatvecdriver import read_rsp_hdf5
@@ -51,6 +53,12 @@ class TDAExciDriver:
         The XC functional.
     :param molgrid:
         The molecular grid.
+    :param pe:
+        The flag for running polarizable embedding calculation.
+    :param V_es:
+        The polarizable embedding matrix.
+    :param potfile:
+        The name of the potential file for polarizable embedding.
     :param conv_thresh:
         The excited states convergence threshold.
     :param max_iter:
@@ -96,6 +104,11 @@ class TDAExciDriver:
         self.grid_level = 4
         self.xcfun = XCFunctional()
         self.molgrid = MolecularGrid()
+
+        # polarizable embedding
+        self.pe = False
+        self.V_es = None
+        self.potfile = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -162,6 +175,14 @@ class TDAExciDriver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
 
+        if 'pe' in method_dict:
+            key = method_dict['pe'].lower()
+            self.pe = True if key == 'yes' else False
+        if 'potfile' in method_dict:
+            if 'pe' not in method_dict:
+                self.pe = True
+            self.potfile = method_dict['potfile']
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs TDA excited states calculation using molecular data.
@@ -212,6 +233,11 @@ class TDAExciDriver:
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
             dft_func_label = 'HF'
+
+        # set up polarizable embedding
+        if self.pe:
+            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
+            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
 
@@ -403,7 +429,7 @@ class TDAExciDriver:
         """
 
         # split communicators
-        if self.dft and self.nodes >= 4:
+        if (self.dft or self.pe) and self.nodes >= 4:
             self.comp_tda_fock_split_comm(fock, tdens, gsdens, molecule, basis,
                                           screening)
 
@@ -411,6 +437,7 @@ class TDAExciDriver:
         else:
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
             eri_drv.compute(fock, tdens, molecule, basis, screening)
+
             if self.dft:
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
@@ -419,6 +446,17 @@ class TDAExciDriver:
                 self.molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, tdens, gsdens, molecule, basis,
                                  self.molgrid, self.xcfun.get_func_label())
+
+            if self.pe:
+                pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
+                pe_drv.V_es = self.V_es.copy()
+                for ifock in range(fock.number_of_fock_matrices()):
+                    dm = tdens.alpha_to_numpy(ifock) + tdens.beta_to_numpy(
+                        ifock)
+                    e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
+                    if self.rank == mpi_master():
+                        fock.add_matrix(DenseMatrix(V_pe), ifock)
+
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
     def comp_tda_fock_split_comm(self, fock, tdens, gsdens, molecule, basis,
@@ -441,21 +479,37 @@ class TDAExciDriver:
         """
 
         if self.split_comm_ratio is None:
-            self.split_comm_ratio = [0.5, 0.5]
-        eri_nodes = int(float(self.nodes) * self.split_comm_ratio[0] + 0.5)
-        dft_nodes = self.nodes - eri_nodes
+            self.split_comm_ratio = [0.5, 0.25, 0.25]
+            if not self.dft:
+                self.split_comm_ratio = [0.5, 0.0, 0.5]
+            if not self.pe:
+                self.split_comm_ratio = [0.5, 0.5, 0.0]
 
-        if eri_nodes < 1:
-            eri_nodes = 1
-            dft_nodes = self.nodes - eri_nodes
+        if self.dft:
+            dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
+            dft_nodes = max(1, dft_nodes)
+        else:
+            dft_nodes = 0
 
-        if dft_nodes < 1:
-            dft_nodes = 1
-            eri_nodes = self.nodes - dft_nodes
+        if self.pe:
+            pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
+            pe_nodes = max(1, pe_nodes)
+        else:
+            pe_nodes = 0
 
-        node_grps = [0] * eri_nodes + [1] * dft_nodes
+        eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
+
+        if eri_nodes >= dft_nodes and eri_nodes >= pe_nodes:
+            eri_nodes = self.nodes - dft_nodes - pe_nodes
+        elif dft_nodes >= eri_nodes and dft_nodes >= pe_nodes:
+            dft_nodes = self.nodes - eri_nodes - pe_nodes
+        else:
+            pe_nodes = self.nodes - eri_nodes - dft_nodes
+
+        node_grps = [0] * eri_nodes + [1] * dft_nodes + [2] * pe_nodes
         eri_comm = (node_grps[self.rank] == 0)
         dft_comm = (node_grps[self.rank] == 1)
+        pe_comm = (node_grps[self.rank] == 2)
 
         subcomms = SubCommunicators(self.comm, node_grps)
         local_comm = subcomms.local_comm
@@ -472,11 +526,16 @@ class TDAExciDriver:
                         fock.scale(2.0, ifock)
             dt = tm.time() - t0
 
-        # reset molecular grid
+        # reset molecular grid for DFT and V_es for PE
         if self.rank != mpi_master():
             self.molgrid = MolecularGrid()
-        if local_comm.Get_rank() == mpi_master():
-            self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
+            self.V_es = np.zeros(0)
+        if self.dft:
+            if local_comm.Get_rank() == mpi_master():
+                self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
+        if self.pe:
+            if local_comm.Get_rank() == mpi_master():
+                self.V_es = cross_comm.bcast(self.V_es, root=mpi_master())
 
         # calculate Fxc on DFT nodes
         if dft_comm:
@@ -488,16 +547,31 @@ class TDAExciDriver:
                              self.xcfun.get_func_label())
             dt = tm.time() - t0
 
+        # calculate e_pe and V_pe on PE nodes
+        if pe_comm:
+            t0 = tm.time()
+            pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
+            pe_drv.V_es = self.V_es.copy()
+            for ifock in range(fock.number_of_fock_matrices()):
+                dm = tdens.alpha_to_numpy(ifock) + tdens.beta_to_numpy(ifock)
+                e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
+                if local_comm.Get_rank() == mpi_master():
+                    fock.add_matrix(DenseMatrix(V_pe), ifock)
+            dt = tm.time() - t0
+
         # collect Fock on master node
         fock.reduce_sum(self.rank, self.nodes, self.comm)
 
         dt = self.comm.gather(dt, root=mpi_master())
         if self.rank == mpi_master():
             time_eri = sum(dt[:eri_nodes])
-            time_dft = sum(dt[eri_nodes:])
+            time_dft = sum(dt[eri_nodes:eri_nodes + dft_nodes])
+            time_pe = sum(dt[eri_nodes + dft_nodes:])
+            time_sum = time_eri + time_dft + time_pe
             self.split_comm_ratio = [
-                time_eri / (time_eri + time_dft),
-                time_dft / (time_eri + time_dft),
+                time_eri / time_sum,
+                time_dft / time_sum,
+                time_pe / time_sum,
             ]
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
