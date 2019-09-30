@@ -8,6 +8,7 @@ from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
+from .polembed import PolEmbed
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -51,6 +52,12 @@ class LinearResponseSolver:
         The molecular grid.
     :param gs_density:
         The ground state density matrix.
+    :param pe:
+        The flag for running polarizable embedding calculation.
+    :param V_es:
+        The polarizable embedding matrix.
+    :param potfile:
+        The name of the potential file for polarizable embedding.
     :param conv_thresh:
         The convergence threshold for the solver.
     :param max_iter:
@@ -108,6 +115,11 @@ class LinearResponseSolver:
         self.xcfun = XCFunctional()
         self.molgrid = MolecularGrid()
         self.gs_density = AODensityMatrix()
+
+        # polarizable embedding
+        self.pe = False
+        self.V_es = None
+        self.potfile = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -190,6 +202,14 @@ class LinearResponseSolver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
 
+        if 'pe' in method_dict:
+            key = method_dict['pe'].lower()
+            self.pe = True if key == 'yes' else False
+        if 'potfile' in method_dict:
+            if 'pe' not in method_dict:
+                self.pe = True
+            self.potfile = method_dict['potfile']
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs linear response calculation for a molecule and a basis set.
@@ -263,6 +283,11 @@ class LinearResponseSolver:
         else:
             dft_func_label = 'HF'
 
+        # set up polarizable embedding
+        if self.pe:
+            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
+            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
+
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
@@ -330,7 +355,8 @@ class LinearResponseSolver:
                                                    screening, molecule, basis,
                                                    self.dft, self.xcfun,
                                                    self.molgrid,
-                                                   self.gs_density)
+                                                   self.gs_density, self.pe,
+                                                   self.V_es, self.potfile)
 
         solutions = {}
         residuals = {}
@@ -455,7 +481,7 @@ class LinearResponseSolver:
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
                 molecule, basis, self.dft, self.xcfun, self.molgrid,
-                self.gs_density)
+                self.gs_density, self.pe, self.V_es, self.potfile)
 
             if self.rank == mpi_master():
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
