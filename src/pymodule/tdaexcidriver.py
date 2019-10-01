@@ -197,12 +197,11 @@ class TDAExciDriver:
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
+        # prepare molecular orbitals
+
         if self.rank == mpi_master():
             mol_orbs = MolecularOrbitals([scf_tensors['C']], [scf_tensors['E']],
                                          molorb.rest)
-            nocc = molecule.number_of_alpha_electrons()
-            mo_occ = scf_tensors['C'][:, :nocc]
-            mo_vir = scf_tensors['C'][:, nocc:]
         else:
             mol_orbs = MolecularOrbitals()
 
@@ -213,7 +212,14 @@ class TDAExciDriver:
 
         start_time = tm.time()
 
-        # generate integration grid
+        # generate screening for ERI
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
+
+        # generate molecular grid for DFT
+
         if self.dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
@@ -232,14 +238,13 @@ class TDAExciDriver:
         else:
             dft_func_label = 'HF'
 
-        # set up polarizable embedding
+        # generate potential for polarizable embedding
+
         if self.pe:
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                    self.eri_thresh, molecule, basis)
+        # initialize E2X driver for response Fock build
 
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
@@ -345,6 +350,10 @@ class TDAExciDriver:
         if self.rank == mpi_master():
             self.print_excited_states(start_time)
 
+            nocc = molecule.number_of_alpha_electrons()
+            mo_occ = scf_tensors['C'][:, :nocc]
+            mo_vir = scf_tensors['C'][:, nocc:]
+
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
 
@@ -392,7 +401,7 @@ class TDAExciDriver:
 
         if self.rank == mpi_master():
 
-            nocc = molecule.number_of_electrons() // 2
+            nocc = molecule.number_of_alpha_electrons()
             norb = mol_orbs.number_mos()
 
             zvec = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
@@ -406,9 +415,9 @@ class TDAExciDriver:
                     ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True))
                 trial_vecs[-1].set_zcoefficient(1.0, i)
 
-            return (diag_mat, trial_vecs)
+            return diag_mat, trial_vecs
 
-        return (None, [])
+        return None, []
 
     def check_convergence(self, iteration):
         """
@@ -470,7 +479,7 @@ class TDAExciDriver:
             The Z vectors as std::vector<CExcitationVector>.
         """
 
-        nocc = molecule.number_of_electrons() // 2
+        nocc = molecule.number_of_alpha_electrons()
         norb = mol_orbs.number_mos()
 
         trial_vecs = []
@@ -487,7 +496,7 @@ class TDAExciDriver:
         # form transition densities
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_electrons() // 2
+            nocc = molecule.number_of_alpha_electrons()
             norb = tensors['C'].shape[1]
             nvir = norb - nocc
             mo_occ = tensors['C'][:, :nocc]
@@ -535,7 +544,7 @@ class TDAExciDriver:
 
     def get_sigmas(self, fock, tensors, molecule, trial_mat):
 
-        nocc = molecule.number_of_electrons() // 2
+        nocc = molecule.number_of_alpha_electrons()
         norb = tensors['C'].shape[1]
         nvir = norb - nocc
         mo_occ = tensors['C'][:, :nocc]
