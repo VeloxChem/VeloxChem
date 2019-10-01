@@ -75,7 +75,7 @@ public:
     int32_t getNumberOfDevices() const;
     
     /**
-     Allocates 2D memory block on CUDA compute capable device.
+     Allocates 2D memory block of real numbers on CUDA compute capable device.
 
      @param pointer the pointer to 2D memory block.
      @param pitch the pointer to pitch of 2D  memory block.
@@ -88,6 +88,19 @@ public:
                   int32_t  nBlocks) const;
     
     /**
+     Allocates 2D memory block of integer numbers on CUDA compute capable device.
+     
+     @param pointer the pointer to 2D memory block.
+     @param pitch the pointer to pitch of 2D  memory block.
+     @param nElements the number of columns in 2D  memory block.
+     @param nBlocks the number of rows in 2D memory block.
+     */
+    void allocate(int32_t** pointer,
+                  size_t*   pitch,
+                  int32_t   nElements,
+                  int32_t   nBlocks) const;
+    
+    /**
      Deallocates device memory.
      
      @param pointer the pointer to device memory.
@@ -95,7 +108,14 @@ public:
     void free(double* pointer) const;
     
     /**
-     Copies 2D data to CUDA device.
+     Deallocates device memory.
+     
+     @param pointer the pointer to device memory.
+     */
+    void free(int32_t* pointer) const;
+    
+    /**
+     Copies 2D real numbers data to CUDA device.
 
      @param pointer the pointer to device memory.
      @param pitch the pitch of device memory.
@@ -104,6 +124,17 @@ public:
     void copyToDevice(      double*              pointer,
                             size_t               pitch,
                       const CMemBlock2D<double>& memBlock2D) const;
+    
+    /**
+     Copies 2D integer numbers data to CUDA device.
+     
+     @param pointer the pointer to device memory.
+     @param pitch the pitch of device memory.
+     @param memBlock2D the 2D memory block.
+     */
+    void copyToDevice(      int32_t*              pointer,
+                            size_t                pitch,
+                      const CMemBlock2D<int32_t>& memBlock2D) const;
     
     /**
      Copies 2D data from CUDA device.
