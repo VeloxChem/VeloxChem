@@ -382,62 +382,6 @@ class LinearResponseMatrixVectorDriver:
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
 
-    def s2n_half_size(self, vecs_ger, vecs_ung, tensors, nocc):
-        """
-        Computes the S2 b matrix vector product.
-
-        :param vecs_ger:
-            The gerade trial vectors in half-size.
-        :param vecs_ung:
-            The ungerade trial vectors in half-size.
-        :param tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-        :param nocc:
-            Number of occupied orbitals.
-
-        :return:
-            The gerade and ungerade S2 b matrix vector product in half-size.
-        """
-
-        assert_msg_critical(
-            vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
-            'LinearResponseSolver.e2n: invalid shape of trial vectors')
-
-        mo = tensors['C']
-        S = tensors['S']
-        D = tensors['D'][0] + tensors['D'][1]
-
-        norb = mo.shape[1]
-
-        n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
-        n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
-
-        if vecs_ger is not None:
-            half_size = vecs_ger.shape[0]
-        else:
-            half_size = vecs_ung.shape[0]
-        s2n_vecs = np.zeros((half_size, n_ger + n_ung))
-
-        for c in range(n_ger + n_ung):
-            if c < n_ger:
-                # full-size gerade trial vector
-                vec = np.hstack((vecs_ger[:, c], vecs_ger[:, c]))
-            else:
-                # full-size ungerade trial vector
-                vec = np.hstack(
-                    (vecs_ung[:, c - n_ger], -vecs_ung[:, c - n_ger]))
-
-            kappa = lrvec2mat(vec, nocc, norb).T
-            kappa_ao = np.linalg.multi_dot([mo, kappa, mo.T])
-
-            s2n_ao = np.linalg.multi_dot([kappa_ao.T, S, D])
-            s2n_ao -= np.linalg.multi_dot([D, S, kappa_ao.T])
-
-            s2n_mo = np.linalg.multi_dot([mo.T, S, s2n_ao, S, mo])
-            s2n_vecs[:, c] = -lrmat2vec(s2n_mo, nocc, norb)[:half_size]
-
-        return s2n_vecs[:, :n_ger], s2n_vecs[:, n_ger:]
-
 
 def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
     """
@@ -782,35 +726,6 @@ def construct_ed_sd_half(orb_ene, nocc, norb):
     sdiag = 2.0 * np.ones(lz)
 
     return ediag, sdiag
-
-
-def swap_xy(xy):
-    """
-    Swaps X and Y parts of response vector.
-
-    :param xy:
-        The vector.
-
-    :return:
-        The vector with X and Y parts swapped.
-    """
-
-    assert_msg_critical(
-        len(xy.shape) == 1 or len(xy.shape) == 2,
-        'LinearResponseSolver.swap: invalid shape of XY')
-
-    half_rows = xy.shape[0] // 2
-    yx = xy.copy()
-
-    if len(xy.shape) == 1:
-        yx[:half_rows] = xy[half_rows:]
-        yx[half_rows:] = xy[:half_rows]
-
-    elif len(xy.shape) == 2:
-        yx[:half_rows, :] = xy[half_rows:, :]
-        yx[half_rows:, :] = xy[:half_rows, :]
-
-    return yx
 
 
 def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,

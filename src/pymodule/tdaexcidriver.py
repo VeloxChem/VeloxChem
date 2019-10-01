@@ -9,11 +9,9 @@ from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
-from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import szblock
 from .veloxchemlib import molorb
@@ -23,8 +21,8 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import parse_xc_func
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
-from .subcommunicators import SubCommunicators
 from .polembed import PolEmbed
+from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .lrmatvecdriver import read_rsp_hdf5
@@ -240,9 +238,10 @@ class TDAExciDriver:
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
 
-        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
-                                  molecule, basis)
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
 
         # set up trial excitation vectors on master node
 
@@ -285,8 +284,9 @@ class TDAExciDriver:
                 fock, tdens, gsdens = self.get_densities(
                     trial_vecs, scf_tensors, molecule)
 
-                self.comp_tda_fock(fock, tdens, gsdens, molecule, basis,
-                                   qq_data)
+                e2x_drv.comp_lr_fock(fock, tdens, molecule, basis, screening,
+                                     self.dft, self.xcfun, self.molgrid, gsdens,
+                                     self.pe, self.V_es, self.potfile)
 
             # solve eigenvalues problem on master node
 
@@ -410,172 +410,6 @@ class TDAExciDriver:
 
         return (None, [])
 
-    def comp_tda_fock(self, fock, tdens, gsdens, molecule, basis, screening):
-        """
-        Computes Fock/Fxc matrix (2e part) for TDA excited states calculation.
-
-        :param fock:
-            The Fock matrix (2e part).
-        :param tdens:
-            The transition density matrix.
-        :param gsdens:
-            The ground state density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param screening:
-            The screening container object.
-        """
-
-        # split communicators
-        if (self.dft or self.pe) and self.nodes >= 4:
-            self.comp_tda_fock_split_comm(fock, tdens, gsdens, molecule, basis,
-                                          screening)
-
-        # single communicator
-        else:
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            eri_drv.compute(fock, tdens, molecule, basis, screening)
-
-            if self.dft:
-                if not self.xcfun.is_hybrid():
-                    for ifock in range(fock.number_of_fock_matrices()):
-                        fock.scale(2.0, ifock)
-                xc_drv = XCIntegrator(self.comm)
-                self.molgrid.distribute(self.rank, self.nodes, self.comm)
-                xc_drv.integrate(fock, tdens, gsdens, molecule, basis,
-                                 self.molgrid, self.xcfun.get_func_label())
-
-            if self.pe:
-                pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
-                pe_drv.V_es = self.V_es.copy()
-                for ifock in range(fock.number_of_fock_matrices()):
-                    dm = tdens.alpha_to_numpy(ifock) + tdens.beta_to_numpy(
-                        ifock)
-                    e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                    if self.rank == mpi_master():
-                        fock.add_matrix(DenseMatrix(V_pe), ifock)
-
-            fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-    def comp_tda_fock_split_comm(self, fock, tdens, gsdens, molecule, basis,
-                                 screening):
-        """
-        Computes TDA Fock/Fxc matrix on split communicators.
-
-        :param fock:
-            The Fock matrix (2e part).
-        :param tdens:
-            The transition density matrix.
-        :param gsdens:
-            The ground state density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param screening:
-            The screening container object.
-        """
-
-        if self.split_comm_ratio is None:
-            self.split_comm_ratio = [0.5, 0.25, 0.25]
-            if not self.dft:
-                self.split_comm_ratio = [0.5, 0.0, 0.5]
-            if not self.pe:
-                self.split_comm_ratio = [0.5, 0.5, 0.0]
-
-        if self.dft:
-            dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
-            dft_nodes = max(1, dft_nodes)
-        else:
-            dft_nodes = 0
-
-        if self.pe:
-            pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
-            pe_nodes = max(1, pe_nodes)
-        else:
-            pe_nodes = 0
-
-        eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
-
-        if eri_nodes >= dft_nodes and eri_nodes >= pe_nodes:
-            eri_nodes = self.nodes - dft_nodes - pe_nodes
-        elif dft_nodes >= eri_nodes and dft_nodes >= pe_nodes:
-            dft_nodes = self.nodes - eri_nodes - pe_nodes
-        else:
-            pe_nodes = self.nodes - eri_nodes - dft_nodes
-
-        node_grps = [0] * eri_nodes + [1] * dft_nodes + [2] * pe_nodes
-        eri_comm = (node_grps[self.rank] == 0)
-        dft_comm = (node_grps[self.rank] == 1)
-        pe_comm = (node_grps[self.rank] == 2)
-
-        subcomms = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomms.local_comm
-        cross_comm = subcomms.cross_comm
-
-        # calculate Fock on ERI nodes
-        if eri_comm:
-            t0 = tm.time()
-            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
-            eri_drv.compute(fock, tdens, molecule, basis, screening)
-            if self.dft:
-                if not self.xcfun.is_hybrid():
-                    for ifock in range(fock.number_of_fock_matrices()):
-                        fock.scale(2.0, ifock)
-            dt = tm.time() - t0
-
-        # reset molecular grid for DFT and V_es for PE
-        if self.rank != mpi_master():
-            self.molgrid = MolecularGrid()
-            self.V_es = np.zeros(0)
-        if self.dft:
-            if local_comm.Get_rank() == mpi_master():
-                self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self.pe:
-            if local_comm.Get_rank() == mpi_master():
-                self.V_es = cross_comm.bcast(self.V_es, root=mpi_master())
-
-        # calculate Fxc on DFT nodes
-        if dft_comm:
-            t0 = tm.time()
-            xc_drv = XCIntegrator(local_comm)
-            self.molgrid.distribute(local_comm.Get_rank(),
-                                    local_comm.Get_size(), local_comm)
-            xc_drv.integrate(fock, tdens, gsdens, molecule, basis, self.molgrid,
-                             self.xcfun.get_func_label())
-            dt = tm.time() - t0
-
-        # calculate e_pe and V_pe on PE nodes
-        if pe_comm:
-            t0 = tm.time()
-            pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
-            pe_drv.V_es = self.V_es.copy()
-            for ifock in range(fock.number_of_fock_matrices()):
-                dm = tdens.alpha_to_numpy(ifock) + tdens.beta_to_numpy(ifock)
-                e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                if local_comm.Get_rank() == mpi_master():
-                    fock.add_matrix(DenseMatrix(V_pe), ifock)
-            dt = tm.time() - t0
-
-        # collect Fock on master node
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-        dt = self.comm.gather(dt, root=mpi_master())
-        if self.rank == mpi_master():
-            time_eri = sum(dt[:eri_nodes])
-            time_dft = sum(dt[eri_nodes:eri_nodes + dft_nodes])
-            time_pe = sum(dt[eri_nodes + dft_nodes:])
-            time_sum = time_eri + time_dft + time_pe
-            self.split_comm_ratio = [
-                time_eri / time_sum,
-                time_dft / time_sum,
-                time_pe / time_sum,
-            ]
-        self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
-                                                root=mpi_master())
-
     def check_convergence(self, iteration):
         """
         Checks convergence of excitation energies and set convergence flag on
@@ -594,30 +428,6 @@ class TDAExciDriver:
 
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
-
-    def convert_to_sigma_matrix(self, sig_vecs):
-        """
-        Converts set of sigma vectors from std::vector<CDenseMatrix> to numpy
-        2D array.
-
-        :param sig_vecs:
-            The sigma vectors as std::vector<CDenseMatrix>.
-
-        :return:
-            The 2D numpy array.
-        """
-
-        nvecs = len(sig_vecs)
-
-        if nvecs > 0:
-
-            sig_mat = sig_vecs[0].to_numpy()
-            for i in range(1, nvecs):
-                sig_mat = np.hstack((sig_mat, sig_vecs[i].to_numpy()))
-
-            return sig_mat
-
-        return None
 
     def convert_to_trial_matrix(self, trial_vecs):
         """
