@@ -163,8 +163,8 @@ class PulsedResponse():
                                 self.pulse_settings[key])
                     except ValueError:
                         raise ValueError(
-                            "Pulse key: '{}' not parseable as float: {}"
-                            .format(key, self.pulse_settings[key]))
+                            "Pulse key: '{}' not parseable as float: {}".format(
+                                key, self.pulse_settings[key]))
 
             # Compute electric field in frequency domain
             field_w += self.gauss_env_pulse_w(
@@ -239,13 +239,11 @@ class PulsedResponse():
 
         results['pulse_settings'] = self.pulse_settings
 
+        # Store the results internally for saving to file is chosen
         self.results = results
         if self.zero_pad:
             results = self.apply_zero_pad(results)
             self.results.update(results)
-
-        # Store the results internally for saving to file is chosen
-        self.results = results
 
         # footer
         self.print_footer()
@@ -307,12 +305,15 @@ class PulsedResponse():
         :return:
             The h5 file saved contains the following datasets:
                 - frequencies : The calculated frequencies
-                - amplitudes : The pulse amplitudes for the calculated
-                               frequencies
-                - zero_padded_frequencies : The zero padded frequency list
+                - amplitudes  : The pulse amplitudes for the calculated
+                                frequencies
                 - zero_padded : Is the dataset zero padded or not
                 - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
                    =>  Amplitudes for all directions
+                - zero_padded_frequencies : The zero padded frequency list
+                - zero_padded_amplitudes  : The pulse amplitudes for the calculated
+                                            frequencies zero padded to match the
+                                            zero padded frequencies.
         """
 
         if not fname:
@@ -334,12 +335,16 @@ class PulsedResponse():
                 hf.create_dataset('amplitudes',
                                   data=self.amplitudes,
                                   compression="gzip")
-                hf.create_dataset('zero_padded_frequencies',
-                                  data=self.w,
-                                  compression="gzip")
                 hf.create_dataset('zero_padded',
                                   data=zeropad,
                                   compression="gzip")
+                if self.zero_pad:
+                    hf.create_dataset('zero_padded_amplitudes',
+                                      data=self.zero_padded_amplitudes,
+                                      compression="gzip")
+                    hf.create_dataset('zero_padded_frequencies',
+                                      data=self.w,
+                                      compression="gzip")
 
                 # Loop over all directions
                 for xyz1 in ['x', 'y', 'z']:
@@ -410,6 +415,10 @@ class PulsedResponse():
 
         # Update the results dictionary with the new zero padded result
         results['properties_zeropad'] = zero_padded_results
+
+        # Zero pad the amplitudes as well
+        zeros = [0 for x in range(len(self.w) - len(self.amplitudes))]
+        self.zero_padded_amplitudes = np.array(zeros + self.amplitudes.tolist())
 
         return results
 

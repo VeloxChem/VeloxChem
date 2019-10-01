@@ -133,6 +133,9 @@ class TestComplexResponse(unittest.TestCase):
             primary_key = "frequencies"
             if hf.get('zero_padded')[()]:
                 primary_key = "zero_padded_frequencies"
+                self.assertTrue(
+                    len(hf.get('zero_padded_frequencies')[(
+                    )]) == len(hf.get('zero_padded_amplitudes')[()]))
 
             for key in directions:
                 try:
