@@ -256,6 +256,11 @@ def parse_frequencies(input_frequencies):
     :param input_frequencies:
         The string of input frequencies.
     """
+    if isinstance(input_frequencies, list):
+        return input_frequencies
+
+    if isinstance(input_frequencies, np.ndarray):
+        return input_frequencies.tolist()
 
     frequencies = []
     for w in input_frequencies.split(','):

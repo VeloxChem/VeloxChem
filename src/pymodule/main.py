@@ -13,6 +13,7 @@ from .rspdriver import ResponseDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .crsp import ComplexResponse
+from .pulsedrsp import PulsedResponse
 from .mp2driver import Mp2Driver
 from .adconedriver import AdcOneDriver
 from .excitondriver import ExcitonModelDriver
@@ -182,6 +183,17 @@ def main():
         crsp_drv = ComplexResponse(task.mpi_comm, task.ostream)
         crsp_drv.update_settings(cpp_dict, method_dict)
         crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+
+
+    # Pulsed Linear Response Theory
+
+    if 'pulses' in task.input_dict and scf_drv.restricted:
+        prt_dict = task.input_dict['pulses'] 
+        crsp_dict = {}
+    
+        pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
+        pulsed_response.update_settings(prt_dict, crsp_dict)
+        pulsed_response.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # ADC(1)
 
