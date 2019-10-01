@@ -772,6 +772,8 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     cudaDevices->copyToDevice(ptr_bpfacts, pitch_bpfacts, bpfacts);
     
+    cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, kpfacts);
+    
     //printf("Pair factors: bra %zu ket %zu\n", pitch_bpfacts, pitch_kpfacts);
     
     // set up horizontal recursion buffer for ket side
@@ -780,7 +782,7 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
     
     // set up integrals screening
     
-    bool useqq = !intsScreener.isEmpty();
+    //bool useqq = !intsScreener.isEmpty();
     
     auto qqpairs = ketpairs;
     
@@ -802,141 +804,39 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(
         
         auto nqpdim = (symbk) ? ketpairs.getNumberOfPrimPairs(i) : pdim;
         
-        auto nqcdim = (symbk) ? i + 1 : cdim;
+        //auto nqcdim = (symbk) ? i + 1 : cdim;
         
-        // integrals screening: QQ or QQR scheme
-        
-        if (useqq)
-        {
-            // compute effective distances between GTOs pairs on bra and ket sides
+        // compute distances: R(PQ) = P - Q
             
-            if (intsScreener.getScreeningScheme() == ericut::qqr)
-            {
-                twointsfunc::compEffectiveDistancesPQ(distpq, brapairs, ketpairs,
-                                                      symbk, i);
-            }
+        twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
+                                    brapairs, nqpdim, i, cudaDevices);
             
-            intsScreener.setScreeningVector(qqvec, distpq, symbk, i);
+        // compute Obara-Saika recursion factors
             
-            mathfunc::ordering(qqidx.data(), qqvec.data(), nqcdim);
+        twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
+                                                    pitch_kpfacts, brapairs, ketpairs, nqpdim, i, cudaDevices);
             
-            nqcdim = qqpairs.compress(ketpairs, qqvec, nqcdim);
+        // compute coordinates of center W
             
-            if (nqcdim > 0) nqpdim = qqpairs.getNumberOfPrimPairs(nqcdim - 1);
-        }
-        
-        // all integrals are vanishing in batch, skip computations
-        
-        if (nqcdim == 0) continue;
-        
-        // density based screeing of integrals batches
-        
-        if (useqq)
-        {
-            // determine max. density element for GTO pairs on ket side
+        twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
+                                     ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
             
-            if ((intsScreener.getScreeningScheme() == ericut::qqden) ||
-                (intsScreener.getScreeningScheme() == ericut::qqrden))
-            {
-                distPattern.getMaxDensityElements(qqden, brapairs, qqpairs,
-                                                  symbk, nqcdim, i);
-                
-                intsScreener.setScreeningVector(qqvec, qqidx, qqden, distpq,
-                                                nqcdim, i);
-                
-                nqcdim = ddpairs.compress(qqpairs, qqvec, nqcdim);
-                
-                if (nqcdim > 0) nqpdim = ddpairs.getNumberOfPrimPairs(nqcdim - 1);
-            }
-        }
-        
-        // density screened scheme
-        
-        if ((intsScreener.getScreeningScheme() == ericut::qqden) ||
-            (intsScreener.getScreeningScheme() == ericut::qqrden))
-        {
-            cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, ddpairs.getPairFactors());
+        // compute distances: R(WP) = W - P
             
-            // for sanity check...
+        twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
+                                    nqpdim, i, cudaDevices);
             
-            cudaDevices->synchronizeCudaDevice();
+        // compute distances: R(WQ) = W - Q;
             
-            // compute distances: R(PQ) = P - Q
+        twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
+                                    ketpairs, nqpdim, i, cudaDevices);
             
-            twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
-                                        brapairs, nqpdim, i, cudaDevices);
+        // compute primitive electron repulsion integrals
             
-            // compute Obara-Saika recursion factors
-            
-            twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
-                                                        pitch_kpfacts, brapairs, ddpairs, nqpdim, i, cudaDevices);
-            
-            // compute coordinates of center W
-            
-            twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
-                                         ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
-            
-            // compute distances: R(WP) = W - P
-            
-            twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
-                                        nqpdim, i, cudaDevices);
-            
-            // compute distances: R(WQ) = W - Q;
-            
-            twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
-                                        ketpairs, nqpdim, i, cudaDevices);
-            
-            // compute primitive electron repulsion integrals
-            
-            twointsgpu::compPrimElectronRepulsionIntsOnGPU(ptr_pbuffer, pitch_pbuffer, ptr_rfacts, pitch_rfacts,
-                                                           ptr_rpq, pitch_rpq, ptr_rwp, pitch_rwp, ptr_rwq, pitch_rwq,
-                                                           ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
-                                                           brapairs, ddpairs, nqpdim, i, cudaDevices);
-            
-            cudaDevices->synchronizeCudaDevice();
-        }
-        else
-        {
-            cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, qqpairs.getPairFactors());
-            
-            // for sanity check...
-            
-            cudaDevices->synchronizeCudaDevice();
-            
-            // compute distances: R(PQ) = P - Q
-            
-            twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
-                                        brapairs, nqpdim, i, cudaDevices);
-            
-            // compute Obara-Saika recursion factors
-            
-            twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
-                                                        pitch_kpfacts, brapairs, qqpairs, nqpdim, i, cudaDevices);
-            
-            // compute coordinates of center W
-            
-            twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
-                                         ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
-            
-            // compute distances: R(WP) = W - P
-            
-            twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
-                                        nqpdim, i, cudaDevices);
-            
-            // compute distances: R(WQ) = W - Q;
-            
-            twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
-                                        ketpairs, nqpdim, i, cudaDevices);
-            
-            // compute primitive electron repulsion integrals
-            
-            twointsgpu::compPrimElectronRepulsionIntsOnGPU(ptr_pbuffer, pitch_pbuffer, ptr_rfacts, pitch_rfacts,
-                                                           ptr_rpq, pitch_rpq, ptr_rwp, pitch_rwp, ptr_rwq, pitch_rwq,
-                                                           ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
-                                                           brapairs, qqpairs, nqpdim, i, cudaDevices);
-            
-            cudaDevices->synchronizeCudaDevice();
-        }
+        twointsgpu::compPrimElectronRepulsionIntsOnGPU(ptr_pbuffer, pitch_pbuffer, ptr_rfacts, pitch_rfacts,
+                                                       ptr_rpq, pitch_rpq, ptr_rwp, pitch_rwp, ptr_rwq, pitch_rwq,
+                                                       ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
+                                                       brapairs, ketpairs, nqpdim, i, cudaDevices);
     }
     
     // deallocate prefactors used in Obara-Saika recursion on device
