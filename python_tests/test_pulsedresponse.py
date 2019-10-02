@@ -4,6 +4,7 @@ import os
 import unittest
 import h5py
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.pulsedrsp import PulsedResponse
@@ -118,7 +119,9 @@ class TestComplexResponse(unittest.TestCase):
 
         # Test the contents of the file
 
-        with h5py.File('{}.h5'.format(self.h5fname), 'r') as hf:
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            hf = h5py.File('{}.h5'.format(self.h5fname), 'r')
             for key in expected_keys:
                 if key not in hf.keys():
                     self.fail(
@@ -161,6 +164,8 @@ class TestComplexResponse(unittest.TestCase):
                     zero_padded_frequencies))
             self.assertTrue(np.allclose(hf.get('xx')[()], xx))
 
+            hf.close()
+
     def test_pulsed_response(self):
 
         expected_keys = [
@@ -168,18 +173,21 @@ class TestComplexResponse(unittest.TestCase):
             'properties_zeropad'
         ]
 
-        for key in expected_keys:
-            if key not in self.results:
-                self.fail(
-                    "Error - expected key '{}' but did not find it".format(key))
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-        # Verify that the results stored are the same as expected
-        self.assertTrue(
-            np.allclose(self.results['pulse_settings']['freq_amplitude'],
-                        amplitudes))
-        self.assertTrue(
-            np.allclose(self.results['pulse_settings']['frequencies'],
-                        frequencies))
+            for key in expected_keys:
+                if key not in self.results:
+                    self.fail(
+                        "Error - expected key '{}' but did not find it".format(
+                            key))
+
+            # Verify that the results stored are the same as expected
+            self.assertTrue(
+                np.allclose(self.results['pulse_settings']['freq_amplitude'],
+                            amplitudes))
+            self.assertTrue(
+                np.allclose(self.results['pulse_settings']['frequencies'],
+                            frequencies))
 
 
 if __name__ == "__main__":

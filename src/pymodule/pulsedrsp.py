@@ -229,32 +229,33 @@ class PulsedResponse():
         if self.rank == mpi_master():
             self.print_header()
 
-        self.ostream.print_info(
-            "Entering CPP Solver from Pulsed Linear Response")
+            self.ostream.print_info(
+                "Entering CPP Solver from Pulsed Linear Response")
 
         # Launch the rsp_driver calculations on the selected frequencies
         results = self.rsp_driver.compute(molecule, ao_basis, scf_tensors)
-        self.ostream.print_info(
-            "Exiting CPP Solver returning to Pulsed Linear Response")
-
         results['pulse_settings'] = self.pulse_settings
 
-        # Store the results internally for saving to file is chosen
-        self.results = results
-        if self.zero_pad:
-            results = self.apply_zero_pad(results)
-            self.results.update(results)
+        if self.rank == mpi_master():
+            self.ostream.print_info(
+                "Exiting CPP Solver returning to Pulsed Linear Response")
 
-        # footer
-        self.print_footer()
+            # Store the results internally for saving to file is chosen
+            self.results = results
+            if self.zero_pad:
+                results = self.apply_zero_pad(results)
+                self.results.update(results)
 
-        # Store results in h5 data file if requested
-        if 'h5' in self.pulse_settings:
-            self.write_hdf5(self.pulse_settings['h5'])
+            # footer
+            self.print_footer()
 
-        # Store results in ascii txt file if requested
-        if 'ascii' in self.pulse_settings:
-            self.write_ascii(self.pulse_settings['ascii'])
+            # Store results in h5 data file if requested
+            if 'h5' in self.pulse_settings:
+                self.write_hdf5(self.pulse_settings['h5'])
+
+            # Store results in ascii txt file if requested
+            if 'ascii' in self.pulse_settings:
+                self.write_ascii(self.pulse_settings['ascii'])
 
         return results
 
@@ -448,8 +449,10 @@ class PulsedResponse():
             return zero_padded_frequencies, frequencies
 
         # Create a new equidistant frequency list
-        self.ostream.print_info(
-            "Pulsed response module adjusts frequencies to intersect with 0")
+        if self.rank == mpi_master():
+            self.ostream.print_info(
+                "Pulsed response module adjusts frequencies to intersect with 0"
+            )
         zero_padded_frequencies = np.arange(0.0, frequencies[-1], dw)
         truncated_frequencies = zero_padded_frequencies[
             zero_padded_frequencies >= frequencies[0]]
