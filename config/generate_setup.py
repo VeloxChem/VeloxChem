@@ -137,6 +137,8 @@ def generate_setup(template_file, setup_file):
         cxxname = get_command_output([cxx, '-show'])
     else:
         cxxname = get_command_output([cxx, '--version'])
+    if 'Cray clang' in cxxname:
+        cxxname = cxxname.replace('Cray clang', 'Crayclang')
     cxxname = cxxname.split()[0]
 
     if cxxname in ['icc', 'gcc', 'clang']:
@@ -145,7 +147,7 @@ def generate_setup(template_file, setup_file):
 
     use_intel = (cxxname == 'icpc')
     use_gnu = cxxname in ['g++', 'x86_64-conda_cos6-linux-gnu-c++']
-    use_clang = (cxxname == 'clang++')
+    use_clang = cxxname in ['clang++', 'Crayclang']
 
     if not (use_intel or use_gnu or use_clang):
         print('*** Error: Unrecognized c++ compiler!')

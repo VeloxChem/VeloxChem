@@ -46,11 +46,6 @@ class CGridDriver
     MPI_Comm _locComm;
 
     /**
-     The flag for local execution mode.
-     */
-    bool _isLocalMode;
-
-    /**
      The threshold of weights screening.
      */
     double _thresholdOfWeight;
