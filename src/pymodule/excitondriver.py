@@ -268,6 +268,7 @@ class ExcitonModelDriver:
 
         rsp_vector_labels = [
             'dimer_indices',
+            'num_states',
             'hamiltonian',
             'electric_transition_dipoles',
             'velocity_transition_dipoles',
@@ -405,17 +406,22 @@ class ExcitonModelDriver:
         # read checkpoint file
         if self.restart:
             if self.rank == mpi_master():
-                dimer_indices, H, tdip, vdip, mdip, state_info = read_rsp_hdf5(
-                    self.checkpoint_file, rsp_vector_labels,
-                    molecule.nuclear_repulsion_energy(),
-                    molecule.elem_ids_to_numpy(), basis.get_label(),
-                    dft_func_label, self.ostream)
-                read_success = (dimer_indices is not None and H is not None and
+                (dimer_indices, num_states, H, tdip, vdip, mdip,
+                 state_info) = read_rsp_hdf5(
+                     self.checkpoint_file, rsp_vector_labels,
+                     molecule.nuclear_repulsion_energy(),
+                     molecule.elem_ids_to_numpy(), basis.get_label(),
+                     dft_func_label, self.ostream)
+                read_success = (dimer_indices is not None and
+                                num_states is not None and H is not None and
                                 tdip is not None and vdip is not None and
                                 mdip is not None and state_info is not None)
                 if read_success:
                     shape_match = (
                         H.shape == self.H.shape and
+                        num_states[0] == self.nstates and
+                        num_states[1] == self.ct_nocc and
+                        num_states[2] == self.ct_nvir and
                         tdip.shape == self.trans_dipoles.shape and
                         vdip.shape == self.velo_trans_dipoles.shape and
                         mdip.shape == self.magn_trans_dipoles.shape and
@@ -901,7 +907,9 @@ class ExcitonModelDriver:
                 ]
 
                 rsp_vector_list = [
-                    np.array([ind_A, ind_B]), self.H, self.trans_dipoles,
+                    np.array([ind_A, ind_B]),
+                    np.array([self.nstates, self.ct_nocc,
+                              self.ct_nvir]), self.H, self.trans_dipoles,
                     self.velo_trans_dipoles, self.magn_trans_dipoles,
                     np.string_(state_info_list)
                 ]
