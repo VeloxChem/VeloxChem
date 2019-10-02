@@ -18,7 +18,6 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
-from .polembed import PolEmbed
 from .errorhandler import assert_msg_critical
 from .subcommunicators import SubCommunicators
 
@@ -241,6 +240,7 @@ class LinearResponseMatrixVectorDriver:
                                  molgrid, xcfun.get_func_label())
 
             if pe:
+                from .polembed import PolEmbed
                 pe_drv = PolEmbed(molecule, basis, self.comm, potfile)
                 pe_drv.V_es = V_es.copy()
                 for ifock in range(fock.number_of_fock_matrices()):
@@ -355,6 +355,7 @@ class LinearResponseMatrixVectorDriver:
 
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
+            from .polembed import PolEmbed
             t0 = tm.time()
             pe_drv = PolEmbed(molecule, basis, local_comm, potfile)
             pe_drv.V_es = V_es.copy()

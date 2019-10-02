@@ -8,7 +8,6 @@ from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
-from .polembed import PolEmbed
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -285,6 +284,7 @@ class LinearResponseSolver:
 
         # set up polarizable embedding
         if self.pe:
+            from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 

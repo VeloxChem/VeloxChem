@@ -14,6 +14,11 @@ class TestPolEmbed(unittest.TestCase):
 
     def test_pe_dft(self):
 
+        try:
+            import cppe
+        except ImportError:
+            return
+
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
@@ -43,6 +48,11 @@ class TestPolEmbed(unittest.TestCase):
             self.assertTrue(abs(scf_energy - ref_scf_energy) < 1.0e-5)
 
     def test_pe_tda(self):
+
+        try:
+            import cppe
+        except ImportError:
+            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):

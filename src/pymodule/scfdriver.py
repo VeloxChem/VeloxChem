@@ -21,7 +21,6 @@ from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .denguess import DensityGuess
-from .polembed import PolEmbed
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -309,6 +308,7 @@ class ScfDriver:
         # set up polarizable embedding
 
         if self.pe:
+            from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 

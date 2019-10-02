@@ -1,5 +1,10 @@
 import numpy as np
-import cppe
+try:
+    import cppe
+except ImportError:
+    raise ImportError(
+        'Unable to import cppe; '
+        'please download and install from https://github.com/maxscheurer/cppe')
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver

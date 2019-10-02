@@ -21,7 +21,6 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import parse_xc_func
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
-from .polembed import PolEmbed
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -241,6 +240,7 @@ class TDAExciDriver:
         # generate potential for polarizable embedding
 
         if self.pe:
+            from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
