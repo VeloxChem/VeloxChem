@@ -75,7 +75,26 @@ CCudaDevices::allocate(double** pointer,
 }
 
 void
+CCudaDevices::allocate(int32_t** pointer,
+                       size_t*  pitch,
+                       int32_t  nElements,
+                       int32_t  nBlocks) const
+{
+#ifdef ENABLE_GPU
+    gpu::allocateDeviceMemory((void**) pointer, pitch, nElements * sizeof(int32_t), static_cast<size_t>(nBlocks));
+#endif
+}
+
+void
 CCudaDevices::free(double* pointer) const
+{
+#ifdef ENABLE_GPU
+    gpu::freeDeviceMemory((void*)pointer);
+#endif
+}
+
+void
+CCudaDevices::free(int32_t* pointer) const
 {
 #ifdef ENABLE_GPU
     gpu::freeDeviceMemory((void*)pointer);
@@ -90,6 +109,17 @@ CCudaDevices::copyToDevice(      double*              pointer,
 #ifdef ENABLE_GPU
     gpu::copyToDeviceMemory(pointer, pitch, memBlock2D.data(0), memBlock2D.pitched_size(0) * sizeof(double),
                             memBlock2D.size(0) * sizeof(double), static_cast<size_t>(memBlock2D.blocks()));
+#endif
+}
+
+void
+CCudaDevices::copyToDevice(      int32_t*              pointer,
+                                 size_t                pitch,
+                           const CMemBlock2D<int32_t>& memBlock2D) const
+{
+#ifdef ENABLE_GPU
+    gpu::copyToDeviceMemory(pointer, pitch, memBlock2D.data(0), memBlock2D.pitched_size(0) * sizeof(double),
+                            memBlock2D.size(0) * sizeof(int32_t), static_cast<size_t>(memBlock2D.blocks()));
 #endif
 }
 
