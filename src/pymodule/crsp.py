@@ -561,6 +561,11 @@ class ComplexResponse:
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
+            pot_info = "Reading polarizable embedding potential: {}".format(
+                self.potfile)
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -1013,21 +1018,22 @@ class ComplexResponse:
 
         width = 60
 
-        cur_str = "Damping Parameter (gamma) : {:.6e}".format(self.damping)
+        cur_str = "Damping Parameter (gamma)       : {:.6e}".format(
+            self.damping)
         self.ostream.print_header(cur_str.ljust(width))
 
-        cur_str = "Max. Number of Iterations : " + str(self.max_iter)
+        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "Convergence Threshold     : " + \
+        cur_str = "Convergence Threshold           : " + \
             "{:.1e}".format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(width))
 
-        cur_str = "ERI Screening Scheme      : " + get_qq_type(self.qq_type)
+        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+            self.qq_type)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "ERI Screening Threshold   : " + \
+        cur_str = "ERI Screening Threshold         : " + \
             "{:.1e}".format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(width))
-        self.ostream.print_blank()
 
         if self.dft:
             cur_str = "Exchange-Correlation Functional : "
@@ -1036,8 +1042,8 @@ class ComplexResponse:
             cur_str = "Molecular Grid Level            : " + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(width))
-        self.ostream.print_blank()
 
+        self.ostream.print_blank()
         self.ostream.flush()
 
     def print_convergence(self):

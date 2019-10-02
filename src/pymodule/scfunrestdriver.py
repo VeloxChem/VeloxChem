@@ -272,7 +272,9 @@ class ScfUnrestrictedDriver(ScfDriver):
             The string for spin unrestricted open shell SCF calculation.
         """
 
-        if self.dft:
-            return "Spin-Unrestricted Kohn-Sham"
+        pe_type = " with PE" if self.pe else ""
 
-        return "Spin-Unrestricted Hartree-Fock"
+        if self.dft:
+            return "Spin-Unrestricted Kohn-Sham" + pe_type
+
+        return "Spin-Unrestricted Hartree-Fock" + pe_type

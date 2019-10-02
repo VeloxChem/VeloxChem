@@ -312,6 +312,11 @@ class ScfDriver:
             pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
+            pot_info = "Reading polarizable embedding potential: {}".format(
+                self.potfile)
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
         # C2-DIIS method
         if self.acc_type == "DIIS":
             self.comp_diis(molecule, ao_basis, min_basis)

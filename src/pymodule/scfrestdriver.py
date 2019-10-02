@@ -215,10 +215,13 @@ class ScfRestrictedDriver(ScfDriver):
         :return:
             The string for spin restricted closed shell SCF calculation.
         """
-        if self.dft:
-            return "Spin-Restricted Kohn-Sham"
 
-        return "Spin-Restricted Hartree-Fock"
+        pe_type = " with PE" if self.pe else ""
+
+        if self.dft:
+            return "Spin-Restricted Kohn-Sham" + pe_type
+
+        return "Spin-Restricted Hartree-Fock" + pe_type
 
     def update_fock_type(self, fock_mat):
         """

@@ -288,6 +288,11 @@ class LinearResponseSolver:
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
             self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
 
+            pot_info = "Reading polarizable embedding potential: {}".format(
+                self.potfile)
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
@@ -542,18 +547,18 @@ class LinearResponseSolver:
 
         str_width = 60
 
-        cur_str = "Max. Number of Iterations : " + str(self.max_iter)
+        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold     : " + \
+        cur_str = "Convergence Threshold           : " + \
             "{:.1e}".format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI Screening Scheme      : " + get_qq_type(self.qq_type)
+        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+            self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold   : " + \
+        cur_str = "ERI Screening Threshold         : " + \
             "{:.1e}".format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-        self.ostream.print_blank()
 
         if self.dft:
             cur_str = "Exchange-Correlation Functional : "
@@ -562,8 +567,8 @@ class LinearResponseSolver:
             cur_str = "Molecular Grid Level            : " + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
-        self.ostream.print_blank()
 
+        self.ostream.print_blank()
         self.ostream.flush()
 
     def print_iteration(self, relative_residual_norm, converged, nvs):
