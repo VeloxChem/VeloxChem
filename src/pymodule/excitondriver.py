@@ -1,6 +1,5 @@
 import numpy as np
 import time as tm
-import h5py
 import math
 
 from .veloxchemlib import KineticEnergyIntegralsDriver
@@ -25,6 +24,8 @@ from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
+from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import write_rsp_hdf5
 
 
 class ExcitonModelDriver:
@@ -81,6 +82,8 @@ class ExcitonModelDriver:
         Number of MPI processes.
     :param ostream:
         The output stream.
+    :param restart:
+        The flag for restarting from checkpoint file.
     :param checkpoint_file:
         Name of the exciton model checkpoint file.
     """
@@ -135,7 +138,8 @@ class ExcitonModelDriver:
         # output stream
         self.ostream = ostream
 
-        # checkpoint file
+        # restart information
+        self.restart = True
         self.checkpoint_file = None
 
     def update_settings(self, exciton_dict, method_dict={}):
@@ -167,6 +171,9 @@ class ExcitonModelDriver:
         if 'ct_nvir' in exciton_dict:
             self.ct_nvir = int(exciton_dict['ct_nvir'])
 
+        if 'restart' in exciton_dict:
+            key = exciton_dict['restart'].lower()
+            self.restart = True if key == 'yes' else False
         if 'checkpoint_file' in exciton_dict:
             self.checkpoint_file = exciton_dict['checkpoint_file']
 
@@ -220,7 +227,11 @@ class ExcitonModelDriver:
         self.magn_trans_dipoles = np.zeros((total_num_states, 3))
         self.center_of_mass = molecule.center_of_mass()
 
-        self.state_info = [{} for s in range(total_num_states)]
+        self.state_info = [{
+            'type': '',
+            'frag': '',
+            'name': '',
+        } for s in range(total_num_states)]
 
         self.monomers = [{} for i in range(nfragments)]
 
@@ -249,6 +260,20 @@ class ExcitonModelDriver:
                 excitation_id[ind_A, ind_B] = ct_id
                 # CT(B->A)
                 excitation_id[ind_B, ind_A] = ct_id + ct_states
+
+        if self.dft:
+            dft_func_label = self.xcfun_label
+        else:
+            dft_func_label = 'HF'
+
+        rsp_vector_labels = [
+            'dimer_indices',
+            'hamiltonian',
+            'electric_transition_dipoles',
+            'velocity_transition_dipoles',
+            'magnetic_transition_dipoles',
+            'state_info',
+        ]
 
         # Monomers
 
@@ -310,6 +335,8 @@ class ExcitonModelDriver:
                     'eri_thresh': self.eri_thresh,
                     'conv_thresh': self.scf_conv_thresh,
                     'max_iter': self.scf_max_iter,
+                    'restart': 'yes' if self.restart else 'no',
+                    'checkpoint_file': 'monomer_{:d}.scf.h5'.format(ind + 1),
                 }, method_dict)
             scf_drv.compute(monomer, basis, min_basis)
 
@@ -329,6 +356,8 @@ class ExcitonModelDriver:
                     'eri_thresh': self.eri_thresh,
                     'conv_thresh': self.tda_conv_thresh,
                     'max_iter': self.tda_max_iter,
+                    'restart': 'yes' if self.restart else 'no',
+                    'checkpoint_file': 'monomer_{:d}.rsp.h5'.format(ind + 1),
                 }, method_dict)
             abs_spec.init_driver(self.comm, self.ostream)
             abs_spec.compute(monomer, basis, scf_drv.scf_tensors)
@@ -370,11 +399,58 @@ class ExcitonModelDriver:
 
         # Dimers
 
-        for ind_A in range(nfragments):
+        dimer_indices = None
+        dimer_index_A = 0
+
+        # read checkpoint file
+        if self.restart:
+            if self.rank == mpi_master():
+                dimer_indices, H, tdip, vdip, mdip, state_info = read_rsp_hdf5(
+                    self.checkpoint_file, rsp_vector_labels,
+                    molecule.nuclear_repulsion_energy(),
+                    molecule.elem_ids_to_numpy(), basis.get_label(),
+                    dft_func_label, self.ostream)
+                read_success = (dimer_indices is not None and H is not None and
+                                tdip is not None and vdip is not None and
+                                mdip is not None and state_info is not None)
+                if read_success:
+                    shape_match = (
+                        H.shape == self.H.shape and
+                        tdip.shape == self.trans_dipoles.shape and
+                        vdip.shape == self.velo_trans_dipoles.shape and
+                        mdip.shape == self.magn_trans_dipoles.shape and
+                        len(state_info) == len(self.state_info))
+                    read_success = read_success and shape_match
+                self.restart = read_success
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
+
+        if self.restart:
+            dimer_indices = self.comm.bcast(dimer_indices, root=mpi_master())
+            dimer_index_A = dimer_indices[0]
+
+            self.H = H.copy()
+            self.trans_dipoles = tdip.copy()
+            self.velo_trans_dipoles = vdip.copy()
+            self.magn_trans_dipoles = mdip.copy()
+
+            for info_string in state_info:
+                info = info_string.decode('utf-8').split()
+                state_id = int(info[0])
+                if len(info) > 1:
+                    self.state_info[state_id]['type'] = info[1]
+                    self.state_info[state_id]['frag'] = info[2]
+                    self.state_info[state_id]['name'] = info[3]
+
+        for ind_A in range(dimer_index_A, nfragments):
             monomer_a = molecule.get_sub_molecule(start_indices[ind_A],
                                                   self.natoms[ind_A])
 
-            for ind_B in range(ind_A + 1, nfragments):
+            if self.restart and ind_A == dimer_index_A:
+                dimer_index_B = dimer_indices[1] + 1
+            else:
+                dimer_index_B = ind_A + 1
+
+            for ind_B in range(dimer_index_B, nfragments):
                 monomer_b = molecule.get_sub_molecule(start_indices[ind_B],
                                                       self.natoms[ind_B])
 
@@ -818,6 +894,26 @@ class ExcitonModelDriver:
                 self.ostream.print_block(valstr.ljust(92))
                 self.ostream.print_blank()
 
+                state_info_list = [
+                    '{} {} {} {}'.format(state_id, info['type'], info['frag'],
+                                         info['name'])
+                    for state_id, info in enumerate(self.state_info)
+                ]
+
+                rsp_vector_list = [
+                    np.array([ind_A, ind_B]), self.H, self.trans_dipoles,
+                    self.velo_trans_dipoles, self.magn_trans_dipoles,
+                    np.string_(state_info_list)
+                ]
+
+                if self.rank == mpi_master():
+                    write_rsp_hdf5(self.checkpoint_file, rsp_vector_list,
+                                   rsp_vector_labels,
+                                   molecule.nuclear_repulsion_energy(),
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label(), dft_func_label,
+                                   self.ostream)
+
         if self.rank == mpi_master():
             self.print_banner('Summary')
 
@@ -877,44 +973,6 @@ class ExcitonModelDriver:
                 self.ostream.print_blank()
 
             self.ostream.flush()
-
-            self.write_hdf5(eigvals, eigvecs, self.ostream)
-
-    def write_hdf5(self, eigenvalues, eigenvectors, ostream):
-        """
-        Writes exciton model hdf5 file.
-
-        :param eigenvalues:
-            The eigenvalues (adiabatic excitation energies) of the exciton
-            model.
-        :param eigenvectors:
-            The eigenvectors of the exciton model.
-        :param ostream:
-            The output stream.
-        """
-
-        if self.checkpoint_file is None:
-            return
-
-        hf = h5py.File(self.checkpoint_file, 'w')
-        hf.create_dataset('hamiltonian', data=self.H, compression='gzip')
-        hf.create_dataset('electric_transition_dipoles',
-                          data=self.trans_dipoles,
-                          compression='gzip')
-        hf.create_dataset('velocity_transition_dipoles',
-                          data=self.velo_trans_dipoles,
-                          compression='gzip')
-        hf.create_dataset('magnetic_transition_dipoles',
-                          data=self.magn_trans_dipoles,
-                          compression='gzip')
-        hf.create_dataset('eigenvalues', data=eigenvalues, compression='gzip')
-        hf.create_dataset('eigenvectors', data=eigenvectors, compression='gzip')
-        hf.close()
-
-        valstr = '*** Exciton model data written to file: {}'.format(
-            self.checkpoint_file)
-        self.ostream.print_header(valstr.ljust(92))
-        self.ostream.print_blank()
 
     def print_banner(self, title):
         """

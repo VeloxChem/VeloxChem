@@ -19,7 +19,12 @@ def _AOFockMatrix_write_hdf5(self, fname):
         fockmat.restjkx: "restjkx",
         fockmat.restj: "restj",
         fockmat.restk: "restk",
-        fockmat.restkx: "restkx"
+        fockmat.restkx: "restkx",
+        fockmat.rgenjk: "rgenjk",
+        fockmat.rgenjkx: "rgenjkx",
+        fockmat.rgenj: "rgenj",
+        fockmat.rgenk: "rgenk",
+        fockmat.rgenkx: "rgenkx",
     }
 
     hf = h5py.File(fname, 'w')
@@ -55,7 +60,12 @@ def _AOFockMatrix_read_hdf5(fname):
         "restjkx": fockmat.restjkx,
         "restj": fockmat.restj,
         "restk": fockmat.restk,
-        "restkx": fockmat.restkx
+        "restkx": fockmat.restkx,
+        "rgenjk": fockmat.rgenjk,
+        "rgenjkx": fockmat.rgenjkx,
+        "rgenj": fockmat.rgenj,
+        "rgenk": fockmat.rgenk,
+        "rgenkx": fockmat.rgenkx,
     }
 
     hf = h5py.File(fname, 'r')
