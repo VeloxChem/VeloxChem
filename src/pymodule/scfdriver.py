@@ -747,6 +747,7 @@ class ScfDriver:
             vxc_mat = None
 
         if self.pe and not self.first_step:
+            from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
             pe_drv.V_es = self.V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
@@ -858,6 +859,7 @@ class ScfDriver:
 
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
+            from .polembed import PolEmbed
             t0 = tm.time()
             pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
             pe_drv.V_es = self.V_es.copy()
