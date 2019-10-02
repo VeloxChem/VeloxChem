@@ -15,7 +15,10 @@ class MyBuildPy(SetuptoolsBuildPy):
         SetuptoolsBuildPy.run(self)
 
     def make_veloxchem(self):
-        process = subprocess.Popen('make -C src -j'.split(),
+        cmd = 'make -C src -j '
+        if 'OMP_NUM_THREADS' in os.environ:
+            cmd += os.environ['OMP_NUM_THREADS']
+        process = subprocess.Popen(cmd.split(),
                                    stdout=sys.stdout,
                                    stderr=subprocess.STDOUT)
         if process.wait() != 0:

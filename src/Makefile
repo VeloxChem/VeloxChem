@@ -86,4 +86,4 @@ clean:
 .PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)
 $(VLX_LIBS): $(VLX_LIBS_DIR)
 $(VLX_LIBS_DIR):
-	make --directory=$@ $(MAKECMDGOALS)
+	$(MAKE) --directory=$@ $(MAKECMDGOALS)
