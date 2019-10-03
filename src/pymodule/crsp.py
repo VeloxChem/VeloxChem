@@ -295,7 +295,7 @@ class ComplexResponse:
 
         half_size = grad.shape[0] // 2
 
-        grad_T = np.zeros(grad.shape)
+        grad_T = np.zeros_like(grad)
         grad_T[:half_size] = grad[half_size:]
         grad_T[half_size:] = grad[:half_size]
 
@@ -589,8 +589,9 @@ class ComplexResponse:
         nonlinear_flag = False
 
         if not v1:
-            b_rhs = get_complex_rhs(self.b_operator, self.b_components, molecule, basis,
-                            scf_tensors, self.rank, self.comm)
+            b_rhs = get_complex_rhs(self.b_operator, self.b_components,
+                                    molecule, basis, scf_tensors, self.rank,
+                                    self.comm)
             if self.rank == mpi_master():
                 v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
                       for w in self.frequencies}
@@ -931,8 +932,9 @@ class ComplexResponse:
                     self.ostream.print_info(line)
 
         if not nonlinear_flag:
-            a_rhs = get_complex_rhs(self.a_operator, self.a_components, molecule, basis,
-                            scf_tensors, self.rank, self.comm)
+            a_rhs = get_complex_rhs(self.a_operator, self.a_components,
+                                    molecule, basis, scf_tensors, self.rank,
+                                    self.comm)
 
             if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}

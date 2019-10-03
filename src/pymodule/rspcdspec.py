@@ -99,27 +99,30 @@ class CircularDichroismSpectrum(ResponseProperty):
         if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No circular dichroism spectrum at zero frequency.'
             ostream.print_header(text.ljust(width))
-        else:
-            title = '{:<20s}{:<20s}{:>28s}'.format(
-                'Frequency[a.u.]', 'Frequency[eV]',
-                'Delta_epsilon[L mol^-1 cm^-1]')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
+            ostream.print_blank()
+            return
+
+        title = 'Reference: '
+        title += 'A. Jiemchooroj and P. Norman, '
+        title += 'J. Chem. Phys. 126, 134102 (2007).'
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
+
+        title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'Delta_epsilon[L mol^-1 cm^-1]')
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
 
         for w in freqs:
             if w == 0.0:
                 continue
 
-            # Reference:
-            # Jiemchooroj and Norman
-            # J. Chem. Phys. 126, 134102 (2007)
-            # https://doi.org/10.1063/1.2716660
-
             Gxx = self.rsp_property['properties'][('x', 'x', w)].imag
             Gyy = self.rsp_property['properties'][('y', 'y', w)].imag
             Gzz = self.rsp_property['properties'][('z', 'z', w)].imag
 
-            beta = (Gxx + Gyy + Gzz) / (3 * w)
+            beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
             wavenumber = 2.1947463e+5 * w
             Delta_epsilon = beta * wavenumber**2 * 0.0001343 / (100.0 * 3298.8)
 

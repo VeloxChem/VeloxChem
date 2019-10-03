@@ -101,21 +101,24 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No linear absorption spectrum at zero frequency.'
             ostream.print_header(text.ljust(width))
-        else:
-            title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
-                                                   'Frequency[eV]',
-                                                   'sigma(w)[a.u.]')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
+            ostream.print_blank()
+            return
+
+        title = 'Reference: '
+        title += 'J. Kauczor and P. Norman, '
+        title += 'J. Chem. Theory Comput. 2014, 10, 2449-2455.'
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
+
+        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'sigma(w)[a.u.]')
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
 
         for w in freqs:
             if w == 0.0:
                 continue
-
-            # Reference:
-            # Kauczor and Norman
-            # J. Chem. Theory Comput. 2014, 10, 2449-2455
-            # dx.doi.org/10.1021/ct500114m
 
             axx = -self.rsp_property['properties'][('x', 'x', w)].imag
             ayy = -self.rsp_property['properties'][('y', 'y', w)].imag

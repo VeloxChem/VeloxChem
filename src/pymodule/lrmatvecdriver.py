@@ -472,7 +472,8 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
         return tuple()
 
 
-def get_complex_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
+def get_complex_rhs(operator, components, molecule, basis, scf_tensors, rank,
+                    comm):
     """
     Creates right-hand side of linear response equations.
 
@@ -518,9 +519,9 @@ def get_complex_rhs(operator, components, molecule, basis, scf_tensors, rank, co
         linmom_mats = linmom_drv.compute(molecule, basis)
 
         if rank == mpi_master():
-            integrals = ((-1j * linmom_mats.x_to_numpy()),
-                         (-1j * linmom_mats.y_to_numpy()),
-                         (-1j * linmom_mats.z_to_numpy()))
+            integrals = (-1j * linmom_mats.x_to_numpy(),
+                         -1j * linmom_mats.y_to_numpy(),
+                         -1j * linmom_mats.z_to_numpy())
         else:
             integrals = tuple()
 
@@ -529,9 +530,9 @@ def get_complex_rhs(operator, components, molecule, basis, scf_tensors, rank, co
         angmom_mats = angmom_drv.compute(molecule, basis)
 
         if rank == mpi_master():
-            integrals = ((-1j * angmom_mats.x_to_numpy()),
-                         (-1j * angmom_mats.y_to_numpy()),
-                         (-1j * angmom_mats.z_to_numpy()))
+            integrals = (-1j * angmom_mats.x_to_numpy(),
+                         -1j * angmom_mats.y_to_numpy(),
+                         -1j * angmom_mats.z_to_numpy())
         else:
             integrals = tuple()
 
