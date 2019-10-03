@@ -143,4 +143,7 @@ class ResponseDriver:
         if self.prop_type == 'linear absorption cross-section':
             return 'Linear Absorption Cross-Section'
 
+        if self.prop_type == 'circular dichroism spectrum':
+            return 'Circular Dichroism Spectrum'
+
         return 'Undefined'

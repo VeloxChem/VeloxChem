@@ -10,6 +10,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
+from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .crsp import ComplexResponse
@@ -150,15 +151,19 @@ def main():
             rsp_dict = {}
 
         assert_msg_critical('property' in rsp_dict,
-                            'response property not found in input file')
+                            'input file: response property not found')
         prop_type = rsp_dict['property'].lower()
 
         if prop_type == 'polarizability':
             rsp_prop = Polarizability(rsp_dict, method_dict)
-        elif prop_type == 'absorption':
+        elif prop_type in ['absorption', 'uv-vis', 'ecd']:
             rsp_prop = Absorption(rsp_dict, method_dict)
         elif prop_type == 'linear absorption cross-section':
             rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
+        elif prop_type == 'circular dichroism spectrum':
+            rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
+        else:
+            assert_msg_critical(False, 'input file: invalid response property')
 
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)

@@ -2,9 +2,9 @@ from .rspproperty import ResponseProperty
 from .inputparser import parse_frequencies
 
 
-class LinearAbsorptionCrossSection(ResponseProperty):
+class CircularDichroismSpectrum(ResponseProperty):
     """
-    Implements the linear absorption cross-section property.
+    Implements the circular dichroism spectrum property.
 
     :param rsp_dict:
         The dictionary of response input.
@@ -16,7 +16,7 @@ class LinearAbsorptionCrossSection(ResponseProperty):
 
     def __init__(self, rsp_dict, method_dict={}):
         """
-        Initializes the linear absorption cross-section property.
+        Initialized the circular dichroism spectrum property.
 
         :param rsp_dict:
             The dictionary of response input.
@@ -27,15 +27,15 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         rsp_dict = dict(rsp_dict)
         method_dict = dict(method_dict)
 
-        rsp_dict['property'] = 'linear absorption cross-section'
+        rsp_dict['property'] = 'circular dichroism spectrum'
         rsp_dict['response'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['complex'] = 'yes'
 
-        rsp_dict['a_operator'] = 'dipole'
+        rsp_dict['a_operator'] = 'angular momentum'
         rsp_dict['a_components'] = 'xyz'
 
-        rsp_dict['b_operator'] = 'dipole'
+        rsp_dict['b_operator'] = 'linear momentum'
         rsp_dict['b_components'] = 'xyz'
 
         if 'frequencies' not in rsp_dict:
@@ -72,18 +72,28 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        for w in parse_frequencies(self.rsp_dict['frequencies']):
-            title = '{:<8s} {:<8s} {:>10s} {:>15s} {:>16s}'.format(
-                'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
+        title = '{:<10s} {:>15s}'.format('Frequency', 'Delta_epsilon')
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
 
-            for a in self.rsp_dict['a_components']:
-                for b in self.rsp_dict['b_components']:
-                    prop = -self.rsp_property['properties'][(a, b, w)]
-                    ops_label = '{:<8s} {:<8s} {:10.4f}'.format(
-                        a.upper(), b.upper(), w)
-                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
-                    ostream.print_header(output.ljust(width))
-            ostream.print_blank()
+        for w in parse_frequencies(self.rsp_dict['frequencies']):
+            if w == 0.0:
+                continue
+
+            # Reference:
+            # Jiemchooroj and Norman
+            # J. Chem. Phys. 126, 134102 (2007)
+            # https://doi.org/10.1063/1.2716660
+
+            Gxx = self.rsp_property['properties'][('x', 'x', w)].imag
+            Gyy = self.rsp_property['properties'][('y', 'y', w)].imag
+            Gzz = self.rsp_property['properties'][('z', 'z', w)].imag
+
+            beta = (Gxx + Gyy + Gzz) / (3 * w)
+            wavenumber = 2.1947463e+5 * w
+            Delta_epsilon = beta * wavenumber**2 * 0.0001343 / (100.0 * 3298.8)
+
+            output = '{:<10.4f} {:>15.8f}'.format(w, Delta_epsilon)
+            ostream.print_header(output.ljust(width))
+
+        ostream.print_blank()
