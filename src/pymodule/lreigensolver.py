@@ -234,7 +234,7 @@ class LinearResponseEigenSolver:
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'LinearResponseSolver: not implemented for unrestricted case')
+            'LinearResponseEigenSolver: not implemented for unrestricted case')
 
         # make preparations
         if self.rank == mpi_master():

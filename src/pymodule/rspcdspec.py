@@ -1,3 +1,4 @@
+from .veloxchemlib import hartree_in_ev
 from .rspproperty import ResponseProperty
 from .inputparser import parse_frequencies
 
@@ -67,16 +68,45 @@ class CircularDichroismSpectrum(ResponseProperty):
 
         width = 92
 
+        title = 'Response Properties'
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        for w in parse_frequencies(self.rsp_dict['frequencies']):
+            title = '{:<8s} {:<8s} {:>10s} {:>15s} {:>16s}'.format(
+                'AngMom', 'LinMom', 'Frequency', 'Real', 'Imaginary')
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
+
+            for a in self.rsp_dict['a_components']:
+                for b in self.rsp_dict['b_components']:
+                    prop = -self.rsp_property['properties'][(a, b, w)]
+                    ops_label = '{:<8s} {:<8s} {:10.4f}'.format(
+                        a.upper(), b.upper(), w)
+                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
+                        ops_label, prop.real, prop.imag)
+                    ostream.print_header(output.ljust(width))
+            ostream.print_blank()
+
         title = self.rsp_driver.prop_str()
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        title = '{:<10s} {:>15s}'.format('Frequency', 'Delta_epsilon')
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('-' * len(title)).ljust(width))
+        freqs = parse_frequencies(self.rsp_dict['frequencies'])
 
-        for w in parse_frequencies(self.rsp_dict['frequencies']):
+        if len(freqs) == 1 and freqs[0] == 0.0:
+            text = '*** No circular dichroism spectrum at zero frequency.'
+            ostream.print_header(text.ljust(width))
+        else:
+            title = '{:<20s}{:<20s}{:>28s}'.format(
+                'Frequency[a.u.]', 'Frequency[eV]',
+                'Delta_epsilon[L mol^-1 cm^-1]')
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
+
+        for w in freqs:
             if w == 0.0:
                 continue
 
@@ -93,7 +123,8 @@ class CircularDichroismSpectrum(ResponseProperty):
             wavenumber = 2.1947463e+5 * w
             Delta_epsilon = beta * wavenumber**2 * 0.0001343 / (100.0 * 3298.8)
 
-            output = '{:<10.4f} {:>15.8f}'.format(w, Delta_epsilon)
+            output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
+                w, w * hartree_in_ev(), Delta_epsilon)
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()

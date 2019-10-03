@@ -100,7 +100,7 @@ class LinearResponseMatrixVectorDriver:
         if self.rank == mpi_master():
             assert_msg_critical(
                 vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
-                'LinearResponseSolver.e2n: invalid shape of trial vectors')
+                'LinearResponse.e2n_half_size: invalid shape of trial vectors')
 
             mo = tensors['C']
             S = tensors['S']

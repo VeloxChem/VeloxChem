@@ -1,3 +1,6 @@
+import math
+
+from .veloxchemlib import hartree_in_ev
 from .rspproperty import ResponseProperty
 from .inputparser import parse_frequencies
 
@@ -67,7 +70,7 @@ class LinearAbsorptionCrossSection(ResponseProperty):
 
         width = 92
 
-        title = self.rsp_driver.prop_str()
+        title = 'Response Properties'
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
@@ -87,3 +90,42 @@ class LinearAbsorptionCrossSection(ResponseProperty):
                         ops_label, prop.real, prop.imag)
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
+
+        title = self.rsp_driver.prop_str()
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        freqs = parse_frequencies(self.rsp_dict['frequencies'])
+
+        if len(freqs) == 1 and freqs[0] == 0.0:
+            text = '*** No linear absorption spectrum at zero frequency.'
+            ostream.print_header(text.ljust(width))
+        else:
+            title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
+                                                   'Frequency[eV]',
+                                                   'sigma(w)[a.u.]')
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
+
+        for w in freqs:
+            if w == 0.0:
+                continue
+
+            # Reference:
+            # Kauczor and Norman
+            # J. Chem. Theory Comput. 2014, 10, 2449-2455
+            # dx.doi.org/10.1021/ct500114m
+
+            axx = -self.rsp_property['properties'][('x', 'x', w)].imag
+            ayy = -self.rsp_property['properties'][('y', 'y', w)].imag
+            azz = -self.rsp_property['properties'][('z', 'z', w)].imag
+
+            alpha_bar = (axx + ayy + azz) / 3.0
+            sigma = 4.0 * math.pi * w * alpha_bar / 137.035999
+
+            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+                w, w * hartree_in_ev(), sigma)
+            ostream.print_header(output.ljust(width))
+
+        ostream.print_blank()
