@@ -55,7 +55,7 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         """
 
         # key example: ('x', 'y', 0.1)
-        return self.rsp_property[key]
+        return self.rsp_property['properties'][key]
 
     def print_property(self, ostream):
         """
