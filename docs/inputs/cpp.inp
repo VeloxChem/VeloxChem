@@ -1,12 +1,13 @@
 @jobs
-task: cpp
+task: response
 @end
 
 @method settings
 basis: aug-cc-pvdz
 @end
 
-@cpp
+@response
+property: linear absorption cross-section
 frequencies: 0-0.25 (0.05)
 @end
 

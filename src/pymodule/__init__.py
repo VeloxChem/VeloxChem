@@ -52,6 +52,7 @@ from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
 from .rspproperty import ResponseProperty
+from .rsplinabscross import LinearAbsorptionCrossSection
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .mpitask import MpiTask

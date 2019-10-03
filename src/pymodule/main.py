@@ -10,6 +10,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .mointsdriver import MOIntegralsDriver
 from .rspdriver import ResponseDriver
+from .rsplinabscross import LinearAbsorptionCrossSection
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .crsp import ComplexResponse
@@ -44,7 +45,7 @@ def main():
     task_types = task.input_dict['jobs']['task'].lower().split(',')
     task_types = [x.strip() for x in task_types]
 
-    # initializa CUDA capable devices 
+    # initialize CUDA capable devices
 
     gpu_devs = CudaDevices()
     if gpu_devs.get_number_devices() > 0:
@@ -147,20 +148,28 @@ def main():
         if 'response' in task.input_dict:
 
             rsp_dict = task.input_dict['response']
+            prop_type = rsp_dict['property'].lower()
 
-            if rsp_dict['property'].lower() == 'polarizability':
+            if prop_type == 'polarizability':
                 polar = Polarizability(rsp_dict, method_dict)
                 polar.init_driver(task.mpi_comm, task.ostream)
                 polar.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():
                     polar.print_property(task.ostream)
 
-            elif rsp_dict['property'].lower() == 'absorption':
+            elif prop_type == 'absorption':
                 abs_spec = Absorption(rsp_dict, method_dict)
                 abs_spec.init_driver(task.mpi_comm, task.ostream)
                 abs_spec.compute(task.molecule, task.ao_basis, scf_tensors)
                 if task.mpi_rank == mpi_master():
                     abs_spec.print_property(task.ostream)
+
+            elif prop_type == 'linear absorption cross-section':
+                lin_abs = LinearAbsorptionCrossSection(rsp_dict, method_dict)
+                lin_abs.init_driver(task.mpi_comm, task.ostream)
+                lin_abs.compute(task.molecule, task.ao_basis, scf_tensors)
+                if task.mpi_rank == mpi_master():
+                    lin_abs.print_property(task.ostream)
 
             else:
                 if task.mpi_rank == mpi_master():
@@ -182,15 +191,16 @@ def main():
 
         crsp_drv = ComplexResponse(task.mpi_comm, task.ostream)
         crsp_drv.update_settings(cpp_dict, method_dict)
-        crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
-
+        results = crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+        if task.mpi_rank == mpi_master():
+            crsp_drv.print_properties(results['properties'])
 
     # Pulsed Linear Response Theory
 
     if 'pulses' in task.input_dict and scf_drv.restricted:
-        prt_dict = task.input_dict['pulses'] 
+        prt_dict = task.input_dict['pulses']
         crsp_dict = {}
-    
+
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
         pulsed_response.update_settings(prt_dict, crsp_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_tensors)

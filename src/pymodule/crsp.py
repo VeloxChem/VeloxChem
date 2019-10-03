@@ -135,7 +135,7 @@ class ComplexResponse:
 
         self.ostream = ostream
 
-        self.restart = False
+        self.restart = True
         self.checkpoint_file = None
 
         self.timing = False
@@ -941,7 +941,6 @@ class ComplexResponse:
                     for bop, w in solutions:
                         props[(aop, bop,
                                w)] = -np.dot(va[aop], solutions[(bop, w)])
-                self.print_properties(props)
                 return {
                     'properties': props,
                     'solutions': solutions,

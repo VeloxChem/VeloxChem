@@ -1,3 +1,4 @@
+from .crsp import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tdaexcidriver import TDAExciDriver
@@ -30,7 +31,7 @@ class ResponseDriver:
         """
 
         # default calculation type
-        self.prop_type = 'ABSORPTION'
+        self.prop_type = 'absorption'
         self.tamm_dancoff = False
         self.triplet = False
         self.rsp_dict = {}
@@ -55,17 +56,15 @@ class ResponseDriver:
         """
 
         # properties
-        if rsp_dict['property'].lower() == 'absorption':
-            self.prop_type = 'ABSORPTION'
+        self.prop_type = rsp_dict['property'].lower()
+
+        if self.prop_type == 'absorption':
             if 'tamm_dancoff' in rsp_dict:
                 key = rsp_dict['tamm_dancoff'].lower()
                 self.tamm_dancoff = True if key in ['yes', 'y'] else False
             if 'spin' in rsp_dict:
                 key = rsp_dict['spin'].lower()
                 self.triplet = True if key[0] == 't' else False
-
-        elif rsp_dict['property'].lower() == 'polarizability':
-            self.prop_type = 'POLARIZABILITY'
 
         self.rsp_dict = dict(rsp_dict)
         self.method_dict = dict(method_dict)
@@ -87,7 +86,7 @@ class ResponseDriver:
 
         # Linear response eigensolver
 
-        if self.prop_type.upper() in ['ABSORPTION']:
+        if self.prop_type in ['absorption']:
             if not self.tamm_dancoff:
                 eigensolver = LinearResponseEigenSolver(self.comm, self.ostream)
                 assert_msg_critical(
@@ -102,12 +101,21 @@ class ResponseDriver:
 
         # Linear response solver
 
-        if self.prop_type.upper() in ['POLARIZABILITY']:
+        if self.prop_type in ['polarizability']:
             lr_solver = LinearResponseSolver(self.comm, self.ostream)
 
             lr_solver.update_settings(self.rsp_dict, self.method_dict)
 
             return lr_solver.compute(molecule, ao_basis, scf_tensors)
+
+        # Complex linear response solver
+
+        if self.prop_type in ['linear absorption cross-section']:
+            clr_solver = ComplexResponse(self.comm, self.ostream)
+
+            clr_solver.update_settings(self.rsp_dict, self.method_dict)
+
+            return clr_solver.compute(molecule, ao_basis, scf_tensors)
 
     def prop_str(self):
         """
@@ -118,13 +126,16 @@ class ResponseDriver:
             The string with type of molecular property calculation.
         """
 
-        if self.prop_type == 'POLARIZABILITY':
+        if self.prop_type == 'polarizability':
             return 'Polarizability'
 
-        if self.prop_type == 'ABSORPTION':
+        if self.prop_type == 'absorption':
             if not self.triplet:
                 return 'Singlet Excited States'
             else:
-                return "Triplet Excited States"
+                return 'Triplet Excited States'
+
+        if self.prop_type == 'linear absorption cross-section':
+            return 'Linear Absorption Cross-Section'
 
         return 'Undefined'
