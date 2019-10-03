@@ -158,9 +158,15 @@ def main():
             rsp_prop = Polarizability(rsp_dict, method_dict)
         elif prop_type in ['absorption', 'uv-vis', 'ecd']:
             rsp_prop = Absorption(rsp_dict, method_dict)
-        elif prop_type == 'linear absorption cross-section':
+        elif prop_type in [
+                'linear absorption cross-section', 'linear absorption (cpp)',
+                'absorption (cpp)'
+        ]:
             rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
-        elif prop_type == 'circular dichroism spectrum':
+        elif prop_type in [
+                'circular dichroism spectrum', 'circular dichroism (cpp)',
+                'ecd (cpp)'
+        ]:
             rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
         else:
             assert_msg_critical(False, 'input file: invalid response property')
