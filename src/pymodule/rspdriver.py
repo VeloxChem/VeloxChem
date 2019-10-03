@@ -2,7 +2,6 @@ from .crsp import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tdaexcidriver import TDAExciDriver
-from .errorhandler import assert_msg_critical
 
 
 class ResponseDriver:
@@ -31,7 +30,7 @@ class ResponseDriver:
         """
 
         # default calculation type
-        self.prop_type = 'absorption'
+        self.prop_type = 'generic'
         self.tamm_dancoff = False
         self.triplet = False
         self.rsp_dict = {}
@@ -55,19 +54,19 @@ class ResponseDriver:
             The dictionary of method settings.
         """
 
-        # properties
-        self.prop_type = rsp_dict['property'].lower()
-
-        if self.prop_type == 'absorption':
-            if 'tamm_dancoff' in rsp_dict:
-                key = rsp_dict['tamm_dancoff'].lower()
-                self.tamm_dancoff = True if key in ['yes', 'y'] else False
-            if 'spin' in rsp_dict:
-                key = rsp_dict['spin'].lower()
-                self.triplet = True if key[0] == 't' else False
-
         self.rsp_dict = dict(rsp_dict)
         self.method_dict = dict(method_dict)
+
+        if 'property' in rsp_dict:
+            self.prop_type = rsp_dict['property'].lower()
+
+        if 'tamm_dancoff' in rsp_dict:
+            key = rsp_dict['tamm_dancoff'].lower()
+            self.tamm_dancoff = True if key in ['yes', 'y'] else False
+
+        # if 'spin' in rsp_dict:
+        #     key = rsp_dict['spin'].lower()
+        #     self.triplet = True if key[0] == 't' else False
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -86,31 +85,37 @@ class ResponseDriver:
 
         # Linear response eigensolver
 
-        if self.prop_type in ['absorption']:
-            if not self.tamm_dancoff:
-                eigensolver = LinearResponseEigenSolver(self.comm, self.ostream)
-                assert_msg_critical(
-                    not self.triplet,
-                    'LR EigenSolver: not yet implemented for triplets')
+        if (self.rsp_dict['response'] == 'linear' and
+                self.rsp_dict['residue'] == 'single' and
+                self.rsp_dict['complex'] == 'no'):
+
+            if self.tamm_dancoff:
+                solver = TDAExciDriver(self.comm, self.ostream)
             else:
-                eigensolver = TDAExciDriver(self.comm, self.ostream)
+                solver = LinearResponseEigenSolver(self.comm, self.ostream)
 
-            eigensolver.update_settings(self.rsp_dict, self.method_dict)
+            solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return eigensolver.compute(molecule, ao_basis, scf_tensors)
+            return solver.compute(molecule, ao_basis, scf_tensors)
 
         # Linear response solver
 
-        if self.prop_type in ['polarizability']:
-            lr_solver = LinearResponseSolver(self.comm, self.ostream)
+        if (self.rsp_dict['response'] == 'linear' and
+                self.rsp_dict['residue'] == 'none' and
+                self.rsp_dict['complex'] == 'no'):
 
-            lr_solver.update_settings(self.rsp_dict, self.method_dict)
+            solver = LinearResponseSolver(self.comm, self.ostream)
 
-            return lr_solver.compute(molecule, ao_basis, scf_tensors)
+            solver.update_settings(self.rsp_dict, self.method_dict)
+
+            return solver.compute(molecule, ao_basis, scf_tensors)
 
         # Complex linear response solver
 
-        if self.prop_type in ['linear absorption cross-section']:
+        if (self.rsp_dict['response'] == 'linear' and
+                self.rsp_dict['residue'] == 'none' and
+                self.rsp_dict['complex'] == 'yes'):
+
             clr_solver = ComplexResponse(self.comm, self.ostream)
 
             clr_solver.update_settings(self.rsp_dict, self.method_dict)

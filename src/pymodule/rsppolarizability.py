@@ -30,6 +30,7 @@ class Polarizability(ResponseProperty):
         rsp_dict['property'] = 'polarizability'
         rsp_dict['response'] = 'linear'
         rsp_dict['residue'] = 'none'
+        rsp_dict['complex'] = 'no'
 
         rsp_dict['a_operator'] = 'dipole'
         rsp_dict['a_components'] = 'xyz'

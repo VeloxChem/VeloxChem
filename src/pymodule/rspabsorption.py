@@ -30,6 +30,7 @@ class Absorption(ResponseProperty):
         rsp_dict['property'] = 'absorption'
         rsp_dict['response'] = 'linear'
         rsp_dict['residue'] = 'single'
+        rsp_dict['complex'] = 'no'
 
         if 'nstates' not in rsp_dict:
             rsp_dict['nstates'] = '3'
@@ -61,7 +62,6 @@ class Absorption(ResponseProperty):
             The output stream.
         """
 
-        ostream.print_blank()
         spin_str = 'T' if self.rsp_dict['spin'][0].upper() == 'T' else 'S'
 
         self.print_transition_dipoles(

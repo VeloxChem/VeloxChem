@@ -9,7 +9,6 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .mointsdriver import MOIntegralsDriver
-from .rspdriver import ResponseDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
@@ -146,39 +145,25 @@ def main():
     if 'response' in task_types and scf_drv.restricted:
 
         if 'response' in task.input_dict:
-
             rsp_dict = task.input_dict['response']
-            prop_type = rsp_dict['property'].lower()
-
-            if prop_type == 'polarizability':
-                polar = Polarizability(rsp_dict, method_dict)
-                polar.init_driver(task.mpi_comm, task.ostream)
-                polar.compute(task.molecule, task.ao_basis, scf_tensors)
-                if task.mpi_rank == mpi_master():
-                    polar.print_property(task.ostream)
-
-            elif prop_type == 'absorption':
-                abs_spec = Absorption(rsp_dict, method_dict)
-                abs_spec.init_driver(task.mpi_comm, task.ostream)
-                abs_spec.compute(task.molecule, task.ao_basis, scf_tensors)
-                if task.mpi_rank == mpi_master():
-                    abs_spec.print_property(task.ostream)
-
-            elif prop_type == 'linear absorption cross-section':
-                lin_abs = LinearAbsorptionCrossSection(rsp_dict, method_dict)
-                lin_abs.init_driver(task.mpi_comm, task.ostream)
-                lin_abs.compute(task.molecule, task.ao_basis, scf_tensors)
-                if task.mpi_rank == mpi_master():
-                    lin_abs.print_property(task.ostream)
-
-            else:
-                if task.mpi_rank == mpi_master():
-                    assert_msg_critical(False, 'response: invalid property')
-
         else:
-            rsp_drv = ResponseDriver(task.mpi_comm, task.ostream)
-            rsp_drv.update_settings({'property': 'absorption'})
-            rsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+            rsp_dict = {}
+
+        assert_msg_critical('property' in rsp_dict,
+                            'response property not found in input file')
+        prop_type = rsp_dict['property'].lower()
+
+        if prop_type == 'polarizability':
+            rsp_prop = Polarizability(rsp_dict, method_dict)
+        elif prop_type == 'absorption':
+            rsp_prop = Absorption(rsp_dict, method_dict)
+        elif prop_type == 'linear absorption cross-section':
+            rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
+
+        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        if task.mpi_rank == mpi_master():
+            rsp_prop.print_property(task.ostream)
 
     # Complex Response
 

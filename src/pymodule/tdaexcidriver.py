@@ -668,8 +668,8 @@ class TDAExciDriver:
             trans_dipole = np.array(
                 [np.vdot(trans_dens, dipole_ints[d]) for d in range(3)])
 
-            if self.triplet:
-                trans_dipole = np.zeros(3)
+            # if self.triplet:
+            #     trans_dipole = np.zeros(3)
 
             transition_dipoles.append(trans_dipole)
 
@@ -705,8 +705,8 @@ class TDAExciDriver:
             trans_dipole = -1.0 / eigvals[s] * np.array(
                 [np.vdot(trans_dens, linmom_ints[d]) for d in range(3)])
 
-            if self.triplet:
-                trans_dipole = np.zeros(3)
+            # if self.triplet:
+            #     trans_dipole = np.zeros(3)
 
             transition_dipoles.append(trans_dipole)
 
@@ -739,8 +739,8 @@ class TDAExciDriver:
             trans_dipole = 0.5 * np.array(
                 [np.vdot(trans_dens, angmom_ints[d]) for d in range(3)])
 
-            if self.triplet:
-                trans_dipole = np.zeros(3)
+            # if self.triplet:
+            #     trans_dipole = np.zeros(3)
 
             transition_dipoles.append(trans_dipole)
 
