@@ -472,6 +472,96 @@ def get_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
         return tuple()
 
 
+def get_complex_rhs(operator, components, molecule, basis, scf_tensors, rank, comm):
+    """
+    Creates right-hand side of linear response equations.
+
+    :param operator:
+        The string for the operator.
+    :param components:
+        The string for Cartesian components.
+    :param molecule:
+        The molecule.
+    :param basis:
+        The AO basis set.
+    :param scf_tensors:
+        The dictionary of tensors from converged SCF wavefunction.
+    :param rank:
+        Rank of the MPI process.
+    :param comm:
+        The MPI communicator.
+
+    :return:
+        The right-hand sides (gradients).
+    """
+
+    # compute 1e integral
+
+    assert_msg_critical(
+        operator in [
+            'dipole', 'linear_momentum', 'linear momentum', 'angular_momentum',
+            'angular momentum'
+        ], 'get_rhs: unsupported operator {}'.format(operator))
+
+    if operator == 'dipole':
+        dipole_drv = ElectricDipoleIntegralsDriver(comm)
+        dipole_mats = dipole_drv.compute(molecule, basis)
+
+        if rank == mpi_master():
+            integrals = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                         dipole_mats.z_to_numpy())
+        else:
+            integrals = tuple()
+
+    elif operator in ['linear_momentum', 'linear momentum']:
+        linmom_drv = LinearMomentumIntegralsDriver(comm)
+        linmom_mats = linmom_drv.compute(molecule, basis)
+
+        if rank == mpi_master():
+            integrals = ((-1j * linmom_mats.x_to_numpy()),
+                         (-1j * linmom_mats.y_to_numpy()),
+                         (-1j * linmom_mats.z_to_numpy()))
+        else:
+            integrals = tuple()
+
+    elif operator in ['angular_momentum', 'angular momentum']:
+        angmom_drv = AngularMomentumIntegralsDriver(comm)
+        angmom_mats = angmom_drv.compute(molecule, basis)
+
+        if rank == mpi_master():
+            integrals = ((-1j * angmom_mats.x_to_numpy()),
+                         (-1j * angmom_mats.y_to_numpy()),
+                         (-1j * angmom_mats.z_to_numpy()))
+        else:
+            integrals = tuple()
+
+    # compute right-hand side
+
+    if rank == mpi_master():
+        indices = {'x': 0, 'y': 1, 'z': 2}
+        integral_comps = [integrals[indices[p]] for p in components]
+
+        mo = scf_tensors['C']
+        S = scf_tensors['S']
+        D = scf_tensors['D'][0] + scf_tensors['D'][1]
+
+        nocc = molecule.number_of_alpha_electrons()
+        norb = mo.shape[1]
+
+        matrices = tuple(
+            np.linalg.multi_dot([
+                mo.T,
+                (np.linalg.multi_dot([S, D, P.conj().T]) -
+                 np.linalg.multi_dot([P.conj().T, D, S])), mo
+            ]) for P in integral_comps)
+
+        gradients = tuple(lrmat2vec(m, nocc, norb) for m in matrices)
+        return gradients
+
+    else:
+        return tuple()
+
+
 def lrvec2mat(vec, nocc, norb):
     """
     Converts vectors to matrices.

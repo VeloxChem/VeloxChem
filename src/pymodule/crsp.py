@@ -15,7 +15,7 @@ from .lrmatvecdriver import orthogonalize_gram_schmidt_half
 from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import lrvec2mat
-from .lrmatvecdriver import get_rhs
+from .lrmatvecdriver import get_complex_rhs
 from .lrmatvecdriver import read_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
 from .errorhandler import assert_msg_critical
@@ -589,7 +589,7 @@ class ComplexResponse:
         nonlinear_flag = False
 
         if not v1:
-            b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
+            b_rhs = get_complex_rhs(self.b_operator, self.b_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
             if self.rank == mpi_master():
                 v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
@@ -931,7 +931,7 @@ class ComplexResponse:
                     self.ostream.print_info(line)
 
         if not nonlinear_flag:
-            a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
+            a_rhs = get_complex_rhs(self.a_operator, self.a_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
 
             if self.rank == mpi_master():
