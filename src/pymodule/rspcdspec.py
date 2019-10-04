@@ -81,7 +81,7 @@ class CircularDichroismSpectrum(ResponseProperty):
 
             for a in self.rsp_dict['a_components']:
                 for b in self.rsp_dict['b_components']:
-                    prop = -self.rsp_property['properties'][(a, b, w)]
+                    prop = self.rsp_property['properties'][(a, b, w)]
                     ops_label = '{:<8s} {:<8s} {:10.4f}'.format(
                         a.upper(), b.upper(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(

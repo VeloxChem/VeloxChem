@@ -771,24 +771,21 @@ class ComplexResponse:
 
                         # ...and projecting them onto respective subspace
 
-                        halfx_realger = np.matmul(bger, c_realger)
-                        halfx_realung = np.matmul(bung, c_realung)
-                        halfx_imagung = np.matmul(bung, c_imagung)
-                        halfx_imagger = np.matmul(bger, c_imagger)
+                        x_realger = np.matmul(bger, c_realger)
+                        x_realung = np.matmul(bung, c_realung)
+                        x_imagung = np.matmul(bung, c_imagung)
+                        x_imagger = np.matmul(bger, c_imagger)
 
                         # composing full size response vector
 
-                        x_realger = np.hstack((halfx_realger, halfx_realger))
-                        x_realung = np.hstack((halfx_realung, -halfx_realung))
-                        x_imagung = np.hstack((halfx_imagung, -halfx_imagung))
-                        x_imagger = np.hstack((halfx_imagger, halfx_imagger))
+                        x_realger_full = np.hstack((x_realger, x_realger))
+                        x_realung_full = np.hstack((x_realung, -x_realung))
+                        x_imagung_full = np.hstack((x_imagung, -x_imagung))
+                        x_imagger_full = np.hstack((x_imagger, x_imagger))
 
-                        x_real = x_realger + x_realung
-                        x_imag = x_imagung + x_imagger
-                        x = np.zeros(len(x_real), dtype=complex)
-
-                        for pos in range(len(x_real)):
-                            x[pos] = complex(x_real[pos], x_imag[pos])
+                        x_real = x_realger_full + x_realung_full
+                        x_imag = x_imagung_full + x_imagger_full
+                        x = x_real + 1j * x_imag
 
                         solutions[(op, w)] = x
 

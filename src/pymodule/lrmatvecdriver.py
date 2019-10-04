@@ -509,8 +509,9 @@ def get_complex_rhs(operator, components, molecule, basis, scf_tensors, rank,
         dipole_mats = dipole_drv.compute(molecule, basis)
 
         if rank == mpi_master():
-            integrals = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                         dipole_mats.z_to_numpy())
+            integrals = (dipole_mats.x_to_numpy() + 0j,
+                         dipole_mats.y_to_numpy() + 0j,
+                         dipole_mats.z_to_numpy() + 0j)
         else:
             integrals = tuple()
 
