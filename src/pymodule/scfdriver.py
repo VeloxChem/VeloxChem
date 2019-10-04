@@ -85,6 +85,8 @@ class ScfDriver:
         The flag for restarting from checkpoint file.
     :param checkpoint_file:
         The name of checkpoint file.
+    :param checkpoint_time:
+        The timer of checkpoint file.
     :param ref_mol_orbs:
         The reference molecular orbitals read from checkpoint file.
     :param restricted:
@@ -176,6 +178,7 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+        self.checkpoint_time = None
         self.ref_mol_orbs = None
 
         # restricted?
@@ -388,8 +391,10 @@ class ScfDriver:
 
         if self.rank == mpi_master() and not self.first_step:
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
-                self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
-                                         basis_set)
+                if tm.time() - self.checkpoint_time > 900.0:
+                    self.mol_orbs.write_hdf5(self.checkpoint_file,
+                                             nuclear_charges, basis_set)
+                    self.checkpoint_time = tm.time()
 
     def comp_diis(self, molecule, ao_basis, min_basis):
         """
@@ -411,6 +416,7 @@ class ScfDriver:
             pr.enable()
 
         start_time = tm.time()
+        self.checkpoint_time = start_time
 
         self.fock_matrices.clear()
         self.den_matrices.clear()

@@ -81,6 +81,8 @@ class LinearResponseSolver:
         The flag for restarting from checkpoint file.
     :param checkpoint_file:
         The name of checkpoint file.
+    :param checkpoint_time:
+        The timer of checkpoint file.
     :param timing:
         The flag for printing timing information.
     :param profiling:
@@ -139,6 +141,7 @@ class LinearResponseSolver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+        self.checkpoint_time = None
 
         self.timing = False
         self.profiling = False
@@ -243,6 +246,7 @@ class LinearResponseSolver:
             self.print_header()
 
         self.start_time = tm.time()
+        self.checkpoint_time = self.start_time
 
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
@@ -492,11 +496,15 @@ class LinearResponseSolver:
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
                 e2bung = np.append(e2bung, new_e2bung, axis=1)
 
-                write_rsp_hdf5(self.checkpoint_file,
-                               [bger, bung, e2bger, e2bung], rsp_vector_labels,
-                               molecule.nuclear_repulsion_energy(),
-                               molecule.elem_ids_to_numpy(), basis.get_label(),
-                               dft_func_label, self.ostream)
+                if tm.time() - self.checkpoint_time > 900.0:
+                    write_rsp_hdf5(self.checkpoint_file,
+                                   [bger, bung, e2bger, e2bung],
+                                   rsp_vector_labels,
+                                   molecule.nuclear_repulsion_energy(),
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label(), dft_func_label,
+                                   self.ostream)
+                    self.checkpoint_time = tm.time()
 
             if self.timing:
                 tid = iteration + 1

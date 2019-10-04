@@ -76,6 +76,8 @@ class TDAExciDriver:
         The flag for restarting from checkpoint file.
     :param checkpoint_file:
         The name of checkpoint file.
+    :param checkpoint_time:
+        The timer of checkpoint file.
     """
 
     def __init__(self, comm, ostream):
@@ -125,6 +127,7 @@ class TDAExciDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+        self.checkpoint_time = None
 
         self.split_comm_ratio = None
 
@@ -210,6 +213,7 @@ class TDAExciDriver:
         # set start time
 
         start_time = tm.time()
+        self.checkpoint_time = start_time
 
         # generate screening for ERI
 
@@ -326,12 +330,15 @@ class TDAExciDriver:
                 if i >= n_restart_iterations:
                     trials = self.solver.trial_matrices
                     sigmas = self.solver.sigma_matrices
-                    write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
-                                   ['TDA_trials', 'TDA_sigmas'],
-                                   molecule.nuclear_repulsion_energy(),
-                                   molecule.elem_ids_to_numpy(),
-                                   basis.get_label(), dft_func_label,
-                                   self.ostream)
+
+                    if tm.time() - self.checkpoint_time > 900.0:
+                        write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
+                                       ['TDA_trials', 'TDA_sigmas'],
+                                       molecule.nuclear_repulsion_energy(),
+                                       molecule.elem_ids_to_numpy(),
+                                       basis.get_label(), dft_func_label,
+                                       self.ostream)
+                        self.checkpoint_time = tm.time()
 
             # check convergence
 
