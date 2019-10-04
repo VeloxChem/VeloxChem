@@ -700,7 +700,7 @@ def orthogonalize_gram_schmidt_half(tvecs):
         The orthogonalized trial vectors.
     """
 
-    invsqrt2 = np.sqrt(2.0)
+    invsqrt2 = 1.0 / np.sqrt(2.0)
 
     if tvecs.shape[1] > 0:
 
@@ -751,7 +751,7 @@ def normalize_half(vecs):
         The normalized vectors.
     """
 
-    invsqrt2 = np.sqrt(2.0)
+    invsqrt2 = 1.0 / np.sqrt(2.0)
 
     if len(vecs.shape) != 1:
         for vec in range(vecs.shape[1]):
