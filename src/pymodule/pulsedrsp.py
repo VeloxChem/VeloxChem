@@ -386,7 +386,7 @@ class PulsedResponse:
                 higher temporal resolution
 
         Example of zero padding:
-            0 ~~~zero_pad~~~ | === DATA === | ~~~zero_pad~~~ end_freq
+            w: 0~~~zero_pad~~~|===DATA===|~~~zero_pad~~~end_freq
 
         :param results:
             A dictionary containing properties, solutions and kappas
