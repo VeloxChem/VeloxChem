@@ -2,6 +2,7 @@ from setuptools import setup
 from setuptools.command.build_py import build_py as SetuptoolsBuildPy
 from setuptools.command.install import install as SetuptoolsInstall
 from config.generate_setup import generate_setup
+import multiprocessing
 import subprocess
 import sys
 import os
@@ -18,6 +19,8 @@ class MyBuildPy(SetuptoolsBuildPy):
         cmd = 'make -C src -j '
         if 'OMP_NUM_THREADS' in os.environ:
             cmd += os.environ['OMP_NUM_THREADS']
+        else:
+            cmd += str(multiprocessing.cpu_count())
         process = subprocess.Popen(cmd.split(),
                                    stdout=sys.stdout,
                                    stderr=subprocess.STDOUT)
