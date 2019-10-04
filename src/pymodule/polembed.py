@@ -65,11 +65,16 @@ class PolEmbed:
         if self._enable_induction:
             elec_fields = self.compute_electric_field_value(dm)
             # solve induced moments
-            self.cppe_state.update_induced_moments(elec_fields.flatten(),
-                                                   elec_only)
-            induced_moments = np.array(
-                self.cppe_state.get_induced_moments()).reshape(
-                    self.polarizable_coords.shape)
+            if self.rank == mpi_master():
+                self.cppe_state.update_induced_moments(elec_fields.flatten(),
+                                                       elec_only)
+                induced_moments = np.array(
+                    self.cppe_state.get_induced_moments()).reshape(
+                        self.polarizable_coords.shape)
+            else:
+                induced_moments = None
+            induced_moments = self.comm.bcast(induced_moments,
+                                              root=mpi_master())
             V_ind = self.compute_induction_operator(induced_moments)
 
         if self.rank == mpi_master():
@@ -125,12 +130,26 @@ class PolEmbed:
 
     def compute_induction_operator(self, moments):
 
-        ef_driver = ElectricFieldIntegralsDriver(self.comm)
-        ret = ef_driver.compute(self.molecule, self.basis, moments,
-                                self.polarizable_coords)
-        if self.rank == mpi_master():
+        node_grps = [p for p in range(self.nodes)]
+        subcomm = SubCommunicators(self.comm, node_grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+
+        ave, res = divmod(self.polarizable_coords.shape[0], self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        ef_driver = ElectricFieldIntegralsDriver(local_comm)
+        ret = ef_driver.compute(self.molecule, self.basis,
+                                moments[start:end, :],
+                                self.polarizable_coords[start:end, :])
+
+        if local_comm.Get_rank() == mpi_master():
             V_ind = -1.0 * (ret.x_to_numpy() + ret.y_to_numpy() +
                             ret.z_to_numpy())
+            V_ind = cross_comm.reduce(V_ind, root=mpi_master())
         else:
             V_ind = np.zeros(0)
 
@@ -161,10 +180,11 @@ class PolEmbed:
 
         if local_comm.Get_rank() == mpi_master():
             elec_field = cross_comm.gather(elec_field, root=mpi_master())
+        else:
+            elec_field = []
+
         if self.rank == mpi_master():
             elec_field = np.array([xyz for ef in elec_field for xyz in ef])
             elec_field = elec_field.reshape(self.polarizable_coords.shape)
-
-        elec_field = self.comm.bcast(elec_field, root=mpi_master())
 
         return elec_field
