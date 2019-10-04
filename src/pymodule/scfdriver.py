@@ -393,10 +393,8 @@ class ScfDriver:
 
         if self.rank == mpi_master() and not self.first_step:
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
-                if tm.time() - self.checkpoint_time > 900.0:
-                    self.mol_orbs.write_hdf5(self.checkpoint_file,
-                                             nuclear_charges, basis_set)
-                    self.checkpoint_time = tm.time()
+                self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
+                                         basis_set)
 
     def comp_diis(self, molecule, ao_basis, min_basis):
         """
@@ -523,8 +521,10 @@ class ScfDriver:
             if self.timing:
                 self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
 
-            self.write_checkpoint(molecule.elem_ids_to_numpy(),
-                                  ao_basis.get_label())
+            if tm.time() - self.checkpoint_time > 900.0:
+                self.write_checkpoint(molecule.elem_ids_to_numpy(),
+                                      ao_basis.get_label())
+                self.checkpoint_time = tm.time()
 
             self.density = AODensityMatrix(den_mat)
 
@@ -537,6 +537,9 @@ class ScfDriver:
 
             if self.is_converged:
                 break
+
+        self.write_checkpoint(molecule.elem_ids_to_numpy(),
+                              ao_basis.get_label())
 
         if self.profiling and not self.first_step:
             pr.disable()
