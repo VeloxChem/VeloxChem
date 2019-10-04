@@ -77,6 +77,8 @@ class ScfDriver:
         The current molecular orbitals.
     :param nuc_energy:
         The nuclear repulsion energy of molecule.
+    :param comm:
+        The MPI communicator.
     :param rank:
         The rank of MPI process.
     :param nodes:

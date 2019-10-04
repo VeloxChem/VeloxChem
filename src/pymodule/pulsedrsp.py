@@ -6,16 +6,19 @@ from .crsp import ComplexResponse
 from .inputparser import parse_frequencies
 
 
-class PulsedResponse():
+class PulsedResponse:
     """
     Pulsed Reponse class for computing molecular responses to
     a resonant or non-resonant laser pulse.
-
 
     :param comm:
         The MPI communicator.
     :param rank:
         The MPI rank.
+    :param nodes:
+        The number of MPI processes.
+    :param ostream:
+        The output stream.
     :param field_cutoff_ratio:
         Float - Ratio between the smallest field amplitude to be included in
         the calculation wrt. the maximum field amplitude.
@@ -38,10 +41,10 @@ class PulsedResponse():
         string - polarization directions, arguments given in combinations of
         x, y and z - e.g.: 'x' for [1 0 0], yz for [0 1 1].
     :param frequency_range:
-        List Frequencies to map solution to - given as range:
-            'start-end(df)' in [au]
-        e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 au in steps of 0.007 au
-        zero-padding will be applied if range does not start at 0
+        List of frequencies to map solution to.
+        Given as range: 'start-end(df)' in [au],
+        e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 au in steps of 0.007 au.
+        Zero-padding will be applied if range does not start at 0.
     :param CEP:
         List of floats (len(N)) - carrier envelope phases in [radians]
     :param h5file:
@@ -49,20 +52,6 @@ class PulsedResponse():
     :param ascii:
         String - optional - name of requested ASCII formatted file
     """
-
-    multi_input_keys = [
-        'pulse_widths', 'carrier_frequencies', 'field_max', 'centers', 'CEP'
-    ]
-
-    # List of parameters that are floats for parsing
-    float_input_keys = [
-        'field_cutoff_ratio',
-        'pulse_widths',
-        'carrier_frequencies',
-        'centers',
-        'CEP',
-        'field_max',
-    ]
 
     def __init__(self, comm, ostream):
         """
@@ -74,8 +63,8 @@ class PulsedResponse():
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.comm = comm
         self.ostream = ostream
+
         self.zero_pad = False
         self.pulse_settings = {}
         self.crsp_settings = {}
@@ -92,6 +81,16 @@ class PulsedResponse():
         self.pulse_settings['field_max'] = 1.0e-5
         self.pulse_settings['pol_dir'] = 'x'
         self.pulse_settings['frequency_range'] = "0.0 - 1.0 (0.0025)"
+
+        self.multi_input_keys = [
+            'pulse_widths', 'carrier_frequencies', 'field_max', 'centers', 'CEP'
+        ]
+
+        # List of parameters that are floats for parsing
+        self.float_input_keys = [
+            'field_cutoff_ratio', 'pulse_widths', 'carrier_frequencies',
+            'centers', 'CEP', 'field_max'
+        ]
 
     def update_settings(self, settings, crsp_settings):
         """
@@ -129,7 +128,7 @@ class PulsedResponse():
         field_w = np.zeros_like(freqs, dtype=np.complex128)
 
         # Check that all Pulse list parameters are given correct
-        for key in PulsedResponse.multi_input_keys:
+        for key in self.multi_input_keys:
             if key not in self.pulse_settings:
                 raise KeyError(
                     "Key '{}' not defined for PulsedResponse".format(key))
@@ -152,10 +151,10 @@ class PulsedResponse():
 
         # Loop over number of pulses
         for p in range(self.pulse_settings['number_pulses']):
-            for key in PulsedResponse.float_input_keys:
+            for key in self.float_input_keys:
                 if key in self.pulse_settings:
                     try:
-                        if key in PulsedResponse.multi_input_keys:
+                        if key in self.multi_input_keys:
                             self.pulse_settings[key][p] = float(
                                 self.pulse_settings[key][p])
                         else:
@@ -387,12 +386,11 @@ class PulsedResponse():
                 higher temporal resolution
 
         Example of zero padding:
-         w:     |~~~~~~~~~~~~|======|~~~~~~~~~~~~|
-                0  zero pad    DATA   zero pad   end freq
+            0 ~~~zero_pad~~~ | === DATA === | ~~~zero_pad~~~ end_freq
 
         :param results:
             A dictionary containing properties, solutions and kappas
-            (the results dict from .compute()
+            (the results dict from .compute())
 
         :return:
             A dictionary containing properties, solutions and kappas
@@ -462,13 +460,18 @@ class PulsedResponse():
         """
         Gaussian pulse from frequency domain input.
 
-        :param frequencies:
-            w         - np array - list of frequencies
-            F0        - float    - pulse amplitude in [au]
-            t0        - float    - time center for pulse in [au]
-            delta_t   - float    - pulse width in [au]
-            w_carrier - float    - carrier frequency in [au]
-            cep       - float    - carrier envelope phases in [radians]
+        :param w:
+            np.array - list of frequencies
+        :param F0:
+            float - pulse amplitude in [au]
+        :param t0:
+            float - time center for pulse in [au]
+        :param delta_t:
+            float - pulse width in [au]
+        :param w_carrier:
+            float - carrier frequency in [au]
+        :param cep:
+            float - carrier envelope phases in [radians]
 
         :return:
             numpy array of the pulse amplitude in the frequency domain

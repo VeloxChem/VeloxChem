@@ -7,7 +7,7 @@ basis: aug-cc-pvdz
 @end
 
 @response
-property: linear absorption cross-section
+property: absorption (cpp)
 frequencies: 0-0.25 (0.05)
 @end
 
