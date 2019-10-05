@@ -16,11 +16,16 @@
 namespace gpu {
 
 /**
- Sets up requested  CUDA compute capable device.
+ Sets up context of requested  CUDA compute capable device.
 
  @param iDevice the identifier of CUDA compute capable device.
  */
-void setDevice(const int32_t iDevice);
+void set_device(const int32_t iDevice);
+    
+/**
+ Synchronizes CUDA compute capable device.
+*/
+void synchronize_device();
     
 /**
  Allocates CUDA compute device memory.
@@ -75,12 +80,6 @@ void copyFromDeviceMemory(      void*  destination,
                                 size_t sourcePitch,
                                 size_t dataWidth,
                                 size_t dataHeight);
-    
-/**
- Synchronizes CUDA compute capable device.
- */
-void synchronizeDevice();
-    
 }
 
 #endif

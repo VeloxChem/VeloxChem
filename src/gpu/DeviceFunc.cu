@@ -13,12 +13,22 @@
 namespace gpu {  // gpu namespace
 
 void
-setDevice(const int32_t iDevice)
+set_device(const int32_t iDevice)
 {
 #ifdef ENABLE_GPU
     auto cerr = cudaSetDevice(iDevice);
 
     errors::assertMsgCritical(cerr == cudaSuccess, {"setCudaDevice"});
+#endif
+}
+
+void
+synchronize_device()
+{
+#ifdef ENABLE_GPU
+auto cerr = cudaDeviceSynchronize();
+
+errors::assertMsgCritical(cerr == cudaSuccess, {"synchronizeCudaDevice"});
 #endif
 }
 
@@ -74,16 +84,6 @@ copyFromDeviceMemory(     void*  destination,
                              cudaMemcpyDeviceToHost);
 
     errors::assertMsgCritical(cerr == cudaSuccess, {"copyFromDeviceMemory"});
-#endif
-}
-
-void
-synchronizeDevice()
-{
-#ifdef ENABLE_GPU
-    auto cerr = cudaDeviceSynchronize();
-
-    errors::assertMsgCritical(cerr == cudaSuccess, {"synchronizeDevice"});
 #endif
 }
 

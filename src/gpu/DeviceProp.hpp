@@ -25,10 +25,10 @@ namespace gpu {
  @param computeMinorCapabilityOfDevices the vector of minor compute capabilities of CUDA
         compute capable devices.
  */
-void getDevicesProperty(std::vector<std::string>& namesOfDevices,
-                        std::vector<int32_t>&     globalMemoryOfDevices,
-                        std::vector<int32_t>&     computeMajorCapabilityOfDevices,
-                        std::vector<int32_t>&     computeMinorCapabilityOfDevices);
+void get_devices_property(std::vector<std::string>& namesOfDevices,
+                          std::vector<int32_t>&     globalMemoryOfDevices,
+                          std::vector<int32_t>&     computeMajorCapabilityOfDevices,
+                          std::vector<int32_t>&     computeMinorCapabilityOfDevices);
 }
 
 #endif

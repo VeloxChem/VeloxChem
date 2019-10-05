@@ -29,7 +29,8 @@ CCudaDevices::CCudaDevices()
     , _computeMinorCapabilityOfDevices(std::vector<int32_t>())
 {
 #ifdef ENABLE_GPU
-    gpu::getDevicesProperty(_namesOfDevices, _globalMemoryOfDevices, _computeMajorCapabilityOfDevices, _computeMinorCapabilityOfDevices);
+    gpu::get_devices_property(_namesOfDevices, _globalMemoryOfDevices, _computeMajorCapabilityOfDevices,
+                              _computeMinorCapabilityOfDevices);
 #endif
 }
 
@@ -44,7 +45,7 @@ CCudaDevices::setCudaDevice(const int32_t iDevice) const
 #ifdef ENABLE_GPU
     if (iDevice < getNumberOfDevices())
     {
-        gpu::setDevice(iDevice); 
+        gpu::set_device(iDevice);
     }
 #endif
 }
@@ -53,7 +54,7 @@ void
 CCudaDevices::synchronizeCudaDevice() const
 {
 #ifdef ENABLE_GPU
-    gpu::synchronizeDevice(); 
+    gpu::synchronize_device(); 
 #endif
 }
 
