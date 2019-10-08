@@ -112,10 +112,10 @@ $(VLX_MAIN_DEP): $(VLX_MAIN_SCR)
 .PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)
 $(VLX_LIBS): $(VLX_LIBS_DIR)
 $(VLX_LIBS_DIR):
-	make --directory=$@ $(MAKECMDGOALS)
+	$(MAKE) --directory=$@ $(MAKECMDGOALS)
 
 # Set internal libraries generation rule
 .PHONY: $(VST_LIBS) $(VST_LIBS_DIR)
 $(VST_LIBS): $(VST_LIBS_DIR)
 $(VST_LIBS_DIR):
-	make --directory=$@ $(MAKECMDGOALS)
+	$(MAKE) --directory=$@ $(MAKECMDGOALS)
