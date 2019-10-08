@@ -13,27 +13,37 @@ from veloxchem.pulsedrsp import PulsedResponse
 # Test data for comparison of Pulse Response Computed results
 # ---------------------------------------------------------------------------
 amplitudes = np.array([
-    1.59140758e-09 - 5.77836923e-11j, -3.67213109e-09 + 6.83655709e-09j,
-    -1.74502523e-08 - 2.85463969e-08j, 1.27592033e-07 - 2.48570048e-09j,
-    -2.10126192e-07 + 3.75898547e-07j, -6.52015265e-07 - 1.10806061e-06j,
-    3.39573025e-06 - 9.04784541e-09j, -3.98764543e-06 + 6.86014049e-06j,
-    -8.08028193e-06 - 1.42758096e-05j, 2.99992466e-05 + 4.24524335e-07j,
-    -2.50990214e-05 + 4.15548207e-05j, -3.32107960e-05 - 6.10472590e-05j,
-    8.79741389e-05 + 2.72498271e-06j, -5.23995798e-05 + 8.35473246e-05j,
-    -4.52672827e-05 - 8.66488453e-05j, 8.56381194e-05 + 4.09487227e-06j,
-    -3.62872478e-05 + 5.57523153e-05j, -2.04600590e-05 - 4.08219182e-05j,
-    2.76723777e-05 + 1.78996808e-06j, -8.33600161e-06 + 1.23483456e-05j,
-    -3.06625102e-06 - 6.38352735e-06j, 2.96819791e-06 + 2.42173236e-07j,
-    -6.35271703e-07 + 9.07749902e-07j, -1.52350347e-07 - 3.31334943e-07j
-])
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   0.00000000e+00+0.00000000e+00j,
+  0.00000000e+00+0.00000000e+00j,   1.59140758e-09-5.77836923e-11j,
+  -3.67213109e-09+6.83655709e-09j, -1.74502523e-08-2.85463969e-08j,
+  1.27592033e-07-2.48570048e-09j,  -2.10126192e-07+3.75898547e-07j,
+  -6.52015265e-07-1.10806061e-06j,  3.39573025e-06-9.04784541e-09j,
+  -3.98764543e-06+6.86014049e-06j, -8.08028193e-06-1.42758096e-05j,
+  2.99992466e-05+4.24524335e-07j,  -2.50990214e-05+4.15548207e-05j,
+  -3.32107960e-05-6.10472590e-05j,  8.79741389e-05+2.72498271e-06j,
+  -5.23995798e-05+8.35473246e-05j, -4.52672827e-05-8.66488453e-05j,
+  8.56381194e-05+4.09487227e-06j,  -3.62872478e-05+5.57523153e-05j,
+  -2.04600590e-05-4.08219182e-05j,  2.76723777e-05+1.78996808e-06j,
+  -8.33600161e-06+1.23483456e-05j, -3.06625102e-06-6.38352735e-06j,
+  2.96819791e-06+2.42173236e-07j,  -6.35271703e-07+9.07749902e-07j,
+  -1.52350347e-07-3.31334943e-07j])
 
 frequencies = np.array([
-    0.231, 0.238, 0.245, 0.252, 0.259, 0.266, 0.273, 0.28, 0.287, 0.294, 0.301,
-    0.308, 0.315, 0.322, 0.329, 0.336, 0.343, 0.35, 0.357, 0.364, 0.371, 0.378,
-    0.385, 0.392
-])
-
-zero_padded_frequencies = np.array([
     0., 0.007, 0.014, 0.021, 0.028, 0.035, 0.042, 0.049, 0.056, 0.063, 0.07,
     0.077, 0.084, 0.091, 0.098, 0.105, 0.112, 0.119, 0.126, 0.133, 0.14, 0.147,
     0.154, 0.161, 0.168, 0.175, 0.182, 0.189, 0.196, 0.203, 0.21, 0.217, 0.224,
@@ -113,9 +123,7 @@ class TestComplexResponse(unittest.TestCase):
 
         directions = ['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz']
         expected_keys = [
-            'amplitudes', 'frequencies', 'zero_padded_frequencies',
-            'zero_padded'
-        ] + directions
+            'amplitudes', 'frequencies', 'zero_padded'] + directions
 
         # Test the contents of the file
 
@@ -134,11 +142,6 @@ class TestComplexResponse(unittest.TestCase):
                 len(hf.get('amplitudes')[()]) == len(hf.get('frequencies')[()]))
 
             primary_key = "frequencies"
-            if hf.get('zero_padded')[()]:
-                primary_key = "zero_padded_frequencies"
-                self.assertTrue(
-                    len(hf.get('zero_padded_frequencies')[(
-                    )]) == len(hf.get('zero_padded_amplitudes')[()]))
 
             for key in directions:
                 try:
@@ -158,10 +161,6 @@ class TestComplexResponse(unittest.TestCase):
             # Verify that the results stored are the same as expected
             self.assertTrue(np.allclose(hf.get('amplitudes')[()], amplitudes))
             self.assertTrue(np.allclose(hf.get('frequencies')[()], frequencies))
-            self.assertTrue(
-                np.allclose(
-                    hf.get('zero_padded_frequencies')[()],
-                    zero_padded_frequencies))
             self.assertTrue(np.allclose(hf.get('xx')[()], xx))
 
             hf.close()
@@ -181,13 +180,16 @@ class TestComplexResponse(unittest.TestCase):
                         "Error - expected key '{}' but did not find it".format(
                             key))
 
+            # Extract the truncated part of the data
+            trunc_amplitudes = amplitudes[33:]
+            trunc_frequencies = frequencies[33:]
             # Verify that the results stored are the same as expected
             self.assertTrue(
                 np.allclose(self.results['pulse_settings']['freq_amplitude'],
-                            amplitudes))
+                            trunc_amplitudes))
             self.assertTrue(
                 np.allclose(self.results['pulse_settings']['frequencies'],
-                            frequencies))
+                            trunc_frequencies))
 
 
 if __name__ == "__main__":

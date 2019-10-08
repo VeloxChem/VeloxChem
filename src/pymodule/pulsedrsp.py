@@ -1,5 +1,4 @@
 import numpy as np
-import copy
 import h5py
 from .veloxchemlib import mpi_master
 from .crsp import ComplexResponse
@@ -114,18 +113,17 @@ class PulsedResponse:
         # Construct frequency array based on input
         self.pulse_settings['given_frequencies'] = self.pulse_settings[
             'frequency_range']
-        freqs = parse_frequencies(self.pulse_settings['frequency_range'])
+        freq_range = parse_frequencies(self.pulse_settings['frequency_range'])
 
-        self.w, freqs = self.verify_frequencies(freqs)
-        self.end_w = freqs[-1]
-
-        # Save frequencies for later zero padding
-        self.freqs = copy.copy(freqs)
+        # Convert frequency range to a zero padded and a truncated list
+        # of frequncies
+        self.zero_pad_freqs, truncated_freqs = self.verify_freqs(freq_range)
+        self.end_w = truncated_freqs[-1]
 
         # TODO Override of number of pulses - set to 1
         self.pulse_settings['number_pulses'] = 1
 
-        field_w = np.zeros_like(freqs, dtype=np.complex128)
+        field_w = np.zeros_like(truncated_freqs, dtype=np.complex128)
 
         # Check that all Pulse list parameters are given correct
         for key in self.multi_input_keys:
@@ -167,7 +165,7 @@ class PulsedResponse:
 
             # Compute electric field in frequency domain
             field_w += self.gauss_env_pulse_w(
-                freqs,
+                truncated_freqs,
                 float(self.pulse_settings['field_max'][p]),
                 float(self.pulse_settings['centers'][p]),
                 float(self.pulse_settings['pulse_widths'][p]),
@@ -181,26 +179,26 @@ class PulsedResponse:
             self.zero_pad = True
             least_field = self.pulse_settings['field_cutoff_ratio'] * max(
                 field_w)
-            freqs = freqs[np.abs(field_w) > least_field]
+            truncated_freqs = truncated_freqs[np.abs(field_w) > least_field]
             field_w = field_w[np.abs(field_w) > least_field]
 
         # If the input frequency range is limited - set the 'use zero pad' flag
         # Request zero-padding if start freq > zero
-        if (self.freqs[0] != 0.0):
+        if (truncated_freqs[0] != 0.0):
             self.zero_pad = True
 
         self.pulse_settings['zero_pad'] = "True" if self.zero_pad else "False"
-        self.pulse_settings['frequencies'] = freqs
-        self.pulse_settings['dw'] = freqs[1] - freqs[0]
+        self.pulse_settings['frequencies'] = truncated_freqs
+        self.pulse_settings['dw'] = truncated_freqs[1] - truncated_freqs[0]
         self.pulse_settings['freq_amplitude'] = field_w
 
-        self.frequencies = freqs
-        self.dw = freqs[1] - freqs[0]
+        self.truncated_freqs = truncated_freqs
+        self.dw = truncated_freqs[1] - truncated_freqs[0]
         self.amplitudes = field_w
 
         # Set up complex response solver
         crsp_settings.update({
-            'frequencies': freqs,
+            'frequencies': truncated_freqs,
             'a_components': self.pulse_settings['pol_dir'],
             'b_components': self.pulse_settings['pol_dir']
         })
@@ -284,7 +282,7 @@ class PulsedResponse:
             for xyz1 in ['x', 'y', 'z']:
                 for xyz2 in ['x', 'y', 'z']:
                     f.write("Frequency   Amplitude   {}{}\n".format(xyz1, xyz2))
-                    for freq, amp in zip(self.frequencies, self.amplitudes):
+                    for freq, amp in zip(self.truncated_freqs, self.amplitudes):
                         cur_str = [
                             "{0:12.6f} {1:>12.8f}{2:>+12.8f}j".format(
                                 freq, np.real(amp), np.imag(amp))
@@ -304,15 +302,16 @@ class PulsedResponse:
 
         :return:
             The h5 file saved contains the following datasets:
-                - frequencies : The calculated frequencies
+                - truncated_freqs : The calculated truncated_freqs
                 - amplitudes  : The pulse amplitudes for the calculated
-                                frequencies
+                                truncated_freqs
                 - zero_padded : Is the dataset zero padded or not
                 - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
                    =>  Amplitudes for all directions
                 - zero_padded_frequencies : The zero padded frequency list
-                - zero_padded_amplitudes  : The pulse amplitudes for the calculated
-                                            frequencies zero padded to match the
+                - zero_padded_amplitudes  : The pulse amplitudes for the
+                                            calculated frequencies zero
+                                            padded to match th
                                             zero padded frequencies.
         """
 
@@ -330,39 +329,25 @@ class PulsedResponse:
         try:
             with h5py.File(fname, 'w') as hf:
                 hf.create_dataset('frequencies',
-                                  data=self.frequencies,
+                                  data=self.zero_pad_freqs,
                                   compression="gzip")
                 hf.create_dataset('amplitudes',
-                                  data=self.amplitudes,
+                                  data=self.zero_padded_amplitudes,
                                   compression="gzip")
                 hf.create_dataset('zero_padded',
                                   data=zeropad,
                                   compression="gzip")
-                if self.zero_pad:
-                    hf.create_dataset('zero_padded_amplitudes',
-                                      data=self.zero_padded_amplitudes,
-                                      compression="gzip")
-                    hf.create_dataset('zero_padded_frequencies',
-                                      data=self.w,
-                                      compression="gzip")
 
                 # Loop over all directions
                 for xyz1 in ['x', 'y', 'z']:
                     for xyz2 in ['x', 'y', 'z']:
                         amplitudes = []
                         # Add all amplitudes for the give direction
-                        for freq in self.w:
-                            if self.zero_pad:
-                                amplitudes.append(
-                                    self.results['properties_zeropad'][(xyz1,
-                                                                        xyz2,
-                                                                        freq)])
-                            elif (xyz1, xyz2,
-                                  freq) in self.results['properties']:
-                                amplitudes.append(
-                                    self.results['properties_zeropad'][(xyz1,
-                                                                        xyz2,
-                                                                        freq)])
+                        for freq in self.zero_pad_freqs:
+                            amplitudes.append(
+                                self.results['properties_zeropad'][(xyz1,
+                                                                    xyz2,
+                                                                    freq)])
 
                         hf.create_dataset("{}{}".format(xyz1, xyz2),
                                           data=np.array(amplitudes),
@@ -403,7 +388,7 @@ class PulsedResponse:
         zero_padded_results = {}
         for xyz1 in ['x', 'y', 'z']:
             for xyz2 in ['x', 'y', 'z']:
-                for freq in self.w:
+                for freq in self.zero_pad_freqs:
                     if (xyz1, xyz2, freq) not in results['properties']:
                         zero_padded_results[(xyz1, xyz2,
                                              freq)] = complex(0.0, 0.0)
@@ -416,12 +401,13 @@ class PulsedResponse:
         results['properties_zeropad'] = zero_padded_results
 
         # Zero pad the amplitudes as well
-        zeros = [0 for x in range(len(self.w) - len(self.amplitudes))]
+        num_zeros = len(self.zero_pad_freqs) - len(self.amplitudes)
+        zeros = [0 for x in range(num_zeros)]
         self.zero_padded_amplitudes = np.array(zeros + self.amplitudes.tolist())
 
         return results
 
-    def verify_frequencies(self, frequencies):
+    def verify_freqs(self, frequencies):
         """
         Takes a list or nd-array of frequencies
         and verifies that it have or can be extended to include
@@ -431,7 +417,8 @@ class PulsedResponse:
             List of frequencies
 
         :return:
-            numpy array of frequencies
+            numpy array of zero-padded frequencies
+            numpy array of truncated frequencies
         """
         if isinstance(frequencies, list):
             frequencies = np.array(frequencies)
@@ -527,13 +514,13 @@ class PulsedResponse:
                                                str(self.pulse_settings[key]))
             self.ostream.print_header(cur_str.ljust(str_width))
 
-        # Print the list of frequencies and their amplitudes
+        # Print the list of truncated frequencies and their amplitudes
         self.ostream.print_blank()
         self.ostream.print_header("Frequency | Amplitude")
         self.ostream.print_header(21 * "=")
 
         str_width = 40
-        for freq, amp in zip(self.frequencies, self.amplitudes):
+        for freq, amp in zip(self.truncated_freqs, self.amplitudes):
             cur_str = "{0:12.6f} : {1:>12.8f}{2:>+12.8f}j".format(
                 freq, np.real(amp), np.imag(amp))
             self.ostream.print_header(cur_str.ljust(str_width))
