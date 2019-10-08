@@ -181,6 +181,8 @@ CCudaDevices::getString() const
         str.append(" GB");
         
         ss << fstr::format(str, width, fmt::left) << "\n";
+
+        if (i < _namesOfDevices.size() - 1) ss << "\n";
     }
     
     return ss.str();
