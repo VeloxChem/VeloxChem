@@ -165,6 +165,15 @@ def generate_setup(template_file, setup_file):
     use_gpu = (nvcc is not None)
 
     if use_gpu:
+        nvcc_version = get_command_output(['nvcc', '--version'])
+        nvcc_version = nvcc_version.lower().split('release')[1]
+        nvcc_version = nvcc_version.split('.')[0]
+        if int(nvcc_version) < 6:
+            use_gpu = False
+            print('*** Disabling cuda because cuda version ({}) is too old.'.
+                  format(nvcc_version.split()[0]))
+
+    if use_gpu:
         cuda_root = os.path.split(nvcc_path)[0]
         cuda_dir = os.path.join(cuda_root, 'lib64')
         if not os.path.isdir(cuda_dir):
@@ -177,15 +186,14 @@ def generate_setup(template_file, setup_file):
     if use_intel:
         cxx_flags = '-xHost -qopenmp'
         omp_flag = '-liomp5'
-        nvcc_flags = '--compiler-options \"-qopenmp\"'
     elif use_gnu:
         cxx_flags = '-fopenmp'
         omp_flag = '-lgomp'
-        nvcc_flags = '--compiler-options \"-fopenmp\"'
     elif use_clang:
         cxx_flags = '-Xpreprocessor -fopenmp'
         omp_flag = '-lomp'
-        nvcc_flags = '--compiler-options \"-fopenmp\"'
+
+    nvcc_flags = '--compiler-options \"-fopenmp\"'
 
     # math library
 
@@ -270,10 +278,8 @@ def generate_setup(template_file, setup_file):
     except ImportError:
         print()
         print('*** Error: Unable to find pybind11!')
-        print('***        Please install via \"pip install pybind11 --user\"')
+        print('***        Please install via \"pip install pybind11 [--user]\"')
         sys.exit(1)
-
-    python_user_base = site.getuserbase()
 
     # google test lib
 
@@ -314,12 +320,6 @@ def generate_setup(template_file, setup_file):
                 print('', file=f_mkfile)
 
                 print('PYTHON :=', 'python3', file=f_mkfile)
-                python_version = 'python{}.{}{}'.format(sys.version_info[0],
-                                                        sys.version_info[1],
-                                                        sys.abiflags)
-                print('PYTHON_USER_INC :=',
-                      os.path.join(python_user_base, 'include', python_version),
-                      file=f_mkfile)
                 print('', file=f_mkfile)
 
                 print('CXX :=', cxx, file=f_mkfile)
