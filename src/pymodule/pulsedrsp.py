@@ -1,7 +1,8 @@
 import numpy as np
 import h5py
+
 from .veloxchemlib import mpi_master
-from .crsp import ComplexResponse
+from .cppsolver import ComplexResponse
 from .inputparser import parse_frequencies
 
 
@@ -66,7 +67,7 @@ class PulsedResponse:
 
         self.zero_pad = False
         self.pulse_settings = {}
-        self.crsp_settings = {}
+        self.cpp_settings = {}
 
         # Default Pulse settings
         # Smallest fraction field amplitude to be included
@@ -91,24 +92,24 @@ class PulsedResponse:
             'centers', 'CEP', 'field_max'
         ]
 
-    def update_settings(self, settings, crsp_settings):
+    def update_settings(self, settings, cpp_settings):
         """
         Updates settings in PulsedRespnse
 
         :param settings:
             The settings dictionary for the driver.
 
-        :param crsp_settings:
+        :param cpp_settings:
             The settings dictionary for complex response driver.
         """
 
         # Default CRSP settings (if nothing else given,
-        # it will use defaults in crsp.cpp)
-        # crsp_settings['rot_averaging'] = False
+        # it will use defaults in cpp.cpp)
+        # cpp_settings['rot_averaging'] = False
 
         # Update the default args with the user provided inputs
         self.pulse_settings.update(settings)
-        self.crsp_settings.update(crsp_settings)
+        self.cpp_settings.update(cpp_settings)
 
         # Construct frequency array based on input
         self.pulse_settings['given_frequencies'] = self.pulse_settings[
@@ -197,13 +198,13 @@ class PulsedResponse:
         self.amplitudes = field_w
 
         # Set up complex response solver
-        crsp_settings.update({
+        cpp_settings.update({
             'frequencies': truncated_freqs,
             'a_components': self.pulse_settings['pol_dir'],
             'b_components': self.pulse_settings['pol_dir']
         })
         self.rsp_driver = ComplexResponse(self.comm, self.ostream)
-        self.rsp_driver.update_settings(crsp_settings)
+        self.rsp_driver.update_settings(cpp_settings)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """

@@ -4,7 +4,7 @@ import os
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.crsp import ComplexResponse
+from veloxchem.cppsolver import ComplexResponse
 from veloxchem.mpitask import MpiTask
 
 

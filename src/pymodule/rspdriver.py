@@ -1,4 +1,4 @@
-from .crsp import ComplexResponse
+from .cppsolver import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tdaexcidriver import TDAExciDriver

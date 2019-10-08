@@ -104,7 +104,7 @@ class TestComplexResponse(unittest.TestCase):
         pulse_input['pulse_widths'] = 50
         pulse_input['pol_dir'] = "xyz"
 
-        crsp_input = {}
+        cpp_input = {}
 
         # Setup the Task parameters
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -113,7 +113,7 @@ class TestComplexResponse(unittest.TestCase):
 
         # Run the pulsed response computation
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
-        pulsed_response.update_settings(pulse_input, crsp_input)
+        pulsed_response.update_settings(pulse_input, cpp_input)
         cls.results = pulsed_response.compute(task.molecule, task.ao_basis,
                                               scf_tensors)
 

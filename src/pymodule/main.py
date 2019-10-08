@@ -13,7 +13,7 @@ from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
-from .crsp import ComplexResponse
+from .cppsolver import ComplexResponse
 from .pulsedrsp import PulsedResponse
 from .mp2driver import Mp2Driver
 from .adconedriver import AdcOneDriver
@@ -185,20 +185,20 @@ def main():
         else:
             cpp_dict = {}
 
-        crsp_drv = ComplexResponse(task.mpi_comm, task.ostream)
-        crsp_drv.update_settings(cpp_dict, method_dict)
-        results = crsp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+        cpp_drv = ComplexResponse(task.mpi_comm, task.ostream)
+        cpp_drv.update_settings(cpp_dict, method_dict)
+        results = cpp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
         if task.mpi_rank == mpi_master():
-            crsp_drv.print_properties(results['properties'])
+            cpp_drv.print_properties(results['properties'])
 
     # Pulsed Linear Response Theory
 
     if 'pulses' in task.input_dict and scf_drv.restricted:
         prt_dict = task.input_dict['pulses']
-        crsp_dict = {}
+        cpp_dict = {}
 
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
-        pulsed_response.update_settings(prt_dict, crsp_dict)
+        pulsed_response.update_settings(prt_dict, cpp_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # ADC(1)
