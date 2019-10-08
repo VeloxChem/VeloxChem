@@ -34,6 +34,10 @@ get_devices_property(std::vector<std::string>& namesOfDevices,
 
         cudaGetDeviceProperties(&prop, i);
 
+        // NOTE: compute capability below 3.0 is not supported
+
+        if (prop.major < 3) return;
+
         namesOfDevices.push_back(std::string(prop.name));
 
         auto globalMemInMB = prop.totalGlobalMem / (1024u * 1024u);

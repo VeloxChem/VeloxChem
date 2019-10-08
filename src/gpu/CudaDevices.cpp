@@ -150,19 +150,19 @@ CCudaDevices::getString() const
     
     for (size_t i = 0; i < _namesOfDevices.size(); i++)
     {
-        str.assign("GPU device ID: ");
+        str.assign("GPU device ID            : ");
         
         str.append(std::to_string(i));
         
         ss << fstr::format(str, width, fmt::left) << "\n";
         
-        str.assign("  Device name:             ");
+        str.assign("  Device name            : ");
         
         str.append(_namesOfDevices[i]);
         
         ss << fstr::format(str, width, fmt::left) << "\n";
         
-        str.assign("  Compute capability:      ");
+        str.assign("  Compute capability     : ");
         
         str.append(std::to_string(_computeMajorCapabilityOfDevices[i]));
         
@@ -172,7 +172,7 @@ CCudaDevices::getString() const
         
         ss << fstr::format(str, width, fmt::left) << "\n";
         
-        str.assign("  Global memory:           ");
+        str.assign("  Global memory          : ");
         
         auto glbmem = static_cast<double>(_globalMemoryOfDevices[i]) / 1024.0;
         

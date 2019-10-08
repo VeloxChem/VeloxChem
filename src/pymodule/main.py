@@ -45,16 +45,18 @@ def main():
     task_types = task.input_dict['jobs']['task'].lower().split(',')
     task_types = [x.strip() for x in task_types]
 
-    # initialize CUDA capable devices
-
-    gpu_devs = CudaDevices()
-    if gpu_devs.get_number_devices() > 0:
-        print(gpu_devs)
-
     if 'method_settings' in task.input_dict:
         method_dict = task.input_dict['method_settings']
     else:
         method_dict = {}
+
+    # initialize CUDA capable devices
+
+    gpu_devs = CudaDevices()
+    if task.mpi_rank == mpi_master():
+        if gpu_devs.get_number_devices() > 0:
+            task.ostream.print_blank()
+            task.ostream.print_block(str(gpu_devs))
 
     # Exciton model
 
