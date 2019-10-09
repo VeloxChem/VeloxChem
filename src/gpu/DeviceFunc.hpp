@@ -35,17 +35,17 @@ void synchronize_device();
  @param dataWidth the width of data.
  @param dataHeight the height  of data.
  */
-void allocateDeviceMemory(void**  pointer,
-                          size_t* dataPitch,
-                          size_t  dataWidth,
-                          size_t  dataHeight);
+void allocate_device_memory(void**  pointer,
+                            size_t* dataPitch,
+                            size_t  dataWidth,
+                            size_t  dataHeight);
 
 /**
  Frees CUDA compute device memory.
 
  @param pointer the pointer to device memory.
  */
-void freeDeviceMemory(void* pointer);
+void free_device_memory(void* pointer);
 
 /**
  Copies 2D data from host memory to device memory.
@@ -57,12 +57,12 @@ void freeDeviceMemory(void* pointer);
  @param dataWidth the width of data.
  @param dataHeight the height of data.
  */
-void copyToDeviceMemory(      void*  destination,
-                              size_t destinationPitch,
-                        const void*  source,
-                              size_t sourcePitch,
-                              size_t dataWidth,
-                              size_t dataHeight);
+void copy_to_device_memory(      void*  destination,
+                                 size_t destinationPitch,
+                           const void*  source,
+                                 size_t sourcePitch,
+                                 size_t dataWidth,
+                                 size_t dataHeight);
 
 /**
  Copies 2D data from device memory to host memory.
@@ -74,12 +74,12 @@ void copyToDeviceMemory(      void*  destination,
  @param dataWidth the width of data.
  @param dataHeight the height of data.
  */
-void copyFromDeviceMemory(      void*  destination,
-                                size_t destinationPitch,
-                          const void*  source,
-                                size_t sourcePitch,
-                                size_t dataWidth,
-                                size_t dataHeight);
+void copy_from_device_memory(      void* destination,
+                                 size_t  destinationPitch,
+                             const void* source,
+                                 size_t  sourcePitch,
+                                 size_t  dataWidth,
+                                 size_t  dataHeight);
 }
 
 #endif

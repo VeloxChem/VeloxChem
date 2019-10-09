@@ -18,7 +18,7 @@ set_device(const int32_t iDevice)
 #ifdef ENABLE_GPU
     auto cerr = cudaSetDevice(iDevice);
 
-    errors::assertMsgCritical(cerr == cudaSuccess, {"setCudaDevice"});
+    errors::assertMsgCritical(cerr == cudaSuccess, {"set_device"});
 #endif
 }
 
@@ -26,64 +26,64 @@ void
 synchronize_device()
 {
 #ifdef ENABLE_GPU
-auto cerr = cudaDeviceSynchronize();
+    auto cerr = cudaDeviceSynchronize();
 
-errors::assertMsgCritical(cerr == cudaSuccess, {"synchronizeCudaDevice"});
+    errors::assertMsgCritical(cerr == cudaSuccess, {"synchronize_device"});
 #endif
 }
 
 void
-allocateDeviceMemory(void**  pointer,
-                     size_t* dataPitch,
-                     size_t  dataWidth,
-                     size_t  dataHeight)
+allocate_device_memory(void**  pointer,
+                       size_t* dataPitch,
+                       size_t  dataWidth,
+                       size_t  dataHeight)
 {
 #ifdef ENABLE_GPU
     auto cerr = cudaMallocPitch(pointer, dataPitch, dataWidth, dataHeight);
 
-    errors::assertMsgCritical(cerr == cudaSuccess, {"allocateDeviceMemory"});
+    errors::assertMsgCritical(cerr == cudaSuccess, {"allocate_device_memory"});
 #endif
 }
 
 void
-freeDeviceMemory(void* pointerToMemory)
+free_device_memory(void* pointer)
 {
 #ifdef ENABLE_GPU
-    auto cerr = cudaFree(pointerToMemory);
+    auto cerr = cudaFree(pointer);
 
-    errors::assertMsgCritical(cerr == cudaSuccess, {"freeDeviceMemory"});
+    errors::assertMsgCritical(cerr == cudaSuccess, {"free_device_memory"});
 #endif
 }
 
 void
-copyToDeviceMemory(      void*  destination,
-                         size_t destinationPitch,
-                   const void*  source,
-                         size_t sourcePitch,
-                         size_t dataWidth,
-                         size_t dataHeight)
+copy_to_device_memory(      void* destination,
+                          size_t  destinationPitch,
+                      const void* source,
+                          size_t  sourcePitch,
+                          size_t  dataWidth,
+                          size_t  dataHeight)
 {
 #ifdef ENABLE_GPU
     auto cerr = cudaMemcpy2D(destination, destinationPitch, source, sourcePitch, dataWidth, dataHeight,
                              cudaMemcpyHostToDevice);
 
-    errors::assertMsgCritical(cerr == cudaSuccess, {"copyToDeviceMemory"});
+    errors::assertMsgCritical(cerr == cudaSuccess, {"copy_to_device_memory"});
 #endif
 }
 
 void
-copyFromDeviceMemory(     void*  destination,
-                          size_t destinationPitch,
-                    const void*  source,
-                          size_t sourcePitch,
-                          size_t dataWidth,
-                          size_t dataHeight)
+copy_from_device_memory(      void* destination,
+                            size_t  destinationPitch,
+                        const void* source,
+                            size_t  sourcePitch,
+                            size_t  dataWidth,
+                            size_t  dataHeight)
 {
 #ifdef ENABLE_GPU
     auto cerr = cudaMemcpy2D(destination, destinationPitch, source, sourcePitch, dataWidth, dataHeight,
                              cudaMemcpyDeviceToHost);
 
-    errors::assertMsgCritical(cerr == cudaSuccess, {"copyFromDeviceMemory"});
+    errors::assertMsgCritical(cerr == cudaSuccess, {"copy_from_device_memory"});
 #endif
 }
 

@@ -75,66 +75,38 @@ public:
     int32_t getNumberOfDevices() const;
     
     /**
-     Allocates 2D memory block of real numbers on CUDA compute capable device.
+     Allocates 2D memory block on CUDA compute capable device.
 
      @param pointer the pointer to 2D memory block.
      @param pitch the pointer to pitch of 2D  memory block.
      @param nElements the number of columns in 2D  memory block.
      @param nBlocks the number of rows in 2D memory block.
      */
-    void allocate(double** pointer,
-                  size_t*  pitch,
-                  int32_t  nElements,
-                  int32_t  nBlocks) const;
-    
-    /**
-     Allocates 2D memory block of integer numbers on CUDA compute capable device.
-     
-     @param pointer the pointer to 2D memory block.
-     @param pitch the pointer to pitch of 2D  memory block.
-     @param nElements the number of columns in 2D  memory block.
-     @param nBlocks the number of rows in 2D memory block.
-     */
-    void allocate(int32_t** pointer,
-                  size_t*   pitch,
-                  int32_t   nElements,
-                  int32_t   nBlocks) const;
+    template <class T>
+    void allocate(T**     pointer,
+                  size_t* pitch,
+                  int32_t nElements,
+                  int32_t nBlocks) const;
     
     /**
      Deallocates device memory.
      
      @param pointer the pointer to device memory.
      */
-    void free(double* pointer) const;
+    template <class T>
+    void free(T* pointer) const;
     
     /**
-     Deallocates device memory.
-     
-     @param pointer the pointer to device memory.
-     */
-    void free(int32_t* pointer) const;
-    
-    /**
-     Copies 2D real numbers data to CUDA device.
+     Copies 2D data to CUDA device.
 
      @param pointer the pointer to device memory.
      @param pitch the pitch of device memory.
      @param memBlock2D the 2D memory block.
      */
-    void copyToDevice(      double*              pointer,
-                            size_t               pitch,
-                      const CMemBlock2D<double>& memBlock2D) const;
-    
-    /**
-     Copies 2D integer numbers data to CUDA device.
-     
-     @param pointer the pointer to device memory.
-     @param pitch the pitch of device memory.
-     @param memBlock2D the 2D memory block.
-     */
-    void copyToDevice(      int32_t*              pointer,
-                            size_t                pitch,
-                      const CMemBlock2D<int32_t>& memBlock2D) const;
+    template <class T>
+    void copyToDevice(      T*              pointer,
+                            size_t          pitch,
+                      const CMemBlock2D<T>& memBlock2D) const;
     
     /**
      Copies 2D data from CUDA device.
@@ -143,9 +115,10 @@ public:
      @param pitch the pitch of device memory.
      @param memBlock2D the 2D memory block.
      */
-    void copyFromDevice(double*              pointer,
-                        size_t               pitch,
-                        CMemBlock2D<double>& memBlock2D) const;
+    template <class T>
+    void copyFromDevice(T*              pointer,
+                        size_t          pitch,
+                        CMemBlock2D<T>& memBlock2D) const;
     
     /**
      Gets string representation of CUDA devices object.
@@ -162,5 +135,50 @@ public:
      */
     int32_t getGridBlockSize(const int32_t iDevice = 0) const;
 };
+
+template <class T>
+void
+CCudaDevices::allocate(T**     pointer,
+                       size_t* pitch,
+                       int32_t nElements,
+                       int32_t nBlocks) const
+{
+#ifdef ENABLE_GPU
+    gpu::allocate_device_memory((void**) pointer, pitch, nElements * sizeof(T), static_cast<size_t>(nBlocks));
+#endif
+}
+
+template <class T>
+void
+CCudaDevices::free(T* pointer) const
+{
+#ifdef ENABLE_GPU
+    gpu::free_device_memory((void*)pointer);
+#endif
+}
+
+template <class T>
+void
+CCudaDevices::copyToDevice(T*                    pointer,
+                           size_t                pitch,
+                           const CMemBlock2D<T>& memBlock2D) const
+{
+#ifdef ENABLE_GPU
+    gpu::copy_to_device_memory(pointer, pitch, memBlock2D.data(0), memBlock2D.pitched_size(0) * sizeof(T),
+                               memBlock2D.size(0) * sizeof(T), static_cast<size_t>(memBlock2D.blocks()));
+#endif
+}
+
+template <class T>
+void
+CCudaDevices::copyFromDevice(T*              pointer,
+                             size_t          pitch,
+                             CMemBlock2D<T>& memBlock2D) const
+{
+#ifdef ENABLE_GPU
+    gpu::copy_from_device_memory(memBlock2D.data(0), memBlock2D.pitched_size(0) * sizeof(T), pointer, pitch,
+                                 memBlock2D.size(0) * sizeof(T), static_cast<size_t>(memBlock2D.blocks()));
+#endif
+}
 
 #endif /* CudaDevices_hpp */
