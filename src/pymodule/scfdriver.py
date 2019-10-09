@@ -743,19 +743,34 @@ class ScfDriver:
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         xc_drv = XCIntegrator(self.comm)
 
+        if self.timing:
+            eri_t0 = tm.time()
+            
         eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.timing:
+            self.timing_dict['fock_2e'].append(tm.time() - eri_t0)
 
         if self.dft:
             if not self.xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
+            if self.timing:
+                vxc_t0 = tm.time()
+            
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
             vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+            if self.timing:
+                self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
         else:
             vxc_mat = None
+
+            if self.timing:
+                self.timing_dict['dft_vxc'].append(0.0)
 
         if self.pe and not self.first_step:
             from .polembed import PolEmbed
