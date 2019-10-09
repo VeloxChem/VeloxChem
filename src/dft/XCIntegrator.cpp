@@ -86,6 +86,12 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
             
             _compRestrictedContribution(ksmat, gtovec, vxcgrid, dgrid, mgrid, fvxc.getFunctionalType());
             
+            // delete GTOs container
+            
+            delete gtovec;
+            
+            // done with Kohn-Sham matrix
+            
             return ksmat;
         }
         else
@@ -94,13 +100,69 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         
             // FIX ME: implement partitioning and screening for density grid
         }
-  
-        // delete GTOs container
-    
-        delete gtovec;
     }
     
     return CAOKohnShamMatrix(); 
+}
+
+CAOKohnShamMatrix
+CXCIntegrator::integrate_m3(const CAODensityMatrix& aoDensityMatrix,
+                            const CMolecule&        molecule,
+                            const CMolecularBasis&  basis,
+                            const CMolecularGrid&   molecularGrid,
+                            const std::string&      xcFuncLabel) const
+{
+    CAOKohnShamMatrix ksmat;
+    
+    // integrator handles single AO density only
+    
+    if (aoDensityMatrix.getNumberOfMatrices() == 1)
+    {
+        // parse exchange-correlation functional data
+        
+        auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+        
+        // create GTOs container
+        
+        CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+        
+        // generate reference density grid
+        
+        CDensityGridDriver dgdrv(_locComm);
+        
+        auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+        
+        if (aoDensityMatrix.isRestricted())
+        {
+            // generate screened molecular and density grids
+            
+            CMolecularGrid mgrid(molecularGrid);
+            
+            CDensityGrid dgrid;
+            
+            refdengrid.getScreenedGridsPair(dgrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
+            
+            // allocate XC gradient grid
+            
+            CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), dgrid.getDensityGridType(), fvxc.getFunctionalType());
+            
+            // compute exchange-correlation functional first derrivatives
+            
+            fvxc.compute(vxcgrid, dgrid);
+            
+            // compute Kohn-Sham matrix
+            
+            ksmat = CAOKohnShamMatrix(aoDensityMatrix.getNumberOfRows(0), aoDensityMatrix.getNumberOfColumns(0), true);
+            
+            _compRestrictedContributionM3(ksmat, gtovec, vxcgrid, dgrid, mgrid, fvxc.getFunctionalType());
+        }
+        
+        // delete GTOs container
+        
+        delete gtovec;
+    }
+    
+    return ksmat;
 }
 
 void
@@ -228,13 +290,9 @@ CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMa
     
     auto ksmatprt = &aoKohnShamMatrix;
     
-    // number of electrons
+    // initialize number of electrons and XC energy
     
-    double xcele = 0.0;
-    
-    // exchange-correlation energy
-    
-    double xcene = 0.0;
+    double xcele = 0.0, xcene = 0.0;
     
     // generate density on grid points
     
@@ -263,11 +321,37 @@ CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMa
         }
     }
     
+    // set number of electrons and XC energy
+    
     aoKohnShamMatrix.setNumberOfElectrons(xcele);
     
     aoKohnShamMatrix.setExchangeCorrelationEnergy(xcene); 
 }
 
+void
+CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                             const CGtoContainer*     gtoContainer,
+                                             const CXCGradientGrid&   xcGradientGrid,
+                                             const CDensityGrid&      densityGrid,
+                                             const CMolecularGrid&    molecularGrid,
+                                             const xcfun              xcFunctional) const
+{
+    // initialize Kohn-Sham matrix to zero
+    
+    aoKohnShamMatrix.zero();
+    
+    // initialize number of electrons and XC energy
+    
+    double xcele = 0.0, xcene = 0.0;
+    
+    // FIX ME: Adding 
+    
+    // set number of electrons and XC energy
+    
+    aoKohnShamMatrix.setNumberOfElectrons(xcele);
+    
+    aoKohnShamMatrix.setExchangeCorrelationEnergy(xcene);
+}
 
 void
 CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMatrix,

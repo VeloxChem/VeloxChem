@@ -70,6 +70,24 @@ class CXCIntegrator
                                      const xcfun              xcFunctional) const;
     
     /**
+     Computes exchange-correlation contribution to Kohn-Sham matrix from restricted density
+     using matrix x matrix scheme.
+     
+     @param aoKohnShamMatrix the Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param densityGrid the density grid.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional type.
+     */
+    void _compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                       const CGtoContainer*     gtoContainer,
+                                       const CXCGradientGrid&   xcGradientGrid,
+                                       const CDensityGrid&      densityGrid,
+                                       const CMolecularGrid&    molecularGrid,
+                                       const xcfun              xcFunctional) const;
+    
+    /**
      Computes exchange-correlation contribution to perturbed Kohn-Sham matrix from restricted density.
      
      @param aoKohnShamMatrix the Kohn-Sham matrix.
@@ -346,6 +364,23 @@ public:
                                 const CMolecularBasis&  basis,
                                 const CMolecularGrid&   molecularGrid,
                                 const std::string&      xcFuncLabel) const;
+    
+    /**
+     Integrates exchnage-correlation functional contribution to zero order Kohn-Sham matrix
+     using matrix x matrix multiplication scheme.
+     
+     @param aoDensityMatrix the AO density matrix object.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the AO Kohn-Sham matrix.
+     */
+    CAOKohnShamMatrix integrate_m3(const CAODensityMatrix& aoDensityMatrix,
+                                   const CMolecule&        molecule,
+                                   const CMolecularBasis&  basis,
+                                   const CMolecularGrid&   molecularGrid,
+                                   const std::string&      xcFuncLabel) const;
     
     /**
      Integrates exchnage-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.
