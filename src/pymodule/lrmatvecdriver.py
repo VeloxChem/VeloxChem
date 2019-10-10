@@ -221,7 +221,7 @@ class LinearResponseMatrixVectorDriver:
 
         # calculate Fock on subcommunicators
 
-        if (dft or pe) and self.nodes >= 4:
+        if (dft or pe) and self.nodes >= 8:
             self.comp_lr_fock_split_comm(fock, dens, molecule, basis, screening,
                                          dft, xcfun, molgrid, gs_density, pe,
                                          V_es, potfile)

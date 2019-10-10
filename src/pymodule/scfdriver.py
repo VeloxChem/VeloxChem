@@ -711,7 +711,7 @@ class ScfDriver:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
-        if (self.dft or self.pe) and self.nodes >= 4:
+        if (self.dft or self.pe) and self.nodes >= 8:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_split_comm(
                 fock_mat, den_mat, molecule, basis, screening)
         else:

@@ -129,8 +129,6 @@ class TDAExciDriver:
         self.checkpoint_file = None
         self.checkpoint_time = None
 
-        self.split_comm_ratio = None
-
     def update_settings(self, rsp_dict, method_dict={}):
         """
         Updates response and method settings in TDA excited states computation
