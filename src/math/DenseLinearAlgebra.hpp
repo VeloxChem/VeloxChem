@@ -87,7 +87,17 @@ CDenseMatrix addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, con
  @param matrixB the matrix B.
  */
 void multABt(CDenseMatrix& matrixC, const double alpha, const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
-
+    
+/**
+Computes matrix multiplication: C = C + alpha * A^T * B.
+     
+@param matrixC the pointer to matrix C.
+@param alpha the scaling factor for A^T * B.
+@param matrixA the matrix A.
+@param matrixB the matrix B.
+*/
+void multAtB(double* matrixC, const double alpha, const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
+    
 /**
  Computes dot product of two vectors.
 

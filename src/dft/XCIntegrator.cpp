@@ -15,6 +15,7 @@
 #include "OMPTasks.hpp"
 #include "AngularMomentum.hpp"
 #include "GtoFunc.hpp"
+#include "DenseLinearAlgebra.hpp"
 
 
 CXCIntegrator::CXCIntegrator(MPI_Comm comm)
@@ -347,6 +348,10 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     
     aoKohnShamMatrix.zero();
     
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmat = aoKohnShamMatrix.getKohnSham(); 
+    
     // initialize number of electrons and XC energy
     
     double xcele = 0.0, xcene = 0.0;
@@ -379,6 +384,8 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
             
             _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
             
+            denblas::multAtB(ksmat, 1.0, bmat, kmat);
+            
             igpnt += nrows;
         }
     }
@@ -397,7 +404,9 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
         
         _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
         
-        _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows); 
+        _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
+        
+        denblas::multAtB(ksmat, 1.0, bmat, kmat);
     }
     
     // set number of electrons and XC energy
@@ -1354,4 +1363,5 @@ CXCIntegrator::_compRestrictedVXCMatrixForLDA(      CDenseMatrix&    ketGtoMatri
         }
     }
 }
+
 

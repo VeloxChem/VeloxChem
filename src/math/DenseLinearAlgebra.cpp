@@ -290,6 +290,43 @@ multABt(CDenseMatrix& matrixC, const double alpha, const CDenseMatrix& matrixA, 
                 nbrow);
 }
 
+void
+multAtB(double* matrixC, const double alpha, const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
+{
+    // set up dimensions of matrix A
+    
+    auto narow = matrixA.getNumberOfRows();
+    
+    auto nacol = matrixA.getNumberOfColumns();
+    
+    // set up dimensions of matrix B
+    
+    auto nbrow = matrixB.getNumberOfRows();
+    
+    auto nbcol = matrixB.getNumberOfColumns();
+    
+    errors::assertMsgCritical(narow == nbrow, "denblas::multAtB - Inconsistent sizes in matrix multiplication");
+    
+    // allocate dense matrix
+    
+    CDenseMatrix mat(nacol, nbcol);
+    
+    cblas_dgemm(CblasRowMajor,
+                CblasTrans,
+                CblasNoTrans,
+                nacol,
+                nbcol,
+                narow,
+                alpha,
+                matrixA.values(),
+                nacol,
+                matrixB.values(),
+                nbcol,
+                1.0,
+                matrixC,
+                nbcol);
+}
+    
 double
 dot(const CMemBlock<double>& vectorA, const CMemBlock<double>& vectorB)
 {
