@@ -334,6 +334,51 @@ class CXCIntegrator
                                   const bool               isBraEqualKet,
                                   const int32_t            iBraContrGto,
                                   const int32_t            iKetContrGto) const;
+    
+    /**
+     Gets number of rows in grid points matrix.
+
+     @return the number of rows.
+     */
+    int32_t _getNumberOfGridRows() const;
+    
+    /**
+     Computes GTOs values matrix for given block of grid points.
+
+     @param gtoMatrix the GTOs values matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param molecularGrid the molecular grid.
+     @param gridOffset the offset in molecular grid.
+     @param nGridPoints the number of grid points. 
+     */
+    void _compGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
+                               const CGtoContainer*  gtoContainer,
+                               const CMolecularGrid& molecularGrid,
+                               const int32_t         gridOffset,
+                               const int32_t         nGridPoints) const;
+    
+    
+    /**
+     Computes GTOs values for batch of grid points.
+
+     @param gtoMatrix the pointer to GTOs values matrix.
+     @param nRows the number of rows in GTOs values matrix.
+     @param nColumns the number of columns in GTOs values matrix.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void _compGtosValuesForLDA(      double*        gtoMatrix,
+                               const int32_t        nRows,
+                               const int32_t        nColumns,
+                               const CGtoContainer* gtoContainer,
+                               const double*        gridCoordinatesX,
+                               const double*        gridCoordinatesY,
+                               const double*        gridCoordinatesZ,
+                               const int32_t        gridOffset,
+                               const int32_t        nGridPoints) const;
    
 public:
     

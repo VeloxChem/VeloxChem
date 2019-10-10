@@ -47,6 +47,13 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         // parse exchange-correlation functional data
     
         auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+        
+        // temporary test for matrix driven approach to computation Kohn-Sham matrix 
+        
+        //if (fvxc.getFunctionalType() == xcfun::lda)
+        //{
+        //    return integrate_m3(aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+        //}
     
         // create GTOs container
     
@@ -344,7 +351,50 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     
     double xcele = 0.0, xcene = 0.0;
     
-    // FIX ME: Adding 
+    // set number of rows in grid block matrix
+    
+    auto nrows = _getNumberOfGridRows();
+    
+    // determine number of AO grid blocks
+    
+    auto nblocks = molecularGrid.getNumberOfGridPoints() / nrows;
+
+    // set up current grid point
+    
+    int32_t igpnt = 0;
+    
+    // loop over grid points blocks
+    
+    if (nblocks > 0)
+    {
+        // allocate AOs grid matrices for bra and ket
+        
+        CDenseMatrix bmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        
+        CDenseMatrix kmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        
+        for (int32_t i = 0; i < nblocks; i++)
+        {
+            _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
+            
+            igpnt += nrows;
+        }
+    }
+    
+    // comopute remaining grid points block
+    
+    nrows = molecularGrid.getNumberOfGridPoints() % nrows;
+    
+    if (nrows > 0)
+    {
+        // allocate AOs grid matrices for bra and ket
+        
+        CDenseMatrix bmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        
+        CDenseMatrix kmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        
+        _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
+    }
     
     // set number of electrons and XC energy
     
@@ -1129,5 +1179,138 @@ CXCIntegrator::_distRestrictedVXCValues(      CAOKohnShamMatrix* aoKohnShamMatri
             }
         }
     }
+}
+
+int32_t
+CXCIntegrator::_getNumberOfGridRows() const
+{
+    // FIX ME: add basis size dependence if needed
     
+    return 10000;
+}
+
+void
+CXCIntegrator::_compGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
+                                     const CGtoContainer*  gtoContainer,
+                                     const CMolecularGrid& molecularGrid,
+                                     const int32_t         gridOffset,
+                                     const int32_t         nGridPoints) const
+{
+    // set up OMP tasks
+    
+    COMPTasks omptaks(3);
+    
+    omptaks.set(nGridPoints);
+    
+    auto ntasks = omptaks.getNumberOfTasks();
+    
+    auto tbsizes = omptaks.getTaskSizes();
+    
+    auto tbpositions = omptaks.getTaskPositions();
+    
+    // set up pointer to molecular grid weigths
+    
+    auto mgx = molecularGrid.getCoordinatesX();
+    
+    auto mgy = molecularGrid.getCoordinatesY();
+    
+    auto mgz = molecularGrid.getCoordinatesZ();
+    
+    // set up GTOs data
+    
+    auto pgaos = gtoMatrix.values();
+    
+    auto nrows = gtoMatrix.getNumberOfRows();
+    
+    auto ncols = gtoMatrix.getNumberOfColumns();
+    
+    // generate density on grid points
+    
+    #pragma omp parallel shared(pgaos, nrows, ncols, tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gridOffset)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+                
+                auto tbsize = tbsizes[i];
+                
+                auto tbposition = tbpositions[i];
+                
+                // generate task
+                
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    _compGtosValuesForLDA(pgaos, nrows, ncols, gtoContainer, mgx, mgy, mgz,
+                                          tbposition + gridOffset, tbsize);
+                }
+            }
+        }
+    }
+}
+
+void
+CXCIntegrator::_compGtosValuesForLDA(      double*        gtoMatrix,
+                                     const int32_t        nRows,
+                                     const int32_t        nColumns,
+                                     const CGtoContainer* gtoContainer,
+                                     const double*        gridCoordinatesX,
+                                     const double*        gridCoordinatesY,
+                                     const double*        gridCoordinatesZ,
+                                     const int32_t        gridOffset,
+                                     const int32_t        nGridPoints) const
+{
+    // local copy of GTOs containers
+    
+    auto gtovec = CGtoContainer(*gtoContainer);
+    
+    // loop over GTOs container data
+    
+    for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+    {
+        auto bgtos = gtovec.getGtoBlock(i);
+        
+        // angular momentum data for bra and ket
+        
+        auto bang = bgtos.getAngularMomentum();
+        
+        // set up Cartesian GTOs buffer
+        
+        auto nvcomp = xcfun_components(xcfun::lda);
+        
+        auto bncart = angmom::to_CartesianComponents(bang);
+        
+        auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+        
+        // set up spherical GTOs buffer
+        
+        auto bnspher = angmom::to_SphericalComponents(bang);
+        
+        CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+        
+        // loop over contracted GTOs
+        
+        for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+        {
+            // compute j-th GTO values on batch of grid points
+            
+            gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                           gridOffset, bgtos, j, xcfun::lda);
+            
+            // distribute j-th GTO values into grid values matrix
+            
+            for (int32_t k = 0; k < bnspher; k++)
+            {
+                auto idx = (bgtos.getIdentifiers(k))[j];
+                
+                auto bgaos = bspherbuff.data(k);
+                
+                for (int32_t l = 0; l < nGridPoints; l++)
+                {
+                    gtoMatrix[l * nColumns + idx] = bgaos[l];
+                }
+            }
+        }
+    }
 }
