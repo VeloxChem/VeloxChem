@@ -379,6 +379,23 @@ class CXCIntegrator
                                const double*        gridCoordinatesZ,
                                const int32_t        gridOffset,
                                const int32_t        nGridPoints) const;
+    
+    /**
+     Computes XC contribution scaled GTOs matrix for spin-restricted LDA case.
+
+     @param ketGtoMatrix the XC contribution scaled GTOs matrix.
+     @param braGtoMatrix the GTOs matrix.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void _compRestrictedVXCMatrixForLDA(      CDenseMatrix&    ketGtoMatrix,
+                                        const CDenseMatrix&    braGtoMatrix,
+                                        const CXCGradientGrid& xcGradientGrid,
+                                        const double*          gridWeights,
+                                        const int32_t          gridOffset,
+                                        const int32_t          nGridPoints) const;
    
 public:
     

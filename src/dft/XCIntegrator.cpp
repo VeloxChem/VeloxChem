@@ -377,6 +377,8 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
         {
             _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
             
+            _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
+            
             igpnt += nrows;
         }
     }
@@ -394,6 +396,8 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
         CDenseMatrix kmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
         
         _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
+        
+        _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows); 
     }
     
     // set number of electrons and XC energy
@@ -1314,3 +1318,40 @@ CXCIntegrator::_compGtosValuesForLDA(      double*        gtoMatrix,
         }
     }
 }
+
+void
+CXCIntegrator::_compRestrictedVXCMatrixForLDA(      CDenseMatrix&    ketGtoMatrix,
+                                              const CDenseMatrix&    braGtoMatrix,
+                                              const CXCGradientGrid& xcGradientGrid,
+                                              const double*          gridWeights, 
+                                              const int32_t          gridOffset,
+                                              const int32_t          nGridPoints) const
+{
+    // set up pointers to GTOs matrices
+    
+    auto kvxc = ketGtoMatrix.values();
+    
+    auto bgao = braGtoMatrix.values();
+    
+    // set up dimensions of GTOs matrices
+    
+    auto ncols = ketGtoMatrix.getNumberOfColumns();
+    
+    // set up pointer to gradient of XC functional
+    
+    auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+    
+    #pragma omp parallel for
+    for (int32_t i = 0; i < nGridPoints; i++)
+    {
+        auto fact = grhoa[gridOffset + i] * gridWeights[gridOffset + i];
+        
+        auto ioff = i * ncols;
+        
+        for (int32_t j = 0; j < ncols; j++)
+        {
+            kvxc[ioff + j] = fact * bgao[ioff + j];
+        }
+    }
+}
+
