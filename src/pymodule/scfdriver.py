@@ -477,7 +477,7 @@ class ScfDriver:
 
         fock_mat = AOFockMatrix(den_mat)
 
-        if self.dft:
+        if self.dft and not self.first_step:
             self.update_fock_type(fock_mat)
 
         if self.rank == mpi_master():
@@ -745,20 +745,20 @@ class ScfDriver:
 
         if self.timing:
             eri_t0 = tm.time()
-            
+
         eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.timing:
             self.timing_dict['fock_2e'].append(tm.time() - eri_t0)
 
-        if self.dft:
+        if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
             if self.timing:
                 vxc_t0 = tm.time()
-            
+
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
             vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
                                        self.xcfun.get_func_label())
@@ -806,12 +806,14 @@ class ScfDriver:
 
         if self.split_comm_ratio is None:
             self.split_comm_ratio = [0.5, 0.25, 0.25]
-            if not self.dft:
-                self.split_comm_ratio = [0.5, 0.0, 0.5]
+            if not (self.dft and not self.first_step):
+                self.split_comm_ratio[0] += self.split_comm_ratio[1]
+                self.split_comm_ratio[1] = 0.0
             if not (self.pe and not self.first_step):
-                self.split_comm_ratio = [0.5, 0.5, 0.0]
+                self.split_comm_ratio[0] += self.split_comm_ratio[2]
+                self.split_comm_ratio[2] = 0.0
 
-        if self.dft:
+        if self.dft and not self.first_step:
             dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
             dft_nodes = max(1, dft_nodes)
         else:
@@ -856,7 +858,7 @@ class ScfDriver:
         if self.rank != mpi_master():
             self.molgrid = MolecularGrid()
             self.V_es = np.zeros(0)
-        if self.dft:
+        if self.dft and not self.first_step:
             if local_comm.Get_rank() == mpi_master():
                 self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
         if self.pe and not self.first_step:
@@ -878,7 +880,7 @@ class ScfDriver:
             vxc_mat = AOKohnShamMatrix()
 
         # collect Vxc to master node
-        if self.dft:
+        if self.dft and not self.first_step:
             if local_comm.Get_rank() == mpi_master():
                 vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
                                 cross_comm, 1)
@@ -954,7 +956,7 @@ class ScfDriver:
             e_ee = fock_mat.get_energy(0, den_mat, 0)
             e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
             e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
-            if self.dft:
+            if self.dft and not self.first_step:
                 e_ee += vxc_mat.get_energy()
             if self.pe and not self.first_step:
                 e_ee += e_pe
@@ -985,7 +987,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
-            if self.dft:
+            if self.dft and not self.first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
             if self.pe and not self.first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
