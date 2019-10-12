@@ -269,7 +269,12 @@ class ScfDriver:
 
         # set up timing data
         if self.timing:
-            self.timing_dict = {'fock_2e': [], 'dft_vxc': [], 'fock_diag': []}
+            self.timing_dict = {
+                'fock_2e': [],
+                'dft_vxc': [],
+                'fock_diag': [],
+                'pol_embed': []
+            }
 
         # check dft setup
         if self.dft:
@@ -509,7 +514,7 @@ class ScfDriver:
 
             self.store_diis_data(i, fock_mat, den_mat)
 
-            if self.timing:
+            if self.timing and not self.first_step:
                 diag_t0 = tm.time()
 
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
@@ -518,7 +523,7 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
-            if self.timing:
+            if self.timing and not self.first_step:
                 self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
 
             if tm.time() - self.checkpoint_time > 900.0:
@@ -743,34 +748,30 @@ class ScfDriver:
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         xc_drv = XCIntegrator(self.comm)
 
-        if self.timing:
+        if self.timing and not self.first_step:
             eri_t0 = tm.time()
 
         eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
-        if self.timing:
+        if self.timing and not self.first_step:
             self.timing_dict['fock_2e'].append(tm.time() - eri_t0)
+            vxc_t0 = tm.time()
 
         if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
-            if self.timing:
-                vxc_t0 = tm.time()
-
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
             vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
-
-            if self.timing:
-                self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
         else:
             vxc_mat = None
 
-            if self.timing:
-                self.timing_dict['dft_vxc'].append(0.0)
+        if self.timing and not self.first_step:
+            self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
+            pe_t0 = tm.time()
 
         if self.pe and not self.first_step:
             from .polembed import PolEmbed
@@ -781,6 +782,9 @@ class ScfDriver:
             self.pe_summary = pe_drv.cppe_state.summary_string
         else:
             e_pe, V_pe = 0.0, None
+
+        if self.timing and not self.first_step:
+            self.timing_dict['pol_embed'].append(tm.time() - pe_t0)
 
         return vxc_mat, e_pe, V_pe
 
@@ -1549,7 +1553,7 @@ class ScfDriver:
 
     def print_timing(self):
         """
-            Prints timing breakdown for the scf driver.
+        Prints timing breakdown for the scf driver.
         """
 
         width = 92
@@ -1558,19 +1562,24 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(width))
         self.ostream.print_header(('-' * len(valstr)).ljust(width))
 
-        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format(
-            '', 'Fock 2E Part', 'XC Part', 'Diag. Part')
+        valstr = '{:<15s} {:>15s}'.format('', 'Fock 2E Part')
+        if self.dft:
+            valstr += ' {:>15s}'.format('XC Part')
+        if self.pe:
+            valstr += ' {:>15s}'.format('PE Part')
+        valstr += ' {:>15s}'.format('Diag. Part')
         self.ostream.print_header(valstr.ljust(width))
 
-        for i, (a, b, c) in enumerate(
-                zip(self.timing_dict['fock_2e'], self.timing_dict['dft_vxc'],
-                    self.timing_dict['fock_diag'])):
+        for i in range(len(self.timing_dict['fock_2e'])):
 
             title = 'Iteration {:<5d}'.format(i)
-            valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
-            self.ostream.print_header(valstr.ljust(width))
-
-            valstr = '---------'
+            valstr = '{:<15s} {:15.3f}'.format(title,
+                                               self.timing_dict['fock_2e'][i])
+            if self.dft:
+                valstr += ' {:15.3f}'.format(self.timing_dict['dft_vxc'][i])
+            if self.pe:
+                valstr += ' {:15.3f}'.format(self.timing_dict['pol_embed'][i])
+            valstr += ' {:15.3f}'.format(self.timing_dict['fock_diag'][i])
             self.ostream.print_header(valstr.ljust(width))
 
         self.ostream.print_blank()
