@@ -419,6 +419,8 @@ CAOKohnShamMatrix::getString() const
 
     ksmat_str += "Exchange-correlation energy: " + std::to_string(_xcEnergy) + "\n";
     
+    ksmat_str += "Number of electrons: " + std::to_string(_xcElectrons) + "\n";
+    
     if (_xcRestricted)
     {
         ksmat_str += "Total Kohn-Sham matrix: \n";

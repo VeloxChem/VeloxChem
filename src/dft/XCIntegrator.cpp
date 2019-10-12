@@ -1392,7 +1392,7 @@ CXCIntegrator::_compEnergyAndDensity(const CXCGradientGrid& xcGradientGrid,
     #pragma omp parallel
     for (int32_t i = 0; i < gpoints; i++)
     {
-         xcene += gw[i] * (rhoa[i] + rhob[i]);
+        nele += gw[i] * (rhoa[i] + rhob[i]);
         
         xcene += gw[i] * efunc[i];
     }
