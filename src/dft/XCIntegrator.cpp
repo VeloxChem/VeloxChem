@@ -350,11 +350,7 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     
     // set up pointer to Kohn-Sham matrix
     
-    auto ksmat = aoKohnShamMatrix.getKohnSham(); 
-    
-    // initialize number of electrons and XC energy
-    
-    double xcele = 0.0, xcene = 0.0;
+    auto ksmat = aoKohnShamMatrix.getKohnSham();
     
     // set number of rows in grid block matrix
     
@@ -409,11 +405,13 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
         denblas::multAtB(ksmat, 1.0, bmat, kmat);
     }
     
-    // set number of electrons and XC energy
+    // compute exchange-correlation energy and number of electrons
     
-    aoKohnShamMatrix.setNumberOfElectrons(xcele);
+    auto xcdat = _compEnergyAndDensity(xcGradientGrid, densityGrid, molecularGrid);
     
-    aoKohnShamMatrix.setExchangeCorrelationEnergy(xcene);
+    aoKohnShamMatrix.setExchangeCorrelationEnergy(std::get<0>(xcdat));
+    
+    aoKohnShamMatrix.setNumberOfElectrons(std::get<1>(xcdat));
 }
 
 void
@@ -1239,7 +1237,7 @@ CXCIntegrator::_compGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
     
     // generate density on grid points
     
-    #pragma omp parallel shared(pgaos, nrows, ncols, tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gridOffset)
+    #pragma omp parallel shared(pgaos, nrows, ncols, tbsizes, tbpositions, ntasks, mgx, mgy, mgz)
     {
         #pragma omp single nowait
         {
@@ -1362,6 +1360,44 @@ CXCIntegrator::_compRestrictedVXCMatrixForLDA(      CDenseMatrix&    ketGtoMatri
             kvxc[ioff + j] = fact * bgao[ioff + j];
         }
     }
+}
+
+std::tuple<double, double>
+CXCIntegrator::_compEnergyAndDensity(const CXCGradientGrid& xcGradientGrid,
+                                     const CDensityGrid&    densityGrid,
+                                     const CMolecularGrid&  molecularGrid) const
+{
+    // set up pointers to density grid
+    
+    auto rhoa = densityGrid.alphaDensity(0);
+    
+    auto rhob = densityGrid.betaDensity(0);
+    
+    // set up pointer to exchange-correlation energy grid
+    
+    auto efunc = xcGradientGrid.xcFunctionalValues();
+    
+    // set up pointer to grid weights
+    
+    auto gw = molecularGrid.getWeights();
+    
+    // set up number of grid points
+    
+    auto gpoints = molecularGrid.getNumberOfGridPoints();
+    
+    // initialize exchange-correlation energy and gradient
+    
+    double xcene = 0.0, nele = 0.0;
+
+    #pragma omp parallel
+    for (int32_t i = 0; i < gpoints; i++)
+    {
+         xcene += gw[i] * (rhoa[i] + rhob[i]);
+        
+        xcene += gw[i] * efunc[i];
+    }
+    
+    return std::make_tuple(xcene, nele);
 }
 
 

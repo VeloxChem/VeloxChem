@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <string>
+#include <tuple>
 
 #include "mpi.h"
 
@@ -396,6 +397,19 @@ class CXCIntegrator
                                         const double*          gridWeights,
                                         const int32_t          gridOffset,
                                         const int32_t          nGridPoints) const;
+    
+    
+    /**
+     Computes exchange-correlation energy and number of electrons for given density grid.
+
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param densityGrid the density grid.
+     @param molecularGrid the molecular grid.
+     @return the tuple (exchange-correlation energy, number of electrons). 
+     */
+    std::tuple<double, double> _compEnergyAndDensity(const CXCGradientGrid& xcGradientGrid,
+                                                     const CDensityGrid&    densityGrid,
+                                                     const CMolecularGrid&  molecularGrid) const;
    
 public:
     
