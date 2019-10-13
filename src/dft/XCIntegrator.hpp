@@ -369,6 +369,7 @@ class CXCIntegrator
      @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
      @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
      @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid. 
      @param nGridPoints the number of grid points in grid points batch.
      */
     void _compGtosValuesForLDA(      double*        gtoMatrix,
@@ -379,6 +380,7 @@ class CXCIntegrator
                                const double*        gridCoordinatesY,
                                const double*        gridCoordinatesZ,
                                const int32_t        gridOffset,
+                               const int32_t        gridBlockPosition,
                                const int32_t        nGridPoints) const;
     
     /**

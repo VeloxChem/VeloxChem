@@ -1276,7 +1276,7 @@ CXCIntegrator::_compGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _compGtosValuesForLDA(pgaos, nrows, ncols, gtoContainer, mgx, mgy, mgz,
-                                          tbposition + gridOffset, tbsize);
+                                          gridOffset, tbposition, tbsize);
                 }
             }
         }
@@ -1292,6 +1292,7 @@ CXCIntegrator::_compGtosValuesForLDA(      double*        gtoMatrix,
                                      const double*        gridCoordinatesY,
                                      const double*        gridCoordinatesZ,
                                      const int32_t        gridOffset,
+                                     const int32_t        gridBlockPosition,
                                      const int32_t        nGridPoints) const
 {
     // local copy of GTOs containers
@@ -1329,7 +1330,7 @@ CXCIntegrator::_compGtosValuesForLDA(      double*        gtoMatrix,
             // compute j-th GTO values on batch of grid points
             
             gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
-                                           gridOffset, bgtos, j, xcfun::lda);
+                                           gridBlockPosition + gridOffset, bgtos, j, xcfun::lda);
             
             // distribute j-th GTO values into grid values matrix
             
@@ -1339,9 +1340,11 @@ CXCIntegrator::_compGtosValuesForLDA(      double*        gtoMatrix,
                 
                 auto bgaos = bspherbuff.data(k);
                 
+                auto loff = gridBlockPosition * nColumns; 
+                
                 for (int32_t l = 0; l < nGridPoints; l++)
                 {
-                    gtoMatrix[l * nColumns + idx] = bgaos[l];
+                    gtoMatrix[loff + l * nColumns + idx] = bgaos[l];
                 }
             }
         }
