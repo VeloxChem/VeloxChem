@@ -51,10 +51,10 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         
         // temporary test for matrix driven approach to computation Kohn-Sham matrix 
         
-        //if (fvxc.getFunctionalType() == xcfun::lda)
-        //{
-        //    return integrate_m3(aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
-        //}
+        if (fvxc.getFunctionalType() == xcfun::lda)
+        {
+            return integrate_m3(aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+        }
     
         // create GTOs container
     
@@ -363,13 +363,7 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     // set up current grid point
     
     int32_t igpnt = 0;
-    
-    // testing overlap  value
-    
-    auto gw = molecularGrid.getWeights();
-    
-    double fovl = 0.0;
-    
+      
     // loop over grid points blocks
     
     if (nblocks > 0)
@@ -383,13 +377,6 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
         for (int32_t i = 0; i < nblocks; i++)
         {
             _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
-            
-            auto gao = bmat.values();
-            
-            for (int32_t j = 0; j < nrows; j++)
-            {
-                fovl += gw[igpnt + j] * gao[j] * gao[j];
-            }
             
             _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
             
@@ -413,19 +400,10 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
         
         _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
         
-        auto gao = bmat.values();
-        
-        for (int32_t j = 0; j < nrows; j++)
-        {
-            fovl += gw[igpnt + j] * gao[j] * gao[j];
-        }
-        
         _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
         
         denblas::multAtB(ksmat, 1.0, bmat, kmat);
     }
-    
-    printf("Overlap (0,0) = %lf\n", fovl); 
     
     // compute exchange-correlation energy and number of electrons
     
