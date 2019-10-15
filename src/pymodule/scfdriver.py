@@ -300,6 +300,10 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_header()
+            valstr = "Nuclear repulsion energy: {:.10f} au".format(
+                self.nuc_energy)
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
 
         # generate integration grid
         if self.dft:
