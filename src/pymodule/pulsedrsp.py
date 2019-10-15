@@ -402,9 +402,21 @@ class PulsedResponse:
         results['properties_zeropad'] = zero_padded_results
 
         # Zero pad the amplitudes as well
-        num_zeros = len(self.zero_pad_freqs) - len(self.amplitudes)
-        zeros = [0 for x in range(num_zeros)]
-        self.zero_padded_amplitudes = np.array(zeros + self.amplitudes.tolist())
+        dw = self.truncated_freqs[1] - self.truncated_freqs[0]
+
+        # Find the number of zeros before the truncated pulse
+        prepended_zeros = int(self.truncated_freqs[0]/dw) + 1  # for zero
+
+        # Find the number of zeros truncated at the end
+        appended_zeros = (len(self.zero_pad_freqs) - len(self.amplitudes)
+                          - prepended_zeros)
+
+        # Assemble the array of amplitudes that matches the frequency array
+        pre_zeros = [0 for x in range(prepended_zeros)]
+        app_zeros = [0 for x in range(appended_zeros)]
+        self.zero_padded_amplitudes = np.array(pre_zeros
+                                               + self.amplitudes.tolist()
+                                               + app_zeros)
 
         return results
 
